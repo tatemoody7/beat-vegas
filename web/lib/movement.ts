@@ -27,7 +27,7 @@ export async function getMovementGames(season: number): Promise<MovementGame[]> 
            COUNT(*) AS snaps
     FROM games g JOIN odds_snapshots o ON o.game_id = g.id
     WHERE g.season = ${season} AND o.market = '1H_total'
-    GROUP BY g.id HAVING snaps > 1 ORDER BY g.week
+    GROUP BY g.id HAVING COUNT(*) > 1 ORDER BY g.week
   `;
   return rows.map((r) => ({
     id: Number(r.id),

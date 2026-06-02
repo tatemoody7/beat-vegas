@@ -3,20 +3,20 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model games {
-  id                     Int              @id @unique(map: "sqlite_autoindex_games_1") @default(autoincrement())
+  id                     Int              @id(map: "uq_game_id") @default(autoincrement())
   season                 Int
   week                   Int
-  season_type            String?
-  start_date             DateTime?
+  season_type            String?          @db.VarChar
+  start_date             DateTime?        @db.Timestamp(6)
   neutral_site           Boolean?
   venue_id               Int?
-  home_team              String?
-  away_team              String?
+  home_team              String?          @db.VarChar
+  away_team              String?          @db.VarChar
   home_team_id           Int?
   away_team_id           Int?
   home_points            Int?
@@ -24,9 +24,9 @@ model games {
   home_first_half_points Int?
   away_first_half_points Int?
   first_half_total       Int?
-  first_half_source      String?
+  first_half_source      String?          @db.VarChar
   full_game_total        Float?
-  full_game_total_book   String?
+  full_game_total_book   String?          @db.VarChar
   venues                 venues?          @relation(fields: [venue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   manual_picks           manual_picks[]
   odds_snapshots         odds_snapshots[]
@@ -45,23 +45,23 @@ model manual_picks {
   game_id                 Int?
   season                  Int?
   week                    Int?
-  home_team               String?
-  away_team               String?
-  side                    String?
+  home_team               String?   @db.VarChar
+  away_team               String?   @db.VarChar
+  side                    String?   @db.VarChar
   line                    Float?
   price                   Int?
   stake                   Float?
-  book                    String?
-  placed_at               DateTime?
-  note                    String?
+  book                    String?   @db.VarChar
+  placed_at               DateTime? @db.Timestamp(6)
+  note                    String?   @db.VarChar
+  model_score_at_pick     Int?
+  model_line_at_pick      Float?
   graded                  Boolean?
   actual_first_half_total Int?
-  result                  String?
+  result                  String?   @db.VarChar
   units                   Float?
   closing_line            Float?
   clv                     Float?
-  model_score_at_pick     Int?
-  model_line_at_pick      Float?
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([season], map: "ix_manual_picks_season")
@@ -70,12 +70,12 @@ model manual_picks {
 
 model model_runs {
   id           Int       @id @default(autoincrement())
-  version      String?
-  train_window String?
-  test_window  String?
-  metrics_json String?
-  notes        String?
-  created_at   DateTime?
+  version      String?   @db.VarChar
+  train_window String?   @db.VarChar
+  test_window  String?   @db.VarChar
+  metrics_json String?   @db.VarChar
+  notes        String?   @db.VarChar
+  created_at   DateTime? @db.Timestamp(6)
 
   @@index([version], map: "ix_model_runs_version")
 }
@@ -83,12 +83,12 @@ model model_runs {
 model odds_snapshots {
   id          Int       @id @default(autoincrement())
   game_id     Int?
-  book        String?
-  market      String?
+  book        String?   @db.VarChar
+  market      String?   @db.VarChar
   line        Float?
   over_price  Int?
   under_price Int?
-  captured_at DateTime?
+  captured_at DateTime? @db.Timestamp(6)
   games       games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([captured_at], map: "ix_odds_snapshots_captured_at")
@@ -98,14 +98,14 @@ model odds_snapshots {
 model predictions {
   id                         Int       @id @default(autoincrement())
   game_id                    Int?
-  model_version              String?
+  model_version              String?   @db.VarChar
   under_probability          Float?
+  under_score                Int?
   projected_first_half_total Float?
   line_used                  Float?
   rank                       Int?
-  created_at                 DateTime?
-  under_score                Int?
-  factors_json               String?
+  factors_json               String?   @db.VarChar
+  created_at                 DateTime? @db.Timestamp(6)
   games                      games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([game_id], map: "ix_predictions_game_id")
@@ -115,10 +115,10 @@ model predictions {
 model results {
   id                      Int      @id @default(autoincrement())
   game_id                 Int?
-  model_version           String?
+  model_version           String?  @db.VarChar
   actual_first_half_total Int?
   line_used               Float?
-  line_kind               String?
+  line_kind               String?  @db.VarChar
   under_hit               Boolean?
   closing_line            Float?
   clv                     Float?
@@ -133,13 +133,13 @@ model team_tempo {
   id               Int       @id @default(autoincrement())
   season           Int?
   week             Int?
-  team             String?
+  team             String?   @db.VarChar
   seconds_per_play Float?
   plays_per_game   Float?
-  as_of_date       String?
-  captured_at      DateTime?
+  as_of_date       String?   @db.VarChar
+  captured_at      DateTime? @db.Timestamp(6)
 
-  @@unique([season, week, team], map: "sqlite_autoindex_team_tempo_1")
+  @@unique([season, week, team], map: "uq_tempo_week")
   @@index([team], map: "ix_team_tempo_team")
   @@index([season], map: "ix_team_tempo_season")
   @@index([week], map: "ix_team_tempo_week")
@@ -149,7 +149,7 @@ model team_week_features {
   id                Int    @id @default(autoincrement())
   season            Int
   week              Int
-  team              String
+  team              String @db.VarChar
   seconds_per_play  Float?
   plays_per_game    Float?
   off_success_rate  Float?
@@ -167,7 +167,7 @@ model team_week_features {
   sp_defense        Float?
   run_rate          Float?
 
-  @@unique([season, week, team], map: "sqlite_autoindex_team_week_features_1")
+  @@unique([season, week, team], map: "uq_team_week")
   @@index([season], map: "ix_team_week_features_season")
   @@index([team], map: "ix_team_week_features_team")
   @@index([week], map: "ix_team_week_features_week")
@@ -175,17 +175,17 @@ model team_week_features {
 
 model teams {
   id         Int     @id @default(autoincrement())
-  school     String
-  conference String?
+  school     String  @db.VarChar
+  conference String? @db.VarChar
 
   @@index([school], map: "ix_teams_school")
 }
 
 model venues {
   id        Int      @id @default(autoincrement())
-  name      String?
-  city      String?
-  state     String?
+  name      String?  @db.VarChar
+  city      String?  @db.VarChar
+  state     String?  @db.VarChar
   latitude  Float?
   longitude Float?
   dome      Boolean?
@@ -193,7 +193,7 @@ model venues {
 }
 
 model weather {
-  game_id       Int      @id @default(autoincrement())
+  game_id       Int      @id
   temperature_f Float?
   wind_mph      Float?
   precipitation Float?

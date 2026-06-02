@@ -1,0 +1,123 @@
+import { prisma } from "@/lib/prisma";
+
+// Port of the 3-way Ledger in beatvegas/dashboard/app.py (market vs model vs you).
+// Market = under vs real closing line (results.model_version='market');
+// Model = the model's leans (results.model_version='gbm_v1');
+// You = graded manual_picks.
+
+export type Record3 = {
+  record: string; // e.g. "6-6" or "2-3" or "5-4-1P"
+  hit: string; // "50.0%" or "—"
+  units: string; // signed, "+0.91" / "-0.55"
+  clv: string; // signed mean, or "—"
+};
+
+export type PickRow = {
+  week: number | null;
+  away: string | null;
+  home: string | null;
+  line: number | null;
+  price: number | null;
+  result: string | null; // under / over / push / pending
+  units: number | null;
+  clv: number | null;
+  graded: boolean;
+};
+
+export type Ledger = {
+  market: Record3 | null;
+  model: Record3 | null;
+  you: Record3 | null;
+  picks: PickRow[];
+};
+
+const signed = (n: number, dp = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
+const truthy = (v: unknown) => v === true || Number(v) === 1;
+
+// app.py::_record — wins/decided/pushes, hit%, summed units, mean non-null CLV.
+function record(
+  wins: number,
+  decided: number,
+  pushes: number,
+  unitsSum: number,
+  clvs: number[],
+): Record3 {
+  const losses = decided - wins;
+  return {
+    record: `${wins}-${losses}${pushes ? `-${pushes}P` : ""}`,
+    hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
+    units: signed(unitsSum),
+    clv: clvs.length ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length) : "—",
+  };
+}
+
+type ResRow = {
+  model_version: string | null;
+  under_hit: number | boolean | null;
+  units: number | null;
+  clv: number | null;
+};
+type RawPick = {
+  graded: number | boolean | null;
+  result: string | null;
+  units: number | null;
+  clv: number | null;
+  week: number | bigint | null;
+  line: number | null;
+  price: number | bigint | null;
+  away_team: string | null;
+  home_team: string | null;
+};
+
+// results have no push concept (under_hit is a bool), matching app.py which
+// passes no push_series for market/model.
+function fromResults(rows: ResRow[]): Record3 | null {
+  if (rows.length === 0) return null;
+  const wins = rows.filter((r) => truthy(r.under_hit)).length;
+  const unitsSum = rows.reduce((a, r) => a + (r.units ?? 0), 0);
+  const clvs = rows.filter((r) => r.clv !== null).map((r) => r.clv as number);
+  return record(wins, rows.length, 0, unitsSum, clvs);
+}
+
+export async function getLedger(season: number): Promise<Ledger> {
+  const res = await prisma.$queryRaw<ResRow[]>`
+    SELECT r.model_version, r.under_hit, r.units, r.clv
+    FROM results r JOIN games g ON g.id = r.game_id
+    WHERE g.season = ${season}
+  `;
+  const mine = await prisma.$queryRaw<RawPick[]>`
+    SELECT graded, result, units, clv, week, line, price, away_team, home_team
+    FROM manual_picks WHERE season = ${season}
+  `;
+
+  const market = fromResults(res.filter((r) => r.model_version === "market"));
+  const model = fromResults(res.filter((r) => r.model_version === "gbm_v1"));
+
+  const graded = mine.filter((p) => truthy(p.graded));
+  let you: Record3 | null = null;
+  if (graded.length) {
+    const wins = graded.filter((p) => p.result === "under").length;
+    const pushes = graded.filter((p) => p.result === "push").length;
+    const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
+    const clvs = graded.filter((p) => p.clv !== null).map((p) => p.clv as number);
+    you = record(wins, graded.length - pushes, pushes, unitsSum, clvs);
+  }
+
+  const picks: PickRow[] = mine.map((p) => ({
+    week: p.week === null ? null : Number(p.week),
+    away: p.away_team,
+    home: p.home_team,
+    line: p.line,
+    price: p.price === null ? null : Number(p.price),
+    result: truthy(p.graded) ? p.result : "pending",
+    units: p.units,
+    clv: p.clv,
+    graded: truthy(p.graded),
+  }));
+  // pending first, then by week
+  picks.sort(
+    (a, b) => Number(a.graded) - Number(b.graded) || (a.week ?? 0) - (b.week ?? 0),
+  );
+
+  return { market, model, you, picks };
+}

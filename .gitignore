@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/*.db
+data/*.db-journal
+data/*.log
+data/cache/
+# Node / Next.js (web/ app, added in later phases)
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+*.egg-info/
+.pytest_cache/
+config.yaml
+.DS_Store

@@ -1,0 +1,36 @@
+# Copy to config.yaml and fill in. config.yaml is gitignored (keeps your key private).
+# You can also set CFBD_API_KEY in the environment instead of putting it here.
+
+cfbd:
+  # Free key: https://collegefootballdata.com/key
+  api_key: ""            # or leave blank and export CFBD_API_KEY=...
+  base_url: "https://api.collegefootballdata.com"
+
+database:
+  path: "data/beatvegas.db"
+
+backfill:
+  start_season: 2015
+  end_season: 2024
+  # 'regular' or 'both' (regular + postseason)
+  season_type: "regular"
+
+proxy_line:
+  # Fallback ratio used before empirical calibration runs.
+  # 1H total ~= ratio * full-game total. Calibrated by etl/proxy_line.py.
+  default_ratio: 0.52
+
+odds_api:
+  # Free key (500 req/month): https://the-odds-api.com/  (or export ODDS_API_KEY)
+  api_key: ""
+  base_url: "https://api.the-odds-api.com/v4"
+  sport: "americanfootball_ncaaf"
+  regions: "us"               # us, us2, uk, eu, au
+  markets: "totals_h1"        # first-half totals
+  odds_format: "american"
+  # Optional whitelist of bookmaker keys (empty = all available).
+  books: []
+
+alerts:
+  imessage_to: ""        # phone/email handle for iMessage alerts (Phase 3)
+  line_move_threshold: 1.0

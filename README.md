@@ -104,6 +104,57 @@ games kicking off within `--days-ahead` (default 8). Games with no posted 1H
 market cost 0 credits. A ~10-game Saturday slate polled daily for its game-week
 ≈ well under 500/month. Widen/narrow with `--days-ahead` and `--max-events`.
 
+## Web app (Next.js → Vercel + Neon)
+
+The product face is a Next.js app in `web/` (App Router + TypeScript + Tailwind +
+Prisma + Recharts), deployed on **Vercel**, reading/writing a **Neon Postgres**
+database, behind a simple password gate. Views: Opportunities, Line Study,
+Movement, Ledger, Research, and writable My Picks. The Streamlit dashboard
+remains for local quick-views; it is not deployed.
+
+**Architecture:** Neon Postgres is the single source of truth. The local Python
+engine (`run_daily.sh` etc.) writes to Neon; the Vercel app reads it and writes
+manual picks. `web/lib/*.ts` port the Streamlit SQL/scoring; API routes under
+`web/app/api/` mirror those queries.
+
+### Local dev
+```bash
+cd web
+npm install
+npm run dev            # http://localhost:3000
+```
+`web/.env` holds `DATABASE_URL` (gitignored). It currently points at **Neon**, so
+what you see locally is the live production data — and Postgres-specific issues
+surface *before* you push. Leave `APP_PASSWORD` unset locally to keep the gate
+off; set it to require the login. (To dev fully offline, point `DATABASE_URL` at
+`file:../../data/demo.db` and set the Prisma datasource `provider` back to
+`sqlite`.)
+
+### Deploy loop
+1. Edit code in `web/`, test with `npm run dev`.
+2. Commit and **push to `main`** → Vercel auto-builds (`prisma generate &&
+   next build`) and deploys to production (**https://beat-vegas.vercel.app**) in
+   ~1 minute. Pushing any *other* branch makes a Preview URL, not production.
+3. Live env vars (Vercel → Settings → Environment Variables): `DATABASE_URL`
+   (Neon) and `APP_PASSWORD` (the login).
+
+**Gotchas:**
+- **Commit author must be GitHub-linked.** Vercel blocks deploys whose commit
+  author email isn't tied to the repo's GitHub account. This repo's git author is
+  set to the GitHub noreply email — keep it that way (`git config user.email`).
+- **Schema changes start in Python** (it owns the SQLAlchemy schema): edit
+  `beatvegas/db/models.py` + migrations, run against Neon, then
+  `cd web && npx prisma db pull && npx prisma generate`, then push.
+- **Fresh data** (predictions, lines, grades) comes from the local engine writing
+  to Neon, which needs a network allowing outbound Postgres (port 5432). Some
+  campus/corporate networks let the TCP connect but drop the data path — run the
+  daily chain off such networks (home/hotspot). The deployed site is unaffected.
+
+### One-time data migration (SQLite → Neon)
+```bash
+DATABASE_URL="postgresql://…neon…" python scripts/migrate_to_postgres.py --sqlite data/demo.db --wipe
+```
+
 ## Data sources (all free)
 - **CollegeFootballData** — games, line scores, play-by-play, advanced stats, SP+, full-game lines, venues
 - **TeamRankings** — tempo (seconds/play), 1Q/1H scoring (Phase 1 enrichment)
@@ -123,7 +174,9 @@ launchctl load ~/Library/LaunchAgents/com.beatvegas.daily.plist
 # stop it later:  launchctl unload ~/Library/LaunchAgents/com.beatvegas.daily.plist
 ```
 Caveats: only runs while the Mac is awake; first run may prompt to allow Messages
-automation; logs to `data/run_daily.log`.
+automation; logs to `data/run_daily.log`. If a root `.env` with `DATABASE_URL` is
+present, the live chain writes to **Neon** (the same DB the Vercel app reads);
+otherwise local SQLite. `--dry-run` always stays on `data/demo.db`.
 
 **Weekly loop pieces** (also runnable individually):
 `weekly_update.py` (score + log model picks) · `grade.py` (grade market + model) ·

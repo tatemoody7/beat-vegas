@@ -60,6 +60,8 @@ model manual_picks {
   units                   Float?
   closing_line            Float?
   clv                     Float?
+  model_score_at_pick     Int?
+  model_line_at_pick      Float?
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([season], map: "ix_manual_picks_season")

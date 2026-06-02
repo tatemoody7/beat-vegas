@@ -40,6 +40,9 @@ export default function RootLayout({
             <Link href="/research" className="hover:text-gray-100">
               Research
             </Link>
+            <Link href="/picks" className="hover:text-gray-100">
+              My Picks
+            </Link>
           </nav>
         </header>
         <main className="flex-1 px-6 py-6">{children}</main>

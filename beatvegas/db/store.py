@@ -14,6 +14,7 @@ from .models import Base
 # New columns added after first release; ALTER existing tables idempotently.
 _MIGRATIONS = {
     "predictions": {"under_score": "INTEGER", "factors_json": "TEXT"},
+    "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
 }
 
 _engine = None

@@ -180,7 +180,11 @@ class ManualPick(Base):
     stake = Column(Float, default=1.0)
     book = Column(String)
     placed_at = Column(DateTime)
-    note = Column(String)
+    note = Column(String)                        # your reason — for later review
+
+    # Snapshot of the model's read at log time (frozen; survives re-scoring).
+    model_score_at_pick = Column(Integer)
+    model_line_at_pick = Column(Float)
 
     # Filled by `pick.py grade`.
     graded = Column(Boolean, default=False)

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { gateEnabled } from "@/lib/auth";
+import LogoutButton from "@/app/components/LogoutButton";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -44,6 +46,11 @@ export default function RootLayout({
               My Picks
             </Link>
           </nav>
+          {gateEnabled() && (
+            <div className="ml-auto">
+              <LogoutButton />
+            </div>
+          )}
         </header>
         <main className="flex-1 px-6 py-6">{children}</main>
       </body>

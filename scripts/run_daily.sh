@@ -11,13 +11,23 @@ cd "$REPO" || exit 1
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
+# Load gitignored secrets (DATABASE_URL -> Neon) so the live chain writes to the
+# same DB the Vercel app reads. Absent -> falls back to local SQLite.
+set -a
+# shellcheck disable=SC1091
+[ -f "$REPO/.env" ] && . "$REPO/.env"
+set +a
+
 DRY=0
 POLL_ARGS=()
 if [ "${1:-}" = "--dry-run" ]; then
   DRY=1
+  unset DATABASE_URL            # dry-run stays on the local demo DB, never Neon
   export BEATVEGAS_DB=data/demo.db
   POLL_ARGS+=(--dry-run-alerts)
 fi
+
+if [ -n "${DATABASE_URL:-}" ]; then DBTARGET="Neon Postgres"; else DBTARGET="sqlite:${BEATVEGAS_DB:-data/beatvegas.db}"; fi
 
 LOG="$REPO/data/run_daily.log"
 ts() { date "+%Y-%m-%d %H:%M:%S"; }
@@ -29,7 +39,7 @@ step() {  # step "label" cmd...
 
 read -r SEASON WEEK < <(python -c "from beatvegas.season import active; s,w=active(); print(s, w if w else '')")
 if [ "$DRY" = "1" ]; then SEASON=2025; WEEK=8; fi
-log "run_daily start season=$SEASON week=${WEEK:-none} dry=$DRY"
+log "run_daily start season=$SEASON week=${WEEK:-none} dry=$DRY db=$DBTARGET"
 
 if [ "$DRY" != "1" ]; then
   step "backfill" python scripts/backfill.py --season "$SEASON"

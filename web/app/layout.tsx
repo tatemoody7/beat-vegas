@@ -31,6 +31,9 @@ export default function RootLayout({
             <Link href="/line-study" className="hover:text-gray-100">
               Line Study
             </Link>
+            <Link href="/movement" className="hover:text-gray-100">
+              Movement
+            </Link>
             <Link href="/ledger" className="hover:text-gray-100">
               Ledger
             </Link>

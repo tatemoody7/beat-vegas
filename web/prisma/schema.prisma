@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model games {
+  id                     Int              @id @unique(map: "sqlite_autoindex_games_1") @default(autoincrement())
+  season                 Int
+  week                   Int
+  season_type            String?
+  start_date             DateTime?
+  neutral_site           Boolean?
+  venue_id               Int?
+  home_team              String?
+  away_team              String?
+  home_team_id           Int?
+  away_team_id           Int?
+  home_points            Int?
+  away_points            Int?
+  home_first_half_points Int?
+  away_first_half_points Int?
+  first_half_total       Int?
+  first_half_source      String?
+  full_game_total        Float?
+  full_game_total_book   String?
+  venues                 venues?          @relation(fields: [venue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manual_picks           manual_picks[]
+  odds_snapshots         odds_snapshots[]
+  predictions            predictions[]
+  results                results[]
+  weather                weather?
+
+  @@index([week], map: "ix_games_week")
+  @@index([season], map: "ix_games_season")
+  @@index([home_team], map: "ix_games_home_team")
+  @@index([away_team], map: "ix_games_away_team")
+}
+
+model manual_picks {
+  id                      Int       @id @default(autoincrement())
+  game_id                 Int?
+  season                  Int?
+  week                    Int?
+  home_team               String?
+  away_team               String?
+  side                    String?
+  line                    Float?
+  price                   Int?
+  stake                   Float?
+  book                    String?
+  placed_at               DateTime?
+  note                    String?
+  graded                  Boolean?
+  actual_first_half_total Int?
+  result                  String?
+  units                   Float?
+  closing_line            Float?
+  clv                     Float?
+  games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([season], map: "ix_manual_picks_season")
+  @@index([game_id], map: "ix_manual_picks_game_id")
+}
+
+model model_runs {
+  id           Int       @id @default(autoincrement())
+  version      String?
+  train_window String?
+  test_window  String?
+  metrics_json String?
+  notes        String?
+  created_at   DateTime?
+
+  @@index([version], map: "ix_model_runs_version")
+}
+
+model odds_snapshots {
+  id          Int       @id @default(autoincrement())
+  game_id     Int?
+  book        String?
+  market      String?
+  line        Float?
+  over_price  Int?
+  under_price Int?
+  captured_at DateTime?
+  games       games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([captured_at], map: "ix_odds_snapshots_captured_at")
+  @@index([game_id], map: "ix_odds_snapshots_game_id")
+}
+
+model predictions {
+  id                         Int       @id @default(autoincrement())
+  game_id                    Int?
+  model_version              String?
+  under_probability          Float?
+  projected_first_half_total Float?
+  line_used                  Float?
+  rank                       Int?
+  created_at                 DateTime?
+  under_score                Int?
+  factors_json               String?
+  games                      games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([game_id], map: "ix_predictions_game_id")
+  @@index([model_version], map: "ix_predictions_model_version")
+}
+
+model results {
+  id                      Int      @id @default(autoincrement())
+  game_id                 Int?
+  model_version           String?
+  actual_first_half_total Int?
+  line_used               Float?
+  line_kind               String?
+  under_hit               Boolean?
+  closing_line            Float?
+  clv                     Float?
+  units                   Float?
+  games                   games?   @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([game_id], map: "ix_results_game_id")
+  @@index([model_version], map: "ix_results_model_version")
+}
+
+model team_tempo {
+  id               Int       @id @default(autoincrement())
+  season           Int?
+  week             Int?
+  team             String?
+  seconds_per_play Float?
+  plays_per_game   Float?
+  as_of_date       String?
+  captured_at      DateTime?
+
+  @@unique([season, week, team], map: "sqlite_autoindex_team_tempo_1")
+  @@index([team], map: "ix_team_tempo_team")
+  @@index([season], map: "ix_team_tempo_season")
+  @@index([week], map: "ix_team_tempo_week")
+}
+
+model team_week_features {
+  id                Int    @id @default(autoincrement())
+  season            Int
+  week              Int
+  team              String
+  seconds_per_play  Float?
+  plays_per_game    Float?
+  off_success_rate  Float?
+  def_success_rate  Float?
+  off_epa_per_play  Float?
+  def_epa_per_play  Float?
+  off_explosiveness Float?
+  def_explosiveness Float?
+  first_quarter_pf  Float?
+  first_quarter_pa  Float?
+  first_half_pf     Float?
+  first_half_pa     Float?
+  sp_overall        Float?
+  sp_offense        Float?
+  sp_defense        Float?
+  run_rate          Float?
+
+  @@unique([season, week, team], map: "sqlite_autoindex_team_week_features_1")
+  @@index([season], map: "ix_team_week_features_season")
+  @@index([team], map: "ix_team_week_features_team")
+  @@index([week], map: "ix_team_week_features_week")
+}
+
+model teams {
+  id         Int     @id @default(autoincrement())
+  school     String
+  conference String?
+
+  @@index([school], map: "ix_teams_school")
+}
+
+model venues {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  city      String?
+  state     String?
+  latitude  Float?
+  longitude Float?
+  dome      Boolean?
+  games     games[]
+}
+
+model weather {
+  game_id       Int      @id @default(autoincrement())
+  temperature_f Float?
+  wind_mph      Float?
+  precipitation Float?
+  dome          Boolean?
+  games         games    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}

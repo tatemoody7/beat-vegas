@@ -16,6 +16,16 @@
   (season-to-date stats are lagged). No peeking at the result.
 - **Walk-forward backtest** — train on past seasons, test on the next, repeat.
   Honest out-of-sample evaluation.
+- **BV line** — our *own* independent projected 1H total, from a regressor over the
+  full feature set (pace/efficiency/weather/era). "Make our own number first."
+  See `BV_LINE.md`.
+- **Gap** — `Vegas 1H line − BV line` (under direction). Positive = Vegas above our
+  number = a candidate under. Big gaps can be model *blind spots*, not edges.
+- **Calibration (of the line)** — unbiasedness: `mean(actual − BV) ≈ 0` overall and
+  per segment (era/tempo/dome). A line biased ~1.5 pt low would falsely scream
+  "under" on every game. Achieved by a global bias correction, audited per segment.
+- **2023 era flag** — feature marking the post-2023 running-clock regime (~8 fewer
+  plays/game); pre-2023 is a different scoring distribution.
 
 ## Data sources (all free)
 - **CollegeFootballData (CFBD)** — games, play-by-play (→ actual 1H points),

@@ -7,7 +7,11 @@ Research only — it never places bets or automates gambling.
 - Full design + history: `~/.claude/plans/i-have-a-strong-tingly-reddy.md` (see
   ADDENDUMs 1–5; **ADDENDUM 5 is the active deploy plan**).
 - Long-term memory (decisions, status) auto-loads from this project's memory dir.
-- **Current phase: B** — build the Next.js web app (see "Resuming Phase B" below).
+- **Phase B shipped**: Next.js app is live on Vercel (Neon-backed, password-gated).
+- **Latest feature: the "BV line"** — an independent calibrated 1H-total regressor
+  compared to the real Vegas 1H line, ranked by gap. Built + deployed. Full
+  write-up: `docs/BV_LINE.md`; design history: this project's memory dir
+  (`beat-vegas-bv-line`).
 
 ## What it does
 Pulls free data (CFBD, TeamRankings tempo, Open-Meteo weather, The Odds API 1H
@@ -28,12 +32,13 @@ and grades market vs model vs the user's own picks.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 cp config.example.yaml config.yaml   # add CFBD + Odds API keys (gitignored)
-pytest -q                            # 56 tests
+pytest -q                            # 61 tests
 ```
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
 (score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
-`retrain.py`, `seed_demo.py`. Streamlit: `streamlit run beatvegas/dashboard/app.py`
-(point at demo with `BEATVEGAS_DB=data/demo.db`).
+`retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py` (re-score
+past seasons to populate `bv_line`), `seed_demo.py`. Streamlit:
+`streamlit run beatvegas/dashboard/app.py` (point at demo with `BEATVEGAS_DB=data/demo.db`).
 
 ## Honest status of the edge (don't oversell)
 - Backtest is **proxy-graded** (no free historical 1H lines; uses 0.52×full-game
@@ -67,3 +72,13 @@ Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **R
   `features.build_feature_frame` coercion; `bool(NaN)` is `True` (bit us on dome).
 - ESPN/TeamRankings are **unofficial** — keep isolated in `sources/`, fail-silent.
 - `config.yaml` (keys + phone) and `data/*.db|*.log|cache/` are gitignored — keep it that way.
+- **Neon id-sequence**: rows seeded from SQLite carry explicit ids without advancing
+  the Postgres sequence, so the next insert collides on the pkey. Before any bulk
+  insert to Neon (`backfill_bv_line.py`, `retrain.py`), resync:
+  `SELECT setval(pg_get_serial_sequence('<table>','id'), (SELECT MAX(id) FROM <table>))`.
+- **BV line is display + a "biggest gaps" sort only** — it must NOT feed
+  `under_score`/`rank` until the gap-vs-CLV table validates it (gaps are often model
+  blind spots, not edges). Calibration uses a **global** intercept correction +
+  `era_post2023` as a feature (a per-era correction would double-count); the gap-vs-CLV
+  tracker joins the **`market`** results ledger (close−open = line movement toward us),
+  not `gbm_v1`. See `docs/BV_LINE.md`.

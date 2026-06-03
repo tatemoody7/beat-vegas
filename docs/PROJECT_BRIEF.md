@@ -29,6 +29,11 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 - The signal is **decaying** recently (≈57–59% in 2018–21 → ≈50% in 2023–25).
 - Verdict: a genuinely useful *research* tool; **not** a proven money-maker. Real
   first-half lines collected this season are the only true test.
+- **Update — "soft market" thesis refuted:** deeper research found no evidence that
+  1H totals are systematically soft. So we stopped assuming it and instead **make our
+  own number** — the **BV line** (an independent, calibrated 1H projection) — and rank
+  games by the **gap** to the real Vegas line, validating with CLV. Live now. See
+  `BV_LINE.md`. The gap is shown for research only; it does not drive the score yet.
 
 ## Architecture (plain English)
 - A **local engine** on my Mac scrapes data, scores games, sends alerts, and runs
@@ -41,9 +46,11 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 - **Done:** data pipeline, backtest, 0–100 scoring, line tracking + iMessage alerts,
   Streamlit dashboard, weekly auto-run, free enrichments, historical pace/weather
   backfill, private GitHub repo, DB layer made Postgres-ready.
-- **Now (Phase B–D):** rebuild the dashboard as a Next.js app on Vercel backed by
-  Neon Postgres, with a simple password gate; point the engine at Neon.
-- **Always:** collect real 1H lines this season and re-measure the edge for real.
+- **Done (Phase B–D):** Next.js app live on Vercel backed by Neon Postgres, password
+  gate, engine writes to Neon.
+- **Done:** the **BV line** + gap vs Vegas + gap-vs-CLV tracker (live on the site).
+- **Always:** collect real 1H lines this season and re-measure the edge for real —
+  now including whether the biggest BV-vs-Vegas gaps earn positive CLV.
 
 ## Good things to brainstorm in this Project
 - Which *new free signals* might actually move the model (we've seen pace/weather

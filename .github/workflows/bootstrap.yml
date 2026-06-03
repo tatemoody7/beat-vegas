@@ -1,0 +1,30 @@
+name: Bootstrap Neon (one-time)
+
+# One-time, manual: populate Neon with Game.spread (2015–2025) and the 2026
+# schedule, directly from CFBD (the Mac can't push its local SQLite to Neon over
+# the campus network). The spread-adjusted multiplier (data/multiplier.json) is
+# committed, so the cloud uses the same fitted curve — no recompute needed here.
+# Safe to re-run: backfill_spread only UPDATEs spread; backfill --season 2026 is
+# an idempotent upsert and 2026 has no 1H data to clobber.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Backfill spread on Neon (2015–2025)
+        run: python scripts/backfill_spread.py --start 2015 --end 2025
+      - name: Backfill 2026 schedule on Neon
+        run: python scripts/backfill.py --season 2026

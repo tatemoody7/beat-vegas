@@ -1,0 +1,38 @@
+name: Sunday opener capture + score
+
+# Captures the full-game opener and re-scores the board, writing to Neon. Runs in
+# the cloud because the local Mac's usual network can't reach Neon (port 5432
+# filtered). GHA runners reach Neon fine and run even when the Mac is asleep.
+# The "DK fired" iMessage stays local (deploy/com.beatvegas.sunday-notify.plist).
+
+on:
+  schedule:
+    # GHA cron is UTC with no DST. 16:30 UTC ≈ 12:30 EDT (Aug–early Nov);
+    # 17:30 UTC ≈ 12:30 EST (Nov–Jan). Both fire in season; runs are idempotent
+    # (snapshots only written on change, predictions upserted).
+    - cron: '30 16 * * 0'
+    - cron: '30 17 * * 0'
+  workflow_dispatch: {}
+
+concurrency:
+  group: sunday
+  cancel-in-progress: false
+
+jobs:
+  capture-and-score:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Capture full-game openers (DK, CFBD fallback)
+        run: python scripts/poll_full_game.py --source auto
+      - name: Score + rank the board
+        run: python scripts/weekly_update.py

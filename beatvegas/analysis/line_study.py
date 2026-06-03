@@ -45,7 +45,8 @@ def assign_opening_line(games_df: pd.DataFrame,
         real = open_by_game.get(row["id"])
         if real is not None:
             return pd.Series([_round_half(real), "real_open"])
-        return pd.Series([_round_half(proxy_total(row["full_game_total"], 0.52)),
+        return pd.Series([_round_half(proxy_total(row["full_game_total"],
+                                                  spread=row.get("spread"))),
                           "proxy"])
 
     df[["line", "line_source"]] = df.apply(_line, axis=1)

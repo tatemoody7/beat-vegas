@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.beatvegas.sunday</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/tatemoody/Desktop/Beat Vegas/scripts/run_sunday.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/tatemoody/Desktop/Beat Vegas</string>
+    <!-- Sundays at 12:30pm local: full-game totals open ~11am (Circa), retail
+         books copy within the hour, so DK has the openers by now. Free DK pull
+         (no API credits), so re-running is cheap. Runs only while the Mac is awake. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>12</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/tatemoody/Desktop/Beat Vegas/data/sunday.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/tatemoody/Desktop/Beat Vegas/data/sunday.err.log</string>
+</dict>
+</plist>

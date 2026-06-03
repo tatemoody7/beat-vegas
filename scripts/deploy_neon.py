@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 from beatvegas.config import REPO_ROOT, database_url
 from beatvegas.db.models import FhTeamGame, Venue, Weather
-from beatvegas.db.store import init_db
+from beatvegas.db.store import try_init_db
 
 
 def _maps(session, model, drop_id=True):
@@ -46,7 +46,9 @@ def main() -> None:
     target = database_url()
     if target.startswith("sqlite"):
         raise SystemExit("Set DATABASE_URL to the Neon Postgres URL first.")
-    init_db()                      # create new tables + venue column migration
+    if not try_init_db():          # create new tables + venue column migration
+        raise SystemExit("Neon unreachable from this network — run from a network "
+                         "that can reach Neon (or via GitHub Actions).")
 
     src = create_engine(f"sqlite:///{REPO_ROOT / 'data' / 'beatvegas.db'}", future=True)
     dst = create_engine(target, future=True, pool_pre_ping=True)

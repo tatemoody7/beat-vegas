@@ -1,11 +1,13 @@
 """Engine/session management + simple upsert helpers."""
 from __future__ import annotations
 
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import database_url, db_path
@@ -20,6 +22,8 @@ _MIGRATIONS = {
     "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
+    "games": {"spread": "FLOAT"},
+    "odds_snapshots": {"spread": "FLOAT"},
 }
 
 _engine = None
@@ -37,15 +41,60 @@ def get_engine(path: Optional[Path] = None):
             if url.startswith("sqlite:///"):
                 Path(url[len("sqlite:///"):]).parent.mkdir(parents=True, exist_ok=True)
         # pool_pre_ping keeps serverless Postgres (Neon) connections healthy.
-        _engine = create_engine(url, future=True, pool_pre_ping=True)
+        # A generous connect_timeout lets a SUSPENDED Neon compute finish waking
+        # (the always-on pooler accepts the TCP connection immediately, but the
+        # compute behind it can take several seconds to resume).
+        connect_args = {}
+        if not url.startswith("sqlite"):
+            connect_args["connect_timeout"] = 20
+        _engine = create_engine(url, future=True, pool_pre_ping=True,
+                                connect_args=connect_args)
         _Session = sessionmaker(bind=_engine, future=True)
     return _engine
 
 
+def wait_for_db(engine=None, retries: int = 6, base_delay: float = 2.0) -> None:
+    """Block until a `SELECT 1` succeeds, with exponential backoff. No-op for
+    SQLite; for Neon it absorbs the cold-start window so the first real query
+    doesn't fail on a still-resuming compute."""
+    engine = engine or get_engine()
+    if engine.url.get_backend_name().startswith("sqlite"):
+        return
+    last = None
+    for i in range(retries):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return
+        except OperationalError as e:
+            last = e
+            time.sleep(base_delay * (2 ** i))
+    if last is not None:
+        raise last
+
+
 def init_db(path: Optional[Path] = None) -> None:
     engine = get_engine(path)
+    wait_for_db(engine)                # absorb Neon cold-start before any DDL
     Base.metadata.create_all(engine)
     _apply_migrations(engine)
+
+
+def try_init_db(path: Optional[Path] = None) -> bool:
+    """init_db that degrades gracefully when the DB is unreachable.
+
+    On a network that can't carry the Postgres connection (e.g. the campus
+    network where Neon's 5432 is filtered), log one clear line and return False
+    so the caller can exit cleanly instead of dumping a raw traceback. Returns
+    True on success. SQLite never fails this way."""
+    try:
+        init_db(path)
+        return True
+    except OperationalError:
+        print("[db] database unreachable from this network — skipping this run. "
+              "(If this is the local Mac on a blocked network, the cloud job "
+              "handles Neon; see .github/workflows/sunday.yml.)")
+        return False
 
 
 def _apply_migrations(engine) -> None:

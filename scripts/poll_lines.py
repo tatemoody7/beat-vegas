@@ -21,7 +21,7 @@ from beatvegas.alerts.detect import detect_line_alerts, format_alert
 from beatvegas.alerts.imessage import send_imessage
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot, Prediction
-from beatvegas.db.store import init_db, session_scope
+from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
 from beatvegas.lines import consensus_open_close
 from beatvegas.season import current_season
@@ -63,7 +63,8 @@ def main() -> None:
     ap.add_argument("--no-alerts", action="store_true", help="disable alerts")
     args = ap.parse_args()
 
-    init_db()
+    if not try_init_db():
+        return
     cfg = load_config().get("odds_api", {}) or {}
     client = OddsAPIClient()
 

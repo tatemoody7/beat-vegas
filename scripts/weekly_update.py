@@ -11,31 +11,74 @@ stores predictions with the current **opening consensus** line as `line_used`
 from __future__ import annotations
 
 import argparse
+import statistics
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from beatvegas.db.models import Game, OddsSnapshot
-from beatvegas.db.store import init_db, session_scope
+from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.lines import consensus_open_close
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 
 
-def opening_line_lookup(season: int, week: int) -> Dict[int, float]:
+def _full_game_opener(snaps: list) -> Tuple[Optional[float], Optional[float]]:
+    """(opener_total, opener_spread): median across books of each book's FIRST
+    full-game snapshot (the Sunday opener)."""
+    by_book: Dict[str, list] = {}
+    for sn in snaps:
+        by_book.setdefault(sn.book, []).append(sn)
+    totals, spreads = [], []
+    for book_snaps in by_book.values():
+        first = sorted(book_snaps, key=lambda s: s.captured_at)[0]
+        if first.line is not None:
+            totals.append(first.line)
+        if first.spread is not None:
+            spreads.append(first.spread)
+    open_total = statistics.median(totals) if totals else None
+    open_spread = statistics.median(spreads) if spreads else None
+    return open_total, open_spread
+
+
+def opening_line_lookup(season: int, week: int
+                        ) -> Tuple[Dict[int, float], Dict[int, str]]:
+    """Per-game ranking line + provenance.
+
+    Prefers an OBSERVED retail 1H opener (kind 'observed_1h'); else DERIVES a 1H
+    number from the captured full-game opener via the spread-adjusted multiplier
+    (kind 'derived_fg') — which on Sunday is every game, before the retail 1H
+    market posts. Games with neither are left to score_slate's internal proxy."""
+    lines: Dict[int, float] = {}
+    kinds: Dict[int, str] = {}
     with session_scope() as s:
         rows = (s.query(OddsSnapshot.game_id, OddsSnapshot.book,
-                        OddsSnapshot.line, OddsSnapshot.captured_at)
+                        OddsSnapshot.line, OddsSnapshot.spread,
+                        OddsSnapshot.market, OddsSnapshot.captured_at)
                 .join(Game, Game.id == OddsSnapshot.game_id)
                 .filter(Game.season == season, Game.week == week,
-                        OddsSnapshot.market == "1H_total").all())
-    by_game: Dict[int, list] = {}
-    for r in rows:
-        by_game.setdefault(r[0], []).append(
-            type("S", (), {"book": r[1], "line": r[2], "captured_at": r[3]}))
-    return {gid: consensus_open_close(snaps)[0]
-            for gid, snaps in by_game.items()
-            if consensus_open_close(snaps)[0] is not None}
+                        OddsSnapshot.market.in_(("1H_total", "full_game_total")))
+                .all())
+    h1: Dict[int, list] = {}
+    fg: Dict[int, list] = {}
+    for gid, book, line, spread, market, cap in rows:
+        snap = type("S", (), {"book": book, "line": line, "spread": spread,
+                              "captured_at": cap})
+        (h1 if market == "1H_total" else fg).setdefault(gid, []).append(snap)
+
+    for gid, snaps in h1.items():
+        opening = consensus_open_close(snaps)[0]
+        if opening is not None:
+            lines[gid], kinds[gid] = opening, "observed_1h"
+    for gid, snaps in fg.items():
+        if gid in lines:
+            continue                       # observed 1H opener wins
+        open_total, open_spread = _full_game_opener(snaps)
+        if open_total is not None:
+            lines[gid] = proxy_total(open_total, spread=open_spread)
+            kinds[gid] = "derived_fg"
+    return lines, kinds
 
 
 def _enrich_qb_out(scored) -> None:
@@ -64,7 +107,8 @@ def main() -> None:
     ap.add_argument("--week", type=int)
     ap.add_argument("--min-games", type=int, default=2)
     args = ap.parse_args()
-    init_db()
+    if not try_init_db():
+        return
 
     week = args.week or detect_week(args.season)
     if week is None:
@@ -73,17 +117,19 @@ def main() -> None:
         return
 
     df = build_feature_frame(min_games=args.min_games)
-    lines = opening_line_lookup(args.season, week)
-    scored = score_slate(args.season, target_week=week, line_lookup=lines, df=df)
+    lines, kinds = opening_line_lookup(args.season, week)
+    scored = score_slate(args.season, target_week=week, line_lookup=lines,
+                         line_kind_lookup=kinds, df=df)
     if scored.empty:
         print(f"No scorable games for {args.season} wk{week} "
               f"(need >= {args.min_games} games played by both teams).")
         return
     _enrich_qb_out(scored)
     n = store_predictions(scored)
-    real = sum(1 for g in scored["id"] if g in lines)
+    obs = sum(1 for k in kinds.values() if k == "observed_1h")
+    der = sum(1 for k in kinds.values() if k == "derived_fg")
     print(f"scored {n} games for {args.season} wk{week} "
-          f"({real} with real opening lines, rest proxy)")
+          f"({obs} observed 1H, {der} derived-from-full-game, rest proxy)")
     top = scored.head(5)
     for _, r in top.iterrows():
         print(f"  #{int(r['rank'])} score {int(r['under_score'])}  "

@@ -65,6 +65,9 @@ class Game(Base):
     # Full-game closing total from CFBD /lines (consensus/best available).
     full_game_total = Column(Float)
     full_game_total_book = Column(String)
+    # Point spread, home-relative signed (negative = home favored). Drives the
+    # spread-adjusted 1H multiplier (favorites score relatively more early).
+    spread = Column(Float)
 
     __table_args__ = (UniqueConstraint("id", name="uq_game_id"),)
 
@@ -171,8 +174,9 @@ class OddsSnapshot(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     book = Column(String)
-    market = Column(String)                         # e.g. '1H_total'
-    line = Column(Float)
+    market = Column(String)                         # '1H_total' | 'full_game_total'
+    line = Column(Float)                            # the total for this market
+    spread = Column(Float)                          # home-relative spread (full_game rows)
     over_price = Column(Integer)
     under_price = Column(Integer)
     captured_at = Column(DateTime, index=True)

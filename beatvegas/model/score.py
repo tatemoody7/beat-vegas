@@ -114,6 +114,8 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "qb_out_away": bool(row.get("qb_out_away")) if row.get("qb_out_away") is not None else None,
         "qb_out_detail": row.get("qb_out_detail") if isinstance(row.get("qb_out_detail"), str) else None,
         "line": _f(line),
+        "line_kind": (row.get("line_kind")
+                      if isinstance(row.get("line_kind"), str) else None),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
         # primary-engine fields (gbm_v2 gap ranking)
         "rank_basis": "bv_gap",
@@ -135,6 +137,7 @@ def _f(v):
 def score_slate(target_season: int, target_week: Optional[int] = None,
                 game_ids: Optional[List[int]] = None,
                 line_lookup: Optional[Dict[int, float]] = None,
+                line_kind_lookup: Optional[Dict[int, str]] = None,
                 df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     if df is None:
         df = build_feature_frame(min_games=2)
@@ -151,9 +154,18 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     model.fit(train[FEATURE_COLS], train["under"])
     target["under_prob"] = model.predict_proba(target[FEATURE_COLS])[:, 1]
     target["under_score"] = target["under_prob"].apply(under_score)
+    # The ranking line per game, with provenance: an observed retail 1H opener
+    # (kind from line_kind_lookup, default 'observed_1h'); else a 1H number
+    # DERIVED from the captured full-game opener (passed in via line_lookup with
+    # kind 'derived_fg'); else the internal proxy off Game.full_game_total. On
+    # Sunday the retail 1H market isn't posted, so derived_fg is the live signal.
     ll = line_lookup or {}
+    lk = line_kind_lookup or {}
     target["line"] = target.apply(
-        lambda r: ll.get(r["id"], proxy_total(r["full_game_total"], 0.52)), axis=1)
+        lambda r: ll.get(r["id"], proxy_total(r["full_game_total"],
+                                              spread=r.get("spread"))), axis=1)
+    target["line_kind"] = target["id"].map(
+        lambda gid: lk.get(gid, "observed_1h" if gid in ll else "proxy"))
 
     # Independent calibrated "BV line": our own 1H total from a MARKET-BLIND
     # regressor (no Vegas inputs). Display + gap sort only; does NOT influence

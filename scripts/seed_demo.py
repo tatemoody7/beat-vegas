@@ -68,7 +68,7 @@ def main() -> None:
 
         close_by_gid = {}
         for g in games:
-            close = proxy_total(g.full_game_total, 0.52)
+            close = proxy_total(g.full_game_total, spread=getattr(g, "spread", None))
             snaps = []
             for book, ts, line in _snapshot_lines(close):
                 snap = OddsSnapshot(game_id=g.id, book=book, market="1H_total",
@@ -92,7 +92,7 @@ def main() -> None:
 
         # a few sample manual picks (bet at the opening number)
         for g in games[:5]:
-            bet_line = proxy_total(g.full_game_total, 0.52) + 0.5
+            bet_line = proxy_total(g.full_game_total, spread=getattr(g, "spread", None)) + 0.5
             _, closing = consensus_open_close(
                 [x for x in s.query(OddsSnapshot).filter(
                     OddsSnapshot.game_id == g.id).all()])

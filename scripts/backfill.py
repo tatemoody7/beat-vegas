@@ -20,9 +20,7 @@ from beatvegas.db.store import init_db, session_scope, upsert
 from beatvegas.db.models import Game, Team, Venue
 from beatvegas.etl.first_half import attach_first_half, first_half_from_plays
 from beatvegas.sources.cfbd import CFBDClient
-
-# Provider priority for picking a single full-game total per game.
-PROVIDER_PRIORITY = ["consensus", "DraftKings", "Bovada", "ESPN Bet", "William Hill (US)"]
+from beatvegas.sources.cfbd_lines import pick_total_spread as _pick_total
 
 
 def _get(d: Dict[str, Any], *names: str) -> Any:
@@ -41,23 +39,6 @@ def _parse_dt(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _pick_total(lines: List[Dict[str, Any]]):
-    """Return (over_under, provider) using provider priority, else first non-null."""
-    by_provider = {}
-    for ln in lines or []:
-        ou = _get(ln, "overUnder", "over_under")
-        prov = _get(ln, "provider")
-        if ou is not None and prov is not None and prov not in by_provider:
-            by_provider[prov] = float(ou)
-    for prov in PROVIDER_PRIORITY:
-        if prov in by_provider:
-            return by_provider[prov], prov
-    if by_provider:
-        prov = next(iter(by_provider))
-        return by_provider[prov], prov
-    return None, None
-
-
 def backfill_season(client: CFBDClient, season: int, season_type: str,
                     use_pbp: bool) -> Dict[str, int]:
     games = client.games(year=season, season_type=season_type)
@@ -65,9 +46,9 @@ def backfill_season(client: CFBDClient, season: int, season_type: str,
     total_by_game = {}
     for g in lines_resp:
         gid = _get(g, "id")
-        ou, prov = _pick_total(_get(g, "lines") or [])
+        ou, sp, prov = _pick_total(_get(g, "lines") or [])
         if gid is not None and ou is not None:
-            total_by_game[gid] = (ou, prov)
+            total_by_game[gid] = (ou, sp, prov)
 
     # Optional play-by-play fallback, fetched per week only if needed.
     pbp_lookup: Dict[int, Any] = {}
@@ -87,7 +68,7 @@ def backfill_season(client: CFBDClient, season: int, season_type: str,
         fh = attach_first_half(g, pbp_lookup if use_pbp else None)
         if fh["first_half_total"] is not None:
             n_with_1h += 1
-        ou, prov = total_by_game.get(gid, (None, None))
+        ou, sp, prov = total_by_game.get(gid, (None, None, None))
         row = {
             "id": gid,
             "season": _get(g, "season") or season,
@@ -104,6 +85,7 @@ def backfill_season(client: CFBDClient, season: int, season_type: str,
             "away_points": _get(g, "awayPoints", "away_points"),
             "full_game_total": ou,
             "full_game_total_book": prov,
+            "spread": sp,
         }
         row.update(fh)
         game_rows.append(row)

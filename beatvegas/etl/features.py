@@ -99,12 +99,13 @@ def _load_all_games() -> pd.DataFrame:
             Game.id, Game.season, Game.week, Game.start_date, Game.neutral_site,
             Game.home_team, Game.away_team, Game.home_points, Game.away_points,
             Game.home_first_half_points, Game.away_first_half_points,
-            Game.first_half_total, Game.full_game_total, Game.venue_id,
+            Game.first_half_total, Game.full_game_total, Game.spread, Game.venue_id,
         )
         df = pd.DataFrame(q.all(), columns=[
             "id", "season", "week", "start_date", "neutral_site",
             "home_team", "away_team", "home_points", "away_points",
-            "home_fh", "away_fh", "first_half_total", "full_game_total", "venue_id",
+            "home_fh", "away_fh", "first_half_total", "full_game_total", "spread",
+            "venue_id",
         ])
         venues = pd.DataFrame(
             s.query(Venue.id, Venue.elevation, Venue.grass, Venue.capacity).all(),
@@ -302,7 +303,8 @@ def build_feature_frame(min_games: int = 2,
     # --- target + filters --------------------------------------------
     df = df[df["full_game_total"].notna() & df["first_half_total"].notna()
             & (df["full_game_total"] > 0)].copy()
-    df["proxy_line"] = df["full_game_total"].apply(lambda t: proxy_total(t, 0.52))
+    df["proxy_line"] = df.apply(
+        lambda r: proxy_total(r["full_game_total"], spread=r.get("spread")), axis=1)
     df = df[df["first_half_total"] != df["proxy_line"]]   # drop pushes
     df["under"] = (df["first_half_total"] < df["proxy_line"]).astype(int)
 

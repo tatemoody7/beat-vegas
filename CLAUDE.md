@@ -4,7 +4,21 @@ College football **first-half (1H) unders** research & decision-support system.
 Research only — it never places bets or automates gambling.
 
 ## How to resume / orient (read this first)
-- **LATEST (2026 pivot): mispricing system shipped.** Reframed from "prove unders
+- **LATEST (opener capture): DraftKings free poller + spread-adjusted multiplier.**
+  Full-game totals open Sunday; retail 1H totals post later — so we capture the
+  **full-game opener from DK's free hidden API** (`beatvegas/sources/draftkings.py`,
+  `scripts/poll_full_game.py`) and **derive a 1H number** from it via a spread-aware
+  multiplier (`proxy_line.fh_share`/`proxy_total(total, spread=...)`). The Sunday
+  board ranks off that derived opener (`opening_line_lookup` returns `(lines, kinds)`;
+  kind `derived_fg` vs `observed_1h`, surfaced in `factors_json.line_kind`).
+  Scheduled by `scripts/run_sunday.sh` + `deploy/com.beatvegas.sunday.plist`
+  (Sun 12:30pm), which also texts a single "DK fired" heads-up (no picks). The
+  spread-adjusted multiplier is **gated**: `scripts/derive_multiplier.py` writes
+  `data/multiplier.json` ONLY if it beats flat 0.52 walk-forward; absent file =>
+  flat 0.52 (zero behavior change). Run `scripts/backfill.py` to populate
+  `Game.spread` (now captured from CFBD /lines) before fitting. Plan:
+  `~/.claude/plans/users-tatemoody-desktop-compass-artifac-jolly-whistle.md`.
+- **EARLIER (2026 pivot): mispricing system shipped.** Reframed from "prove unders
   win" to "find games where the book mispriced the 1H under." The **predict-the-1H-
   total engine is now PRIMARY**: `score_slate` ranks the board by the gap between
   the line and our market-blind predicted 1H total (unders only), not the old
@@ -92,7 +106,13 @@ Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **R
 - Features must stay **leak-free** (only pre-kickoff info; season-to-date shifted).
 - Numeric model columns must be clean floats (NaN, never `pd.NA`/None/bool) — see
   `features.build_feature_frame` coercion; `bool(NaN)` is `True` (bit us on dome).
-- ESPN/TeamRankings are **unofficial** — keep isolated in `sources/`, fail-silent.
+- ESPN/TeamRankings/**DraftKings** are **unofficial** — keep isolated in `sources/`,
+  fail-silent. DK's hidden API returns **403 without browser-like headers** (set in
+  `draftkings.py::_HEADERS`); the host, operator key (`dkusoh`) and league id (`87637`)
+  drift — if capture goes empty mid-season, re-discover the `leagues/{id}` XHR in
+  DevTools. Schema is `events`/`markets`/`selections` (the old `eventgroups` endpoint
+  is dead). The default payload carries only main full-game markets (1H totals post
+  later via a subcategory query), which is exactly the Sunday opener we want.
 - `config.yaml` (keys + phone) and `data/*.db|*.log|cache/|pbp_cache/` are gitignored —
   keep it that way (`pbp_cache/` holds 56MB parquet files per season).
 - **Neon id-sequence**: rows seeded from SQLite carry explicit ids without advancing

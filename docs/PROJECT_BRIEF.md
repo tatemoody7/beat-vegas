@@ -48,9 +48,13 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   backfill, private GitHub repo, DB layer made Postgres-ready.
 - **Done (Phase B–D):** Next.js app live on Vercel backed by Neon Postgres, password
   gate, engine writes to Neon.
-- **Done:** the **BV line** + gap vs Vegas + gap-vs-CLV tracker (live on the site).
+- **Done:** the **BV line** + gap vs Vegas + gap-vs-CLV tracker (live). Now
+  **market-blind** (no Vegas number feeds it, by rule), with an **80% prediction
+  band** so gaps are read in units of noise (the line's σ ≈ 12 pts — most single-game
+  gaps are noise, and the UI says so), a **near-kickoff line poll** so CLV is
+  trustworthy, and a forward-only **QB-out flag**. See `BV_LINE.md`.
 - **Always:** collect real 1H lines this season and re-measure the edge for real —
-  now including whether the biggest BV-vs-Vegas gaps earn positive CLV.
+  the verdict is whether the biggest (noise-adjusted) BV-vs-Vegas gaps earn positive CLV.
 
 ## Good things to brainstorm in this Project
 - Which *new free signals* might actually move the model (we've seen pace/weather

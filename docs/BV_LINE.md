@@ -21,34 +21,46 @@ anywhere, we genuinely diverge with value.
 
 ## What the BV line *is* (and isn't)
 - **Is:** a `HistGradientBoostingRegressor` (scikit-learn) trained to predict the
-  **actual realized 1H points**, using the full leak-free feature set — pace
-  (expected possessions), efficiency (SP+/PPA/success), 1H scoring history, weather,
-  situational, and a **2023-era flag**. Walk-forward (train on prior seasons),
-  bias-corrected so it's unbiased out of fold. Lives in `beatvegas/model/bv_line.py`.
-- **Isn't:** the old `proj_1h_total` "Hist proj" chip — that's a *naive* formula
-  from 1H scoring history only (no pace/weather/efficiency/era). It stays on the card
-  as a separate, clearly-labeled context chip. Don't conflate the two.
+  **actual realized 1H points**, **market-blind** — it sees pace, efficiency
+  (SP+/PPA/success), 1H scoring history, weather, situational, and a **2023-era
+  flag**, but **none** of Vegas's numbers. Walk-forward, bias-corrected to be
+  unbiased out of fold. Lives in `beatvegas/model/bv_line.py`.
+- **Is noisy, and says so.** Stripped of the market's number, the BV line's own
+  error bar is wide — out-of-fold **σ ≈ 12 points**. So it ships with an **80%
+  prediction band** (`bv_lo`–`bv_hi`) and reports each gap in units of that noise
+  (`bv_gap_z`). A gap inside ~1σ is **noise, not an edge**, and the card says so.
+- **Isn't:** the old `proj_1h_total` "Hist proj" chip — a *naive* 1H-scoring-history
+  formula. It stays as a separate, clearly-labeled context chip. Don't conflate them.
 - **Isn't:** an input to the score. The 0–100 **Under Score still comes only from the
   classifier.** The gap is **display + a "Biggest gaps" sort** — nothing more — until
   CLV proves it out (see "Honesty").
 
 ## Where it shows up
-- **Opportunities cards** (web + Streamlit): each card shows `BV · Vegas · gap` and a
-  "BV line" chip. The board has a **Sort** toggle: "Model rank" (default) or
-  "Biggest gaps." The card gap is computed against the *live* consensus line when
-  available, else the line stored at scoring time.
+- **Opportunities cards** (web + Streamlit): each card shows `BV (lo–hi) · Vegas ·
+  gap (±Nσ)` — the band and the gap in σ, with sub-1σ gaps greyed and labeled
+  "noise." A **⚠ QB OUT** banner appears when a starting QB is listed out (live
+  ESPN, unofficial). The board **Sort** toggles: "Model rank" (default), "Biggest
+  gaps," or "Biggest gaps (noise-adjusted)" = ranked by σ. A manual BV nudge, if
+  set, shows as `(adj −N: reason)`.
 - **Research tab:** a **Gap vs CLV** bucket table (the verdict — do our biggest gaps
   earn positive CLV?) and a **BV-line calibration** table (out-of-fold mean residual
   per segment; near 0 = unbiased).
 
 ## How it works (for builders)
-- **Feature:** `era_post2023 = (season >= 2023)` added to `FEATURE_COLS`
-  (`beatvegas/etl/features.py`). The 2023 NCAA running-clock rule cut ~8 plays/game —
-  a real scoring-regime shift, so pre-2023 is a different distribution.
+- **The no-Vegas-line rule (enforced):** `MARKET_COLS = {full_game_total,
+  proj_1h_ratio}` in `features.py`; the regressor trains on `BV_FEATURE_COLS =
+  FEATURE_COLS − MARKET_COLS`. A runtime assert in `fit_bv_regressor` + the guard
+  tests in `tests/test_features.py` make it impossible for any betting line to become
+  a model input. (The classifier keeps `FEATURE_COLS` — it's the *market-relative*
+  model by design.)
+- **Prediction interval:** `residual_band()` reuses the walk-forward OOF residuals
+  (no extra models) to produce `bv_lo`/`bv_hi` (80%) and `bv_sigma`; `score_slate`
+  also stores `bv_gap_z = gap / sigma`.
+- **Feature:** `era_post2023 = (season >= 2023)` (the 2023 running-clock rule cut
+  ~8 plays/game — a real regime shift).
 - **Scoring:** `score_slate` (`beatvegas/model/score.py`) fits the regressor on the
-  same walk-forward train slice as the classifier and writes `bv_line` +
-  `bv_gap` (= `line_used − bv_line`) to the `predictions` table and into
-  `factors_json`.
+  same walk-forward train slice as the classifier and writes `bv_line`, `bv_gap`,
+  `bv_lo`, `bv_hi`, `bv_sigma` to the `predictions` table and into `factors_json`.
 - **Calibration = unbiasedness.** For a regression line, "calibrated" means
   `mean(actual − pred) ≈ 0` overall and per segment — NOT `calibration_curve` /
   `CalibratedClassifierCV` (those are for probabilities). We learn a **global**
@@ -71,18 +83,27 @@ anywhere, we genuinely diverge with value.
 
 ## Operating it
 ```bash
-# Local dev (SQLite). Score a slate normally; bv_line populates automatically:
+# Score a slate normally; bv_line + band populate automatically. weekly_update also
+# tags the upcoming slate with live QB-out flags (forward-only, unofficial):
 python scripts/weekly_update.py --season 2025 --week 8
 
-# Backfill bv_line onto historical predictions (re-scores walk-forward; no API calls):
+# Backfill bv_line/band onto historical predictions (re-scores walk-forward; no API calls):
 python scripts/backfill_bv_line.py --start-season 2018
 
 # Log model_runs + BV calibration residual table (feeds the Research calibration table):
 python scripts/retrain.py --notes "..."
+
+# Keep the closing line fresh: poll games kicking off in the next ~2h (every ~30 min
+# via deploy/com.beatvegas.kickoff.plist; only runs while the Mac is awake):
+python scripts/poll_kickoff_lines.py
+
+# Manual BV nudge for a game the model can't see (display-only, clearly labeled):
+python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"
 ```
 **Deploying to the live site (Neon + Vercel):**
-1. The `bv_line`/`bv_gap` columns auto-add to Neon on the next `init_db()` (via
-   `db/store.py::_MIGRATIONS`) — no hand-written migration.
+1. New columns/tables auto-add to Neon on the next `init_db()` (via
+   `db/store.py::_MIGRATIONS` for columns; `create_all` for the `bv_adjustments`
+   table) — no hand-written migration.
 2. **Resync the Postgres id sequence before bulk inserts** (rows seeded from SQLite
    leave the sequence at 1 → pkey collision):
    `SELECT setval(pg_get_serial_sequence('predictions','id'), (SELECT MAX(id) FROM predictions))`
@@ -92,6 +113,9 @@ python scripts/retrain.py --notes "..."
    code never queries a column that isn't there yet.)
 
 ## Honesty (carry this through every change)
+- **Most gaps are noise.** The market-blind BV line's σ ≈ 12 pts, so a single-game
+  gap under ~1σ is statistically indistinguishable from zero. The σ view says this
+  out loud — don't read a raw 6-pt gap as an edge on its own.
 - **Gaps can be blind spots, not edges.** Vegas embeds injuries, late weather, and
   sharp money the model can't see. A huge gap may mean *we're* missing something.
 - **CLV, not win rate, is the verdict.** On the biggest-gap bucket: lines moving

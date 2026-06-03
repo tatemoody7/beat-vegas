@@ -16,16 +16,28 @@
   (season-to-date stats are lagged). No peeking at the result.
 - **Walk-forward backtest** — train on past seasons, test on the next, repeat.
   Honest out-of-sample evaluation.
-- **BV line** — our *own* independent projected 1H total, from a regressor over the
-  full feature set (pace/efficiency/weather/era). "Make our own number first."
-  See `BV_LINE.md`.
+- **BV line** — our *own* independent projected 1H total, from a **market-blind**
+  regressor (pace/efficiency/weather/era — but no Vegas number, by rule). "Make our
+  own number first." See `BV_LINE.md`.
 - **Gap** — `Vegas 1H line − BV line` (under direction). Positive = Vegas above our
   number = a candidate under. Big gaps can be model *blind spots*, not edges.
+- **Prediction band / gap-in-σ** — the BV line is noisy (σ ≈ 12 pts), so it ships an
+  80% band (`bv_lo`–`bv_hi`) and reports each gap in σ (`bv_gap_z`). A gap **under
+  ~1σ is noise, not an edge** — the UI flags it as such.
+- **Market-blind (rule)** — the BV regressor is forbidden from training on any Vegas
+  number (full-game total, 1H line). Enforced by a guard test; keeps the gap from
+  being circular. (The 0–100 classifier is allowed to be market-relative — different job.)
 - **Calibration (of the line)** — unbiasedness: `mean(actual − BV) ≈ 0` overall and
-  per segment (era/tempo/dome). A line biased ~1.5 pt low would falsely scream
-  "under" on every game. Achieved by a global bias correction, audited per segment.
+  per segment (era/tempo/dome). Achieved by a global bias correction, audited per
+  segment. Measured OOF residual ≈ −0.18, all segments within ±0.5.
 - **2023 era flag** — feature marking the post-2023 running-clock regime (~8 fewer
   plays/game); pre-2023 is a different scoring distribution.
+- **QB-out flag** — a forward-only, unofficial "starting QB listed out" banner from
+  live ESPN injuries. Display only — never a model feature (no historical injury data
+  exists to train on).
+- **Closing-line freshness** — CLV is only trustworthy if the closing line was
+  captured near kickoff. A near-kickoff poll keeps it fresh; grading stores when the
+  closing snapshot landed.
 
 ## Data sources (all free)
 - **CollegeFootballData (CFBD)** — games, play-by-play (→ actual 1H points),

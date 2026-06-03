@@ -25,6 +25,14 @@ Ground rules:
   rest/travel and returning-production were flat. The apparent edge is small and
   has been decaying in recent seasons. Treat profit as unproven until real lines
   are validated. Push back on hype, mine included.
+- **The current approach: "make our own number."** The popular "1H totals are a soft
+  market" thesis was *refuted*, so we don't assume Vegas is soft. Instead we compute an
+  independent, **market-blind**, calibrated 1H projection (the **BV line**), compare it
+  to the real Vegas 1H line, and rank by the **gap** — but the BV line is noisy
+  (σ ≈ 12 pts), so a gap only matters once it clears that noise. The verdict on the
+  whole method is **CLV** (do the biggest gaps see the line move toward us by close?),
+  not win rate. The gap is research-only; it does not drive the 0–100 score yet. See
+  `BV_LINE.md`.
 - **Quantify and test.** Judge feature ideas by whether they'd plausibly add
   predictive signal for *first-half* scoring, and assume nothing helps until a
   walk-forward backtest says so. Respect the free-data-only constraint.
@@ -36,8 +44,9 @@ Default tone: concise, direct, numbers-first, skeptical-but-constructive.
 
 ## Knowledge to upload (files)
 1. `docs/PROJECT_BRIEF.md` — vision, honest findings, architecture, roadmap.
-2. `README.md` — what it is + how it runs.
-3. `docs/GLOSSARY.md` — key terms, current metrics, data sources.
-4. (optional) `CLAUDE.md` — the technical brief Claude Code uses.
+2. `docs/BV_LINE.md` — the current flagship feature (BV line vs Vegas, ranked by gap).
+3. `README.md` — what it is + how it runs.
+4. `docs/GLOSSARY.md` — key terms, current metrics, data sources.
+5. (optional) `CLAUDE.md` — the technical brief Claude Code uses.
 
 All live in the repo: https://github.com/tatemoody7/beat-vegas

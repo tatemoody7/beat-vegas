@@ -24,11 +24,21 @@ real 1H line and actual results — invisible to a proxy.
 Built & tested:
 - The Odds API client + normalizer for `totals_h1` (`beatvegas/sources/odds.py`)
 - Event→CFBD game matcher (`beatvegas/etl/match.py`)
-- Line poller with movement dedupe (`scripts/poll_lines.py`)
+- Line poller with movement dedupe (`scripts/poll_lines.py`) + a **near-kickoff
+  poll** (`scripts/poll_kickoff_lines.py`) so the closing line — and therefore CLV —
+  is fresh
 - Consensus open/close grading + CLV ledger (`scripts/grade.py`, `beatvegas/grading.py`)
 
 This is the path that can actually prove or kill the edge, starting when lines
 post for the season.
+
+**The product: the "BV line" (make our own number first).** We don't assume Vegas
+is soft (that thesis was refuted). Instead a **market-blind** regressor projects an
+independent 1H total (`beatvegas/model/bv_line.py`), we rank games by the **gap** to
+the real Vegas line, and validate with **CLV**. The BV line is noisy (σ ≈ 12 pts) so
+it ships an 80% prediction band and reports gaps in σ — a sub-1σ gap is noise, not an
+edge. The gap is research-only; it never drives the 0–100 score until CLV earns it.
+Full write-up: **`docs/BV_LINE.md`**. Live on the web app (below).
 
 ### Earlier Phase 1 components
 - CFBD REST client (`sources/cfbd.py`), 1H points ETL (`etl/first_half.py`)
@@ -172,6 +182,10 @@ bash scripts/run_daily.sh --dry-run     # test on demo DB, alerts printed not se
 cp deploy/com.beatvegas.daily.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.beatvegas.daily.plist
 # stop it later:  launchctl unload ~/Library/LaunchAgents/com.beatvegas.daily.plist
+
+# (optional) near-kickoff line poll every 30 min for fresh closing lines / CLV:
+cp deploy/com.beatvegas.kickoff.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.beatvegas.kickoff.plist
 ```
 Caveats: only runs while the Mac is awake; first run may prompt to allow Messages
 automation; logs to `data/run_daily.log`. If a root `.env` with `DATABASE_URL` is

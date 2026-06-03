@@ -4,6 +4,21 @@ College football **first-half (1H) unders** research & decision-support system.
 Research only — it never places bets or automates gambling.
 
 ## How to resume / orient (read this first)
+- **LATEST (cloud + board): scheduled Neon writes run in GitHub Actions; derived-1H
+  lines show on the board.** The Mac's usual network (campus/fgcu) **can't reach Neon**
+  (5432 TLS filtered; 443 fine), so the Sunday capture+score runs in **GitHub Actions**
+  (`.github/workflows/sunday.yml` cron; `bootstrap.yml` one-time; `post-lines.yml` to
+  publish derived lines). **DK 403s GHA datacenter IPs**, so the cloud uses
+  `poll_full_game --source auto` → **CFBD `/lines` fallback** (`sources/cfbd_lines.py`).
+  Local jobs degrade gracefully via `store.try_init_db` (logs + exits 0, no traceback);
+  the iMessage heads-up is local notify-only (`scripts/notify_sunday.py` +
+  `deploy/com.beatvegas.sunday-notify.plist`). Two read paths to the posted lines:
+  `scripts/grade_lines.py` (terminal report) and `scripts/post_derived_lines.py` (writes
+  display-only `predictions` rows, `model_version=derived_lines`, model fields NULL,
+  `factors_json.line_kind="derived_fg"`) → board cards labeled **"DERIVED · no model
+  pick"**. The board query is **season-scoped** (`web/lib/board.ts`) so derived rows for
+  one season don't hide another's real model board; real in-season scoring auto-supersedes
+  derived rows. GH secrets set: `DATABASE_URL`/`CFBD_API_KEY`/`ODDS_API_KEY`.
 - **LATEST (opener capture): DraftKings free poller + spread-adjusted multiplier.**
   Full-game totals open Sunday; retail 1H totals post later — so we capture the
   **full-game opener from DK's free hidden API** (`beatvegas/sources/draftkings.py`,
@@ -65,8 +80,13 @@ Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_upd
 `backfill_context.py` (venue/talent/roster), `rank_factors.py` (factor ranking →
 `factor_scores`), `validate_engine.py` (gbm_v2 gate + MAE ablation), `inspect_combo.py`
 + `explain_pbp.py` (factor deep-dives), `weekly_report.py` (markdown board), `deploy_neon.py`
-(additive Neon push). Streamlit: `streamlit run beatvegas/dashboard/app.py` (demo via
-`BEATVEGAS_DB=data/demo.db`). 84 tests.
+(additive Neon push). **Opener/cloud scripts**: `poll_full_game.py` (DK/CFBD full-game
+capture, `--source dk|cfbd|auto`), `derive_multiplier.py` (gated spread multiplier),
+`backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py` (additive
+games+spread push), `grade_lines.py` (terminal derived-1H report), `post_derived_lines.py`
+(writes display-only `derived_lines` predictions for the board), `notify_sunday.py` (local
+iMessage heads-up). Streamlit: `streamlit run beatvegas/dashboard/app.py` (demo via
+`BEATVEGAS_DB=data/demo.db`). 104 tests.
 
 ## Honest status of the edge (don't oversell)
 - Backtest is **proxy-graded** (no free historical 1H lines; uses 0.52×full-game

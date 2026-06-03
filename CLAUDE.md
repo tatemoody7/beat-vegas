@@ -4,20 +4,30 @@ College football **first-half (1H) unders** research & decision-support system.
 Research only — it never places bets or automates gambling.
 
 ## How to resume / orient (read this first)
-- Full design + history: `~/.claude/plans/i-have-a-strong-tingly-reddy.md` (see
-  ADDENDUMs 1–5; **ADDENDUM 5 is the active deploy plan**).
+- **LATEST (2026 pivot): mispricing system shipped.** Reframed from "prove unders
+  win" to "find games where the book mispriced the 1H under." The **predict-the-1H-
+  total engine is now PRIMARY**: `score_slate` ranks the board by the gap between
+  the line and our market-blind predicted 1H total (unders only), not the old
+  classifier probability. Validated +3.0% ROI vs the classifier's +1.4% (proxy OOS).
+  Full write-ups: `docs/PIVOT.md`; memory `beat-vegas-factor-pivot`; plan
+  `~/.claude/plans/we-need-to-pivot-lazy-bonbon.md`.
+- **Factor framework**: `beatvegas/factors/` ranks 117 factors by OOS relationship
+  to the 1H under (`scripts/rank_factors.py` → `factor_scores`). Includes 1H-specific
+  play-by-play factors (`fh_team_game`, from a free bulk PBP backfill).
 - Long-term memory (decisions, status) auto-loads from this project's memory dir.
-- **Phase B shipped**: Next.js app is live on Vercel (Neon-backed, password-gated).
-- **Latest feature: the "BV line"** — an independent calibrated 1H-total regressor
-  compared to the real Vegas 1H line, ranked by gap. Built + deployed. Full
-  write-up: `docs/BV_LINE.md`; design history: this project's memory dir
-  (`beat-vegas-bv-line`).
+- **Phase B shipped**: Next.js app is live on Vercel (Neon-backed, password-gated)
+  at https://beat-vegas.vercel.app. The board reads Neon, orders by `rank` (= gap).
+- The **"BV line"** regressor (`docs/BV_LINE.md`) is the engine core, now promoted
+  from display-only to the primary ranking signal (gate passed — see Gotchas).
 
 ## What it does
-Pulls free data (CFBD, TeamRankings tempo, Open-Meteo weather, The Odds API 1H
-totals), derives ground-truth 1H points, builds leak-free features, scores each
-upcoming game 0–100 for under value, tracks line movement, sends iMessage alerts,
-and grades market vs model vs the user's own picks.
+Pulls free data (CFBD, **bulk play-by-play via cfbfastR parquet + CFBD /plays**,
+TeamRankings tempo, Open-Meteo weather, The Odds API 1H totals), derives ground-truth
+1H points, builds leak-free features (incl. **1H-specific PBP factors**: EPA/success/
+explosive/opening-drive/havoc/redzone/4th-down), predicts each game's 1H total with a
+market-blind regressor, ranks the board by line-vs-prediction **gap** (the mispricing
+signal), tracks line movement, sends iMessage alerts, and grades market vs model vs
+the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`).
 
 ## Architecture
 - **Local Mac engine** (`beatvegas/` + `scripts/`): scrape → score → grade →
@@ -36,18 +46,30 @@ pytest -q                            # 61 tests
 ```
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
 (score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
-`retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py` (re-score
-past seasons to populate `bv_line`), `seed_demo.py`. Streamlit:
-`streamlit run beatvegas/dashboard/app.py` (point at demo with `BEATVEGAS_DB=data/demo.db`).
+`retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py`, `seed_demo.py`.
+**Pivot scripts**: `backfill_pbp.py` (1H PBP aggregates → `fh_team_game`),
+`backfill_context.py` (venue/talent/roster), `rank_factors.py` (factor ranking →
+`factor_scores`), `validate_engine.py` (gbm_v2 gate + MAE ablation), `inspect_combo.py`
++ `explain_pbp.py` (factor deep-dives), `weekly_report.py` (markdown board), `deploy_neon.py`
+(additive Neon push). Streamlit: `streamlit run beatvegas/dashboard/app.py` (demo via
+`BEATVEGAS_DB=data/demo.db`). 84 tests.
 
 ## Honest status of the edge (don't oversell)
 - Backtest is **proxy-graded** (no free historical 1H lines; uses 0.52×full-game
-  total). Real lines collected going forward are the true test.
-- Top-20% model picks: ~**53.7% under / +2.45% ROI** (2018–25) after pace+weather
-  were backfilled into the model. **Pace + weather carry the signal**;
-  situational/returning were flat (kept as display chips only).
-- Edge is **decaying** recently (57–59% in 2018–21 → ~50% in 2023–25). Marginal,
-  unconfirmed. The system's job is to *measure* it honestly, not to promise profit.
+  total). Real DraftKings lines collected going forward are the true test.
+- **Predict-total engine (gbm_v2): top-20% by gap = 54.0% under / +3.0% ROI** OOS
+  (2018+), vs the old classifier's 53.1% / +1.4%. Profitable 6/8 seasons.
+- **The proxy-under ROI is partly a PROXY ARTIFACT**: the flashy proxy-leaders
+  (1H explosive/turnovers) actually correlate with *more* 1H scoring — they win the
+  under via the flat-0.52 proxy over-pricing low-1H-share games, not real low scoring.
+  The `corr_1h` diagnostic (`rank_factors.py`) measures genuine 1H-scoring signal,
+  immune to this. **Genuine signal = pace + efficiency/scoring levels.**
+- The heavy PBP backfill **did not improve 1H-total prediction** (MAE ablation in
+  `validate_engine.py`: 9.22 full vs 9.18 without) — base features already capture
+  it. PBP factors confirmed the thesis + exposed the artifact; they stay as display
+  chips and could be trimmed from the predictor.
+- The edge is real but **small and unconfirmed**. The system's job is to *measure* it
+  honestly vs real lines, not to promise profit.
 
 ## Resuming Phase B (Next.js app)
 Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **Recharts**.
@@ -71,14 +93,19 @@ Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **R
 - Numeric model columns must be clean floats (NaN, never `pd.NA`/None/bool) — see
   `features.build_feature_frame` coercion; `bool(NaN)` is `True` (bit us on dome).
 - ESPN/TeamRankings are **unofficial** — keep isolated in `sources/`, fail-silent.
-- `config.yaml` (keys + phone) and `data/*.db|*.log|cache/` are gitignored — keep it that way.
+- `config.yaml` (keys + phone) and `data/*.db|*.log|cache/|pbp_cache/` are gitignored —
+  keep it that way (`pbp_cache/` holds 56MB parquet files per season).
 - **Neon id-sequence**: rows seeded from SQLite carry explicit ids without advancing
   the Postgres sequence, so the next insert collides on the pkey. Before any bulk
-  insert to Neon (`backfill_bv_line.py`, `retrain.py`), resync:
+  insert to Neon (`backfill_bv_line.py`, `retrain.py`, `deploy_neon.py`), resync:
   `SELECT setval(pg_get_serial_sequence('<table>','id'), (SELECT MAX(id) FROM <table>))`.
-- **BV line is display + a "biggest gaps" sort only** — it must NOT feed
-  `under_score`/`rank` until the gap-vs-CLV table validates it (gaps are often model
-  blind spots, not edges). Calibration uses a **global** intercept correction +
-  `era_post2023` as a feature (a per-era correction would double-count); the gap-vs-CLV
-  tracker joins the **`market`** results ledger (close−open = line movement toward us),
-  not `gbm_v1`. See `docs/BV_LINE.md`.
+- **Neon bulk inserts must be CHUNKED** (~500 rows/commit) — a single big
+  `bulk_insert_mappings` STALLS the Neon pooler indefinitely. See `deploy_neon.py::_chunked_insert`.
+- **psycopg3** required for Neon (`pip install "psycopg[binary]"`); the engine normalizes
+  `postgresql://` → `postgresql+psycopg://` (config.py). NOT psycopg2.
+- **Deploy to Neon is ADDITIVE** (`deploy_neon.py`) — never `--wipe`/full-migrate to
+  prod: `manual_picks`, `odds_snapshots`, `results` are live Neon-only data.
+- **BV gap is now the PRIMARY ranking** (gate passed in `validate_engine.py`).
+  `score_slate` sorts by `bv_gap` desc; `is_opportunity` = `bv_gap_z >= 0.5`. Calibration
+  still uses a **global** intercept + `era_post2023` feature (per-era would double-count).
+  The regressor is MARKET-BLIND (`BV_FEATURE_COLS = FEATURE_COLS − MARKET_COLS`) — keep it so.

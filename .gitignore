@@ -7,6 +7,7 @@ data/*.db-journal
 data/*.log
 data/cache/
 data/pbp_cache/
+data/pg_sim/
 # Node / Next.js (web/ app, added in later phases)
 node_modules/
 .next/

@@ -5,6 +5,8 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
   const color = scoreColor(row.underScore);
   const chips = buildChips(row.factors);
 
+  // Derived-line card: our 1H number off the posted full-game line, no model.
+  const derived = row.factors.line_kind === "derived_fg";
   // Current line: consensus current, else the line baked into factors at scoring.
   const line = row.curLine ?? row.factors.line ?? null;
   const showMove =
@@ -48,6 +50,15 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
           <span className="shrink-0 text-xs text-gray-500">Wk {row.week}</span>
         </div>
 
+        {derived && (
+          <div
+            className="mt-1 inline-block rounded-md border border-sky-700/60 bg-sky-950/40 px-2 py-0.5 text-xs text-sky-300"
+            title="Our spread-adjusted 1H number derived from the posted full-game line. Not a model pick and not graded — there is no score, BV line, or gap."
+          >
+            DERIVED · no model pick
+          </div>
+        )}
+
         {qbOut && (
           <div
             className="mt-1 inline-block rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-300"
@@ -60,53 +71,73 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
           </div>
         )}
 
-        <div className="mt-1 text-sm text-gray-300">
-          Current 1H line: {line !== null ? line.toFixed(1) : "—"}
-          {showMove && (
-            <span className="ml-2 text-gray-500">
-              ({row.openLine!.toFixed(1)} → {row.curLine!.toFixed(1)})
+        {derived ? (
+          <div className="mt-1 text-sm text-gray-300">
+            Derived 1H:{" "}
+            <span className="font-semibold text-gray-100">
+              {line !== null ? line.toFixed(1) : "—"}
             </span>
-          )}
-        </div>
+            {row.factors.full_game_total !== null &&
+              row.factors.full_game_total !== undefined && (
+                <span className="text-gray-500">
+                  {" "}· from full-game {row.factors.full_game_total.toFixed(1)}
+                  {row.factors.spread !== null && row.factors.spread !== undefined
+                    ? ` (${row.factors.spread > 0 ? "+" : ""}${row.factors.spread.toFixed(1)})`
+                    : ""}
+                </span>
+              )}
+          </div>
+        ) : (
+          <>
+            <div className="mt-1 text-sm text-gray-300">
+              Current 1H line: {line !== null ? line.toFixed(1) : "—"}
+              {showMove && (
+                <span className="ml-2 text-gray-500">
+                  ({row.openLine!.toFixed(1)} → {row.curLine!.toFixed(1)})
+                </span>
+              )}
+            </div>
 
-        <div
-          className="mt-0.5 text-sm text-gray-300"
-          title="BV = our own MARKET-BLIND 1H projection (no Vegas number feeds it). The band is the 80% range — the BV line is noisy, so a gap only counts as a signal once it clears ~1σ. Gaps within the band are noise, not edges. Validated only by the CLV-by-gap table in Research."
-        >
-          BV {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
-          {row.bvLo !== null && row.bvHi !== null && (
-            <span className="text-gray-600">
-              {" "}({row.bvLo.toFixed(0)}–{row.bvHi.toFixed(0)})
-            </span>
-          )}
-          <span className="text-gray-600"> · </span>
-          Vegas {vegas !== null ? vegas.toFixed(1) : "—"}
-          <span className="text-gray-600"> · gap </span>
-          <span style={{ color: gapColor }}>
-            {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
-          </span>
-          {z !== null && (
-            <span className={significant ? "text-gray-300" : "text-gray-600"}>
-              {" "}({z > 0 ? "+" : ""}{z.toFixed(1)}σ{significant ? "" : " · noise"})
-            </span>
-          )}
-          {row.bvAdjust !== null && (
-            <span
-              className="ml-1 text-amber-400"
-              title={row.bvAdjustReason ?? "manual BV adjustment"}
+            <div
+              className="mt-0.5 text-sm text-gray-300"
+              title="BV = our own MARKET-BLIND 1H projection (no Vegas number feeds it). The band is the 80% range — the BV line is noisy, so a gap only counts as a signal once it clears ~1σ. Gaps within the band are noise, not edges. Validated only by the CLV-by-gap table in Research."
             >
-              (adj {row.bvAdjust > 0 ? "+" : ""}{row.bvAdjust}
-              {row.bvAdjustReason ? `: ${row.bvAdjustReason}` : ""})
-            </span>
-          )}
-        </div>
+              BV {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
+              {row.bvLo !== null && row.bvHi !== null && (
+                <span className="text-gray-600">
+                  {" "}({row.bvLo.toFixed(0)}–{row.bvHi.toFixed(0)})
+                </span>
+              )}
+              <span className="text-gray-600"> · </span>
+              Vegas {vegas !== null ? vegas.toFixed(1) : "—"}
+              <span className="text-gray-600"> · gap </span>
+              <span style={{ color: gapColor }}>
+                {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
+              </span>
+              {z !== null && (
+                <span className={significant ? "text-gray-300" : "text-gray-600"}>
+                  {" "}({z > 0 ? "+" : ""}{z.toFixed(1)}σ{significant ? "" : " · noise"})
+                </span>
+              )}
+              {row.bvAdjust !== null && (
+                <span
+                  className="ml-1 text-amber-400"
+                  title={row.bvAdjustReason ?? "manual BV adjustment"}
+                >
+                  (adj {row.bvAdjust > 0 ? "+" : ""}{row.bvAdjust}
+                  {row.bvAdjustReason ? `: ${row.bvAdjustReason}` : ""})
+                </span>
+              )}
+            </div>
 
-        <div className="text-sm text-gray-400">
-          Model:{" "}
-          {row.underProb !== null
-            ? `under ${Math.round(row.underProb * 100)}%`
-            : "—"}
-        </div>
+            <div className="text-sm text-gray-400">
+              Model:{" "}
+              {row.underProb !== null
+                ? `under ${Math.round(row.underProb * 100)}%`
+                : "—"}
+            </div>
+          </>
+        )}
 
         <div className="mt-2 flex flex-wrap gap-1.5">
           {chips.map((c) => (

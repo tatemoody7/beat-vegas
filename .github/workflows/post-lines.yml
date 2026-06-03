@@ -1,0 +1,43 @@
+name: Post derived lines to the board
+
+# Writes our derived-1H numbers for the posted full-game lines to Neon as
+# display-only `predictions` rows (model_version=derived_lines), so they show on
+# the Opportunities board labeled "DERIVED — no model pick". Runs in the cloud
+# because the Mac can't reach Neon on the campus network. Real in-season scoring
+# (gbm_v1, newer created_at) auto-supersedes these per the season-scoped query.
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season"
+        required: false
+        default: "2026"
+      week:
+        description: "Week filter (blank = all posted)"
+        required: false
+        default: "1"
+      source:
+        description: "dk | cfbd | auto"
+        required: false
+        default: "auto"
+
+jobs:
+  post-lines:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Post derived lines
+        run: |
+          ARGS="--season ${{ inputs.season }} --source ${{ inputs.source }}"
+          if [ -n "${{ inputs.week }}" ]; then ARGS="$ARGS --week ${{ inputs.week }}"; fi
+          python scripts/post_derived_lines.py $ARGS

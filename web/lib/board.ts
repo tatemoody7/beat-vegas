@@ -124,8 +124,11 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
            g.week, g.away_team, g.home_team, g.full_game_total
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
-      AND p.model_version = (SELECT model_version FROM predictions
-                             ORDER BY created_at DESC LIMIT 1)
+      AND p.model_version = (
+        SELECT p2.model_version FROM predictions p2
+        JOIN games g2 ON g2.id = p2.game_id
+        WHERE g2.season = ${season}
+        ORDER BY p2.created_at DESC LIMIT 1)
     ORDER BY p.rank
   `;
   const [lines, adjustments] = await Promise.all([consensusLines(), bvAdjustments()]);

@@ -28,6 +28,9 @@ export default async function Home({
     // Noise-adjusted: biggest gaps relative to the BV line's own σ.
     rows.sort((a, b) => (b.liveGapZ ?? -Infinity) - (a.liveGapZ ?? -Infinity));
   }
+  // Derived board = posted full-game lines run through our 1H pricing, no model.
+  const derivedBoard =
+    rows.length > 0 && rows.every((r) => r.factors.line_kind === "derived_fg");
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -35,7 +38,9 @@ export default async function Home({
         <div>
           <h1 className="text-xl font-semibold">Opportunities</h1>
           <p className="text-sm text-gray-500">
-            Ranked 1H-under leans · score 0–100 (50 = breakeven)
+            {derivedBoard
+              ? "Derived 1H lines off posted full-game numbers · not model picks"
+              : "Ranked 1H-under leans · score 0–100 (50 = breakeven)"}
           </p>
         </div>
         <div className="flex items-center gap-4">

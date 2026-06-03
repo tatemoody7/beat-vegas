@@ -26,6 +26,12 @@ export type Factors = {
   qb_out_detail?: string | null;
   line?: number | null;
   edge?: number | null;
+  // derived-line entries (scripts/post_derived_lines.py): our 1H number off the
+  // posted full-game line, no model. `line_kind="derived_fg"` flags these cards.
+  line_kind?: string | null;
+  full_game_total?: number | null;
+  spread?: number | null;
+  fh_share?: number | null;
   // primary-engine fields (gbm_v2 gap ranking, Phase 3)
   rank_basis?: string | null;
   is_opportunity?: boolean | null;

@@ -147,7 +147,8 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();
 
-  // Raw insert keeps placed_at a plain string (consistent with Python-written rows).
+  // Postgres is strict: cast the ISO string to a timestamp and use a real
+  // boolean for `graded` (SQLite tolerated a text date + integer 0; Neon/PG won't).
   await prisma.$executeRaw`
     INSERT INTO manual_picks
       (game_id, season, week, home_team, away_team, side, line, price, stake,
@@ -155,7 +156,7 @@ export async function createPick(input: CreatePickInput): Promise<void> {
     VALUES
       (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
        ${game.away_team}, 'under', ${input.line}, ${price}, ${stake},
-       ${placedAt}, ${note}, ${modelScore}, ${modelLine}, 0)
+       ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine}, false)
   `;
 }
 

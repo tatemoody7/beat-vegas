@@ -113,6 +113,17 @@ Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **R
   DevTools. Schema is `events`/`markets`/`selections` (the old `eventgroups` endpoint
   is dead). The default payload carries only main full-game markets (1H totals post
   later via a subcategory query), which is exactly the Sunday opener we want.
+- **Neon is UNREACHABLE from the campus/fgcu network** (port 5432 TLS data filtered;
+  HTTPS/443 works). So **Neon-writing scheduled jobs run in GitHub Actions**
+  (`.github/workflows/sunday.yml` cron + `bootstrap.yml` one-time), not local launchd.
+  **DK's API 403s GHA datacenter IPs** (confirmed), so the cloud job uses
+  `poll_full_game --source auto` → **CFBD /lines fallback** (`sources/cfbd_lines.py`,
+  reliable but less fresh than DK; DK only works from the Mac, which can't write Neon).
+  Local jobs degrade gracefully via `store.try_init_db` (logs "unreachable", exits 0).
+  The Sunday iMessage stays local + notify-only (`scripts/notify_sunday.py` +
+  `deploy/com.beatvegas.sunday-notify.plist`). Secrets `DATABASE_URL`/`CFBD_API_KEY`/
+  `ODDS_API_KEY` are set as GH secrets. Pushing `.github/workflows/` needs the gh
+  `workflow` token scope.
 - `config.yaml` (keys + phone) and `data/*.db|*.log|cache/|pbp_cache/` are gitignored —
   keep it that way (`pbp_cache/` holds 56MB parquet files per season).
 - **Neon id-sequence**: rows seeded from SQLite carry explicit ids without advancing

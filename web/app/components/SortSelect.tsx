@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 export const SORTS = [
   { value: "rank", label: "Model rank" },
   { value: "gap", label: "Biggest gaps" },
+  { value: "gapz", label: "Biggest gaps (noise-adj)" },
 ] as const;
 
 export default function SortSelect({ current }: { current: string }) {

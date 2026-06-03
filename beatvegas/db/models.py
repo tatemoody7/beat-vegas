@@ -147,6 +147,9 @@ class Prediction(Base):
     projected_first_half_total = Column(Float)
     bv_line = Column(Float)                   # calibrated independent 1H projection
     bv_gap = Column(Float)                     # line_used - bv_line (under direction)
+    bv_lo = Column(Float)                      # 80% prediction band lower bound
+    bv_hi = Column(Float)                      # 80% prediction band upper bound
+    bv_sigma = Column(Float)                   # residual std (gap noise scale)
     line_used = Column(Float)
     rank = Column(Integer)
     factors_json = Column(String)             # per-game factor payload for cards
@@ -163,6 +166,7 @@ class Result(Base):
     line_kind = Column(String)                      # 'proxy' | 'real'
     under_hit = Column(Boolean)
     closing_line = Column(Float)
+    closing_captured_at = Column(DateTime)          # when the closing snapshot landed
     clv = Column(Float)
     units = Column(Float)
 
@@ -195,6 +199,18 @@ class ManualPick(Base):
     units = Column(Float)
     closing_line = Column(Float)
     clv = Column(Float)
+
+
+class BvAdjustment(Base):
+    """A manual nudge to the BV line for one game (e.g. a confirmed QB-out the
+    model can't see). Display-only: shifts the shown BV line + gap, clearly
+    labeled. Latest row per game_id wins."""
+    __tablename__ = "bv_adjustments"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    delta_pts = Column(Float)                    # added to bv_line (− = lower scoring)
+    reason = Column(String)
+    created_at = Column(DateTime)
 
 
 class ModelRun(Base):

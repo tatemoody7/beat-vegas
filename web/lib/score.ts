@@ -17,6 +17,13 @@ export type Factors = {
   proj_1h_total?: number | null;
   bv_line?: number | null;
   bv_gap?: number | null;
+  bv_lo?: number | null;
+  bv_hi?: number | null;
+  bv_sigma?: number | null;
+  bv_gap_z?: number | null;
+  qb_out_home?: boolean | null;
+  qb_out_away?: boolean | null;
+  qb_out_detail?: string | null;
   line?: number | null;
   edge?: number | null;
 };

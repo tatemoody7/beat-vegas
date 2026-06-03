@@ -99,22 +99,39 @@ def render_card(row: pd.Series) -> None:
                 + f" &nbsp;·&nbsp; **Model: under {prob_txt}** "
                 "<span style='font-size:0.75rem;color:#9ca3af'>"
                 "(breakeven 52%)</span>", unsafe_allow_html=True)
-            # BV line vs Vegas + gap (under direction). Gap vs live consensus
-            # when available, else the gap baked in at scoring time.
+            # BV line (market-blind) vs Vegas + gap, with the 80% band and the
+            # gap in units of the line's own noise (σ). |z|<1 = noise, not edge.
             bv = f.get("bv_line")
+            bv_lo, bv_hi, bv_sigma = f.get("bv_lo"), f.get("bv_hi"), f.get("bv_sigma")
             vegas = line_now
             gap = (vegas - bv) if (vegas is not None and bv is not None) else f.get("bv_gap")
-            gap_color = ("#9ca3af" if gap is None else
-                         "#65a30d" if gap > 0 else "#dc2626" if gap < 0 else "#9ca3af")
+            z = (gap / bv_sigma) if (gap is not None and bv_sigma) else None
+            significant = z is not None and abs(z) >= 1
+            gap_color = ("#6b7280" if gap is None or not significant else
+                         "#65a30d" if gap > 0 else "#dc2626")
+            band = (f" ({bv_lo:.0f}–{bv_hi:.0f})"
+                    if bv_lo is not None and bv_hi is not None else "")
+            z_txt = (f" <span style='color:{'#d1d5db' if significant else '#6b7280'}'>"
+                     f"({z:+.1f}σ{'' if significant else ' · noise'})</span>"
+                     if z is not None else "")
+            qb_home, qb_away = f.get("qb_out_home"), f.get("qb_out_away")
+            if qb_home or qb_away:
+                who = " · ".join(t for t, flag in
+                                 [(row['away_team'], qb_away), (row['home_team'], qb_home)] if flag)
+                st.markdown(
+                    f"<span style='font-size:0.8rem;color:#fbbf24'>⚠ QB OUT · {who} "
+                    "<span style='color:#a16207'>(live, unofficial)</span></span>",
+                    unsafe_allow_html=True)
             st.markdown(
                 f"<span style='font-size:0.85rem;color:#9ca3af'>"
-                f"BV {('%.1f' % bv) if bv is not None else '—'} · "
+                f"BV {('%.1f' % bv) if bv is not None else '—'}{band} · "
                 f"Vegas {('%.1f' % vegas) if vegas is not None else '—'} · gap "
                 f"</span><span style='font-size:0.85rem;color:{gap_color}'>"
-                f"{('%+.1f' % gap) if gap is not None else '—'}</span>"
-                "<br><span style='font-size:0.7rem;color:#6b7280'>BV = model's own "
-                "calibrated 1H number; large gaps can be blind spots, not edges "
-                "(see Research → Gap vs CLV)</span>", unsafe_allow_html=True)
+                f"{('%+.1f' % gap) if gap is not None else '—'}</span>{z_txt}"
+                "<br><span style='font-size:0.7rem;color:#6b7280'>BV = our own "
+                "MARKET-BLIND 1H number (no Vegas input); the band is the 80% range. "
+                "A gap only counts past ~1σ — see Research → Gap vs CLV</span>",
+                unsafe_allow_html=True)
             proj_txt = f"{proj:.1f}" if proj is not None else "—"
             chips = [
                 _chip("Pace", f.get("pace") or "live ✦",

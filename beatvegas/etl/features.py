@@ -45,6 +45,22 @@ FEATURE_COLS: List[str] = [
     "era_post2023",
 ]
 
+# --- the "no Vegas line" rule -------------------------------------------------
+# The BV line is our OWN number; if it learned from Vegas it wouldn't be
+# independent and the gap would be circular. MARKET_COLS are the only
+# Vegas-derived entries in FEATURE_COLS — the BV regressor must exclude them
+# (see model/bv_line.BV_FEATURE_COLS). The classifier may keep them: it is
+# explicitly the market-relative model (target = 1H < proxy_line).
+MARKET_COLS = {"full_game_total", "proj_1h_ratio"}
+
+# Names derived from the 1H BETTING line. These must NEVER be a feature in ANY
+# model — they're used only post-prediction for the gap/grading. The guard test
+# in tests/test_features.py enforces this.
+BANNED_LINE_COLS = {
+    "line_used", "closing_line", "consensus_line", "totals_h1",
+    "proxy_line", "open_line", "cur_line", "bv_gap", "bv_line",
+}
+
 
 def _load_all_games() -> pd.DataFrame:
     with session_scope() as s:

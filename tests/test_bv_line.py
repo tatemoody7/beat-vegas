@@ -4,7 +4,7 @@ import pandas as pd
 from beatvegas.etl.features import FEATURE_COLS
 from beatvegas.model.bv_line import (
     apply_bias, bias_corrections, bv_line_for_slate, oof_residuals,
-    residual_report,
+    residual_band, residual_report,
 )
 
 
@@ -70,3 +70,12 @@ def test_empty_slate_returns_empty():
     df = _synthetic_frame()
     assert len(bv_line_for_slate(df, df.iloc[0:0])) == 0
     assert len(bv_line_for_slate(df.iloc[0:0], df)) == 0
+
+
+def test_residual_band_is_ordered_and_positive_sigma():
+    df = _synthetic_frame()
+    band = residual_band(df)
+    assert band["sigma"] > 0
+    assert band["lo_off"] < 0 < band["hi_off"]      # lo below, hi above the line
+    # Synthetic noise is N(0, 1.5) → 80% band ≈ ±1.9; sanity bound.
+    assert 0.5 < band["sigma"] < 4.0

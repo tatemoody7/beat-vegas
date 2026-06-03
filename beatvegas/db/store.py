@@ -14,7 +14,9 @@ from .models import Base
 # New columns added after first release; ALTER existing tables idempotently.
 _MIGRATIONS = {
     "predictions": {"under_score": "INTEGER", "factors_json": "TEXT",
-                    "bv_line": "FLOAT", "bv_gap": "FLOAT"},
+                    "bv_line": "FLOAT", "bv_gap": "FLOAT",
+                    "bv_lo": "FLOAT", "bv_hi": "FLOAT", "bv_sigma": "FLOAT"},
+    "results": {"closing_captured_at": "TIMESTAMP"},
     "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
 }
 

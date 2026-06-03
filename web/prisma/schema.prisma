@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model bv_adjustments {
+  id         Int       @id @default(autoincrement())
+  game_id    Int?
+  delta_pts  Float?
+  reason     String?   @db.VarChar
+  created_at DateTime? @db.Timestamp(6)
+
+  @@index([game_id], map: "ix_bv_adjustments_game_id")
+}
+
 model games {
   id                     Int              @id(map: "uq_game_id") @default(autoincrement())
   season                 Int
@@ -104,6 +114,9 @@ model predictions {
   projected_first_half_total Float?
   bv_line                    Float?
   bv_gap                     Float?
+  bv_lo                      Float?
+  bv_hi                      Float?
+  bv_sigma                   Float?
   line_used                  Float?
   rank                       Int?
   factors_json               String?   @db.VarChar
@@ -123,6 +136,7 @@ model results {
   line_kind               String?  @db.VarChar
   under_hit               Boolean?
   closing_line            Float?
+  closing_captured_at     DateTime? @db.Timestamp(6)
   clv                     Float?
   units                   Float?
   games                   games?   @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

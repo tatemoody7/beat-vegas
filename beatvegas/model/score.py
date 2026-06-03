@@ -22,7 +22,7 @@ from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.features import FEATURE_COLS, build_feature_frame
 from ..etl.proxy_line import proxy_total
-from .bv_line import bv_line_for_slate
+from .bv_line import bv_line_for_slate, residual_band
 
 MODEL_VERSION = "gbm_v1"
 MODEL_BET_THRESHOLD = 53          # under_score at/above this = the model "bets" it
@@ -105,6 +105,13 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "proj_1h_total": _f(proj),
         "bv_line": _f(row.get("bv_line")),
         "bv_gap": _f(row.get("bv_gap")),
+        "bv_lo": _f(row.get("bv_lo")),
+        "bv_hi": _f(row.get("bv_hi")),
+        "bv_sigma": _f(row.get("bv_sigma")),
+        "bv_gap_z": _f(row.get("bv_gap_z")),
+        "qb_out_home": bool(row.get("qb_out_home")) if row.get("qb_out_home") is not None else None,
+        "qb_out_away": bool(row.get("qb_out_away")) if row.get("qb_out_away") is not None else None,
+        "qb_out_detail": row.get("qb_out_detail") if isinstance(row.get("qb_out_detail"), str) else None,
         "line": _f(line),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
     }
@@ -137,10 +144,20 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     target["line"] = target.apply(
         lambda r: ll.get(r["id"], proxy_total(r["full_game_total"], 0.52)), axis=1)
 
-    # Independent calibrated "BV line": our own 1H total from a regressor over the
-    # full feature set (display + gap sort only; does NOT influence under_score).
+    # Independent calibrated "BV line": our own 1H total from a MARKET-BLIND
+    # regressor (no Vegas inputs). Display + gap sort only; does NOT influence
+    # under_score. bv_lo/bv_hi = 80% prediction band; bv_gap_z = gap in sigmas
+    # (noise-aware — a gap inside the band is noise, not an edge).
     target["bv_line"] = bv_line_for_slate(train, target).round(2)
     target["bv_gap"] = (target["line"] - target["bv_line"]).round(2)
+    band = residual_band(train)
+    sigma = band.get("sigma")
+    lo_off, hi_off = band.get("lo_off"), band.get("hi_off")
+    target["bv_sigma"] = sigma
+    target["bv_lo"] = (target["bv_line"] + lo_off).round(2) if lo_off is not None else None
+    target["bv_hi"] = (target["bv_line"] + hi_off).round(2) if hi_off is not None else None
+    target["bv_gap_z"] = ((target["bv_gap"] / sigma).round(2)
+                          if sigma else None)
 
     target = target.sort_values("under_prob", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
@@ -165,6 +182,8 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
                 under_score=int(r["under_score"]),
                 projected_first_half_total=_f(r.get("proj_1h_total")),
                 bv_line=_f(r.get("bv_line")), bv_gap=_f(r.get("bv_gap")),
+                bv_lo=_f(r.get("bv_lo")), bv_hi=_f(r.get("bv_hi")),
+                bv_sigma=_f(r.get("bv_sigma")),
                 line_used=_f(line), rank=int(r["rank"]),
                 factors_json=json.dumps(_factors(r, line)),
                 created_at=now,

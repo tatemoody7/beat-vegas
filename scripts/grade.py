@@ -18,14 +18,19 @@ from typing import Dict, List, Optional, Tuple
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.grading import clv_under, under_result, units_won
-from beatvegas.lines import consensus_open_close
+from beatvegas.lines import closing_before_kickoff
 from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
 MODEL_MARKET = "market"   # tag for the pure market-vs-result grade
 
 
 def _closings(session, season: int):
-    """game -> (opening, closing) consensus for finished games with snapshots."""
+    """game -> (g, (opening, closing), closing_at) for finished games.
+
+    The closing line uses only snapshots captured BEFORE kickoff (so a late poll
+    that ran after the game started can't pollute it), and closing_at is the
+    freshest such snapshot — the CLV-trust signal (how close to kickoff we got).
+    """
     games = (session.query(Game)
              .filter(Game.season == season,
                      Game.first_half_total.isnot(None)).all())
@@ -34,13 +39,14 @@ def _closings(session, season: int):
         snaps = (session.query(OddsSnapshot)
                  .filter(OddsSnapshot.game_id == g.id,
                          OddsSnapshot.market == "1H_total").all())
-        out[g.id] = (g, consensus_open_close(snaps) if snaps else (None, None))
+        opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
+        out[g.id] = (g, (opening, closing), closing_at)
     return out
 
 
 def grade_market(session, closings) -> int:
     n = 0
-    for gid, (g, (opening, closing)) in closings.items():
+    for gid, (g, (opening, closing), closing_at) in closings.items():
         if closing is None:
             continue
         actual = g.first_half_total
@@ -50,7 +56,8 @@ def grade_market(session, closings) -> int:
             game_id=gid, model_version=MODEL_MARKET, actual_first_half_total=actual,
             line_used=closing, line_kind="real",
             under_hit=under_result(actual, closing) == "under",
-            closing_line=closing, clv=clv_under(opening, closing),
+            closing_line=closing, closing_captured_at=closing_at,
+            clv=clv_under(opening, closing),
             units=units_won(actual, closing)))
         n += 1
     return n
@@ -67,7 +74,7 @@ def grade_model(session, season: int, closings) -> int:
         entry = closings.get(p.game_id)
         if entry is None:
             continue
-        g, (_open, closing) = entry
+        g, (_open, closing), closing_at = entry
         actual = g.first_half_total
         bet_line = p.line_used
         (session.query(Result).filter(Result.game_id == p.game_id,
@@ -77,7 +84,8 @@ def grade_model(session, season: int, closings) -> int:
             actual_first_half_total=actual, line_used=bet_line,
             line_kind="real" if closing is not None else "proxy",
             under_hit=under_result(actual, bet_line) == "under",
-            closing_line=closing, clv=clv_under(bet_line, closing),
+            closing_line=closing, closing_captured_at=closing_at,
+            clv=clv_under(bet_line, closing),
             units=units_won(actual, bet_line)))
         n += 1
     return n

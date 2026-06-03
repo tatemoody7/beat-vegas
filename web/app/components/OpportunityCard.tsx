@@ -15,9 +15,18 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
   // Vegas line for the gap: live consensus, else the line at scoring time.
   const vegas = row.curLine ?? row.factors.line ?? null;
   const gap = row.liveGap;
-  // Positive gap (Vegas above our BV number) = an under-leaning gap.
+  const z = row.liveGapZ;
+  // A gap only "counts" once it clears the BV line's own noise (|z| >= 1).
+  const significant = z !== null && Math.abs(z) >= 1;
+  // Positive gap (Vegas above our BV number) = an under-leaning gap — but grey it
+  // out when it's within noise, so a noisy gap doesn't read as an edge.
   const gapColor =
-    gap === null ? "#6b7280" : gap > 0 ? "#65a30d" : gap < 0 ? "#dc2626" : "#9ca3af";
+    gap === null || !significant
+      ? "#6b7280"
+      : gap > 0
+        ? "#65a30d"
+        : "#dc2626";
+  const qbOut = row.factors.qb_out_home || row.factors.qb_out_away;
 
   return (
     <div className="flex gap-4 rounded-xl border border-gray-800 bg-gray-950 p-4">
@@ -39,6 +48,18 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
           <span className="shrink-0 text-xs text-gray-500">Wk {row.week}</span>
         </div>
 
+        {qbOut && (
+          <div
+            className="mt-1 inline-block rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-300"
+            title={row.factors.qb_out_detail ?? "Starting QB listed out (live ESPN, unofficial). Not a model input."}
+          >
+            ⚠ QB OUT
+            {row.factors.qb_out_away ? ` · ${row.away}` : ""}
+            {row.factors.qb_out_home ? ` · ${row.home}` : ""}
+            <span className="ml-1 text-amber-500/70">(live, unofficial)</span>
+          </div>
+        )}
+
         <div className="mt-1 text-sm text-gray-300">
           Current 1H line: {line !== null ? line.toFixed(1) : "—"}
           {showMove && (
@@ -50,15 +71,34 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
         <div
           className="mt-0.5 text-sm text-gray-300"
-          title="BV = the model's own calibrated 1H projection vs the market. Positive gap = Vegas above our number (under-leaning). Large gaps can be model blind spots, not edges — see the CLV-by-gap table in Research."
+          title="BV = our own MARKET-BLIND 1H projection (no Vegas number feeds it). The band is the 80% range — the BV line is noisy, so a gap only counts as a signal once it clears ~1σ. Gaps within the band are noise, not edges. Validated only by the CLV-by-gap table in Research."
         >
           BV {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
+          {row.bvLo !== null && row.bvHi !== null && (
+            <span className="text-gray-600">
+              {" "}({row.bvLo.toFixed(0)}–{row.bvHi.toFixed(0)})
+            </span>
+          )}
           <span className="text-gray-600"> · </span>
           Vegas {vegas !== null ? vegas.toFixed(1) : "—"}
           <span className="text-gray-600"> · gap </span>
           <span style={{ color: gapColor }}>
             {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
           </span>
+          {z !== null && (
+            <span className={significant ? "text-gray-300" : "text-gray-600"}>
+              {" "}({z > 0 ? "+" : ""}{z.toFixed(1)}σ{significant ? "" : " · noise"})
+            </span>
+          )}
+          {row.bvAdjust !== null && (
+            <span
+              className="ml-1 text-amber-400"
+              title={row.bvAdjustReason ?? "manual BV adjustment"}
+            >
+              (adj {row.bvAdjust > 0 ? "+" : ""}{row.bvAdjust}
+              {row.bvAdjustReason ? `: ${row.bvAdjustReason}` : ""})
+            </span>
+          )}
         </div>
 
         <div className="text-sm text-gray-400">

@@ -17,9 +17,17 @@ export type BoardRow = {
   openLine: number | null;
   curLine: number | null;
   bvLine: number | null;
+  bvLo: number | null;
+  bvHi: number | null;
+  bvSigma: number | null;
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
+  // gap in units of the BV line's own noise (σ). |z|<1 = within noise.
+  liveGapZ: number | null;
+  // manual display-only nudge applied to the BV line (e.g. confirmed QB-out).
+  bvAdjust: number | null;
+  bvAdjustReason: string | null;
 };
 
 const num = (v: unknown): number | null =>
@@ -40,6 +48,9 @@ type PredRow = {
   factors_json: string | null;
   bv_line: number | null;
   bv_gap: number | null;
+  bv_lo: number | null;
+  bv_hi: number | null;
+  bv_sigma: number | null;
   week: number | bigint;
   away_team: string | null;
   home_team: string | null;
@@ -89,10 +100,27 @@ async function consensusLines(): Promise<
   return out;
 }
 
+// Latest manual BV adjustment per game (display-only nudge, e.g. QB-out).
+async function bvAdjustments(): Promise<Map<number, { delta: number; reason: string | null }>> {
+  const rows = await prisma.$queryRaw<
+    { game_id: number | bigint; delta_pts: number | null; reason: string | null;
+      created_at: string | null }[]
+  >`
+    SELECT game_id, delta_pts, reason, CAST(created_at AS TEXT) AS created_at
+    FROM bv_adjustments ORDER BY created_at
+  `;
+  const out = new Map<number, { delta: number; reason: string | null }>();
+  for (const r of rows) {
+    if (r.delta_pts === null || r.delta_pts === undefined) continue;
+    out.set(Number(r.game_id), { delta: Number(r.delta_pts), reason: r.reason });
+  }
+  return out; // later rows overwrite earlier → latest wins
+}
+
 export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
-           p.bv_line, p.bv_gap,
+           p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi, p.bv_sigma,
            g.week, g.away_team, g.home_team, g.full_game_total
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
@@ -100,18 +128,26 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
                              ORDER BY created_at DESC LIMIT 1)
     ORDER BY p.rank
   `;
-  const lines = await consensusLines();
+  const [lines, adjustments] = await Promise.all([consensusLines(), bvAdjustments()]);
   return preds.map((p) => {
     const gid = Number(p.game_id);
     const l = lines.get(gid);
     const curLine = l?.cur ?? null;
-    const bvLine = num(p.bv_line);
+    const adj = adjustments.get(gid) ?? null;
+    const rawBv = num(p.bv_line);
+    // Apply the manual nudge to the displayed BV line + band (clearly labeled).
+    const bvLine = rawBv !== null && adj ? Math.round((rawBv + adj.delta) * 100) / 100 : rawBv;
+    const bvSigma = num(p.bv_sigma);
     // Prefer the gap vs the live consensus; fall back to the gap baked in at
     // scoring time (bv_gap = line_used − bv_line) when no live line exists.
     const liveGap =
       curLine !== null && bvLine !== null
         ? Math.round((curLine - bvLine) * 100) / 100
         : num(p.bv_gap);
+    const liveGapZ =
+      liveGap !== null && bvSigma && bvSigma > 0
+        ? Math.round((liveGap / bvSigma) * 100) / 100
+        : null;
     return {
       gameId: gid,
       week: Number(p.week),
@@ -125,7 +161,13 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       openLine: l?.open ?? null,
       curLine,
       bvLine,
+      bvLo: adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
+      bvHi: adj && num(p.bv_hi) !== null ? num(p.bv_hi)! + adj.delta : num(p.bv_hi),
+      bvSigma,
       liveGap,
+      liveGapZ,
+      bvAdjust: adj?.delta ?? null,
+      bvAdjustReason: adj?.reason ?? null,
     };
   });
 }

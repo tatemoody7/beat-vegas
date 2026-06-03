@@ -38,6 +38,26 @@ def opening_line_lookup(season: int, week: int) -> Dict[int, float]:
             if consensus_open_close(snaps)[0] is not None}
 
 
+def _enrich_qb_out(scored) -> None:
+    """Forward-only: tag the upcoming slate with live 'QB OUT' flags from ESPN.
+
+    Display only, unofficial, fail-silent — never a model feature, never
+    backfilled. Mutates `scored` in place, adding qb_out_home/away/detail which
+    store_predictions persists into factors_json."""
+    from beatvegas.sources.espn import qb_out_flags
+    homes, aways, details = [], [], []
+    for _, r in scored.iterrows():
+        f = qb_out_flags(r["home_team"], r["away_team"])
+        homes.append(bool(f["home"]))
+        aways.append(bool(f["away"]))
+        details.append(f["detail"] or None)
+    scored["qb_out_home"] = homes
+    scored["qb_out_away"] = aways
+    scored["qb_out_detail"] = details
+    flagged = sum(1 for h, a in zip(homes, aways) if h or a)
+    print(f"qb-out flags: {flagged}/{len(scored)} games (live ESPN, unofficial)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
@@ -59,6 +79,7 @@ def main() -> None:
         print(f"No scorable games for {args.season} wk{week} "
               f"(need >= {args.min_games} games played by both teams).")
         return
+    _enrich_qb_out(scored)
     n = store_predictions(scored)
     real = sum(1 for g in scored["id"] if g in lines)
     print(f"scored {n} games for {args.season} wk{week} "

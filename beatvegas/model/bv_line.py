@@ -29,11 +29,16 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from ..etl.features import FEATURE_COLS
+from ..etl.features import BANNED_LINE_COLS, FEATURE_COLS, MARKET_COLS
 
 TARGET = "first_half_total"
 ERA_COL = "era_post2023"
 _MIN_SEGMENT = 200          # min rows to report a segment residual
+
+# The BV line is MARKET-BLIND: it sees none of the Vegas-derived inputs. This is
+# the whole point — an independent number to compare against Vegas, so the gap
+# isn't circular. (The classifier in score.py keeps FEATURE_COLS by design.)
+BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS]
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:
@@ -44,9 +49,17 @@ def _new_regressor() -> HistGradientBoostingRegressor:
     )
 
 
+def _assert_market_blind(cols) -> None:
+    """Defense in depth: the BV regressor must never train on a Vegas number."""
+    leaked = (set(cols) & MARKET_COLS) | (set(cols) & BANNED_LINE_COLS)
+    if leaked:
+        raise AssertionError(f"BV line must be market-blind; leaked columns: {leaked}")
+
+
 def fit_bv_regressor(train_df: pd.DataFrame) -> HistGradientBoostingRegressor:
+    _assert_market_blind(BV_FEATURE_COLS)
     model = _new_regressor()
-    model.fit(train_df[FEATURE_COLS], train_df[TARGET])
+    model.fit(train_df[BV_FEATURE_COLS], train_df[TARGET])
     return model
 
 
@@ -66,7 +79,7 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500) -> pd.DataFrame:
         if len(train) < min_train or test.empty:
             continue
         model = fit_bv_regressor(train)
-        pred = model.predict(test[FEATURE_COLS])
+        pred = model.predict(test[BV_FEATURE_COLS])
         chunk = test.copy()
         chunk["bv_raw"] = pred
         chunk["residual"] = chunk[TARGET].astype(float) - pred
@@ -106,9 +119,32 @@ def bv_line_for_slate(train_df: pd.DataFrame,
     if train_df.empty or target_df.empty:
         return np.array([], dtype=float)
     model = fit_bv_regressor(train_df)
-    raw = model.predict(target_df[FEATURE_COLS])
+    raw = model.predict(target_df[BV_FEATURE_COLS])
     corrections = bias_corrections(train_df)
     return apply_bias(raw, target_df, corrections)
+
+
+def residual_band(train_df: pd.DataFrame, lo: float = 0.1,
+                  hi: float = 0.9) -> Dict:
+    """Empirical (conformal) prediction band for the BV line.
+
+    Reuses the walk-forward OOF residuals — no extra models. Returns
+    {"lo_off", "hi_off", "sigma"}: offsets to add to the calibrated BV line for
+    an [lo, hi] interval (default 80%), and the residual std. A raw gap is
+    meaningless without this — a 2pt gap is noise if sigma is 7pt.
+    """
+    res = oof_residuals(train_df)
+    if res.empty or len(res) < _MIN_SEGMENT:
+        return {"lo_off": None, "hi_off": None, "sigma": None}
+    r = res["residual"]
+    # Bias correction already centers residuals near 0; the band is around the
+    # calibrated line, so center the quantiles on the mean (the applied shift).
+    mean = float(r.mean())
+    return {
+        "lo_off": round(float(r.quantile(lo)) - mean, 2),
+        "hi_off": round(float(r.quantile(hi)) - mean, 2),
+        "sigma": round(float(r.std()), 2),
+    }
 
 
 def residual_report(df: pd.DataFrame) -> Dict:

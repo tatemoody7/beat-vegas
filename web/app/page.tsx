@@ -17,12 +17,16 @@ export default async function Home({
     Number.isFinite(requested) && seasons.includes(requested)
       ? requested
       : (seasons[0] ?? new Date().getFullYear());
-  const sort = sp.sort === "gap" ? "gap" : "rank";
+  const sort =
+    sp.sort === "gap" ? "gap" : sp.sort === "gapz" ? "gapz" : "rank";
 
   const rows = await getBoard(season);
   if (sort === "gap") {
     // Biggest under-leaning gaps first (Vegas above our number); nulls last.
     rows.sort((a, b) => (b.liveGap ?? -Infinity) - (a.liveGap ?? -Infinity));
+  } else if (sort === "gapz") {
+    // Noise-adjusted: biggest gaps relative to the BV line's own σ.
+    rows.sort((a, b) => (b.liveGapZ ?? -Infinity) - (a.liveGapZ ?? -Infinity));
   }
 
   return (

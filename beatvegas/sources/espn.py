@@ -92,6 +92,43 @@ def team_injuries(espn_id: str, limit: int = 6) -> List[str]:
     return out
 
 
+_OUT_STATUSES = ("out", "doubtful", "injured reserve", "season")
+
+
+def _qb_out_from_injuries(injuries: List[str]) -> Optional[str]:
+    """Given team_injuries() strings ('QB Name — Out'), return the detail string
+    if a QB is listed Out/Doubtful, else None. Heuristic + unofficial."""
+    for inj in injuries:
+        low = inj.lower()
+        is_qb = low.startswith("qb ") or " qb " in low.split("—")[0].lower()
+        if is_qb and any(st in low for st in _OUT_STATUSES):
+            return inj
+    return None
+
+
+def qb_out_flags(home_school: str, away_school: str) -> Dict[str, object]:
+    """Forward-only 'starting QB out' flag per side from live ESPN injuries.
+
+    DISPLAY ONLY, unofficial, fail-silent. Returns
+    {"home": bool, "away": bool, "detail": str}. Never used as a model feature
+    and never backfilled (no historical injury data exists)."""
+    out = {"home": False, "away": False, "detail": ""}
+    details = []
+    try:
+        for side, school in (("home", home_school), ("away", away_school)):
+            eid = espn_team_id(school)
+            if not eid:
+                continue
+            d = _qb_out_from_injuries(team_injuries(eid))
+            if d:
+                out[side] = True
+                details.append(f"{school}: {d}")
+    except Exception:  # noqa: BLE001 — unofficial source, never break scoring
+        return {"home": False, "away": False, "detail": ""}
+    out["detail"] = " · ".join(details)
+    return out
+
+
 def game_context(home_school: str, away_school: str) -> Dict[str, Dict[str, List[str]]]:
     """News + injuries for both teams (each may be empty)."""
     ctx = {}

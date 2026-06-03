@@ -30,7 +30,7 @@ export default function GameSelect({
       >
         {games.map((g) => (
           <option key={g.id} value={g.id}>
-            wk{g.week}: {g.matchup} ({g.snaps} snaps)
+            wk{g.week}: {g.matchup} ({g.snaps} updates)
           </option>
         ))}
       </select>

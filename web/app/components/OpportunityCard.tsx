@@ -32,14 +32,24 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
   return (
     <div className="flex gap-4 rounded-xl border border-gray-800 bg-gray-950 p-4">
-      {/* Left: score */}
-      <div className="flex w-24 shrink-0 flex-col items-center justify-center">
-        <span className="text-[3rem] font-bold leading-none" style={{ color }}>
-          {row.underScore ?? "—"}
-        </span>
-        <span className="mt-1 text-sm text-gray-400">#{row.rank ?? "—"}</span>
-        <span className="text-xs text-gray-600">50 = BE</span>
-      </div>
+      {/* Left: under score — hidden on reference-line cards (they have no pick) */}
+      {derived ? (
+        <div className="flex w-24 shrink-0 flex-col items-center justify-center text-center text-gray-600">
+          <span className="text-sm">no pick</span>
+        </div>
+      ) : (
+        <div className="flex w-24 shrink-0 flex-col items-center justify-center">
+          <span
+            className="text-[3rem] font-bold leading-none"
+            style={{ color }}
+            title="Under score, 0–100: how strongly we lean under. 50 = a coin flip after the vig; higher = a stronger under lean."
+          >
+            {row.underScore ?? "—"}
+          </span>
+          <span className="mt-1 text-sm text-gray-400">#{row.rank ?? "—"}</span>
+          <span className="text-xs text-gray-600">50 = coin flip</span>
+        </div>
+      )}
 
       {/* Right: matchup + details + chips */}
       <div className="min-w-0 flex-1">
@@ -53,9 +63,9 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
         {derived && (
           <div
             className="mt-1 inline-block rounded-md border border-sky-700/60 bg-sky-950/40 px-2 py-0.5 text-xs text-sky-300"
-            title="Our spread-adjusted 1H number derived from the posted full-game line. Not a model pick and not graded — there is no score, BV line, or gap."
+            title="Our spread-adjusted first-half number worked out from the posted full-game line. It's a reference point, not a model pick, and it isn't graded — there's no score or edge."
           >
-            DERIVED · no model pick
+            Reference line — no pick
           </div>
         )}
 
@@ -73,14 +83,14 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
         {derived ? (
           <div className="mt-1 text-sm text-gray-300">
-            Derived 1H:{" "}
+            Reference 1st-half line:{" "}
             <span className="font-semibold text-gray-100">
               {line !== null ? line.toFixed(1) : "—"}
             </span>
             {row.factors.full_game_total !== null &&
               row.factors.full_game_total !== undefined && (
                 <span className="text-gray-500">
-                  {" "}· from full-game {row.factors.full_game_total.toFixed(1)}
+                  {" "}· from full-game total {row.factors.full_game_total.toFixed(1)}
                   {row.factors.spread !== null && row.factors.spread !== undefined
                     ? ` (${row.factors.spread > 0 ? "+" : ""}${row.factors.spread.toFixed(1)})`
                     : ""}
@@ -89,20 +99,23 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
           </div>
         ) : (
           <>
-            <div className="mt-1 text-sm text-gray-300">
-              Current 1H line: {line !== null ? line.toFixed(1) : "—"}
+            <div
+              className="mt-1 text-sm text-gray-300"
+              title="The sportsbook's first-half points total right now."
+            >
+              Current 1st-half line: {line !== null ? line.toFixed(1) : "—"}
               {showMove && (
                 <span className="ml-2 text-gray-500">
-                  ({row.openLine!.toFixed(1)} → {row.curLine!.toFixed(1)})
+                  (opened {row.openLine!.toFixed(1)} → now {row.curLine!.toFixed(1)})
                 </span>
               )}
             </div>
 
             <div
               className="mt-0.5 text-sm text-gray-300"
-              title="BV = our own MARKET-BLIND 1H projection (no Vegas number feeds it). The band is the 80% range — the BV line is noisy, so a gap only counts as a signal once it clears ~1σ. Gaps within the band are noise, not edges. Validated only by the CLV-by-gap table in Research."
+              title="Our number is the model's own predicted first-half total — it never looks at the Vegas line. The range in parentheses is its margin of error; an edge inside that margin isn't a real signal. Tracked by the line-value table in Research."
             >
-              BV {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
+              Our number {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
               {row.bvLo !== null && row.bvHi !== null && (
                 <span className="text-gray-600">
                   {" "}({row.bvLo.toFixed(0)}–{row.bvHi.toFixed(0)})
@@ -110,19 +123,19 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
               )}
               <span className="text-gray-600"> · </span>
               Vegas {vegas !== null ? vegas.toFixed(1) : "—"}
-              <span className="text-gray-600"> · gap </span>
+              <span className="text-gray-600"> · Edge vs Vegas </span>
               <span style={{ color: gapColor }}>
                 {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
               </span>
               {z !== null && (
                 <span className={significant ? "text-gray-300" : "text-gray-600"}>
-                  {" "}({z > 0 ? "+" : ""}{z.toFixed(1)}σ{significant ? "" : " · noise"})
+                  {" "}({significant ? "clear signal" : "within normal range"})
                 </span>
               )}
               {row.bvAdjust !== null && (
                 <span
                   className="ml-1 text-amber-400"
-                  title={row.bvAdjustReason ?? "manual BV adjustment"}
+                  title={row.bvAdjustReason ?? "manual adjustment to our number"}
                 >
                   (adj {row.bvAdjust > 0 ? "+" : ""}{row.bvAdjust}
                   {row.bvAdjustReason ? `: ${row.bvAdjustReason}` : ""})
@@ -130,10 +143,13 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
               )}
             </div>
 
-            <div className="text-sm text-gray-400">
+            <div
+              className="text-sm text-gray-400"
+              title="The model's estimated chance the first half stays under the line."
+            >
               Model:{" "}
               {row.underProb !== null
-                ? `under ${Math.round(row.underProb * 100)}%`
+                ? `${Math.round(row.underProb * 100)}% chance under`
                 : "—"}
             </div>
           </>

@@ -28,7 +28,7 @@ export default async function LineStudyPage({
         <div>
           <h1 className="text-xl font-semibold">Line Study</h1>
           <p className="text-sm text-gray-500">
-            Which opening 1H line cashed unders most — {season}
+            Which opening first-half lines hit the under most often — {season}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -40,15 +40,15 @@ export default async function LineStudyPage({
       </div>
 
       <p className="mb-4 text-xs text-gray-500">
-        Bucketed by{" "}
+        Grouped by{" "}
         <span className="text-gray-300">
-          {anyReal ? "real opening lines" : "PROXY lines (0.52×full total)"}
+          {anyReal ? "real opening lines" : "estimated lines (0.52 × full-game total)"}
         </span>
-        . Breakeven vs −110 = {BREAKEVEN_PCT}%.
+        . You need to win {BREAKEVEN_PCT}% to break even at −110.
         {!anyReal &&
-          " ⚠️ On proxy data the cross-line ranking partly reflects game-total" +
-            " level, not a standalone tradeable signal — directional until real" +
-            " lines accrue."}
+          " ⚠️ On estimated lines this ranking partly reflects how high-scoring the" +
+            " games are, not a standalone signal you can bet — treat it as a hint" +
+            " until real lines build up."}
       </p>
 
       {buckets.length === 0 ? (

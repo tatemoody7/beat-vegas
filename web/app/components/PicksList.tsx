@@ -37,10 +37,10 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
             <th className="px-3 py-2 font-medium">Wk</th>
             <th className="px-3 py-2 font-medium">Matchup</th>
             <th className="px-3 py-2 font-medium">Your line</th>
-            <th className="px-3 py-2 font-medium">Model @ pick</th>
+            <th className="px-3 py-2 font-medium" title="The under score and our number at the time you logged the pick.">Model @ pick</th>
             <th className="px-3 py-2 font-medium">Result</th>
-            <th className="px-3 py-2 font-medium">Units</th>
-            <th className="px-3 py-2 font-medium">CLV</th>
+            <th className="px-3 py-2 font-medium" title="Profit in units. 1 unit = one standard bet.">Units</th>
+            <th className="px-3 py-2 font-medium" title="Line value (CLV): positive = the line moved your way after you'd bet.">Line value</th>
             <th className="px-3 py-2 font-medium">Note</th>
             <th className="px-3 py-2 font-medium"></th>
           </tr>
@@ -53,7 +53,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 {p.away} <span className="text-gray-600">@</span> {p.home}
               </td>
               <td className="px-3 py-1.5 text-gray-300">
-                {p.line !== null ? `u${p.line}` : "—"}
+                {p.line !== null ? `under ${p.line}` : "—"}
               </td>
               <td className="px-3 py-1.5 text-gray-400">
                 {p.modelScore !== null ? `${p.modelScore}` : "—"}

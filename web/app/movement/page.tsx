@@ -33,7 +33,9 @@ export default async function MovementPage({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Line Movement</h1>
-          <p className="text-sm text-gray-500">1H total by book over time — {season}</p>
+          <p className="text-sm text-gray-500">
+            First-half line at each sportsbook over time — {season}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           {games.length > 0 && selected !== null && (
@@ -45,8 +47,8 @@ export default async function MovementPage({
 
       {!movement || movement.points.length === 0 ? (
         <p className="rounded-lg border border-gray-800 bg-gray-900 p-6 text-sm text-gray-400">
-          No multi-snapshot games for {season} — movement charts appear once a line
-          has been polled more than once.
+          Nothing to chart for {season} yet — a movement chart appears once a game's
+          line has been checked more than once.
         </p>
       ) : (
         <div className="flex flex-col gap-5">
@@ -56,8 +58,8 @@ export default async function MovementPage({
             <table className="w-full text-sm">
               <thead className="bg-gray-900 text-left text-gray-400">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Captured</th>
-                  <th className="px-3 py-2 font-medium">Book</th>
+                  <th className="px-3 py-2 font-medium">When checked</th>
+                  <th className="px-3 py-2 font-medium">Sportsbook</th>
                   <th className="px-3 py-2 font-medium">Line</th>
                 </tr>
               </thead>

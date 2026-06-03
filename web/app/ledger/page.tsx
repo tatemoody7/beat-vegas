@@ -21,7 +21,9 @@ function LedgerCard({
       ) : (
         <dl className="space-y-2">
           <div>
-            <dt className="text-xs text-gray-500">Hit</dt>
+            <dt className="text-xs text-gray-500" title="Share of bets that won.">
+              Win rate
+            </dt>
             <dd className="text-2xl font-bold text-gray-100">
               {rec.hit}{" "}
               <span className="text-sm font-normal text-gray-500">{rec.record}</span>
@@ -29,7 +31,12 @@ function LedgerCard({
           </div>
           <div className="flex gap-6">
             <div>
-              <dt className="text-xs text-gray-500">Units</dt>
+              <dt
+                className="text-xs text-gray-500"
+                title="Profit in units. 1 unit = one standard bet."
+              >
+                Units
+              </dt>
               <dd
                 className="text-lg font-semibold"
                 style={{ color: rec.units.startsWith("-") ? "#dc2626" : "#16a34a" }}
@@ -38,7 +45,12 @@ function LedgerCard({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-500">Avg CLV</dt>
+              <dt
+                className="text-xs text-gray-500"
+                title="Average line value (CLV): did the line move our way after we'd bet? Positive = we beat the closing line."
+              >
+                Avg line value
+              </dt>
               <dd className="text-lg font-semibold text-gray-300">{rec.clv}</dd>
             </div>
           </div>
@@ -70,16 +82,17 @@ export default async function LedgerPage({
         {seasons.length > 0 && <SeasonSelect seasons={seasons} current={season} />}
       </div>
       <p className="mb-4 text-sm text-gray-500">
-        Graded {season} · Market = under vs real closing line · Model = the model&apos;s
-        leans (score ≥ 53) · You = your logged bets.
+        Settled results for {season} · Market = how the under did at the closing line
+        (the final line before kickoff) · Model = the model&apos;s under picks · You =
+        your own logged bets.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <LedgerCard title="📊 Market" rec={market} emptyHint="Run grade.py after games." />
+        <LedgerCard title="📊 Market" rec={market} emptyHint="Fills in once games are settled." />
         <LedgerCard
           title="🤖 Model"
           rec={model}
-          emptyHint="Run weekly_update + grade."
+          emptyHint="Fills in once the week is scored and settled."
         />
         <LedgerCard title="✍️ You" rec={you} emptyHint="Log bets in My Picks." />
       </div>
@@ -97,10 +110,10 @@ export default async function LedgerPage({
                 <th className="px-3 py-2 font-medium">Wk</th>
                 <th className="px-3 py-2 font-medium">Matchup</th>
                 <th className="px-3 py-2 font-medium">Line</th>
-                <th className="px-3 py-2 font-medium">Price</th>
+                <th className="px-3 py-2 font-medium" title="The odds / price (e.g. −110).">Odds</th>
                 <th className="px-3 py-2 font-medium">Result</th>
-                <th className="px-3 py-2 font-medium">Units</th>
-                <th className="px-3 py-2 font-medium">CLV</th>
+                <th className="px-3 py-2 font-medium" title="Profit in units. 1 unit = one standard bet.">Units</th>
+                <th className="px-3 py-2 font-medium" title="Line value (CLV): positive = the line moved our way after we'd bet.">Line value</th>
               </tr>
             </thead>
             <tbody>
@@ -111,7 +124,7 @@ export default async function LedgerPage({
                     {p.away} <span className="text-gray-600">@</span> {p.home}
                   </td>
                   <td className="px-3 py-1.5 text-gray-400">
-                    {p.line !== null ? `u${p.line}` : "—"}
+                    {p.line !== null ? `under ${p.line}` : "—"}
                   </td>
                   <td className="px-3 py-1.5 text-gray-500">{p.price ?? "—"}</td>
                   <td className="px-3 py-1.5">

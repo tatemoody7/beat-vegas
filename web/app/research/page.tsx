@@ -19,54 +19,56 @@ export default async function ResearchPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="text-xl font-semibold">Research</h1>
-      <p className="mb-5 text-sm text-gray-500">The edge question</p>
+      <p className="mb-5 text-sm text-gray-500">Is there really an edge?</p>
 
       {edge ? (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Stat label="Games analyzed" value={edge.games.toLocaleString()} />
-            <Stat label="Realized 1H / full (mean)" value={edge.mean.toFixed(3)} />
+            <Stat label="1st-half share of full game (avg)" value={edge.mean.toFixed(3)} />
             <Stat label="Median" value={edge.median.toFixed(3)} />
           </div>
           <p className="mt-4 text-sm leading-relaxed text-gray-400">
-            First halves realize <b className="text-gray-200">~52% of the full-game
-            total</b> — right where books price the 1H line. Blanket and
-            model-selected 1H unders did <b className="text-gray-200">not</b> reliably
-            beat the −110 breakeven (52.4%) against a proxy line, and the apparent
-            signal sits inside the ±1.5 pt proxy uncertainty.
+            First halves end up worth <b className="text-gray-200">~52% of the
+            full-game total</b> — right where sportsbooks set the first-half line.
+            Betting every first-half under, or only the model&apos;s picks, did{" "}
+            <b className="text-gray-200">not</b> reliably beat the −110 break-even
+            (you need to win 52.4%) against an estimated line, and the apparent edge
+            sits inside the ±1.5-point margin of that estimate.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-gray-400">
-            <b className="text-gray-200">Verdict:</b> no edge is{" "}
-            <i>confirmable</i> on free historical data — there are no historical 1H
-            lines to grade against. The real test is the live ledger, built from real
+            <b className="text-gray-200">Bottom line:</b> we can&apos;t{" "}
+            <i>confirm</i> an edge on free past data — there are no past first-half
+            lines to check against. The real test is the live record, built from real
             first-half lines captured this season.
           </p>
         </>
       ) : (
         <p className="rounded-lg border border-gray-800 bg-gray-900 p-6 text-sm text-gray-400">
           Load history with <code className="text-gray-300">scripts/backfill.py</code>{" "}
-          to see calibration.
+          to see this.
         </p>
       )}
 
       <hr className="my-6 border-gray-800" />
 
       <h2 className="mb-1 text-sm font-semibold text-gray-200">
-        Gap vs CLV — do our biggest gaps earn closing-line value?
+        Edge vs line value — do our biggest edges actually move the line our way?
       </h2>
       <p className="mb-3 text-xs leading-relaxed text-gray-500">
-        Gap = Vegas line − BV line (under direction). If the BV number finds real
-        value, the lines on our biggest-gap picks should move{" "}
-        <i>toward</i> us before close — i.e. mean CLV rises with the gap bucket.
-        If it&apos;s flat or negative, the big gaps are model blind spots, not
-        edges. CLV positive = the under closed at a softer number.
+        Edge = Vegas line − our number (toward the under). If our number really
+        finds value, the line on our biggest-edge picks should drift{" "}
+        <i>toward</i> us before kickoff — i.e. average line value rises with the size
+        of the edge. If it&apos;s flat or negative, the big edges are blind spots,
+        not real value. Positive line value = the under closed at a more favorable
+        number than we bet.
       </p>
 
       {gapGraded === 0 ? (
         <p className="rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
-          No graded games with a BV line and real closing line yet. This fills in
-          as real 1H lines are polled (<code className="text-gray-300">scripts/poll_lines.py</code>)
-          and graded (<code className="text-gray-300">scripts/grade.py</code>)
+          No settled games with our number and a real closing line yet. This fills in
+          as real first-half lines are checked (<code className="text-gray-300">scripts/poll_lines.py</code>)
+          and settled (<code className="text-gray-300">scripts/grade.py</code>)
           through the season.
         </p>
       ) : (
@@ -74,11 +76,11 @@ export default async function ResearchPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-900 text-left text-gray-400">
               <tr>
-                <th className="px-3 py-2 font-medium">Gap bucket</th>
-                <th className="px-3 py-2 font-medium">N</th>
-                <th className="px-3 py-2 font-medium">Mean gap</th>
-                <th className="px-3 py-2 font-medium">Mean CLV</th>
-                <th className="px-3 py-2 font-medium">Mean units</th>
+                <th className="px-3 py-2 font-medium">Edge size</th>
+                <th className="px-3 py-2 font-medium" title="Number of games in this group.">Games</th>
+                <th className="px-3 py-2 font-medium">Avg edge</th>
+                <th className="px-3 py-2 font-medium" title="Average line value (CLV): positive = the line moved our way.">Avg line value</th>
+                <th className="px-3 py-2 font-medium" title="Average profit in units. 1 unit = one standard bet.">Avg units</th>
                 <th className="px-3 py-2 font-medium">Under %</th>
               </tr>
             </thead>
@@ -117,22 +119,22 @@ export default async function ResearchPage() {
       {calib && (
         <>
           <h2 className="mb-1 mt-6 text-sm font-semibold text-gray-200">
-            BV-line calibration (out-of-fold)
+            How accurate is our number? (on unseen games)
           </h2>
           <p className="mb-3 text-xs leading-relaxed text-gray-500">
-            Mean residual = actual − BV line, per segment ({calib.n.toLocaleString()}{" "}
-            games). Near 0 = unbiased. A persistent positive residual means the BV
-            line runs low (would falsely scream &quot;under&quot;); the first
-            post-2023 season can&apos;t be de-biased from data that doesn&apos;t
-            exist yet — it&apos;s surfaced here, not hidden.
+            Average miss = actual first-half points − our number, per segment
+            ({calib.n.toLocaleString()} games). Near 0 = on target. A steady positive
+            miss means our number runs low (it would wrongly scream &quot;under&quot;);
+            the first post-2023 season can&apos;t be corrected from data that
+            doesn&apos;t exist yet — so it&apos;s shown here, not hidden.
           </p>
           <div className="overflow-x-auto rounded-xl border border-gray-800">
             <table className="w-full text-sm">
               <thead className="bg-gray-900 text-left text-gray-400">
                 <tr>
                   <th className="px-3 py-2 font-medium">Segment</th>
-                  <th className="px-3 py-2 font-medium">N</th>
-                  <th className="px-3 py-2 font-medium">Mean residual</th>
+                  <th className="px-3 py-2 font-medium" title="Number of games.">Games</th>
+                  <th className="px-3 py-2 font-medium" title="Average of (actual first-half points − our number). 0 = on target.">Avg miss</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,7 +174,8 @@ export default async function ResearchPage() {
         Model runs over time
       </h2>
       <p className="mb-3 text-xs text-gray-500">
-        Does it sharpen as seasons are added? (baseline vs top-fraction under% + ROI)
+        Does it get sharper as seasons are added? (under % for all picks vs the top
+        picks, plus return)
       </p>
 
       {runs.length === 0 ? (
@@ -186,11 +189,11 @@ export default async function ResearchPage() {
             <thead className="bg-gray-900 text-left text-gray-400">
               <tr>
                 <th className="px-3 py-2 font-medium">Run</th>
-                <th className="px-3 py-2 font-medium">Train</th>
-                <th className="px-3 py-2 font-medium">Test</th>
-                <th className="px-3 py-2 font-medium">Baseline U%</th>
-                <th className="px-3 py-2 font-medium">Top U%</th>
-                <th className="px-3 py-2 font-medium">Top ROI</th>
+                <th className="px-3 py-2 font-medium" title="Seasons the model learned from.">Trained on</th>
+                <th className="px-3 py-2 font-medium" title="Seasons it was checked against.">Tested on</th>
+                <th className="px-3 py-2 font-medium" title="Under win rate across every game.">Under % (all)</th>
+                <th className="px-3 py-2 font-medium" title="Under win rate on just the strongest picks.">Under % (top)</th>
+                <th className="px-3 py-2 font-medium" title="Return on units risked for the top picks.">Return (top)</th>
                 <th className="px-3 py-2 font-medium">Notes</th>
               </tr>
             </thead>

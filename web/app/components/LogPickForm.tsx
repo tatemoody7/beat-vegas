@@ -79,7 +79,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           >
             {slate.map((g) => (
               <option key={g.gameId} value={g.gameId}>
-                {g.away} @ {g.home} · score {g.underScore ?? "—"} · line{" "}
+                {g.away} @ {g.home} · under score {g.underScore ?? "—"} · line{" "}
                 {g.curLine ?? "—"}
               </option>
             ))}
@@ -97,8 +97,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           />
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs text-gray-400">
-            Stake (u)
+          <label className="flex flex-col gap-1 text-xs text-gray-400" title="1 unit = one standard bet.">
+            Stake (units)
             <input
               type="number"
               step={0.5}
@@ -107,8 +107,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
               className={field}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-gray-400">
-            Price
+          <label className="flex flex-col gap-1 text-xs text-gray-400" title="The odds / price (e.g. −110).">
+            Odds
             <input
               type="number"
               step={5}

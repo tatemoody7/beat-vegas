@@ -39,8 +39,8 @@ export default async function Home({
           <h1 className="text-xl font-semibold">Opportunities</h1>
           <p className="text-sm text-gray-500">
             {derivedBoard
-              ? "Derived 1H lines off posted full-game numbers · not model picks"
-              : "Ranked 1H-under leans · score 0–100 (50 = breakeven)"}
+              ? "Reference first-half lines from the posted full-game totals — not model picks"
+              : "First-half games we lean under, best first · under score 0–100 (50 = coin flip)"}
           </p>
         </div>
         <div className="flex items-center gap-4">

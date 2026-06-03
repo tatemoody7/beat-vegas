@@ -98,7 +98,7 @@ export default function LineStudyView({
               stroke="#9ca3af"
               strokeDasharray="4 4"
               label={{
-                value: `${breakeven}% BE`,
+                value: `${breakeven}% break-even`,
                 fill: "#9ca3af",
                 fontSize: 10,
                 position: "right",

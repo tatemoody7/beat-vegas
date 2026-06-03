@@ -31,7 +31,8 @@ export default async function PicksPage({
         {seasons.length > 0 && <SeasonSelect seasons={seasons} current={season} />}
       </div>
       <p className="mb-4 text-sm text-gray-500">
-        Log your 1H unders — stored and graded so the record sharpens each week.
+        Log your first-half unders — saved and settled after games finish, so your
+        record builds each week.
       </p>
 
       {/* Running record */}
@@ -43,20 +44,20 @@ export default async function PicksPage({
               <span className="text-2xl font-bold text-gray-100">{record.hit}</span>{" "}
               <span className="text-sm text-gray-500">{record.record}</span>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400" title="Profit in units. 1 unit = one standard bet.">
               Units{" "}
               <b style={{ color: record.units.startsWith("-") ? "#dc2626" : "#16a34a" }}>
                 {record.units}
               </b>
             </div>
-            <div className="text-sm text-gray-400">
-              Avg CLV <b className="text-gray-300">{record.clv}</b>
+            <div className="text-sm text-gray-400" title="Average line value (CLV): positive = the line moved your way after you'd bet.">
+              Avg line value <b className="text-gray-300">{record.clv}</b>
             </div>
           </div>
         ) : (
           <p className="text-xs text-gray-500">
-            No graded picks yet — log some below; the local grader fills results
-            after games finish.
+            No settled picks yet — log some below; results fill in after the games
+            finish.
           </p>
         )}
       </div>

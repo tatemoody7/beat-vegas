@@ -45,7 +45,7 @@ export default function MovementChart({
             tickLine={false}
             axisLine={{ stroke: "#374151" }}
             label={{
-              value: "1H line",
+              value: "1st-half line",
               angle: -90,
               position: "insideLeft",
               fill: "#9ca3af",

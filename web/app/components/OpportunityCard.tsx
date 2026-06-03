@@ -12,6 +12,13 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
     row.curLine !== null &&
     Math.abs(row.openLine - row.curLine) >= 0.01;
 
+  // Vegas line for the gap: live consensus, else the line at scoring time.
+  const vegas = row.curLine ?? row.factors.line ?? null;
+  const gap = row.liveGap;
+  // Positive gap (Vegas above our BV number) = an under-leaning gap.
+  const gapColor =
+    gap === null ? "#6b7280" : gap > 0 ? "#65a30d" : gap < 0 ? "#dc2626" : "#9ca3af";
+
   return (
     <div className="flex gap-4 rounded-xl border border-gray-800 bg-gray-950 p-4">
       {/* Left: score */}
@@ -39,6 +46,19 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
               ({row.openLine!.toFixed(1)} → {row.curLine!.toFixed(1)})
             </span>
           )}
+        </div>
+
+        <div
+          className="mt-0.5 text-sm text-gray-300"
+          title="BV = the model's own calibrated 1H projection vs the market. Positive gap = Vegas above our number (under-leaning). Large gaps can be model blind spots, not edges — see the CLV-by-gap table in Research."
+        >
+          BV {row.bvLine !== null ? row.bvLine.toFixed(1) : "—"}
+          <span className="text-gray-600"> · </span>
+          Vegas {vegas !== null ? vegas.toFixed(1) : "—"}
+          <span className="text-gray-600"> · gap </span>
+          <span style={{ color: gapColor }}>
+            {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
+          </span>
         </div>
 
         <div className="text-sm text-gray-400">

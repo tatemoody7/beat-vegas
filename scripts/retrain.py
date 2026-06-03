@@ -17,6 +17,7 @@ from beatvegas.backtest.engine import run_backtest
 from beatvegas.db.models import ModelRun
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.etl.features import build_feature_frame
+from beatvegas.model.bv_line import residual_report
 from beatvegas.model.score import MODEL_VERSION
 
 
@@ -33,6 +34,8 @@ def main() -> None:
                        top_frac=args.top_frac)
     seasons = sorted(df["season"].unique().tolist())
     metrics = res.summary
+    # Auditable BV-line calibration: OOF mean residual overall + per segment.
+    metrics["bv_residual"] = residual_report(df)
 
     with session_scope() as s:
         s.add(ModelRun(

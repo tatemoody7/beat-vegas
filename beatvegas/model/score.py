@@ -22,6 +22,7 @@ from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.features import FEATURE_COLS, build_feature_frame
 from ..etl.proxy_line import proxy_total
+from .bv_line import bv_line_for_slate
 
 MODEL_VERSION = "gbm_v1"
 MODEL_BET_THRESHOLD = 53          # under_score at/above this = the model "bets" it
@@ -102,6 +103,8 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "fh_home_pf": _f(row.get("home_fh_pf")), "fh_home_pa": _f(row.get("home_fh_pa")),
         "fh_away_pf": _f(row.get("away_fh_pf")), "fh_away_pa": _f(row.get("away_fh_pa")),
         "proj_1h_total": _f(proj),
+        "bv_line": _f(row.get("bv_line")),
+        "bv_gap": _f(row.get("bv_gap")),
         "line": _f(line),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
     }
@@ -133,6 +136,12 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     ll = line_lookup or {}
     target["line"] = target.apply(
         lambda r: ll.get(r["id"], proxy_total(r["full_game_total"], 0.52)), axis=1)
+
+    # Independent calibrated "BV line": our own 1H total from a regressor over the
+    # full feature set (display + gap sort only; does NOT influence under_score).
+    target["bv_line"] = bv_line_for_slate(train, target).round(2)
+    target["bv_gap"] = (target["line"] - target["bv_line"]).round(2)
+
     target = target.sort_values("under_prob", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
     return target
@@ -155,6 +164,7 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
                 under_probability=float(r["under_prob"]),
                 under_score=int(r["under_score"]),
                 projected_first_half_total=_f(r.get("proj_1h_total")),
+                bv_line=_f(r.get("bv_line")), bv_gap=_f(r.get("bv_gap")),
                 line_used=_f(line), rank=int(r["rank"]),
                 factors_json=json.dumps(_factors(r, line)),
                 created_at=now,

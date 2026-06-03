@@ -15,6 +15,8 @@ export type Factors = {
   fh_away_pf?: number | null;
   fh_away_pa?: number | null;
   proj_1h_total?: number | null;
+  bv_line?: number | null;
+  bv_gap?: number | null;
   line?: number | null;
   edge?: number | null;
 };
@@ -83,6 +85,11 @@ export function buildChips(f: Factors): Chip[] {
       label: "Hist proj",
       value: has(f.proj_1h_total) ? f.proj_1h_total!.toFixed(1) : "—",
       hint: "Naive 1H projection from scoring history (context only — the model, not this, drives the score)",
+    },
+    {
+      label: "BV line",
+      value: has(f.bv_line) ? f.bv_line!.toFixed(1) : "—",
+      hint: "The model's own calibrated 1H projection from the full feature set (pace, efficiency, weather, era). Large Vegas−BV gaps can be model blind spots, not edges — validated only by the CLV-by-gap table in Research.",
     },
   ];
 }

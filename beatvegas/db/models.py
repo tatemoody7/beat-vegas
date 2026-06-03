@@ -145,6 +145,8 @@ class Prediction(Base):
     under_probability = Column(Float)
     under_score = Column(Integer)             # 0-100 display score
     projected_first_half_total = Column(Float)
+    bv_line = Column(Float)                   # calibrated independent 1H projection
+    bv_gap = Column(Float)                     # line_used - bv_line (under direction)
     line_used = Column(Float)
     rank = Column(Integer)
     factors_json = Column(String)             # per-game factor payload for cards

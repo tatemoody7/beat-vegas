@@ -41,6 +41,8 @@ FEATURE_COLS: List[str] = [
     # pace + weather (populated by scripts/backfill_enrichment.py)
     "combined_sec_play", "combined_plays",
     "wx_temp", "wx_wind", "wx_precip", "wx_dome",
+    # era: 2023 NCAA running-clock rule cut ~8 plays/game (scoring-regime shift)
+    "era_post2023",
 ]
 
 
@@ -200,6 +202,9 @@ def build_feature_frame(min_games: int = 2,
     df["combined_def_ppa"] = df["home_q_def_ppa"] + df["away_q_def_ppa"]
     df["home_returning_ppa"] = df["home_r_returning_ppa"]
     df["away_returning_ppa"] = df["away_r_returning_ppa"]
+
+    # Era flag: post-2023 running-clock rule (leak-free; season known pre-kickoff).
+    df["era_post2023"] = (df["season"] >= 2023).astype(float)
 
     # --- display enrichment: pace (TeamRankings) + weather (Open-Meteo) ----
     # Joined for the card factor payload, NOT added to FEATURE_COLS (history

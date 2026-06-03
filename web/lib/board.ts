@@ -16,6 +16,10 @@ export type BoardRow = {
   factors: Factors;
   openLine: number | null;
   curLine: number | null;
+  bvLine: number | null;
+  // gap vs the live consensus (curLine − bvLine), under direction: positive =
+  // Vegas above our number. Falls back to the gap stored at scoring time.
+  liveGap: number | null;
 };
 
 const num = (v: unknown): number | null =>
@@ -34,6 +38,8 @@ type PredRow = {
   under_probability: number | null;
   rank: number | bigint | null;
   factors_json: string | null;
+  bv_line: number | null;
+  bv_gap: number | null;
   week: number | bigint;
   away_team: string | null;
   home_team: string | null;
@@ -86,6 +92,7 @@ async function consensusLines(): Promise<
 export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
+           p.bv_line, p.bv_gap,
            g.week, g.away_team, g.home_team, g.full_game_total
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
@@ -97,6 +104,14 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
   return preds.map((p) => {
     const gid = Number(p.game_id);
     const l = lines.get(gid);
+    const curLine = l?.cur ?? null;
+    const bvLine = num(p.bv_line);
+    // Prefer the gap vs the live consensus; fall back to the gap baked in at
+    // scoring time (bv_gap = line_used − bv_line) when no live line exists.
+    const liveGap =
+      curLine !== null && bvLine !== null
+        ? Math.round((curLine - bvLine) * 100) / 100
+        : num(p.bv_gap);
     return {
       gameId: gid,
       week: Number(p.week),
@@ -108,7 +123,9 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       fullGameTotal: p.full_game_total ?? null,
       factors: parseFactors(p.factors_json),
       openLine: l?.open ?? null,
-      curLine: l?.cur ?? null,
+      curLine,
+      bvLine,
+      liveGap,
     };
   });
 }

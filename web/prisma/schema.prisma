@@ -102,6 +102,8 @@ model predictions {
   under_probability          Float?
   under_score                Int?
   projected_first_half_total Float?
+  bv_line                    Float?
+  bv_gap                     Float?
   line_used                  Float?
   rank                       Int?
   factors_json               String?   @db.VarChar

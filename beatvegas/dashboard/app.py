@@ -99,6 +99,22 @@ def render_card(row: pd.Series) -> None:
                 + f" &nbsp;·&nbsp; **Model: under {prob_txt}** "
                 "<span style='font-size:0.75rem;color:#9ca3af'>"
                 "(breakeven 52%)</span>", unsafe_allow_html=True)
+            # BV line vs Vegas + gap (under direction). Gap vs live consensus
+            # when available, else the gap baked in at scoring time.
+            bv = f.get("bv_line")
+            vegas = line_now
+            gap = (vegas - bv) if (vegas is not None and bv is not None) else f.get("bv_gap")
+            gap_color = ("#9ca3af" if gap is None else
+                         "#65a30d" if gap > 0 else "#dc2626" if gap < 0 else "#9ca3af")
+            st.markdown(
+                f"<span style='font-size:0.85rem;color:#9ca3af'>"
+                f"BV {('%.1f' % bv) if bv is not None else '—'} · "
+                f"Vegas {('%.1f' % vegas) if vegas is not None else '—'} · gap "
+                f"</span><span style='font-size:0.85rem;color:{gap_color}'>"
+                f"{('%+.1f' % gap) if gap is not None else '—'}</span>"
+                "<br><span style='font-size:0.7rem;color:#6b7280'>BV = model's own "
+                "calibrated 1H number; large gaps can be blind spots, not edges "
+                "(see Research → Gap vs CLV)</span>", unsafe_allow_html=True)
             proj_txt = f"{proj:.1f}" if proj is not None else "—"
             chips = [
                 _chip("Pace", f.get("pace") or "live ✦",
@@ -419,6 +435,66 @@ with tab_research:
             "season.")
     else:
         st.info("Load history with `scripts/backfill.py` to see calibration.")
+
+    st.divider()
+    st.markdown("**Gap vs CLV** — do our biggest BV-vs-Vegas gaps earn closing-line value?")
+    st.caption("Gap = Vegas line − BV line (under direction). If the BV number "
+               "finds value, lines on big-gap picks move toward us before close "
+               "(mean CLV rises with the bucket). Flat/negative ⇒ blind spots, "
+               "not edges. CLV>0 = under closed at a softer number.")
+    # 'market' ledger = consensus open as bet line, close-open as CLV: measures
+    # whether the LINE moves toward our BV number by close. BV line from gbm_v1.
+    gap_rows = q("""
+        SELECT (r.line_used - p.bv_line) AS gap, r.clv, r.units, r.under_hit
+        FROM results r JOIN predictions p ON p.game_id = r.game_id
+        WHERE r.model_version = 'market' AND p.model_version = 'gbm_v1'
+          AND r.clv IS NOT NULL AND p.bv_line IS NOT NULL AND r.line_used IS NOT NULL
+    """)
+    if gap_rows.empty:
+        st.info("No graded games with a BV line and real closing line yet — fills "
+                "in as 1H lines are polled (`poll_lines.py`) and graded (`grade.py`).")
+    else:
+        edges = [(-1e9, 0, "<0"), (0, 1, "0–1"), (1, 2, "1–2"),
+                 (2, 3, "2–3"), (3, 1e9, "3+")]
+        buckets = []
+        for lo, hi, label in edges:
+            b = gap_rows[(gap_rows["gap"] >= lo) & (gap_rows["gap"] < hi)]
+            buckets.append({
+                "Gap bucket": label, "N": len(b),
+                "Mean gap": round(b["gap"].mean(), 2) if len(b) else None,
+                "Mean CLV": round(b["clv"].mean(), 2) if len(b) else None,
+                "Mean units": round(b["units"].mean(), 2) if len(b) else None,
+                "Under %": round(100 * b["under_hit"].mean(), 1) if len(b) else None,
+            })
+        st.dataframe(pd.DataFrame(buckets), width="stretch", hide_index=True)
+
+    st.divider()
+    st.markdown("**BV-line calibration (out-of-fold)** — mean residual = actual − BV, per segment")
+    st.caption("Near 0 = unbiased. A persistent positive residual means the BV "
+               "line runs low (would falsely scream 'under'). The first post-2023 "
+               "season can't be de-biased from data that doesn't exist yet — "
+               "surfaced here, not hidden.")
+    cal = q("""SELECT metrics_json FROM model_runs WHERE metrics_json IS NOT NULL
+               ORDER BY created_at DESC LIMIT 5""")
+    bv_res = None
+    for js in cal["metrics_json"] if not cal.empty else []:
+        try:
+            bv_res = json.loads(js).get("bv_residual")
+        except Exception:  # noqa: BLE001
+            bv_res = None
+        if bv_res:
+            break
+    if not bv_res:
+        st.caption("No calibration logged yet — run `scripts/retrain.py`.")
+    else:
+        rows_c = [{"Segment": "overall", "N": bv_res.get("n"),
+                   "Mean residual": bv_res.get("overall_mean_residual")}]
+        for grp in ("by_era", "by_tempo", "by_dome"):
+            for k, v in (bv_res.get(grp) or {}).items():
+                if isinstance(v, dict):
+                    rows_c.append({"Segment": k, "N": v.get("n"),
+                                   "Mean residual": v.get("mean_residual")})
+        st.dataframe(pd.DataFrame(rows_c), width="stretch", hide_index=True)
 
     st.divider()
     st.markdown("**Model runs over time** (does it sharpen as seasons are added?)")

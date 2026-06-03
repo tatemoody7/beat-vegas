@@ -1,13 +1,14 @@
 import { getBoard, getSeasons } from "@/lib/board";
 import OpportunityCard from "@/app/components/OpportunityCard";
 import SeasonSelect from "@/app/components/SeasonSelect";
+import SortSelect from "@/app/components/SortSelect";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; sort?: string }>;
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
@@ -16,8 +17,13 @@ export default async function Home({
     Number.isFinite(requested) && seasons.includes(requested)
       ? requested
       : (seasons[0] ?? new Date().getFullYear());
+  const sort = sp.sort === "gap" ? "gap" : "rank";
 
   const rows = await getBoard(season);
+  if (sort === "gap") {
+    // Biggest under-leaning gaps first (Vegas above our number); nulls last.
+    rows.sort((a, b) => (b.liveGap ?? -Infinity) - (a.liveGap ?? -Infinity));
+  }
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -28,9 +34,12 @@ export default async function Home({
             Ranked 1H-under leans · score 0–100 (50 = breakeven)
           </p>
         </div>
-        {seasons.length > 0 && (
-          <SeasonSelect seasons={seasons} current={season} />
-        )}
+        <div className="flex items-center gap-4">
+          <SortSelect current={sort} />
+          {seasons.length > 0 && (
+            <SeasonSelect seasons={seasons} current={season} />
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (

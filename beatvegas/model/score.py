@@ -26,6 +26,7 @@ from .bv_line import bv_line_for_slate, residual_band
 
 MODEL_VERSION = "gbm_v1"
 MODEL_BET_THRESHOLD = 53          # under_score at/above this = the model "bets" it
+OPPORTUNITY_Z = 0.5               # gap >= 0.5 residual-sigma toward under = flagged
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:
@@ -114,6 +115,16 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "qb_out_detail": row.get("qb_out_detail") if isinstance(row.get("qb_out_detail"), str) else None,
         "line": _f(line),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
+        # primary-engine fields (gbm_v2 gap ranking)
+        "rank_basis": "bv_gap",
+        "is_opportunity": (bool(row.get("is_opportunity"))
+                           if row.get("is_opportunity") is not None
+                           and not pd.isna(row.get("is_opportunity")) else None),
+        # genuine 1H-scoring signal chips (corr_1h drivers)
+        "fh_off_epa_home": _f(row.get("home_fh_off_epa")),
+        "fh_off_epa_away": _f(row.get("away_fh_off_epa")),
+        "fh_off_success_home": _f(row.get("home_fh_off_success")),
+        "fh_off_success_away": _f(row.get("away_fh_off_success")),
     }
 
 
@@ -159,7 +170,17 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     target["bv_gap_z"] = ((target["bv_gap"] / sigma).round(2)
                           if sigma else None)
 
-    target = target.sort_values("under_prob", ascending=False).reset_index(drop=True)
+    # PRIMARY ENGINE (gbm_v2, validated Phase 3): an under opportunity is a game
+    # where the book's line sits materially ABOVE our predicted 1H total —
+    # measured in residual-sigmas (bv_gap_z), so it's noise-aware. Rank the board
+    # by the raw gap (unders only). under_prob/under_score remain a secondary
+    # classifier lean on the card.
+    if sigma:
+        target["is_opportunity"] = (target["bv_gap_z"] >= OPPORTUNITY_Z)
+    else:
+        target["is_opportunity"] = (target["bv_gap"] > 0)
+
+    target = target.sort_values("bv_gap", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
     return target
 

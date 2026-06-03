@@ -16,11 +16,15 @@ import numpy as np
 import pandas as pd
 
 from ..db.store import session_scope
-from ..db.models import Game, TeamTempo, Weather
+from ..db.models import Game, TeamTempo, Venue, Weather
+from .fh_factors import FH_METRICS, fh_factor_frame
 from .proxy_line import proxy_total
 from .situational import SITUATIONAL_COLS, situational_frame
 from ..sources.cfbd import CFBDClient
-from ..sources.season_stats import advanced_frame, returning_frame, sp_frame
+from ..sources.season_stats import (
+    advanced_frame, returning_frame, roster_experience_frame, sp_frame,
+    talent_frame,
+)
 
 # Feature columns handed to the model (filled below).
 FEATURE_COLS: List[str] = [
@@ -43,6 +47,17 @@ FEATURE_COLS: List[str] = [
     "wx_temp", "wx_wind", "wx_precip", "wx_dome",
     # era: 2023 NCAA running-clock rule cut ~8 plays/game (scoring-regime shift)
     "era_post2023",
+    # --- easy free adds (Phase 1 deepen) -----------------------------------
+    # schedule-derived context (offline; leak-free). NB: openers are excluded —
+    # the min_games filter removes every team's first game, so they're inert here.
+    "home_revenge", "away_revenge",
+    "night_game", "rivalry_game", "conference_game",
+    # venue metadata (CFBD /venues; static, leak-free)
+    "venue_elevation", "venue_grass", "venue_capacity",
+    # talent + roster experience (preseason-known; same-season, leak-free)
+    "home_talent", "away_talent",
+    "home_roster_exp", "away_roster_exp",
+    "home_roster_upperclass", "away_roster_upperclass",
 ]
 
 # --- the "no Vegas line" rule -------------------------------------------------
@@ -51,6 +66,22 @@ FEATURE_COLS: List[str] = [
 # Vegas-derived entries in FEATURE_COLS — the BV regressor must exclude them
 # (see model/bv_line.BV_FEATURE_COLS). The classifier may keep them: it is
 # explicitly the market-relative model (target = 1H < proxy_line).
+# First-half PBP factors (Phase 2): season-to-date offense + defense-allowed for
+# each metric, leak-free. Generated to keep names consistent with fh_factors.
+FH_FACTOR_COLS = [f"{side}_fh_{role}_{m}"
+                  for side in ("home", "away")
+                  for role in ("off", "def")
+                  for m in FH_METRICS]
+FEATURE_COLS += FH_FACTOR_COLS
+
+# Matchup interactions (Phase 2b): offense vs the opponent's defense-allowed, for
+# each of the two teams summed -> "how much edge the offenses have over the
+# defenses they face" in the 1H. High edge -> expect more early scoring (over);
+# the model learns the under direction. Built from FH factors, so leak-free.
+MATCHUP_COLS = ["mm_explosive_edge", "mm_epa_edge", "mm_success_edge",
+                "mm_pace", "mm_havoc"]
+FEATURE_COLS += MATCHUP_COLS
+
 MARKET_COLS = {"full_game_total", "proj_1h_ratio"}
 
 # Names derived from the 1H BETTING line. These must NEVER be a feature in ANY
@@ -68,14 +99,19 @@ def _load_all_games() -> pd.DataFrame:
             Game.id, Game.season, Game.week, Game.start_date, Game.neutral_site,
             Game.home_team, Game.away_team, Game.home_points, Game.away_points,
             Game.home_first_half_points, Game.away_first_half_points,
-            Game.first_half_total, Game.full_game_total,
+            Game.first_half_total, Game.full_game_total, Game.venue_id,
         )
         df = pd.DataFrame(q.all(), columns=[
             "id", "season", "week", "start_date", "neutral_site",
             "home_team", "away_team", "home_points", "away_points",
-            "home_fh", "away_fh", "first_half_total", "full_game_total",
+            "home_fh", "away_fh", "first_half_total", "full_game_total", "venue_id",
         ])
+        venues = pd.DataFrame(
+            s.query(Venue.id, Venue.elevation, Venue.grass, Venue.capacity).all(),
+            columns=["venue_id", "venue_elevation", "venue_grass", "venue_capacity"])
     df["neutral_site"] = df["neutral_site"].fillna(False).astype(int)
+    df = df.merge(venues, on="venue_id", how="left")
+    df["venue_grass"] = df["venue_grass"].map({True: 1.0, False: 0.0})
     return df
 
 
@@ -186,6 +222,16 @@ def build_feature_frame(min_games: int = 2,
             rr, left_on=["season", f"{side}_team"],
             right_on=[f"{side}_r_season", f"{side}_r_team"], how="left")
 
+    # Talent composite + roster experience — also preseason-known (SAME season).
+    tal = talent_frame(client, yrs)
+    exp = roster_experience_frame(client, yrs)
+    preseason = tal.merge(exp, on=["season", "team"], how="outer")
+    for side in ["home", "away"]:
+        p = preseason.add_prefix(f"{side}_p_")
+        df = df.merge(
+            p, left_on=["season", f"{side}_team"],
+            right_on=[f"{side}_p_season", f"{side}_p_team"], how="left")
+
     # --- assemble model features -------------------------------------
     df["home_fh_pf"] = df["h_fh_pf_std"]
     df["home_fh_pa"] = df["h_fh_pa_std"]
@@ -219,6 +265,13 @@ def build_feature_frame(min_games: int = 2,
     df["home_returning_ppa"] = df["home_r_returning_ppa"]
     df["away_returning_ppa"] = df["away_r_returning_ppa"]
 
+    df["home_talent"] = df["home_p_talent"]
+    df["away_talent"] = df["away_p_talent"]
+    df["home_roster_exp"] = df["home_p_roster_exp"]
+    df["away_roster_exp"] = df["away_p_roster_exp"]
+    df["home_roster_upperclass"] = df["home_p_roster_upperclass"]
+    df["away_roster_upperclass"] = df["away_p_roster_upperclass"]
+
     # Era flag: post-2023 running-clock rule (leak-free; season known pre-kickoff).
     df["era_post2023"] = (df["season"] >= 2023).astype(float)
 
@@ -229,6 +282,22 @@ def build_feature_frame(min_games: int = 2,
 
     # --- situational features (schedule-derived; real model inputs) ---
     df = df.merge(situational_frame(), on="id", how="left")
+
+    # --- first-half PBP factors (season-to-date off + def-allowed) ----------
+    fh = fh_factor_frame()
+    if "id" in fh.columns and len(fh.columns) > 1:
+        df = df.merge(fh, on="id", how="left")
+
+        def _edge(metric):
+            return ((df[f"home_fh_off_{metric}"] - df[f"away_fh_def_{metric}"])
+                    + (df[f"away_fh_off_{metric}"] - df[f"home_fh_def_{metric}"]))
+        if "home_fh_off_explosive" in df.columns:
+            df["mm_explosive_edge"] = _edge("explosive")
+            df["mm_epa_edge"] = _edge("epa")
+            df["mm_success_edge"] = _edge("success")
+            df["mm_pace"] = df["home_fh_off_n_plays"] + df["away_fh_off_n_plays"]
+            df["mm_havoc"] = (df["home_fh_def_havoc_suffered"]
+                              + df["away_fh_def_havoc_suffered"])
 
     # --- target + filters --------------------------------------------
     df = df[df["full_game_total"].notna() & df["first_half_total"].notna()
@@ -243,7 +312,10 @@ def build_feature_frame(min_games: int = 2,
         df = df[df["season"].isin(list(seasons))]
 
     # Model columns must be clean numeric floats (NaN, never pd.NA / None / bool).
+    # Any feature not yet produced (e.g. PBP factors before backfill) -> NaN
+    # column so df[FEATURE_COLS] never KeyErrors.
     for c in FEATURE_COLS:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
+        if c not in df.columns:
+            df[c] = np.nan
+        df[c] = pd.to_numeric(df[c], errors="coerce")
     return df.reset_index(drop=True)

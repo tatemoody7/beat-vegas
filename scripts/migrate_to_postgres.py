@@ -17,13 +17,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from beatvegas.config import REPO_ROOT, database_url
-from beatvegas.db.models import (Base, Game, ManualPick, ModelRun, OddsSnapshot,
-                                 Prediction, Result, Team, TeamTempo,
-                                 TeamWeekFeature, Venue, Weather)
+from beatvegas.db.models import (Base, FactorScore, FhTeamGame, Game, ManualPick,
+                                 ModelRun, OddsSnapshot, Prediction, Result, Team,
+                                 TeamTempo, TeamWeekFeature, Venue, Weather)
 
 # FK-dependency order: parents before children.
 ORDER = [Team, Venue, Game, Weather, OddsSnapshot, Prediction, Result,
-         ManualPick, TeamTempo, TeamWeekFeature, ModelRun]
+         ManualPick, TeamTempo, TeamWeekFeature, FhTeamGame, FactorScore, ModelRun]
 
 
 def _rows(session, model):

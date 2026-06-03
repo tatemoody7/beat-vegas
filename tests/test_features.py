@@ -30,3 +30,26 @@ def test_market_features_are_exactly_known_set():
 
 def test_bv_features_are_classifier_features_minus_market():
     assert set(BV_FEATURE_COLS) == set(FEATURE_COLS) - MARKET_COLS
+
+
+def test_feature_cols_unique():
+    assert len(FEATURE_COLS) == len(set(FEATURE_COLS))
+
+
+def test_every_feature_is_registered():
+    # The ranking harness must be able to evaluate every model feature, so the
+    # registry must cover all of FEATURE_COLS (keeps registry/features in sync).
+    from beatvegas.factors.registry import default_registry
+    registered = {f.name for f in default_registry()}
+    missing = set(FEATURE_COLS) - registered
+    assert not missing, f"FEATURE_COLS not in factor registry: {missing}"
+
+
+def test_registry_has_no_banned_or_forward_only_market():
+    # No registered factor may be a banned 1H-line column; market factors must
+    # be flagged so the BV engine never trains on them.
+    from beatvegas.factors.registry import default_registry
+    for f in default_registry():
+        assert f.name not in BANNED_LINE_COLS, f"banned col registered: {f.name}"
+        if f.name in MARKET_COLS:
+            assert f.market, f"{f.name} must be flagged market in the registry"

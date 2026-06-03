@@ -1,0 +1,162 @@
+"""Registry of candidate factors for the 1H-under ranking harness.
+
+A Factor is one column in the feature frame plus the metadata the harness and UI
+need: which family it belongs to, whether it's leak-free, whether it's derived
+from a Vegas number (market), and whether it can only be known going forward
+(forward_only — e.g. live injuries — so it can't be backtested historically).
+
+Phase 1 registers the factors already computable from build_feature_frame
+(the existing model features + the pace/weather display columns). Later phases
+append the play-by-play-derived 1H-specific factors here; nothing else changes.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List
+
+import pandas as pd
+
+from ..etl.features import FH_FACTOR_COLS, MARKET_COLS, MATCHUP_COLS
+
+
+@dataclass(frozen=True)
+class Factor:
+    name: str                  # column name in the feature frame
+    family: str                # grouping for the UI / reporting
+    description: str = ""
+    leak_free: bool = True     # uses only pre-kickoff info
+    market: bool = False       # derived from a Vegas number
+    forward_only: bool = False  # only knowable live; not historically backtestable
+
+
+# Family assignments + descriptions for the columns build_feature_frame produces.
+# (market flag is applied from MARKET_COLS below so the two never drift.)
+_FACTORS: List[Factor] = [
+    # --- 1H / full-game scoring history (season-to-date, leak-free) ----------
+    Factor("home_fh_pf", "scoring", "Home season-to-date 1H points for"),
+    Factor("home_fh_pa", "scoring", "Home season-to-date 1H points allowed"),
+    Factor("away_fh_pf", "scoring", "Away season-to-date 1H points for"),
+    Factor("away_fh_pa", "scoring", "Away season-to-date 1H points allowed"),
+    Factor("combined_fh_offense", "scoring", "Both teams' 1H offense, summed"),
+    Factor("combined_fh_defense", "scoring", "Both teams' 1H defense, summed"),
+    Factor("home_full_pf", "scoring", "Home season-to-date full-game points for"),
+    Factor("home_full_pa", "scoring", "Home season-to-date full-game points allowed"),
+    Factor("away_full_pf", "scoring", "Away season-to-date full-game points for"),
+    Factor("away_full_pa", "scoring", "Away season-to-date full-game points allowed"),
+    Factor("proj_1h_total", "scoring", "Blended projected 1H total (own off + opp def)"),
+    # --- prior-season efficiency (leak-free season-1 prior) -----------------
+    Factor("home_sp_off", "efficiency", "Home SP+ offense (prior season)"),
+    Factor("home_sp_def", "efficiency", "Home SP+ defense (prior season)"),
+    Factor("away_sp_off", "efficiency", "Away SP+ offense (prior season)"),
+    Factor("away_sp_def", "efficiency", "Away SP+ defense (prior season)"),
+    Factor("home_off_ppa", "efficiency", "Home offensive PPA (prior season)"),
+    Factor("home_def_ppa", "efficiency", "Home defensive PPA (prior season)"),
+    Factor("away_off_ppa", "efficiency", "Away offensive PPA (prior season)"),
+    Factor("away_def_ppa", "efficiency", "Away defensive PPA (prior season)"),
+    Factor("home_off_success", "efficiency", "Home offensive success rate (prior season)"),
+    Factor("away_off_success", "efficiency", "Away offensive success rate (prior season)"),
+    Factor("combined_off_ppa", "efficiency", "Both offenses' PPA, summed"),
+    Factor("combined_def_ppa", "efficiency", "Both defenses' PPA, summed"),
+    Factor("home_returning_ppa", "personnel", "Home returning production (PPA share)"),
+    Factor("away_returning_ppa", "personnel", "Away returning production (PPA share)"),
+    # --- situational (schedule-derived, leak-free) --------------------------
+    Factor("home_rest_days", "situational", "Home days of rest"),
+    Factor("away_rest_days", "situational", "Away days of rest"),
+    Factor("home_short_week", "situational", "Home on a short week (<6 days)"),
+    Factor("away_short_week", "situational", "Away on a short week (<6 days)"),
+    Factor("home_off_bye", "situational", "Home off a bye (>9 days)"),
+    Factor("away_off_bye", "situational", "Away off a bye (>9 days)"),
+    Factor("away_travel_dist", "situational", "Away travel distance (miles)"),
+    Factor("away_tz_shift", "situational", "Away time-zone shift (hours)"),
+    Factor("kickoff_local_hour", "situational", "Local kickoff hour"),
+    Factor("early_kickoff", "situational", "Early kickoff (<=1pm local)"),
+    Factor("week", "situational", "Week of season"),
+    Factor("neutral_site", "situational", "Neutral-site game"),
+    # --- pace (TeamRankings; historical) ------------------------------------
+    Factor("combined_sec_play", "pace", "Average seconds per play (both teams)"),
+    Factor("combined_plays", "pace", "Combined plays per game (both teams)"),
+    # --- weather (Open-Meteo; partial historical coverage) ------------------
+    Factor("wx_temp", "weather", "Temperature (F)"),
+    Factor("wx_wind", "weather", "Wind speed (mph)"),
+    Factor("wx_precip", "weather", "Precipitation (in)"),
+    Factor("wx_dome", "weather", "Dome (1/0)"),
+    # --- schedule-derived context (offline; leak-free) ----------------------
+    Factor("home_revenge", "situational", "Home lost the last meeting"),
+    Factor("away_revenge", "situational", "Away lost the last meeting"),
+    Factor("night_game", "situational", "Night kickoff (>=6pm local)"),
+    Factor("rivalry_game", "situational", "Recurring annual rivalry matchup"),
+    Factor("conference_game", "situational", "Conference matchup"),
+    # --- venue (CFBD /venues; static, leak-free) ----------------------------
+    Factor("venue_elevation", "venue", "Stadium elevation (m)"),
+    Factor("venue_grass", "venue", "Natural grass surface (1/0)"),
+    Factor("venue_capacity", "venue", "Stadium capacity"),
+    # --- talent + roster experience (preseason-known; leak-free) ------------
+    Factor("home_talent", "personnel", "Home talent composite"),
+    Factor("away_talent", "personnel", "Away talent composite"),
+    Factor("home_roster_exp", "personnel", "Home mean roster class year"),
+    Factor("away_roster_exp", "personnel", "Away mean roster class year"),
+    Factor("home_roster_upperclass", "personnel", "Home upperclassman share"),
+    Factor("away_roster_upperclass", "personnel", "Away upperclassman share"),
+    # --- regime --------------------------------------------------------------
+    Factor("era_post2023", "regime", "Post-2023 running-clock era"),
+    # --- market (derived from the Vegas number; not used by the BV engine) ---
+    Factor("full_game_total", "market", "Vegas full-game total", market=True),
+    Factor("proj_1h_ratio", "market", "Projected 1H / full-game ratio", market=True),
+]
+
+
+# First-half PBP factors (Phase 2) — generated from FH_FACTOR_COLS so the
+# registry can never drift from what features.py actually produces.
+_FH_FAMILY = {
+    "epa": "fh_efficiency", "success": "fh_efficiency", "explosive": "fh_efficiency",
+    "early_success": "fh_efficiency", "third_conv": "fh_efficiency",
+    "pass_rate": "fh_tendency", "n_plays": "fh_pace",
+    "havoc_suffered": "fh_disruption", "turnovers": "fh_disruption",
+    "opening_score": "fh_opening", "opening_3out": "fh_opening",
+}
+for _name in FH_FACTOR_COLS:
+    _role, _metric = _name.split("_fh_", 1)[1].split("_", 1)
+    _FACTORS.append(Factor(_name, _FH_FAMILY.get(_metric, "fh"),
+                           f"1H {_role} {_metric.replace('_', ' ')} (season-to-date)"))
+
+# Matchup-interaction factors (offense edge over opposing defense).
+_MM_DESC = {
+    "mm_explosive_edge": "Combined explosive-play edge (offenses vs defenses)",
+    "mm_epa_edge": "Combined EPA edge (offenses vs defenses)",
+    "mm_success_edge": "Combined success-rate edge (offenses vs defenses)",
+    "mm_pace": "Combined expected 1H pace (sum of offensive plays)",
+    "mm_havoc": "Combined defensive havoc generated (both defenses)",
+}
+for _name in MATCHUP_COLS:
+    _FACTORS.append(Factor(_name, "matchup", _MM_DESC.get(_name, _name)))
+
+
+def default_registry() -> List[Factor]:
+    """All registered factors, with the market flag synced to MARKET_COLS."""
+    out = []
+    for f in _FACTORS:
+        market = f.market or (f.name in MARKET_COLS)
+        out.append(f if market == f.market else Factor(
+            f.name, f.family, f.description, f.leak_free, market, f.forward_only))
+    return out
+
+
+def evaluable_factors(df: pd.DataFrame,
+                      include_market: bool = True,
+                      include_forward_only: bool = False) -> List[Factor]:
+    """Factors present in the frame and eligible to evaluate.
+
+    Forward-only factors are excluded by default (no historical truth to score
+    them against). Market factors are kept for univariate ranking (so we can see
+    how much raw signal the line carries) but the BV engine never trains on them.
+    """
+    out = []
+    for f in default_registry():
+        if f.name not in df.columns:
+            continue
+        if f.forward_only and not include_forward_only:
+            continue
+        if f.market and not include_market:
+            continue
+        out.append(f)
+    return out

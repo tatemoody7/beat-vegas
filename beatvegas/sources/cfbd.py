@@ -76,3 +76,11 @@ class CFBDClient:
 
     def venues(self) -> List[Dict]:
         return self._get("/venues", {})
+
+    def talent(self, year: int) -> List[Dict]:
+        """Recruiting-based team talent composite (preseason-known)."""
+        return self._get("/talent", {"year": year})
+
+    def roster(self, year: int, team: Optional[str] = None) -> List[Dict]:
+        """Team roster with class `year` (1-4) per player (preseason-known)."""
+        return self._get("/roster", {"year": year, "team": team})

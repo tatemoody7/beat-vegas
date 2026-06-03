@@ -12,14 +12,19 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from ..db.models import Game, Venue
+from ..db.models import Game, Team, Venue
 from ..db.store import session_scope
 
 SITUATIONAL_COLS = [
     "home_rest_days", "away_rest_days", "home_short_week", "away_short_week",
     "home_off_bye", "away_off_bye", "away_travel_dist", "away_tz_shift",
     "kickoff_local_hour", "early_kickoff",
+    # schedule-derived context (offline; leak-free — prior games / static only)
+    "home_revenge", "away_revenge", "home_opener", "away_opener",
+    "night_game", "rivalry_game", "conference_game",
 ]
+
+_RIVALRY_MIN_SEASONS = 8    # near-annual series: met in >=8 distinct seasons
 
 
 def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
@@ -37,13 +42,77 @@ def _load() -> tuple:
     with session_scope() as s:
         games = pd.DataFrame(
             s.query(Game.id, Game.season, Game.week, Game.start_date,
-                    Game.venue_id, Game.home_team, Game.away_team).all(),
+                    Game.venue_id, Game.home_team, Game.away_team,
+                    Game.home_points, Game.away_points).all(),
             columns=["id", "season", "week", "start_date", "venue_id",
-                     "home_team", "away_team"])
+                     "home_team", "away_team", "home_points", "away_points"])
         venues = pd.DataFrame(
             s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
             columns=["venue_id", "lat", "lon"])
-    return games, venues
+        teams = pd.DataFrame(
+            s.query(Team.school, Team.conference).all(),
+            columns=["team", "conference"])
+    return games, venues, teams
+
+
+def _pair_key(a, b) -> tuple:
+    """Order-independent team pair key."""
+    return (a, b) if str(a) <= str(b) else (b, a)
+
+
+def _revenge_and_rivalry(games: pd.DataFrame) -> pd.DataFrame:
+    """Per-game home/away revenge flags + a static rivalry flag.
+
+    revenge: in the two teams' most recent PRIOR meeting (earlier date), this
+    side LOST (prior info only -> leak-free). rivalry: the pair met in
+    >=_RIVALRY_MIN_SEASONS distinct seasons across the dataset (a stable
+    structural property, not a predictive signal, so full history is fine).
+    """
+    g = games.sort_values("start_date", na_position="last")
+    last_meet: Dict[tuple, tuple] = {}     # pair -> (winner, loser) of last meeting
+    pair_seasons: Dict[tuple, set] = {}
+    rows = []
+    for r in g.itertuples(index=False):
+        pk = _pair_key(r.home_team, r.away_team)
+        prev = last_meet.get(pk)
+        home_rev = away_rev = 0
+        if prev is not None:
+            _, loser = prev
+            home_rev = 1 if loser == r.home_team else 0
+            away_rev = 1 if loser == r.away_team else 0
+        rows.append({"id": r.id, "home_revenge": home_rev, "away_revenge": away_rev})
+        pair_seasons.setdefault(pk, set()).add(r.season)
+        # update last meeting (skip ties / missing scores)
+        hp, ap = r.home_points, r.away_points
+        if pd.notna(hp) and pd.notna(ap) and hp != ap:
+            winner = r.home_team if hp > ap else r.away_team
+            loser = r.away_team if hp > ap else r.home_team
+            last_meet[pk] = (winner, loser)
+    rivalry_pairs = {pk for pk, seas in pair_seasons.items()
+                     if len(seas) >= _RIVALRY_MIN_SEASONS}
+    rv = pd.DataFrame(rows)
+    rv["rivalry_game"] = [
+        1 if _pair_key(h, a) in rivalry_pairs else 0
+        for h, a in zip(games.set_index("id").loc[rv["id"], "home_team"],
+                        games.set_index("id").loc[rv["id"], "away_team"])]
+    return rv
+
+
+def _opener(games: pd.DataFrame) -> pd.DataFrame:
+    """Flag each team's first game of the season (leak-free; schedule-known)."""
+    long = pd.concat([
+        games[["id", "season", "start_date", "home_team"]].rename(
+            columns={"home_team": "team"}).assign(side="home"),
+        games[["id", "season", "start_date", "away_team"]].rename(
+            columns={"away_team": "team"}).assign(side="away"),
+    ], ignore_index=True).sort_values(["season", "team", "start_date"],
+                                      na_position="last")
+    long["is_opener"] = (long.groupby(["season", "team"]).cumcount() == 0).astype(int)
+    home = long[long.side == "home"][["id", "is_opener"]].rename(
+        columns={"is_opener": "home_opener"})
+    away = long[long.side == "away"][["id", "is_opener"]].rename(
+        columns={"is_opener": "away_opener"})
+    return home.merge(away, on="id", how="outer")
 
 
 def _rest_days(games: pd.DataFrame) -> pd.DataFrame:
@@ -61,9 +130,10 @@ def _rest_days(games: pd.DataFrame) -> pd.DataFrame:
 
 def situational_frame() -> pd.DataFrame:
     """One row per game id with the situational columns."""
-    games, venues = _load()
+    games, venues, teams = _load()
     games["start_date"] = pd.to_datetime(games["start_date"])
     vcoord = venues.set_index("venue_id")
+    conf = teams.dropna(subset=["conference"]).set_index("team")["conference"].to_dict()
 
     # team's modal home venue per season (their "home base")
     home_base = (games.dropna(subset=["venue_id"])
@@ -94,6 +164,7 @@ def situational_frame() -> pd.DataFrame:
         local_hour = None
         if pd.notna(r.start_date) and glon is not None and not pd.isna(glon):
             local_hour = (r.start_date.hour + glon / 15.0) % 24
+        h_conf, a_conf = conf.get(r.home_team), conf.get(r.away_team)
         rows.append({
             "id": r.id,
             "home_rest_days": r.home_rest_days,
@@ -106,8 +177,17 @@ def situational_frame() -> pd.DataFrame:
             "away_tz_shift": tz,
             "kickoff_local_hour": local_hour,
             "early_kickoff": 1 if (local_hour is not None and local_hour <= 13) else 0,
+            "night_game": 1 if (local_hour is not None and local_hour >= 18) else 0,
+            # conference_game from current team conference (realignment-approx
+            # for older seasons; fine for a factor screen).
+            "conference_game": (1 if (h_conf is not None and a_conf is not None
+                                      and h_conf == a_conf) else 0),
         })
-    return pd.DataFrame(rows)
+    df_base = pd.DataFrame(rows)
+    df_base = (df_base
+               .merge(_revenge_and_rivalry(games), on="id", how="left")
+               .merge(_opener(games), on="id", how="left"))
+    return df_base
 
 
 def _flag(v, pred) -> Optional[int]:

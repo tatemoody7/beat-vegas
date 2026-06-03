@@ -32,6 +32,9 @@ class Venue(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     dome = Column(Boolean)
+    elevation = Column(Float)            # meters (CFBD /venues)
+    grass = Column(Boolean)              # natural grass surface (vs turf)
+    capacity = Column(Integer)
 
 
 class Game(Base):
@@ -94,6 +97,44 @@ class TeamWeekFeature(Base):
 
     __table_args__ = (
         UniqueConstraint("season", "week", "team", name="uq_team_week"),
+    )
+
+
+class FhTeamGame(Base):
+    """First-half (period<=2) offensive aggregates for one team in one game.
+
+    Two rows per game (home-offense, away-offense). The OFFENSE's metrics here
+    double as the DEFENSE's "allowed" metrics for `def_team` — features.py builds
+    season-to-date offense (rows where off_team=T) and defense-allowed (rows
+    where def_team=T) expanding means, exactly like the existing fh_pf/fh_pa.
+    Computed from play-by-play (cfbfastR parquet 2015-21, CFBD /plays 2022+);
+    raw plays are processed transiently and not stored."""
+    __tablename__ = "fh_team_game"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    off_team = Column(String, index=True)
+    def_team = Column(String, index=True)
+    is_home = Column(Boolean)
+    source = Column(String)                  # 'cfbfastr' | 'cfbd'
+
+    n_plays = Column(Integer)                # 1H offensive plays (pace proxy)
+    epa = Column(Float)                      # mean EPA/play
+    success = Column(Float)                  # mean(EPA>0)
+    explosive = Column(Float)                # mean(yards>=15)
+    pass_rate = Column(Float)                # mean(is_pass)
+    early_success = Column(Float)            # success on 1st/2nd down
+    third_conv = Column(Float)               # 3rd-down conversion rate
+    havoc_suffered = Column(Float)           # (TFL+PBU+turnover)/play against this O
+    turnovers = Column(Float)                # 1H giveaways (count)
+    opening_score = Column(Integer)          # opening drive scored (1/0)
+    opening_3out = Column(Integer)           # opening drive <=3 plays, no score (1/0)
+    redzone_td = Column(Float)               # 1H red-zone drives scoring a TD
+    fourth_go = Column(Float)                # 4th-down go-for-it rate
+
+    __table_args__ = (
+        UniqueConstraint("game_id", "off_team", name="uq_fh_team_game"),
     )
 
 
@@ -210,6 +251,32 @@ class BvAdjustment(Base):
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     delta_pts = Column(Float)                    # added to bv_line (− = lower scoring)
     reason = Column(String)
+    created_at = Column(DateTime)
+
+
+class FactorScore(Base):
+    """One row per factor (or factor combination) evaluated by the ranking
+    harness (scripts/rank_factors.py). `metrics_json` holds the full diagnostic
+    payload; the scalar columns are denormalized so the UI/queries can sort
+    without parsing JSON. Stored, never a model input."""
+    __tablename__ = "factor_scores"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, index=True)          # groups one rank_factors run
+    kind = Column(String)                        # 'univariate' | 'combo'
+    factor = Column(String, index=True)          # column name, or 'a + b' combo key
+    family = Column(String)
+    leak_free = Column(Boolean)
+    market = Column(Boolean)                     # derived from a Vegas number
+    forward_only = Column(Boolean)               # can't be backtested historically
+    n = Column(Integer)                          # out-of-sample sample size
+    top_under_pct = Column(Float)                # under% in the top-fraction selection
+    top_roi = Column(Float)                      # ROI on that selection (-110)
+    auc = Column(Float)                          # walk-forward single/multi-feature AUC
+    corr = Column(Float)                         # Pearson corr(factor, under) OOS
+    perm_importance = Column(Float)              # permutation importance in full GBM
+    stability_std = Column(Float)                # std of per-season top under%
+    rank = Column(Integer)
+    metrics_json = Column(String)
     created_at = Column(DateTime)
 
 

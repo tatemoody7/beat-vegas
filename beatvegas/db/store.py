@@ -18,6 +18,8 @@ _MIGRATIONS = {
                     "bv_lo": "FLOAT", "bv_hi": "FLOAT", "bv_sigma": "FLOAT"},
     "results": {"closing_captured_at": "TIMESTAMP"},
     "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
+    "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
+    "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
 }
 
 _engine = None

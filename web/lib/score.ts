@@ -26,6 +26,14 @@ export type Factors = {
   qb_out_detail?: string | null;
   line?: number | null;
   edge?: number | null;
+  // primary-engine fields (gbm_v2 gap ranking, Phase 3)
+  rank_basis?: string | null;
+  is_opportunity?: boolean | null;
+  // genuine 1H-scoring signal (corr_1h drivers) from PBP
+  fh_off_epa_home?: number | null;
+  fh_off_epa_away?: number | null;
+  fh_off_success_home?: number | null;
+  fh_off_success_away?: number | null;
 };
 
 export function parseFactors(raw: string | null | undefined): Factors {
@@ -82,6 +90,13 @@ export function buildChips(f: Factors): Chip[] {
       label: "1H hist",
       value: oneH,
       hint: "Season-to-date 1H pts for/against (home · away)",
+    },
+    {
+      label: "1H eff",
+      value: has(f.fh_off_epa_home)
+        ? `${f.fh_off_epa_home!.toFixed(2)} · ${(f.fh_off_epa_away ?? 0).toFixed(2)}`
+        : "—",
+      hint: "Season-to-date 1H offensive EPA/play (home · away), from play-by-play — the genuine 1H-scoring driver",
     },
     {
       label: "Spot",

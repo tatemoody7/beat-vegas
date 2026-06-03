@@ -75,6 +75,48 @@ def returning_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def talent_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
+    """Team talent composite per (season, team). Preseason-known -> SAME season."""
+    rows = []
+    for yr in seasons:
+        data = _cached(f"talent_{yr}.json", lambda yr=yr: client.talent(year=yr))
+        for r in data:
+            team = _g(r, "team")
+            if not team:
+                continue
+            rows.append({"season": _g(r, "year", "season"), "team": team,
+                         "talent": _g(r, "talent")})
+    return pd.DataFrame(rows)
+
+
+def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
+    """Roster experience per (season, team): mean class year + upperclass share.
+
+    Class `year` is 1 (FR) .. 4+ (SR), known preseason -> joined on SAME season.
+    """
+    rows = []
+    for yr in seasons:
+        data = _cached(f"roster_{yr}.json", lambda yr=yr: client.roster(year=yr))
+        df = pd.DataFrame([{"team": _g(r, "team"),
+                            "yr": pd.to_numeric(_g(r, "year"), errors="coerce")}
+                           for r in data])
+        if df.empty:
+            continue
+        # CFBD roster `year` is class 1(FR)..5; some rows carry a bad value (the
+        # season, e.g. 2023) — keep only valid class years.
+        df.loc[(df["yr"] < 1) | (df["yr"] > 5), "yr"] = pd.NA
+        for team, g in df.dropna(subset=["team"]).groupby("team"):
+            yrs = g["yr"].dropna()
+            if yrs.empty:
+                continue
+            rows.append({
+                "season": yr, "team": team,
+                "roster_exp": round(float(yrs.mean()), 3),
+                "roster_upperclass": round(float((yrs >= 3).mean()), 3),
+            })
+    return pd.DataFrame(rows)
+
+
 def advanced_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     rows = []
     for yr in seasons:

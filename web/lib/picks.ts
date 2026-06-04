@@ -139,14 +139,19 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   if (!game) throw new Error("game not found");
 
   const pred = await prisma.$queryRaw<
-    { under_score: number | bigint | null; line_used: number | null }[]
+    {
+      under_score: number | bigint | null;
+      line_used: number | null;
+      factors_json: string | null;
+    }[]
   >`
-    SELECT under_score, line_used FROM predictions
+    SELECT under_score, line_used, factors_json FROM predictions
     WHERE game_id = ${input.gameId} ORDER BY created_at DESC LIMIT 1
   `;
   const modelScore =
     pred[0]?.under_score == null ? null : Number(pred[0].under_score);
   const modelLine = pred[0]?.line_used ?? null;
+  const factorsAtPick = pred[0]?.factors_json ?? null;
 
   const stake = input.stake ?? 1.0;
   const price = input.price ?? -110;
@@ -158,11 +163,13 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   await prisma.$executeRaw`
     INSERT INTO manual_picks
       (game_id, season, week, home_team, away_team, side, line, price, stake,
-       placed_at, note, model_score_at_pick, model_line_at_pick, graded)
+       placed_at, note, model_score_at_pick, model_line_at_pick,
+       factors_json_at_pick, graded)
     VALUES
       (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
        ${game.away_team}, 'under', ${input.line}, ${price}, ${stake},
-       ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine}, false)
+       ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+       ${factorsAtPick}, false)
   `;
 }
 

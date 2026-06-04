@@ -13,9 +13,9 @@ We never match team *names* across sources: each play carries `is_home_off`
 (was the offense the home team), and the backfill attaches our own canonical
 team names from the games table by game_id. Game ids are the shared ESPN id.
 """
+
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
@@ -25,16 +25,33 @@ from ..config import REPO_ROOT
 from .cfbd import CFBDClient
 
 PBP_CACHE = REPO_ROOT / "data" / "pbp_cache"
-_PARQUET_URL = ("https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/"
-                "main/pbp/parquet/play_by_play_{year}.parquet")
-PARQUET_MAX_YEAR = 2021         # repo coverage ceiling; >this uses CFBD
+_PARQUET_URL = (
+    "https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/"
+    "main/pbp/parquet/play_by_play_{year}.parquet"
+)
+PARQUET_MAX_YEAR = 2021  # repo coverage ceiling; >this uses CFBD
 
 # Normalized columns every loader returns.
-NORM_COLS = ["game_id", "period", "is_home_off", "epa", "yards", "down",
-             "distance", "is_pass", "scoring", "is_to", "is_havoc",
-             "yte", "is_td", "is_special", "drive_key", "play_order"]
+NORM_COLS = [
+    "game_id",
+    "period",
+    "is_home_off",
+    "epa",
+    "yards",
+    "down",
+    "distance",
+    "is_pass",
+    "scoring",
+    "is_to",
+    "is_havoc",
+    "yte",
+    "is_td",
+    "is_special",
+    "drive_key",
+    "play_order",
+]
 
-EXPLOSIVE_YDS = 15              # yards threshold for an explosive play
+EXPLOSIVE_YDS = 15  # yards threshold for an explosive play
 
 
 def _col(df: pd.DataFrame, name: str):
@@ -65,24 +82,28 @@ def normalize_cfbfastr(df: pd.DataFrame) -> pd.DataFrame:
     turnover = _boolnum(df, "turnover_vec")
     sack = _boolnum(df, "sack")
     tfl = _boolnum(df, "TFL")
-    out = pd.DataFrame({
-        "game_id": pd.to_numeric(_col(df, "game_id"), errors="coerce"),
-        "period": pd.to_numeric(_col(df, "period"), errors="coerce"),
-        "is_home_off": _boolnum(df, "is_home"),
-        "epa": pd.to_numeric(_col(df, "EPA"), errors="coerce"),
-        "yards": yards,
-        "down": pd.to_numeric(_col(df, "start.down"), errors="coerce"),
-        "distance": pd.to_numeric(_col(df, "start.distance"), errors="coerce"),
-        "is_pass": _boolnum(df, "pass"),
-        "scoring": _boolnum(df, "scoringPlay"),
-        "is_to": turnover,
-        "yte": pd.to_numeric(_col(df, "start.yardsToEndzone"), errors="coerce"),
-        "is_td": ((_boolnum(df, "rush_td") > 0) | (_boolnum(df, "pass_td") > 0)).astype(float),
-        "is_special": ((_boolnum(df, "punt") > 0) | (_boolnum(df, "fg_attempt") > 0)).astype(float),
-        "drive_key": _col(df, "drive.id").astype("string"),
-        "play_order": pd.to_numeric(_col(df, "game_play_number"), errors="coerce"),
-    })
-    out["is_havoc"] = (((turnover > 0) | (sack > 0) | (tfl > 0)).astype(float))
+    out = pd.DataFrame(
+        {
+            "game_id": pd.to_numeric(_col(df, "game_id"), errors="coerce"),
+            "period": pd.to_numeric(_col(df, "period"), errors="coerce"),
+            "is_home_off": _boolnum(df, "is_home"),
+            "epa": pd.to_numeric(_col(df, "EPA"), errors="coerce"),
+            "yards": yards,
+            "down": pd.to_numeric(_col(df, "start.down"), errors="coerce"),
+            "distance": pd.to_numeric(_col(df, "start.distance"), errors="coerce"),
+            "is_pass": _boolnum(df, "pass"),
+            "scoring": _boolnum(df, "scoringPlay"),
+            "is_to": turnover,
+            "yte": pd.to_numeric(_col(df, "start.yardsToEndzone"), errors="coerce"),
+            "is_td": ((_boolnum(df, "rush_td") > 0) | (_boolnum(df, "pass_td") > 0)).astype(float),
+            "is_special": ((_boolnum(df, "punt") > 0) | (_boolnum(df, "fg_attempt") > 0)).astype(
+                float
+            ),
+            "drive_key": _col(df, "drive.id").astype("string"),
+            "play_order": pd.to_numeric(_col(df, "game_play_number"), errors="coerce"),
+        }
+    )
+    out["is_havoc"] = ((turnover > 0) | (sack > 0) | (tfl > 0)).astype(float)
     out["_is_scrim"] = _boolnum(df, "scrimmage_play")
     return out
 
@@ -104,32 +125,34 @@ def normalize_cfbd(plays: List[dict]) -> pd.DataFrame:
     sack = pt.str.contains("Sack", case=False)
     is_td = pt.isin(["Rushing Touchdown", "Passing Touchdown"])
     is_special = pt.str.contains("Punt", case=False) | pt.str.contains("Field Goal", case=False)
-    out = pd.DataFrame({
-        "game_id": pd.to_numeric(_col(df, "gameId"), errors="coerce"),
-        "period": pd.to_numeric(_col(df, "period"), errors="coerce"),
-        "is_home_off": (_col(df, "offense").astype("string")
-                        == _col(df, "home").astype("string")).astype(float),
-        "epa": pd.to_numeric(_col(df, "ppa"), errors="coerce"),
-        "yards": yards,
-        "down": pd.to_numeric(_col(df, "down"), errors="coerce"),
-        "distance": pd.to_numeric(_col(df, "distance"), errors="coerce"),
-        "is_pass": is_pass.astype(float),
-        "scoring": pd.to_numeric(_col(df, "scoring"), errors="coerce").fillna(0),
-        "is_to": turnover.astype(float),
-        "yte": pd.to_numeric(_col(df, "yardsToGoal"), errors="coerce"),
-        "is_td": is_td.astype(float),
-        "is_special": is_special.astype(float),
-        "drive_key": _col(df, "driveId").astype("string"),
-        "play_order": pd.to_numeric(_col(df, "playNumber"), errors="coerce"),
-    })
+    out = pd.DataFrame(
+        {
+            "game_id": pd.to_numeric(_col(df, "gameId"), errors="coerce"),
+            "period": pd.to_numeric(_col(df, "period"), errors="coerce"),
+            "is_home_off": (
+                _col(df, "offense").astype("string") == _col(df, "home").astype("string")
+            ).astype(float),
+            "epa": pd.to_numeric(_col(df, "ppa"), errors="coerce"),
+            "yards": yards,
+            "down": pd.to_numeric(_col(df, "down"), errors="coerce"),
+            "distance": pd.to_numeric(_col(df, "distance"), errors="coerce"),
+            "is_pass": is_pass.astype(float),
+            "scoring": pd.to_numeric(_col(df, "scoring"), errors="coerce").fillna(0),
+            "is_to": turnover.astype(float),
+            "yte": pd.to_numeric(_col(df, "yardsToGoal"), errors="coerce"),
+            "is_td": is_td.astype(float),
+            "is_special": is_special.astype(float),
+            "drive_key": _col(df, "driveId").astype("string"),
+            "play_order": pd.to_numeric(_col(df, "playNumber"), errors="coerce"),
+        }
+    )
     is_scrim = is_pass | is_rush
-    out["is_havoc"] = ((turnover | sack | (is_rush & (yards < 0))).astype(float))
+    out["is_havoc"] = (turnover | sack | (is_rush & (yards < 0))).astype(float)
     out["_is_scrim"] = is_scrim.astype(float)
     return out
 
 
-def load_plays(season: int, client: Optional[CFBDClient] = None,
-               weeks: int = 20) -> pd.DataFrame:
+def load_plays(season: int, client: Optional[CFBDClient] = None, weeks: int = 20) -> pd.DataFrame:
     """Normalized plays for a season from whichever free source covers it."""
     if season <= PARQUET_MAX_YEAR:
         return normalize_cfbfastr(load_parquet_season(season))

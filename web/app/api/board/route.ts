@@ -7,7 +7,10 @@ export async function GET(req: NextRequest) {
   const seasonParam = req.nextUrl.searchParams.get("season");
   const season = seasonParam ? Number(seasonParam) : NaN;
   if (!Number.isFinite(season)) {
-    return NextResponse.json({ error: "missing or invalid ?season" }, { status: 400 });
+    return NextResponse.json(
+      { error: "missing or invalid ?season" },
+      { status: 400 },
+    );
   }
   const rows = await getBoard(season);
   return NextResponse.json(rows);

@@ -1,4 +1,5 @@
 """Shared consensus-line helpers over captured odds snapshots."""
+
 from __future__ import annotations
 
 import statistics
@@ -23,8 +24,9 @@ def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[flo
     return statistics.median(opens), statistics.median(closes)
 
 
-def closing_before_kickoff(snaps: Sequence, kickoff) -> Tuple[
-        Optional[float], Optional[float], Optional[object]]:
+def closing_before_kickoff(
+    snaps: Sequence, kickoff
+) -> Tuple[Optional[float], Optional[float], Optional[object]]:
     """(opening, closing, closing_captured_at) using only PRE-kickoff snapshots.
 
     CLV is the project's verdict, so the closing line must reflect the market
@@ -32,8 +34,7 @@ def closing_before_kickoff(snaps: Sequence, kickoff) -> Tuple[
     snapshots with captured_at <= kickoff (all of them if kickoff/captured_at is
     unknown), and report the freshest used timestamp as the trust signal.
     """
-    pre = [s for s in snaps
-           if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
+    pre = [s for s in snaps if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
     pre = pre or list(snaps)
     opening, closing = consensus_open_close(pre)
     caps = [s.captured_at for s in pre if s.captured_at is not None]

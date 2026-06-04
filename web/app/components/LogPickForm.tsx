@@ -9,7 +9,9 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
   const [gameId, setGameId] = useState(slate[0]?.gameId ?? 0);
   const lineFor = (gid: number) =>
     slate.find((g) => g.gameId === gid)?.curLine ?? "";
-  const [line, setLine] = useState<string>(String(lineFor(slate[0]?.gameId ?? 0)));
+  const [line, setLine] = useState<string>(
+    String(lineFor(slate[0]?.gameId ?? 0)),
+  );
   const [stake, setStake] = useState("1");
   const [price, setPrice] = useState("-110");
   const [note, setNote] = useState("");
@@ -63,7 +65,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
   }
 
   const field = "bv-input";
-  const labelCls = "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
+  const labelCls =
+    "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
 
   return (
     <form onSubmit={submit} className="bv-card p-4">

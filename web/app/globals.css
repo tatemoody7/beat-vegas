@@ -21,15 +21,16 @@
 
   /* Outcome semantics — mirror web/lib/score.ts scoreColor (do not change) */
   --under-strong: #16a34a; /* green  */
-  --under-lean: #65a30d;   /* lime   */
-  --neutral: #ca8a04;      /* amber  */
-  --over-lean: #ea580c;    /* orange */
-  --over: #dc2626;         /* red    */
+  --under-lean: #65a30d; /* lime   */
+  --neutral: #ca8a04; /* amber  */
+  --over-lean: #ea580c; /* orange */
+  --over: #dc2626; /* red    */
 
   /* Elevation */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
-  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5),
-    0 16px 40px -16px rgba(2, 132, 199, 0.35);
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover:
+    0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -16px rgba(2, 132, 199, 0.35);
 
   /* Compat with any legacy refs */
   --background: var(--bg);
@@ -64,7 +65,10 @@ body {
     ),
     linear-gradient(rgba(36, 48, 73, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(36, 48, 73, 0.18) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-size:
+    100% 100%,
+    40px 40px,
+    40px 40px;
   background-attachment: fixed;
 }
 
@@ -157,11 +161,8 @@ body {
     color: var(--text);
     padding: 0.4rem 2rem 0.4rem 0.7rem;
     font-size: 0.85rem;
-    background-image: linear-gradient(
-        45deg,
-        transparent 50%,
-        var(--text-muted) 50%
-      ),
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
       linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
     background-position:
       calc(100% - 16px) 52%,

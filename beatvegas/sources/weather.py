@@ -3,6 +3,7 @@
 Past dates use the archive API; near-future dates use the forecast API. Returns
 the conditions nearest kickoff hour. Dome handling lives in the enrich script.
 """
+
 from __future__ import annotations
 
 from datetime import date as _date
@@ -20,8 +21,9 @@ def _today() -> _date:
     return datetime.utcnow().date()
 
 
-def fetch_weather(lat: float, lon: float, date_str: str, hour: int = 19,
-                  timeout: int = 30) -> Optional[dict]:
+def fetch_weather(
+    lat: float, lon: float, date_str: str, hour: int = 19, timeout: int = 30
+) -> Optional[dict]:
     """Return {temperature_f, wind_mph, precipitation} near `hour` local, or None.
 
     Uses the archive API for past dates and the forecast API within its ~16-day
@@ -35,12 +37,16 @@ def fetch_weather(lat: float, lon: float, date_str: str, hour: int = 19,
     today = _today()
     url = _ARCHIVE if d < today else _FORECAST
     if (d - today).days > 16:
-        return None                              # beyond forecast horizon
+        return None  # beyond forecast horizon
     params = {
-        "latitude": lat, "longitude": lon,
-        "start_date": date_str, "end_date": date_str,
-        "hourly": _HOURLY, "temperature_unit": "fahrenheit",
-        "wind_speed_unit": "mph", "precipitation_unit": "inch",
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": date_str,
+        "end_date": date_str,
+        "hourly": _HOURLY,
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
         "timezone": "auto",
     }
     try:
@@ -62,8 +68,9 @@ def fetch_weather(lat: float, lon: float, date_str: str, hour: int = 19,
     }
 
 
-def fetch_weather_series(lat: float, lon: float, start_date: str, end_date: str,
-                         timeout: int = 60) -> dict:
+def fetch_weather_series(
+    lat: float, lon: float, start_date: str, end_date: str, timeout: int = 60
+) -> dict:
     """One ranged archive call → {'YYYY-MM-DDTHH': {temp,wind,precip}} (local).
 
     Used by the historical backfill to fetch a venue's whole span in one request,
@@ -71,10 +78,15 @@ def fetch_weather_series(lat: float, lon: float, start_date: str, end_date: str,
     if lat is None or lon is None:
         return {}
     params = {
-        "latitude": lat, "longitude": lon,
-        "start_date": start_date, "end_date": end_date,
-        "hourly": _HOURLY, "temperature_unit": "fahrenheit",
-        "wind_speed_unit": "mph", "precipitation_unit": "inch", "timezone": "auto",
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start_date,
+        "end_date": end_date,
+        "hourly": _HOURLY,
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "auto",
     }
     try:
         r = requests.get(_ARCHIVE, params=params, timeout=timeout)
@@ -88,7 +100,7 @@ def fetch_weather_series(lat: float, lon: float, start_date: str, end_date: str,
     precs = h.get("precipitation") or []
     out = {}
     for i, t in enumerate(times):
-        out[t[:13]] = {                      # key 'YYYY-MM-DDTHH'
+        out[t[:13]] = {  # key 'YYYY-MM-DDTHH'
             "temperature_f": temps[i] if i < len(temps) else None,
             "wind_mph": winds[i] if i < len(winds) else None,
             "precipitation": precs[i] if i < len(precs) else None,

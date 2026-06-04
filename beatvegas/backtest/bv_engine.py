@@ -14,17 +14,19 @@ Two questions it answers:
 
 The proxy grade is still directional; the real test is forward CLV vs DK lines.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
 from ..model.bv_line import (
-    BV_FEATURE_COLS, TARGET, _assert_market_blind, bias_corrections,
+    TARGET,
+    _assert_market_blind,
     bv_line_for_slate,
 )
 from .engine import _roi
@@ -37,8 +39,9 @@ class BvBacktestResult:
     summary: Dict
 
 
-def run_bv_backtest(df: pd.DataFrame, first_test_season: int = 2018,
-                    top_frac: float = 0.20, min_train: int = 500) -> BvBacktestResult:
+def run_bv_backtest(
+    df: pd.DataFrame, first_test_season: int = 2018, top_frac: float = 0.20, min_train: int = 500
+) -> BvBacktestResult:
     """Walk-forward gap ranking + MAE for the BV regressor engine."""
     seasons = sorted(df["season"].unique())
     preds = []
@@ -48,10 +51,11 @@ def run_bv_backtest(df: pd.DataFrame, first_test_season: int = 2018,
         if len(train) < min_train or target.empty:
             continue
         bv = bv_line_for_slate(train, target)
-        t = target[["id", "season", "week", "proxy_line", "first_half_total",
-                    "under", "full_game_total"]].copy()
+        t = target[
+            ["id", "season", "week", "proxy_line", "first_half_total", "under", "full_game_total"]
+        ].copy()
         t["bv_line"] = bv
-        t["gap"] = t["proxy_line"] - t["bv_line"]          # +gap -> under lean
+        t["gap"] = t["proxy_line"] - t["bv_line"]  # +gap -> under lean
         t["abs_err"] = (t[TARGET].astype(float) - t["bv_line"]).abs()
         preds.append(t)
     per_game = pd.concat(preds, ignore_index=True)
@@ -62,10 +66,15 @@ def run_bv_backtest(df: pd.DataFrame, first_test_season: int = 2018,
         k = max(1, int(len(g) * top_frac))
         top = g.head(k)
         tops.append(top)
-        rows.append({"season": int(ts), "games": len(g),
-                     "top_under_pct": round(100 * top["under"].mean(), 2),
-                     "top_roi": round(_roi(int(top["under"].sum()), len(top)), 4),
-                     "mae": round(float(g["abs_err"].mean()), 3)})
+        rows.append(
+            {
+                "season": int(ts),
+                "games": len(g),
+                "top_under_pct": round(100 * top["under"].mean(), 2),
+                "top_roi": round(_roi(int(top["under"].sum()), len(top)), 4),
+                "mae": round(float(g["abs_err"].mean()), 3),
+            }
+        )
     pooled = pd.concat(tops, ignore_index=True)
     summary = {
         "test_seasons": f"{rows[0]['season']}-{rows[-1]['season']}" if rows else "n/a",
@@ -76,18 +85,23 @@ def run_bv_backtest(df: pd.DataFrame, first_test_season: int = 2018,
         "mae": round(float(per_game["abs_err"].mean()), 3),
         "breakeven_pct": 52.4,
     }
-    return BvBacktestResult(per_game=per_game,
-                            by_season=pd.DataFrame(rows), summary=summary)
+    return BvBacktestResult(per_game=per_game, by_season=pd.DataFrame(rows), summary=summary)
 
 
 def _reg() -> HistGradientBoostingRegressor:
     return HistGradientBoostingRegressor(
-        learning_rate=0.05, max_depth=3, max_iter=300,
-        l2_regularization=1.0, min_samples_leaf=40, random_state=7)
+        learning_rate=0.05,
+        max_depth=3,
+        max_iter=300,
+        l2_regularization=1.0,
+        min_samples_leaf=40,
+        random_state=7,
+    )
 
 
-def mae_ablation(df: pd.DataFrame, cols: List[str],
-                 first_test_season: int = 2018, min_train: int = 500) -> float:
+def mae_ablation(
+    df: pd.DataFrame, cols: List[str], first_test_season: int = 2018, min_train: int = 500
+) -> float:
     """Walk-forward MAE of a regressor predicting the 1H total on `cols` only.
 
     Used to ask: does a column family improve 1H-total accuracy? Compare the MAE

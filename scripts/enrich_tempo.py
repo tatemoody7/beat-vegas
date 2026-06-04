@@ -7,6 +7,7 @@
 `--date` (optional) pulls season-to-date values AS OF that date (leak-free for
 backtests); omit it to pull the latest.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,17 +37,27 @@ def main() -> None:
             if not school:
                 unmatched.append(r["tr_team"])
                 continue
-            rows.append({
-                "season": args.season, "week": args.week, "team": school,
-                "seconds_per_play": None if r["seconds_per_play"] != r["seconds_per_play"]
+            rows.append(
+                {
+                    "season": args.season,
+                    "week": args.week,
+                    "team": school,
+                    "seconds_per_play": None
+                    if r["seconds_per_play"] != r["seconds_per_play"]
                     else float(r["seconds_per_play"]),
-                "plays_per_game": None if r["plays_per_game"] != r["plays_per_game"]
+                    "plays_per_game": None
+                    if r["plays_per_game"] != r["plays_per_game"]
                     else float(r["plays_per_game"]),
-                "as_of_date": args.date, "captured_at": now,
-            })
+                    "as_of_date": args.date,
+                    "captured_at": now,
+                }
+            )
         n = upsert(s, TeamTempo, rows, ["season", "week", "team"])
-    print(f"stored tempo for {n} teams ({args.season} wk{args.week}"
-          + (f", as-of {args.date}" if args.date else "") + ")")
+    print(
+        f"stored tempo for {n} teams ({args.season} wk{args.week}"
+        + (f", as-of {args.date}" if args.date else "")
+        + ")"
+    )
     if unmatched:
         print(f"unmatched TeamRankings names ({len(unmatched)}): {unmatched}")
 

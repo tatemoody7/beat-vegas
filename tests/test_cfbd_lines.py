@@ -1,4 +1,5 @@
 """CFBD /lines fallback: provider-priority pick + rows shaped like the DK path."""
+
 from beatvegas.sources.cfbd_lines import full_game_rows, pick_total_spread
 
 
@@ -9,7 +10,7 @@ def test_pick_total_spread_provider_priority():
         {"provider": "consensus", "overUnder": 50.0, "spread": -9.5},
     ]
     ou, sp, prov = pick_total_spread(lines)
-    assert (ou, sp, prov) == (50.0, -9.5, "consensus")   # consensus wins priority
+    assert (ou, sp, prov) == (50.0, -9.5, "consensus")  # consensus wins priority
 
 
 def test_pick_total_spread_empty():
@@ -20,18 +21,22 @@ def test_pick_total_spread_empty():
 class _FakeClient:
     def lines(self, year, season_type="regular"):
         return [
-            {"id": 5, "homeTeam": "LSU", "awayTeam": "Clemson",
-             "startDate": "2026-08-30T16:00:00Z",
-             "lines": [{"provider": "DraftKings", "overUnder": 50.5, "spread": -10.5}]},
+            {
+                "id": 5,
+                "homeTeam": "LSU",
+                "awayTeam": "Clemson",
+                "startDate": "2026-08-30T16:00:00Z",
+                "lines": [{"provider": "DraftKings", "overUnder": 50.5, "spread": -10.5}],
+            },
             {"id": 6, "homeTeam": "X", "awayTeam": "Y", "lines": []},  # no total -> dropped
         ]
 
 
 def test_full_game_rows_shape_and_id():
     rows = full_game_rows(_FakeClient(), 2026)
-    assert len(rows) == 1                                  # game 6 dropped (no total)
+    assert len(rows) == 1  # game 6 dropped (no total)
     r = rows[0]
-    assert r["game_id"] == 5                               # CFBD id == Game.id
+    assert r["game_id"] == 5  # CFBD id == Game.id
     assert r["home_team"] == "LSU" and r["away_team"] == "Clemson"
     assert r["line"] == 50.5 and r["spread"] == -10.5
     assert r["over_price"] is None and r["under_price"] is None

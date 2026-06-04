@@ -13,6 +13,7 @@ The synthesize/grade/score steps are exposed as importable functions so the week
 simulator (scripts/simulate_week.py -> beatvegas/pipeline.py) reuses them against
 a local Postgres sim DB instead of duplicating the logic.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -49,9 +50,9 @@ def _snapshot_lines(close_line: float, base: datetime, n_days: int = 5):
     return rows
 
 
-def synthesize_1h_snapshots(s, games: List[Game],
-                            base: Optional[datetime] = None
-                            ) -> Dict[int, List[OddsSnapshot]]:
+def synthesize_1h_snapshots(
+    s, games: List[Game], base: Optional[datetime] = None
+) -> Dict[int, List[OddsSnapshot]]:
     """Add synthetic 1H line snapshots (3 books, week-long drift) for each game.
     Returns {game_id: [snapshots]}. Clears any prior OddsSnapshot rows first."""
     base = base or _DEFAULT_BASE
@@ -61,18 +62,24 @@ def synthesize_1h_snapshots(s, games: List[Game],
         close = proxy_total(g.full_game_total, spread=getattr(g, "spread", None))
         snaps = []
         for book, ts, line in _snapshot_lines(close, base):
-            snap = OddsSnapshot(game_id=g.id, book=book, market="1H_total",
-                                line=line, over_price=-110, under_price=-110,
-                                captured_at=ts)
+            snap = OddsSnapshot(
+                game_id=g.id,
+                book=book,
+                market="1H_total",
+                line=line,
+                over_price=-110,
+                under_price=-110,
+                captured_at=ts,
+            )
             s.add(snap)
             snaps.append(snap)
         snaps_by_gid[g.id] = snaps
     return snaps_by_gid
 
 
-def grade_market_results(s, games: List[Game],
-                         snaps_by_gid: Dict[int, List[OddsSnapshot]]
-                         ) -> Dict[int, float]:
+def grade_market_results(
+    s, games: List[Game], snaps_by_gid: Dict[int, List[OddsSnapshot]]
+) -> Dict[int, float]:
     """Grade the market (under vs closing 1H line) for each completed game.
     Returns {game_id: closing_line}. Clears prior 'market' results first."""
     s.query(Result).filter(Result.model_version == "market").delete()
@@ -81,53 +88,78 @@ def grade_market_results(s, games: List[Game],
         opening, closing = consensus_open_close(snaps_by_gid[g.id])
         close_by_gid[g.id] = closing
         res = under_result(g.first_half_total, closing)
-        s.add(Result(game_id=g.id, model_version="market",
-                     actual_first_half_total=g.first_half_total,
-                     line_used=closing, line_kind="real",
-                     under_hit=(res == "under"), closing_line=closing,
-                     clv=clv_under(opening, closing),
-                     units=units_won(g.first_half_total, closing)))
+        s.add(
+            Result(
+                game_id=g.id,
+                model_version="market",
+                actual_first_half_total=g.first_half_total,
+                line_used=closing,
+                line_kind="real",
+                under_hit=(res == "under"),
+                closing_line=closing,
+                clv=clv_under(opening, closing),
+                units=units_won(g.first_half_total, closing),
+            )
+        )
     return close_by_gid
 
 
-def sample_manual_picks(s, games: List[Game], season: int, week: int,
-                        base: Optional[datetime] = None, n: int = 5) -> None:
+def sample_manual_picks(
+    s, games: List[Game], season: int, week: int, base: Optional[datetime] = None, n: int = 5
+) -> None:
     """Add a few graded sample manual picks (bet at the opener + 0.5)."""
     base = base or _DEFAULT_BASE
     s.query(ManualPick).delete()
     for g in games[:n]:
-        bet_line = proxy_total(g.full_game_total,
-                               spread=getattr(g, "spread", None)) + 0.5
+        bet_line = proxy_total(g.full_game_total, spread=getattr(g, "spread", None)) + 0.5
         _, closing = consensus_open_close(
-            list(s.query(OddsSnapshot).filter(OddsSnapshot.game_id == g.id).all()))
+            list(s.query(OddsSnapshot).filter(OddsSnapshot.game_id == g.id).all())
+        )
         res = under_result(g.first_half_total, bet_line)
-        s.add(ManualPick(
-            game_id=g.id, season=season, week=week,
-            home_team=g.home_team, away_team=g.away_team, side="under",
-            line=bet_line, price=-110, stake=1.0, book="draftkings",
-            placed_at=base + timedelta(days=1, hours=-3), note="demo",
-            graded=True, actual_first_half_total=g.first_half_total,
-            result=res, units=units_won(g.first_half_total, bet_line),
-            closing_line=closing, clv=clv_under(bet_line, closing)))
+        s.add(
+            ManualPick(
+                game_id=g.id,
+                season=season,
+                week=week,
+                home_team=g.home_team,
+                away_team=g.away_team,
+                side="under",
+                line=bet_line,
+                price=-110,
+                stake=1.0,
+                book="draftkings",
+                placed_at=base + timedelta(days=1, hours=-3),
+                note="demo",
+                graded=True,
+                actual_first_half_total=g.first_half_total,
+                result=res,
+                units=units_won(g.first_half_total, bet_line),
+                closing_line=closing,
+                clv=clv_under(bet_line, closing),
+            )
+        )
 
 
-def score_and_store(season: int, line_lookup: Dict[int, float],
-                    min_games: int = 2) -> int:
+def score_and_store(season: int, line_lookup: Dict[int, float], min_games: int = 2) -> int:
     """Build features, score the listed games, persist predictions. Returns count."""
     df = build_feature_frame(min_games=min_games)
-    scored = score_slate(season, game_ids=list(line_lookup),
-                         line_lookup=line_lookup, df=df)
+    scored = score_slate(season, game_ids=list(line_lookup), line_lookup=line_lookup, df=df)
     return store_predictions(scored)
 
 
 def pick_games(s, season: int, week: int, limit: Optional[int] = 12) -> List[Game]:
     """Completed games for a week that have both a full-game total and a final
     1H score (so they're derivable + gradeable). Cheapest unders first."""
-    q = (s.query(Game)
-         .filter(Game.season == season, Game.week == week,
-                 Game.full_game_total.isnot(None),
-                 Game.first_half_total.isnot(None))
-         .order_by(Game.full_game_total))
+    q = (
+        s.query(Game)
+        .filter(
+            Game.season == season,
+            Game.week == week,
+            Game.full_game_total.isnot(None),
+            Game.first_half_total.isnot(None),
+        )
+        .order_by(Game.full_game_total)
+    )
     return q.limit(limit).all() if limit else q.all()
 
 
@@ -136,7 +168,7 @@ def main() -> None:
         raise SystemExit("Real DB not found — run scripts/backfill.py first.")
     DEMO.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(REAL, DEMO)
-    get_engine(DEMO)                                # point the process at demo.db
+    get_engine(DEMO)  # point the process at demo.db
     init_db(DEMO)
 
     with session_scope() as s:
@@ -149,8 +181,10 @@ def main() -> None:
         n_games = len(games)
 
     n_pred = score_and_store(DEMO_SEASON, close_by_gid)
-    print(f"seeded {n_games} games of synthetic 1H lines + results, 5 sample "
-          f"picks, {n_pred} scored predictions into {DEMO.relative_to(REPO_ROOT)}")
+    print(
+        f"seeded {n_games} games of synthetic 1H lines + results, 5 sample "
+        f"picks, {n_pred} scored predictions into {DEMO.relative_to(REPO_ROOT)}"
+    )
 
 
 if __name__ == "__main__":

@@ -41,14 +41,16 @@ export default async function MovementPage({
           {games.length > 0 && selected !== null && (
             <GameSelect games={games} current={selected} />
           )}
-          {seasons.length > 0 && <SeasonSelect seasons={seasons} current={season} />}
+          {seasons.length > 0 && (
+            <SeasonSelect seasons={seasons} current={season} />
+          )}
         </div>
       </div>
 
       {!movement || movement.points.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          Nothing to chart for {season} yet — a movement chart appears once a game's
-          line has been checked more than once.
+          Nothing to chart for {season} yet — a movement chart appears once a
+          game&apos;s line has been checked more than once.
         </p>
       ) : (
         <div className="flex flex-col gap-5">
@@ -66,7 +68,9 @@ export default async function MovementPage({
               <tbody>
                 {movement.rows.map((r, i) => (
                   <tr key={i}>
-                    <td className="text-[var(--text-muted)]">{r.captured_at}</td>
+                    <td className="text-[var(--text-muted)]">
+                      {r.captured_at}
+                    </td>
                     <td className="text-[var(--text-muted)]">{r.book}</td>
                     <td className="font-mono text-[var(--text)]">{r.line}</td>
                   </tr>

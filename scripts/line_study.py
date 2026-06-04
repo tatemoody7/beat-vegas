@@ -7,6 +7,7 @@
 Uses real consensus opening lines where captured, else the proxy (0.52*full),
 labeled per row. Breakeven vs -110 = 52.4%.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,18 +31,21 @@ def main() -> None:
 
     sources = df["line_source"].value_counts().to_dict()
     src_note = "real opening lines" if sources.get("real_open") else "PROXY lines (0.52*full)"
-    print(f"{args.season} 1H under-rate by opening line "
-          f"[{src_note}], min {args.min_games} games, ranked:")
-    print(df[["line", "games", "under", "push", "under_pct", "line_source"]]
-          .to_string(index=False))
+    print(
+        f"{args.season} 1H under-rate by opening line "
+        f"[{src_note}], min {args.min_games} games, ranked:"
+    )
+    print(df[["line", "games", "under", "push", "under_pct", "line_source"]].to_string(index=False))
     print(f"\nbreakeven to beat -110 = {BREAKEVEN_PCT}%")
 
     hl = df[df["line"] == args.highlight]
     if not hl.empty:
         r = hl.iloc[0]
         verdict = "BEATS" if r["under_pct"] >= BREAKEVEN_PCT else "below"
-        print(f"\nyour {args.highlight}: under {r['under_pct']}% "
-              f"({int(r['under'])}/{int(r['games'])}) — {verdict} breakeven")
+        print(
+            f"\nyour {args.highlight}: under {r['under_pct']}% "
+            f"({int(r['under'])}/{int(r['games'])}) — {verdict} breakeven"
+        )
     else:
         print(f"\n{args.highlight}: no bucket with >= {args.min_games} games")
 

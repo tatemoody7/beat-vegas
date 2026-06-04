@@ -4,6 +4,15 @@ College football **first-half (1H) unders** research & decision-support system.
 Research only — it never places bets or automates gambling.
 
 ## How to resume / orient (read this first)
+- **LATEST (web redesign + cleanup): the Next.js app got a plain-English rewrite and a
+  modern "sportsbook" visual system** (deep navy + electric-cyan; `.bv-*` classes in
+  `web/app/globals.css`; active-route nav in `MainNav.tsx`). The old **Streamlit
+  dashboard was removed** (Next.js is the product). Added a **Neon-isolated week-sim**
+  (`scripts/simulate_week.py` + `pg_sim.py`) for off-season dry-runs, and **lint/format
+  tooling** (Ruff for Python, ESLint+Prettier for `web/`). The prod **"Log pick" Neon
+  bug is fixed** (`web/lib/picks.ts`: `::timestamp` cast + boolean `graded`). All shipped
+  to `main` (PR #1, deployed via Vercel). See plan
+  `~/.claude/plans/session-handoff-week-1-eager-matsumoto.md`.
 - **LATEST (cloud + board): scheduled Neon writes run in GitHub Actions; derived-1H
   lines show on the board.** The Mac's usual network (campus/fgcu) **can't reach Neon**
   (5432 TLS filtered; 443 fine), so the Sunday capture+score runs in **GitHub Actions**
@@ -63,15 +72,17 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
   alert, scheduled by launchd (`scripts/run_daily.sh`, `deploy/com.beatvegas.daily.plist`).
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
-- **Dashboard today**: Streamlit (`beatvegas/dashboard/app.py`) — local quick-view.
-- **Dashboard target**: Next.js app in `web/` on Vercel, reading/writing Neon
-  (replaces Streamlit as the product; Streamlit stays for local dev).
+- **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
+  product (the old Streamlit dashboard was removed — see git history if you need
+  the original `_score_color`/chip reference). Plain-English copy + a modern
+  "sportsbook" visual system (deep navy + electric-cyan accent; green/red reserved
+  for under/over outcomes) live in `web/app/globals.css` (`.bv-*` component classes).
 
 ## Setup
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 cp config.example.yaml config.yaml   # add CFBD + Odds API keys (gitignored)
-pytest -q                            # 61 tests
+pytest -q                            # 104 tests
 ```
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
 (score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
@@ -85,8 +96,12 @@ capture, `--source dk|cfbd|auto`), `derive_multiplier.py` (gated spread multipli
 `backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py` (additive
 games+spread push), `grade_lines.py` (terminal derived-1H report), `post_derived_lines.py`
 (writes display-only `derived_lines` predictions for the board), `notify_sunday.py` (local
-iMessage heads-up). Streamlit: `streamlit run beatvegas/dashboard/app.py` (demo via
-`BEATVEGAS_DB=data/demo.db`). 104 tests.
+iMessage heads-up). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
+`~/.cache/beatvegas/pg_sim`) + `simulate_week.py` (replay a real week into it, rendered by
+the real Next.js app, Neon-isolated). 104 tests. **Lint/format**: `ruff check` + `ruff
+format` for Python (`[tool.ruff]` in `pyproject.toml`, pragmatic F/E/I/B set — NOT pyupgrade,
+which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/`
+(ESLint flat config via Next 16's native arrays + Prettier).
 
 ## Honest status of the edge (don't oversell)
 - Backtest is **proxy-graded** (no free historical 1H lines; uses 0.52×full-game
@@ -105,22 +120,24 @@ iMessage heads-up). Streamlit: `streamlit run beatvegas/dashboard/app.py` (demo 
 - The edge is real but **small and unconfirmed**. The system's job is to *measure* it
   honestly vs real lines, not to promise profit.
 
-## Resuming Phase B (Next.js app)
-Build in `web/`: Next.js (App Router) + TypeScript + Tailwind + **Prisma** + **Recharts**.
-- **Dev against local data**: Prisma `sqlite` provider → `data/beatvegas.db`
-  (has 2015–25 games, predictions, results, snapshots). Switch datasource to
-  `postgresql` for Neon/Vercel deploy. `prisma db pull` introspects the schema.
-- **Use `beatvegas/dashboard/app.py` as the visual spec** — port these views:
-  Opportunities (ranked 0–100 cards w/ chips: Pace, Weather, Def/Off eff, 1H hist,
-  Spot, Returning), Line movement (per-game chart), Line Study (under% by opening
-  line vs 52.4% breakeven), Ledger (3-way market/model/you), Research (model_runs).
-  Score color thresholds + chip logic are in `model/score.py` and `app.py`.
-- **API routes** read the same SQL the Streamlit `q()` calls use. **My Picks** =
-  writable form → `POST /api/picks` (insert ManualPick). Lock the app with a
-  password gate (`middleware.ts` + `APP_PASSWORD` cookie).
-- Deploy needs (user): Neon `DATABASE_URL`, Vercel project + env vars
-  (`DATABASE_URL`, `APP_PASSWORD`). `gh` is authed (tatemoody7); repo is
-  private: https://github.com/tatemoody7/beat-vegas
+## Web app (`web/`) — shipped + redesigned
+Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
+Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
+- **Views**: Opportunities (ranked under-score cards + chips), Line movement (per-game
+  chart), Line Study (under% by opening line vs 52.4% breakeven), Ledger (3-way
+  market/model/you), Research (model_runs/calibration), writable My Picks
+  (`POST /api/picks`). Score-color thresholds + chip logic live in `web/lib/score.ts`
+  (ported from `model/score.py`; keep the two in sync). API routes read the same SQL
+  the page loaders use; the app is locked by `middleware.ts` + `APP_PASSWORD` cookie.
+- **Design system**: plain-English copy + a modern sportsbook look in
+  `web/app/globals.css` — deep-navy canvas, electric-cyan brand accent, Archivo display
+  font, reusable `.bv-card`/`.bv-pill`/`.bv-stat`/`.bv-table`/`.bv-btn`/`.bv-nav-link`
+  classes. **Green/red are reserved for under/over outcomes** — never use them as a UI
+  accent (cyan is the brand). `MainNav.tsx` gives the active-route highlight.
+- **Dev**: `web/.env` `DATABASE_URL` points at Neon (prod) or the local sim PG
+  (`simulate_week.py`); the Neon line is commented as a fallback. Neon is unreachable
+  from the campus/fgcu network — use the sim there. `npm run lint` / `npm run format`
+  before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas
 - Features must stay **leak-free** (only pre-kickoff info; season-to-date shifted).

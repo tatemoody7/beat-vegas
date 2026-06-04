@@ -8,9 +8,8 @@ auto-upgrading as real lines accrue.
 Caveat: on proxy data the cross-line ranking partly reflects game-total level
 rather than a standalone tradeable signal — surfaced wherever this is displayed.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 import pandas as pd
 
@@ -19,15 +18,14 @@ from ..db.store import session_scope
 from ..etl.proxy_line import load_games_frame, proxy_total
 from ..lines import consensus_open_close
 
-BREAKEVEN_PCT = 52.4          # win% to beat standard -110 juice
+BREAKEVEN_PCT = 52.4  # win% to beat standard -110 juice
 
 
 def _round_half(x: float) -> float:
     return round(x * 2) / 2
 
 
-def assign_opening_line(games_df: pd.DataFrame,
-                        snapshots_df: pd.DataFrame) -> pd.DataFrame:
+def assign_opening_line(games_df: pd.DataFrame, snapshots_df: pd.DataFrame) -> pd.DataFrame:
     """Add `line` (opening, rounded to 0.5) and `line_source` to each game.
 
     `snapshots_df`: columns game_id, book, line, captured_at (may be empty).
@@ -45,9 +43,9 @@ def assign_opening_line(games_df: pd.DataFrame,
         real = open_by_game.get(row["id"])
         if real is not None:
             return pd.Series([_round_half(real), "real_open"])
-        return pd.Series([_round_half(proxy_total(row["full_game_total"],
-                                                  spread=row.get("spread"))),
-                          "proxy"])
+        return pd.Series(
+            [_round_half(proxy_total(row["full_game_total"], spread=row.get("spread"))), "proxy"]
+        )
 
     df[["line", "line_source"]] = df.apply(_line, axis=1)
     return df
@@ -65,15 +63,17 @@ def bucket_under_rates(games_df: pd.DataFrame, min_games: int = 15) -> pd.DataFr
         decided = len(x) - int(x["push"].sum())
         under = int(x["under"].sum())
         src = x["line_source"].mode()
-        return pd.Series({
-            "games": len(x),
-            "under": under,
-            "push": int(x["push"].sum()),
-            "under_pct": round(100 * under / decided, 1) if decided else 0.0,
-            "line_source": src.iloc[0] if len(src) else "proxy",
-        })
+        return pd.Series(
+            {
+                "games": len(x),
+                "under": under,
+                "push": int(x["push"].sum()),
+                "under_pct": round(100 * under / decided, 1) if decided else 0.0,
+                "line_source": src.iloc[0] if len(src) else "proxy",
+            }
+        )
 
-    out = (df.groupby("line").apply(_agg, include_groups=False).reset_index())
+    out = df.groupby("line").apply(_agg, include_groups=False).reset_index()
     out = out[out["games"] >= min_games]
     return out.sort_values("under_pct", ascending=False).reset_index(drop=True)
 
@@ -82,10 +82,13 @@ def line_study(season: int, min_games: int = 15) -> pd.DataFrame:
     """DB wrapper: load season games + snapshots, assign opening line, rank."""
     games = load_games_frame(seasons=range(season, season + 1))
     with session_scope() as s:
-        rows = (s.query(OddsSnapshot.game_id, OddsSnapshot.book,
-                        OddsSnapshot.line, OddsSnapshot.captured_at)
-                .join(Game, Game.id == OddsSnapshot.game_id)
-                .filter(Game.season == season,
-                        OddsSnapshot.market == "1H_total").all())
+        rows = (
+            s.query(
+                OddsSnapshot.game_id, OddsSnapshot.book, OddsSnapshot.line, OddsSnapshot.captured_at
+            )
+            .join(Game, Game.id == OddsSnapshot.game_id)
+            .filter(Game.season == season, OddsSnapshot.market == "1H_total")
+            .all()
+        )
     snaps = pd.DataFrame(rows, columns=["game_id", "book", "line", "captured_at"])
     return bucket_under_rates(assign_opening_line(games, snaps), min_games)

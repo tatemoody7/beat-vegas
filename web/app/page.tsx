@@ -17,8 +17,7 @@ export default async function Home({
     Number.isFinite(requested) && seasons.includes(requested)
       ? requested
       : (seasons[0] ?? new Date().getFullYear());
-  const sort =
-    sp.sort === "gap" ? "gap" : sp.sort === "gapz" ? "gapz" : "rank";
+  const sort = sp.sort === "gap" ? "gap" : sp.sort === "gapz" ? "gapz" : "rank";
 
   const rows = await getBoard(season);
   if (sort === "gap") {
@@ -68,7 +67,6 @@ export default async function Home({
           )}
         </div>
         <div className="bv-toolbar flex flex-wrap items-center gap-3">
-
           <SortSelect current={sort} />
           {seasons.length > 0 && (
             <SeasonSelect seasons={seasons} current={season} />
@@ -78,10 +76,10 @@ export default async function Home({
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No predictions for {season}. Score a slate
-          (<code className="text-[var(--text)]">scripts/weekly_update.py</code>) or
-          point <code className="text-[var(--text)]">DATABASE_URL</code> at a DB that
-          has them.
+          No predictions for {season}. Score a slate (
+          <code className="text-[var(--text)]">scripts/weekly_update.py</code>)
+          or point <code className="text-[var(--text)]">DATABASE_URL</code> at a
+          DB that has them.
         </p>
       ) : (
         <div className="flex flex-col gap-3.5">

@@ -10,6 +10,7 @@ Run this once or twice a day during the season (later: schedule it).
     python scripts/poll_lines.py
     python scripts/poll_lines.py --season 2025
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,37 +30,52 @@ from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
 
 
 def _candidate_games(session, season: int) -> List[Dict]:
-    rows = session.query(
-        Game.id, Game.home_team, Game.away_team, Game.start_date
-    ).filter(Game.season == season).all()
-    return [{"id": r[0], "home_team": r[1], "away_team": r[2],
-             "start_date": r[3]} for r in rows]
+    rows = (
+        session.query(Game.id, Game.home_team, Game.away_team, Game.start_date)
+        .filter(Game.season == season)
+        .all()
+    )
+    return [{"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3]} for r in rows]
 
 
 def _latest_snapshot(session, game_id: int, book: str):
-    return (session.query(OddsSnapshot)
-            .filter(OddsSnapshot.game_id == game_id, OddsSnapshot.book == book,
-                    OddsSnapshot.market == "1H_total")
-            .order_by(OddsSnapshot.captured_at.desc()).first())
+    return (
+        session.query(OddsSnapshot)
+        .filter(
+            OddsSnapshot.game_id == game_id,
+            OddsSnapshot.book == book,
+            OddsSnapshot.market == "1H_total",
+        )
+        .order_by(OddsSnapshot.captured_at.desc())
+        .first()
+    )
 
 
 def _changed(prev, line, over, under) -> bool:
     if prev is None:
         return True
-    return (prev.line != line or prev.over_price != over
-            or prev.under_price != under)
+    return prev.line != line or prev.over_price != over or prev.under_price != under
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
-    ap.add_argument("--days-ahead", type=int, default=8,
-                    help="only pull odds for events kicking off within N days "
-                         "(conserves credits; 1H totals only post game-week)")
-    ap.add_argument("--max-events", type=int, default=80,
-                    help="hard cap on per-event odds calls (credit safety)")
-    ap.add_argument("--dry-run-alerts", action="store_true",
-                    help="print alerts instead of sending iMessages")
+    ap.add_argument(
+        "--days-ahead",
+        type=int,
+        default=8,
+        help="only pull odds for events kicking off within N days "
+        "(conserves credits; 1H totals only post game-week)",
+    )
+    ap.add_argument(
+        "--max-events",
+        type=int,
+        default=80,
+        help="hard cap on per-event odds calls (credit safety)",
+    )
+    ap.add_argument(
+        "--dry-run-alerts", action="store_true", help="print alerts instead of sending iMessages"
+    )
     ap.add_argument("--no-alerts", action="store_true", help="disable alerts")
     args = ap.parse_args()
 
@@ -97,8 +113,7 @@ def main() -> None:
         games = _candidate_games(s, args.season)
         meta = {g["id"]: g for g in games}
         for r in rows:
-            gid, _score = match_event(r["home_team"], r["away_team"],
-                                      r["commence_time"], games)
+            gid, _score = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
             if gid is None:
                 unmatched += 1
                 unmatched_names.append(f"{r['away_team']} @ {r['home_team']}")
@@ -106,15 +121,20 @@ def main() -> None:
             matched += 1
             # consensus-before-this-poll (latest per book), computed once per game
             if gid not in prev_consensus:
-                existing = (s.query(OddsSnapshot)
-                            .filter(OddsSnapshot.game_id == gid,
-                                    OddsSnapshot.market == "1H_total").all())
+                existing = (
+                    s.query(OddsSnapshot)
+                    .filter(OddsSnapshot.game_id == gid, OddsSnapshot.market == "1H_total")
+                    .all()
+                )
                 prev_consensus[gid] = consensus_open_close(existing)[1]
                 g = meta.get(gid, {})
                 matchups[gid] = f"{g.get('away_team')} @ {g.get('home_team')}"
-                pred = (s.query(Prediction.under_score)
-                        .filter(Prediction.game_id == gid)
-                        .order_by(Prediction.created_at.desc()).first())
+                pred = (
+                    s.query(Prediction.under_score)
+                    .filter(Prediction.game_id == gid)
+                    .order_by(Prediction.created_at.desc())
+                    .first()
+                )
                 if pred and pred[0] is not None:
                     scores[gid] = int(pred[0])
             this_poll_lines.setdefault(gid, []).append(r["line"])
@@ -123,22 +143,28 @@ def main() -> None:
             if not _changed(prev, r["line"], r["over_price"], r["under_price"]):
                 skipped += 1
                 continue
-            s.add(OddsSnapshot(
-                game_id=gid, book=r["book"], market="1H_total",
-                line=r["line"], over_price=r["over_price"],
-                under_price=r["under_price"], captured_at=now,
-            ))
+            s.add(
+                OddsSnapshot(
+                    game_id=gid,
+                    book=r["book"],
+                    market="1H_total",
+                    line=r["line"],
+                    over_price=r["over_price"],
+                    under_price=r["under_price"],
+                    captured_at=now,
+                )
+            )
             written += 1
 
     # --- alerts: newly-posted + significant consensus moves ---
-    new_consensus = {gid: statistics.median(ls)
-                     for gid, ls in this_poll_lines.items() if ls}
+    new_consensus = {gid: statistics.median(ls) for gid, ls in this_poll_lines.items() if ls}
     acfg = load_config().get("alerts", {}) or {}
     threshold = float(acfg.get("line_move_threshold", 1.0))
     recipient = acfg.get("imessage_to", "")
     if not args.no_alerts:
-        alerts = detect_line_alerts(prev_consensus, new_consensus, matchups,
-                                    threshold=threshold, scores=scores)
+        alerts = detect_line_alerts(
+            prev_consensus, new_consensus, matchups, threshold=threshold, scores=scores
+        )
         for a in alerts:
             msg = format_alert(a)
             alert_msgs.append(msg)
@@ -149,18 +175,21 @@ def main() -> None:
                 print(f"[alert {'sent' if ok else 'FAILED: ' + detail}] {msg}")
 
     c = client.last_credits
-    print(f"events_total={len(all_events)} in_window={len(in_window)} "
-          f"odds_rows={len(rows)} matched={matched} unmatched={unmatched} "
-          f"new_snapshots={written} unchanged={skipped} alerts={len(alert_msgs)}")
+    print(
+        f"events_total={len(all_events)} in_window={len(in_window)} "
+        f"odds_rows={len(rows)} matched={matched} unmatched={unmatched} "
+        f"new_snapshots={written} unchanged={skipped} alerts={len(alert_msgs)}"
+    )
     if c:
         print(f"credits: remaining={c.remaining} used={c.used} last_cost={c.last_cost}")
     if unmatched_names:
         uniq = sorted(set(unmatched_names))
-        print(f"unmatched events ({len(uniq)}): {uniq[:10]}"
-              + (" ..." if len(uniq) > 10 else ""))
+        print(f"unmatched events ({len(uniq)}): {uniq[:10]}" + (" ..." if len(uniq) > 10 else ""))
         if not games:
-            print("  (no games loaded for this season yet — run backfill --season "
-                  f"{args.season} first)")
+            print(
+                "  (no games loaded for this season yet — run backfill --season "
+                f"{args.season} first)"
+            )
 
 
 if __name__ == "__main__":

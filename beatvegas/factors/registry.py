@@ -9,6 +9,7 @@ Phase 1 registers the factors already computable from build_feature_frame
 (the existing model features + the pace/weather display columns). Later phases
 append the play-by-play-derived 1H-specific factors here; nothing else changes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,11 +22,11 @@ from ..etl.features import FH_FACTOR_COLS, MARKET_COLS, MATCHUP_COLS
 
 @dataclass(frozen=True)
 class Factor:
-    name: str                  # column name in the feature frame
-    family: str                # grouping for the UI / reporting
+    name: str  # column name in the feature frame
+    family: str  # grouping for the UI / reporting
     description: str = ""
-    leak_free: bool = True     # uses only pre-kickoff info
-    market: bool = False       # derived from a Vegas number
+    leak_free: bool = True  # uses only pre-kickoff info
+    market: bool = False  # derived from a Vegas number
     forward_only: bool = False  # only knowable live; not historically backtestable
 
 
@@ -108,16 +109,27 @@ _FACTORS: List[Factor] = [
 # First-half PBP factors (Phase 2) — generated from FH_FACTOR_COLS so the
 # registry can never drift from what features.py actually produces.
 _FH_FAMILY = {
-    "epa": "fh_efficiency", "success": "fh_efficiency", "explosive": "fh_efficiency",
-    "early_success": "fh_efficiency", "third_conv": "fh_efficiency",
-    "pass_rate": "fh_tendency", "n_plays": "fh_pace",
-    "havoc_suffered": "fh_disruption", "turnovers": "fh_disruption",
-    "opening_score": "fh_opening", "opening_3out": "fh_opening",
+    "epa": "fh_efficiency",
+    "success": "fh_efficiency",
+    "explosive": "fh_efficiency",
+    "early_success": "fh_efficiency",
+    "third_conv": "fh_efficiency",
+    "pass_rate": "fh_tendency",
+    "n_plays": "fh_pace",
+    "havoc_suffered": "fh_disruption",
+    "turnovers": "fh_disruption",
+    "opening_score": "fh_opening",
+    "opening_3out": "fh_opening",
 }
 for _name in FH_FACTOR_COLS:
     _role, _metric = _name.split("_fh_", 1)[1].split("_", 1)
-    _FACTORS.append(Factor(_name, _FH_FAMILY.get(_metric, "fh"),
-                           f"1H {_role} {_metric.replace('_', ' ')} (season-to-date)"))
+    _FACTORS.append(
+        Factor(
+            _name,
+            _FH_FAMILY.get(_metric, "fh"),
+            f"1H {_role} {_metric.replace('_', ' ')} (season-to-date)",
+        )
+    )
 
 # Matchup-interaction factors (offense edge over opposing defense).
 _MM_DESC = {
@@ -136,14 +148,17 @@ def default_registry() -> List[Factor]:
     out = []
     for f in _FACTORS:
         market = f.market or (f.name in MARKET_COLS)
-        out.append(f if market == f.market else Factor(
-            f.name, f.family, f.description, f.leak_free, market, f.forward_only))
+        out.append(
+            f
+            if market == f.market
+            else Factor(f.name, f.family, f.description, f.leak_free, market, f.forward_only)
+        )
     return out
 
 
-def evaluable_factors(df: pd.DataFrame,
-                      include_market: bool = True,
-                      include_forward_only: bool = False) -> List[Factor]:
+def evaluable_factors(
+    df: pd.DataFrame, include_market: bool = True, include_forward_only: bool = False
+) -> List[Factor]:
     """Factors present in the frame and eligible to evaluate.
 
     Forward-only factors are excluded by default (no historical truth to score

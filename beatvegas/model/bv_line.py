@@ -21,9 +21,10 @@ training data with the final model that does. We instead REPORT per-era residual
 honest limit being that the very first post-2023 season can't be de-biased from
 data that doesn't yet exist.
 """
+
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -33,7 +34,7 @@ from ..etl.features import BANNED_LINE_COLS, FEATURE_COLS, MARKET_COLS
 
 TARGET = "first_half_total"
 ERA_COL = "era_post2023"
-_MIN_SEGMENT = 200          # min rows to report a segment residual
+_MIN_SEGMENT = 200  # min rows to report a segment residual
 
 # The BV line is MARKET-BLIND: it sees none of the Vegas-derived inputs. This is
 # the whole point — an independent number to compare against Vegas, so the gap
@@ -44,8 +45,12 @@ BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS]
 def _new_regressor() -> HistGradientBoostingRegressor:
     # Mirrors backtest.engine._new_model() hyperparameters for consistency.
     return HistGradientBoostingRegressor(
-        learning_rate=0.05, max_depth=3, max_iter=300,
-        l2_regularization=1.0, min_samples_leaf=40, random_state=7,
+        learning_rate=0.05,
+        max_depth=3,
+        max_iter=300,
+        l2_regularization=1.0,
+        min_samples_leaf=40,
+        random_state=7,
     )
 
 
@@ -102,15 +107,13 @@ def bias_corrections(train_df: pd.DataFrame) -> Dict:
     return {"global": float(res["residual"].mean())}
 
 
-def apply_bias(raw_pred: np.ndarray, frame: pd.DataFrame,
-               corrections: Dict) -> np.ndarray:
+def apply_bias(raw_pred: np.ndarray, frame: pd.DataFrame, corrections: Dict) -> np.ndarray:
     """Shift raw predictions by the global intercept correction."""
     global_bias = corrections.get("global", 0.0)
     return np.asarray(raw_pred, dtype=float) + global_bias
 
 
-def bv_line_for_slate(train_df: pd.DataFrame,
-                      target_df: pd.DataFrame) -> np.ndarray:
+def bv_line_for_slate(train_df: pd.DataFrame, target_df: pd.DataFrame) -> np.ndarray:
     """Fit on train, predict the target slate, return calibrated BV lines.
 
     Empty train/target yields an empty array. Bias corrections are derived from
@@ -124,8 +127,7 @@ def bv_line_for_slate(train_df: pd.DataFrame,
     return apply_bias(raw, target_df, corrections)
 
 
-def residual_band(train_df: pd.DataFrame, lo: float = 0.1,
-                  hi: float = 0.9) -> Dict:
+def residual_band(train_df: pd.DataFrame, lo: float = 0.1, hi: float = 0.9) -> Dict:
     """Empirical (conformal) prediction band for the BV line.
 
     Reuses the walk-forward OOF residuals — no extra models. Returns
@@ -154,23 +156,28 @@ def residual_report(df: pd.DataFrame) -> Dict:
     res = oof_residuals(df)
     if res.empty:
         return {"n": 0}
-    report: Dict = {"n": int(len(res)), "overall_mean_residual": round(float(res["residual"].mean()), 3)}
+    report: Dict = {
+        "n": int(len(res)),
+        "overall_mean_residual": round(float(res["residual"].mean()), 3),
+    }
 
     by_era = {}
     for era_val, grp in res.groupby(ERA_COL):
         label = "post2023" if float(era_val) >= 1.0 else "pre2023"
-        by_era[label] = {"n": int(len(grp)),
-                         "mean_residual": round(float(grp["residual"].mean()), 3)}
+        by_era[label] = {
+            "n": int(len(grp)),
+            "mean_residual": round(float(grp["residual"].mean()), 3),
+        }
     report["by_era"] = by_era
 
     if res["combined_sec_play"].notna().sum() >= 3 * _MIN_SEGMENT:
         try:
             res = res.copy()
-            res["_tempo_bucket"] = pd.qcut(res["combined_sec_play"], 3,
-                                           labels=["fast", "mid", "slow"])
+            res["_tempo_bucket"] = pd.qcut(
+                res["combined_sec_play"], 3, labels=["fast", "mid", "slow"]
+            )
             report["by_tempo"] = {
-                str(b): {"n": int(len(g)),
-                         "mean_residual": round(float(g["residual"].mean()), 3)}
+                str(b): {"n": int(len(g)), "mean_residual": round(float(g["residual"].mean()), 3)}
                 for b, g in res.groupby("_tempo_bucket", observed=True)
             }
         except ValueError:
@@ -179,9 +186,13 @@ def residual_report(df: pd.DataFrame) -> Dict:
     dome = res[res["wx_dome"] == 1]
     outdoor = res[res["wx_dome"] != 1]
     report["by_dome"] = {
-        "dome": {"n": int(len(dome)),
-                 "mean_residual": round(float(dome["residual"].mean()), 3) if len(dome) else None},
-        "outdoor": {"n": int(len(outdoor)),
-                    "mean_residual": round(float(outdoor["residual"].mean()), 3) if len(outdoor) else None},
+        "dome": {
+            "n": int(len(dome)),
+            "mean_residual": round(float(dome["residual"].mean()), 3) if len(dome) else None,
+        },
+        "outdoor": {
+            "n": int(len(outdoor)),
+            "mean_residual": round(float(outdoor["residual"].mean()), 3) if len(outdoor) else None,
+        },
     }
     return report

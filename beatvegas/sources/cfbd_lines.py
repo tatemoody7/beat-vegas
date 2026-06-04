@@ -6,6 +6,7 @@ SAME row shape `scripts/poll_full_game.py` consumes, so it's a drop-in fallback
 for the DK capture path. Rows carry the CFBD game id directly (== Game.id), so
 the poller can match by id without fuzzy name matching.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,8 +22,9 @@ def _get(d: Dict[str, Any], *names: str) -> Any:
     return None
 
 
-def pick_total_spread(lines: List[Dict[str, Any]]
-                      ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
+def pick_total_spread(
+    lines: List[Dict[str, Any]],
+) -> Tuple[Optional[float], Optional[float], Optional[str]]:
     """(over_under, spread, provider) by provider priority, else first non-null.
 
     `spread` is CFBD's home-relative line (negative = home favored)."""
@@ -44,8 +46,7 @@ def pick_total_spread(lines: List[Dict[str, Any]]
     return None, None, None
 
 
-def full_game_rows(client, season: int, season_type: str = "regular"
-                   ) -> List[Dict[str, Any]]:
+def full_game_rows(client, season: int, season_type: str = "regular") -> List[Dict[str, Any]]:
     """Full-game total+spread rows from CFBD /lines, shaped like the DK rows
     `poll_full_game` consumes. Each row carries `game_id` (CFBD id == Game.id)."""
     rows: List[Dict[str, Any]] = []
@@ -54,17 +55,19 @@ def full_game_rows(client, season: int, season_type: str = "regular"
         ou, sp, prov = pick_total_spread(_get(g, "lines") or [])
         if gid is None or ou is None:
             continue
-        rows.append({
-            "game_id": gid,
-            "event_id": str(gid),
-            "commence_time": _get(g, "startDate", "start_date"),
-            "home_team": _get(g, "homeTeam", "home_team"),
-            "away_team": _get(g, "awayTeam", "away_team"),
-            "book": prov or "cfbd",
-            "line": float(ou),
-            "spread": sp,
-            "over_price": None,
-            "under_price": None,
-            "last_update": None,
-        })
+        rows.append(
+            {
+                "game_id": gid,
+                "event_id": str(gid),
+                "commence_time": _get(g, "startDate", "start_date"),
+                "home_team": _get(g, "homeTeam", "home_team"),
+                "away_team": _get(g, "awayTeam", "away_team"),
+                "book": prov or "cfbd",
+                "line": float(ou),
+                "spread": sp,
+                "over_price": None,
+                "under_price": None,
+                "last_update": None,
+            }
+        )
     return rows

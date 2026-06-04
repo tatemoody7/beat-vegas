@@ -7,7 +7,10 @@ export async function GET(req: NextRequest) {
   const season = Number(sp.get("season"));
   const minGames = sp.get("minGames") ? Number(sp.get("minGames")) : 30;
   if (!Number.isFinite(season)) {
-    return NextResponse.json({ error: "missing or invalid ?season" }, { status: 400 });
+    return NextResponse.json(
+      { error: "missing or invalid ?season" },
+      { status: 400 },
+    );
   }
   const data = await getLineStudy(season, minGames);
   return NextResponse.json(data);

@@ -11,6 +11,7 @@ no extra API calls. Real opening-consensus lines are used as `line_used` where
     python scripts/backfill_bv_line.py                 # 2018..latest
     python scripts/backfill_bv_line.py --start-season 2021
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,15 +28,19 @@ def season_opening_lines(season: int) -> Dict[int, float]:
     """Opening-consensus 1H line per game for a whole season (where snapshots
     exist). Mirrors weekly_update.opening_line_lookup but season-wide."""
     with session_scope() as s:
-        rows = (s.query(OddsSnapshot.game_id, OddsSnapshot.book,
-                        OddsSnapshot.line, OddsSnapshot.captured_at)
-                .join(Game, Game.id == OddsSnapshot.game_id)
-                .filter(Game.season == season,
-                        OddsSnapshot.market == "1H_total").all())
+        rows = (
+            s.query(
+                OddsSnapshot.game_id, OddsSnapshot.book, OddsSnapshot.line, OddsSnapshot.captured_at
+            )
+            .join(Game, Game.id == OddsSnapshot.game_id)
+            .filter(Game.season == season, OddsSnapshot.market == "1H_total")
+            .all()
+        )
     by_game: Dict[int, list] = {}
     for gid, book, line, captured_at in rows:
         by_game.setdefault(gid, []).append(
-            type("S", (), {"book": book, "line": line, "captured_at": captured_at}))
+            type("S", (), {"book": book, "line": line, "captured_at": captured_at})
+        )
     out: Dict[int, float] = {}
     for gid, snaps in by_game.items():
         opening = consensus_open_close(snaps)[0]

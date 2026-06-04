@@ -7,6 +7,7 @@ can watch the metrics move as seasons accumulate.
 
     python scripts/retrain.py
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,21 +31,23 @@ def main() -> None:
     init_db()
 
     df = build_feature_frame(min_games=2)
-    res = run_backtest(df, first_test_season=args.first_test_season,
-                       top_frac=args.top_frac)
+    res = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
     seasons = sorted(df["season"].unique().tolist())
     metrics = res.summary
     # Auditable BV-line calibration: OOF mean residual overall + per segment.
     metrics["bv_residual"] = residual_report(df)
 
     with session_scope() as s:
-        s.add(ModelRun(
-            version=MODEL_VERSION,
-            train_window=f"{seasons[0]}-{seasons[-1]}",
-            test_window=metrics.get("test_seasons"),
-            metrics_json=json.dumps(metrics),
-            notes=args.notes,
-            created_at=datetime.utcnow()))
+        s.add(
+            ModelRun(
+                version=MODEL_VERSION,
+                train_window=f"{seasons[0]}-{seasons[-1]}",
+                test_window=metrics.get("test_seasons"),
+                metrics_json=json.dumps(metrics),
+                notes=args.notes,
+                created_at=datetime.utcnow(),
+            )
+        )
     print("logged model_run:", metrics)
 
 

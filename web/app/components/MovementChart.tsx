@@ -13,7 +13,14 @@ import type { MovementPoint } from "@/lib/movement";
 
 // One color-coded line per book. Books are sampled at different times, so
 // connectNulls bridges the per-book gaps (mirrors Streamlit's line chart).
-const COLORS = ["#38bdf8", "#f59e0b", "#34d399", "#f472b6", "#a78bfa", "#fb7185"];
+const COLORS = [
+  "#38bdf8",
+  "#f59e0b",
+  "#34d399",
+  "#f472b6",
+  "#a78bfa",
+  "#fb7185",
+];
 
 export default function MovementChart({
   points,
@@ -22,8 +29,9 @@ export default function MovementChart({
   points: MovementPoint[];
   books: string[];
 }) {
-  const lines = points
-    .flatMap((p) => books.map((b) => p[b]).filter((v): v is number => typeof v === "number"));
+  const lines = points.flatMap((p) =>
+    books.map((b) => p[b]).filter((v): v is number => typeof v === "number"),
+  );
   const lo = Math.min(...lines);
   const hi = Math.max(...lines);
   const pad = 0.5;
@@ -31,7 +39,10 @@ export default function MovementChart({
   return (
     <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={points} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+        <LineChart
+          data={points}
+          margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+        >
           <CartesianGrid stroke="#1b2336" vertical={false} />
           <XAxis
             dataKey="t"

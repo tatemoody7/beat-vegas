@@ -23,7 +23,11 @@ export default function GameSelect({
   return (
     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
       Game
-      <select value={current} onChange={onChange} className="bv-select max-w-xs">
+      <select
+        value={current}
+        onChange={onChange}
+        className="bv-select max-w-xs"
+      >
         {games.map((g) => (
           <option key={g.id} value={g.id}>
             wk{g.week}: {g.matchup} ({g.snaps} updates)

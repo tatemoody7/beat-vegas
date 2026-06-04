@@ -4,10 +4,10 @@ These are full-season aggregates, so to stay leak-free we only ever join a
 season's stats to the *following* season's games (a stable preseason prior).
 Raw responses are cached under data/cache/ to avoid refetching.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
@@ -45,12 +45,15 @@ def sp_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
                 continue
             off = _g(r, "offense") or {}
             de = _g(r, "defense") or {}
-            rows.append({
-                "season": _g(r, "year", "season"), "team": team,
-                "sp_overall": _g(r, "rating"),
-                "sp_offense": _g(off, "rating"),
-                "sp_defense": _g(de, "rating"),
-            })
+            rows.append(
+                {
+                    "season": _g(r, "year", "season"),
+                    "team": team,
+                    "sp_overall": _g(r, "rating"),
+                    "sp_offense": _g(off, "rating"),
+                    "sp_defense": _g(de, "rating"),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -60,18 +63,21 @@ def returning_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     rows = []
     for yr in seasons:
         data = _cached(
-            f"returning_{yr}.json",
-            lambda yr=yr: client._get("/player/returning", {"year": yr}))
+            f"returning_{yr}.json", lambda yr=yr: client._get("/player/returning", {"year": yr})
+        )
         for r in data:
             team = _g(r, "team")
             if not team:
                 continue
-            rows.append({
-                "season": _g(r, "season", "year"), "team": team,
-                "returning_ppa": _g(r, "percentPPA", "percent_ppa"),
-                "returning_pass_ppa": _g(r, "percentPassingPPA", "percent_passing_ppa"),
-                "returning_usage": _g(r, "returningUsage", "returning_usage"),
-            })
+            rows.append(
+                {
+                    "season": _g(r, "season", "year"),
+                    "team": team,
+                    "returning_ppa": _g(r, "percentPPA", "percent_ppa"),
+                    "returning_pass_ppa": _g(r, "percentPassingPPA", "percent_passing_ppa"),
+                    "returning_usage": _g(r, "returningUsage", "returning_usage"),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -84,8 +90,9 @@ def talent_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
             team = _g(r, "team")
             if not team:
                 continue
-            rows.append({"season": _g(r, "year", "season"), "team": team,
-                         "talent": _g(r, "talent")})
+            rows.append(
+                {"season": _g(r, "year", "season"), "team": team, "talent": _g(r, "talent")}
+            )
     return pd.DataFrame(rows)
 
 
@@ -97,9 +104,12 @@ def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFr
     rows = []
     for yr in seasons:
         data = _cached(f"roster_{yr}.json", lambda yr=yr: client.roster(year=yr))
-        df = pd.DataFrame([{"team": _g(r, "team"),
-                            "yr": pd.to_numeric(_g(r, "year"), errors="coerce")}
-                           for r in data])
+        df = pd.DataFrame(
+            [
+                {"team": _g(r, "team"), "yr": pd.to_numeric(_g(r, "year"), errors="coerce")}
+                for r in data
+            ]
+        )
         if df.empty:
             continue
         # CFBD roster `year` is class 1(FR)..5; some rows carry a bad value (the
@@ -109,32 +119,37 @@ def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFr
             yrs = g["yr"].dropna()
             if yrs.empty:
                 continue
-            rows.append({
-                "season": yr, "team": team,
-                "roster_exp": round(float(yrs.mean()), 3),
-                "roster_upperclass": round(float((yrs >= 3).mean()), 3),
-            })
+            rows.append(
+                {
+                    "season": yr,
+                    "team": team,
+                    "roster_exp": round(float(yrs.mean()), 3),
+                    "roster_upperclass": round(float((yrs >= 3).mean()), 3),
+                }
+            )
     return pd.DataFrame(rows)
 
 
 def advanced_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     rows = []
     for yr in seasons:
-        data = _cached(f"adv_{yr}.json",
-                       lambda yr=yr: client.advanced_season_stats(year=yr))
+        data = _cached(f"adv_{yr}.json", lambda yr=yr: client.advanced_season_stats(year=yr))
         for r in data:
             team = _g(r, "team")
             if not team:
                 continue
             off = _g(r, "offense") or {}
             de = _g(r, "defense") or {}
-            rows.append({
-                "season": _g(r, "season", "year"), "team": team,
-                "off_ppa": _g(off, "ppa"),
-                "def_ppa": _g(de, "ppa"),
-                "off_success": _g(off, "successRate", "success_rate"),
-                "def_success": _g(de, "successRate", "success_rate"),
-                "off_explosive": _g(off, "explosiveness"),
-                "def_explosive": _g(de, "explosiveness"),
-            })
+            rows.append(
+                {
+                    "season": _g(r, "season", "year"),
+                    "team": team,
+                    "off_ppa": _g(off, "ppa"),
+                    "def_ppa": _g(de, "ppa"),
+                    "off_success": _g(off, "successRate", "success_rate"),
+                    "def_success": _g(de, "successRate", "success_rate"),
+                    "off_explosive": _g(off, "explosiveness"),
+                    "def_explosive": _g(de, "explosiveness"),
+                }
+            )
     return pd.DataFrame(rows)

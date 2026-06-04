@@ -1,5 +1,6 @@
 """Config loading. Reads config.yaml (falling back to config.example.yaml) and
 allows the CFBD key to come from the CFBD_API_KEY environment variable."""
+
 from __future__ import annotations
 
 import os
@@ -65,8 +66,9 @@ def odds_api_key() -> str:
 
 def db_path() -> Path:
     # BEATVEGAS_DB env var overrides config (used for the demo/preview DB).
-    rel = os.environ.get("BEATVEGAS_DB") or \
-        (load_config().get("database", {}) or {}).get("path", "data/beatvegas.db")
+    rel = os.environ.get("BEATVEGAS_DB") or (load_config().get("database", {}) or {}).get(
+        "path", "data/beatvegas.db"
+    )
     p = Path(rel)
     return p if p.is_absolute() else REPO_ROOT / p
 

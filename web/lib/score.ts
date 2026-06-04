@@ -78,10 +78,9 @@ const has = (v: unknown): v is number => v !== null && v !== undefined;
 
 // The 7 chips, matching the order/labels/tooltips/fallbacks in app.py.
 export function buildChips(f: Factors): Chip[] {
-  const oneH =
-    has(f.fh_home_pf)
-      ? `${f.fh_home_pf}/${f.fh_home_pa} · ${f.fh_away_pf}/${f.fh_away_pa}`
-      : "—";
+  const oneH = has(f.fh_home_pf)
+    ? `${f.fh_home_pf}/${f.fh_home_pa} · ${f.fh_away_pf}/${f.fh_away_pa}`
+    : "—";
   return [
     {
       label: "Pace",

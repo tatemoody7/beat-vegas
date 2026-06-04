@@ -9,11 +9,11 @@ actual results are loaded (re-run backfill --season <yr> after games finish).
 
     python scripts/grade.py --season 2025
 """
+
 from __future__ import annotations
 
 import argparse
 import statistics
-from typing import Dict, List, Optional, Tuple
 
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
 from beatvegas.db.store import session_scope, try_init_db
@@ -21,7 +21,7 @@ from beatvegas.grading import clv_under, under_result, units_won
 from beatvegas.lines import closing_before_kickoff
 from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
-MODEL_MARKET = "market"   # tag for the pure market-vs-result grade
+MODEL_MARKET = "market"  # tag for the pure market-vs-result grade
 
 
 def _closings(session, season: int):
@@ -31,14 +31,16 @@ def _closings(session, season: int):
     that ran after the game started can't pollute it), and closing_at is the
     freshest such snapshot — the CLV-trust signal (how close to kickoff we got).
     """
-    games = (session.query(Game)
-             .filter(Game.season == season,
-                     Game.first_half_total.isnot(None)).all())
+    games = (
+        session.query(Game).filter(Game.season == season, Game.first_half_total.isnot(None)).all()
+    )
     out = {}
     for g in games:
-        snaps = (session.query(OddsSnapshot)
-                 .filter(OddsSnapshot.game_id == g.id,
-                         OddsSnapshot.market == "1H_total").all())
+        snaps = (
+            session.query(OddsSnapshot)
+            .filter(OddsSnapshot.game_id == g.id, OddsSnapshot.market == "1H_total")
+            .all()
+        )
         opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
         out[g.id] = (g, (opening, closing), closing_at)
     return out
@@ -50,23 +52,32 @@ def grade_market(session, closings) -> int:
         if closing is None:
             continue
         actual = g.first_half_total
-        (session.query(Result).filter(Result.game_id == gid,
-         Result.model_version == MODEL_MARKET).delete())
-        session.add(Result(
-            game_id=gid, model_version=MODEL_MARKET, actual_first_half_total=actual,
-            line_used=closing, line_kind="real",
-            under_hit=under_result(actual, closing) == "under",
-            closing_line=closing, closing_captured_at=closing_at,
-            clv=clv_under(opening, closing),
-            units=units_won(actual, closing)))
+        (
+            session.query(Result)
+            .filter(Result.game_id == gid, Result.model_version == MODEL_MARKET)
+            .delete()
+        )
+        session.add(
+            Result(
+                game_id=gid,
+                model_version=MODEL_MARKET,
+                actual_first_half_total=actual,
+                line_used=closing,
+                line_kind="real",
+                under_hit=under_result(actual, closing) == "under",
+                closing_line=closing,
+                closing_captured_at=closing_at,
+                clv=clv_under(opening, closing),
+                units=units_won(actual, closing),
+            )
+        )
         n += 1
     return n
 
 
 def grade_model(session, season: int, closings) -> int:
     """Grade the model's bets (under_score >= threshold) at the line it picked."""
-    preds = (session.query(Prediction)
-             .filter(Prediction.model_version == MODEL_VERSION).all())
+    preds = session.query(Prediction).filter(Prediction.model_version == MODEL_VERSION).all()
     n = 0
     for p in preds:
         if not is_model_bet(p.under_score) or p.line_used is None:
@@ -77,23 +88,31 @@ def grade_model(session, season: int, closings) -> int:
         g, (_open, closing), closing_at = entry
         actual = g.first_half_total
         bet_line = p.line_used
-        (session.query(Result).filter(Result.game_id == p.game_id,
-         Result.model_version == MODEL_VERSION).delete())
-        session.add(Result(
-            game_id=p.game_id, model_version=MODEL_VERSION,
-            actual_first_half_total=actual, line_used=bet_line,
-            line_kind="real" if closing is not None else "proxy",
-            under_hit=under_result(actual, bet_line) == "under",
-            closing_line=closing, closing_captured_at=closing_at,
-            clv=clv_under(bet_line, closing),
-            units=units_won(actual, bet_line)))
+        (
+            session.query(Result)
+            .filter(Result.game_id == p.game_id, Result.model_version == MODEL_VERSION)
+            .delete()
+        )
+        session.add(
+            Result(
+                game_id=p.game_id,
+                model_version=MODEL_VERSION,
+                actual_first_half_total=actual,
+                line_used=bet_line,
+                line_kind="real" if closing is not None else "proxy",
+                under_hit=under_result(actual, bet_line) == "under",
+                closing_line=closing,
+                closing_captured_at=closing_at,
+                clv=clv_under(bet_line, closing),
+                units=units_won(actual, bet_line),
+            )
+        )
         n += 1
     return n
 
 
 def _summary(session, model_version: str, label: str) -> None:
-    rows = (session.query(Result)
-            .filter(Result.model_version == model_version).all())
+    rows = session.query(Result).filter(Result.model_version == model_version).all()
     if not rows:
         print(f"{label}: no graded bets")
         return
@@ -102,8 +121,7 @@ def _summary(session, model_version: str, label: str) -> None:
     units = sum(r.units for r in rows)
     clvs = [r.clv for r in rows if r.clv is not None]
     clv_txt = f"  avg CLV={statistics.mean(clvs):+.2f}" if clvs else ""
-    print(f"{label}: UNDER {unders}/{n} ({100*unders/n:.1f}%)  "
-          f"units={units:+.2f}{clv_txt}")
+    print(f"{label}: UNDER {unders}/{n} ({100 * unders / n:.1f}%)  units={units:+.2f}{clv_txt}")
 
 
 def main() -> None:

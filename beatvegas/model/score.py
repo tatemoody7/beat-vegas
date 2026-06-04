@@ -9,6 +9,7 @@ dashboard cards render.
 Honest framing: the backtest showed only a small, unstable edge vs a proxy line,
 so treat the score as the model's *relative lean*, not a guarantee.
 """
+
 from __future__ import annotations
 
 import json
@@ -25,8 +26,8 @@ from ..etl.proxy_line import proxy_total
 from .bv_line import bv_line_for_slate, residual_band
 
 MODEL_VERSION = "gbm_v1"
-MODEL_BET_THRESHOLD = 53          # under_score at/above this = the model "bets" it
-OPPORTUNITY_Z = 0.5               # gap >= 0.5 residual-sigma toward under = flagged
+MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
+OPPORTUNITY_Z = 0.5  # gap >= 0.5 residual-sigma toward under = flagged
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:
@@ -56,7 +57,7 @@ def _pace_str(row: pd.Series) -> Optional[str]:
 
 def _weather_str(row: pd.Series) -> Optional[str]:
     dome = row.get("wx_dome")
-    if dome == 1 or dome is True:          # NaN/None are NOT dome
+    if dome == 1 or dome is True:  # NaN/None are NOT dome
         return "Dome"
     temp, wind, precip = row.get("wx_temp"), row.get("wx_wind"), row.get("wx_precip")
     if temp is None or pd.isna(temp):
@@ -87,8 +88,10 @@ def _returning_str(row: pd.Series) -> Optional[str]:
     h, a = row.get("home_returning_ppa"), row.get("away_returning_ppa")
     if (h is None or pd.isna(h)) and (a is None or pd.isna(a)):
         return None
+
     def _p(v):
-        return f"{v*100:.0f}%" if v is not None and not pd.isna(v) else "—"
+        return f"{v * 100:.0f}%" if v is not None and not pd.isna(v) else "—"
+
     return f"{_p(h)}/{_p(a)}"
 
 
@@ -101,8 +104,10 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "returning": _returning_str(row),
         "off_ppa": _f(row.get("combined_off_ppa")),
         "def_ppa": _f(row.get("combined_def_ppa")),
-        "fh_home_pf": _f(row.get("home_fh_pf")), "fh_home_pa": _f(row.get("home_fh_pa")),
-        "fh_away_pf": _f(row.get("away_fh_pf")), "fh_away_pa": _f(row.get("away_fh_pa")),
+        "fh_home_pf": _f(row.get("home_fh_pf")),
+        "fh_home_pa": _f(row.get("home_fh_pa")),
+        "fh_away_pf": _f(row.get("away_fh_pf")),
+        "fh_away_pa": _f(row.get("away_fh_pa")),
         "proj_1h_total": _f(proj),
         "bv_line": _f(row.get("bv_line")),
         "bv_gap": _f(row.get("bv_gap")),
@@ -112,16 +117,19 @@ def _factors(row: pd.Series, line: float) -> Dict:
         "bv_gap_z": _f(row.get("bv_gap_z")),
         "qb_out_home": bool(row.get("qb_out_home")) if row.get("qb_out_home") is not None else None,
         "qb_out_away": bool(row.get("qb_out_away")) if row.get("qb_out_away") is not None else None,
-        "qb_out_detail": row.get("qb_out_detail") if isinstance(row.get("qb_out_detail"), str) else None,
+        "qb_out_detail": row.get("qb_out_detail")
+        if isinstance(row.get("qb_out_detail"), str)
+        else None,
         "line": _f(line),
-        "line_kind": (row.get("line_kind")
-                      if isinstance(row.get("line_kind"), str) else None),
+        "line_kind": (row.get("line_kind") if isinstance(row.get("line_kind"), str) else None),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
         # primary-engine fields (gbm_v2 gap ranking)
         "rank_basis": "bv_gap",
-        "is_opportunity": (bool(row.get("is_opportunity"))
-                           if row.get("is_opportunity") is not None
-                           and not pd.isna(row.get("is_opportunity")) else None),
+        "is_opportunity": (
+            bool(row.get("is_opportunity"))
+            if row.get("is_opportunity") is not None and not pd.isna(row.get("is_opportunity"))
+            else None
+        ),
         # genuine 1H-scoring signal chips (corr_1h drivers)
         "fh_off_epa_home": _f(row.get("home_fh_off_epa")),
         "fh_off_epa_away": _f(row.get("away_fh_off_epa")),
@@ -134,11 +142,14 @@ def _f(v):
     return None if v is None or pd.isna(v) else round(float(v), 2)
 
 
-def score_slate(target_season: int, target_week: Optional[int] = None,
-                game_ids: Optional[List[int]] = None,
-                line_lookup: Optional[Dict[int, float]] = None,
-                line_kind_lookup: Optional[Dict[int, str]] = None,
-                df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+def score_slate(
+    target_season: int,
+    target_week: Optional[int] = None,
+    game_ids: Optional[List[int]] = None,
+    line_lookup: Optional[Dict[int, float]] = None,
+    line_kind_lookup: Optional[Dict[int, str]] = None,
+    df: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
     if df is None:
         df = build_feature_frame(min_games=2)
     train = df[df["season"] < target_season]
@@ -162,10 +173,11 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     ll = line_lookup or {}
     lk = line_kind_lookup or {}
     target["line"] = target.apply(
-        lambda r: ll.get(r["id"], proxy_total(r["full_game_total"],
-                                              spread=r.get("spread"))), axis=1)
+        lambda r: ll.get(r["id"], proxy_total(r["full_game_total"], spread=r.get("spread"))), axis=1
+    )
     target["line_kind"] = target["id"].map(
-        lambda gid: lk.get(gid, "observed_1h" if gid in ll else "proxy"))
+        lambda gid: lk.get(gid, "observed_1h" if gid in ll else "proxy")
+    )
 
     # Independent calibrated "BV line": our own 1H total from a MARKET-BLIND
     # regressor (no Vegas inputs). Display + gap sort only; does NOT influence
@@ -179,8 +191,7 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     target["bv_sigma"] = sigma
     target["bv_lo"] = (target["bv_line"] + lo_off).round(2) if lo_off is not None else None
     target["bv_hi"] = (target["bv_line"] + hi_off).round(2) if hi_off is not None else None
-    target["bv_gap_z"] = ((target["bv_gap"] / sigma).round(2)
-                          if sigma else None)
+    target["bv_gap_z"] = (target["bv_gap"] / sigma).round(2) if sigma else None
 
     # PRIMARY ENGINE (gbm_v2, validated Phase 3): an under opportunity is a game
     # where the book's line sits materially ABOVE our predicted 1H total —
@@ -188,9 +199,9 @@ def score_slate(target_season: int, target_week: Optional[int] = None,
     # by the raw gap (unders only). under_prob/under_score remain a secondary
     # classifier lean on the card.
     if sigma:
-        target["is_opportunity"] = (target["bv_gap_z"] >= OPPORTUNITY_Z)
+        target["is_opportunity"] = target["bv_gap_z"] >= OPPORTUNITY_Z
     else:
-        target["is_opportunity"] = (target["bv_gap"] > 0)
+        target["is_opportunity"] = target["bv_gap"] > 0
 
     target = target.sort_values("bv_gap", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
@@ -204,22 +215,30 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
     with session_scope() as s:
         ids = [int(x) for x in scored["id"].tolist()]
         if ids:
-            (s.query(Prediction)
-             .filter(Prediction.model_version == model_version,
-                     Prediction.game_id.in_(ids)).delete(synchronize_session=False))
+            (
+                s.query(Prediction)
+                .filter(Prediction.model_version == model_version, Prediction.game_id.in_(ids))
+                .delete(synchronize_session=False)
+            )
         for _, r in scored.iterrows():
             line = r.get("line")
-            s.add(Prediction(
-                game_id=int(r["id"]), model_version=model_version,
-                under_probability=float(r["under_prob"]),
-                under_score=int(r["under_score"]),
-                projected_first_half_total=_f(r.get("proj_1h_total")),
-                bv_line=_f(r.get("bv_line")), bv_gap=_f(r.get("bv_gap")),
-                bv_lo=_f(r.get("bv_lo")), bv_hi=_f(r.get("bv_hi")),
-                bv_sigma=_f(r.get("bv_sigma")),
-                line_used=_f(line), rank=int(r["rank"]),
-                factors_json=json.dumps(_factors(r, line)),
-                created_at=now,
-            ))
+            s.add(
+                Prediction(
+                    game_id=int(r["id"]),
+                    model_version=model_version,
+                    under_probability=float(r["under_prob"]),
+                    under_score=int(r["under_score"]),
+                    projected_first_half_total=_f(r.get("proj_1h_total")),
+                    bv_line=_f(r.get("bv_line")),
+                    bv_gap=_f(r.get("bv_gap")),
+                    bv_lo=_f(r.get("bv_lo")),
+                    bv_hi=_f(r.get("bv_hi")),
+                    bv_sigma=_f(r.get("bv_sigma")),
+                    line_used=_f(line),
+                    rank=int(r["rank"]),
+                    factors_json=json.dumps(_factors(r, line)),
+                    created_at=now,
+                )
+            )
             n += 1
     return n

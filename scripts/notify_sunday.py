@@ -10,6 +10,7 @@ texting; otherwise we send a schedule-based heads-up.
     python scripts/notify_sunday.py            # send
     python scripts/notify_sunday.py --dry-run  # print only
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,6 +26,7 @@ def board_reachable(url: str, timeout: int = 15) -> bool:
     redirect both mean it's up). Fail-silent."""
     try:
         import requests
+
         return requests.get(url, timeout=timeout).status_code < 500
     except Exception:  # noqa: BLE001 — best-effort check, never raise
         return False
@@ -32,15 +34,18 @@ def board_reachable(url: str, timeout: int = 15) -> bool:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true",
-                    help="print the message instead of sending it")
+    ap.add_argument(
+        "--dry-run", action="store_true", help="print the message instead of sending it"
+    )
     ap.add_argument("--url", default=DEFAULT_URL)
     args = ap.parse_args()
 
     up = board_reachable(args.url)
-    msg = (f"DK fired — this week's openers are in, board updated. {args.url}"
-           if up else
-           f"Sunday run complete — check the board: {args.url}")
+    msg = (
+        f"DK fired — this week's openers are in, board updated. {args.url}"
+        if up
+        else f"Sunday run complete — check the board: {args.url}"
+    )
 
     acfg = load_config().get("alerts", {}) or {}
     recipient = acfg.get("imessage_to", "")

@@ -9,6 +9,7 @@
     python scripts/backfill_context.py                 # venues + cache warm
     python scripts/backfill_context.py --venues-only
 """
+
 from __future__ import annotations
 
 import argparse
@@ -63,8 +64,10 @@ def main() -> None:
         seasons = list(range(a, b + 1))
         tal = talent_frame(client, seasons)
         exp = roster_experience_frame(client, seasons)
-        print(f"talent rows: {len(tal)} | roster-experience rows: {len(exp)} "
-              f"(cached under data/cache/)")
+        print(
+            f"talent rows: {len(tal)} | roster-experience rows: {len(exp)} "
+            f"(cached under data/cache/)"
+        )
 
 
 if __name__ == "__main__":

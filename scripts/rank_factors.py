@@ -14,6 +14,7 @@ check (the existing backtest already credits them with the signal).
 Diagnostics (per-season stability, sample size) are reported, never used to
 filter factors out — breadth is the goal; the human judges fragility.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,16 +51,33 @@ def main() -> None:
 
     df = build_feature_frame(min_games=args.min_games)
     factors = evaluable_factors(df)
-    result = rank_factors(df, factors, top_frac=args.top_frac,
-                          first_test_season=args.first_test_season,
-                          combo_top_k=args.combo_top_k)
+    result = rank_factors(
+        df,
+        factors,
+        top_frac=args.top_frac,
+        first_test_season=args.first_test_season,
+        combo_top_k=args.combo_top_k,
+    )
     uni, combos, baseline = result["univariate"], result["combos"], result["baseline"]
 
-    print(f"\nbaseline: {baseline['n']} games, {baseline['under_pct']}% under "
-          f"(breakeven {baseline['breakeven_roi_under_pct']}%), "
-          f"top_frac={baseline['top_frac']}, OOS {baseline['first_test_season']}+")
-    cols = ["rank", "factor", "family", "top_under_pct", "top_roi", "auc",
-            "corr_1h", "perm_importance", "stability_std", "n", "market"]
+    print(
+        f"\nbaseline: {baseline['n']} games, {baseline['under_pct']}% under "
+        f"(breakeven {baseline['breakeven_roi_under_pct']}%), "
+        f"top_frac={baseline['top_frac']}, OOS {baseline['first_test_season']}+"
+    )
+    cols = [
+        "rank",
+        "factor",
+        "family",
+        "top_under_pct",
+        "top_roi",
+        "auc",
+        "corr_1h",
+        "perm_importance",
+        "stability_std",
+        "n",
+        "market",
+    ]
     _print_table("Univariate factor ranking (by OOS top-fraction ROI)", uni, cols)
     ccols = ["rank", "factor", "top_under_pct", "top_roi", "auc", "stability_std", "n"]
     _print_table("Top factor combinations", combos[:15], ccols)
@@ -73,31 +91,67 @@ def main() -> None:
     now = datetime.utcnow()
     with session_scope() as s:
         for r in uni:
-            s.add(FactorScore(
-                run_id=run_id, kind="univariate", factor=r["factor"],
-                family=r["family"], leak_free=r["leak_free"], market=r["market"],
-                forward_only=r["forward_only"], n=r["n"],
-                top_under_pct=r["top_under_pct"], top_roi=r["top_roi"],
-                auc=r["auc"], corr=r["corr"], perm_importance=r.get("perm_importance"),
-                stability_std=r["stability_std"], rank=r["rank"],
-                metrics_json=json.dumps(r), created_at=now))
+            s.add(
+                FactorScore(
+                    run_id=run_id,
+                    kind="univariate",
+                    factor=r["factor"],
+                    family=r["family"],
+                    leak_free=r["leak_free"],
+                    market=r["market"],
+                    forward_only=r["forward_only"],
+                    n=r["n"],
+                    top_under_pct=r["top_under_pct"],
+                    top_roi=r["top_roi"],
+                    auc=r["auc"],
+                    corr=r["corr"],
+                    perm_importance=r.get("perm_importance"),
+                    stability_std=r["stability_std"],
+                    rank=r["rank"],
+                    metrics_json=json.dumps(r),
+                    created_at=now,
+                )
+            )
         for c in combos:
-            s.add(FactorScore(
-                run_id=run_id, kind="combo", factor=c["factor"], family="combo",
-                leak_free=True, market=False, forward_only=False, n=c["n"],
-                top_under_pct=c["top_under_pct"], top_roi=c["top_roi"],
-                auc=c["auc"], corr=None, perm_importance=None,
-                stability_std=c["stability_std"], rank=c["rank"],
-                metrics_json=json.dumps(c), created_at=now))
-        s.add(ModelRun(
-            version="factor_rank_v1",
-            train_window=f"{sorted(df['season'].unique())[0]}-{sorted(df['season'].unique())[-1]}",
-            test_window=f"{args.first_test_season}+",
-            metrics_json=json.dumps({"baseline": baseline, "run_id": run_id,
-                                     "n_factors": len(uni), "n_combos": len(combos)}),
-            notes=args.notes, created_at=now))
-    print(f"\nstored {len(uni)} univariate + {len(combos)} combo rows "
-          f"(run_id={run_id})")
+            s.add(
+                FactorScore(
+                    run_id=run_id,
+                    kind="combo",
+                    factor=c["factor"],
+                    family="combo",
+                    leak_free=True,
+                    market=False,
+                    forward_only=False,
+                    n=c["n"],
+                    top_under_pct=c["top_under_pct"],
+                    top_roi=c["top_roi"],
+                    auc=c["auc"],
+                    corr=None,
+                    perm_importance=None,
+                    stability_std=c["stability_std"],
+                    rank=c["rank"],
+                    metrics_json=json.dumps(c),
+                    created_at=now,
+                )
+            )
+        s.add(
+            ModelRun(
+                version="factor_rank_v1",
+                train_window=f"{sorted(df['season'].unique())[0]}-{sorted(df['season'].unique())[-1]}",
+                test_window=f"{args.first_test_season}+",
+                metrics_json=json.dumps(
+                    {
+                        "baseline": baseline,
+                        "run_id": run_id,
+                        "n_factors": len(uni),
+                        "n_combos": len(combos),
+                    }
+                ),
+                notes=args.notes,
+                created_at=now,
+            )
+        )
+    print(f"\nstored {len(uni)} univariate + {len(combos)} combo rows (run_id={run_id})")
 
 
 if __name__ == "__main__":

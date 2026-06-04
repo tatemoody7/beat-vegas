@@ -9,6 +9,7 @@ backfill.py without --use-pbp would null those — see etl/first_half). Idempote
     python scripts/backfill_spread.py --start 2015 --end 2025
     python scripts/backfill_spread.py --season 2026
 """
+
 from __future__ import annotations
 
 import argparse

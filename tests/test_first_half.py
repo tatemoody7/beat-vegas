@@ -24,8 +24,10 @@ def test_line_scores_with_overtime_ignored():
 def test_line_scores_missing_returns_none():
     assert first_half_from_line_scores({"id": 4}) is None
     assert first_half_from_line_scores({"id": 5, "homeLineScores": [7]}) is None
-    assert first_half_from_line_scores(
-        {"id": 6, "homeLineScores": [7, 7], "awayLineScores": None}) is None
+    assert (
+        first_half_from_line_scores({"id": 6, "homeLineScores": [7, 7], "awayLineScores": None})
+        is None
+    )
 
 
 def test_plays_running_score_end_of_half():

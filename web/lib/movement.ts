@@ -19,9 +19,16 @@ export type Movement = {
 };
 
 // Games with >1 snapshot for the season, labeled + sorted by week (app.py:180-186).
-export async function getMovementGames(season: number): Promise<MovementGame[]> {
+export async function getMovementGames(
+  season: number,
+): Promise<MovementGame[]> {
   const rows = await prisma.$queryRaw<
-    { id: number | bigint; week: number | bigint; matchup: string; snaps: number | bigint }[]
+    {
+      id: number | bigint;
+      week: number | bigint;
+      matchup: string;
+      snaps: number | bigint;
+    }[]
   >`
     SELECT g.id, g.week, g.away_team || ' @ ' || g.home_team AS matchup,
            COUNT(*) AS snaps

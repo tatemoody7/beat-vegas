@@ -7,6 +7,7 @@ Two paths, in order of preference:
 CFBD JSON key casing has varied across API versions, so every lookup tolerates
 both camelCase and snake_case. Functions here are pure and unit-tested.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -33,8 +34,9 @@ def first_half_from_line_scores(game: Dict[str, Any]) -> Optional[Tuple[int, int
 
 
 def _valid_line_score(ls: Any) -> bool:
-    return (isinstance(ls, list) and len(ls) >= 2
-            and all(isinstance(x, (int, float)) for x in ls[:2]))
+    return (
+        isinstance(ls, list) and len(ls) >= 2 and all(isinstance(x, (int, float)) for x in ls[:2])
+    )
 
 
 def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, int]]:
@@ -60,9 +62,9 @@ def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, i
     return best
 
 
-def attach_first_half(game: Dict[str, Any],
-                      pbp_lookup: Optional[Dict[int, Tuple[int, int]]] = None
-                      ) -> Dict[str, Any]:
+def attach_first_half(
+    game: Dict[str, Any], pbp_lookup: Optional[Dict[int, Tuple[int, int]]] = None
+) -> Dict[str, Any]:
     """Return a dict of the first-half columns to persist for one game.
     Prefers line scores; falls back to play-by-play if provided."""
     gid = _get(game, "id")

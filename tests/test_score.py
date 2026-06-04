@@ -11,8 +11,9 @@ def test_weather_nan_dome_is_not_dome():
 
 def test_weather_real_dome_and_outdoor():
     assert _weather_str(pd.Series({"wx_dome": 1.0})) == "Dome"
-    out = _weather_str(pd.Series({"wx_dome": 0.0, "wx_temp": 68.0,
-                                  "wx_wind": 10.0, "wx_precip": 0.0}))
+    out = _weather_str(
+        pd.Series({"wx_dome": 0.0, "wx_temp": 68.0, "wx_wind": 10.0, "wx_precip": 0.0})
+    )
     assert out == "68°F · wind 10mph"
 
 
@@ -21,7 +22,7 @@ def test_breakeven_maps_to_50():
 
 
 def test_lean_under_above_50():
-    assert under_score(0.60) == 65       # 50 + 0.076*200
+    assert under_score(0.60) == 65  # 50 + 0.076*200
     assert under_score(0.55) == 55
 
 

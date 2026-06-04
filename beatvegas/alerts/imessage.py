@@ -5,6 +5,7 @@ A plain Python script can't reach MCP tools, so unattended alerts go through
 trigger a macOS Automation permission prompt. Returns False (with reason) on
 failure rather than raising, so polling never crashes on a send error.
 """
+
 from __future__ import annotations
 
 import platform
@@ -30,7 +31,11 @@ def send_imessage(to: str, body: str, timeout: int = 20) -> Tuple[bool, str]:
     try:
         p = subprocess.run(
             ["osascript", "-", to, body],
-            input=_SCRIPT, text=True, capture_output=True, timeout=timeout)
+            input=_SCRIPT,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
     except subprocess.TimeoutExpired:
         return False, "osascript timed out"
     if p.returncode == 0:

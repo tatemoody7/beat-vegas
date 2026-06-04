@@ -9,6 +9,7 @@ vanish against real 1H lines. This dissects:
      full total / 1H-share ratio;
   B. how the OOS-selected picks differ from the pool on actual 1H vs full total.
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -25,9 +26,11 @@ def main() -> None:
     df = df[df["full_game_total"] > 0].copy()
     df["ratio"] = df["first_half_total"] / df["full_game_total"]
 
-    print(f"sample: {len(df)} games | overall under {100*df['under'].mean():.1f}% | "
-          f"mean 1H {df['first_half_total'].mean():.1f} | mean full "
-          f"{df['full_game_total'].mean():.1f} | mean ratio {df['ratio'].mean():.3f}")
+    print(
+        f"sample: {len(df)} games | overall under {100 * df['under'].mean():.1f}% | "
+        f"mean 1H {df['first_half_total'].mean():.1f} | mean full "
+        f"{df['full_game_total'].mean():.1f} | mean ratio {df['ratio'].mean():.3f}"
+    )
 
     print("\n=== A. univariate quartile relationship ===")
     for col in COLS:
@@ -37,18 +40,26 @@ def main() -> None:
             under_pct=("under", lambda s: round(100 * s.mean(), 1)),
             actual_1H=("first_half_total", "mean"),
             full_total=("full_game_total", "mean"),
-            ratio=("ratio", "mean"))
+            ratio=("ratio", "mean"),
+        )
         print(f"\n[{col}]")
         print(g.round(2).to_string())
 
     print("\n=== B. OOS-selected picks vs pool ===")
     pg = _oof_preds(df, COLS)
     sel = _top(pg, 0.20)
+
     def m(frame, c):
         return round(float(frame[c].mean()), 3)
+
     print(f"{'metric':16s} {'selected':>10s} {'pool':>10s}")
-    for c in ["under", "first_half_total", "full_game_total",
-              "away_fh_off_explosive", "away_fh_off_turnovers"]:
+    for c in [
+        "under",
+        "first_half_total",
+        "full_game_total",
+        "away_fh_off_explosive",
+        "away_fh_off_turnovers",
+    ]:
         if c in pg.columns:
             print(f"{c:16s} {m(sel, c):>10} {m(pg, c):>10}")
     # the artifact test: is the under driven by low actual 1H, or high full total?

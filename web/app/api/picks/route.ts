@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   const season = Number(req.nextUrl.searchParams.get("season"));
   if (!Number.isFinite(season)) {
-    return NextResponse.json({ error: "missing or invalid ?season" }, { status: 400 });
+    return NextResponse.json(
+      { error: "missing or invalid ?season" },
+      { status: 400 },
+    );
   }
   return NextResponse.json(await getPicks(season));
 }
@@ -26,11 +29,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "gameId required" }, { status: 400 });
   }
   if (!Number.isFinite(line)) {
-    return NextResponse.json({ error: "line required (number)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "line required (number)" },
+      { status: 400 },
+    );
   }
 
   // gameId must be in the current scored slate.
-  const game = await prisma.games.findUnique({ where: { id: gameId }, select: { season: true } });
+  const game = await prisma.games.findUnique({
+    where: { id: gameId },
+    select: { season: true },
+  });
   const slate = game ? await getSlate(game.season) : [];
   if (!slate.some((g) => g.gameId === gameId)) {
     return NextResponse.json(
@@ -41,7 +50,8 @@ export async function POST(req: NextRequest) {
 
   const stake = b.stake !== undefined ? Number(b.stake) : undefined;
   const price = b.price !== undefined ? Number(b.price) : undefined;
-  const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : undefined;
+  const note =
+    typeof b.note === "string" && b.note.trim() ? b.note.trim() : undefined;
 
   await createPick({ gameId, line, stake, price, note });
   return NextResponse.json({ ok: true }, { status: 201 });

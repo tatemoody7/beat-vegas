@@ -17,6 +17,7 @@ isn't quoted. This is a sim-only sandbox; it never touches Neon.
     python scripts/pg_sim.py stop      # stop the server
     python scripts/pg_sim.py reset     # stop + wipe the data dir (clean slate)
 """
+
 from __future__ import annotations
 
 import os
@@ -34,6 +35,7 @@ PGDATA = Path.home() / ".cache" / "beatvegas" / "pg_sim"
 
 def _bin(name: str) -> str:
     import pgserver
+
     bindir = Path(pgserver.postgres_server.__file__).parent / "pginstall" / "bin"
     return str(bindir / name)
 
@@ -44,8 +46,12 @@ def uri(database: str = DBNAME) -> str:
 
 def is_running() -> bool:
     try:
-        out = subprocess.run([_bin("pg_isready"), "-h", HOST, "-p", str(PORT)],
-                             capture_output=True, text=True, timeout=10)
+        out = subprocess.run(
+            [_bin("pg_isready"), "-h", HOST, "-p", str(PORT)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         return out.returncode == 0
     except Exception:
         return False
@@ -63,38 +69,67 @@ def start() -> str:
         return uri()
     PGDATA.mkdir(parents=True, exist_ok=True)
     if not _initialized():
-        subprocess.run([_bin("initdb"), "-D", str(PGDATA), "-U", USER,
-                        "--auth=trust", "--encoding=utf8"], check=True,
-                       capture_output=True, text=True)
-    subprocess.run([_bin("pg_ctl"), "-D", str(PGDATA),
-                    "-o", f"-h {HOST} -p {PORT} -k {PGDATA}",
-                    "-l", str(PGDATA / "server.log"), "-w", "start"],
-                   check=True, capture_output=True, text=True)
+        subprocess.run(
+            [_bin("initdb"), "-D", str(PGDATA), "-U", USER, "--auth=trust", "--encoding=utf8"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    subprocess.run(
+        [
+            _bin("pg_ctl"),
+            "-D",
+            str(PGDATA),
+            "-o",
+            f"-h {HOST} -p {PORT} -k {PGDATA}",
+            "-l",
+            str(PGDATA / "server.log"),
+            "-w",
+            "start",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     _ensure_db()
     return uri()
 
 
 def _ensure_db() -> None:
     """Create the sim database if it doesn't exist yet."""
-    check = subprocess.run([_bin("psql"), uri("postgres"), "-tAc",
-                            f"SELECT 1 FROM pg_database WHERE datname='{DBNAME}'"],
-                           capture_output=True, text=True)
+    check = subprocess.run(
+        [
+            _bin("psql"),
+            uri("postgres"),
+            "-tAc",
+            f"SELECT 1 FROM pg_database WHERE datname='{DBNAME}'",
+        ],
+        capture_output=True,
+        text=True,
+    )
     if check.stdout.strip() != "1":
-        subprocess.run([_bin("createdb"), "-h", HOST, "-p", str(PORT),
-                        "-U", USER, DBNAME], check=True,
-                       capture_output=True, text=True)
+        subprocess.run(
+            [_bin("createdb"), "-h", HOST, "-p", str(PORT), "-U", USER, DBNAME],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 def stop() -> None:
     if _initialized():
-        subprocess.run([_bin("pg_ctl"), "-D", str(PGDATA), "-w", "-m", "fast",
-                        "stop"], capture_output=True, text=True)
+        subprocess.run(
+            [_bin("pg_ctl"), "-D", str(PGDATA), "-w", "-m", "fast", "stop"],
+            capture_output=True,
+            text=True,
+        )
 
 
 def reset() -> None:
     """Stop and wipe — next start() is a clean slate."""
     stop()
     import shutil
+
     if PGDATA.exists():
         shutil.rmtree(PGDATA)
 
@@ -108,9 +143,11 @@ def main() -> None:
     elif cmd == "status":
         print("running" if is_running() else "stopped", uri())
     elif cmd == "stop":
-        stop(); print("stopped")
+        stop()
+        print("stopped")
     elif cmd == "reset":
-        reset(); print("reset (data dir wiped)")
+        reset()
+        print("reset (data dir wiped)")
     else:
         raise SystemExit(f"unknown command: {cmd}")
 

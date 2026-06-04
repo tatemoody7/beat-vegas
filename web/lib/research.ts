@@ -80,7 +80,9 @@ export async function getGapClvBuckets(
     );
     const gaps = inB.map((x) => Number(x.gap));
     const clvs = inB.filter((x) => x.clv !== null).map((x) => Number(x.clv));
-    const units = inB.filter((x) => x.units !== null).map((x) => Number(x.units));
+    const units = inB
+      .filter((x) => x.units !== null)
+      .map((x) => Number(x.units));
     const hits = inB.filter((x) => x.under_hit !== null);
     const underPct = hits.length
       ? hits.filter((x) => Number(x.under_hit) === 1 || x.under_hit === true)
@@ -121,7 +123,11 @@ export async function getBvCalibration(): Promise<BvCalibration> {
       continue;
     }
     if (!bv || typeof bv !== "object") continue;
-    const segments: { label: string; n: number; meanResidual: number | null }[] = [];
+    const segments: {
+      label: string;
+      n: number;
+      meanResidual: number | null;
+    }[] = [];
     const pushGroup = (group: unknown) => {
       if (!group || typeof group !== "object") return;
       for (const [k, v] of Object.entries(group as Record<string, unknown>)) {
@@ -144,7 +150,8 @@ export async function getBvCalibration(): Promise<BvCalibration> {
     return {
       n: Number(bv.n ?? 0),
       overall:
-        bv.overall_mean_residual === null || bv.overall_mean_residual === undefined
+        bv.overall_mean_residual === null ||
+        bv.overall_mean_residual === undefined
           ? null
           : Number(bv.overall_mean_residual),
       segments,
@@ -161,7 +168,9 @@ export async function getEdgeStats(): Promise<EdgeStats> {
     WHERE first_half_total IS NOT NULL AND full_game_total > 0
   `;
   if (rows.length === 0) return null;
-  const ratios = rows.map((r) => Number(r.first_half_total) / r.full_game_total);
+  const ratios = rows.map(
+    (r) => Number(r.first_half_total) / r.full_game_total,
+  );
   const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
   return { games: ratios.length, mean, median: median(ratios) };
 }

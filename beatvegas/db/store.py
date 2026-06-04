@@ -1,4 +1,5 @@
 """Engine/session management + simple upsert helpers."""
+
 from __future__ import annotations
 
 import time
@@ -10,14 +11,20 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
-from ..config import database_url, db_path
+from ..config import database_url
 from .models import Base
 
 # New columns added after first release; ALTER existing tables idempotently.
 _MIGRATIONS = {
-    "predictions": {"under_score": "INTEGER", "factors_json": "TEXT",
-                    "bv_line": "FLOAT", "bv_gap": "FLOAT",
-                    "bv_lo": "FLOAT", "bv_hi": "FLOAT", "bv_sigma": "FLOAT"},
+    "predictions": {
+        "under_score": "INTEGER",
+        "factors_json": "TEXT",
+        "bv_line": "FLOAT",
+        "bv_gap": "FLOAT",
+        "bv_lo": "FLOAT",
+        "bv_hi": "FLOAT",
+        "bv_sigma": "FLOAT",
+    },
     "results": {"closing_captured_at": "TIMESTAMP"},
     "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
@@ -33,13 +40,13 @@ _Session: Optional[sessionmaker] = None
 def get_engine(path: Optional[Path] = None):
     global _engine, _Session
     if _engine is None:
-        if path is not None:                      # explicit SQLite path (tests/demo/snapshot)
+        if path is not None:  # explicit SQLite path (tests/demo/snapshot)
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             url = f"sqlite:///{path}"
         else:
-            url = database_url()                  # DATABASE_URL (Postgres) or config SQLite
+            url = database_url()  # DATABASE_URL (Postgres) or config SQLite
             if url.startswith("sqlite:///"):
-                Path(url[len("sqlite:///"):]).parent.mkdir(parents=True, exist_ok=True)
+                Path(url[len("sqlite:///") :]).parent.mkdir(parents=True, exist_ok=True)
         # pool_pre_ping keeps serverless Postgres (Neon) connections healthy.
         # A generous connect_timeout lets a SUSPENDED Neon compute finish waking
         # (the always-on pooler accepts the TCP connection immediately, but the
@@ -47,8 +54,7 @@ def get_engine(path: Optional[Path] = None):
         connect_args = {}
         if not url.startswith("sqlite"):
             connect_args["connect_timeout"] = 20
-        _engine = create_engine(url, future=True, pool_pre_ping=True,
-                                connect_args=connect_args)
+        _engine = create_engine(url, future=True, pool_pre_ping=True, connect_args=connect_args)
         _Session = sessionmaker(bind=_engine, future=True)
     return _engine
 
@@ -68,14 +74,14 @@ def wait_for_db(engine=None, retries: int = 6, base_delay: float = 2.0) -> None:
             return
         except OperationalError as e:
             last = e
-            time.sleep(base_delay * (2 ** i))
+            time.sleep(base_delay * (2**i))
     if last is not None:
         raise last
 
 
 def init_db(path: Optional[Path] = None) -> None:
     engine = get_engine(path)
-    wait_for_db(engine)                # absorb Neon cold-start before any DDL
+    wait_for_db(engine)  # absorb Neon cold-start before any DDL
     Base.metadata.create_all(engine)
     _apply_migrations(engine)
 
@@ -91,9 +97,11 @@ def try_init_db(path: Optional[Path] = None) -> bool:
         init_db(path)
         return True
     except OperationalError:
-        print("[db] database unreachable from this network — skipping this run. "
-              "(If this is the local Mac on a blocked network, the cloud job "
-              "handles Neon; see .github/workflows/sunday.yml.)")
+        print(
+            "[db] database unreachable from this network — skipping this run. "
+            "(If this is the local Mac on a blocked network, the cloud job "
+            "handles Neon; see .github/workflows/sunday.yml.)"
+        )
         return False
 
 
@@ -107,8 +115,7 @@ def _apply_migrations(engine) -> None:
             have = {c["name"] for c in insp.get_columns(table)}
             for col, sqltype in cols.items():
                 if col not in have:
-                    conn.execute(text(
-                        f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
 
 
 @contextmanager

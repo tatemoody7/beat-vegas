@@ -8,22 +8,48 @@ row into the target Postgres DB, preserving types via the ORM. Creates the schem
 first. Tables are loaded in FK-dependency order. Re-runnable: pass --wipe to clear
 the target tables before loading.
 """
+
 from __future__ import annotations
 
 import argparse
-import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from beatvegas.config import REPO_ROOT, database_url
-from beatvegas.db.models import (Base, FactorScore, FhTeamGame, Game, ManualPick,
-                                 ModelRun, OddsSnapshot, Prediction, Result, Team,
-                                 TeamTempo, TeamWeekFeature, Venue, Weather)
+from beatvegas.db.models import (
+    Base,
+    FactorScore,
+    FhTeamGame,
+    Game,
+    ManualPick,
+    ModelRun,
+    OddsSnapshot,
+    Prediction,
+    Result,
+    Team,
+    TeamTempo,
+    TeamWeekFeature,
+    Venue,
+    Weather,
+)
 
 # FK-dependency order: parents before children.
-ORDER = [Team, Venue, Game, Weather, OddsSnapshot, Prediction, Result,
-         ManualPick, TeamTempo, TeamWeekFeature, FhTeamGame, FactorScore, ModelRun]
+ORDER = [
+    Team,
+    Venue,
+    Game,
+    Weather,
+    OddsSnapshot,
+    Prediction,
+    Result,
+    ManualPick,
+    TeamTempo,
+    TeamWeekFeature,
+    FhTeamGame,
+    FactorScore,
+    ModelRun,
+]
 
 
 def _rows(session, model):
@@ -34,8 +60,7 @@ def _rows(session, model):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sqlite", default=str(REPO_ROOT / "data" / "beatvegas.db"))
-    ap.add_argument("--wipe", action="store_true",
-                    help="delete target rows before loading")
+    ap.add_argument("--wipe", action="store_true", help="delete target rows before loading")
     args = ap.parse_args()
 
     target = database_url()

@@ -16,6 +16,7 @@ NOTE: the prod/live path is implemented here but NOT yet wired into
 run_sunday.sh / .github/workflows — prod entry points are left untouched until the
 sim has proven these step functions.
 """
+
 from __future__ import annotations
 
 import json
@@ -38,9 +39,17 @@ from beatvegas.etl.proxy_line import fh_share, proxy_total
 # Input tables cloned from the real SQLite DB into the sim Postgres (read-only
 # context for scoring + the board). Generated tables (odds_snapshots, results,
 # predictions, manual_picks) are produced by the sim, never cloned.
-_CLONE_TABLES = ["teams", "venues", "games", "team_week_features",
-                 "fh_team_game", "team_tempo", "weather", "factor_scores",
-                 "model_runs"]
+_CLONE_TABLES = [
+    "teams",
+    "venues",
+    "games",
+    "team_week_features",
+    "fh_team_game",
+    "team_tempo",
+    "weather",
+    "factor_scores",
+    "model_runs",
+]
 DERIVED_VERSION = "derived_lines"
 REAL_SQLITE = REPO_ROOT / "data" / "beatvegas.db"
 
@@ -51,6 +60,7 @@ REAL_SQLITE = REPO_ROOT / "data" / "beatvegas.db"
 def _reset_engine() -> None:
     """Drop the cached engine so the next get_engine() re-reads DATABASE_URL."""
     from beatvegas.db import store
+
     store._engine = None
     store._Session = None
 
@@ -61,8 +71,10 @@ def _assert_sim_target() -> str:
     url = database_url()
     host_ok = ("127.0.0.1" in url) or ("@localhost" in url) or ("localhost:" in url)
     if "neon.tech" in url or not host_ok:
-        raise SystemExit(f"[sim] refusing to run: target is not local Postgres "
-                         f"({url!r}). The sim must point at scripts/pg_sim.py.")
+        raise SystemExit(
+            f"[sim] refusing to run: target is not local Postgres "
+            f"({url!r}). The sim must point at scripts/pg_sim.py."
+        )
     return url
 
 
@@ -73,15 +85,27 @@ def _clone_inputs() -> Dict[str, int]:
     """Copy the read-only input tables from the real SQLite DB into the current
     (sim Postgres) engine. Chunked + sequence-resynced (Postgres pkey safety),
     mirroring scripts/deploy_neon.py."""
-    from beatvegas.db.store import get_engine
     from beatvegas.db import models as M
+    from beatvegas.db.store import get_engine
+
     # reuse the proven helpers rather than reimplementing
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    from deploy_neon import _maps, _chunked_insert, _resync  # type: ignore
+    from deploy_neon import _chunked_insert, _maps, _resync  # type: ignore
 
-    by_table = {t.__tablename__: t for t in (
-        M.Team, M.Venue, M.Game, M.TeamWeekFeature, M.FhTeamGame,
-        M.TeamTempo, M.Weather, M.FactorScore, M.ModelRun)}
+    by_table = {
+        t.__tablename__: t
+        for t in (
+            M.Team,
+            M.Venue,
+            M.Game,
+            M.TeamWeekFeature,
+            M.FhTeamGame,
+            M.TeamTempo,
+            M.Weather,
+            M.FactorScore,
+            M.ModelRun,
+        )
+    }
 
     src = create_engine(f"sqlite:///{REAL_SQLITE}", future=True)
     dst = get_engine()
@@ -94,10 +118,11 @@ def _clone_inputs() -> Dict[str, int]:
         # fresh inserts (predictions/results/...) don't collide on the pkey.
         for table in _CLONE_TABLES:
             model = by_table[table]
-            ds.query(model).delete(); ds.commit()
+            ds.query(model).delete()
+            ds.commit()
             rows = list(_maps(ss, model, drop_id=False))
             _chunked_insert(ds, model, rows)
-            if table != "weather":          # weather PK is game_id (no serial)
+            if table != "weather":  # weather PK is game_id (no serial)
                 _resync(ds, table)
             ds.commit()
             counts[table] = len(rows)
@@ -109,37 +134,56 @@ def _clone_inputs() -> Dict[str, int]:
 # matching scripts/post_derived_lines.py's row shape + label exactly.
 # --------------------------------------------------------------------------- #
 def _derive_lines_replay(s, season: int, week: int, now: datetime) -> int:
-    games = (s.query(Game)
-             .filter(Game.season == season, Game.week == week,
-                     Game.full_game_total.isnot(None)).all())
+    games = (
+        s.query(Game)
+        .filter(Game.season == season, Game.week == week, Game.full_game_total.isnot(None))
+        .all()
+    )
     rows: List[Dict] = []
     for g in games:
         total, spread = g.full_game_total, getattr(g, "spread", None)
         derived = proxy_total(total, spread=spread)
-        rows.append({"game_id": g.id, "line_used": derived,
-                     "factors_json": json.dumps({
-                         "line": derived, "line_kind": "derived_fg",
-                         "full_game_total": total, "spread": spread,
-                         "fh_share": round(fh_share(spread), 3)})})
+        rows.append(
+            {
+                "game_id": g.id,
+                "line_used": derived,
+                "factors_json": json.dumps(
+                    {
+                        "line": derived,
+                        "line_kind": "derived_fg",
+                        "full_game_total": total,
+                        "spread": spread,
+                        "fh_share": round(fh_share(spread), 3),
+                    }
+                ),
+            }
+        )
     rows.sort(key=lambda d: d["line_used"])
     season_ids = [g.id for g in games]
     if season_ids:
-        (s.query(Prediction)
-         .filter(Prediction.model_version == DERIVED_VERSION,
-                 Prediction.game_id.in_(season_ids))
-         .delete(synchronize_session=False))
+        (
+            s.query(Prediction)
+            .filter(Prediction.model_version == DERIVED_VERSION, Prediction.game_id.in_(season_ids))
+            .delete(synchronize_session=False)
+        )
     for i, d in enumerate(rows, start=1):
-        s.add(Prediction(game_id=d["game_id"], model_version=DERIVED_VERSION,
-                         line_used=d["line_used"], rank=i,
-                         factors_json=d["factors_json"], created_at=now))
+        s.add(
+            Prediction(
+                game_id=d["game_id"],
+                model_version=DERIVED_VERSION,
+                line_used=d["line_used"],
+                rank=i,
+                factors_json=d["factors_json"],
+                created_at=now,
+            )
+        )
     return len(rows)
 
 
 # --------------------------------------------------------------------------- #
 # Notify (print): the heads-up text the real run would send.
 # --------------------------------------------------------------------------- #
-def _notify_print(season: int, week: int, n_model: int, n_derived: int,
-                  top: List[str]) -> None:
+def _notify_print(season: int, week: int, n_model: int, n_derived: int, top: List[str]) -> None:
     print("\n" + "=" * 60)
     print(f"[notify · PRINT ONLY] Beat Vegas {season} wk{week}")
     if n_model:
@@ -147,8 +191,10 @@ def _notify_print(season: int, week: int, n_model: int, n_derived: int,
         for line in top:
             print(f"  {line}")
     else:
-        print(f"COLD START: no model picks (wk{week} < min games). "
-              f"{n_derived} DERIVED reference lines posted — no model pick.")
+        print(
+            f"COLD START: no model picks (wk{week} < min games). "
+            f"{n_derived} DERIVED reference lines posted — no model pick."
+        )
     print("(real run would iMessage this; sim prints only)")
     print("=" * 60 + "\n")
 
@@ -156,10 +202,17 @@ def _notify_print(season: int, week: int, n_model: int, n_derived: int,
 # --------------------------------------------------------------------------- #
 # Orchestrator
 # --------------------------------------------------------------------------- #
-def run_pipeline(db_target: str, season: int, week: int, *,
-                 mode: str = "replay", notify: str = "print",
-                 min_games: int = 2, limit: Optional[int] = 12,
-                 action: str = "build") -> Dict:
+def run_pipeline(
+    db_target: str,
+    season: int,
+    week: int,
+    *,
+    mode: str = "replay",
+    notify: str = "print",
+    min_games: int = 2,
+    limit: Optional[int] = 12,
+    action: str = "build",
+) -> Dict:
     """Run the weekly chain. Returns a summary dict.
 
     db_target: "sim" (local Postgres) | "prod" (Neon, env DATABASE_URL).
@@ -173,20 +226,19 @@ def run_pipeline(db_target: str, season: int, week: int, *,
             raise SystemExit("[sim] only mode='replay' is supported.")
         if action == "grade":
             return _grade_sim(season, week)
-        return _run_sim(season, week, notify=notify, min_games=min_games,
-                        limit=limit)
+        return _run_sim(season, week, notify=notify, min_games=min_games, limit=limit)
     if db_target == "prod":
         return _run_live(season, week, notify=notify, min_games=min_games)
     raise SystemExit(f"unknown db_target: {db_target!r}")
 
 
-def _run_sim(season: int, week: int, *, notify: str, min_games: int,
-             limit: Optional[int]) -> Dict:
+def _run_sim(season: int, week: int, *, notify: str, min_games: int, limit: Optional[int]) -> Dict:
     """Build a PRE-GAME slate: lines + model picks, but NO results and NO
     pre-seeded picks — exactly the board you'd face on game day before kickoff.
     Place your own picks in the app, then reveal outcomes with action='grade'."""
+    from seed_demo import pick_games, score_and_store, synthesize_1h_snapshots
+
     from beatvegas.db.store import init_db, session_scope
-    from seed_demo import (synthesize_1h_snapshots, score_and_store, pick_games)
 
     _reset_engine()
     url = _assert_sim_target()
@@ -201,7 +253,7 @@ def _run_sim(season: int, week: int, *, notify: str, min_games: int,
         # lines + movement only — proxy_total derives from the line, never the
         # final score, so this leaks no outcome. No grading, no sample picks.
         synthesize_1h_snapshots(s, games, base=_base_for(season, week))
-        s.query(_Result).delete()           # ensure a clean PRE-GAME ledger
+        s.query(_Result).delete()  # ensure a clean PRE-GAME ledger
         s.query(_ManualPick).delete()
         close_by_gid = {g.id: _consensus_close(s, g.id) for g in games}
         n_games = len(games)
@@ -215,9 +267,14 @@ def _run_sim(season: int, week: int, *, notify: str, min_games: int,
     top = _top_lines(season, week) if n_model else []
     if notify == "print":
         _notify_print(season, week, n_model, n_derived, top)
-    return {"url": url, "cloned": counts, "games": n_games,
-            "model_preds": n_model, "derived_preds": n_derived,
-            "phase": "pregame"}
+    return {
+        "url": url,
+        "cloned": counts,
+        "games": n_games,
+        "model_preds": n_model,
+        "derived_preds": n_derived,
+        "phase": "pregame",
+    }
 
 
 def _grade_sim(season: int, week: int) -> Dict:
@@ -226,6 +283,7 @@ def _grade_sim(season: int, week: int) -> Dict:
     from beatvegas.db.store import session_scope
     from beatvegas.grading import clv_under, under_result, units_won
     from beatvegas.lines import consensus_open_close
+
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     from grade import _closings, grade_market, grade_model  # type: ignore
 
@@ -239,17 +297,24 @@ def _grade_sim(season: int, week: int) -> Dict:
     # grade the user's own manual picks (mirrors scripts/pick.py cmd_grade)
     graded = 0
     with session_scope() as s:
-        picks = (s.query(_ManualPick)
-                 .filter(_ManualPick.season == season,
-                         _ManualPick.graded == False,            # noqa: E712
-                         _ManualPick.game_id.isnot(None)).all())
+        picks = (
+            s.query(_ManualPick)
+            .filter(
+                _ManualPick.season == season,
+                _ManualPick.graded == False,  # noqa: E712
+                _ManualPick.game_id.isnot(None),
+            )
+            .all()
+        )
         for p in picks:
             g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
             if g is None or g.first_half_total is None:
                 continue
-            snaps = (s.query(_OddsSnapshot)
-                     .filter(_OddsSnapshot.game_id == p.game_id,
-                             _OddsSnapshot.market == "1H_total").all())
+            snaps = (
+                s.query(_OddsSnapshot)
+                .filter(_OddsSnapshot.game_id == p.game_id, _OddsSnapshot.market == "1H_total")
+                .all()
+            )
             _open, closing = consensus_open_close(snaps)
             p.actual_first_half_total = g.first_half_total
             p.result = under_result(g.first_half_total, p.line)
@@ -258,17 +323,21 @@ def _grade_sim(season: int, week: int) -> Dict:
             p.clv = clv_under(p.line, closing) if closing is not None else None
             p.graded = True
             graded += 1
-    print(f"[reveal] graded {n_market} market + {n_model} model + {graded} "
-          f"of your picks for {season} wk{week}")
-    return {"market": n_market, "model": n_model, "your_picks": graded,
-            "phase": "graded"}
+    print(
+        f"[reveal] graded {n_market} market + {n_model} model + {graded} "
+        f"of your picks for {season} wk{week}"
+    )
+    return {"market": n_market, "model": n_model, "your_picks": graded, "phase": "graded"}
 
 
 def _consensus_close(s, gid: int) -> float:
     from beatvegas.lines import consensus_open_close
-    snaps = (s.query(_OddsSnapshot)
-             .filter(_OddsSnapshot.game_id == gid,
-                     _OddsSnapshot.market == "1H_total").all())
+
+    snaps = (
+        s.query(_OddsSnapshot)
+        .filter(_OddsSnapshot.game_id == gid, _OddsSnapshot.market == "1H_total")
+        .all()
+    )
     return consensus_open_close(snaps)[1]
 
 
@@ -279,17 +348,25 @@ def _run_live(season: int, week: int, *, notify: str, min_games: int) -> Dict:
     steps = [
         ["python", "scripts/poll_full_game.py", "--source", "auto"],
         ["python", "scripts/poll_lines.py"],
-        ["python", "scripts/weekly_update.py", "--season", str(season),
-         "--week", str(week), "--min-games", str(min_games)],
-        ["python", "scripts/post_derived_lines.py", "--season", str(season),
-         "--week", str(week)],
+        [
+            "python",
+            "scripts/weekly_update.py",
+            "--season",
+            str(season),
+            "--week",
+            str(week),
+            "--min-games",
+            str(min_games),
+        ],
+        ["python", "scripts/post_derived_lines.py", "--season", str(season), "--week", str(week)],
         ["python", "scripts/grade.py", "--season", str(season)],
     ]
     for cmd in steps:
         subprocess.run(cmd, cwd=str(REPO_ROOT), env=env, check=True)
     if notify == "send":
-        subprocess.run(["python", "scripts/notify_sunday.py"],
-                       cwd=str(REPO_ROOT), env=env, check=False)
+        subprocess.run(
+            ["python", "scripts/notify_sunday.py"], cwd=str(REPO_ROOT), env=env, check=False
+        )
     return {"mode": "live", "season": season, "week": week}
 
 
@@ -302,13 +379,19 @@ def _base_for(season: int, week: int) -> datetime:
 def _top_lines(season: int, week: int, n: int = 5) -> List[str]:
     from beatvegas.db.store import session_scope
     from beatvegas.model.score import MODEL_VERSION
+
     out: List[str] = []
     with session_scope() as s:
-        rows = (s.query(Prediction, Game)
-                .join(Game, Game.id == Prediction.game_id)
-                .filter(Prediction.model_version == MODEL_VERSION,
-                        Game.season == season, Game.week == week)
-                .order_by(Prediction.rank).limit(n).all())
+        rows = (
+            s.query(Prediction, Game)
+            .join(Game, Game.id == Prediction.game_id)
+            .filter(
+                Prediction.model_version == MODEL_VERSION, Game.season == season, Game.week == week
+            )
+            .order_by(Prediction.rank)
+            .limit(n)
+            .all()
+        )
         for p, g in rows:
             sc = int(p.under_score) if p.under_score is not None else "?"
             ln = f"{p.line_used:g}" if p.line_used is not None else "?"

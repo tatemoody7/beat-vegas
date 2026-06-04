@@ -46,20 +46,29 @@ export default function LineStudyView({
         {hl ? (
           <span className="text-[var(--text-muted)]">
             Under {highlight}:{" "}
-            <b style={{ color: hl.under_pct >= breakeven ? "#16a34a" : "#dc2626" }}>
+            <b
+              style={{
+                color: hl.under_pct >= breakeven ? "#16a34a" : "#dc2626",
+              }}
+            >
               {hl.under_pct}%
             </b>{" "}
             ({hl.under}/{hl.games} ·{" "}
             {hl.under_pct >= breakeven ? "beats" : "below"} breakeven)
           </span>
         ) : (
-          <span className="text-[var(--text-dim)]">no bucket at {highlight}</span>
+          <span className="text-[var(--text-dim)]">
+            no bucket at {highlight}
+          </span>
         )}
       </div>
 
       <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+          >
             <XAxis
               dataKey="line"
               tick={{ fill: "#97a3bd", fontSize: 11 }}
@@ -132,7 +141,9 @@ export default function LineStudyView({
             {buckets.map((b) => (
               <tr
                 key={b.line}
-                className={b.line === highlight ? "bg-[var(--accent-soft)]" : ""}
+                className={
+                  b.line === highlight ? "bg-[var(--accent-soft)]" : ""
+                }
               >
                 <td className="font-mono text-[var(--text)]">{b.line}</td>
                 <td className="text-[var(--text-muted)]">{b.games}</td>
@@ -140,7 +151,9 @@ export default function LineStudyView({
                 <td className="text-[var(--text-muted)]">{b.push}</td>
                 <td
                   className="font-mono font-semibold"
-                  style={{ color: b.under_pct >= breakeven ? "#16a34a" : "#dc2626" }}
+                  style={{
+                    color: b.under_pct >= breakeven ? "#16a34a" : "#dc2626",
+                  }}
                 >
                   {b.under_pct}%
                 </td>

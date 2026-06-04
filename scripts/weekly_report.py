@@ -9,6 +9,7 @@ construction: notes the proxy caveat when no real line is supplied.
     python scripts/weekly_report.py --season 2025 --week 8
     python scripts/weekly_report.py --season 2025 --week 8 --out report.md
 """
+
 from __future__ import annotations
 
 import argparse
@@ -46,15 +47,18 @@ def main() -> None:
     df = build_feature_frame(min_games=2)
     s = score_slate(args.season, target_week=args.week, df=df)
     if s.empty:
-        print("no games scored"); return
+        print("no games scored")
+        return
     s = s.head(args.top)
 
     lines = [f"# 1H Under Board — {args.season} Week {args.week}", ""]
     n_opp = int(s["is_opportunity"].sum())
-    lines.append(f"_{len(s)} games shown, {n_opp} flagged opportunities "
-                 f"(gap ≥ 0.5σ). Ranked by gap = line − our predicted 1H total. "
-                 f"Lines are the 0.52× proxy unless a real book line was supplied — "
-                 f"directional until graded vs real DraftKings lines._")
+    lines.append(
+        f"_{len(s)} games shown, {n_opp} flagged opportunities "
+        f"(gap ≥ 0.5σ). Ranked by gap = line − our predicted 1H total. "
+        f"Lines are the 0.52× proxy unless a real book line was supplied — "
+        f"directional until graded vs real DraftKings lines._"
+    )
     lines.append("")
     lines.append("| # | Matchup | Line | Our 1H | Gap | σ-gap | Opp | Lean | Why |")
     lines.append("|--:|---|--:|--:|--:|--:|:-:|--:|---|")
@@ -66,7 +70,8 @@ def main() -> None:
             f"| {int(rd['rank'])} | {rd['away_team']} @ {rd['home_team']} | "
             f"{rd['line']:.1f} | {rd['bv_line']:.1f} | {rd['bv_gap']:+.1f} | "
             f"{(f'{z:.1f}' if pd.notna(z) else '—')} | {opp} | "
-            f"{int(rd['under_score'])} | {_reason(rd)} |")
+            f"{int(rd['under_score'])} | {_reason(rd)} |"
+        )
     report = "\n".join(lines)
 
     if args.out:

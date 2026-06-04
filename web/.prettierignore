@@ -1,0 +1,4 @@
+.next
+node_modules
+prisma/generated
+package-lock.json

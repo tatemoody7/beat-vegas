@@ -2,8 +2,28 @@
 // beatvegas/model/score.py::_factors. Keep faithful to those so the web board
 // matches the Streamlit view exactly.
 
+// One factor on the green/red board (pure explainer; never affects the rank).
+// Mirrors beatvegas/factors/board.py::build_factor_board.
+export type BoardFactor = {
+  key: string;
+  label: string;
+  family: string;
+  tier: number; // 1 proven · 2 context · 3 speculative
+  direction: number; // +1 helps under, -1 hurts, 0 neutral/unknown
+  hypothesis: boolean; // unverified — rendered amber
+  binary: boolean;
+  value: number;
+  color: "green" | "red" | "neutral" | "amber" | "unknown";
+  intensity: number; // 0..1 tint strength
+  lean: number; // signed; under-favorable positive
+  sentence: string;
+  // Filled by the credibility ledger: real-line 1H-under record when green.
+  live: { n: number; mean: number; lo: number; hi: number; cooling: boolean } | null;
+};
+
 // Per-game factor payload stored as JSON in predictions.factors_json.
 export type Factors = {
+  factor_board?: BoardFactor[] | null;
   pace?: string | null;
   weather?: string | null;
   spot?: string | null;
@@ -70,6 +90,40 @@ export function scoreLabel(score: number | null | undefined): string {
   if (score >= 47) return "Coin flip";
   if (score >= 40) return "Lean over";
   return "Over";
+}
+
+// Group the board into the tiers the Option-A card renders. Hypotheses are
+// pulled into their own amber group regardless of tier (we never show them as
+// a plain green/red signal until the real-line ledger has earned them).
+export type FactorTierGroup = { tier: number; title: string; factors: BoardFactor[] };
+
+export function groupFactorBoard(board: BoardFactor[] | null | undefined): FactorTierGroup[] {
+  const fb = board ?? [];
+  const proven = fb.filter((f) => !f.hypothesis && f.tier === 1);
+  const context = fb.filter((f) => !f.hypothesis && f.tier === 2);
+  const speculative = fb.filter((f) => !f.hypothesis && f.tier >= 3);
+  const hypotheses = fb.filter((f) => f.hypothesis);
+  return [
+    { tier: 1, title: "Proven — history + live", factors: proven },
+    { tier: 2, title: "Context — real info, flat in backtest", factors: context },
+    { tier: 3, title: "Speculative — weight 0 until proven", factors: speculative },
+    { tier: 0, title: "Unverified — amber until the ledger speaks", factors: hypotheses },
+  ].filter((g) => g.factors.length > 0);
+}
+
+// rgba tint for a board row: color at an alpha scaled by intensity.
+export function factorTint(f: BoardFactor): { bg: string; dot: string } {
+  const rgb: Record<string, string> = {
+    green: "22,163,74",
+    red: "220,38,38",
+    amber: "224,164,74",
+    neutral: "120,135,170",
+    unknown: "120,135,170",
+  };
+  const base = rgb[f.color] ?? rgb.neutral;
+  // binary/active factors read full-strength; continuous scale with intensity.
+  const alpha = f.color === "neutral" || f.color === "unknown" ? 0.05 : 0.08 + 0.22 * f.intensity;
+  return { bg: `rgba(${base},${alpha.toFixed(3)})`, dot: `rgb(${base})` };
 }
 
 export type Chip = { label: string; value: string; hint: string };

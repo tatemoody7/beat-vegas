@@ -245,6 +245,11 @@ class ManualPick(Base):
     closing_line = Column(Float)
     clv = Column(Float)
 
+    # Decision-quality snapshot (Phase 4b). factors_json_at_pick freezes the
+    # factor board at log time (forward-only); opening_line filled at grading.
+    factors_json_at_pick = Column(String)
+    opening_line = Column(Float)
+
 
 class BvAdjustment(Base):
     """A manual nudge to the BV line for one game (e.g. a confirmed QB-out the
@@ -283,6 +288,60 @@ class FactorScore(Base):
     stability_std = Column(Float)  # std of per-season top under%
     rank = Column(Integer)
     metrics_json = Column(String)
+    created_at = Column(DateTime)
+
+
+class GameRecord(Base):
+    """Immutable per-game snapshot — our own model-shaped record (plan Phase 0).
+
+    Frozen pre-kickoff: the leak-free feature vector + the line + our as-of-then
+    bv_line/bv_gap. The real 1H result + outcome are filled in AFTER the game
+    (the only post-kickoff write). Cumulative from 2023 forward; the shared fuel
+    for the Research records grid, the credibility ledger, and bv_line
+    recalibration. A separate re-scoreable view re-runs the current model over
+    these features — this row is never recomputed.
+    """
+
+    __tablename__ = "game_records"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    captured_at = Column(DateTime)  # when the pre-kickoff snapshot was frozen
+    model_version = Column(String)  # model that produced the as-of bv_line
+    features_json = Column(String)  # leak-free feature vector, as-of kickoff
+    line = Column(Float)  # 1H line at snapshot
+    line_kind = Column(String)  # 'observed_1h' | 'derived_fg' | 'proxy'
+    bv_line = Column(Float)
+    bv_gap = Column(Float)
+    bv_gap_z = Column(Float)
+    under_score = Column(Integer)
+    # filled after the game (the only post-kickoff write):
+    first_half_total = Column(Integer)
+    under_hit = Column(Boolean)
+    outcome = Column(String)  # 'under' | 'over' | 'push'
+    graded_at = Column(DateTime)
+
+
+class FactorLedger(Base):
+    """The factor credibility ledger: one row per factor's real-line 1H-under
+    record (graded by scripts/grade_factor_ledger.py). Cumulative across seasons
+    (2023→now); a Beta-binomial posterior over the under hit rate when the factor
+    is 'green'. Display + tiering only — never a model input, never moves the rank.
+    """
+
+    __tablename__ = "factor_ledger"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    factor = Column(String, index=True)  # column name
+    n = Column(Integer)  # real-line green-state games graded
+    hits = Column(Integer)  # of those, 1H unders that cashed (pushes dropped)
+    post_mean = Column(Float)  # posterior mean hit rate
+    post_lo = Column(Float)  # 2.5th pct (95% credible interval)
+    post_hi = Column(Float)  # 97.5th pct
+    tier = Column(Integer)  # displayed tier after evidence (1 if promoted)
+    recent_n = Column(Integer)  # trailing-window games (decay detection)
+    recent_mean = Column(Float)  # trailing-window hit rate
+    drift_flag = Column(Boolean)  # "cooling": recent below breakeven, all-time above
     created_at = Column(DateTime)
 
 

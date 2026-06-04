@@ -22,7 +22,10 @@ from ..backtest.engine import BREAKEVEN, _new_model
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.features import FEATURE_COLS, build_feature_frame
+from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
+from ..factors.board import build_factor_board, factor_references
+from ..factors.ledger import load_ledger
 from .bv_line import bv_line_for_slate, residual_band
 
 MODEL_VERSION = "gbm_v1"
@@ -95,9 +98,14 @@ def _returning_str(row: pd.Series) -> Optional[str]:
     return f"{_p(h)}/{_p(a)}"
 
 
-def _factors(row: pd.Series, line: float) -> Dict:
+def _factors(
+    row: pd.Series, line: float, refs: Optional[Dict] = None, ledger: Optional[Dict] = None
+) -> Dict:
     proj = row.get("proj_1h_total")
     return {
+        # Green/red factor board (pure explainer; never affects rank). Empty
+        # until references are available; the ledger fills each factor's `live`.
+        "factor_board": build_factor_board(row, refs, ledger=ledger) if refs else [],
         "pace": _pace_str(row),
         "weather": _weather_str(row),
         "spot": _spot_str(row),
@@ -205,14 +213,22 @@ def score_slate(
 
     target = target.sort_values("bv_gap", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
+    # Stash historical board references (median/spread per factor) on the frame
+    # so store_predictions can tint the factor board against HISTORY, not the
+    # current slate. Computed from the full frame (display-only, not a model input).
+    target.attrs["factor_refs"] = factor_references(df)
     return target
 
 
 def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) -> int:
     init_db()
     now = datetime.utcnow()
+    # Board references: prefer the historical ones score_slate attached; else
+    # fall back to the scored slate (noisier, but keeps direct callers working).
+    refs = scored.attrs.get("factor_refs") or factor_references(scored)
     n = 0
     with session_scope() as s:
+        ledger = load_ledger(s)  # real-line track record → each card's `live` badge
         ids = [int(x) for x in scored["id"].tolist()]
         if ids:
             (
@@ -236,9 +252,12 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
                     bv_sigma=_f(r.get("bv_sigma")),
                     line_used=_f(line),
                     rank=int(r["rank"]),
-                    factors_json=json.dumps(_factors(r, line)),
+                    factors_json=json.dumps(_factors(r, line, refs=refs, ledger=ledger)),
                     created_at=now,
                 )
             )
             n += 1
+        # Freeze immutable per-game snapshots (our own model-shaped record).
+        # Idempotent per (game, model): the first pre-kickoff capture stands.
+        snapshot_slate(s, scored, model_version, now)
     return n

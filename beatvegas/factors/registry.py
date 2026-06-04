@@ -12,8 +12,8 @@ append the play-by-play-derived 1H-specific factors here; nothing else changes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, replace
+from typing import List, Optional
 
 import pandas as pd
 
@@ -28,6 +28,12 @@ class Factor:
     leak_free: bool = True  # uses only pre-kickoff info
     market: bool = False  # derived from a Vegas number
     forward_only: bool = False  # only knowable live; not historically backtestable
+    # --- green/red factor-board display metadata (pure explainer; never ranks) ---
+    direction: int = 0  # sign: direction*(value-median) > 0 => more under-favorable
+    binary: bool = False  # hard green/red (dome, short week), not a tinted continuum
+    hypothesis: bool = False  # unverified; rendered amber until the real ledger speaks
+    tier: int = 3  # base display tier (1 proven, 2 context, 3 speculative)
+    sentence: str = ""  # plain-English template for the card
 
 
 # Family assignments + descriptions for the columns build_feature_frame produces.
@@ -38,8 +44,22 @@ _FACTORS: List[Factor] = [
     Factor("home_fh_pa", "scoring", "Home season-to-date 1H points allowed"),
     Factor("away_fh_pf", "scoring", "Away season-to-date 1H points for"),
     Factor("away_fh_pa", "scoring", "Away season-to-date 1H points allowed"),
-    Factor("combined_fh_offense", "scoring", "Both teams' 1H offense, summed"),
-    Factor("combined_fh_defense", "scoring", "Both teams' 1H defense, summed"),
+    Factor(
+        "combined_fh_offense",
+        "scoring",
+        "Both teams' 1H offense, summed",
+        tier=1,
+        direction=-1,
+        sentence="Both 1H offenses average {value:.1f} pts — {dir} the under.",
+    ),
+    Factor(
+        "combined_fh_defense",
+        "scoring",
+        "Both teams' 1H defense, summed",
+        tier=1,
+        direction=-1,
+        sentence="Both 1H defenses allow {value:.1f} pts — {dir} the under.",
+    ),
     Factor("home_full_pf", "scoring", "Home season-to-date full-game points for"),
     Factor("home_full_pa", "scoring", "Home season-to-date full-game points allowed"),
     Factor("away_full_pf", "scoring", "Away season-to-date full-game points for"),
@@ -56,15 +76,33 @@ _FACTORS: List[Factor] = [
     Factor("away_def_ppa", "efficiency", "Away defensive PPA (prior season)"),
     Factor("home_off_success", "efficiency", "Home offensive success rate (prior season)"),
     Factor("away_off_success", "efficiency", "Away offensive success rate (prior season)"),
-    Factor("combined_off_ppa", "efficiency", "Both offenses' PPA, summed"),
-    Factor("combined_def_ppa", "efficiency", "Both defenses' PPA, summed"),
+    Factor(
+        "combined_off_ppa",
+        "efficiency",
+        "Both offenses' PPA, summed",
+        tier=1,
+        direction=-1,
+        sentence="Combined offensive efficiency {value:.2f} PPA — {dir} the under.",
+    ),
+    Factor(
+        "combined_def_ppa",
+        "efficiency",
+        "Both defenses' PPA, summed",
+        tier=1,
+        direction=-1,
+        sentence="Combined PPA allowed {value:.2f} — {dir} the under.",
+    ),
     Factor("home_returning_ppa", "personnel", "Home returning production (PPA share)"),
     Factor("away_returning_ppa", "personnel", "Away returning production (PPA share)"),
     # --- situational (schedule-derived, leak-free) --------------------------
     Factor("home_rest_days", "situational", "Home days of rest"),
     Factor("away_rest_days", "situational", "Away days of rest"),
-    Factor("home_short_week", "situational", "Home on a short week (<6 days)"),
-    Factor("away_short_week", "situational", "Away on a short week (<6 days)"),
+    Factor(
+        "home_short_week", "situational", "Home on a short week (<6 days)", tier=2, binary=True
+    ),
+    Factor(
+        "away_short_week", "situational", "Away on a short week (<6 days)", tier=2, binary=True
+    ),
     Factor("home_off_bye", "situational", "Home off a bye (>9 days)"),
     Factor("away_off_bye", "situational", "Away off a bye (>9 days)"),
     Factor("away_travel_dist", "situational", "Away travel distance (miles)"),
@@ -74,13 +112,48 @@ _FACTORS: List[Factor] = [
     Factor("week", "situational", "Week of season"),
     Factor("neutral_site", "situational", "Neutral-site game"),
     # --- pace (TeamRankings; historical) ------------------------------------
-    Factor("combined_sec_play", "pace", "Average seconds per play (both teams)"),
-    Factor("combined_plays", "pace", "Combined plays per game (both teams)"),
+    Factor(
+        "combined_sec_play",
+        "pace",
+        "Average seconds per play (both teams)",
+        tier=1,
+        direction=1,
+        sentence="Combined pace {value:.1f}s/play — {dir} the under.",
+    ),
+    Factor(
+        "combined_plays",
+        "pace",
+        "Combined plays per game (both teams)",
+        tier=1,
+        direction=-1,
+        sentence="~{value:.0f} combined plays — {dir} the under.",
+    ),
     # --- weather (Open-Meteo; partial historical coverage) ------------------
-    Factor("wx_temp", "weather", "Temperature (F)"),
-    Factor("wx_wind", "weather", "Wind speed (mph)"),
-    Factor("wx_precip", "weather", "Precipitation (in)"),
-    Factor("wx_dome", "weather", "Dome (1/0)"),
+    Factor(
+        "wx_temp",
+        "weather",
+        "Temperature (F)",
+        tier=1,
+        direction=-1,
+        sentence="{value:.0f}°F — {dir} the under.",
+    ),
+    Factor(
+        "wx_wind",
+        "weather",
+        "Wind speed (mph)",
+        tier=1,
+        direction=1,
+        sentence="Wind {value:.0f} mph — {dir} the under (passing & kicking).",
+    ),
+    Factor(
+        "wx_precip",
+        "weather",
+        "Precipitation (in)",
+        tier=1,
+        direction=1,
+        sentence="{value:.2f}in precip — {dir} the under.",
+    ),
+    Factor("wx_dome", "weather", "Dome (1/0)", tier=1, binary=True, direction=-1),
     # --- schedule-derived context (offline; leak-free) ----------------------
     Factor("home_revenge", "situational", "Home lost the last meeting"),
     Factor("away_revenge", "situational", "Away lost the last meeting"),
@@ -121,6 +194,10 @@ _FH_FAMILY = {
     "opening_score": "fh_opening",
     "opening_3out": "fh_opening",
 }
+# Metrics that look like under-signal on the proxy but whose real-line link is
+# unproven (corr_1h shows explosive/turnovers track MORE 1H scoring). Rendered
+# amber as hypotheses until the real-line ledger overturns or confirms them.
+_FH_HYPOTHESIS = {"explosive", "turnovers", "havoc_suffered", "pass_rate"}
 for _name in FH_FACTOR_COLS:
     _role, _metric = _name.split("_fh_", 1)[1].split("_", 1)
     _FACTORS.append(
@@ -128,6 +205,7 @@ for _name in FH_FACTOR_COLS:
             _name,
             _FH_FAMILY.get(_metric, "fh"),
             f"1H {_role} {_metric.replace('_', ' ')} (season-to-date)",
+            hypothesis=_metric in _FH_HYPOTHESIS,
         )
     )
 
@@ -139,8 +217,11 @@ _MM_DESC = {
     "mm_pace": "Combined expected 1H pace (sum of offensive plays)",
     "mm_havoc": "Combined defensive havoc generated (both defenses)",
 }
+_MM_HYPOTHESIS = {"mm_explosive_edge", "mm_havoc"}
 for _name in MATCHUP_COLS:
-    _FACTORS.append(Factor(_name, "matchup", _MM_DESC.get(_name, _name)))
+    _FACTORS.append(
+        Factor(_name, "matchup", _MM_DESC.get(_name, _name), hypothesis=_name in _MM_HYPOTHESIS)
+    )
 
 
 def default_registry() -> List[Factor]:
@@ -148,12 +229,16 @@ def default_registry() -> List[Factor]:
     out = []
     for f in _FACTORS:
         market = f.market or (f.name in MARKET_COLS)
-        out.append(
-            f
-            if market == f.market
-            else Factor(f.name, f.family, f.description, f.leak_free, market, f.forward_only)
-        )
+        out.append(f if market == f.market else replace(f, market=market))
     return out
+
+
+def factor_by_name(name: str) -> Optional[Factor]:
+    """The registered factor with this column name (flags synced), or None."""
+    for f in default_registry():
+        if f.name == name:
+            return f
+    return None
 
 
 def evaluable_factors(

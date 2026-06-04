@@ -1,8 +1,12 @@
 import { getSeasons } from "@/lib/board";
 import { getLedger, Record3 } from "@/lib/ledger";
+import { getDecisionQuality } from "@/lib/decision-quality";
 import SeasonSelect from "@/app/components/SeasonSelect";
 
 export const dynamic = "force-dynamic";
+
+const pct = (v: number | null | undefined) =>
+  v == null ? "—" : `${v.toFixed(1)}%`;
 
 function LedgerCard({
   title,
@@ -80,6 +84,7 @@ export default async function LedgerPage({
       : (seasons[0] ?? new Date().getFullYear());
 
   const { market, model, you, picks } = await getLedger(season);
+  const dq = await getDecisionQuality(season);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -185,6 +190,127 @@ export default async function LedgerPage({
             </tbody>
           </table>
         </div>
+      )}
+
+      <h2 className="mb-2 mt-7 text-sm font-semibold text-[var(--text)]">
+        Decision quality
+      </h2>
+      {dq.n === 0 ? (
+        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
+          No graded picks yet. Log picks to see whether your calls beat your
+          model, beat the close, and which factors you lean on well.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="bv-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Beat my model</h3>
+              <dl className="space-y-1">
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="Hit% when your model agreed (market line above our line)."
+                  >
+                    With model
+                  </dt>
+                  <dd>
+                    {pct(dq.beatModel.agreed.hitPct)} ({dq.beatModel.agreed.n})
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="Hit% when you picked against your model."
+                  >
+                    Against model
+                  </dt>
+                  <dd>
+                    {pct(dq.beatModel.against.hitPct)} ({dq.beatModel.against.n})
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <div className="bv-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Beat the close</h3>
+              <dl className="space-y-1">
+                <div className="flex justify-between">
+                  <dt className="bv-stat-label" title="Average closing line value.">
+                    Avg CLV
+                  </dt>
+                  <dd>{dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="Share of picks with positive CLV."
+                  >
+                    % positive
+                  </dt>
+                  <dd>{pct(dq.clv.pctPositive)}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="bv-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Timing</h3>
+              <dl className="space-y-1">
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="Share of picks taken at or above the opening line."
+                  >
+                    ≥ open
+                  </dt>
+                  <dd>{pct(dq.timing.pctAtOrBetterThanOpen)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="Share of picks with a better number than the close."
+                  >
+                    Beat close
+                  </dt>
+                  <dd>{pct(dq.timing.pctBeatingClose)}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          {dq.factors.length > 0 && (
+            <div className="bv-table-wrap mt-3">
+              <table className="bv-table">
+                <thead>
+                  <tr>
+                    <th>Factor</th>
+                    <th>Your n</th>
+                    <th>Your hit%</th>
+                    <th>Ledger hit%</th>
+                    <th>Weighting</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dq.factors.map((f) => (
+                    <tr key={f.key}>
+                      <td>{f.label}</td>
+                      <td>{f.n}</td>
+                      <td>{pct(f.yourHitPct)}</td>
+                      <td>
+                        {f.ledgerHitPct == null ? "—" : pct(f.ledgerHitPct)}
+                      </td>
+                      <td>
+                        <span className="bv-pill">
+                          {f.weight === "even"
+                            ? "balanced"
+                            : f.weight === "under"
+                              ? "use well"
+                              : "over-lean"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,9 +1,61 @@
 import { BoardRow } from "@/lib/board";
-import { buildChips, scoreColor, scoreLabel } from "@/lib/score";
+import {
+  BoardFactor,
+  buildChips,
+  factorTint,
+  groupFactorBoard,
+  scoreColor,
+  scoreLabel,
+} from "@/lib/score";
+
+const TIER_DOT: Record<number, string> = {
+  1: "var(--accent)",
+  2: "#5b6b8c",
+  3: "#46506b",
+  0: "#e0a44a", // hypotheses
+};
+
+function FactorRow({ f }: { f: BoardFactor }) {
+  const tint = factorTint(f);
+  // position marker: under-favorable lean to the right, clamped to ±2 spreads.
+  const pct = Math.max(4, Math.min(96, 50 + (Math.max(-2, Math.min(2, f.lean)) / 2) * 50));
+  const text = f.sentence || `${f.label} — ${f.value}`;
+  return (
+    <div className="bv-fac-row" style={{ background: tint.bg }}>
+      <span className="bv-fac-text">{text}</span>
+      {f.hypothesis ? (
+        <span className="bv-fac-badge bv-fac-badge-amber" title="Tracks more 1H scoring on the proxy; unproven on real lines.">
+          ⚠ unproven
+        </span>
+      ) : f.live ? (
+        <span
+          className={`bv-fac-badge ${f.live.cooling ? "bv-fac-badge-amber" : "bv-fac-badge-live"}`}
+          title={
+            f.live.cooling
+              ? "Real-line under record when green — but the recent window has cooled below breakeven."
+              : "Real-line first-half under record when this factor is green."
+          }
+        >
+          {f.live.cooling ? "❄ " : ""}n={f.live.n} · {Math.round(f.live.mean * 100)}% ±
+          {Math.round(((f.live.hi - f.live.lo) / 2) * 100)}
+        </span>
+      ) : (
+        <span className="bv-fac-badge">no live data yet</span>
+      )}
+      <span className="bv-fac-track" aria-hidden>
+        <span
+          className="bv-fac-track-dot"
+          style={{ left: `${pct}%`, background: tint.dot }}
+        />
+      </span>
+    </div>
+  );
+}
 
 export default function OpportunityCard({ row }: { row: BoardRow }) {
   const color = scoreColor(row.underScore);
   const chips = buildChips(row.factors);
+  const tierGroups = groupFactorBoard(row.factors.factor_board);
 
   // Derived-line card: our 1H number off the posted full-game line, no model.
   const derived = row.factors.line_kind === "derived_fg";
@@ -203,15 +255,36 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
             </>
           )}
 
-          {/* Detail chips */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {chips.map((c) => (
-              <span key={c.label} title={c.hint} className="bv-pill">
-                <span className="bv-pill-label">{c.label}</span>
-                <span className="bv-pill-value">{c.value}</span>
-              </span>
-            ))}
-          </div>
+          {/* Green/red factor board — the story behind the rank (explainer
+              only; never moves it). Falls back to the legacy chips until a
+              card has a factor_board payload. */}
+          {!derived && tierGroups.length > 0 ? (
+            <div className="mt-3">
+              {tierGroups.map((g) => (
+                <div key={g.tier}>
+                  <div className="bv-fac-tier">
+                    <span
+                      className="bv-fac-tier-dot"
+                      style={{ background: TIER_DOT[g.tier] }}
+                    />
+                    {g.title}
+                  </div>
+                  {g.factors.map((f) => (
+                    <FactorRow key={f.key} f={f} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {chips.map((c) => (
+                <span key={c.label} title={c.hint} className="bv-pill">
+                  <span className="bv-pill-label">{c.label}</span>
+                  <span className="bv-pill-value">{c.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

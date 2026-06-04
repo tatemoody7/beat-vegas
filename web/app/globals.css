@@ -152,6 +152,77 @@ body {
     font-variant-numeric: tabular-nums;
   }
 
+  /* Green/red factor board (Option-A tiered stack) — pure explainer */
+  .bv-fac-tier {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .bv-fac-tier-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 9999px;
+  }
+  .bv-fac-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+  .bv-fac-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .bv-fac-text b {
+    font-weight: 800;
+  }
+  .bv-fac-badge {
+    flex-shrink: 0;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    padding: 0.1rem 0.4rem;
+    white-space: nowrap;
+  }
+  .bv-fac-badge-live {
+    color: var(--accent);
+    border-color: var(--accent-strong);
+  }
+  .bv-fac-badge-amber {
+    color: #e0a44a;
+    border-color: #6b4a1f;
+    background: #241a0c;
+  }
+  .bv-fac-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 3rem;
+    height: 0.3rem;
+    border-radius: 9999px;
+    background: var(--surface-2);
+  }
+  .bv-fac-track-dot {
+    position: absolute;
+    top: -0.12rem;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 9999px;
+    transform: translateX(-50%);
+  }
+
   /* Toolbar select (season / sort) */
   .bv-select {
     appearance: none;

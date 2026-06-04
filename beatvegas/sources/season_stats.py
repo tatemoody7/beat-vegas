@@ -54,7 +54,9 @@ def sp_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
                     "sp_defense": _g(de, "rating"),
                 }
             )
-    return pd.DataFrame(rows)
+    # Keep the column schema when empty so prefixed merges in build_feature_frame
+    # don't KeyError on missing join keys (thin/sandbox data).
+    return pd.DataFrame(rows, columns=["season", "team", "sp_overall", "sp_offense", "sp_defense"])
 
 
 def returning_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
@@ -78,7 +80,10 @@ def returning_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
                     "returning_usage": _g(r, "returningUsage", "returning_usage"),
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows,
+        columns=["season", "team", "returning_ppa", "returning_pass_ppa", "returning_usage"],
+    )
 
 
 def talent_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
@@ -93,7 +98,7 @@ def talent_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
             rows.append(
                 {"season": _g(r, "year", "season"), "team": team, "talent": _g(r, "talent")}
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["season", "team", "talent"])
 
 
 def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
@@ -127,7 +132,7 @@ def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFr
                     "roster_upperclass": round(float((yrs >= 3).mean()), 3),
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["season", "team", "roster_exp", "roster_upperclass"])
 
 
 def advanced_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
@@ -152,4 +157,16 @@ def advanced_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
                     "def_explosive": _g(de, "explosiveness"),
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "season",
+            "team",
+            "off_ppa",
+            "def_ppa",
+            "off_success",
+            "def_success",
+            "off_explosive",
+            "def_explosive",
+        ],
+    )

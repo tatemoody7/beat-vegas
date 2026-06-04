@@ -65,3 +65,34 @@ export function clvSummary(picks: DqPickRow[]): {
     negClvHitPct: neg.hitPct,
   };
 }
+
+export function timingSummary(picks: DqPickRow[]): {
+  nOpen: number;
+  pctAtOrBetterThanOpen: number | null;
+  nClose: number;
+  pctBeatingClose: number | null;
+} {
+  // UNDER bettor: a higher line taken is a better number.
+  const withOpen = picks.filter(
+    (p) => p.line != null && p.opening_line != null,
+  );
+  const atOrBetter = withOpen.filter(
+    (p) => (p.line as number) >= (p.opening_line as number),
+  );
+  const withClose = picks.filter(
+    (p) => p.line != null && p.closing_line != null,
+  );
+  const beatClose = withClose.filter(
+    (p) => (p.line as number) > (p.closing_line as number),
+  );
+  return {
+    nOpen: withOpen.length,
+    pctAtOrBetterThanOpen: withOpen.length
+      ? (100 * atOrBetter.length) / withOpen.length
+      : null,
+    nClose: withClose.length,
+    pctBeatingClose: withClose.length
+      ? (100 * beatClose.length) / withClose.length
+      : null,
+  };
+}

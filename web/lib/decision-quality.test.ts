@@ -38,3 +38,20 @@ test("clvSummary: avg, positive share, and hit% by clv sign", () => {
   expect(r.posClvHitPct).toBe(50);          // 2 decided +clv, 1 win
   expect(r.negClvHitPct).toBe(100);         // 1 decided -clv, 1 win
 });
+
+import { timingSummary } from "@/lib/decision-quality";
+
+test("timingSummary: share at/better than open, share beating close", () => {
+  // For an UNDER bettor a HIGHER line taken is better.
+  const picks: DqPickRow[] = [
+    row({ line: 26, opening_line: 25, closing_line: 25.5 }), // >= open, > close
+    row({ line: 24, opening_line: 25, closing_line: 24.5 }), // < open, < close
+    row({ line: 25, opening_line: 25, closing_line: 25 }),   // == open (counts), == close (not beating)
+    row({ line: 27, opening_line: null, closing_line: 26 }), // no open; > close
+  ];
+  const r = timingSummary(picks);
+  expect(r.nOpen).toBe(3);                  // rows with opening_line
+  expect(r.pctAtOrBetterThanOpen).toBeCloseTo((100 * 2) / 3); // rows 1 and 3
+  expect(r.nClose).toBe(4);
+  expect(r.pctBeatingClose).toBeCloseTo((100 * 2) / 4);       // rows 1 and 4
+});

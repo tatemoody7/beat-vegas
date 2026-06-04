@@ -318,6 +318,28 @@ class GameRecord(Base):
     graded_at = Column(DateTime)
 
 
+class FactorLedger(Base):
+    """The factor credibility ledger: one row per factor's real-line 1H-under
+    record (graded by scripts/grade_factor_ledger.py). Cumulative across seasons
+    (2023→now); a Beta-binomial posterior over the under hit rate when the factor
+    is 'green'. Display + tiering only — never a model input, never moves the rank.
+    """
+
+    __tablename__ = "factor_ledger"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    factor = Column(String, index=True)  # column name
+    n = Column(Integer)  # real-line green-state games graded
+    hits = Column(Integer)  # of those, 1H unders that cashed (pushes dropped)
+    post_mean = Column(Float)  # posterior mean hit rate
+    post_lo = Column(Float)  # 2.5th pct (95% credible interval)
+    post_hi = Column(Float)  # 97.5th pct
+    tier = Column(Integer)  # displayed tier after evidence (1 if promoted)
+    recent_n = Column(Integer)  # trailing-window games (decay detection)
+    recent_mean = Column(Float)  # trailing-window hit rate
+    drift_flag = Column(Boolean)  # "cooling": recent below breakeven, all-time above
+    created_at = Column(DateTime)
+
+
 class ModelRun(Base):
     __tablename__ = "model_runs"
     id = Column(Integer, primary_key=True, autoincrement=True)

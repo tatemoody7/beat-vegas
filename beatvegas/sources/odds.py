@@ -78,6 +78,45 @@ class OddsAPIClient:
         resp.raise_for_status()
         return resp.json()
 
+    # --- historical (paid backfill / coverage gate, plan Phase 0) -------------
+    def list_historical_events(self, date_iso: str) -> List[Dict[str, Any]]:
+        """Events as of a past timestamp. The historical envelope wraps the list
+        in `data`. Cheap (no odds)."""
+        url = f"{self.base_url}/historical/sports/{self.sport}/events"
+        resp = requests.get(
+            url,
+            params={"apiKey": self.api_key, "date": date_iso, "dateFormat": "iso"},
+            timeout=self.timeout,
+        )
+        self._credits(resp)
+        resp.raise_for_status()
+        return _unwrap_historical(resp.json()) or []
+
+    def historical_event_first_half_totals(self, event_id: str, date_iso: str) -> Dict[str, Any]:
+        """totals_h1 odds for one event as of a past timestamp. Historical
+        snapshots cost more per market than live calls — probe sparingly."""
+        url = f"{self.base_url}/historical/sports/{self.sport}/events/{event_id}/odds"
+        params = {
+            "apiKey": self.api_key,
+            "regions": self.regions,
+            "markets": self.markets,
+            "oddsFormat": self.odds_format,
+            "dateFormat": "iso",
+            "date": date_iso,
+        }
+        resp = requests.get(url, params=params, timeout=self.timeout)
+        self._credits(resp)
+        if resp.status_code == 404:
+            return {}
+        resp.raise_for_status()
+        return _unwrap_historical(resp.json()) or {}
+
+
+def _unwrap_historical(payload: Dict[str, Any]):
+    """Pull `data` out of a historical snapshot envelope (list of events, or a
+    single event-odds object). Returns None when absent."""
+    return payload.get("data")
+
 
 def normalize_first_half(
     events: List[Dict[str, Any]], books: Optional[List[str]] = None

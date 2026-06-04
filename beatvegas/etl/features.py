@@ -187,9 +187,18 @@ def _load_all_games() -> pd.DataFrame:
             columns=["venue_id", "venue_elevation", "venue_grass", "venue_capacity"],
         )
     df["neutral_site"] = df["neutral_site"].fillna(False).astype(int)
-    df = df.merge(venues, on="venue_id", how="left")
+    df = _merge_venue_meta(df, venues)
     df["venue_grass"] = df["venue_grass"].map({True: 1.0, False: 0.0})
     return df
+
+
+def _merge_venue_meta(df: pd.DataFrame, venues: pd.DataFrame) -> pd.DataFrame:
+    """Left-join venue metadata, coercing the join key so an object-dtype
+    venue_id (psycopg returns object for a nullable int) merges cleanly with
+    Venue.id's int64 — otherwise pandas raises on the dtype mismatch."""
+    for d in (df, venues):
+        d["venue_id"] = pd.to_numeric(d["venue_id"], errors="coerce").astype("float64")
+    return df.merge(venues, on="venue_id", how="left")
 
 
 def _team_long(df: pd.DataFrame) -> pd.DataFrame:

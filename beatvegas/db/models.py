@@ -286,6 +286,38 @@ class FactorScore(Base):
     created_at = Column(DateTime)
 
 
+class GameRecord(Base):
+    """Immutable per-game snapshot — our own model-shaped record (plan Phase 0).
+
+    Frozen pre-kickoff: the leak-free feature vector + the line + our as-of-then
+    bv_line/bv_gap. The real 1H result + outcome are filled in AFTER the game
+    (the only post-kickoff write). Cumulative from 2023 forward; the shared fuel
+    for the Research records grid, the credibility ledger, and bv_line
+    recalibration. A separate re-scoreable view re-runs the current model over
+    these features — this row is never recomputed.
+    """
+
+    __tablename__ = "game_records"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    captured_at = Column(DateTime)  # when the pre-kickoff snapshot was frozen
+    model_version = Column(String)  # model that produced the as-of bv_line
+    features_json = Column(String)  # leak-free feature vector, as-of kickoff
+    line = Column(Float)  # 1H line at snapshot
+    line_kind = Column(String)  # 'observed_1h' | 'derived_fg' | 'proxy'
+    bv_line = Column(Float)
+    bv_gap = Column(Float)
+    bv_gap_z = Column(Float)
+    under_score = Column(Integer)
+    # filled after the game (the only post-kickoff write):
+    first_half_total = Column(Integer)
+    under_hit = Column(Boolean)
+    outcome = Column(String)  # 'under' | 'over' | 'push'
+    graded_at = Column(DateTime)
+
+
 class ModelRun(Base):
     __tablename__ = "model_runs"
     id = Column(Integer, primary_key=True, autoincrement=True)

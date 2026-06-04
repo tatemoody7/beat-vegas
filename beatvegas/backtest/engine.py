@@ -47,7 +47,7 @@ class BacktestResult:
 
 
 def run_backtest(
-    df: Optional[pd.DataFrame] = None, first_test_season: int = 2018, top_frac: float = 0.20
+    df: Optional[pd.DataFrame] = None, first_test_season: int = 2023, top_frac: float = 0.20
 ) -> BacktestResult:
     if df is None:
         df = build_feature_frame(min_games=2)

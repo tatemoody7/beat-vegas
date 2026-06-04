@@ -41,7 +41,7 @@ def _print_table(title: str, rows, cols) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--first-test-season", type=int, default=2018)
+    ap.add_argument("--first-test-season", type=int, default=2023)
     ap.add_argument("--top-frac", type=float, default=0.20)
     ap.add_argument("--combo-top-k", type=int, default=8)
     ap.add_argument("--min-games", type=int, default=2)

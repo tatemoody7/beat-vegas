@@ -26,7 +26,12 @@ _MIGRATIONS = {
         "bv_sigma": "FLOAT",
     },
     "results": {"closing_captured_at": "TIMESTAMP"},
-    "manual_picks": {"model_score_at_pick": "INTEGER", "model_line_at_pick": "FLOAT"},
+    "manual_picks": {
+        "model_score_at_pick": "INTEGER",
+        "model_line_at_pick": "FLOAT",
+        "factors_json_at_pick": "TEXT",
+        "opening_line": "FLOAT",
+    },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
     "games": {"spread": "FLOAT"},

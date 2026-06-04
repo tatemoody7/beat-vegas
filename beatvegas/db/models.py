@@ -245,6 +245,11 @@ class ManualPick(Base):
     closing_line = Column(Float)
     clv = Column(Float)
 
+    # Decision-quality snapshot (Phase 4b). factors_json_at_pick freezes the
+    # factor board at log time (forward-only); opening_line filled at grading.
+    factors_json_at_pick = Column(String)
+    opening_line = Column(Float)
+
 
 class BvAdjustment(Base):
     """A manual nudge to the BV line for one game (e.g. a confirmed QB-out the

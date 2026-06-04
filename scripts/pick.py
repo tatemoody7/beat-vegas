@@ -92,6 +92,18 @@ def cmd_list(args) -> None:
             )
 
 
+def graded_pick_fields(actual_first_half, line, price, stake, opening, closing) -> dict:
+    """Pure: the graded ManualPick fields for one pick + its line snapshots."""
+    return {
+        "actual_first_half_total": actual_first_half,
+        "result": under_result(actual_first_half, line),
+        "units": stake * units_won(actual_first_half, line, price),
+        "opening_line": opening,
+        "closing_line": closing,
+        "clv": clv_under(line, closing) if closing is not None else None,
+    }
+
+
 def cmd_grade(args) -> None:
     season = args.season or _default_season()
     graded = 0
@@ -114,12 +126,11 @@ def cmd_grade(args) -> None:
                 .filter(OddsSnapshot.game_id == p.game_id, OddsSnapshot.market == "1H_total")
                 .all()
             )
-            _open, closing = consensus_open_close(snaps)
-            p.actual_first_half_total = g.first_half_total
-            p.result = under_result(g.first_half_total, p.line)
-            p.units = p.stake * units_won(g.first_half_total, p.line, p.price)
-            p.closing_line = closing
-            p.clv = clv_under(p.line, closing) if closing is not None else None
+            opening, closing = consensus_open_close(snaps)
+            for k, v in graded_pick_fields(
+                g.first_half_total, p.line, p.price, p.stake, opening, closing
+            ).items():
+                setattr(p, k, v)
             p.graded = True
             graded += 1
     print(f"graded {graded} pick(s) for {season}")

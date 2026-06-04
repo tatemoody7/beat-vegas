@@ -86,3 +86,15 @@ test("perFactorAttribution: your hit% per green factor vs ledger rate", () => {
   // your 66.7% > ledger 60% => you use it well
   expect(f.weight).toBe("under");
 });
+
+test("beatMyModel excludes picks with no model line (null edge)", () => {
+  const picks: DqPickRow[] = [
+    row({ line: 26, model_line_at_pick: 24, result: "under" }), // +2 agreed, win
+    row({ line: 22, model_line_at_pick: 25, result: "under" }), // -3 against, win
+    row({ line: 24, model_line_at_pick: null, result: "over" }), // null edge -> EXCLUDED
+    row({ line: null, model_line_at_pick: 25, result: "under" }), // null edge -> EXCLUDED
+  ];
+  const r = beatMyModel(picks);
+  expect(r.agreed).toEqual({ n: 1, wins: 1, decided: 1, hitPct: 100 });
+  expect(r.against).toEqual({ n: 1, wins: 1, decided: 1, hitPct: 100 });
+});

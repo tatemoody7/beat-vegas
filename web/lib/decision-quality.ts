@@ -35,13 +35,16 @@ export function beatMyModel(picks: DqPickRow[]): {
   agreed: Bucket;
   against: Bucket;
 } {
-  const edge = (p: DqPickRow) =>
-    p.line != null && p.model_line_at_pick != null
-      ? p.line - p.model_line_at_pick
-      : null;
-  // edge > 0 = market line above our model line = our model agreed under is favorable.
-  const agreed = picks.filter((p) => (edge(p) ?? -1) > 0);
-  const against = picks.filter((p) => (edge(p) ?? -1) <= 0);
+  // Only picks where we know our model's line at pick time can be compared.
+  // edge = line taken - our model line; > 0 = our model agreed under is favorable.
+  const withEdge = picks
+    .filter((p) => p.line != null && p.model_line_at_pick != null)
+    .map((p) => ({
+      pick: p,
+      edge: (p.line as number) - (p.model_line_at_pick as number),
+    }));
+  const agreed = withEdge.filter((e) => e.edge > 0).map((e) => e.pick);
+  const against = withEdge.filter((e) => e.edge <= 0).map((e) => e.pick);
   return { agreed: tally(agreed), against: tally(against) };
 }
 

@@ -55,3 +55,34 @@ test("timingSummary: share at/better than open, share beating close", () => {
   expect(r.nClose).toBe(4);
   expect(r.pctBeatingClose).toBeCloseTo((100 * 2) / 4);       // rows 1 and 4
 });
+
+import { perFactorAttribution } from "@/lib/decision-quality";
+
+const board = (greens: string[]) =>
+  JSON.stringify({
+    factor_board: greens.map((key) => ({
+      key, label: key, family: "x", tier: 1, direction: 1, hypothesis: false,
+      binary: false, value: 1, color: "green", intensity: 0.5, lean: 1,
+      sentence: "", live: null,
+    })),
+  });
+
+test("perFactorAttribution: your hit% per green factor vs ledger rate", () => {
+  const picks: DqPickRow[] = [
+    row({ result: "under", factors_json_at_pick: board(["pace_estimate"]) }),
+    row({ result: "over", factors_json_at_pick: board(["pace_estimate"]) }),
+    row({ result: "under", factors_json_at_pick: board(["pace_estimate"]) }),
+    row({ result: "push", factors_json_at_pick: board([]) }),
+  ];
+  const ledger = { pace_estimate: { mean: 0.6, n: 100 } };
+  const rows = perFactorAttribution(picks, ledger);
+  expect(rows).toHaveLength(1);
+  const f = rows[0];
+  expect(f.key).toBe("pace_estimate");
+  expect(f.n).toBe(3);
+  expect(f.decided).toBe(3);          // no pushes among the 3 with this factor green
+  expect(f.yourHitPct).toBeCloseTo((100 * 2) / 3);
+  expect(f.ledgerHitPct).toBe(60);
+  // your 66.7% > ledger 60% => you use it well
+  expect(f.weight).toBe("under");
+});

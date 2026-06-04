@@ -1,3 +1,6 @@
+import { parseFactors } from "@/lib/score";
+import { prisma } from "@/lib/prisma";
+
 export type DqPickRow = {
   result: string | null;
   line: number | null;
@@ -94,5 +97,95 @@ export function timingSummary(picks: DqPickRow[]): {
     pctBeatingClose: withClose.length
       ? (100 * beatClose.length) / withClose.length
       : null,
+  };
+}
+
+export type LedgerRates = Record<string, { mean: number; n: number }>;
+
+export type FactorAttribution = {
+  key: string;
+  label: string;
+  n: number;
+  wins: number;
+  decided: number;
+  yourHitPct: number | null;
+  ledgerHitPct: number | null;
+  weight: "under" | "over" | "even";
+};
+
+export function perFactorAttribution(
+  picks: DqPickRow[],
+  ledger: LedgerRates,
+): FactorAttribution[] {
+  // factor key -> {label, picks where it was green}
+  const acc = new Map<string, { label: string; rows: DqPickRow[] }>();
+  for (const p of picks) {
+    const board = parseFactors(p.factors_json_at_pick).factor_board ?? [];
+    for (const f of board) {
+      if (f.color !== "green") continue;
+      const e = acc.get(f.key) ?? { label: f.label, rows: [] };
+      e.rows.push(p);
+      acc.set(f.key, e);
+    }
+  }
+  const out: FactorAttribution[] = [];
+  for (const [key, { label, rows }] of acc) {
+    const b = tally(rows);
+    const ledgerHitPct = ledger[key] ? 100 * ledger[key].mean : null;
+    let weight: "under" | "over" | "even" = "even";
+    if (b.hitPct != null && ledgerHitPct != null) {
+      if (b.hitPct > ledgerHitPct + 1) weight = "under";
+      else if (b.hitPct < ledgerHitPct - 1) weight = "over";
+    }
+    out.push({
+      key, label, n: b.n, wins: b.wins, decided: b.decided,
+      yourHitPct: b.hitPct, ledgerHitPct, weight,
+    });
+  }
+  return out.sort((a, b) => b.n - a.n);
+}
+
+export type DecisionQuality = {
+  beatModel: ReturnType<typeof beatMyModel>;
+  clv: ReturnType<typeof clvSummary>;
+  timing: ReturnType<typeof timingSummary>;
+  factors: FactorAttribution[];
+  n: number;
+};
+
+export async function getDecisionQuality(
+  season: number,
+): Promise<DecisionQuality> {
+  const picks = await prisma.$queryRaw<DqPickRow[]>`
+    SELECT result, line, model_line_at_pick, opening_line, closing_line, clv,
+           factors_json_at_pick
+    FROM manual_picks
+    WHERE season = ${season} AND graded = true
+  `;
+  // factor_ledger may not exist yet (created by the Phase-3 Python jobs on
+  // their next Neon write). Degrade to no ledger rather than throwing.
+  let ledgerRows: {
+    factor: string;
+    post_mean: number | null;
+    n: number | bigint | null;
+  }[] = [];
+  try {
+    ledgerRows = await prisma.$queryRaw`
+      SELECT factor, post_mean, n FROM factor_ledger
+    `;
+  } catch {
+    ledgerRows = [];
+  }
+  const ledger: LedgerRates = {};
+  for (const r of ledgerRows) {
+    if (r.post_mean != null)
+      ledger[r.factor] = { mean: r.post_mean, n: Number(r.n ?? 0) };
+  }
+  return {
+    beatModel: beatMyModel(picks),
+    clv: clvSummary(picks),
+    timing: timingSummary(picks),
+    factors: perFactorAttribution(picks, ledger),
+    n: picks.length,
   };
 }

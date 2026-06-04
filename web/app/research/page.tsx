@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   getBvCalibration,
   getEdgeStats,
@@ -19,7 +21,12 @@ export default async function ResearchPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="bv-page-title">Research</h1>
-      <p className="bv-page-sub mb-5">Is there really an edge?</p>
+      <p className="bv-page-sub mb-3">Is there really an edge?</p>
+      <p className="mb-5">
+        <Link href="/research/records" className="bv-btn">
+          Our records — every game, exportable →
+        </Link>
+      </p>
 
       {edge ? (
         <>

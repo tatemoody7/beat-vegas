@@ -56,21 +56,19 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
 
   if (slate.length === 0) {
     return (
-      <p className="rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
+      <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
         No scored games this week — log picks once a slate is scored.
       </p>
     );
   }
 
-  const field = "rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-gray-100 focus:border-gray-500 focus:outline-none";
+  const field = "bv-input";
+  const labelCls = "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
 
   return (
-    <form
-      onSubmit={submit}
-      className="rounded-xl border border-gray-800 bg-gray-950 p-4"
-    >
+    <form onSubmit={submit} className="bv-card p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-xs text-gray-400 sm:col-span-2">
+        <label className={`${labelCls} sm:col-span-2`}>
           Game
           <select
             value={gameId}
@@ -79,14 +77,14 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           >
             {slate.map((g) => (
               <option key={g.gameId} value={g.gameId}>
-                {g.away} @ {g.home} · score {g.underScore ?? "—"} · line{" "}
+                {g.away} @ {g.home} · under score {g.underScore ?? "—"} · line{" "}
                 {g.curLine ?? "—"}
               </option>
             ))}
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className={labelCls}>
           Your line (under)
           <input
             type="number"
@@ -97,8 +95,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           />
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs text-gray-400">
-            Stake (u)
+          <label className={labelCls} title="1 unit = one standard bet.">
+            Stake (units)
             <input
               type="number"
               step={0.5}
@@ -107,8 +105,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
               className={field}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-gray-400">
-            Price
+          <label className={labelCls} title="The odds / price (e.g. −110).">
+            Odds
             <input
               type="number"
               step={5}
@@ -119,7 +117,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           </label>
         </div>
 
-        <label className="flex flex-col gap-1 text-xs text-gray-400 sm:col-span-2">
+        <label className={`${labelCls} sm:col-span-2`}>
           Reason / note (why you took it — for later review)
           <input
             type="text"
@@ -131,13 +129,13 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
         </label>
       </div>
 
-      {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
+      {err && (
+        <p role="alert" className="mt-2 text-sm text-red-400">
+          {err}
+        </p>
+      )}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="mt-3 rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} className="bv-btn mt-4">
         {busy ? "Logging…" : "Log pick"}
       </button>
     </form>

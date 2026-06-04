@@ -20,7 +20,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
 
   if (picks.length === 0) {
     return (
-      <p className="rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
+      <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
         No logged picks yet.
       </p>
     );
@@ -30,36 +30,36 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
     n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-800">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-900 text-left text-gray-400">
+    <div className="bv-table-wrap">
+      <table className="bv-table">
+        <thead>
           <tr>
-            <th className="px-3 py-2 font-medium">Wk</th>
-            <th className="px-3 py-2 font-medium">Matchup</th>
-            <th className="px-3 py-2 font-medium">Your line</th>
-            <th className="px-3 py-2 font-medium">Model @ pick</th>
-            <th className="px-3 py-2 font-medium">Result</th>
-            <th className="px-3 py-2 font-medium">Units</th>
-            <th className="px-3 py-2 font-medium">CLV</th>
-            <th className="px-3 py-2 font-medium">Note</th>
-            <th className="px-3 py-2 font-medium"></th>
+            <th>Wk</th>
+            <th>Matchup</th>
+            <th>Your line</th>
+            <th title="The under score and our number at the time you logged the pick.">Model @ pick</th>
+            <th>Result</th>
+            <th title="Profit in units. 1 unit = one standard bet.">Units</th>
+            <th title="Line value (CLV): positive = the line moved your way after you'd bet.">Line value</th>
+            <th>Note</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {picks.map((p) => (
-            <tr key={p.id} className="border-t border-gray-800 align-top">
-              <td className="px-3 py-1.5 text-gray-400">{p.week ?? "—"}</td>
-              <td className="px-3 py-1.5 text-gray-200">
-                {p.away} <span className="text-gray-600">@</span> {p.home}
+            <tr key={p.id} className="align-top">
+              <td className="text-[var(--text-muted)]">{p.week ?? "—"}</td>
+              <td className="text-[var(--text)]">
+                {p.away} <span className="text-[var(--text-dim)]">@</span> {p.home}
               </td>
-              <td className="px-3 py-1.5 text-gray-300">
-                {p.line !== null ? `u${p.line}` : "—"}
+              <td className="text-[var(--text-muted)]">
+                {p.line !== null ? `under ${p.line}` : "—"}
               </td>
-              <td className="px-3 py-1.5 text-gray-400">
+              <td className="text-[var(--text-muted)]">
                 {p.modelScore !== null ? `${p.modelScore}` : "—"}
                 {p.modelLine !== null ? ` @ ${p.modelLine}` : ""}
               </td>
-              <td className="px-3 py-1.5">
+              <td>
                 <span
                   style={{
                     color:
@@ -74,7 +74,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 </span>
               </td>
               <td
-                className="px-3 py-1.5"
+                className="font-mono"
                 style={{
                   color:
                     p.units === null ? "#9ca3af" : p.units >= 0 ? "#16a34a" : "#dc2626",
@@ -82,14 +82,14 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
               >
                 {num(p.units)}
               </td>
-              <td className="px-3 py-1.5 text-gray-400">{num(p.clv)}</td>
-              <td className="max-w-xs px-3 py-1.5 text-gray-500">{p.note ?? "—"}</td>
-              <td className="px-3 py-1.5">
+              <td className="font-mono text-[var(--text-muted)]">{num(p.clv)}</td>
+              <td className="max-w-xs text-[var(--text-dim)]">{p.note ?? "—"}</td>
+              <td>
                 {!p.graded && (
                   <button
                     onClick={() => del(p.id)}
                     disabled={deleting === p.id}
-                    className="text-xs text-gray-500 hover:text-red-400 disabled:opacity-50"
+                    className="text-xs text-[var(--text-dim)] hover:text-red-400 disabled:opacity-50"
                   >
                     {deleting === p.id ? "…" : "delete"}
                   </button>

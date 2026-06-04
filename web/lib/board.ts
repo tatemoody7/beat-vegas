@@ -176,8 +176,12 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
 }
 
 export async function getSeasons(): Promise<number[]> {
+  // Only seasons that actually have a board (predictions) — so the app lands on
+  // a populated week by default instead of an empty backfilled future schedule.
   const rows = await prisma.$queryRaw<{ season: number | bigint }[]>`
-    SELECT DISTINCT season FROM games ORDER BY season DESC
+    SELECT DISTINCT g.season
+    FROM games g JOIN predictions p ON p.game_id = g.id
+    ORDER BY g.season DESC
   `;
   return rows.map((r) => Number(r.season));
 }

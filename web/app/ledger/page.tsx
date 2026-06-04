@@ -14,32 +14,48 @@ function LedgerCard({
   emptyHint: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-950 p-4">
-      <h3 className="mb-2 text-sm font-semibold text-gray-200">{title}</h3>
+    <div className="bv-card p-4">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">{title}</h3>
       {rec === null ? (
-        <p className="text-xs text-gray-500">{emptyHint}</p>
+        <p className="text-xs text-[var(--text-dim)]">{emptyHint}</p>
       ) : (
-        <dl className="space-y-2">
+        <dl className="space-y-3">
           <div>
-            <dt className="text-xs text-gray-500">Hit</dt>
-            <dd className="text-2xl font-bold text-gray-100">
+            <dt className="bv-stat-label" title="Share of bets that won.">
+              Win rate
+            </dt>
+            <dd className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-[var(--text)]">
               {rec.hit}{" "}
-              <span className="text-sm font-normal text-gray-500">{rec.record}</span>
+              <span className="font-sans text-sm font-normal text-[var(--text-dim)]">
+                {rec.record}
+              </span>
             </dd>
           </div>
           <div className="flex gap-6">
             <div>
-              <dt className="text-xs text-gray-500">Units</dt>
+              <dt
+                className="bv-stat-label"
+                title="Profit in units. 1 unit = one standard bet."
+              >
+                Units
+              </dt>
               <dd
-                className="text-lg font-semibold"
+                className="mt-0.5 font-mono text-lg font-semibold tabular-nums"
                 style={{ color: rec.units.startsWith("-") ? "#dc2626" : "#16a34a" }}
               >
                 {rec.units}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-500">Avg CLV</dt>
-              <dd className="text-lg font-semibold text-gray-300">{rec.clv}</dd>
+              <dt
+                className="bv-stat-label"
+                title="Average line value (CLV): did the line move our way after we'd bet? Positive = we beat the closing line."
+              >
+                Avg line value
+              </dt>
+              <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
+                {rec.clv}
+              </dd>
             </div>
           </div>
         </dl>
@@ -64,57 +80,58 @@ export default async function LedgerPage({
   const { market, model, you, picks } = await getLedger(season);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Ledger</h1>
+        <h1 className="bv-page-title">Ledger</h1>
         {seasons.length > 0 && <SeasonSelect seasons={seasons} current={season} />}
       </div>
-      <p className="mb-4 text-sm text-gray-500">
-        Graded {season} · Market = under vs real closing line · Model = the model&apos;s
-        leans (score ≥ 53) · You = your logged bets.
+      <p className="bv-page-sub mb-5">
+        Settled results for {season} · Market = how the under did at the closing line
+        (the final line before kickoff) · Model = the model&apos;s under picks · You =
+        your own logged bets.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <LedgerCard title="📊 Market" rec={market} emptyHint="Run grade.py after games." />
+        <LedgerCard title="Market" rec={market} emptyHint="Fills in once games are settled." />
         <LedgerCard
-          title="🤖 Model"
+          title="Model"
           rec={model}
-          emptyHint="Run weekly_update + grade."
+          emptyHint="Fills in once the week is scored and settled."
         />
-        <LedgerCard title="✍️ You" rec={you} emptyHint="Log bets in My Picks." />
+        <LedgerCard title="You" rec={you} emptyHint="Log bets in My Picks." />
       </div>
 
-      <h2 className="mb-2 mt-6 text-sm font-semibold text-gray-200">Your bets</h2>
+      <h2 className="mb-2 mt-7 text-sm font-semibold text-[var(--text)]">Your bets</h2>
       {picks.length === 0 ? (
-        <p className="rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
+        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
           No logged picks for {season}.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-800">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-900 text-left text-gray-400">
+        <div className="bv-table-wrap">
+          <table className="bv-table">
+            <thead>
               <tr>
-                <th className="px-3 py-2 font-medium">Wk</th>
-                <th className="px-3 py-2 font-medium">Matchup</th>
-                <th className="px-3 py-2 font-medium">Line</th>
-                <th className="px-3 py-2 font-medium">Price</th>
-                <th className="px-3 py-2 font-medium">Result</th>
-                <th className="px-3 py-2 font-medium">Units</th>
-                <th className="px-3 py-2 font-medium">CLV</th>
+                <th>Wk</th>
+                <th>Matchup</th>
+                <th>Line</th>
+                <th title="The odds / price (e.g. −110).">Odds</th>
+                <th>Result</th>
+                <th title="Profit in units. 1 unit = one standard bet.">Units</th>
+                <th title="Line value (CLV): positive = the line moved our way after we'd bet.">Line value</th>
               </tr>
             </thead>
             <tbody>
               {picks.map((p, i) => (
-                <tr key={i} className="border-t border-gray-800">
-                  <td className="px-3 py-1.5 text-gray-400">{p.week ?? "—"}</td>
-                  <td className="px-3 py-1.5 text-gray-200">
-                    {p.away} <span className="text-gray-600">@</span> {p.home}
+                <tr key={i}>
+                  <td className="text-[var(--text-muted)]">{p.week ?? "—"}</td>
+                  <td className="text-[var(--text)]">
+                    {p.away} <span className="text-[var(--text-dim)]">@</span> {p.home}
                   </td>
-                  <td className="px-3 py-1.5 text-gray-400">
-                    {p.line !== null ? `u${p.line}` : "—"}
+                  <td className="text-[var(--text-muted)]">
+                    {p.line !== null ? `under ${p.line}` : "—"}
                   </td>
-                  <td className="px-3 py-1.5 text-gray-500">{p.price ?? "—"}</td>
-                  <td className="px-3 py-1.5">
+                  <td className="text-[var(--text-dim)]">{p.price ?? "—"}</td>
+                  <td>
                     <span
                       style={{
                         color:
@@ -129,7 +146,7 @@ export default async function LedgerPage({
                     </span>
                   </td>
                   <td
-                    className="px-3 py-1.5"
+                    className="font-mono"
                     style={{
                       color:
                         p.units === null
@@ -141,7 +158,7 @@ export default async function LedgerPage({
                   >
                     {p.units !== null ? `${p.units >= 0 ? "+" : ""}${p.units.toFixed(2)}` : "—"}
                   </td>
-                  <td className="px-3 py-1.5 text-gray-400">
+                  <td className="font-mono text-[var(--text-muted)]">
                     {p.clv !== null ? `${p.clv >= 0 ? "+" : ""}${p.clv.toFixed(2)}` : "—"}
                   </td>
                 </tr>

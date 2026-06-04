@@ -61,6 +61,17 @@ export function scoreColor(score: number | null | undefined): string {
   return "#dc2626"; // over (red)
 }
 
+// Short tier label for the score, matching the scoreColor bands above.
+// Additive — purely for display; doesn't change any existing logic.
+export function scoreLabel(score: number | null | undefined): string {
+  if (score === null || score === undefined) return "no read";
+  if (score >= 60) return "Strong under";
+  if (score >= 53) return "Lean under";
+  if (score >= 47) return "Coin flip";
+  if (score >= 40) return "Lean over";
+  return "Over";
+}
+
 export type Chip = { label: string; value: string; hint: string };
 
 const has = (v: unknown): v is number => v !== null && v !== undefined;
@@ -75,49 +86,49 @@ export function buildChips(f: Factors): Chip[] {
     {
       label: "Pace",
       value: f.pace || "live ✦",
-      hint: "Combined seconds/play + plays/game (TeamRankings)",
+      hint: "How fast both teams play — seconds per play and plays per game.",
     },
     {
       label: "Weather",
       value: f.weather || "live ✦",
-      hint: "Temp / wind / precip near kickoff (Open-Meteo)",
+      hint: "Temperature, wind, and rain near kickoff.",
     },
     {
-      label: "Def eff",
+      label: "Defense",
       value: has(f.def_ppa) ? String(f.def_ppa) : "—",
-      hint: "Combined defensive PPA allowed (lower = stronger D)",
+      hint: "Points each team gives up per play this season (lower = tougher defense).",
     },
     {
-      label: "Off eff",
+      label: "Offense",
       value: has(f.off_ppa) ? String(f.off_ppa) : "—",
-      hint: "Combined offensive PPA (lower = less explosive)",
+      hint: "Points each team gains per play this season (lower = less explosive).",
     },
     {
-      label: "1H hist",
+      label: "1st-half pts",
       value: oneH,
-      hint: "Season-to-date 1H pts for/against (home · away)",
+      hint: "Average first-half points scored / allowed this season — home · away.",
     },
     {
-      label: "1H eff",
+      label: "1st-half offense",
       value: has(f.fh_off_epa_home)
         ? `${f.fh_off_epa_home!.toFixed(2)} · ${(f.fh_off_epa_away ?? 0).toFixed(2)}`
         : "—",
-      hint: "Season-to-date 1H offensive EPA/play (home · away), from play-by-play — the genuine 1H-scoring driver",
+      hint: "How efficient each offense is per play in the first half (home · away).",
     },
     {
-      label: "Spot",
+      label: "Rest & travel",
       value: f.spot || "—",
-      hint: "Rest days (home/away) · away travel · ~local kickoff (context only — not a model input)",
+      hint: "Days of rest, miles traveled, and kickoff time. Context only — not part of the pick.",
     },
     {
-      label: "Hist proj",
+      label: "History estimate",
       value: has(f.proj_1h_total) ? f.proj_1h_total!.toFixed(1) : "—",
-      hint: "Naive 1H projection from scoring history (context only — the model, not this, drives the score)",
+      hint: "A rough first-half total from past scoring. Context only — the model, not this, drives the score.",
     },
     {
-      label: "BV line",
+      label: "Our number",
       value: has(f.bv_line) ? f.bv_line!.toFixed(1) : "—",
-      hint: "The model's own calibrated 1H projection from the full feature set (pace, efficiency, weather, era). Large Vegas−BV gaps can be model blind spots, not edges — validated only by the CLV-by-gap table in Research.",
+      hint: "Our model's own predicted first-half total, from the full feature set (pace, efficiency, weather). It never looks at the Vegas line.",
     },
   ];
 }

@@ -29,13 +29,15 @@ export default async function MovementPage({
   const movement = selected !== null ? await getMovement(selected) : null;
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Line Movement</h1>
-          <p className="text-sm text-gray-500">1H total by book over time — {season}</p>
+          <h1 className="bv-page-title">Line Movement</h1>
+          <p className="bv-page-sub">
+            First-half line at each sportsbook over time — {season}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {games.length > 0 && selected !== null && (
             <GameSelect games={games} current={selected} />
           )}
@@ -44,29 +46,29 @@ export default async function MovementPage({
       </div>
 
       {!movement || movement.points.length === 0 ? (
-        <p className="rounded-lg border border-gray-800 bg-gray-900 p-6 text-sm text-gray-400">
-          No multi-snapshot games for {season} — movement charts appear once a line
-          has been polled more than once.
+        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
+          Nothing to chart for {season} yet — a movement chart appears once a game's
+          line has been checked more than once.
         </p>
       ) : (
         <div className="flex flex-col gap-5">
           <MovementChart points={movement.points} books={movement.books} />
 
-          <div className="overflow-x-auto rounded-xl border border-gray-800">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-900 text-left text-gray-400">
+          <div className="bv-table-wrap">
+            <table className="bv-table">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 font-medium">Captured</th>
-                  <th className="px-3 py-2 font-medium">Book</th>
-                  <th className="px-3 py-2 font-medium">Line</th>
+                  <th>When checked</th>
+                  <th>Sportsbook</th>
+                  <th>Line</th>
                 </tr>
               </thead>
               <tbody>
                 {movement.rows.map((r, i) => (
-                  <tr key={i} className="border-t border-gray-800">
-                    <td className="px-3 py-1.5 text-gray-400">{r.captured_at}</td>
-                    <td className="px-3 py-1.5 text-gray-300">{r.book}</td>
-                    <td className="px-3 py-1.5 text-gray-200">{r.line}</td>
+                  <tr key={i}>
+                    <td className="text-[var(--text-muted)]">{r.captured_at}</td>
+                    <td className="text-[var(--text-muted)]">{r.book}</td>
+                    <td className="font-mono text-[var(--text)]">{r.line}</td>
                   </tr>
                 ))}
               </tbody>

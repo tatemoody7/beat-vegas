@@ -17,6 +17,9 @@ include = ["beatvegas*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that run against the local Postgres sandbox (scripts/pg_sim.py)",
+]
 
 [tool.ruff]
 target-version = "py39"

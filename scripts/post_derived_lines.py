@@ -85,6 +85,34 @@ def build_prediction_rows(
     return out
 
 
+def write_derived_rows(session, fetched, gmeta, week, now) -> int:
+    """Build derived-1H rows and persist them, replacing any prior derived_lines
+    rows for the season's games (idempotent). Returns the number written."""
+    rows = build_prediction_rows(fetched, gmeta, week)
+
+    season_ids = list(gmeta.keys())
+    if season_ids:
+        (
+            session.query(Prediction)
+            .filter(
+                Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(season_ids)
+            )
+            .delete(synchronize_session=False)
+        )
+    for d in rows:
+        session.add(
+            Prediction(
+                game_id=d["game_id"],
+                model_version=MODEL_VERSION,
+                line_used=d["line_used"],
+                rank=d["rank"],
+                factors_json=d["factors_json"],
+                created_at=now,
+            )
+        )
+    return len(rows)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
@@ -103,33 +131,12 @@ def main() -> None:
             g.id: {"week": g.week, "home": g.home_team, "away": g.away_team}
             for g in s.query(Game).filter(Game.season == args.season).all()
         }
-        rows = build_prediction_rows(fetched, gmeta, args.week)
-
-        season_ids = list(gmeta.keys())
-        if season_ids:
-            (
-                s.query(Prediction)
-                .filter(
-                    Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(season_ids)
-                )
-                .delete(synchronize_session=False)
-            )
-        for d in rows:
-            s.add(
-                Prediction(
-                    game_id=d["game_id"],
-                    model_version=MODEL_VERSION,
-                    line_used=d["line_used"],
-                    rank=d["rank"],
-                    factors_json=d["factors_json"],
-                    created_at=now,
-                )
-            )
+        n = write_derived_rows(s, fetched, gmeta, args.week, now)
 
     print(
         f"source={source} season={args.season} "
         f"week={args.week if args.week is not None else 'all'} "
-        f"derived_rows_written={len(rows)}"
+        f"derived_rows_written={n}"
     )
 
 

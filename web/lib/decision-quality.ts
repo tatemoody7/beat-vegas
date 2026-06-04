@@ -176,7 +176,11 @@ export async function getDecisionQuality(
     ledgerRows = await prisma.$queryRaw`
       SELECT factor, post_mean, n FROM factor_ledger
     `;
-  } catch {
+  } catch (err) {
+    // factor_ledger may not exist yet (created lazily by the Phase-3 Python jobs).
+    // Degrade to no ledger, but surface real DB problems (connection/permission/
+    // typo) instead of silently masquerading them as "no ledger".
+    console.warn("getDecisionQuality: factor_ledger unavailable, degrading", err);
     ledgerRows = [];
   }
   const ledger: LedgerRates = {};

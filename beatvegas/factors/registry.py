@@ -12,8 +12,8 @@ append the play-by-play-derived 1H-specific factors here; nothing else changes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, replace
+from typing import List, Optional
 
 import pandas as pd
 

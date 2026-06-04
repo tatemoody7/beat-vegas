@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 
 import pandas as pd
+
 from beatvegas.etl.game_records import grade_records, outcome_of, record_fields, snapshot_slate
 
 

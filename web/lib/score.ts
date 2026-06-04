@@ -61,6 +61,17 @@ export function scoreColor(score: number | null | undefined): string {
   return "#dc2626"; // over (red)
 }
 
+// Short tier label for the score, matching the scoreColor bands above.
+// Additive — purely for display; doesn't change any existing logic.
+export function scoreLabel(score: number | null | undefined): string {
+  if (score === null || score === undefined) return "no read";
+  if (score >= 60) return "Strong under";
+  if (score >= 53) return "Lean under";
+  if (score >= 47) return "Coin flip";
+  if (score >= 40) return "Lean over";
+  return "Over";
+}
+
 export type Chip = { label: string; value: string; hint: string };
 
 const has = (v: unknown): v is number => v !== null && v !== undefined;

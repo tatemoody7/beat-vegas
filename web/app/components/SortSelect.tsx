@@ -20,13 +20,9 @@ export default function SortSelect({ current }: { current: string }) {
   }
 
   return (
-    <label className="flex items-center gap-2 text-sm text-gray-400">
+    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
       Sort
-      <select
-        value={current}
-        onChange={onChange}
-        className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-gray-100 focus:border-gray-500 focus:outline-none"
-      >
+      <select value={current} onChange={onChange} className="bv-select">
         {SORTS.map((s) => (
           <option key={s.value} value={s.value}>
             {s.label}

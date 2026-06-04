@@ -1,19 +1,307 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712; /* gray-950 */
-  --foreground: #ededed;
+  /* Canvas — deep navy, layered for elevation */
+  --bg: #070b16;
+  --bg-2: #0a0f1e;
+  --surface: #111a2e;
+  --surface-2: #16213a;
+  --border: #243049; /* cyan-tinted slate */
+  --border-soft: #1b2336;
+
+  /* Text */
+  --text: #eef2f9;
+  --text-muted: #97a3bd;
+  --text-dim: #5e6c87;
+
+  /* Brand accent — electric cyan/blue (never used for outcomes) */
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --accent-soft: rgba(56, 189, 248, 0.12);
+
+  /* Outcome semantics — mirror web/lib/score.ts scoreColor (do not change) */
+  --under-strong: #16a34a; /* green  */
+  --under-lean: #65a30d;   /* lime   */
+  --neutral: #ca8a04;      /* amber  */
+  --over-lean: #ea580c;    /* orange */
+  --over: #dc2626;         /* red    */
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5),
+    0 16px 40px -16px rgba(2, 132, 199, 0.35);
+
+  /* Compat with any legacy refs */
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-bv-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  /* Atmosphere: faint cyan glow up top + subtle grid for depth, not flat */
+  background-image:
+    radial-gradient(
+      1200px 600px at 50% -10%,
+      rgba(56, 189, 248, 0.07),
+      transparent 70%
+    ),
+    linear-gradient(rgba(36, 48, 73, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 48, 73, 0.18) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-attachment: fixed;
+}
+
+/* Tabular figures everywhere numbers matter (prevents layout shift) */
+.tnum,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Global focus ring — cyan, never removed */
+:where(a, button, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@layer components {
+  /* Elevated surface card */
+  .bv-card {
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, var(--surface), var(--bg-2));
+    box-shadow: var(--shadow-card);
+    transition:
+      transform 0.18s ease-out,
+      border-color 0.18s ease-out,
+      box-shadow 0.18s ease-out;
+  }
+  .bv-card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.45);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Compact stat block: dim label over a big mono value */
+  .bv-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .bv-stat-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .bv-stat-value {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  /* Data pill */
+  .bv-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 100%;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    padding: 0.2rem 0.65rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .bv-pill-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .bv-pill-value {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Toolbar select (season / sort) */
+  .bv-select {
+    appearance: none;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 0.4rem 2rem 0.4rem 0.7rem;
+    font-size: 0.85rem;
+    background-image: linear-gradient(
+        45deg,
+        transparent 50%,
+        var(--text-muted) 50%
+      ),
+      linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 16px) 52%,
+      calc(100% - 11px) 52%;
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .bv-select:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+  }
+
+  /* Page heading (shared) */
+  .bv-page-title {
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-size: 1.875rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+  .bv-page-sub {
+    margin-top: 0.35rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  /* Data table */
+  .bv-table-wrap {
+    overflow-x: auto;
+    border-radius: 0.85rem;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, var(--surface), var(--bg-2));
+    box-shadow: var(--shadow-card);
+  }
+  .bv-table {
+    width: 100%;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+  }
+  .bv-table thead {
+    background: var(--surface-2);
+  }
+  .bv-table th {
+    text-align: left;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .bv-table td {
+    padding: 0.45rem 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .bv-table tbody tr {
+    border-top: 1px solid var(--border-soft);
+  }
+  .bv-table tbody tr:hover {
+    background: rgba(56, 189, 248, 0.04);
+  }
+
+  /* Form input */
+  .bv-input {
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    padding: 0.45rem 0.6rem;
+    font-size: 0.875rem;
+    color: var(--text);
+    transition: border-color 0.15s ease;
+  }
+  .bv-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .bv-input::placeholder {
+    color: var(--text-dim);
+  }
+
+  /* Primary action button — brand cyan (never green; green = outcome) */
+  .bv-btn {
+    border-radius: 0.5rem;
+    background: var(--accent-strong);
+    color: #04121f;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.5rem 1.1rem;
+    transition: background 0.15s ease;
+  }
+  .bv-btn:hover {
+    background: var(--accent);
+  }
+  .bv-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Nav link + active state */
+  .bv-nav-link {
+    position: relative;
+    padding: 0.35rem 0.1rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+  .bv-nav-link:hover {
+    color: var(--text);
+  }
+  .bv-nav-link[data-active="true"] {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .bv-nav-link[data-active="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.85rem;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+  }
+}
+
+/* Respect reduced-motion: kill transforms/transitions */
+@media (prefers-reduced-motion: reduce) {
+  .bv-card,
+  .bv-card-interactive:hover {
+    transition: none;
+    transform: none;
+  }
+  * {
+    scroll-behavior: auto;
+  }
 }

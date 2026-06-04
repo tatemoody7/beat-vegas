@@ -23,15 +23,15 @@ export default async function LineStudyPage({
   const { buckets, anyReal } = await getLineStudy(season, minGames);
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Line Study</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="bv-page-title">Line Study</h1>
+          <p className="bv-page-sub">
             Which opening first-half lines hit the under most often — {season}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <MinGamesSelect current={minGames} />
           {seasons.length > 0 && (
             <SeasonSelect seasons={seasons} current={season} />
@@ -39,9 +39,9 @@ export default async function LineStudyPage({
         </div>
       </div>
 
-      <p className="mb-4 text-xs text-gray-500">
+      <p className="mb-4 text-xs text-[var(--text-dim)]">
         Grouped by{" "}
-        <span className="text-gray-300">
+        <span className="text-[var(--text-muted)]">
           {anyReal ? "real opening lines" : "estimated lines (0.52 × full-game total)"}
         </span>
         . You need to win {BREAKEVEN_PCT}% to break even at −110.
@@ -52,7 +52,7 @@ export default async function LineStudyPage({
       </p>
 
       {buckets.length === 0 ? (
-        <p className="rounded-lg border border-gray-800 bg-gray-900 p-6 text-sm text-gray-400">
+        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
           No line buckets with ≥ {minGames} games for {season}.
         </p>
       ) : (

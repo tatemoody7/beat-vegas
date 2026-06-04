@@ -13,7 +13,7 @@ import type { MovementPoint } from "@/lib/movement";
 
 // One color-coded line per book. Books are sampled at different times, so
 // connectNulls bridges the per-book gaps (mirrors Streamlit's line chart).
-const COLORS = ["#60a5fa", "#f59e0b", "#34d399", "#f472b6", "#a78bfa", "#f87171"];
+const COLORS = ["#38bdf8", "#f59e0b", "#34d399", "#f472b6", "#a78bfa", "#fb7185"];
 
 export default function MovementChart({
   points,
@@ -29,35 +29,35 @@ export default function MovementChart({
   const pad = 0.5;
 
   return (
-    <div className="h-72 w-full rounded-xl border border-gray-800 bg-gray-950 p-3">
+    <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-          <CartesianGrid stroke="#1f2937" vertical={false} />
+          <CartesianGrid stroke="#1b2336" vertical={false} />
           <XAxis
             dataKey="t"
-            tick={{ fill: "#9ca3af", fontSize: 11 }}
+            tick={{ fill: "#97a3bd", fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: "#374151" }}
+            axisLine={{ stroke: "#243049" }}
           />
           <YAxis
             domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]}
-            tick={{ fill: "#9ca3af", fontSize: 11 }}
+            tick={{ fill: "#97a3bd", fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: "#374151" }}
+            axisLine={{ stroke: "#243049" }}
             label={{
               value: "1st-half line",
               angle: -90,
               position: "insideLeft",
-              fill: "#9ca3af",
+              fill: "#97a3bd",
               fontSize: 11,
             }}
           />
           <Tooltip
             contentStyle={{
-              background: "#0a0a0a",
-              border: "1px solid #374151",
+              background: "#0a0f1e",
+              border: "1px solid #243049",
               borderRadius: 8,
-              color: "#e5e7eb",
+              color: "#eef2f9",
               fontSize: 12,
             }}
           />
@@ -76,7 +76,7 @@ export default function MovementChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex flex-wrap gap-3 px-1 text-xs text-gray-400">
+      <div className="mt-2 flex flex-wrap gap-3 px-1 text-xs text-[var(--text-muted)]">
         {books.map((b, i) => (
           <span key={b} className="flex items-center gap-1.5">
             <span

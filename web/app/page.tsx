@@ -32,18 +32,43 @@ export default async function Home({
   const derivedBoard =
     rows.length > 0 && rows.every((r) => r.factors.line_kind === "derived_fg");
 
+  // Count of games showing a clear edge (not derived, significant gap).
+  const edgeCount = rows.filter(
+    (r) =>
+      r.factors.line_kind !== "derived_fg" &&
+      r.liveGapZ !== null &&
+      Math.abs(r.liveGapZ) >= 1 &&
+      (r.liveGap ?? 0) > 0,
+  ).length;
+
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Opportunities</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight text-[var(--text)]">
+            Opportunities
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             {derivedBoard
               ? "Reference first-half lines from the posted full-game totals — not model picks"
               : "First-half games we lean under, best first · under score 0–100 (50 = coin flip)"}
           </p>
+          {!derivedBoard && rows.length > 0 && (
+            <p className="mt-2 text-sm text-[var(--text-dim)]">
+              <span className="font-mono font-semibold text-[var(--text)]">
+                {rows.length}
+              </span>{" "}
+              games
+              <span className="mx-2 text-[var(--border)]">·</span>
+              <span className="font-mono font-semibold text-[var(--accent)]">
+                {edgeCount}
+              </span>{" "}
+              with a clear edge
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="bv-toolbar flex flex-wrap items-center gap-3">
+
           <SortSelect current={sort} />
           {seasons.length > 0 && (
             <SeasonSelect seasons={seasons} current={season} />
@@ -52,14 +77,14 @@ export default async function Home({
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-gray-800 bg-gray-900 p-6 text-sm text-gray-400">
+        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
           No predictions for {season}. Score a slate
-          (<code className="text-gray-300">scripts/weekly_update.py</code>) or
-          point <code className="text-gray-300">DATABASE_URL</code> at a DB that
+          (<code className="text-[var(--text)]">scripts/weekly_update.py</code>) or
+          point <code className="text-[var(--text)]">DATABASE_URL</code> at a DB that
           has them.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3.5">
           {rows.map((row) => (
             <OpportunityCard key={row.gameId} row={row} />
           ))}

@@ -18,3 +18,7 @@ node_modules/
 .pytest_cache/
 config.yaml
 .DS_Store
+
+# Local agent tooling (not part of the project)
+.claude/
+.superpowers/

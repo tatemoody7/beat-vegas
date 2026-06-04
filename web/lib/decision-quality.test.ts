@@ -21,3 +21,20 @@ test("beatMyModel splits on edge sign and computes hit% excluding pushes", () =>
   // push excluded from decided, so 1 decided / 1 win.
   expect(r.against).toEqual({ n: 2, wins: 1, decided: 1, hitPct: 100 });
 });
+
+import { clvSummary } from "@/lib/decision-quality";
+
+test("clvSummary: avg, positive share, and hit% by clv sign", () => {
+  const picks: DqPickRow[] = [
+    row({ clv: 1.0, result: "under" }),  // +clv win
+    row({ clv: 0.5, result: "over" }),   // +clv loss
+    row({ clv: -1.0, result: "under" }), // -clv win
+    row({ clv: null, result: "under" }), // ignored for clv stats
+  ];
+  const r = clvSummary(picks);
+  expect(r.n).toBe(3);                       // non-null clv only
+  expect(r.avg).toBeCloseTo((1.0 + 0.5 - 1.0) / 3);
+  expect(r.pctPositive).toBeCloseTo((100 * 2) / 3);
+  expect(r.posClvHitPct).toBe(50);          // 2 decided +clv, 1 win
+  expect(r.negClvHitPct).toBe(100);         // 1 decided -clv, 1 win
+});

@@ -41,3 +41,27 @@ export function beatMyModel(picks: DqPickRow[]): {
   const against = picks.filter((p) => (edge(p) ?? -1) <= 0);
   return { agreed: tally(agreed), against: tally(against) };
 }
+
+export function clvSummary(picks: DqPickRow[]): {
+  n: number;
+  avg: number | null;
+  pctPositive: number | null;
+  posClvHitPct: number | null;
+  negClvHitPct: number | null;
+} {
+  const withClv = picks.filter((p) => p.clv != null);
+  const n = withClv.length;
+  const avg = n
+    ? withClv.reduce((a, p) => a + (p.clv as number), 0) / n
+    : null;
+  const positive = withClv.filter((p) => (p.clv as number) > 0);
+  const pos = tally(positive);
+  const neg = tally(withClv.filter((p) => (p.clv as number) <= 0));
+  return {
+    n,
+    avg,
+    pctPositive: n ? (100 * positive.length) / n : null,
+    posClvHitPct: pos.hitPct,
+    negClvHitPct: neg.hitPct,
+  };
+}

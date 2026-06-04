@@ -47,7 +47,9 @@ function record(
     record: `${wins}-${losses}${pushes ? `-${pushes}P` : ""}`,
     hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
     units: signed(unitsSum),
-    clv: clvs.length ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length) : "—",
+    clv: clvs.length
+      ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
+      : "—",
   };
 }
 
@@ -99,7 +101,9 @@ export async function getLedger(season: number): Promise<Ledger> {
     const wins = graded.filter((p) => p.result === "under").length;
     const pushes = graded.filter((p) => p.result === "push").length;
     const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
-    const clvs = graded.filter((p) => p.clv !== null).map((p) => p.clv as number);
+    const clvs = graded
+      .filter((p) => p.clv !== null)
+      .map((p) => p.clv as number);
     you = record(wins, graded.length - pushes, pushes, unitsSum, clvs);
   }
 
@@ -116,7 +120,8 @@ export async function getLedger(season: number): Promise<Ledger> {
   }));
   // pending first, then by week
   picks.sort(
-    (a, b) => Number(a.graded) - Number(b.graded) || (a.week ?? 0) - (b.week ?? 0),
+    (a, b) =>
+      Number(a.graded) - Number(b.graded) || (a.week ?? 0) - (b.week ?? 0),
   );
 
   return { market, model, you, picks };

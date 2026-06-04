@@ -1,4 +1,5 @@
 """SQLAlchemy schema for Beat Vegas. Classic Column style for broad compatibility."""
+
 from __future__ import annotations
 
 from sqlalchemy import (
@@ -11,38 +12,38 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 
 class Team(Base):
     __tablename__ = "teams"
-    id = Column(Integer, primary_key=True)          # CFBD team id
+    id = Column(Integer, primary_key=True)  # CFBD team id
     school = Column(String, nullable=False, index=True)
     conference = Column(String)
 
 
 class Venue(Base):
     __tablename__ = "venues"
-    id = Column(Integer, primary_key=True)          # CFBD venue id
+    id = Column(Integer, primary_key=True)  # CFBD venue id
     name = Column(String)
     city = Column(String)
     state = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
     dome = Column(Boolean)
-    elevation = Column(Float)            # meters (CFBD /venues)
-    grass = Column(Boolean)              # natural grass surface (vs turf)
+    elevation = Column(Float)  # meters (CFBD /venues)
+    grass = Column(Boolean)  # natural grass surface (vs turf)
     capacity = Column(Integer)
 
 
 class Game(Base):
     __tablename__ = "games"
-    id = Column(Integer, primary_key=True)          # CFBD game id
+    id = Column(Integer, primary_key=True)  # CFBD game id
     season = Column(Integer, nullable=False, index=True)
     week = Column(Integer, nullable=False, index=True)
-    season_type = Column(String)                    # regular / postseason
+    season_type = Column(String)  # regular / postseason
     start_date = Column(DateTime)
     neutral_site = Column(Boolean)
     venue_id = Column(Integer, ForeignKey("venues.id"))
@@ -60,7 +61,7 @@ class Game(Base):
     home_first_half_points = Column(Integer)
     away_first_half_points = Column(Integer)
     first_half_total = Column(Integer)
-    first_half_source = Column(String)              # 'pbp' | 'linescores'
+    first_half_source = Column(String)  # 'pbp' | 'linescores'
 
     # Full-game closing total from CFBD /lines (consensus/best available).
     full_game_total = Column(Float)
@@ -75,6 +76,7 @@ class Game(Base):
 class TeamWeekFeature(Base):
     """Season-to-date / lagged team metrics, keyed by season+week+team.
     Built leak-free: only data available before that week's kickoff."""
+
     __tablename__ = "team_week_features"
     id = Column(Integer, primary_key=True, autoincrement=True)
     season = Column(Integer, nullable=False, index=True)
@@ -98,9 +100,7 @@ class TeamWeekFeature(Base):
     sp_defense = Column(Float)
     run_rate = Column(Float)
 
-    __table_args__ = (
-        UniqueConstraint("season", "week", "team", name="uq_team_week"),
-    )
+    __table_args__ = (UniqueConstraint("season", "week", "team", name="uq_team_week"),)
 
 
 class FhTeamGame(Base):
@@ -112,6 +112,7 @@ class FhTeamGame(Base):
     where def_team=T) expanding means, exactly like the existing fh_pf/fh_pa.
     Computed from play-by-play (cfbfastR parquet 2015-21, CFBD /plays 2022+);
     raw plays are processed transiently and not stored."""
+
     __tablename__ = "fh_team_game"
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
@@ -120,42 +121,39 @@ class FhTeamGame(Base):
     off_team = Column(String, index=True)
     def_team = Column(String, index=True)
     is_home = Column(Boolean)
-    source = Column(String)                  # 'cfbfastr' | 'cfbd'
+    source = Column(String)  # 'cfbfastr' | 'cfbd'
 
-    n_plays = Column(Integer)                # 1H offensive plays (pace proxy)
-    epa = Column(Float)                      # mean EPA/play
-    success = Column(Float)                  # mean(EPA>0)
-    explosive = Column(Float)                # mean(yards>=15)
-    pass_rate = Column(Float)                # mean(is_pass)
-    early_success = Column(Float)            # success on 1st/2nd down
-    third_conv = Column(Float)               # 3rd-down conversion rate
-    havoc_suffered = Column(Float)           # (TFL+PBU+turnover)/play against this O
-    turnovers = Column(Float)                # 1H giveaways (count)
-    opening_score = Column(Integer)          # opening drive scored (1/0)
-    opening_3out = Column(Integer)           # opening drive <=3 plays, no score (1/0)
-    redzone_td = Column(Float)               # 1H red-zone drives scoring a TD
-    fourth_go = Column(Float)                # 4th-down go-for-it rate
+    n_plays = Column(Integer)  # 1H offensive plays (pace proxy)
+    epa = Column(Float)  # mean EPA/play
+    success = Column(Float)  # mean(EPA>0)
+    explosive = Column(Float)  # mean(yards>=15)
+    pass_rate = Column(Float)  # mean(is_pass)
+    early_success = Column(Float)  # success on 1st/2nd down
+    third_conv = Column(Float)  # 3rd-down conversion rate
+    havoc_suffered = Column(Float)  # (TFL+PBU+turnover)/play against this O
+    turnovers = Column(Float)  # 1H giveaways (count)
+    opening_score = Column(Integer)  # opening drive scored (1/0)
+    opening_3out = Column(Integer)  # opening drive <=3 plays, no score (1/0)
+    redzone_td = Column(Float)  # 1H red-zone drives scoring a TD
+    fourth_go = Column(Float)  # 4th-down go-for-it rate
 
-    __table_args__ = (
-        UniqueConstraint("game_id", "off_team", name="uq_fh_team_game"),
-    )
+    __table_args__ = (UniqueConstraint("game_id", "off_team", name="uq_fh_team_game"),)
 
 
 class TeamTempo(Base):
     """Pace metrics scraped from TeamRankings, as-of a date (leak-free)."""
+
     __tablename__ = "team_tempo"
     id = Column(Integer, primary_key=True, autoincrement=True)
     season = Column(Integer, index=True)
     week = Column(Integer, index=True)
-    team = Column(String, index=True)            # mapped to CFBD school name
+    team = Column(String, index=True)  # mapped to CFBD school name
     seconds_per_play = Column(Float)
     plays_per_game = Column(Float)
     as_of_date = Column(String)
     captured_at = Column(DateTime)
 
-    __table_args__ = (
-        UniqueConstraint("season", "week", "team", name="uq_tempo_week"),
-    )
+    __table_args__ = (UniqueConstraint("season", "week", "team", name="uq_tempo_week"),)
 
 
 class Weather(Base):
@@ -170,13 +168,14 @@ class Weather(Base):
 class OddsSnapshot(Base):
     """One row per (game, book, market) observation. Repeated polling builds the
     full movement history; the earliest captured_at = posting time."""
+
     __tablename__ = "odds_snapshots"
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     book = Column(String)
-    market = Column(String)                         # '1H_total' | 'full_game_total'
-    line = Column(Float)                            # the total for this market
-    spread = Column(Float)                          # home-relative spread (full_game rows)
+    market = Column(String)  # '1H_total' | 'full_game_total'
+    line = Column(Float)  # the total for this market
+    spread = Column(Float)  # home-relative spread (full_game rows)
     over_price = Column(Integer)
     under_price = Column(Integer)
     captured_at = Column(DateTime, index=True)
@@ -188,16 +187,16 @@ class Prediction(Base):
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     model_version = Column(String, index=True)
     under_probability = Column(Float)
-    under_score = Column(Integer)             # 0-100 display score
+    under_score = Column(Integer)  # 0-100 display score
     projected_first_half_total = Column(Float)
-    bv_line = Column(Float)                   # calibrated independent 1H projection
-    bv_gap = Column(Float)                     # line_used - bv_line (under direction)
-    bv_lo = Column(Float)                      # 80% prediction band lower bound
-    bv_hi = Column(Float)                      # 80% prediction band upper bound
-    bv_sigma = Column(Float)                   # residual std (gap noise scale)
+    bv_line = Column(Float)  # calibrated independent 1H projection
+    bv_gap = Column(Float)  # line_used - bv_line (under direction)
+    bv_lo = Column(Float)  # 80% prediction band lower bound
+    bv_hi = Column(Float)  # 80% prediction band upper bound
+    bv_sigma = Column(Float)  # residual std (gap noise scale)
     line_used = Column(Float)
     rank = Column(Integer)
-    factors_json = Column(String)             # per-game factor payload for cards
+    factors_json = Column(String)  # per-game factor payload for cards
     created_at = Column(DateTime)
 
 
@@ -208,16 +207,17 @@ class Result(Base):
     model_version = Column(String, index=True)
     actual_first_half_total = Column(Integer)
     line_used = Column(Float)
-    line_kind = Column(String)                      # 'proxy' | 'real'
+    line_kind = Column(String)  # 'proxy' | 'real'
     under_hit = Column(Boolean)
     closing_line = Column(Float)
-    closing_captured_at = Column(DateTime)          # when the closing snapshot landed
+    closing_captured_at = Column(DateTime)  # when the closing snapshot landed
     clv = Column(Float)
     units = Column(Float)
 
 
 class ManualPick(Base):
     """Your own first-half bets, logged for grading vs the real result + CLV."""
+
     __tablename__ = "manual_picks"
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
@@ -225,13 +225,13 @@ class ManualPick(Base):
     week = Column(Integer)
     home_team = Column(String)
     away_team = Column(String)
-    side = Column(String, default="under")      # under (this project's market)
-    line = Column(Float)                         # the 1H total you bet
+    side = Column(String, default="under")  # under (this project's market)
+    line = Column(Float)  # the 1H total you bet
     price = Column(Integer, default=-110)
     stake = Column(Float, default=1.0)
     book = Column(String)
     placed_at = Column(DateTime)
-    note = Column(String)                        # your reason — for later review
+    note = Column(String)  # your reason — for later review
 
     # Snapshot of the model's read at log time (frozen; survives re-scoring).
     model_score_at_pick = Column(Integer)
@@ -240,7 +240,7 @@ class ManualPick(Base):
     # Filled by `pick.py grade`.
     graded = Column(Boolean, default=False)
     actual_first_half_total = Column(Integer)
-    result = Column(String)                      # under / over / push
+    result = Column(String)  # under / over / push
     units = Column(Float)
     closing_line = Column(Float)
     clv = Column(Float)
@@ -250,10 +250,11 @@ class BvAdjustment(Base):
     """A manual nudge to the BV line for one game (e.g. a confirmed QB-out the
     model can't see). Display-only: shifts the shown BV line + gap, clearly
     labeled. Latest row per game_id wins."""
+
     __tablename__ = "bv_adjustments"
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
-    delta_pts = Column(Float)                    # added to bv_line (− = lower scoring)
+    delta_pts = Column(Float)  # added to bv_line (− = lower scoring)
     reason = Column(String)
     created_at = Column(DateTime)
 
@@ -263,22 +264,23 @@ class FactorScore(Base):
     harness (scripts/rank_factors.py). `metrics_json` holds the full diagnostic
     payload; the scalar columns are denormalized so the UI/queries can sort
     without parsing JSON. Stored, never a model input."""
+
     __tablename__ = "factor_scores"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(String, index=True)          # groups one rank_factors run
-    kind = Column(String)                        # 'univariate' | 'combo'
-    factor = Column(String, index=True)          # column name, or 'a + b' combo key
+    run_id = Column(String, index=True)  # groups one rank_factors run
+    kind = Column(String)  # 'univariate' | 'combo'
+    factor = Column(String, index=True)  # column name, or 'a + b' combo key
     family = Column(String)
     leak_free = Column(Boolean)
-    market = Column(Boolean)                     # derived from a Vegas number
-    forward_only = Column(Boolean)               # can't be backtested historically
-    n = Column(Integer)                          # out-of-sample sample size
-    top_under_pct = Column(Float)                # under% in the top-fraction selection
-    top_roi = Column(Float)                      # ROI on that selection (-110)
-    auc = Column(Float)                          # walk-forward single/multi-feature AUC
-    corr = Column(Float)                         # Pearson corr(factor, under) OOS
-    perm_importance = Column(Float)              # permutation importance in full GBM
-    stability_std = Column(Float)                # std of per-season top under%
+    market = Column(Boolean)  # derived from a Vegas number
+    forward_only = Column(Boolean)  # can't be backtested historically
+    n = Column(Integer)  # out-of-sample sample size
+    top_under_pct = Column(Float)  # under% in the top-fraction selection
+    top_roi = Column(Float)  # ROI on that selection (-110)
+    auc = Column(Float)  # walk-forward single/multi-feature AUC
+    corr = Column(Float)  # Pearson corr(factor, under) OOS
+    perm_importance = Column(Float)  # permutation importance in full GBM
+    stability_std = Column(Float)  # std of per-season top under%
     rank = Column(Integer)
     metrics_json = Column(String)
     created_at = Column(DateTime)

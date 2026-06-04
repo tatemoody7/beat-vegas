@@ -1,7 +1,15 @@
 from beatvegas.sources.teamrankings import _expand, map_to_cfbd
 
-CFBD = ["South Florida", "Ohio State", "Michigan State", "Massachusetts",
-        "Central Michigan", "Appalachian State", "Miami", "Alabama"]
+CFBD = [
+    "South Florida",
+    "Ohio State",
+    "Michigan State",
+    "Massachusetts",
+    "Central Michigan",
+    "Appalachian State",
+    "Miami",
+    "Alabama",
+]
 
 
 def test_expand_abbreviations():

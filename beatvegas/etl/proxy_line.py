@@ -6,6 +6,7 @@ where a *fair* 1H line sits. Books typically price 1H totals around 0.50-0.52 of
 the full game; if the realized ratio is meaningfully below that, 1H unders carry
 systematic value. This module quantifies that ratio and fits a simple model.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,8 +17,8 @@ import numpy as np
 import pandas as pd
 
 from ..config import REPO_ROOT
-from ..db.store import session_scope
 from ..db.models import Game
+from ..db.store import session_scope
 
 # Central estimate when we have no spread / no fitted curve. The research band for
 # the CFB 1H share is ~0.50-0.53 (clamp wider to absorb extreme favorites).
@@ -33,9 +34,17 @@ def load_games_frame(seasons: Optional[range] = None) -> pd.DataFrame:
     """Games that have BOTH a realized 1H total and a full-game total."""
     with session_scope() as s:
         q = s.query(
-            Game.id, Game.season, Game.week, Game.home_team, Game.away_team,
-            Game.first_half_total, Game.full_game_total, Game.home_points,
-            Game.away_points, Game.neutral_site, Game.spread,
+            Game.id,
+            Game.season,
+            Game.week,
+            Game.home_team,
+            Game.away_team,
+            Game.first_half_total,
+            Game.full_game_total,
+            Game.home_points,
+            Game.away_points,
+            Game.neutral_site,
+            Game.spread,
         ).filter(
             Game.first_half_total.isnot(None),
             Game.full_game_total.isnot(None),
@@ -43,10 +52,22 @@ def load_games_frame(seasons: Optional[range] = None) -> pd.DataFrame:
         )
         if seasons is not None:
             q = q.filter(Game.season.in_(list(seasons)))
-        df = pd.DataFrame(q.all(), columns=[
-            "id", "season", "week", "home_team", "away_team", "first_half_total",
-            "full_game_total", "home_points", "away_points", "neutral_site", "spread",
-        ])
+        df = pd.DataFrame(
+            q.all(),
+            columns=[
+                "id",
+                "season",
+                "week",
+                "home_team",
+                "away_team",
+                "first_half_total",
+                "full_game_total",
+                "home_points",
+                "away_points",
+                "neutral_site",
+                "spread",
+            ],
+        )
     df["full_game_actual"] = df["home_points"] + df["away_points"]
     df["fh_ratio"] = df["first_half_total"] / df["full_game_total"]
     return df
@@ -82,8 +103,7 @@ def _load_share_coeffs() -> Optional[Dict[str, float]]:
     return None
 
 
-def fh_share(spread: Optional[float] = None,
-             coeffs: Optional[Dict[str, float]] = None) -> float:
+def fh_share(spread: Optional[float] = None, coeffs: Optional[Dict[str, float]] = None) -> float:
     """Fraction of the full-game total expected in the 1H, as a function of the
     spread magnitude (favorites score relatively more early). Falls back to the
     flat DEFAULT_SHARE when no spread or no fitted curve is available."""
@@ -95,9 +115,12 @@ def fh_share(spread: Optional[float] = None,
     return min(max(share, SHARE_CLAMP[0]), SHARE_CLAMP[1])
 
 
-def proxy_total(full_game_total: float, spread: Optional[float] = None,
-                ratio: Optional[float] = None,
-                coeffs: Optional[Dict[str, float]] = None) -> float:
+def proxy_total(
+    full_game_total: float,
+    spread: Optional[float] = None,
+    ratio: Optional[float] = None,
+    coeffs: Optional[Dict[str, float]] = None,
+) -> float:
     """The synthetic 1H line we grade against (rounded to the nearest half-point,
     matching how books post totals).
 
@@ -107,8 +130,9 @@ def proxy_total(full_game_total: float, spread: Optional[float] = None,
     return round(full_game_total * r * 2) / 2
 
 
-def fit_share(full_total: np.ndarray, spread: np.ndarray,
-              first_half_total: np.ndarray) -> Dict[str, float]:
+def fit_share(
+    full_total: np.ndarray, spread: np.ndarray, first_half_total: np.ndarray
+) -> Dict[str, float]:
     """Least-squares fit of realized 1H share ~ a + b*|spread|. Pure / testable."""
     share = np.asarray(first_half_total, float) / np.asarray(full_total, float)
     x = np.abs(np.asarray(spread, float))

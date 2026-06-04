@@ -16,7 +16,8 @@ export type LineBucket = {
 };
 
 const roundHalf = (x: number) => Math.round(x * 2) / 2;
-const proxyTotal = (fullTotal: number, ratio = 0.52) => roundHalf(fullTotal * ratio);
+const proxyTotal = (fullTotal: number, ratio = 0.52) =>
+  roundHalf(fullTotal * ratio);
 
 function median(xs: number[]): number | null {
   if (xs.length === 0) return null;
@@ -59,7 +60,9 @@ async function openByGame(season: number): Promise<Map<number, number>> {
   for (const [gid, books] of byGame) {
     const firsts: number[] = [];
     for (const caps of books.values()) {
-      caps.sort((a, b) => (a.captured_at ?? "").localeCompare(b.captured_at ?? ""));
+      caps.sort((a, b) =>
+        (a.captured_at ?? "").localeCompare(b.captured_at ?? ""),
+      );
       firsts.push(Number(caps[0].line));
     }
     const m = median(firsts);
@@ -87,7 +90,11 @@ export async function getLineStudy(
     const gid = Number(g.id);
     const real = opens.get(gid);
     return real !== undefined
-      ? { fh: Number(g.first_half_total), line: roundHalf(real), source: "real_open" }
+      ? {
+          fh: Number(g.first_half_total),
+          line: roundHalf(real),
+          source: "real_open",
+        }
       : {
           fh: Number(g.first_half_total),
           line: proxyTotal(g.full_game_total),
@@ -109,7 +116,8 @@ export async function getLineStudy(
     const under = rows.filter((r) => r.fh < r.line).length;
     const push = rows.filter((r) => r.fh === r.line).length;
     const decisive = games_n - push;
-    const under_pct = decisive > 0 ? Math.round((1000 * under) / decisive) / 10 : 0;
+    const under_pct =
+      decisive > 0 ? Math.round((1000 * under) / decisive) / 10 : 0;
     const real = rows.filter((r) => r.source === "real_open").length;
     const line_source = real > games_n / 2 ? "real_open" : "proxy";
     buckets.push({ line, games: games_n, under, push, under_pct, line_source });

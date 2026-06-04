@@ -8,11 +8,11 @@ stores predictions with the current **opening consensus** line as `line_used`
     python scripts/weekly_update.py                 # current season, auto week
     python scripts/weekly_update.py --season 2025 --week 8
 """
+
 from __future__ import annotations
 
 import argparse
 import statistics
-from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
 from beatvegas.db.models import Game, OddsSnapshot
@@ -42,8 +42,7 @@ def _full_game_opener(snaps: list) -> Tuple[Optional[float], Optional[float]]:
     return open_total, open_spread
 
 
-def opening_line_lookup(season: int, week: int
-                        ) -> Tuple[Dict[int, float], Dict[int, str]]:
+def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[int, str]]:
     """Per-game ranking line + provenance.
 
     Prefers an OBSERVED retail 1H opener (kind 'observed_1h'); else DERIVES a 1H
@@ -53,18 +52,27 @@ def opening_line_lookup(season: int, week: int
     lines: Dict[int, float] = {}
     kinds: Dict[int, str] = {}
     with session_scope() as s:
-        rows = (s.query(OddsSnapshot.game_id, OddsSnapshot.book,
-                        OddsSnapshot.line, OddsSnapshot.spread,
-                        OddsSnapshot.market, OddsSnapshot.captured_at)
-                .join(Game, Game.id == OddsSnapshot.game_id)
-                .filter(Game.season == season, Game.week == week,
-                        OddsSnapshot.market.in_(("1H_total", "full_game_total")))
-                .all())
+        rows = (
+            s.query(
+                OddsSnapshot.game_id,
+                OddsSnapshot.book,
+                OddsSnapshot.line,
+                OddsSnapshot.spread,
+                OddsSnapshot.market,
+                OddsSnapshot.captured_at,
+            )
+            .join(Game, Game.id == OddsSnapshot.game_id)
+            .filter(
+                Game.season == season,
+                Game.week == week,
+                OddsSnapshot.market.in_(("1H_total", "full_game_total")),
+            )
+            .all()
+        )
     h1: Dict[int, list] = {}
     fg: Dict[int, list] = {}
     for gid, book, line, spread, market, cap in rows:
-        snap = type("S", (), {"book": book, "line": line, "spread": spread,
-                              "captured_at": cap})
+        snap = type("S", (), {"book": book, "line": line, "spread": spread, "captured_at": cap})
         (h1 if market == "1H_total" else fg).setdefault(gid, []).append(snap)
 
     for gid, snaps in h1.items():
@@ -73,7 +81,7 @@ def opening_line_lookup(season: int, week: int
             lines[gid], kinds[gid] = opening, "observed_1h"
     for gid, snaps in fg.items():
         if gid in lines:
-            continue                       # observed 1H opener wins
+            continue  # observed 1H opener wins
         open_total, open_spread = _full_game_opener(snaps)
         if open_total is not None:
             lines[gid] = proxy_total(open_total, spread=open_spread)
@@ -88,6 +96,7 @@ def _enrich_qb_out(scored) -> None:
     backfilled. Mutates `scored` in place, adding qb_out_home/away/detail which
     store_predictions persists into factors_json."""
     from beatvegas.sources.espn import qb_out_flags
+
     homes, aways, details = [], [], []
     for _, r in scored.iterrows():
         f = qb_out_flags(r["home_team"], r["away_team"])
@@ -112,28 +121,37 @@ def main() -> None:
 
     week = args.week or detect_week(args.season)
     if week is None:
-        print(f"Could not detect an active week for {args.season}. "
-              "Pass --week explicitly (offseason has no upcoming games).")
+        print(
+            f"Could not detect an active week for {args.season}. "
+            "Pass --week explicitly (offseason has no upcoming games)."
+        )
         return
 
     df = build_feature_frame(min_games=args.min_games)
     lines, kinds = opening_line_lookup(args.season, week)
-    scored = score_slate(args.season, target_week=week, line_lookup=lines,
-                         line_kind_lookup=kinds, df=df)
+    scored = score_slate(
+        args.season, target_week=week, line_lookup=lines, line_kind_lookup=kinds, df=df
+    )
     if scored.empty:
-        print(f"No scorable games for {args.season} wk{week} "
-              f"(need >= {args.min_games} games played by both teams).")
+        print(
+            f"No scorable games for {args.season} wk{week} "
+            f"(need >= {args.min_games} games played by both teams)."
+        )
         return
     _enrich_qb_out(scored)
     n = store_predictions(scored)
     obs = sum(1 for k in kinds.values() if k == "observed_1h")
     der = sum(1 for k in kinds.values() if k == "derived_fg")
-    print(f"scored {n} games for {args.season} wk{week} "
-          f"({obs} observed 1H, {der} derived-from-full-game, rest proxy)")
+    print(
+        f"scored {n} games for {args.season} wk{week} "
+        f"({obs} observed 1H, {der} derived-from-full-game, rest proxy)"
+    )
     top = scored.head(5)
     for _, r in top.iterrows():
-        print(f"  #{int(r['rank'])} score {int(r['under_score'])}  "
-              f"{r['away_team']} @ {r['home_team']}  line {r['line']:g}")
+        print(
+            f"  #{int(r['rank'])} score {int(r['under_score'])}  "
+            f"{r['away_team']} @ {r['home_team']}  line {r['line']:g}"
+        )
 
 
 if __name__ == "__main__":

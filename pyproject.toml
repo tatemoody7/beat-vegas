@@ -17,3 +17,18 @@ include = ["beatvegas*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+extend-exclude = ["web", ".venv", "data"]
+
+[tool.ruff.lint]
+# Pragmatic default set: pyflakes (F) + pycodestyle errors (E) + import sorting (I)
+# + a few bugbears (B). Deliberately NOT enabling pyupgrade (UP): rewriting
+# Optional[x] -> x | None breaks at runtime on this project's Python 3.9 target.
+select = ["F", "E", "I", "B"]
+ignore = [
+    "E501",  # line length handled by the formatter, not enforced as an error
+    "B008",  # function calls in argument defaults (common + intentional here)
+]

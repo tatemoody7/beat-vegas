@@ -4,7 +4,7 @@ MATCHUPS = {1: "Michigan @ Ohio State", 2: "LSU @ Alabama", 3: "Iowa @ Wisconsin
 
 
 def test_newly_posted_alert():
-    prev = {}                              # nothing seen yet
+    prev = {}  # nothing seen yet
     new = {1: 24.5}
     alerts = detect_line_alerts(prev, new, MATCHUPS)
     assert len(alerts) == 1
@@ -13,7 +13,7 @@ def test_newly_posted_alert():
 
 def test_significant_move_alert():
     prev = {2: 27.0}
-    new = {2: 25.5}                        # moved 1.5 >= threshold 1.0
+    new = {2: 25.5}  # moved 1.5 >= threshold 1.0
     alerts = detect_line_alerts(prev, new, MATCHUPS, threshold=1.0)
     assert len(alerts) == 1 and alerts[0].kind == "move"
     assert alerts[0].old_line == 27.0 and alerts[0].new_line == 25.5
@@ -26,7 +26,7 @@ def test_small_move_below_threshold_ignored():
 
 def test_scores_attached_and_unchanged_ignored():
     prev = {1: 24.5}
-    new = {1: 24.5}                        # no change
+    new = {1: 24.5}  # no change
     alerts = detect_line_alerts(prev, new, MATCHUPS, scores={1: 63})
     assert alerts == []
 

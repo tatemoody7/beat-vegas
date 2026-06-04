@@ -4,10 +4,10 @@ DISPLAY CONTEXT ONLY — never a model feature. The API is unofficial (can chang
 without notice) and CFB injury reporting is unreliable, so every call fails silent
 (returns empty) rather than raising. Results are cached by the dashboard.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
@@ -17,8 +17,7 @@ from ..etl.match import name_score
 
 _UA = {"User-Agent": "Mozilla/5.0"}
 _SITE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
-_CORE = ("https://sports.core.api.espn.com/v2/sports/football/leagues/"
-         "college-football")
+_CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football"
 _CACHE = REPO_ROOT / "data" / "cache"
 
 
@@ -43,8 +42,13 @@ def _teams() -> List[dict]:
         try:
             for t in data["sports"][0]["leagues"][0]["teams"]:
                 tm = t["team"]
-                out.append({"id": tm["id"], "location": tm.get("location", ""),
-                            "displayName": tm.get("displayName", "")})
+                out.append(
+                    {
+                        "id": tm["id"],
+                        "location": tm.get("location", ""),
+                        "displayName": tm.get("displayName", ""),
+                    }
+                )
         except (KeyError, IndexError, TypeError):
             out = []
     if out:
@@ -78,13 +82,12 @@ def team_injuries(espn_id: str, limit: int = 6) -> List[str]:
         try:
             if "$ref" in item:
                 item = _get(item["$ref"]) or {}
-            status = (item.get("status")
-                      or (item.get("type") or {}).get("description") or "")
+            status = item.get("status") or (item.get("type") or {}).get("description") or ""
             ath = item.get("athlete") or {}
             if "$ref" in ath:
                 ath = _get(ath["$ref"]) or {}
             name = ath.get("displayName") or ath.get("shortName") or "Player"
-            pos = ((ath.get("position") or {}).get("abbreviation") or "")
+            pos = (ath.get("position") or {}).get("abbreviation") or ""
             label = f"{pos + ' ' if pos else ''}{name}"
             out.append(f"{label} — {status}" if status else label)
         except (KeyError, TypeError, AttributeError):

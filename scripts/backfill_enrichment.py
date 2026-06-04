@@ -9,11 +9,11 @@ so they can become real model features (not just current-week display).
   each game's kickoff hour — ~hundreds of calls instead of ~9,500.
 Idempotent (upserts). Slow; safe to re-run / resume.
 """
+
 from __future__ import annotations
 
 import argparse
 import time
-from typing import Dict
 
 import pandas as pd
 
@@ -26,16 +26,17 @@ from beatvegas.sources.weather import fetch_weather_series
 
 def backfill_tempo(start: int, end: int) -> None:
     from datetime import datetime
+
     with session_scope() as s:
         teams = [t[0] for t in s.query(Team.school).distinct().all()]
         games = pd.DataFrame(
             s.query(Game.season, Game.week, Game.start_date)
-            .filter(Game.season.between(start, end),
-                    Game.start_date.isnot(None)).all(),
-            columns=["season", "week", "start_date"])
+            .filter(Game.season.between(start, end), Game.start_date.isnot(None))
+            .all(),
+            columns=["season", "week", "start_date"],
+        )
     games["start_date"] = pd.to_datetime(games["start_date"])
-    wk_dates = (games.groupby(["season", "week"])["start_date"]
-                .median().dt.strftime("%Y-%m-%d"))
+    wk_dates = games.groupby(["season", "week"])["start_date"].median().dt.strftime("%Y-%m-%d")
     for (season, week), date in wk_dates.items():
         try:
             df = fetch_tempo(date=date)
@@ -49,24 +50,34 @@ def backfill_tempo(start: int, end: int) -> None:
             if not school or school in seen:
                 continue
             seen.add(school)
-            rows.append({
-                "season": int(season), "week": int(week), "team": school,
-                "seconds_per_play": _num(r["seconds_per_play"]),
-                "plays_per_game": _num(r["plays_per_game"]),
-                "as_of_date": date, "captured_at": datetime.utcnow()})
+            rows.append(
+                {
+                    "season": int(season),
+                    "week": int(week),
+                    "team": school,
+                    "seconds_per_play": _num(r["seconds_per_play"]),
+                    "plays_per_game": _num(r["plays_per_game"]),
+                    "as_of_date": date,
+                    "captured_at": datetime.utcnow(),
+                }
+            )
         with session_scope() as s:
             upsert(s, TeamTempo, rows, ["season", "week", "team"])
         print(f"  tempo {season} wk{week}: {len(rows)} teams")
-        time.sleep(0.4)            # be polite to TeamRankings
+        time.sleep(0.4)  # be polite to TeamRankings
 
 
 def backfill_weather(start: int, end: int) -> None:
     with session_scope() as s:
-        rows = (s.query(Game.id, Game.venue_id, Game.start_date)
-                .filter(Game.season.between(start, end),
-                        Game.start_date.isnot(None)).all())
-        venues = {v.id: {"dome": v.dome, "lat": v.latitude, "lon": v.longitude,
-                         "name": v.name} for v in s.query(Venue).all()}
+        rows = (
+            s.query(Game.id, Game.venue_id, Game.start_date)
+            .filter(Game.season.between(start, end), Game.start_date.isnot(None))
+            .all()
+        )
+        venues = {
+            v.id: {"dome": v.dome, "lat": v.latitude, "lon": v.longitude, "name": v.name}
+            for v in s.query(Venue).all()
+        }
     games = pd.DataFrame(rows, columns=["id", "venue_id", "start_date"])
     games["start_date"] = pd.to_datetime(games["start_date"])
 
@@ -75,8 +86,16 @@ def backfill_weather(start: int, end: int) -> None:
         if v is None:
             continue
         if v["dome"]:
-            wrows = [{"game_id": int(g.id), "temperature_f": 72.0, "wind_mph": 0.0,
-                      "precipitation": 0.0, "dome": True} for g in grp.itertuples()]
+            wrows = [
+                {
+                    "game_id": int(g.id),
+                    "temperature_f": 72.0,
+                    "wind_mph": 0.0,
+                    "precipitation": 0.0,
+                    "dome": True,
+                }
+                for g in grp.itertuples()
+            ]
             with session_scope() as s:
                 upsert(s, Weather, wrows, ["game_id"])
             continue
@@ -92,13 +111,21 @@ def backfill_weather(start: int, end: int) -> None:
         for g in grp.itertuples():
             key = pd.Timestamp(g.start_date).strftime("%Y-%m-%dT%H")
             w = series.get(key) or series.get(
-                pd.Timestamp(g.start_date).strftime("%Y-%m-%dT%H").replace(
-                    f"T{g.start_date.hour:02d}", "T19"))
+                pd.Timestamp(g.start_date)
+                .strftime("%Y-%m-%dT%H")
+                .replace(f"T{g.start_date.hour:02d}", "T19")
+            )
             if not w or w.get("temperature_f") is None:
                 continue
-            wrows.append({"game_id": int(g.id), "temperature_f": w["temperature_f"],
-                          "wind_mph": w["wind_mph"], "precipitation": w["precipitation"],
-                          "dome": False})
+            wrows.append(
+                {
+                    "game_id": int(g.id),
+                    "temperature_f": w["temperature_f"],
+                    "wind_mph": w["wind_mph"],
+                    "precipitation": w["precipitation"],
+                    "dome": False,
+                }
+            )
         with session_scope() as s:
             upsert(s, Weather, wrows, ["game_id"])
         print(f"  weather venue {vid} ({v['name']}): {len(wrows)}/{len(grp)} games")
@@ -106,7 +133,7 @@ def backfill_weather(start: int, end: int) -> None:
 
 
 def _num(v):
-    return None if v != v else float(v)     # NaN -> None
+    return None if v != v else float(v)  # NaN -> None
 
 
 def main() -> None:

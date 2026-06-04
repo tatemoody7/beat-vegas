@@ -12,6 +12,7 @@ campus network. Idempotent: replaces prior derived_lines rows for the season.
 
     python scripts/post_derived_lines.py --season 2026 --week 1
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,39 +41,45 @@ def fetch(source: str, season: int):
     return cfbd_full_game_rows(CFBDClient(), season), "cfbd"
 
 
-def build_prediction_rows(fetched: List[Dict], gmeta: Dict[int, Dict],
-                          week: Optional[int]) -> List[Dict]:
+def build_prediction_rows(
+    fetched: List[Dict], gmeta: Dict[int, Dict], week: Optional[int]
+) -> List[Dict]:
     """Pure: map posted full-game rows -> derived-1H prediction-row dicts.
 
     `gmeta`: game_id -> {week, home, away}. `games` list for name matching is
     derived from gmeta. Returns dicts ready for the Prediction model (model fields
     omitted = NULL), ranked by lowest derived 1H. Unit-tested without a DB."""
-    games = [{"id": gid, "home_team": m["home"], "away_team": m["away"],
-              "start_date": None} for gid, m in gmeta.items()]
+    games = [
+        {"id": gid, "home_team": m["home"], "away_team": m["away"], "start_date": None}
+        for gid, m in gmeta.items()
+    ]
     out: List[Dict] = []
     for r in fetched:
         gid = r.get("game_id")
         if gid is None:
-            gid, _ = match_event(r["home_team"], r["away_team"],
-                                 r["commence_time"], games)
+            gid, _ = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
         if gid is None or gid not in gmeta:
             continue
         if week is not None and gmeta[gid]["week"] != week:
             continue
         total, spread = r["line"], r.get("spread")
         derived = proxy_total(total, spread=spread)
-        out.append({
-            "game_id": gid,
-            "line_used": derived,
-            "factors_json": json.dumps({
-                "line": derived,
-                "line_kind": "derived_fg",
-                "full_game_total": total,
-                "spread": spread,
-                "fh_share": round(fh_share(spread), 3),
-            }),
-        })
-    out.sort(key=lambda d: d["line_used"])           # lowest derived 1H first
+        out.append(
+            {
+                "game_id": gid,
+                "line_used": derived,
+                "factors_json": json.dumps(
+                    {
+                        "line": derived,
+                        "line_kind": "derived_fg",
+                        "full_game_total": total,
+                        "spread": spread,
+                        "fh_share": round(fh_share(spread), 3),
+                    }
+                ),
+            }
+        )
+    out.sort(key=lambda d: d["line_used"])  # lowest derived 1H first
     for i, d in enumerate(out, start=1):
         d["rank"] = i
     return out
@@ -92,25 +99,38 @@ def main() -> None:
     now = datetime.utcnow()
 
     with session_scope() as s:
-        gmeta = {g.id: {"week": g.week, "home": g.home_team, "away": g.away_team}
-                 for g in s.query(Game).filter(Game.season == args.season).all()}
+        gmeta = {
+            g.id: {"week": g.week, "home": g.home_team, "away": g.away_team}
+            for g in s.query(Game).filter(Game.season == args.season).all()
+        }
         rows = build_prediction_rows(fetched, gmeta, args.week)
 
         season_ids = list(gmeta.keys())
         if season_ids:
-            (s.query(Prediction)
-             .filter(Prediction.model_version == MODEL_VERSION,
-                     Prediction.game_id.in_(season_ids))
-             .delete(synchronize_session=False))
+            (
+                s.query(Prediction)
+                .filter(
+                    Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(season_ids)
+                )
+                .delete(synchronize_session=False)
+            )
         for d in rows:
-            s.add(Prediction(
-                game_id=d["game_id"], model_version=MODEL_VERSION,
-                line_used=d["line_used"], rank=d["rank"],
-                factors_json=d["factors_json"], created_at=now))
+            s.add(
+                Prediction(
+                    game_id=d["game_id"],
+                    model_version=MODEL_VERSION,
+                    line_used=d["line_used"],
+                    rank=d["rank"],
+                    factors_json=d["factors_json"],
+                    created_at=now,
+                )
+            )
 
-    print(f"source={source} season={args.season} "
-          f"week={args.week if args.week is not None else 'all'} "
-          f"derived_rows_written={len(rows)}")
+    print(
+        f"source={source} season={args.season} "
+        f"week={args.week if args.week is not None else 'all'} "
+        f"derived_rows_written={len(rows)}"
+    )
 
 
 if __name__ == "__main__":

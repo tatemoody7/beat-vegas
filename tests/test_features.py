@@ -3,6 +3,7 @@
 The BV line is only meaningful if it's independent of Vegas. These tests fail
 loudly if a betting line ever becomes a model input.
 """
+
 from beatvegas.etl.features import BANNED_LINE_COLS, FEATURE_COLS, MARKET_COLS
 from beatvegas.model.bv_line import BV_FEATURE_COLS
 
@@ -25,7 +26,8 @@ def test_market_features_are_exactly_known_set():
     # consciously add it to MARKET_COLS (or this test trips).
     present = MARKET_COLS & set(FEATURE_COLS)
     assert present == {"full_game_total", "proj_1h_ratio"}, (
-        f"Unexpected market features in FEATURE_COLS: {present}")
+        f"Unexpected market features in FEATURE_COLS: {present}"
+    )
 
 
 def test_bv_features_are_classifier_features_minus_market():
@@ -40,6 +42,7 @@ def test_every_feature_is_registered():
     # The ranking harness must be able to evaluate every model feature, so the
     # registry must cover all of FEATURE_COLS (keeps registry/features in sync).
     from beatvegas.factors.registry import default_registry
+
     registered = {f.name for f in default_registry()}
     missing = set(FEATURE_COLS) - registered
     assert not missing, f"FEATURE_COLS not in factor registry: {missing}"
@@ -49,6 +52,7 @@ def test_registry_has_no_banned_or_forward_only_market():
     # No registered factor may be a banned 1H-line column; market factors must
     # be flagged so the BV engine never trains on them.
     from beatvegas.factors.registry import default_registry
+
     for f in default_registry():
         assert f.name not in BANNED_LINE_COLS, f"banned col registered: {f.name}"
         if f.name in MARKET_COLS:

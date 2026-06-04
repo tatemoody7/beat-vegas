@@ -5,6 +5,7 @@ All are knowable before kickoff and computable for every historical game from th
 the slow-start thesis: early kickoffs + long westward travel tend to dampen first
 halves. The backtest decides whether they actually matter.
 """
+
 from __future__ import annotations
 
 import math
@@ -16,15 +17,27 @@ from ..db.models import Game, Team, Venue
 from ..db.store import session_scope
 
 SITUATIONAL_COLS = [
-    "home_rest_days", "away_rest_days", "home_short_week", "away_short_week",
-    "home_off_bye", "away_off_bye", "away_travel_dist", "away_tz_shift",
-    "kickoff_local_hour", "early_kickoff",
+    "home_rest_days",
+    "away_rest_days",
+    "home_short_week",
+    "away_short_week",
+    "home_off_bye",
+    "away_off_bye",
+    "away_travel_dist",
+    "away_tz_shift",
+    "kickoff_local_hour",
+    "early_kickoff",
     # schedule-derived context (offline; leak-free — prior games / static only)
-    "home_revenge", "away_revenge", "home_opener", "away_opener",
-    "night_game", "rivalry_game", "conference_game",
+    "home_revenge",
+    "away_revenge",
+    "home_opener",
+    "away_opener",
+    "night_game",
+    "rivalry_game",
+    "conference_game",
 ]
 
-_RIVALRY_MIN_SEASONS = 8    # near-annual series: met in >=8 distinct seasons
+_RIVALRY_MIN_SEASONS = 8  # near-annual series: met in >=8 distinct seasons
 
 
 def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
@@ -41,17 +54,36 @@ def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
 def _load() -> tuple:
     with session_scope() as s:
         games = pd.DataFrame(
-            s.query(Game.id, Game.season, Game.week, Game.start_date,
-                    Game.venue_id, Game.home_team, Game.away_team,
-                    Game.home_points, Game.away_points).all(),
-            columns=["id", "season", "week", "start_date", "venue_id",
-                     "home_team", "away_team", "home_points", "away_points"])
+            s.query(
+                Game.id,
+                Game.season,
+                Game.week,
+                Game.start_date,
+                Game.venue_id,
+                Game.home_team,
+                Game.away_team,
+                Game.home_points,
+                Game.away_points,
+            ).all(),
+            columns=[
+                "id",
+                "season",
+                "week",
+                "start_date",
+                "venue_id",
+                "home_team",
+                "away_team",
+                "home_points",
+                "away_points",
+            ],
+        )
         venues = pd.DataFrame(
             s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
-            columns=["venue_id", "lat", "lon"])
+            columns=["venue_id", "lat", "lon"],
+        )
         teams = pd.DataFrame(
-            s.query(Team.school, Team.conference).all(),
-            columns=["team", "conference"])
+            s.query(Team.school, Team.conference).all(), columns=["team", "conference"]
+        )
     return games, venues, teams
 
 
@@ -69,7 +101,7 @@ def _revenge_and_rivalry(games: pd.DataFrame) -> pd.DataFrame:
     structural property, not a predictive signal, so full history is fine).
     """
     g = games.sort_values("start_date", na_position="last")
-    last_meet: Dict[tuple, tuple] = {}     # pair -> (winner, loser) of last meeting
+    last_meet: Dict[tuple, tuple] = {}  # pair -> (winner, loser) of last meeting
     pair_seasons: Dict[tuple, set] = {}
     rows = []
     for r in g.itertuples(index=False):
@@ -88,41 +120,48 @@ def _revenge_and_rivalry(games: pd.DataFrame) -> pd.DataFrame:
             winner = r.home_team if hp > ap else r.away_team
             loser = r.away_team if hp > ap else r.home_team
             last_meet[pk] = (winner, loser)
-    rivalry_pairs = {pk for pk, seas in pair_seasons.items()
-                     if len(seas) >= _RIVALRY_MIN_SEASONS}
+    rivalry_pairs = {pk for pk, seas in pair_seasons.items() if len(seas) >= _RIVALRY_MIN_SEASONS}
     rv = pd.DataFrame(rows)
     rv["rivalry_game"] = [
         1 if _pair_key(h, a) in rivalry_pairs else 0
-        for h, a in zip(games.set_index("id").loc[rv["id"], "home_team"],
-                        games.set_index("id").loc[rv["id"], "away_team"])]
+        for h, a in zip(
+            games.set_index("id").loc[rv["id"], "home_team"],
+            games.set_index("id").loc[rv["id"], "away_team"],
+        )
+    ]
     return rv
 
 
 def _opener(games: pd.DataFrame) -> pd.DataFrame:
     """Flag each team's first game of the season (leak-free; schedule-known)."""
-    long = pd.concat([
-        games[["id", "season", "start_date", "home_team"]].rename(
-            columns={"home_team": "team"}).assign(side="home"),
-        games[["id", "season", "start_date", "away_team"]].rename(
-            columns={"away_team": "team"}).assign(side="away"),
-    ], ignore_index=True).sort_values(["season", "team", "start_date"],
-                                      na_position="last")
+    long = pd.concat(
+        [
+            games[["id", "season", "start_date", "home_team"]]
+            .rename(columns={"home_team": "team"})
+            .assign(side="home"),
+            games[["id", "season", "start_date", "away_team"]]
+            .rename(columns={"away_team": "team"})
+            .assign(side="away"),
+        ],
+        ignore_index=True,
+    ).sort_values(["season", "team", "start_date"], na_position="last")
     long["is_opener"] = (long.groupby(["season", "team"]).cumcount() == 0).astype(int)
     home = long[long.side == "home"][["id", "is_opener"]].rename(
-        columns={"is_opener": "home_opener"})
+        columns={"is_opener": "home_opener"}
+    )
     away = long[long.side == "away"][["id", "is_opener"]].rename(
-        columns={"is_opener": "away_opener"})
+        columns={"is_opener": "away_opener"}
+    )
     return home.merge(away, on="id", how="outer")
 
 
 def _rest_days(games: pd.DataFrame) -> pd.DataFrame:
     """Per (game, team) days since that team's previous game this season."""
-    home = games[["id", "season", "start_date", "home_team"]].rename(
-        columns={"home_team": "team"})
-    away = games[["id", "season", "start_date", "away_team"]].rename(
-        columns={"away_team": "team"})
+    home = games[["id", "season", "start_date", "home_team"]].rename(columns={"home_team": "team"})
+    away = games[["id", "season", "start_date", "away_team"]].rename(columns={"away_team": "team"})
     long = pd.concat([home, away], ignore_index=True).sort_values(
-        ["season", "team", "start_date"], na_position="last")
+        ["season", "team", "start_date"], na_position="last"
+    )
     long["prev"] = long.groupby(["season", "team"])["start_date"].shift(1)
     long["rest_days"] = (long["start_date"] - long["prev"]).dt.days
     return long[["id", "team", "rest_days"]]
@@ -136,16 +175,18 @@ def situational_frame() -> pd.DataFrame:
     conf = teams.dropna(subset=["conference"]).set_index("team")["conference"].to_dict()
 
     # team's modal home venue per season (their "home base")
-    home_base = (games.dropna(subset=["venue_id"])
-                 .groupby(["season", "home_team"])["venue_id"]
-                 .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None))
+    home_base = (
+        games.dropna(subset=["venue_id"])
+        .groupby(["season", "home_team"])["venue_id"]
+        .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
+    )
 
     rest = _rest_days(games)
     h_rest = rest.rename(columns={"team": "home_team", "rest_days": "home_rest_days"})
     a_rest = rest.rename(columns={"team": "away_team", "rest_days": "away_rest_days"})
-    df = (games
-          .merge(h_rest, on=["id", "home_team"], how="left")
-          .merge(a_rest, on=["id", "away_team"], how="left"))
+    df = games.merge(h_rest, on=["id", "home_team"], how="left").merge(
+        a_rest, on=["id", "away_team"], how="left"
+    )
 
     def _coords(vid):
         if vid is None or vid not in vcoord.index:
@@ -159,34 +200,40 @@ def situational_frame() -> pd.DataFrame:
         ahome = home_base.get((r.season, r.away_team))
         alat, alon = _coords(ahome)
         travel = haversine(alat, alon, glat, glon)
-        tz = (glon - alon) / 15.0 if (glon is not None and alon is not None
-                                      and not pd.isna(glon) and not pd.isna(alon)) else None
+        tz = (
+            (glon - alon) / 15.0
+            if (glon is not None and alon is not None and not pd.isna(glon) and not pd.isna(alon))
+            else None
+        )
         local_hour = None
         if pd.notna(r.start_date) and glon is not None and not pd.isna(glon):
             local_hour = (r.start_date.hour + glon / 15.0) % 24
         h_conf, a_conf = conf.get(r.home_team), conf.get(r.away_team)
-        rows.append({
-            "id": r.id,
-            "home_rest_days": r.home_rest_days,
-            "away_rest_days": r.away_rest_days,
-            "home_short_week": _flag(r.home_rest_days, lambda x: x < 6),
-            "away_short_week": _flag(r.away_rest_days, lambda x: x < 6),
-            "home_off_bye": _flag(r.home_rest_days, lambda x: x > 9),
-            "away_off_bye": _flag(r.away_rest_days, lambda x: x > 9),
-            "away_travel_dist": travel,
-            "away_tz_shift": tz,
-            "kickoff_local_hour": local_hour,
-            "early_kickoff": 1 if (local_hour is not None and local_hour <= 13) else 0,
-            "night_game": 1 if (local_hour is not None and local_hour >= 18) else 0,
-            # conference_game from current team conference (realignment-approx
-            # for older seasons; fine for a factor screen).
-            "conference_game": (1 if (h_conf is not None and a_conf is not None
-                                      and h_conf == a_conf) else 0),
-        })
+        rows.append(
+            {
+                "id": r.id,
+                "home_rest_days": r.home_rest_days,
+                "away_rest_days": r.away_rest_days,
+                "home_short_week": _flag(r.home_rest_days, lambda x: x < 6),
+                "away_short_week": _flag(r.away_rest_days, lambda x: x < 6),
+                "home_off_bye": _flag(r.home_rest_days, lambda x: x > 9),
+                "away_off_bye": _flag(r.away_rest_days, lambda x: x > 9),
+                "away_travel_dist": travel,
+                "away_tz_shift": tz,
+                "kickoff_local_hour": local_hour,
+                "early_kickoff": 1 if (local_hour is not None and local_hour <= 13) else 0,
+                "night_game": 1 if (local_hour is not None and local_hour >= 18) else 0,
+                # conference_game from current team conference (realignment-approx
+                # for older seasons; fine for a factor screen).
+                "conference_game": (
+                    1 if (h_conf is not None and a_conf is not None and h_conf == a_conf) else 0
+                ),
+            }
+        )
     df_base = pd.DataFrame(rows)
-    df_base = (df_base
-               .merge(_revenge_and_rivalry(games), on="id", how="left")
-               .merge(_opener(games), on="id", how="left"))
+    df_base = df_base.merge(_revenge_and_rivalry(games), on="id", how="left").merge(
+        _opener(games), on="id", how="left"
+    )
     return df_base
 
 

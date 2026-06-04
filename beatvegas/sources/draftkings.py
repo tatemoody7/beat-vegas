@@ -17,6 +17,7 @@ Schema (leagues/{id}): {events:[{id,name,startEventDate,participants:[{name,
 venueRole}]}], markets:[{id,eventId,name,main}], selections:[{marketId,label,
 points,outcomeType,displayOdds:{american}}]}.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -30,9 +31,11 @@ _HOST = "https://sportsbook-nash.draftkings.com"
 _PATH = "/sites/US-SB/api/sportscontent/dkusoh/v1/leagues/87637"
 # DK returns 403 to non-browser clients; these headers get a 200.
 _HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                   "AppleWebKit/537.36 (KHTML, like Gecko) "
-                   "Chrome/124.0.0.0 Safari/537.36"),
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Referer": "https://sportsbook.draftkings.com/",
@@ -98,7 +101,8 @@ def _events_map(payload: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
             elif role == "away":
                 away = p.get("name")
         out[str(eid)] = {
-            "home_team": home, "away_team": away,
+            "home_team": home,
+            "away_team": away,
             "commence_time": ev.get("startEventDate") or ev.get("startDate"),
         }
     return out
@@ -193,12 +197,20 @@ def normalize_full_game(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         if smid is not None:
             spread = _home_spread_from_selections(sbm.get(smid, []))
         ev = events[eid]
-        rows.append({
-            "event_id": eid, "commence_time": ev.get("commence_time"),
-            "home_team": ev.get("home_team"), "away_team": ev.get("away_team"),
-            "book": "draftkings", "line": float(line), "spread": spread,
-            "over_price": ov, "under_price": un, "last_update": None,
-        })
+        rows.append(
+            {
+                "event_id": eid,
+                "commence_time": ev.get("commence_time"),
+                "home_team": ev.get("home_team"),
+                "away_team": ev.get("away_team"),
+                "book": "draftkings",
+                "line": float(line),
+                "spread": spread,
+                "over_price": ov,
+                "under_price": un,
+                "last_update": None,
+            }
+        )
     return rows
 
 
@@ -225,10 +237,17 @@ def normalize_first_half(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         if line is None:
             continue
         ev = events[eid]
-        rows.append({
-            "event_id": eid, "commence_time": ev.get("commence_time"),
-            "home_team": ev.get("home_team"), "away_team": ev.get("away_team"),
-            "book": "draftkings", "line": float(line),
-            "over_price": ov, "under_price": un, "last_update": None,
-        })
+        rows.append(
+            {
+                "event_id": eid,
+                "commence_time": ev.get("commence_time"),
+                "home_team": ev.get("home_team"),
+                "away_team": ev.get("away_team"),
+                "book": "draftkings",
+                "line": float(line),
+                "over_price": ov,
+                "under_price": un,
+                "last_update": None,
+            }
+        )
     return rows

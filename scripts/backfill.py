@@ -9,15 +9,16 @@ Usage:
     python scripts/backfill.py --season 2023   # single season
     python scripts/backfill.py --use-pbp       # fill 1H gaps via play-by-play
 """
+
 from __future__ import annotations
 
 import argparse
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from beatvegas.config import load_config
-from beatvegas.db.store import init_db, session_scope, upsert
 from beatvegas.db.models import Game, Team, Venue
+from beatvegas.db.store import init_db, session_scope, upsert
 from beatvegas.etl.first_half import attach_first_half, first_half_from_plays
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import pick_total_spread as _pick_total
@@ -39,8 +40,9 @@ def _parse_dt(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def backfill_season(client: CFBDClient, season: int, season_type: str,
-                    use_pbp: bool) -> Dict[str, int]:
+def backfill_season(
+    client: CFBDClient, season: int, season_type: str, use_pbp: bool
+) -> Dict[str, int]:
     games = client.games(year=season, season_type=season_type)
     lines_resp = client.lines(year=season, season_type=season_type)
     total_by_game = {}
@@ -56,8 +58,11 @@ def backfill_season(client: CFBDClient, season: int, season_type: str,
         weeks = sorted({_get(g, "week") for g in games if _get(g, "week") is not None})
         for wk in weeks:
             try:
-                pbp_lookup.update(first_half_from_plays(
-                    client.plays(year=season, week=wk, season_type=season_type)))
+                pbp_lookup.update(
+                    first_half_from_plays(
+                        client.plays(year=season, week=wk, season_type=season_type)
+                    )
+                )
             except Exception as e:  # noqa: BLE001 - log and continue
                 print(f"  [warn] plays {season} wk{wk}: {e}")
 
@@ -101,23 +106,28 @@ def backfill_season(client: CFBDClient, season: int, season_type: str,
         upsert(s, Game, game_rows, "id")
         upsert(s, Team, list(team_rows.values()), "id")
 
-    return {"games": len(game_rows), "with_1h": n_with_1h,
-            "with_total": sum(1 for r in game_rows if r["full_game_total"] is not None)}
+    return {
+        "games": len(game_rows),
+        "with_1h": n_with_1h,
+        "with_total": sum(1 for r in game_rows if r["full_game_total"] is not None),
+    }
 
 
 def backfill_venues(client: CFBDClient) -> int:
     rows = []
     for v in client.venues():
         loc = _get(v, "location") or {}
-        rows.append({
-            "id": _get(v, "id"),
-            "name": _get(v, "name"),
-            "city": _get(v, "city"),
-            "state": _get(v, "state"),
-            "latitude": _get(v, "latitude") or _get(loc, "x"),
-            "longitude": _get(v, "longitude") or _get(loc, "y"),
-            "dome": _get(v, "dome"),
-        })
+        rows.append(
+            {
+                "id": _get(v, "id"),
+                "name": _get(v, "name"),
+                "city": _get(v, "city"),
+                "state": _get(v, "state"),
+                "latitude": _get(v, "latitude") or _get(loc, "x"),
+                "longitude": _get(v, "longitude") or _get(loc, "y"),
+                "dome": _get(v, "dome"),
+            }
+        )
     rows = [r for r in rows if r["id"] is not None]
     with session_scope() as s:
         upsert(s, Venue, rows, "id")
@@ -131,8 +141,9 @@ def main() -> None:
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
     ap.add_argument("--end", type=int, default=cfg.get("end_season", 2024))
     ap.add_argument("--season-type", default=cfg.get("season_type", "regular"))
-    ap.add_argument("--use-pbp", action="store_true",
-                    help="fill first-half gaps via play-by-play (slower)")
+    ap.add_argument(
+        "--use-pbp", action="store_true", help="fill first-half gaps via play-by-play (slower)"
+    )
     args = ap.parse_args()
 
     init_db()
@@ -142,8 +153,10 @@ def main() -> None:
     seasons = [args.season] if args.season else range(args.start, args.end + 1)
     for season in seasons:
         stats = backfill_season(client, season, args.season_type, args.use_pbp)
-        print(f"{season}: {stats['games']} games, {stats['with_1h']} with 1H, "
-              f"{stats['with_total']} with full-game total")
+        print(
+            f"{season}: {stats['games']} games, {stats['with_1h']} with 1H, "
+            f"{stats['with_total']} with full-game total"
+        )
 
 
 if __name__ == "__main__":

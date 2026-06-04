@@ -1,4 +1,5 @@
 """build_prediction_rows: derived-1H rows, model fields absent, ranked low->high."""
+
 import importlib.util
 import json
 from pathlib import Path
@@ -18,9 +19,9 @@ def test_build_prediction_rows():
     build = _load("post_derived_lines").build_prediction_rows
     # CFBD-shaped rows carry game_id directly (no name matching needed).
     fetched = [
-        {"game_id": 1, "line": 50.5, "spread": -10.5},   # week 1
-        {"game_id": 2, "line": 59.5, "spread": -6.5},    # week 1
-        {"game_id": 3, "line": 44.0, "spread": -3.0},    # week 2 (filtered out)
+        {"game_id": 1, "line": 50.5, "spread": -10.5},  # week 1
+        {"game_id": 2, "line": 59.5, "spread": -6.5},  # week 1
+        {"game_id": 3, "line": 44.0, "spread": -3.0},  # week 2 (filtered out)
     ]
     gmeta = {
         1: {"week": 1, "home": "LSU", "away": "Clemson"},
@@ -29,7 +30,7 @@ def test_build_prediction_rows():
     }
     rows = build(fetched, gmeta, week=1)
 
-    assert len(rows) == 2                                  # week 2 dropped
+    assert len(rows) == 2  # week 2 dropped
     # ranked by lowest derived 1H first
     assert rows[0]["game_id"] == 1 and rows[0]["rank"] == 1
     assert rows[1]["game_id"] == 2 and rows[1]["rank"] == 2
@@ -49,8 +50,10 @@ def test_build_prediction_rows():
 
 def test_build_prediction_rows_no_week_filter_keeps_all_matched():
     build = _load("post_derived_lines").build_prediction_rows
-    fetched = [{"game_id": 1, "line": 50.0, "spread": 0.0},
-               {"game_id": 99, "line": 48.0, "spread": 0.0}]  # 99 not in gmeta
+    fetched = [
+        {"game_id": 1, "line": 50.0, "spread": 0.0},
+        {"game_id": 99, "line": 48.0, "spread": 0.0},
+    ]  # 99 not in gmeta
     gmeta = {1: {"week": 1, "home": "A", "away": "B"}}
     rows = build(fetched, gmeta, week=None)
-    assert len(rows) == 1 and rows[0]["game_id"] == 1     # unmatched dropped
+    assert len(rows) == 1 and rows[0]["game_id"] == 1  # unmatched dropped

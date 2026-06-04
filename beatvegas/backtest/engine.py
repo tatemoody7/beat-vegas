@@ -6,20 +6,19 @@ are unders actually beat the -110 breakeven (52.4%)? If yes, predictive selectio
 signal exists. (Still graded vs the 0.52*full proxy line — directional until real
 1H lines validate it.)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from ..etl.features import FEATURE_COLS, build_feature_frame
-from ..etl.proxy_line import proxy_total
 
-BREAKEVEN = 0.524           # win% needed to beat standard -110 juice
-WIN_PROFIT = 100 / 110      # units won on a winning -110 bet
+BREAKEVEN = 0.524  # win% needed to beat standard -110 juice
+WIN_PROFIT = 100 / 110  # units won on a winning -110 bet
 
 
 def _roi(hits: int, n: int) -> float:
@@ -31,21 +30,25 @@ def _roi(hits: int, n: int) -> float:
 
 def _new_model() -> HistGradientBoostingClassifier:
     return HistGradientBoostingClassifier(
-        learning_rate=0.05, max_depth=3, max_iter=300,
-        l2_regularization=1.0, min_samples_leaf=40, random_state=7,
+        learning_rate=0.05,
+        max_depth=3,
+        max_iter=300,
+        l2_regularization=1.0,
+        min_samples_leaf=40,
+        random_state=7,
     )
 
 
 @dataclass
 class BacktestResult:
-    per_game: pd.DataFrame          # test-season predictions across all seasons
+    per_game: pd.DataFrame  # test-season predictions across all seasons
     by_season: pd.DataFrame
     summary: Dict[str, float]
 
 
-def run_backtest(df: Optional[pd.DataFrame] = None,
-                 first_test_season: int = 2018,
-                 top_frac: float = 0.20) -> BacktestResult:
+def run_backtest(
+    df: Optional[pd.DataFrame] = None, first_test_season: int = 2018, top_frac: float = 0.20
+) -> BacktestResult:
     if df is None:
         df = build_feature_frame(min_games=2)
     seasons = sorted(df["season"].unique())
@@ -60,9 +63,19 @@ def run_backtest(df: Optional[pd.DataFrame] = None,
         model = _new_model()
         model.fit(train[FEATURE_COLS], train["under"])
         p = model.predict_proba(test[FEATURE_COLS])[:, 1]
-        t = test[["id", "season", "week", "home_team", "away_team",
-                  "full_game_total", "proxy_line", "first_half_total",
-                  "under"]].copy()
+        t = test[
+            [
+                "id",
+                "season",
+                "week",
+                "home_team",
+                "away_team",
+                "full_game_total",
+                "proxy_line",
+                "first_half_total",
+                "under",
+            ]
+        ].copy()
         t["under_prob"] = p
         preds.append(t)
 
@@ -73,19 +86,23 @@ def run_backtest(df: Optional[pd.DataFrame] = None,
         g = g.sort_values("under_prob", ascending=False)
         k = max(1, int(len(g) * top_frac))
         top = g.head(k)
-        rows.append({
-            "season": int(ts), "games": len(g),
-            "all_under_pct": 100 * g["under"].mean(),
-            f"top{int(top_frac*100)}_under_pct": 100 * top["under"].mean(),
-            f"top{int(top_frac*100)}_roi": _roi(int(top["under"].sum()), len(top)),
-            f"top{int(top_frac*100)}_n": len(top),
-        })
+        rows.append(
+            {
+                "season": int(ts),
+                "games": len(g),
+                "all_under_pct": 100 * g["under"].mean(),
+                f"top{int(top_frac * 100)}_under_pct": 100 * top["under"].mean(),
+                f"top{int(top_frac * 100)}_roi": _roi(int(top["under"].sum()), len(top)),
+                f"top{int(top_frac * 100)}_n": len(top),
+            }
+        )
     by_season = pd.DataFrame(rows)
 
     # Pooled top-fraction performance (rank within each season, then pool).
-    pooled_top = (per_game.groupby("season", group_keys=False)
-                  .apply(lambda g: g.sort_values("under_prob", ascending=False)
-                         .head(max(1, int(len(g) * top_frac))), include_groups=False))
+    pooled_top = per_game.groupby("season", group_keys=False).apply(
+        lambda g: g.sort_values("under_prob", ascending=False).head(max(1, int(len(g) * top_frac))),
+        include_groups=False,
+    )
     summary = {
         "test_seasons": f"{test_seasons[0]}-{test_seasons[-1]}",
         "n_games": int(len(per_game)),
@@ -98,8 +115,9 @@ def run_backtest(df: Optional[pd.DataFrame] = None,
     return BacktestResult(per_game=per_game, by_season=by_season, summary=summary)
 
 
-def stress_test_lines(per_game: pd.DataFrame, deltas: List[float],
-                      top_frac: float = 0.20) -> pd.DataFrame:
+def stress_test_lines(
+    per_game: pd.DataFrame, deltas: List[float], top_frac: float = 0.20
+) -> pd.DataFrame:
     """Re-grade the top-fraction selections at proxy line +/- delta points to
     check the conclusion isn't an artifact of the exact proxy ratio."""
     rows = []
@@ -108,12 +126,18 @@ def stress_test_lines(per_game: pd.DataFrame, deltas: List[float],
         g["line"] = g["proxy_line"] + d
         g = g[g["first_half_total"] != g["line"]]
         g["under_shifted"] = (g["first_half_total"] < g["line"]).astype(int)
-        top = (g.groupby("season", group_keys=False)
-               .apply(lambda x: x.sort_values("under_prob", ascending=False)
-                      .head(max(1, int(len(x) * top_frac))), include_groups=False))
-        rows.append({
-            "line_delta": d, "n": len(top),
-            "top_under_pct": round(100 * top["under_shifted"].mean(), 2),
-            "roi": round(_roi(int(top["under_shifted"].sum()), len(top)), 4),
-        })
+        top = g.groupby("season", group_keys=False).apply(
+            lambda x: x.sort_values("under_prob", ascending=False).head(
+                max(1, int(len(x) * top_frac))
+            ),
+            include_groups=False,
+        )
+        rows.append(
+            {
+                "line_delta": d,
+                "n": len(top),
+                "top_under_pct": round(100 * top["under_shifted"].mean(), 2),
+                "roi": round(_roi(int(top["under_shifted"].sum()), len(top)), 4),
+            }
+        )
     return pd.DataFrame(rows)

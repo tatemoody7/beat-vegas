@@ -7,6 +7,7 @@ that date — which keeps historical features leak-free.
 Team names use abbreviations ("S Florida", "Ohio St", "Miami (FL)"), so we expand
 common patterns then fuzzy-match to the CFBD school list.
 """
+
 from __future__ import annotations
 
 import io
@@ -18,20 +19,32 @@ import requests
 
 from ..etl.match import name_score
 
-_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"}
+_UA = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+}
 _BASE = "https://www.teamrankings.com/college-football/stat"
 
 # Directional / common abbreviations TeamRankings uses.
-_PREFIX = {"N ": "North ", "S ": "South ", "E ": "East ", "W ": "West ",
-           "C ": "Central ", "St ": "State "}
+_PREFIX = {
+    "N ": "North ",
+    "S ": "South ",
+    "E ": "East ",
+    "W ": "West ",
+    "C ": "Central ",
+    "St ": "State ",
+}
 
 # Exact aliases for names fuzzy matching can't resolve.
 _ALIASES = {
-    "UMass": "Massachusetts", "Southern Miss": "Southern Mississippi",
-    "App State": "Appalachian State", "Hawaii": "Hawai'i",
-    "Miami (FL)": "Miami", "Miami (OH)": "Miami (OH)",
-    "Florida Intl": "Florida International", "Middle Tennessee": "Middle Tennessee",
+    "UMass": "Massachusetts",
+    "Southern Miss": "Southern Mississippi",
+    "App State": "Appalachian State",
+    "Hawaii": "Hawai'i",
+    "Miami (FL)": "Miami",
+    "Miami (OH)": "Miami (OH)",
+    "Florida Intl": "Florida International",
+    "Middle Tennessee": "Middle Tennessee",
 }
 
 
@@ -46,7 +59,7 @@ def _fetch_stat(stat: str, date: Optional[str], timeout: int = 30) -> pd.DataFra
 def _season_col(df: pd.DataFrame) -> str:
     """The 4-digit-year column = season-to-date average."""
     yrs = [c for c in df.columns if re.fullmatch(r"\d{4}", str(c))]
-    return yrs[0] if yrs else df.columns[2]      # leftmost year, else 3rd col
+    return yrs[0] if yrs else df.columns[2]  # leftmost year, else 3rd col
 
 
 def fetch_tempo(date: Optional[str] = None) -> pd.DataFrame:
@@ -56,7 +69,8 @@ def fetch_tempo(date: Optional[str] = None) -> pd.DataFrame:
     spp = spp.rename(columns={"Team": "tr_team", _season_col(spp): "seconds_per_play"})
     ppg = ppg.rename(columns={"Team": "tr_team", _season_col(ppg): "plays_per_game"})
     out = spp[["tr_team", "seconds_per_play"]].merge(
-        ppg[["tr_team", "plays_per_game"]], on="tr_team", how="outer")
+        ppg[["tr_team", "plays_per_game"]], on="tr_team", how="outer"
+    )
     for c in ("seconds_per_play", "plays_per_game"):
         out[c] = pd.to_numeric(out[c], errors="coerce")
     return out
@@ -68,14 +82,15 @@ def _expand(name: str) -> str:
         return _ALIASES[s]
     for ab, full in _PREFIX.items():
         if s.startswith(ab):
-            s = full + s[len(ab):]
-    s = re.sub(r"\bSt\b", "State", s)            # "Ohio St" -> "Ohio State"
+            s = full + s[len(ab) :]
+    s = re.sub(r"\bSt\b", "State", s)  # "Ohio St" -> "Ohio State"
     s = re.sub(r"\s*\((FL|OH|PA|CA|TX)\)", lambda m: " " + m.group(1), s)  # Miami (FL)
     return s
 
 
-def map_to_cfbd(tr_names: List[str], cfbd_teams: List[str],
-                min_score: float = 0.78) -> Dict[str, Optional[str]]:
+def map_to_cfbd(
+    tr_names: List[str], cfbd_teams: List[str], min_score: float = 0.78
+) -> Dict[str, Optional[str]]:
     """Best CFBD school for each TeamRankings name (None if no confident match)."""
     mapping: Dict[str, Optional[str]] = {}
     for tr in tr_names:

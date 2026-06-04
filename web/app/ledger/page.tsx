@@ -41,7 +41,9 @@ function LedgerCard({
               </dt>
               <dd
                 className="mt-0.5 font-mono text-lg font-semibold tabular-nums"
-                style={{ color: rec.units.startsWith("-") ? "#dc2626" : "#16a34a" }}
+                style={{
+                  color: rec.units.startsWith("-") ? "#dc2626" : "#16a34a",
+                }}
               >
                 {rec.units}
               </dd>
@@ -83,16 +85,22 @@ export default async function LedgerPage({
     <div className="mx-auto max-w-5xl">
       <div className="mb-1 flex items-center justify-between">
         <h1 className="bv-page-title">Ledger</h1>
-        {seasons.length > 0 && <SeasonSelect seasons={seasons} current={season} />}
+        {seasons.length > 0 && (
+          <SeasonSelect seasons={seasons} current={season} />
+        )}
       </div>
       <p className="bv-page-sub mb-5">
-        Settled results for {season} · Market = how the under did at the closing line
-        (the final line before kickoff) · Model = the model&apos;s under picks · You =
-        your own logged bets.
+        Settled results for {season} · Market = how the under did at the closing
+        line (the final line before kickoff) · Model = the model&apos;s under
+        picks · You = your own logged bets.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <LedgerCard title="Market" rec={market} emptyHint="Fills in once games are settled." />
+        <LedgerCard
+          title="Market"
+          rec={market}
+          emptyHint="Fills in once games are settled."
+        />
         <LedgerCard
           title="Model"
           rec={model}
@@ -101,7 +109,9 @@ export default async function LedgerPage({
         <LedgerCard title="You" rec={you} emptyHint="Log bets in My Picks." />
       </div>
 
-      <h2 className="mb-2 mt-7 text-sm font-semibold text-[var(--text)]">Your bets</h2>
+      <h2 className="mb-2 mt-7 text-sm font-semibold text-[var(--text)]">
+        Your bets
+      </h2>
       {picks.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
           No logged picks for {season}.
@@ -116,8 +126,12 @@ export default async function LedgerPage({
                 <th>Line</th>
                 <th title="The odds / price (e.g. −110).">Odds</th>
                 <th>Result</th>
-                <th title="Profit in units. 1 unit = one standard bet.">Units</th>
-                <th title="Line value (CLV): positive = the line moved our way after we'd bet.">Line value</th>
+                <th title="Profit in units. 1 unit = one standard bet.">
+                  Units
+                </th>
+                <th title="Line value (CLV): positive = the line moved our way after we'd bet.">
+                  Line value
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -125,7 +139,8 @@ export default async function LedgerPage({
                 <tr key={i}>
                   <td className="text-[var(--text-muted)]">{p.week ?? "—"}</td>
                   <td className="text-[var(--text)]">
-                    {p.away} <span className="text-[var(--text-dim)]">@</span> {p.home}
+                    {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+                    {p.home}
                   </td>
                   <td className="text-[var(--text-muted)]">
                     {p.line !== null ? `under ${p.line}` : "—"}
@@ -156,10 +171,14 @@ export default async function LedgerPage({
                             : "#dc2626",
                     }}
                   >
-                    {p.units !== null ? `${p.units >= 0 ? "+" : ""}${p.units.toFixed(2)}` : "—"}
+                    {p.units !== null
+                      ? `${p.units >= 0 ? "+" : ""}${p.units.toFixed(2)}`
+                      : "—"}
                   </td>
                   <td className="font-mono text-[var(--text-muted)]">
-                    {p.clv !== null ? `${p.clv >= 0 ? "+" : ""}${p.clv.toFixed(2)}` : "—"}
+                    {p.clv !== null
+                      ? `${p.clv >= 0 ? "+" : ""}${p.clv.toFixed(2)}`
+                      : "—"}
                   </td>
                 </tr>
               ))}

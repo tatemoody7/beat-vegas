@@ -23,11 +23,7 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
   // Positive gap (Vegas above our BV number) = an under-leaning gap — but grey it
   // out when it's within noise, so a noisy gap doesn't read as an edge.
   const gapColor =
-    gap === null || !significant
-      ? "#6b7280"
-      : gap > 0
-        ? "#65a30d"
-        : "#dc2626";
+    gap === null || !significant ? "#6b7280" : gap > 0 ? "#65a30d" : "#dc2626";
   const qbOut = row.factors.qb_out_home || row.factors.qb_out_away;
 
   return (
@@ -72,8 +68,8 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="truncate text-lg font-semibold text-[var(--text)]">
-              {row.away}{" "}
-              <span className="text-[var(--text-dim)]">@</span> {row.home}
+              {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+              {row.home}
             </h3>
             <span className="shrink-0 rounded-md bg-[var(--surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--text-muted)]">
               Wk {row.week}
@@ -93,12 +89,17 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
             {qbOut && (
               <span
                 className="inline-block rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-300"
-                title={row.factors.qb_out_detail ?? "Starting QB listed out (live ESPN, unofficial). Not a model input."}
+                title={
+                  row.factors.qb_out_detail ??
+                  "Starting QB listed out (live ESPN, unofficial). Not a model input."
+                }
               >
                 ⚠ QB OUT
                 {row.factors.qb_out_away ? ` · ${row.away}` : ""}
                 {row.factors.qb_out_home ? ` · ${row.home}` : ""}
-                <span className="ml-1 text-amber-500/70">(live, unofficial)</span>
+                <span className="ml-1 text-amber-500/70">
+                  (live, unofficial)
+                </span>
               </span>
             )}
           </div>
@@ -112,7 +113,8 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
               {row.factors.full_game_total !== null &&
                 row.factors.full_game_total !== undefined && (
                   <span className="text-[var(--text-dim)]">
-                    {" "}· from full-game total{" "}
+                    {" "}
+                    · from full-game total{" "}
                     {row.factors.full_game_total.toFixed(1)}
                     {row.factors.spread !== null &&
                     row.factors.spread !== undefined
@@ -140,7 +142,10 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
                     {row.bvAdjust !== null && (
                       <span
                         className="ml-1 text-xs font-normal text-amber-400"
-                        title={row.bvAdjustReason ?? "manual adjustment to our number"}
+                        title={
+                          row.bvAdjustReason ??
+                          "manual adjustment to our number"
+                        }
                       >
                         (adj {row.bvAdjust > 0 ? "+" : ""}
                         {row.bvAdjust})
@@ -170,7 +175,9 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
                 >
                   <span className="bv-stat-label">Edge vs Vegas</span>
                   <span className="bv-stat-value" style={{ color: gapColor }}>
-                    {gap !== null ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}` : "—"}
+                    {gap !== null
+                      ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}`
+                      : "—"}
                     {z !== null && (
                       <span
                         className={`ml-1 text-xs font-normal ${significant ? "text-[var(--text-muted)]" : "text-[var(--text-dim)]"}`}

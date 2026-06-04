@@ -5,7 +5,10 @@ import { getLedger } from "@/lib/ledger";
 export async function GET(req: NextRequest) {
   const season = Number(req.nextUrl.searchParams.get("season"));
   if (!Number.isFinite(season)) {
-    return NextResponse.json({ error: "missing or invalid ?season" }, { status: 400 });
+    return NextResponse.json(
+      { error: "missing or invalid ?season" },
+      { status: 400 },
+    );
   }
   return NextResponse.json(await getLedger(season));
 }

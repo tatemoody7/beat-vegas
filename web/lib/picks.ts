@@ -88,7 +88,8 @@ export async function getPicks(
     stake: r.stake,
     price: r.price === null ? null : Number(r.price),
     note: r.note,
-    modelScore: r.model_score_at_pick === null ? null : Number(r.model_score_at_pick),
+    modelScore:
+      r.model_score_at_pick === null ? null : Number(r.model_score_at_pick),
     modelLine: r.model_line_at_pick,
     result: truthy(r.graded) ? r.result : "pending",
     units: r.units,
@@ -106,12 +107,16 @@ export async function getPicks(
     const pushes = graded.filter((p) => p.result === "push").length;
     const decided = graded.length - pushes;
     const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
-    const clvs = graded.filter((p) => p.clv !== null).map((p) => p.clv as number);
+    const clvs = graded
+      .filter((p) => p.clv !== null)
+      .map((p) => p.clv as number);
     record = {
       record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
       hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
       units: signed(unitsSum),
-      clv: clvs.length ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length) : "—",
+      clv: clvs.length
+        ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
+        : "—",
     };
   }
   return { picks, record };
@@ -139,7 +144,8 @@ export async function createPick(input: CreatePickInput): Promise<void> {
     SELECT under_score, line_used FROM predictions
     WHERE game_id = ${input.gameId} ORDER BY created_at DESC LIMIT 1
   `;
-  const modelScore = pred[0]?.under_score == null ? null : Number(pred[0].under_score);
+  const modelScore =
+    pred[0]?.under_score == null ? null : Number(pred[0].under_score);
   const modelLine = pred[0]?.line_used ?? null;
 
   const stake = input.stake ?? 1.0;

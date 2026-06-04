@@ -1,4 +1,5 @@
 """Current season / active week helpers (shared by scripts + the daily runner)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -19,8 +20,11 @@ def detect_week(season: int, now: Optional[datetime] = None) -> Optional[int]:
     now = now or datetime.utcnow()
     lo, hi = now - timedelta(days=2), now + timedelta(days=9)
     with session_scope() as s:
-        rows = (s.query(Game.week, Game.start_date)
-                .filter(Game.season == season, Game.start_date.isnot(None)).all())
+        rows = (
+            s.query(Game.week, Game.start_date)
+            .filter(Game.season == season, Game.start_date.isnot(None))
+            .all()
+        )
     counts: Dict[int, int] = {}
     for wk, dt in rows:
         if wk is not None and dt is not None and lo <= dt <= hi:

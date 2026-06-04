@@ -3,6 +3,7 @@
 Kept dependency-free and unit-tested so the money logic is never in doubt.
 Convention: we only ever bet the UNDER (the project's market).
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -21,8 +22,7 @@ def under_result(actual_first_half_total: float, line: float) -> str:
     return "push"
 
 
-def units_won(actual_first_half_total: float, line: float,
-              under_price: int = -110) -> float:
+def units_won(actual_first_half_total: float, line: float, under_price: int = -110) -> float:
     """Profit in units for a 1-unit UNDER bet (push = 0, loss = -1)."""
     res = under_result(actual_first_half_total, line)
     if res == "push":

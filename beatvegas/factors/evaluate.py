@@ -15,6 +15,7 @@ Ranking is by out-of-sample top-fraction ROI (ties broken by under% then AUC) �
 this matches the project goal of "positive ROI at any volume". Stability and
 sample size travel alongside as diagnostics, never as filters.
 """
+
 from __future__ import annotations
 
 from itertools import combinations
@@ -29,7 +30,7 @@ from sklearn.metrics import roc_auc_score
 from ..backtest.engine import WIN_PROFIT, _new_model, _roi
 from .registry import Factor
 
-_MIN_OOS = 300          # need this many OOS rows to trust a factor's metrics
+_MIN_OOS = 300  # need this many OOS rows to trust a factor's metrics
 
 
 def _screen_model() -> HistGradientBoostingClassifier:
@@ -39,14 +40,22 @@ def _screen_model() -> HistGradientBoostingClassifier:
     of small models, so we trade a little fidelity for ~3x speed — fine for
     *ranking* factors relative to each other."""
     return HistGradientBoostingClassifier(
-        learning_rate=0.1, max_depth=3, max_iter=100,
-        l2_regularization=1.0, min_samples_leaf=40, random_state=7,
+        learning_rate=0.1,
+        max_depth=3,
+        max_iter=100,
+        l2_regularization=1.0,
+        min_samples_leaf=40,
+        random_state=7,
     )
 
 
-def _walk_forward(df: pd.DataFrame, cols: List[str],
-                  first_test_season: int = 2018, min_train: int = 500,
-                  dropna: bool = False) -> Optional[pd.DataFrame]:
+def _walk_forward(
+    df: pd.DataFrame,
+    cols: List[str],
+    first_test_season: int = 2018,
+    min_train: int = 500,
+    dropna: bool = False,
+) -> Optional[pd.DataFrame]:
     """OOS predictions from a GBM over `cols`, one model per test season.
 
     Returns a frame with season/under/prob (+ the single factor value when
@@ -97,20 +106,27 @@ def _selection_metrics(pg: pd.DataFrame, top_frac: float) -> Dict:
     }
 
 
-def evaluate_factor(df: pd.DataFrame, factor: Factor, top_frac: float = 0.20,
-                    first_test_season: int = 2018) -> Optional[Dict]:
+def evaluate_factor(
+    df: pd.DataFrame, factor: Factor, top_frac: float = 0.20, first_test_season: int = 2018
+) -> Optional[Dict]:
     """Full univariate diagnostic payload for one factor, or None if too sparse."""
     pg = _walk_forward(df, [factor.name], first_test_season, dropna=True)
     if pg is None or len(pg) < _MIN_OOS:
         return None
-    auc = (round(float(roc_auc_score(pg["under"], pg["prob"])), 4)
-           if pg["under"].nunique() > 1 else None)
+    auc = (
+        round(float(roc_auc_score(pg["under"], pg["prob"])), 4)
+        if pg["under"].nunique() > 1
+        else None
+    )
     corr = pg["val"].astype(float).corr(pg["under"].astype(float))
     # corr to ACTUAL 1H total — the genuine 1H-scoring signal, immune to the
     # proxy artifact that inflates proxy-under ROI. Negative = factor up ->
     # fewer real 1H points (a true under driver).
-    corr_1h = (pg["val"].astype(float).corr(pg["fh_total"].astype(float))
-               if "fh_total" in pg.columns else None)
+    corr_1h = (
+        pg["val"].astype(float).corr(pg["fh_total"].astype(float))
+        if "fh_total" in pg.columns
+        else None
+    )
     out = {
         "factor": factor.name,
         "family": factor.family,
@@ -127,9 +143,9 @@ def evaluate_factor(df: pd.DataFrame, factor: Factor, top_frac: float = 0.20,
     return out
 
 
-def permutation_importances(df: pd.DataFrame, cols: List[str],
-                            n_repeats: int = 5,
-                            random_state: int = 7) -> Dict[str, float]:
+def permutation_importances(
+    df: pd.DataFrame, cols: List[str], n_repeats: int = 5, random_state: int = 7
+) -> Dict[str, float]:
     """Permutation importance (mean AUC drop) of each col in the full GBM,
     measured on the most recent season held out from training."""
     seasons = sorted(df["season"].unique())
@@ -142,15 +158,25 @@ def permutation_importances(df: pd.DataFrame, cols: List[str],
         return {}
     model = _new_model()
     model.fit(train[cols], train["under"])
-    r = permutation_importance(model, test[cols], test["under"],
-                               n_repeats=n_repeats, random_state=random_state,
-                               scoring="roc_auc")
+    r = permutation_importance(
+        model,
+        test[cols],
+        test["under"],
+        n_repeats=n_repeats,
+        random_state=random_state,
+        scoring="roc_auc",
+    )
     return {c: round(float(v), 5) for c, v in zip(cols, r.importances_mean)}
 
 
-def evaluate_combos(df: pd.DataFrame, factor_names: List[str],
-                    sizes=(2, 3), top_k: int = 10, top_frac: float = 0.20,
-                    first_test_season: int = 2018) -> List[Dict]:
+def evaluate_combos(
+    df: pd.DataFrame,
+    factor_names: List[str],
+    sizes=(2, 3),
+    top_k: int = 10,
+    top_frac: float = 0.20,
+    first_test_season: int = 2018,
+) -> List[Dict]:
     """Scan 2- and 3-way combinations of the strongest univariate factors.
 
     `factor_names` must already be ranked best-first; we take the top_k and try
@@ -163,25 +189,37 @@ def evaluate_combos(df: pd.DataFrame, factor_names: List[str],
             pg = _walk_forward(df, list(combo), first_test_season, dropna=False)
             if pg is None or len(pg) < _MIN_OOS:
                 continue
-            auc = (round(float(roc_auc_score(pg["under"], pg["prob"])), 4)
-                   if pg["under"].nunique() > 1 else None)
-            row = {"factor": " + ".join(combo), "members": list(combo),
-                   "n": int(len(pg)), "auc": auc}
+            auc = (
+                round(float(roc_auc_score(pg["under"], pg["prob"])), 4)
+                if pg["under"].nunique() > 1
+                else None
+            )
+            row = {
+                "factor": " + ".join(combo),
+                "members": list(combo),
+                "n": int(len(pg)),
+                "auc": auc,
+            }
             row.update(_selection_metrics(pg, top_frac))
             out.append(row)
     out.sort(key=lambda r: (r["top_roi"], r["top_under_pct"]), reverse=True)
     return out
 
 
-def rank_factors(df: pd.DataFrame, factors: List[Factor], top_frac: float = 0.20,
-                 first_test_season: int = 2018,
-                 combo_top_k: int = 10) -> Dict:
+def rank_factors(
+    df: pd.DataFrame,
+    factors: List[Factor],
+    top_frac: float = 0.20,
+    first_test_season: int = 2018,
+    combo_top_k: int = 10,
+) -> Dict:
     """Evaluate every factor univariately, attach permutation importance, rank
     by OOS top-fraction ROI, then scan combinations of the strongest. Returns
     {"univariate": [...ranked...], "combos": [...], "baseline": {...}}.
     """
-    rows = [r for f in factors if (r := evaluate_factor(
-        df, f, top_frac, first_test_season)) is not None]
+    rows = [
+        r for f in factors if (r := evaluate_factor(df, f, top_frac, first_test_season)) is not None
+    ]
 
     # Permutation importance over the non-forward-only present columns.
     present = [f.name for f in factors if f.name in df.columns]
@@ -189,14 +227,14 @@ def rank_factors(df: pd.DataFrame, factors: List[Factor], top_frac: float = 0.20
     for r in rows:
         r["perm_importance"] = perm.get(r["factor"])
 
-    rows.sort(key=lambda r: (r["top_roi"], r["top_under_pct"], r["auc"] or 0),
-              reverse=True)
+    rows.sort(key=lambda r: (r["top_roi"], r["top_under_pct"], r["auc"] or 0), reverse=True)
     for i, r in enumerate(rows, 1):
         r["rank"] = i
 
     ranked_names = [r["factor"] for r in rows if not r["market"]]
-    combos = evaluate_combos(df, ranked_names, top_k=combo_top_k,
-                             top_frac=top_frac, first_test_season=first_test_season)
+    combos = evaluate_combos(
+        df, ranked_names, top_k=combo_top_k, top_frac=top_frac, first_test_season=first_test_season
+    )
     for i, c in enumerate(combos, 1):
         c["rank"] = i
 

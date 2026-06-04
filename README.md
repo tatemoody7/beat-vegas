@@ -101,11 +101,9 @@ python scripts/pick.py summary                 # your hit rate, units, CLV
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
-**Dashboard** (opportunity board, line-movement charts, Line Study, market +
-your-picks ledger with CLV, research verdict):
-```bash
-streamlit run beatvegas/dashboard/app.py
-```
+**Dashboard:** the product face is the Next.js app in `web/` (see *Web app* below) —
+opportunity board, line-movement charts, Line Study, market + your-picks ledger with
+CLV, and the research verdict.
 
 **Credit budget (free tier = 500/month):** `totals_h1` is an Odds API
 *additional market*, served only per-event. `poll_lines.py` lists events for
@@ -119,12 +117,13 @@ market cost 0 credits. A ~10-game Saturday slate polled daily for its game-week
 The product face is a Next.js app in `web/` (App Router + TypeScript + Tailwind +
 Prisma + Recharts), deployed on **Vercel**, reading/writing a **Neon Postgres**
 database, behind a simple password gate. Views: Opportunities, Line Study,
-Movement, Ledger, Research, and writable My Picks. The Streamlit dashboard
-remains for local quick-views; it is not deployed.
+Movement, Ledger, Research, and writable My Picks. It uses a plain-English,
+modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*`
+classes in `web/app/globals.css`).
 
 **Architecture:** Neon Postgres is the single source of truth. The local Python
 engine (`run_daily.sh` etc.) writes to Neon; the Vercel app reads it and writes
-manual picks. `web/lib/*.ts` port the Streamlit SQL/scoring; API routes under
+manual picks. `web/lib/*.ts` hold the SQL/scoring logic; API routes under
 `web/app/api/` mirror those queries.
 
 ### Local dev

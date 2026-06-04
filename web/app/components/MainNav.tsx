@@ -18,7 +18,8 @@ export default function MainNav() {
   return (
     <nav className="flex min-w-0 flex-1 gap-6 overflow-x-auto">
       {LINKS.map((l) => {
-        const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+        const active =
+          l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
         return (
           <Link
             key={l.href}

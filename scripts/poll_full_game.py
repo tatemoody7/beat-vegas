@@ -17,6 +17,7 @@ Sources (`--source`):
 
 Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + close.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,30 +33,43 @@ from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
 from beatvegas.sources.draftkings import (
-    DraftKingsClient, normalize_first_half, normalize_full_game,
+    DraftKingsClient,
+    normalize_first_half,
+    normalize_full_game,
 )
 
 
 def _candidate_games(session, season: int) -> List[Dict]:
-    rows = session.query(
-        Game.id, Game.home_team, Game.away_team, Game.start_date
-    ).filter(Game.season == season).all()
-    return [{"id": r[0], "home_team": r[1], "away_team": r[2],
-             "start_date": r[3]} for r in rows]
+    rows = (
+        session.query(Game.id, Game.home_team, Game.away_team, Game.start_date)
+        .filter(Game.season == season)
+        .all()
+    )
+    return [{"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3]} for r in rows]
 
 
 def _latest_snapshot(session, game_id: int, book: str, market: str):
-    return (session.query(OddsSnapshot)
-            .filter(OddsSnapshot.game_id == game_id, OddsSnapshot.book == book,
-                    OddsSnapshot.market == market)
-            .order_by(OddsSnapshot.captured_at.desc()).first())
+    return (
+        session.query(OddsSnapshot)
+        .filter(
+            OddsSnapshot.game_id == game_id,
+            OddsSnapshot.book == book,
+            OddsSnapshot.market == market,
+        )
+        .order_by(OddsSnapshot.captured_at.desc())
+        .first()
+    )
 
 
 def _changed(prev, line, spread, over, under) -> bool:
     if prev is None:
         return True
-    return (prev.line != line or prev.spread != spread
-            or prev.over_price != over or prev.under_price != under)
+    return (
+        prev.line != line
+        or prev.spread != spread
+        or prev.over_price != over
+        or prev.under_price != under
+    )
 
 
 def _fetch(source: str, season: int) -> Tuple[List[Dict], List[Dict], str, int]:
@@ -84,14 +98,23 @@ def _resolve_gid(r: Dict, games: List[Dict], ids: set) -> Optional[int]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
-    ap.add_argument("--source", choices=("dk", "cfbd", "auto"), default="auto",
-                    help="opener source; auto=DK then CFBD fallback")
-    ap.add_argument("--days-ahead", type=int, default=8,
-                    help="only store odds for events within N days")
-    ap.add_argument("--notify", action="store_true",
-                    help="send a single 'DK fired' iMessage when done (no picks)")
-    ap.add_argument("--dry-run-alerts", action="store_true",
-                    help="print the notification instead of sending it")
+    ap.add_argument(
+        "--source",
+        choices=("dk", "cfbd", "auto"),
+        default="auto",
+        help="opener source; auto=DK then CFBD fallback",
+    )
+    ap.add_argument(
+        "--days-ahead", type=int, default=8, help="only store odds for events within N days"
+    )
+    ap.add_argument(
+        "--notify",
+        action="store_true",
+        help="send a single 'DK fired' iMessage when done (no picks)",
+    )
+    ap.add_argument(
+        "--dry-run-alerts", action="store_true", help="print the notification instead of sending it"
+    )
     args = ap.parse_args()
 
     if not try_init_db():
@@ -124,13 +147,19 @@ def main() -> None:
             matched += 1
             matched_gids.add(gid)
             prev = _latest_snapshot(s, gid, r["book"], "full_game_total")
-            if _changed(prev, r["line"], r.get("spread"),
-                        r["over_price"], r["under_price"]):
-                s.add(OddsSnapshot(
-                    game_id=gid, book=r["book"], market="full_game_total",
-                    line=r["line"], spread=r.get("spread"),
-                    over_price=r["over_price"], under_price=r["under_price"],
-                    captured_at=now))
+            if _changed(prev, r["line"], r.get("spread"), r["over_price"], r["under_price"]):
+                s.add(
+                    OddsSnapshot(
+                        game_id=gid,
+                        book=r["book"],
+                        market="full_game_total",
+                        line=r["line"],
+                        spread=r.get("spread"),
+                        over_price=r["over_price"],
+                        under_price=r["under_price"],
+                        captured_at=now,
+                    )
+                )
                 written_fg += 1
             else:
                 skipped += 1
@@ -151,22 +180,33 @@ def main() -> None:
                 continue
             prev = _latest_snapshot(s, gid, r["book"], "1H_total")
             if _changed(prev, r["line"], None, r["over_price"], r["under_price"]):
-                s.add(OddsSnapshot(
-                    game_id=gid, book=r["book"], market="1H_total",
-                    line=r["line"], over_price=r["over_price"],
-                    under_price=r["under_price"], captured_at=now))
+                s.add(
+                    OddsSnapshot(
+                        game_id=gid,
+                        book=r["book"],
+                        market="1H_total",
+                        line=r["line"],
+                        over_price=r["over_price"],
+                        under_price=r["under_price"],
+                        captured_at=now,
+                    )
+                )
                 written_h1 += 1
 
-    print(f"source={source} dk_events={dk_events} "
-          f"fg_rows={len(fg_rows)} h1_rows={len(h1_rows)} matched={matched} "
-          f"unmatched={unmatched} new_fg={written_fg} new_h1={written_h1} "
-          f"unchanged={skipped} games_updated={games_updated}")
+    print(
+        f"source={source} dk_events={dk_events} "
+        f"fg_rows={len(fg_rows)} h1_rows={len(h1_rows)} matched={matched} "
+        f"unmatched={unmatched} new_fg={written_fg} new_h1={written_h1} "
+        f"unchanged={skipped} games_updated={games_updated}"
+    )
 
     if args.notify:
         acfg = load_config().get("alerts", {}) or {}
         recipient = acfg.get("imessage_to", "")
-        msg = (f"DK poll done — {len(matched_gids)} games captured "
-               f"({written_fg} new full-game lines). Board updated.")
+        msg = (
+            f"DK poll done — {len(matched_gids)} games captured "
+            f"({written_fg} new full-game lines). Board updated."
+        )
         if args.dry_run_alerts or not recipient:
             print(f"[notify] {msg}" + ("" if recipient else "  (no recipient set)"))
         elif fg_rows:  # don't text on empty offseason pulls

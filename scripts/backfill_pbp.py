@@ -12,6 +12,7 @@ transiently — only the compact aggregates are stored.
 
 Resumable (upsert by game_id+off_team) and fail-silent per season.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,8 +31,10 @@ def _games_meta(season: int) -> pd.DataFrame:
     with session_scope() as s:
         return pd.DataFrame(
             s.query(Game.id, Game.season, Game.week, Game.home_team, Game.away_team)
-            .filter(Game.season == season).all(),
-            columns=["game_id", "season", "week", "home_team", "away_team"])
+            .filter(Game.season == season)
+            .all(),
+            columns=["game_id", "season", "week", "home_team", "away_team"],
+        )
 
 
 def _resync_sequence() -> None:
@@ -40,9 +43,12 @@ def _resync_sequence() -> None:
     if engine.dialect.name != "postgresql":
         return
     with engine.begin() as conn:
-        conn.execute(text(
-            "SELECT setval(pg_get_serial_sequence('fh_team_game','id'), "
-            "COALESCE((SELECT MAX(id) FROM fh_team_game), 1))"))
+        conn.execute(
+            text(
+                "SELECT setval(pg_get_serial_sequence('fh_team_game','id'), "
+                "COALESCE((SELECT MAX(id) FROM fh_team_game), 1))"
+            )
+        )
 
 
 def backfill_season(season: int, client: CFBDClient) -> int:
@@ -62,17 +68,30 @@ def backfill_season(season: int, client: CFBDClient) -> int:
         is_home = bool(r.is_home_off)
         off_team = r.home_team if is_home else r.away_team
         def_team = r.away_team if is_home else r.home_team
-        rows.append({
-            "game_id": int(r.game_id), "season": int(r.season), "week": int(r.week),
-            "off_team": off_team, "def_team": def_team, "is_home": is_home,
-            "source": src,
-            "n_plays": int(r.n_plays), "epa": _f(r.epa), "success": _f(r.success),
-            "explosive": _f(r.explosive), "pass_rate": _f(r.pass_rate),
-            "early_success": _f(r.early_success), "third_conv": _f(r.third_conv),
-            "havoc_suffered": _f(r.havoc_suffered), "turnovers": _f(r.turnovers),
-            "opening_score": _i(r.opening_score), "opening_3out": _i(r.opening_3out),
-            "redzone_td": _f(r.redzone_td), "fourth_go": _f(r.fourth_go),
-        })
+        rows.append(
+            {
+                "game_id": int(r.game_id),
+                "season": int(r.season),
+                "week": int(r.week),
+                "off_team": off_team,
+                "def_team": def_team,
+                "is_home": is_home,
+                "source": src,
+                "n_plays": int(r.n_plays),
+                "epa": _f(r.epa),
+                "success": _f(r.success),
+                "explosive": _f(r.explosive),
+                "pass_rate": _f(r.pass_rate),
+                "early_success": _f(r.early_success),
+                "third_conv": _f(r.third_conv),
+                "havoc_suffered": _f(r.havoc_suffered),
+                "turnovers": _f(r.turnovers),
+                "opening_score": _i(r.opening_score),
+                "opening_3out": _i(r.opening_3out),
+                "redzone_td": _f(r.redzone_td),
+                "fourth_go": _f(r.fourth_go),
+            }
+        )
     _resync_sequence()
     with session_scope() as s:
         upsert(s, FhTeamGame, rows, ["game_id", "off_team"])

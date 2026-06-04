@@ -35,7 +35,9 @@ export default function LoginPage() {
         className="w-full max-w-xs rounded-xl border border-gray-800 bg-gray-950 p-6"
       >
         <h1 className="text-lg font-semibold">Beat Vegas</h1>
-        <p className="mb-4 text-sm text-gray-500">Enter the password to continue.</p>
+        <p className="mb-4 text-sm text-gray-500">
+          Enter the password to continue.
+        </p>
         <input
           type="password"
           autoFocus

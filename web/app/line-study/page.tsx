@@ -42,7 +42,9 @@ export default async function LineStudyPage({
       <p className="mb-4 text-xs text-[var(--text-dim)]">
         Grouped by{" "}
         <span className="text-[var(--text-muted)]">
-          {anyReal ? "real opening lines" : "estimated lines (0.52 × full-game total)"}
+          {anyReal
+            ? "real opening lines"
+            : "estimated lines (0.52 × full-game total)"}
         </span>
         . You need to win {BREAKEVEN_PCT}% to break even at −110.
         {!anyReal &&

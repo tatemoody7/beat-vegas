@@ -1,9 +1,14 @@
 """Spread-adjusted 1H multiplier: flat fallback, spread sensitivity, clamps, fit."""
+
 import numpy as np
 
 from beatvegas.etl import proxy_line
 from beatvegas.etl.proxy_line import (
-    DEFAULT_SHARE, SHARE_CLAMP, fh_share, fit_share, proxy_total,
+    DEFAULT_SHARE,
+    SHARE_CLAMP,
+    fh_share,
+    fit_share,
+    proxy_total,
 )
 
 
@@ -25,7 +30,7 @@ def test_share_rises_with_spread_magnitude():
     c = {"a": 0.50, "b": 0.003}
     assert fh_share(0.0, coeffs=c) == 0.50
     assert fh_share(10.0, coeffs=c) == 0.53
-    assert fh_share(-10.0, coeffs=c) == 0.53          # uses |spread|
+    assert fh_share(-10.0, coeffs=c) == 0.53  # uses |spread|
 
 
 def test_clamps_hold():
@@ -43,8 +48,8 @@ def test_proxy_total_flat_default_matches_legacy():
 
 def test_proxy_total_spread_adjusted_is_higher_for_big_favorite():
     c = {"a": 0.50, "b": 0.003}
-    flat = proxy_total(60.0)                            # 31.0
-    big = proxy_total(60.0, spread=20.0, coeffs=c)      # share clamps to 0.56 -> 33.5
+    flat = proxy_total(60.0)  # 31.0
+    big = proxy_total(60.0, spread=20.0, coeffs=c)  # share clamps to 0.56 -> 33.5
     assert big > flat
     assert big == 33.5
 

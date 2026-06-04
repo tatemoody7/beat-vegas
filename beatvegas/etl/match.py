@@ -4,10 +4,11 @@ Odds API team names carry mascots ("Ohio State Buckeyes") and at neutral sites
 the home/away designation can be flipped vs CFBD. We score both orientations
 against same-window CFBD games and require a confident name match on both teams.
 """
+
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -45,10 +46,14 @@ def _parse_dt(s: Any) -> Optional[datetime]:
         return None
 
 
-def match_event(ev_home: str, ev_away: str, commence: Any,
-                games: List[Dict[str, Any]],
-                date_window_days: int = 1,
-                min_team_score: float = 0.80) -> Tuple[Optional[int], float]:
+def match_event(
+    ev_home: str,
+    ev_away: str,
+    commence: Any,
+    games: List[Dict[str, Any]],
+    date_window_days: int = 1,
+    min_team_score: float = 0.80,
+) -> Tuple[Optional[int], float]:
     """Return (game_id, score) of the best CFBD match, or (None, 0.0).
 
     `games`: list of dicts with id, home_team, away_team, start_date.
@@ -74,9 +79,13 @@ def match_event(ev_home: str, ev_away: str, commence: Any,
     return best_id, best_score
 
 
-def resolve_game(home: str, away: str, games: List[Dict[str, Any]],
-                 week: Optional[int] = None,
-                 min_team_score: float = 0.6) -> Tuple[Optional[int], float, int]:
+def resolve_game(
+    home: str,
+    away: str,
+    games: List[Dict[str, Any]],
+    week: Optional[int] = None,
+    min_team_score: float = 0.6,
+) -> Tuple[Optional[int], float, int]:
     """Resolve a game id from typed team names (no kickoff time needed).
 
     Returns (game_id, score, n_close). n_close > 1 means genuinely ambiguous —

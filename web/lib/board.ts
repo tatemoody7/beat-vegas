@@ -91,7 +91,9 @@ async function consensusLines(): Promise<
     const lasts: number[] = [];
     for (const caps of books.values()) {
       // ISO-ish timestamps sort chronologically as strings.
-      caps.sort((a, b) => (a.captured_at ?? "").localeCompare(b.captured_at ?? ""));
+      caps.sort((a, b) =>
+        (a.captured_at ?? "").localeCompare(b.captured_at ?? ""),
+      );
       firsts.push(Number(caps[0].line));
       lasts.push(Number(caps[caps.length - 1].line));
     }
@@ -101,10 +103,16 @@ async function consensusLines(): Promise<
 }
 
 // Latest manual BV adjustment per game (display-only nudge, e.g. QB-out).
-async function bvAdjustments(): Promise<Map<number, { delta: number; reason: string | null }>> {
+async function bvAdjustments(): Promise<
+  Map<number, { delta: number; reason: string | null }>
+> {
   const rows = await prisma.$queryRaw<
-    { game_id: number | bigint; delta_pts: number | null; reason: string | null;
-      created_at: string | null }[]
+    {
+      game_id: number | bigint;
+      delta_pts: number | null;
+      reason: string | null;
+      created_at: string | null;
+    }[]
   >`
     SELECT game_id, delta_pts, reason, CAST(created_at AS TEXT) AS created_at
     FROM bv_adjustments ORDER BY created_at
@@ -112,7 +120,10 @@ async function bvAdjustments(): Promise<Map<number, { delta: number; reason: str
   const out = new Map<number, { delta: number; reason: string | null }>();
   for (const r of rows) {
     if (r.delta_pts === null || r.delta_pts === undefined) continue;
-    out.set(Number(r.game_id), { delta: Number(r.delta_pts), reason: r.reason });
+    out.set(Number(r.game_id), {
+      delta: Number(r.delta_pts),
+      reason: r.reason,
+    });
   }
   return out; // later rows overwrite earlier → latest wins
 }
@@ -131,7 +142,10 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
         ORDER BY p2.created_at DESC LIMIT 1)
     ORDER BY p.rank
   `;
-  const [lines, adjustments] = await Promise.all([consensusLines(), bvAdjustments()]);
+  const [lines, adjustments] = await Promise.all([
+    consensusLines(),
+    bvAdjustments(),
+  ]);
   return preds.map((p) => {
     const gid = Number(p.game_id);
     const l = lines.get(gid);
@@ -139,7 +153,10 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
     const adj = adjustments.get(gid) ?? null;
     const rawBv = num(p.bv_line);
     // Apply the manual nudge to the displayed BV line + band (clearly labeled).
-    const bvLine = rawBv !== null && adj ? Math.round((rawBv + adj.delta) * 100) / 100 : rawBv;
+    const bvLine =
+      rawBv !== null && adj
+        ? Math.round((rawBv + adj.delta) * 100) / 100
+        : rawBv;
     const bvSigma = num(p.bv_sigma);
     // Prefer the gap vs the live consensus; fall back to the gap baked in at
     // scoring time (bv_gap = line_used − bv_line) when no live line exists.
@@ -164,8 +181,10 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       openLine: l?.open ?? null,
       curLine,
       bvLine,
-      bvLo: adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
-      bvHi: adj && num(p.bv_hi) !== null ? num(p.bv_hi)! + adj.delta : num(p.bv_hi),
+      bvLo:
+        adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
+      bvHi:
+        adj && num(p.bv_hi) !== null ? num(p.bv_hi)! + adj.delta : num(p.bv_hi),
       bvSigma,
       liveGap,
       liveGapZ,

@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
   const price = b.price !== undefined ? Number(b.price) : undefined;
   const note =
     typeof b.note === "string" && b.note.trim() ? b.note.trim() : undefined;
+  const market = b.market === "full" ? "full" : "1H";
 
-  await createPick({ gameId, line, stake, price, note });
+  await createPick({ gameId, market, line, stake, price, note });
   return NextResponse.json({ ok: true }, { status: 201 });
 }

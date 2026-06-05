@@ -33,8 +33,8 @@ export default async function PicksPage({
         )}
       </div>
       <p className="bv-page-sub mb-5">
-        Log your first-half unders — saved and settled after games finish, so
-        your record builds each week.
+        Log your unders — full game or first half — saved and settled after games
+        finish, so your record builds each week.
       </p>
 
       {/* Running record */}

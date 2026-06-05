@@ -12,6 +12,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
   const [line, setLine] = useState<string>(
     String(lineFor(slate[0]?.gameId ?? 0)),
   );
+  const [market, setMarket] = useState<"1H" | "full">("1H");
   const [stake, setStake] = useState("1");
   const [price, setPrice] = useState("-110");
   const [note, setNote] = useState("");
@@ -37,6 +38,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId,
+          market,
           line: Number(line),
           stake: Number(stake) || 1,
           price: Number(price) || -110,
@@ -88,7 +90,18 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
         </label>
 
         <label className={labelCls}>
-          Your line (under)
+          Market
+          <select
+            value={market}
+            onChange={(e) => setMarket(e.target.value as "1H" | "full")}
+            className={field}
+          >
+            <option value="1H">First half</option>
+            <option value="full">Full game</option>
+          </select>
+        </label>
+        <label className={labelCls}>
+          {market === "full" ? "Your line (full game, under)" : "Your line (1H, under)"}
           <input
             type="number"
             step={0.5}

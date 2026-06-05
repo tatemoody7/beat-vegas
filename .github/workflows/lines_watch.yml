@@ -1,0 +1,54 @@
+name: Hard Rock line watch (push alerts)
+
+# Fires a phone push (Pushover) the moment Hard Rock POSTS a line, so Tate can bet
+# the opener before it moves. Runs in the cloud: GHA reaches the Odds API (HTTPS)
+# AND Neon, and runs even when the Mac is asleep. Two cadences:
+#   - Sunday full-game opener: every 10 min across the ~11am ET drop window.
+#   - Mid-week 1H: once daily Mon–Fri (full upcoming-week slate).
+#
+# CREDIT BUDGET (free tier = 500/mo): full-game is a featured market (~2 credits/
+# whole-slate poll); the Sunday window is ~24 polls => ~48 credits/Sunday. The 1H
+# market is per-event (~2 credits PER GAME), so a full daily slate sweep can run
+# ~80-160 credits/day — that ALONE exceeds the free tier across a week and likely
+# needs a paid Odds API tier. Dial scope with poll_lines.py --days-ahead / --max-events.
+
+on:
+  schedule:
+    # Sunday full-game opener window — every 10 min, 14:00–17:50 UTC (covers
+    # ~10am–1pm EDT and ~9am–12:50pm EST so the 11am-local drop is caught in both
+    # DST regimes). First-appearance detection means only the actual drop pushes.
+    - cron: '*/10 14-17 * * 0'
+    # Mid-week 1H sweep — once daily Mon–Fri at 17:00 UTC (~1pm ET).
+    - cron: '0 17 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      market:
+        description: 'manual run: full_game | 1h'
+        default: full_game
+
+concurrency:
+  group: lines-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Full-game opener capture + Hard Rock push (Sunday window)
+        if: github.event.schedule == '*/10 14-17 * * 0' || github.event.inputs.market == 'full_game'
+        run: python scripts/poll_full_game.py --source oddsapi --push
+      - name: 1H capture + Hard Rock push (mid-week daily)
+        if: github.event.schedule == '0 17 * * 1-5' || github.event.inputs.market == '1h'
+        run: python scripts/poll_lines.py --push --no-alerts

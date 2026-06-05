@@ -226,7 +226,8 @@ class ManualPick(Base):
     home_team = Column(String)
     away_team = Column(String)
     side = Column(String, default="under")  # under (this project's market)
-    line = Column(Float)  # the 1H total you bet
+    market = Column(String, default="1H")  # '1H' | 'full' (first-half vs full-game)
+    line = Column(Float)  # the total you bet (1H or full-game per `market`)
     price = Column(Integer, default=-110)
     stake = Column(Float, default=1.0)
     book = Column(String)

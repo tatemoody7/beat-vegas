@@ -4,6 +4,7 @@ __pycache__/
 venv/
 data/*.db
 data/*.db-journal
+data/*.bak-*
 data/*.log
 data/cache/
 data/pbp_cache/

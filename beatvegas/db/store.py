@@ -25,7 +25,7 @@ _MIGRATIONS = {
         "bv_hi": "FLOAT",
         "bv_sigma": "FLOAT",
     },
-    "results": {"closing_captured_at": "TIMESTAMP"},
+    "results": {"closing_captured_at": "TIMESTAMP", "market": "VARCHAR"},
     "manual_picks": {
         "model_score_at_pick": "INTEGER",
         "model_line_at_pick": "FLOAT",

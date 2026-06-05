@@ -21,7 +21,8 @@ from beatvegas.grading import clv_under, under_result, units_won
 from beatvegas.lines import closing_before_kickoff
 from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
-MODEL_MARKET = "market"  # tag for the pure market-vs-result grade
+MODEL_MARKET = "market"  # tag for the pure market-vs-result grade (1H)
+MODEL_MARKET_FG = "market_fg"  # full-game market-vs-result grade
 
 
 def _closings(session, season: int):
@@ -46,6 +47,63 @@ def _closings(session, season: int):
     return out
 
 
+def _closings_fg(session, season: int):
+    """game -> (g, (opening, closing), closing_at) for the FULL-GAME market.
+
+    Mirrors _closings but uses full_game_total snapshots and games with a final
+    score (home_points + away_points = the realized full-game total)."""
+    games = (
+        session.query(Game)
+        .filter(
+            Game.season == season,
+            Game.home_points.isnot(None),
+            Game.away_points.isnot(None),
+        )
+        .all()
+    )
+    out = {}
+    for g in games:
+        snaps = (
+            session.query(OddsSnapshot)
+            .filter(OddsSnapshot.game_id == g.id, OddsSnapshot.market == "full_game_total")
+            .all()
+        )
+        opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
+        out[g.id] = (g, (opening, closing), closing_at)
+    return out
+
+
+def grade_market_fg(session, closings_fg) -> int:
+    """Full-game market ledger: consensus open/close vs the realized total."""
+    n = 0
+    for gid, (g, (opening, closing), closing_at) in closings_fg.items():
+        if closing is None:
+            continue
+        actual = g.home_points + g.away_points
+        (
+            session.query(Result)
+            .filter(Result.game_id == gid, Result.model_version == MODEL_MARKET_FG)
+            .delete()
+        )
+        session.add(
+            Result(
+                game_id=gid,
+                model_version=MODEL_MARKET_FG,
+                market="full",
+                actual_first_half_total=actual,  # full-game total (see model note)
+                line_used=closing,
+                line_kind="real",
+                under_hit=under_result(actual, closing) == "under",
+                closing_line=closing,
+                closing_captured_at=closing_at,
+                clv=clv_under(opening, closing),
+                units=units_won(actual, closing),
+            )
+        )
+        n += 1
+    return n
+
+
 def grade_market(session, closings) -> int:
     n = 0
     for gid, (g, (opening, closing), closing_at) in closings.items():
@@ -61,6 +119,7 @@ def grade_market(session, closings) -> int:
             Result(
                 game_id=gid,
                 model_version=MODEL_MARKET,
+                market="1H",
                 actual_first_half_total=actual,
                 line_used=closing,
                 line_kind="real",
@@ -97,6 +156,7 @@ def grade_model(session, season: int, closings) -> int:
             Result(
                 game_id=p.game_id,
                 model_version=MODEL_VERSION,
+                market="1H",
                 actual_first_half_total=actual,
                 line_used=bet_line,
                 line_kind="real" if closing is not None else "proxy",
@@ -133,12 +193,15 @@ def main() -> None:
 
     with session_scope() as s:
         closings = _closings(s, args.season)
+        closings_fg = _closings_fg(s, args.season)
         m = grade_market(s, closings)
         mdl = grade_model(s, args.season, closings)
-    print(f"graded {m} market + {mdl} model bets for {args.season}")
+        mfg = grade_market_fg(s, closings_fg)
+    print(f"graded {m} market(1H) + {mdl} model(1H) + {mfg} market(FG) bets for {args.season}")
     with session_scope() as s:
-        _summary(s, MODEL_MARKET, "MARKET")
-        _summary(s, MODEL_VERSION, "MODEL ")
+        _summary(s, MODEL_MARKET, "MARKET 1H")
+        _summary(s, MODEL_VERSION, "MODEL  1H")
+        _summary(s, MODEL_MARKET_FG, "MARKET FG")
 
 
 if __name__ == "__main__":

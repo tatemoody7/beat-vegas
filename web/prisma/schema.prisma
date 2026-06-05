@@ -132,6 +132,7 @@ model results {
   id                      Int      @id @default(autoincrement())
   game_id                 Int?
   model_version           String?  @db.VarChar
+  market                  String?  @db.VarChar
   actual_first_half_total Int?
   line_used               Float?
   line_kind               String?  @db.VarChar

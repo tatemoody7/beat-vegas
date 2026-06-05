@@ -20,6 +20,7 @@ export type PickFull = {
   week: number | null;
   away: string | null;
   home: string | null;
+  market: string; // '1H' | 'full'
   line: number | null;
   stake: number | null;
   price: number | null;
@@ -58,6 +59,7 @@ type RawPick = {
   week: number | bigint | null;
   away_team: string | null;
   home_team: string | null;
+  market: string | null;
   line: number | null;
   stake: number | null;
   price: number | bigint | null;
@@ -74,7 +76,7 @@ export async function getPicks(
   season: number,
 ): Promise<{ picks: PickFull[]; record: Record3 | null }> {
   const rows = await prisma.$queryRaw<RawPick[]>`
-    SELECT id, week, away_team, home_team, line, stake, price, note,
+    SELECT id, week, away_team, home_team, market, line, stake, price, note,
            model_score_at_pick, model_line_at_pick, result, units, clv, graded
     FROM manual_picks WHERE season = ${season}
   `;
@@ -84,6 +86,7 @@ export async function getPicks(
     week: r.week === null ? null : Number(r.week),
     away: r.away_team,
     home: r.home_team,
+    market: r.market === "full" ? "full" : "1H", // null (legacy) -> 1H
     line: r.line,
     stake: r.stake,
     price: r.price === null ? null : Number(r.price),
@@ -124,6 +127,7 @@ export async function getPicks(
 
 export type CreatePickInput = {
   gameId: number;
+  market?: "1H" | "full"; // default 1H
   line: number;
   stake?: number;
   price?: number;
@@ -138,16 +142,23 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   });
   if (!game) throw new Error("game not found");
 
-  const pred = await prisma.$queryRaw<
-    {
-      under_score: number | bigint | null;
-      line_used: number | null;
-      factors_json: string | null;
-    }[]
-  >`
+  const market = input.market === "full" ? "full" : "1H";
+
+  // The model (predictions) is 1H-only — only freeze its read onto a 1H pick.
+  // Full-game picks store NULL model fields (the model is a reference, not a pick).
+  const pred =
+    market === "1H"
+      ? await prisma.$queryRaw<
+          {
+            under_score: number | bigint | null;
+            line_used: number | null;
+            factors_json: string | null;
+          }[]
+        >`
     SELECT under_score, line_used, factors_json FROM predictions
     WHERE game_id = ${input.gameId} ORDER BY created_at DESC LIMIT 1
-  `;
+  `
+      : [];
   const modelScore =
     pred[0]?.under_score == null ? null : Number(pred[0].under_score);
   const modelLine = pred[0]?.line_used ?? null;
@@ -162,12 +173,12 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   // boolean for `graded` (SQLite tolerated a text date + integer 0; Neon/PG won't).
   await prisma.$executeRaw`
     INSERT INTO manual_picks
-      (game_id, season, week, home_team, away_team, side, line, price, stake,
-       placed_at, note, model_score_at_pick, model_line_at_pick,
+      (game_id, season, week, home_team, away_team, side, market, line, price,
+       stake, placed_at, note, model_score_at_pick, model_line_at_pick,
        factors_json_at_pick, graded)
     VALUES
       (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-       ${game.away_team}, 'under', ${input.line}, ${price}, ${stake},
+       ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
        ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
        ${factorsAtPick}, false)
   `;

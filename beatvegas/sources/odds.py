@@ -47,6 +47,26 @@ class OddsAPIClient:
         self.last_credits = c
         return c
 
+    def list_full_game_totals(self, regions: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Full-game `totals` for every book in `regions`, from the BULK /odds
+        endpoint. `totals` is a FEATURED market, so this costs (1 x n_regions)
+        credits TOTAL for the whole slate — cheap vs the per-event 1H calls.
+
+        Hard Rock (Florida) is `hardrockbet_fl`, which lives in the `us2` region,
+        so pass regions='us,us2' to capture it alongside the rest of the market."""
+        url = f"{self.base_url}/sports/{self.sport}/odds"
+        params = {
+            "apiKey": self.api_key,
+            "regions": regions or self.regions,
+            "markets": "totals",
+            "oddsFormat": self.odds_format,
+            "dateFormat": "iso",
+        }
+        resp = requests.get(url, params=params, timeout=self.timeout)
+        self._credits(resp)
+        resp.raise_for_status()
+        return resp.json()
+
     def list_events(self) -> List[Dict[str, Any]]:
         """Upcoming events for the sport. FREE (0 credits). Each has id,
         commence_time, home_team, away_team — but no odds."""
@@ -118,10 +138,10 @@ def _unwrap_historical(payload: Dict[str, Any]):
     return payload.get("data")
 
 
-def normalize_first_half(
-    events: List[Dict[str, Any]], books: Optional[List[str]] = None
+def _rows_for_market(
+    events: List[Dict[str, Any]], market_key: str, books: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """Flatten events into one row per (event, book) for the totals_h1 market.
+    """Flatten events into one row per (event, book) for a totals market.
 
     Each row: event_id, commence_time, home_team, away_team, book, line,
     over_price, under_price, last_update."""
@@ -132,7 +152,7 @@ def normalize_first_half(
             if book_filter and bm.get("key") not in book_filter:
                 continue
             for mkt in bm.get("markets", []):
-                if mkt.get("key") != "totals_h1":
+                if mkt.get("key") != market_key:
                     continue
                 over_price = under_price = line = None
                 for oc in mkt.get("outcomes", []):
@@ -156,4 +176,23 @@ def normalize_first_half(
                         "last_update": mkt.get("last_update") or bm.get("last_update"),
                     }
                 )
+    return rows
+
+
+def normalize_first_half(
+    events: List[Dict[str, Any]], books: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
+    """One row per (event, book) for the first-half totals_h1 market."""
+    return _rows_for_market(events, "totals_h1", books)
+
+
+def normalize_full_game(
+    events: List[Dict[str, Any]], books: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
+    """One row per (event, book) for the full-game `totals` market. Same shape as
+    sources.draftkings.normalize_full_game (spread is None — the totals market
+    carries no spread), so scripts/poll_full_game.py consumes either source."""
+    rows = _rows_for_market(events, "totals", books)
+    for r in rows:
+        r["spread"] = None
     return rows

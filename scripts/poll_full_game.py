@@ -7,12 +7,15 @@ keep Game.spread/full_game_total current so the slate can be scored + ranked
 before the retail 1H market exists.
 
 Sources (`--source`):
-  dk    — DraftKings hidden API (free, fresh; may 403 datacenter IPs)
-  cfbd  — CFBD /lines (key-based, reachable from anywhere incl. GitHub Actions)
-  auto  — try DK, fall back to CFBD if DK returns nothing (default)
+  dk      — DraftKings hidden API (free, fresh; may 403 datacenter IPs)
+  cfbd    — CFBD /lines (key-based, reachable from anywhere incl. GitHub Actions)
+  oddsapi — The Odds API bulk /odds (MULTI-BOOK incl. Hard Rock; cloud-safe; the
+            source for the HR-vs-market comparison + the HR-line-drop alert)
+  auto    — try DK, fall back to CFBD if DK returns nothing (default)
 
     python scripts/poll_full_game.py                      # auto, local
-    python scripts/poll_full_game.py --source cfbd        # cloud-safe
+    python scripts/poll_full_game.py --source cfbd        # cloud-safe, one book
+    python scripts/poll_full_game.py --source oddsapi     # multi-book incl. Hard Rock
     python scripts/poll_full_game.py --season 2026 --notify
 
 Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + close.
@@ -24,11 +27,14 @@ import argparse
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
+from beatvegas.alerts.detect import detect_full_game_posted, format_posted_summary
 from beatvegas.alerts.imessage import send_imessage
+from beatvegas.alerts.push import send_push
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
+from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
@@ -37,6 +43,8 @@ from beatvegas.sources.draftkings import (
     normalize_first_half,
     normalize_full_game,
 )
+from beatvegas.sources.odds import OddsAPIClient
+from beatvegas.sources.odds import normalize_full_game as oa_normalize_full_game
 
 
 def _candidate_games(session, season: int) -> List[Dict]:
@@ -72,9 +80,15 @@ def _changed(prev, line, spread, over, under) -> bool:
     )
 
 
-def _fetch(source: str, season: int) -> Tuple[List[Dict], List[Dict], str, int]:
-    """Return (full_game_rows, first_half_rows, source_used, dk_event_count)."""
+def _fetch(source: str, season: int, regions: str = "us,us2") -> Tuple[List[Dict], List[Dict], str, int]:
+    """Return (full_game_rows, first_half_rows, source_used, event_count)."""
     dk_events = 0
+    if source == "oddsapi":
+        # Bulk /odds: multi-book full-game totals incl. Hard Rock (us2). The
+        # rows carry team names + commence_time, so they match by name+time like
+        # the DK path (no CFBD game id). 1H is captured separately (poll_lines).
+        events = OddsAPIClient().list_full_game_totals(regions=regions)
+        return oa_normalize_full_game(events), [], "oddsapi", len(events)
     if source in ("dk", "auto"):
         payload = DraftKingsClient().fetch_ncaaf()
         dk_events = len(payload.get("events", []) or [])
@@ -100,9 +114,14 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument(
         "--source",
-        choices=("dk", "cfbd", "auto"),
+        choices=("dk", "cfbd", "oddsapi", "auto"),
         default="auto",
-        help="opener source; auto=DK then CFBD fallback",
+        help="opener source; auto=DK then CFBD fallback; oddsapi=multi-book incl. Hard Rock",
+    )
+    ap.add_argument(
+        "--regions",
+        default="us,us2",
+        help="Odds API regions for --source oddsapi (us2 carries Hard Rock FL)",
     )
     ap.add_argument(
         "--days-ahead", type=int, default=8, help="only store odds for events within N days"
@@ -113,6 +132,11 @@ def main() -> None:
         help="send a single 'DK fired' iMessage when done (no picks)",
     )
     ap.add_argument(
+        "--push",
+        action="store_true",
+        help="send a cloud push when Hard Rock POSTS new full-game lines (the opener trigger)",
+    )
+    ap.add_argument(
         "--dry-run-alerts", action="store_true", help="print the notification instead of sending it"
     )
     args = ap.parse_args()
@@ -120,7 +144,7 @@ def main() -> None:
     if not try_init_db():
         return
 
-    fg_rows, h1_rows, source, dk_events = _fetch(args.source, args.season)
+    fg_rows, h1_rows, source, dk_events = _fetch(args.source, args.season, args.regions)
 
     now = datetime.utcnow()
     horizon = now + timedelta(days=args.days_ahead)
@@ -134,10 +158,24 @@ def main() -> None:
 
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
     matched_gids = set()
+    hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: line}
+    matchups: Dict[int, str] = {}
 
     with session_scope() as s:
         games = _candidate_games(s, args.season)
         ids = {g["id"] for g in games}
+
+        # Games that ALREADY had a Hard Rock full-game line (for first-appearance
+        # detection) — captured before we insert this run's rows.
+        hr_prev_ids = {
+            gid
+            for (gid,) in s.query(OddsSnapshot.game_id)
+            .filter(
+                OddsSnapshot.market == "full_game_total",
+                OddsSnapshot.book.in_(HR_BOOK_KEYS),
+            )
+            .distinct()
+        }
 
         for r in fg_rows:
             gid = _resolve_gid(r, games, ids)
@@ -146,6 +184,9 @@ def main() -> None:
                 continue
             matched += 1
             matched_gids.add(gid)
+            if r["book"] in HR_BOOK_KEYS:
+                hr_rows.setdefault(gid, {})[r["book"]] = r["line"]
+                matchups[gid] = f"{r['away_team']} @ {r['home_team']}"
             prev = _latest_snapshot(s, gid, r["book"], "full_game_total")
             if _changed(prev, r["line"], r.get("spread"), r["over_price"], r["under_price"]):
                 s.add(
@@ -199,6 +240,22 @@ def main() -> None:
         f"unmatched={unmatched} new_fg={written_fg} new_h1={written_h1} "
         f"unchanged={skipped} games_updated={games_updated}"
     )
+
+    if args.push:
+        hr_new = {
+            gid: line
+            for gid, bl in hr_rows.items()
+            if (line := pick_hr_line(bl)) is not None
+        }
+        alerts = detect_full_game_posted(hr_prev_ids, hr_new, matchups)
+        msg = format_posted_summary(alerts)
+        if not msg:
+            print(f"[push] no newly-posted Hard Rock full-game lines ({len(hr_new)} HR lines seen)")
+        elif args.dry_run_alerts:
+            print(f"[push] {msg}")
+        else:
+            ok, detail = send_push("Beat Vegas", msg, url=BOARD_URL)
+            print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {msg}")
 
     if args.notify:
         acfg = load_config().get("alerts", {}) or {}

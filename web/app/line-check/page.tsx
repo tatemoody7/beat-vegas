@@ -1,0 +1,70 @@
+import { getSeasons } from "@/lib/board";
+import { getLineCheck, type Market } from "@/lib/lineCheck";
+import SeasonSelect from "@/app/components/SeasonSelect";
+import MarketToggle from "@/app/components/MarketToggle";
+import LineCheckCard from "@/app/components/LineCheckCard";
+
+export const dynamic = "force-dynamic";
+
+export default async function LineCheckPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string; market?: string }>;
+}) {
+  const seasons = await getSeasons();
+  const sp = await searchParams;
+  const requested = sp.season ? Number(sp.season) : NaN;
+  const season =
+    Number.isFinite(requested) && seasons.includes(requested)
+      ? requested
+      : (seasons[0] ?? new Date().getFullYear());
+  const market: Market = sp.market === "1h" ? "1h" : "full_game";
+
+  const rows = await getLineCheck(season, market);
+  const priced = rows.filter((r) => r.hrLine !== null);
+  const good = priced.filter((r) => r.verdict === "good").length;
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="bv-page-title">Line Check</h1>
+          <p className="bv-page-sub">
+            Is Hard Rock giving you a good number? For an under, a higher total is
+            better — verdict is Hard Rock vs the best total in the market.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <MarketToggle current={market} />
+          {seasons.length > 0 && (
+            <SeasonSelect seasons={seasons} current={season} />
+          )}
+        </div>
+      </div>
+
+      {priced.length > 0 && (
+        <p className="mb-4 text-sm text-[var(--text-muted)]">
+          Hard Rock has priced{" "}
+          <span className="font-semibold text-[var(--text)]">{priced.length}</span>{" "}
+          {market === "1h" ? "first-half" : "full-game"} game
+          {priced.length === 1 ? "" : "s"} —{" "}
+          <span style={{ color: "var(--under-strong)" }}>{good} good</span>.
+        </p>
+      )}
+
+      {rows.length === 0 ? (
+        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
+          No {market === "1h" ? "first-half" : "full-game"} lines captured for{" "}
+          {season} yet. They appear once the cloud poller records Hard Rock and
+          the rest of the market.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {rows.map((r) => (
+            <LineCheckCard key={r.gameId} row={r} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

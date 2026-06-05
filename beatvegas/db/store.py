@@ -31,6 +31,7 @@ _MIGRATIONS = {
         "model_line_at_pick": "FLOAT",
         "factors_json_at_pick": "TEXT",
         "opening_line": "FLOAT",
+        "market": "VARCHAR",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},

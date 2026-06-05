@@ -46,6 +46,55 @@ def pick_total_spread(
     return None, None, None
 
 
+def pick_open_close(
+    lines: List[Dict[str, Any]],
+) -> Tuple[Optional[float], Optional[float], Optional[str]]:
+    """(opening_total, closing_total, provider) by provider priority.
+
+    Opener = CFBD `overUnderOpen`; close = `overUnder`. Either may be missing for
+    a given provider, in which case the present value backfills the other so a
+    game with only one number is still usable. Used by the full-game backtest to
+    simulate betting the Sunday opener and to measure opener->close CLV."""
+    by_provider: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+    for ln in lines or []:
+        prov = _get(ln, "provider")
+        opn = _get(ln, "overUnderOpen", "over_under_open")
+        close = _get(ln, "overUnder", "over_under")
+        if prov is None or prov in by_provider or (opn is None and close is None):
+            continue
+        o = float(opn) if opn is not None else float(close)
+        c = float(close) if close is not None else float(opn)
+        by_provider[prov] = (o, c)
+    for prov in PROVIDER_PRIORITY:
+        if prov in by_provider:
+            o, c = by_provider[prov]
+            return o, c, prov
+    if by_provider:
+        prov = next(iter(by_provider))
+        o, c = by_provider[prov]
+        return o, c, prov
+    return None, None, None
+
+
+def open_close_lookup(
+    client, season: int, season_type: str = "regular"
+) -> Dict[int, Tuple[float, float, str]]:
+    """{game_id: (open_total, close_total, provider)} for a season from CFBD /lines.
+
+    game_id is the CFBD id (== Game.id), so callers can join by id without fuzzy
+    name matching. Games with no usable total are omitted."""
+    out: Dict[int, Tuple[float, float, str]] = {}
+    for g in client.lines(year=season, season_type=season_type):
+        gid = _get(g, "id")
+        if gid is None:
+            continue
+        o, c, prov = pick_open_close(_get(g, "lines") or [])
+        if o is None:
+            continue
+        out[int(gid)] = (o, c, prov or "cfbd")
+    return out
+
+
 def full_game_rows(client, season: int, season_type: str = "regular") -> List[Dict[str, Any]]:
     """Full-game total+spread rows from CFBD /lines, shaped like the DK rows
     `poll_full_game` consumes. Each row carries `game_id` (CFBD id == Game.id)."""

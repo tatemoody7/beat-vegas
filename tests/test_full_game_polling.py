@@ -63,6 +63,52 @@ def test_full_game_snapshot_roundtrips_spread():
         assert got.line == 55.5 and got.spread == -17.0
 
 
+def test_oddsapi_normalize_full_game_multibook_incl_hardrock():
+    from beatvegas.sources.odds import normalize_full_game
+
+    events = [
+        {
+            "id": "evt1",
+            "commence_time": "2026-08-30T16:00:00Z",
+            "home_team": "LSU",
+            "away_team": "Clemson",
+            "bookmakers": [
+                {
+                    "key": "hardrockbet_fl",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": -110, "point": 56.5},
+                                {"name": "Under", "price": -110, "point": 56.5},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "key": "draftkings",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": -108, "point": 57.0},
+                                {"name": "Under", "price": -112, "point": 57.0},
+                            ],
+                        }
+                    ],
+                },
+                {"key": "fanduel", "markets": [{"key": "spreads", "outcomes": []}]},  # ignored
+            ],
+        }
+    ]
+    rows = normalize_full_game(events)
+    by_book = {r["book"]: r for r in rows}
+    assert set(by_book) == {"hardrockbet_fl", "draftkings"}  # spreads market ignored
+    assert by_book["hardrockbet_fl"]["line"] == 56.5
+    assert by_book["hardrockbet_fl"]["spread"] is None  # totals market has no spread
+    assert all(r["event_id"] == "evt1" for r in rows)
+
+
 def test_full_game_opener_consensus_with_spread():
     _full_game_opener = _load("weekly_update")._full_game_opener
 

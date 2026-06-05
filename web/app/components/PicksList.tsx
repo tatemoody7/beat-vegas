@@ -36,6 +36,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
           <tr>
             <th>Wk</th>
             <th>Matchup</th>
+            <th>Market</th>
             <th>Your line</th>
             <th title="The under score and our number at the time you logged the pick.">
               Model @ pick
@@ -56,6 +57,9 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
               <td className="text-[var(--text)]">
                 {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
                 {p.home}
+              </td>
+              <td className="text-[var(--text-muted)]">
+                {p.market === "full" ? "Full game" : "1H"}
               </td>
               <td className="text-[var(--text-muted)]">
                 {p.line !== null ? `under ${p.line}` : "—"}

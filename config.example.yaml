@@ -25,7 +25,9 @@ odds_api:
   api_key: ""
   base_url: "https://api.the-odds-api.com/v4"
   sport: "americanfootball_ncaaf"
-  regions: "us"               # us, us2, uk, eu, au
+  regions: "us,us2"           # us2 carries Hard Rock FL; needed to capture HR.
+                              # NB: 1H (totals_h1) is per-event & costs markets x
+                              # regions PER GAME, so us,us2 doubles 1H credit use.
   markets: "totals_h1"        # first-half totals
   odds_format: "american"
   # Optional whitelist of bookmaker keys (empty = all available).
@@ -34,3 +36,12 @@ odds_api:
 alerts:
   imessage_to: ""        # phone/email handle for iMessage alerts (Phase 3)
   line_move_threshold: 1.0
+
+push:                    # cloud push for "Hard Rock lines dropped" (works from CI)
+  provider: pushover     # pushover (recommended) | ntfy
+  pushover:
+    token: ""            # Pushover app token (or env PUSHOVER_TOKEN)
+    user: ""             # Pushover user key (or env PUSHOVER_USER)
+  ntfy:
+    topic: ""            # ntfy topic, e.g. beatvegas-<random> (or env NTFY_TOPIC)
+    server: "https://ntfy.sh"

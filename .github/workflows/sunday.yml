@@ -32,7 +32,7 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
-      - name: Capture full-game openers (DK, CFBD fallback)
-        run: python scripts/poll_full_game.py --source auto
+      - name: Capture full-game openers (multi-book incl. Hard Rock)
+        run: python scripts/poll_full_game.py --source oddsapi
       - name: Score + rank the board
         run: python scripts/weekly_update.py

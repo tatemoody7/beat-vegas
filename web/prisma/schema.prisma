@@ -58,6 +58,7 @@ model manual_picks {
   home_team               String?   @db.VarChar
   away_team               String?   @db.VarChar
   side                    String?   @db.VarChar
+  market                  String?   @db.VarChar
   line                    Float?
   price                   Int?
   stake                   Float?

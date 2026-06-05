@@ -18,12 +18,19 @@ import statistics
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from beatvegas.alerts.detect import detect_line_alerts, format_alert
+from beatvegas.alerts.detect import (
+    detect_first_half_posted,
+    detect_line_alerts,
+    format_alert,
+    format_posted_summary,
+)
 from beatvegas.alerts.imessage import send_imessage
+from beatvegas.alerts.push import send_push
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot, Prediction
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
+from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
 from beatvegas.lines import consensus_open_close
 from beatvegas.season import current_season
 from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
@@ -77,6 +84,11 @@ def main() -> None:
         "--dry-run-alerts", action="store_true", help="print alerts instead of sending iMessages"
     )
     ap.add_argument("--no-alerts", action="store_true", help="disable alerts")
+    ap.add_argument(
+        "--push",
+        action="store_true",
+        help="send a cloud push when Hard Rock POSTS new 1H lines (the mid-week trigger)",
+    )
     args = ap.parse_args()
 
     if not try_init_db():
@@ -105,6 +117,7 @@ def main() -> None:
     unmatched_names = []
     this_poll_lines: Dict[int, List[float]] = {}
     prev_consensus: Dict[int, Optional[float]] = {}
+    hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: 1H line}
     matchups: Dict[int, str] = {}
     scores: Dict[int, int] = {}
     alert_msgs: List[str] = []
@@ -112,6 +125,16 @@ def main() -> None:
     with session_scope() as s:
         games = _candidate_games(s, args.season)
         meta = {g["id"]: g for g in games}
+        # Games that ALREADY had a Hard Rock 1H line (first-appearance detection).
+        hr_prev_ids = {
+            gid
+            for (gid,) in s.query(OddsSnapshot.game_id)
+            .filter(
+                OddsSnapshot.market == "1H_total",
+                OddsSnapshot.book.in_(HR_BOOK_KEYS),
+            )
+            .distinct()
+        }
         for r in rows:
             gid, _score = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
             if gid is None:
@@ -138,6 +161,8 @@ def main() -> None:
                 if pred and pred[0] is not None:
                     scores[gid] = int(pred[0])
             this_poll_lines.setdefault(gid, []).append(r["line"])
+            if r["book"] in HR_BOOK_KEYS:
+                hr_rows.setdefault(gid, {})[r["book"]] = r["line"]
 
             prev = _latest_snapshot(s, gid, r["book"])
             if not _changed(prev, r["line"], r["over_price"], r["under_price"]):
@@ -173,6 +198,21 @@ def main() -> None:
             else:
                 ok, detail = send_imessage(recipient, msg)
                 print(f"[alert {'sent' if ok else 'FAILED: ' + detail}] {msg}")
+
+    # --- cloud push: Hard Rock 1H lines newly posted (the mid-week trigger) ---
+    if args.push:
+        hr_new = {
+            gid: line for gid, bl in hr_rows.items() if (line := pick_hr_line(bl)) is not None
+        }
+        posted = detect_first_half_posted(hr_prev_ids, hr_new, matchups)
+        pmsg = format_posted_summary(posted)
+        if not pmsg:
+            print(f"[push] no newly-posted Hard Rock 1H lines ({len(hr_new)} HR lines seen)")
+        elif args.dry_run_alerts:
+            print(f"[push] {pmsg}")
+        else:
+            ok, detail = send_push("Beat Vegas", pmsg, url=BOARD_URL)
+            print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {pmsg}")
 
     c = client.last_credits
     print(

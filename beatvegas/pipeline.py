@@ -122,6 +122,7 @@ def _clone_inputs() -> Dict[str, int]:
             M.OddsSnapshot,
             M.BvAdjustment,
             M.ManualPick,
+            M.GamePreview,
         ):
             ds.query(child).delete()
         ds.commit()

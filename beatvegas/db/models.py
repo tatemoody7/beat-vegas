@@ -205,6 +205,9 @@ class Result(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     model_version = Column(String, index=True)
+    market = Column(String, default="1H")  # '1H' | 'full' (the bet market graded)
+    # The realized total for `market` (1H points, or full-game points). Named for
+    # the original 1H-only ledger; for market='full' it holds the full-game total.
     actual_first_half_total = Column(Integer)
     line_used = Column(Float)
     line_kind = Column(String)  # 'proxy' | 'real'

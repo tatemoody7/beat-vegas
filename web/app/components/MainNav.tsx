@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/line-study", label: "Line Study" },
   { href: "/movement", label: "Movement" },
   { href: "/ledger", label: "Ledger" },
+  { href: "/weekly-review", label: "Weekly Review" },
   { href: "/research", label: "Research" },
   { href: "/picks", label: "My Picks" },
 ];

@@ -119,16 +119,27 @@ def cmd_grade(args) -> None:
         )
         for p in picks:
             g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
-            if g is None or g.first_half_total is None:
-                continue  # game not finished / no result yet
+            if g is None:
+                continue
+            is_full = (p.market or "1H") == "full"
+            if is_full:
+                if g.home_points is None or g.away_points is None:
+                    continue  # game not finished
+                actual = g.home_points + g.away_points
+                snap_market = "full_game_total"
+            else:
+                if g.first_half_total is None:
+                    continue  # game not finished / no 1H result yet
+                actual = g.first_half_total
+                snap_market = "1H_total"
             snaps = (
                 s.query(OddsSnapshot)
-                .filter(OddsSnapshot.game_id == p.game_id, OddsSnapshot.market == "1H_total")
+                .filter(OddsSnapshot.game_id == p.game_id, OddsSnapshot.market == snap_market)
                 .all()
             )
             opening, closing = consensus_open_close(snaps)
             for k, v in graded_pick_fields(
-                g.first_half_total, p.line, p.price, p.stake, opening, closing
+                actual, p.line, p.price, p.stake, opening, closing
             ).items():
                 setattr(p, k, v)
             p.graded = True

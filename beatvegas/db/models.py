@@ -358,3 +358,20 @@ class ModelRun(Base):
     metrics_json = Column(String)
     notes = Column(String)
     created_at = Column(DateTime)
+
+
+class GamePreview(Base):
+    """Pre-kickoff research context for a game (news + injuries + QB-out), pulled
+    from ESPN by scripts/research_preview.py. DISPLAY ONLY — never a model input
+    (ESPN is unofficial, fail-silent). One row per game, refreshed each run."""
+
+    __tablename__ = "game_previews"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True, unique=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    qb_out = Column(Boolean, default=False)
+    qb_out_detail = Column(String)
+    news_json = Column(String)  # {"home": [...], "away": [...]}
+    injuries_json = Column(String)  # {"home": [...], "away": [...]}
+    updated_at = Column(DateTime)

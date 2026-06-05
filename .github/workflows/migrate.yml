@@ -1,0 +1,27 @@
+name: Migrate Neon schema (init_db)
+
+# Applies ADDITIVE schema changes to Neon — new columns + new tables that
+# beatvegas.db.store.init_db creates/ALTERs (create_all for new tables,
+# _MIGRATIONS for new columns). Run after merging schema changes, BEFORE the new
+# web code queries them. Idempotent + additive (never drops/wipes). Manual only.
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: migrate
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Apply additive schema (new columns + tables)
+        run: python -c "from beatvegas.db.store import init_db; init_db(); print('migrated')"

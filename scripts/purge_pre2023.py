@@ -31,6 +31,7 @@ GAME_LINKED = [
     M.OddsSnapshot,
     M.BvAdjustment,
     M.Weather,
+    M.GamePreview,
 ]
 # Tables with their own season column: deleted by season directly.
 SEASON_SCOPED = [

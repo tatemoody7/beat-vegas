@@ -1,0 +1,32 @@
+name: Weekly research preview (news + injuries)
+
+# Pulls the upcoming week's ESPN news/injuries/QB-out into game_previews (read by
+# the web /preview view). Runs in the cloud because it writes Neon (the Mac can't
+# reach Neon from the campus network). ESPN is unofficial + fail-silent — display
+# only, never a model input.
+
+on:
+  schedule:
+    - cron: '0 13 * * 2' # Tue ~9am ET — early-week research read
+    - cron: '0 13 * * 5' # Fri ~9am ET — refresh before the weekend
+  workflow_dispatch: {}
+
+concurrency:
+  group: research-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Build week preview (slate + ESPN news/injuries)
+        run: python scripts/research_preview.py

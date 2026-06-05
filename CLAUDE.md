@@ -1,10 +1,33 @@
 # Beat Vegas — project brief for Claude Code
 
-College football **first-half (1H) unders** research & decision-support system.
+College football **full-game + first-half (1H) unders** research & decision-support
+system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## How to resume / orient (read this first)
-- **LATEST (web redesign + cleanup): the Next.js app got a plain-English rewrite and a
+- **LATEST (full-game + 1H Hard Rock pivot — SHIPPED to `main`, PRs #7→#8→#9):** the
+  system now covers **full-game unders AND 1H unders**, organized around Tate's weekly
+  Hard Rock workflow. **Decision-support, not a model-pick board** — the model number is
+  one reference chip (the full-game backtest `scripts/backtest_full_game.py` found **no
+  edge** on the thin 2023-25 regime; we *measure* the edge via CLV, not gate on it).
+  Pieces: **multi-book capture incl. Hard Rock** via The Odds API bulk `/odds`
+  (`odds.normalize_full_game` + `list_full_game_totals`; `poll_full_game --source oddsapi
+  --regions us,us2`; HR key is **`hardrockbet`**, FL-specific `hardrockbet_fl` when prices
+  diverge — `beatvegas/hardrock.py`). **Cloud push alerts** (Pushover; `alerts/push.py` +
+  `detect_full_game_posted`/`detect_first_half_posted`; `--push` on both pollers;
+  `.github/workflows/lines_watch.yml` = Sunday FG opener window every 10 min + daily 1H).
+  **Web views:** `/preview` (Week Preview — slate + ESPN news/injuries/QB-out from
+  `game_previews`, built by `scripts/research_preview.py`), `/line-check` (Hard Rock vs
+  best-available total, verdict + per-book detail), `/weekly-review` (market/model/you ×
+  full-game/1H scorecard + your picks + UNCONFIRMED trend scan). **Logging + grading both
+  markets:** additive `manual_picks.market` + `results.market`; `pick.py` grades full-game
+  OR 1H; `grade.py` adds the full-game market ledger (`market_fg`). New Neon schema applies
+  via `.github/workflows/migrate.yml` (workflow_dispatch → `init_db`). **Setup before
+  season:** Pushover (config `push.pushover` + GH secrets `PUSHOVER_TOKEN`/`PUSHOVER_USER`),
+  `odds_api.regions: "us,us2"` locally. Plan:
+  `~/.claude/plans/the-overall-plan-right-dreamy-stardust.md`; memory
+  `beat-vegas-hardrock-oddsapi`.
+- **EARLIER (web redesign + cleanup): the Next.js app got a plain-English rewrite and a
   modern "sportsbook" visual system** (deep navy + electric-cyan; `.bv-*` classes in
   `web/app/globals.css`; active-route nav in `MainNav.tsx`). The old **Streamlit
   dashboard was removed** (Next.js is the product). Added a **Neon-isolated week-sim**

@@ -1,8 +1,10 @@
 # Beat Vegas
 
-Research & analysis system for **college football first-half (1H) unders**. It
-identifies, scores, and ranks the best 1H-under opportunities each week and
-tracks line movement over time.
+Research & analysis system for **college football full-game + first-half (1H)
+unders**, built around **Hard Rock Bet** (the only book bettable from Florida).
+It pulls the week's slate + news, captures Hard Rock vs the rest of the market,
+pushes a phone alert the moment lines drop, logs your bets, and reviews each week
+(market vs model vs you, with CLV). Decision-support — you pick the games.
 
 > **Research / decision-support only.** This project never places bets and never
 > automates any gambling activity. It exists to inform your own decisions.

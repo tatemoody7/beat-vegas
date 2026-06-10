@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { suggestedUnits } from "@/lib/kelly";
 import type { SlateOption } from "@/lib/picks";
 
 export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
@@ -80,6 +81,17 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
   const labelCls =
     "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
 
+  // Advisory fractional-Kelly stake hint: only for 1H picks where we have a
+  // market no-vig fair-under to size the edge against the price you'd take.
+  const selected = slate.find((s) => s.gameId === gameId);
+  const fairUnder = market === "1H" ? (selected?.fairUnder ?? null) : null;
+  const priceNum = Number(price);
+  const kellyUnits =
+    fairUnder != null && Number.isFinite(priceNum)
+      ? suggestedUnits(fairUnder, priceNum)
+      : 0;
+  const kellyRounded = Math.round(kellyUnits * 2) / 2;
+
   return (
     <form onSubmit={submit} className="bv-card p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -148,6 +160,39 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
             />
           </label>
         </div>
+
+        {fairUnder != null && (
+          <div className="sm:col-span-2 rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_6%,transparent)] px-3 py-2 text-xs">
+            {kellyUnits > 0 ? (
+              <span className="text-[var(--text-muted)]">
+                Quarter-Kelly suggests{" "}
+                <span className="font-mono font-semibold text-[var(--accent)]">
+                  {kellyRounded.toFixed(1)} u
+                </span>{" "}
+                <span
+                  title="Market no-vig fair-under at this number. Stake is advisory: quarter-Kelly, 1 unit = 1% of bankroll, capped at 3u."
+                  className="underline decoration-dotted"
+                >
+                  (market fair under {(fairUnder * 100).toFixed(1)}%)
+                </span>
+                {kellyRounded > 0 && (
+                  <button
+                    type="button"
+                    className="bv-nav-link ml-2"
+                    onClick={() => setStake(String(kellyRounded))}
+                  >
+                    use {kellyRounded.toFixed(1)}u
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span className="text-[var(--text-muted)]">
+                No +EV edge at {price} vs the market no-vig fair under{" "}
+                {(fairUnder * 100).toFixed(1)}% — advisory stake 0u.
+              </span>
+            )}
+          </div>
+        )}
 
         <label className={`${labelCls} sm:col-span-2`}>
           Reason / note (why you took it — for later review)

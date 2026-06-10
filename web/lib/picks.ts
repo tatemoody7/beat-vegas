@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getBoard } from "@/lib/board";
+import { getLineCheck } from "@/lib/lineCheck";
 import type { Record3 } from "@/lib/ledger";
 
 // Writable My Picks: the current scored slate to bet on, the user's logged picks
@@ -14,6 +15,7 @@ export type SlateOption = {
   curLine: number | null; // consensus current 1H line; falls back to model line
   fullGameLine: number | null; // posted full-game total (for full-game picks)
   modelLine: number | null;
+  fairUnder: number | null; // market no-vig fair-under (1H) — feeds the Kelly hint
 };
 
 export type PickFull = {
@@ -39,6 +41,11 @@ export async function getSlate(season: number): Promise<SlateOption[]> {
   const board = await getBoard(season);
   if (board.length === 0) return [];
   const maxWeek = Math.max(...board.map((b) => b.week));
+  // Market no-vig fair-under per game (same devig consensus /line-check uses).
+  const fairByGame = new Map<number, number | null>();
+  for (const r of await getLineCheck(season, "1h")) {
+    fairByGame.set(r.gameId, r.marketFairUnder);
+  }
   return board
     .filter((b) => b.week === maxWeek)
     .map((b) => ({
@@ -50,6 +57,7 @@ export async function getSlate(season: number): Promise<SlateOption[]> {
       curLine: b.curLine ?? b.factors.line ?? null,
       fullGameLine: b.fullGameTotal ?? null,
       modelLine: b.factors.line ?? null,
+      fairUnder: fairByGame.get(b.gameId) ?? null,
     }));
 }
 

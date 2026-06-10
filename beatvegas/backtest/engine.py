@@ -3,8 +3,12 @@
 For each test season we train only on prior seasons (no look-ahead), score the
 test season, and ask the real question: do the games the model is most confident
 are unders actually beat the -110 breakeven (52.4%)? If yes, predictive selection
-signal exists. (Still graded vs the 0.52*full proxy line — directional until real
-1H lines validate it.)
+signal exists.
+
+Grading uses the REAL 1H closing line wherever we have one (pass `real_lines`,
+populated by scripts/backfill_1h_history.py from The Odds API historical
+endpoint) and falls back to the 0.52*full proxy line otherwise. The summary
+reports the real/proxy coverage split so the proxy artifact is never hidden.
 """
 
 from __future__ import annotations
@@ -47,7 +51,10 @@ class BacktestResult:
 
 
 def run_backtest(
-    df: Optional[pd.DataFrame] = None, first_test_season: int = 2023, top_frac: float = 0.20
+    df: Optional[pd.DataFrame] = None,
+    first_test_season: int = 2023,
+    top_frac: float = 0.20,
+    real_lines: Optional[Dict[int, float]] = None,
 ) -> BacktestResult:
     if df is None:
         df = build_feature_frame(min_games=2)
@@ -61,6 +68,8 @@ def run_backtest(
         if len(train) < 500 or test.empty:
             continue
         model = _new_model()
+        # Train target stays proxy-based: there is no real historical 1H line for
+        # most games, and the model's job is RANKING, graded below on real lines.
         model.fit(train[FEATURE_COLS], train["under"])
         p = model.predict_proba(test[FEATURE_COLS])[:, 1]
         t = test[
@@ -80,39 +89,62 @@ def run_backtest(
         preds.append(t)
 
     per_game = pd.concat(preds, ignore_index=True)
+    by_season, summary = grade_predictions(per_game, top_frac, real_lines)
+    summary["test_seasons"] = f"{test_seasons[0]}-{test_seasons[-1]}"
+    return BacktestResult(per_game=per_game, by_season=by_season, summary=summary)
 
+
+def grade_predictions(
+    per_game: pd.DataFrame, top_frac: float, real_lines: Optional[Dict[int, float]] = None
+):
+    """Grade scored predictions on the REAL 1H closing line where present, else
+    the proxy. Mutates `per_game` with line/line_kind/under_graded columns and
+    returns (by_season df, summary dict incl. the real/proxy coverage split).
+
+    Pure given a scored frame (id, season, proxy_line, first_half_total,
+    under_prob) — separated from model training so it is unit-testable."""
+    real = real_lines or {}
+    per_game["line"] = per_game["id"].map(real).fillna(per_game["proxy_line"])
+    per_game["line_kind"] = per_game["id"].apply(lambda i: "real" if i in real else "proxy")
+    per_game["under_graded"] = (per_game["first_half_total"] < per_game["line"]).astype(int)
+    # Pushes (real lines can be integers) are excluded from win-rate / ROI.
+    graded = per_game[per_game["first_half_total"] != per_game["line"]]
+
+    pct = int(top_frac * 100)
     rows = []
-    for ts, g in per_game.groupby("season"):
+    for ts, g in graded.groupby("season"):
         g = g.sort_values("under_prob", ascending=False)
-        k = max(1, int(len(g) * top_frac))
-        top = g.head(k)
+        top = g.head(max(1, int(len(g) * top_frac)))
         rows.append(
             {
                 "season": int(ts),
                 "games": len(g),
-                "all_under_pct": 100 * g["under"].mean(),
-                f"top{int(top_frac * 100)}_under_pct": 100 * top["under"].mean(),
-                f"top{int(top_frac * 100)}_roi": _roi(int(top["under"].sum()), len(top)),
-                f"top{int(top_frac * 100)}_n": len(top),
+                "all_under_pct": 100 * g["under_graded"].mean(),
+                f"top{pct}_under_pct": 100 * top["under_graded"].mean(),
+                f"top{pct}_roi": _roi(int(top["under_graded"].sum()), len(top)),
+                f"top{pct}_n": len(top),
             }
         )
     by_season = pd.DataFrame(rows)
 
-    # Pooled top-fraction performance (rank within each season, then pool).
-    pooled_top = per_game.groupby("season", group_keys=False).apply(
+    pooled_top = graded.groupby("season", group_keys=False).apply(
         lambda g: g.sort_values("under_prob", ascending=False).head(max(1, int(len(g) * top_frac))),
         include_groups=False,
     )
+    n_real = int((per_game["line_kind"] == "real").sum())
+    n = len(per_game)
     summary = {
-        "test_seasons": f"{test_seasons[0]}-{test_seasons[-1]}",
-        "n_games": int(len(per_game)),
-        "baseline_under_pct": round(100 * per_game["under"].mean(), 2),
+        "n_games": int(n),
+        "real_graded": n_real,
+        "proxy_graded": int(n - n_real),
+        "pct_real": round(100 * n_real / n, 1) if n else 0.0,
+        "baseline_under_pct": round(100 * graded["under_graded"].mean(), 2),
         "top_n": int(len(pooled_top)),
-        "top_under_pct": round(100 * pooled_top["under"].mean(), 2),
-        "top_roi": round(_roi(int(pooled_top["under"].sum()), len(pooled_top)), 4),
+        "top_under_pct": round(100 * pooled_top["under_graded"].mean(), 2),
+        "top_roi": round(_roi(int(pooled_top["under_graded"].sum()), len(pooled_top)), 4),
         "breakeven_pct": round(100 * BREAKEVEN, 1),
     }
-    return BacktestResult(per_game=per_game, by_season=by_season, summary=summary)
+    return by_season, summary
 
 
 def stress_test_lines(

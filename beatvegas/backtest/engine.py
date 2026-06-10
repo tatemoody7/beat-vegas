@@ -147,6 +147,33 @@ def grade_predictions(
     return by_season, summary
 
 
+def config_return_series(
+    per_game: pd.DataFrame,
+    rank_col: str,
+    outcome_col: str,
+    fracs: List[float],
+    win_profit: float = WIN_PROFIT,
+):
+    """Build the per-configuration return series the overfitting controls need.
+
+    Each `frac` is one configuration: bet the top frac by `rank_col` within each
+    season. Returns (full_matrix, bet_returns_by_cfg) where full_matrix is
+    T_observations x N_configs of the -110 unit return (0 when not selected) for
+    the CSCV/PBO matrix, and bet_returns_by_cfg holds each config's selected-bet
+    returns (for the Deflated Sharpe). `outcome_col` is the 0/1 under flag."""
+    rets = per_game[outcome_col].map(lambda u: win_profit if u == 1 else -1.0)
+    full_by_cfg, bet_by_cfg = [], []
+    for frac in fracs:
+        mask = pd.Series(False, index=per_game.index)
+        for _ts, g in per_game.groupby("season"):
+            k = max(1, int(len(g) * frac))
+            mask.loc[g.sort_values(rank_col, ascending=False).head(k).index] = True
+        full_by_cfg.append((rets * mask.astype(float)).tolist())
+        bet_by_cfg.append(rets[mask].tolist())
+    matrix = [list(row) for row in zip(*full_by_cfg)]
+    return matrix, bet_by_cfg
+
+
 def stress_test_lines(
     per_game: pd.DataFrame, deltas: List[float], top_frac: float = 0.20
 ) -> pd.DataFrame:

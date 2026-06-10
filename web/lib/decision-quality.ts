@@ -8,6 +8,7 @@ export type DqPickRow = {
   opening_line: number | null;
   closing_line: number | null;
   clv: number | null;
+  clv_prob: number | null; // no-vig PRICE CLV (prob points), juice only
   factors_json_at_pick: string | null;
 };
 
@@ -54,6 +55,10 @@ export function clvSummary(picks: DqPickRow[]): {
   pctPositive: number | null;
   posClvHitPct: number | null;
   negClvHitPct: number | null;
+  // No-vig PRICE CLV (juice dimension only): avg in percentage points, share +.
+  nPrice: number;
+  avgPricePp: number | null;
+  pctPricePositive: number | null;
 } {
   const withClv = picks.filter((p) => p.clv != null);
   const n = withClv.length;
@@ -61,12 +66,21 @@ export function clvSummary(picks: DqPickRow[]): {
   const positive = withClv.filter((p) => (p.clv as number) > 0);
   const pos = tally(positive);
   const neg = tally(withClv.filter((p) => (p.clv as number) <= 0));
+  const withPrice = picks.filter((p) => p.clv_prob != null);
+  const nPrice = withPrice.length;
+  const pricePos = withPrice.filter((p) => (p.clv_prob as number) > 0).length;
   return {
     n,
     avg,
     pctPositive: n ? (100 * positive.length) / n : null,
     posClvHitPct: pos.hitPct,
     negClvHitPct: neg.hitPct,
+    nPrice,
+    avgPricePp: nPrice
+      ? (100 * withPrice.reduce((a, p) => a + (p.clv_prob as number), 0)) /
+        nPrice
+      : null,
+    pctPricePositive: nPrice ? (100 * pricePos) / nPrice : null,
   };
 }
 
@@ -165,7 +179,7 @@ export async function getDecisionQuality(
 ): Promise<DecisionQuality> {
   const picks = await prisma.$queryRaw<DqPickRow[]>`
     SELECT result, line, model_line_at_pick, opening_line, closing_line, clv,
-           factors_json_at_pick
+           clv_prob, factors_json_at_pick
     FROM manual_picks
     WHERE season = ${season} AND graded = true
   `;

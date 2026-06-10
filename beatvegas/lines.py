@@ -5,6 +5,8 @@ from __future__ import annotations
 import statistics
 from typing import List, Optional, Sequence, Tuple
 
+from .devig import devig_two_way
+
 
 def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[float]]:
     """Median across books of each book's first / last observed 1H line.
@@ -24,6 +26,32 @@ def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[flo
     return statistics.median(opens), statistics.median(closes)
 
 
+def consensus_fair_under_open_close(
+    snaps: Sequence, method: str = "multiplicative"
+) -> Tuple[Optional[float], Optional[float]]:
+    """Median across books of each book's first / last NO-VIG fair-under prob.
+
+    Only snapshots carrying both prices contribute (devig needs both sides).
+    Isolates the juice dimension — fair-under is ~0.5 at any fair line, so this
+    measures the price asymmetry, NOT line movement (see consensus_open_close
+    for the line)."""
+    by_book = {}
+    for sn in snaps:
+        if sn.over_price is None or sn.under_price is None:
+            continue
+        by_book.setdefault(sn.book, []).append(sn)
+    opens: List[float] = []
+    closes: List[float] = []
+    for book_snaps in by_book.values():
+        book_snaps = sorted(book_snaps, key=lambda s: s.captured_at)
+        first, last = book_snaps[0], book_snaps[-1]
+        opens.append(devig_two_way(first.over_price, first.under_price, method)[1])
+        closes.append(devig_two_way(last.over_price, last.under_price, method)[1])
+    if not opens:
+        return None, None
+    return statistics.median(opens), statistics.median(closes)
+
+
 def closing_before_kickoff(
     snaps: Sequence, kickoff
 ) -> Tuple[Optional[float], Optional[float], Optional[object]]:
@@ -34,9 +62,21 @@ def closing_before_kickoff(
     snapshots with captured_at <= kickoff (all of them if kickoff/captured_at is
     unknown), and report the freshest used timestamp as the trust signal.
     """
-    pre = [s for s in snaps if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
-    pre = pre or list(snaps)
+    pre = _pre_kickoff(snaps, kickoff)
     opening, closing = consensus_open_close(pre)
     caps = [s.captured_at for s in pre if s.captured_at is not None]
     closing_at = max(caps) if caps and closing is not None else None
     return opening, closing, closing_at
+
+
+def _pre_kickoff(snaps: Sequence, kickoff) -> list:
+    """Snapshots captured at or before kickoff (all of them if unknown)."""
+    pre = [s for s in snaps if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
+    return pre or list(snaps)
+
+
+def fair_under_before_kickoff(
+    snaps: Sequence, kickoff, method: str = "multiplicative"
+) -> Tuple[Optional[float], Optional[float]]:
+    """(open_fair_under, close_fair_under) using only PRE-kickoff snapshots."""
+    return consensus_fair_under_open_close(_pre_kickoff(snaps, kickoff), method)

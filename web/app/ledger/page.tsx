@@ -256,6 +256,19 @@ export default async function LedgerPage({
                   </dt>
                   <dd>{pct(dq.clv.pctPositive)}</dd>
                 </div>
+                <div className="flex justify-between">
+                  <dt
+                    className="bv-stat-label"
+                    title="No-vig PRICE CLV: avg open→close move in the under's fair (de-vigged) price, in percentage points. Isolates the juice — line movement shows in Avg CLV above."
+                  >
+                    Price CLV
+                  </dt>
+                  <dd>
+                    {dq.clv.avgPricePp == null
+                      ? "—"
+                      : `${dq.clv.avgPricePp >= 0 ? "+" : ""}${dq.clv.avgPricePp.toFixed(2)}pp`}
+                  </dd>
+                </div>
               </dl>
             </div>
             <div className="bv-card p-4">

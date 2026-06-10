@@ -17,8 +17,8 @@ import statistics
 
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.grading import clv_under, under_result, units_won
-from beatvegas.lines import closing_before_kickoff
+from beatvegas.grading import clv_under, price_clv_under, under_result, units_won
+from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
 from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
 MODEL_MARKET = "market"  # tag for the pure market-vs-result grade (1H)
@@ -43,7 +43,8 @@ def _closings(session, season: int):
             .all()
         )
         opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
-        out[g.id] = (g, (opening, closing), closing_at)
+        fair = fair_under_before_kickoff(snaps, g.start_date)
+        out[g.id] = (g, (opening, closing), closing_at, fair)
     return out
 
 
@@ -69,14 +70,15 @@ def _closings_fg(session, season: int):
             .all()
         )
         opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
-        out[g.id] = (g, (opening, closing), closing_at)
+        fair = fair_under_before_kickoff(snaps, g.start_date)
+        out[g.id] = (g, (opening, closing), closing_at, fair)
     return out
 
 
 def grade_market_fg(session, closings_fg) -> int:
     """Full-game market ledger: consensus open/close vs the realized total."""
     n = 0
-    for gid, (g, (opening, closing), closing_at) in closings_fg.items():
+    for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings_fg.items():
         if closing is None:
             continue
         actual = g.home_points + g.away_points
@@ -97,6 +99,7 @@ def grade_market_fg(session, closings_fg) -> int:
                 closing_line=closing,
                 closing_captured_at=closing_at,
                 clv=clv_under(opening, closing),
+                clv_prob=price_clv_under(fair_open, fair_close),
                 units=units_won(actual, closing),
             )
         )
@@ -106,7 +109,7 @@ def grade_market_fg(session, closings_fg) -> int:
 
 def grade_market(session, closings) -> int:
     n = 0
-    for gid, (g, (opening, closing), closing_at) in closings.items():
+    for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings.items():
         if closing is None:
             continue
         actual = g.first_half_total
@@ -127,6 +130,7 @@ def grade_market(session, closings) -> int:
                 closing_line=closing,
                 closing_captured_at=closing_at,
                 clv=clv_under(opening, closing),
+                clv_prob=price_clv_under(fair_open, fair_close),
                 units=units_won(actual, closing),
             )
         )
@@ -144,7 +148,7 @@ def grade_model(session, season: int, closings) -> int:
         entry = closings.get(p.game_id)
         if entry is None:
             continue
-        g, (_open, closing), closing_at = entry
+        g, (_open, closing), closing_at, (fair_open, fair_close) = entry
         actual = g.first_half_total
         bet_line = p.line_used
         (
@@ -164,6 +168,7 @@ def grade_model(session, season: int, closings) -> int:
                 closing_line=closing,
                 closing_captured_at=closing_at,
                 clv=clv_under(bet_line, closing),
+                clv_prob=price_clv_under(fair_open, fair_close),
                 units=units_won(actual, bet_line),
             )
         )
@@ -181,7 +186,12 @@ def _summary(session, model_version: str, label: str) -> None:
     units = sum(r.units for r in rows)
     clvs = [r.clv for r in rows if r.clv is not None]
     clv_txt = f"  avg CLV={statistics.mean(clvs):+.2f}" if clvs else ""
-    print(f"{label}: UNDER {unders}/{n} ({100 * unders / n:.1f}%)  units={units:+.2f}{clv_txt}")
+    pclvs = [r.clv_prob for r in rows if r.clv_prob is not None]
+    pclv_txt = f"  price-CLV={100 * statistics.mean(pclvs):+.2f}pp" if pclvs else ""
+    print(
+        f"{label}: UNDER {unders}/{n} ({100 * unders / n:.1f}%)  "
+        f"units={units:+.2f}{clv_txt}{pclv_txt}"
+    )
 
 
 def main() -> None:

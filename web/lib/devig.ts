@@ -75,7 +75,10 @@ export function devigTwoWay(
 
 // Per-$1 EV of taking the UNDER at `offeredUnderPrice`, given a reference no-vig
 // fair under probability. Positive = +EV.
-export function evUnder(fairUnderProb: number, offeredUnderPrice: number): number {
+export function evUnder(
+  fairUnderProb: number,
+  offeredUnderPrice: number,
+): number {
   const payout = americanToDecimal(offeredUnderPrice) - 1;
   return fairUnderProb * payout - (1 - fairUnderProb);
 }

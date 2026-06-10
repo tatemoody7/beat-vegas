@@ -10,7 +10,11 @@ test("americanToProb", () => {
 });
 
 test("symmetric -110/-110 -> fair 0.5 each, hold ~4.55%", () => {
-  const { fairOver, fairUnder, hold } = devigTwoWay(-110, -110, "multiplicative");
+  const { fairOver, fairUnder, hold } = devigTwoWay(
+    -110,
+    -110,
+    "multiplicative",
+  );
   expect(fairOver).toBeCloseTo(0.5, 6);
   expect(fairUnder).toBeCloseTo(0.5, 6);
   expect(hold).toBeCloseTo(0.0476, 3);

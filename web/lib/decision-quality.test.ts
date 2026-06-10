@@ -8,6 +8,7 @@ const row = (o: Partial<DqPickRow>): DqPickRow => ({
   opening_line: null,
   closing_line: null,
   clv: null,
+  clv_prob: null,
   factors_json_at_pick: null,
   ...o,
 });
@@ -43,6 +44,18 @@ test("clvSummary: avg, positive share, and hit% by clv sign", () => {
   expect(r.pctPositive).toBeCloseTo((100 * 2) / 3);
   expect(r.posClvHitPct).toBe(50); // 2 decided +clv, 1 win
   expect(r.negClvHitPct).toBe(100); // 1 decided -clv, 1 win
+});
+
+test("clvSummary: no-vig price CLV avg (pp) and positive share", () => {
+  const picks: DqPickRow[] = [
+    row({ clv_prob: 0.02 }), // under's fair price rose 2pp open->close
+    row({ clv_prob: -0.01 }),
+    row({ clv_prob: null }), // ignored for price stats
+  ];
+  const r = clvSummary(picks);
+  expect(r.nPrice).toBe(2);
+  expect(r.avgPricePp).toBeCloseTo((100 * (0.02 - 0.01)) / 2); // 0.5pp
+  expect(r.pctPricePositive).toBeCloseTo((100 * 1) / 2); // 50%
 });
 
 import { timingSummary } from "@/lib/decision-quality";

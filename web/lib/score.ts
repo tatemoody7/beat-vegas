@@ -18,7 +18,13 @@ export type BoardFactor = {
   lean: number; // signed; under-favorable positive
   sentence: string;
   // Filled by the credibility ledger: real-line 1H-under record when green.
-  live: { n: number; mean: number; lo: number; hi: number; cooling: boolean } | null;
+  live: {
+    n: number;
+    mean: number;
+    lo: number;
+    hi: number;
+    cooling: boolean;
+  } | null;
 };
 
 // Per-game factor payload stored as JSON in predictions.factors_json.
@@ -95,9 +101,15 @@ export function scoreLabel(score: number | null | undefined): string {
 // Group the board into the tiers the Option-A card renders. Hypotheses are
 // pulled into their own amber group regardless of tier (we never show them as
 // a plain green/red signal until the real-line ledger has earned them).
-export type FactorTierGroup = { tier: number; title: string; factors: BoardFactor[] };
+export type FactorTierGroup = {
+  tier: number;
+  title: string;
+  factors: BoardFactor[];
+};
 
-export function groupFactorBoard(board: BoardFactor[] | null | undefined): FactorTierGroup[] {
+export function groupFactorBoard(
+  board: BoardFactor[] | null | undefined,
+): FactorTierGroup[] {
   const fb = board ?? [];
   const proven = fb.filter((f) => !f.hypothesis && f.tier === 1);
   const context = fb.filter((f) => !f.hypothesis && f.tier === 2);
@@ -105,9 +117,21 @@ export function groupFactorBoard(board: BoardFactor[] | null | undefined): Facto
   const hypotheses = fb.filter((f) => f.hypothesis);
   return [
     { tier: 1, title: "Proven — history + live", factors: proven },
-    { tier: 2, title: "Context — real info, flat in backtest", factors: context },
-    { tier: 3, title: "Speculative — weight 0 until proven", factors: speculative },
-    { tier: 0, title: "Unverified — amber until the ledger speaks", factors: hypotheses },
+    {
+      tier: 2,
+      title: "Context — real info, flat in backtest",
+      factors: context,
+    },
+    {
+      tier: 3,
+      title: "Speculative — weight 0 until proven",
+      factors: speculative,
+    },
+    {
+      tier: 0,
+      title: "Unverified — amber until the ledger speaks",
+      factors: hypotheses,
+    },
   ].filter((g) => g.factors.length > 0);
 }
 
@@ -122,7 +146,10 @@ export function factorTint(f: BoardFactor): { bg: string; dot: string } {
   };
   const base = rgb[f.color] ?? rgb.neutral;
   // binary/active factors read full-strength; continuous scale with intensity.
-  const alpha = f.color === "neutral" || f.color === "unknown" ? 0.05 : 0.08 + 0.22 * f.intensity;
+  const alpha =
+    f.color === "neutral" || f.color === "unknown"
+      ? 0.05
+      : 0.08 + 0.22 * f.intensity;
   return { bg: `rgba(${base},${alpha.toFixed(3)})`, dot: `rgb(${base})` };
 }
 

@@ -39,8 +39,8 @@ export default async function WeeklyReviewPage({
         <div>
           <h1 className="bv-page-title">Weekly Review</h1>
           <p className="bv-page-sub">
-            How the market, the model, and you did this week — full game and first
-            half — once the games finished.
+            How the market, the model, and you did this week — full game and
+            first half — once the games finished.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -55,8 +55,8 @@ export default async function WeeklyReviewPage({
 
       {review.week === null ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          Nothing graded for {season} yet. The review fills in after a week&apos;s
-          games finish and grading runs.
+          Nothing graded for {season} yet. The review fills in after a
+          week&apos;s games finish and grading runs.
         </p>
       ) : (
         <>
@@ -138,7 +138,8 @@ export default async function WeeklyReviewPage({
                     <tr key={i}>
                       <td className="text-[var(--text)]">
                         {p.away}{" "}
-                        <span className="text-[var(--text-dim)]">@</span> {p.home}
+                        <span className="text-[var(--text-dim)]">@</span>{" "}
+                        {p.home}
                       </td>
                       <td className="text-[var(--text-muted)]">{p.market}</td>
                       <td className="text-[var(--text-muted)]">
@@ -190,16 +191,17 @@ export default async function WeeklyReviewPage({
         <span className="text-[var(--neutral)]">(UNCONFIRMED)</span>
       </h2>
       <p className="bv-page-sub mb-3 max-w-3xl">
-        Top factors from the latest ranking run — <strong>hypotheses, not edges</strong>.
-        A season is only ~14 weeks, so anything here is a multiple-testing candidate:
-        pre-register it and confirm out-of-sample (and opponent-adjust — low scoring is
-        often a blowout, i.e. the spread, already priced) before betting it.
+        Top factors from the latest ranking run —{" "}
+        <strong>hypotheses, not edges</strong>. A season is only ~14 weeks, so
+        anything here is a multiple-testing candidate: pre-register it and
+        confirm out-of-sample (and opponent-adjust — low scoring is often a
+        blowout, i.e. the spread, already priced) before betting it.
       </p>
       {trends.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
           No factor-ranking run found yet. Run{" "}
-          <code className="text-[var(--text)]">scripts/rank_factors.py</code> to populate
-          candidate trends.
+          <code className="text-[var(--text)]">scripts/rank_factors.py</code> to
+          populate candidate trends.
         </p>
       ) : (
         <div className="bv-table-wrap">
@@ -208,7 +210,9 @@ export default async function WeeklyReviewPage({
               <tr>
                 <th>Factor</th>
                 <th>Family</th>
-                <th title="Under% in the top-fraction selection (OOS).">Under %</th>
+                <th title="Under% in the top-fraction selection (OOS).">
+                  Under %
+                </th>
                 <th title="ROI on that selection at -110 (OOS).">ROI</th>
                 <th title="Pearson corr(factor, under) out-of-sample.">Corr</th>
                 <th>n</th>
@@ -228,7 +232,9 @@ export default async function WeeklyReviewPage({
                   <td className="font-mono text-[var(--text-muted)]">
                     {t.corr === null ? "—" : t.corr.toFixed(3)}
                   </td>
-                  <td className="font-mono text-[var(--text-dim)]">{t.n ?? "—"}</td>
+                  <td className="font-mono text-[var(--text-dim)]">
+                    {t.n ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

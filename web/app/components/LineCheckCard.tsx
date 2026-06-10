@@ -117,13 +117,19 @@ export default function LineCheckCard({ row }: { row: LineCheckRow }) {
             </thead>
             <tbody>
               {row.books.map((b) => {
-                const d = row.best !== null ? Number((b.line - row.best).toFixed(2)) : null;
+                const d =
+                  row.best !== null
+                    ? Number((b.line - row.best).toFixed(2))
+                    : null;
                 return (
                   <tr
                     key={b.book}
                     style={
                       b.isHR
-                        ? { background: "color-mix(in srgb, var(--accent) 12%, transparent)" }
+                        ? {
+                            background:
+                              "color-mix(in srgb, var(--accent) 12%, transparent)",
+                          }
                         : undefined
                     }
                   >

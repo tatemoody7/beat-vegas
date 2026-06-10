@@ -7,12 +7,17 @@ import type { SlateOption } from "@/lib/picks";
 export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
   const router = useRouter();
   const [gameId, setGameId] = useState(slate[0]?.gameId ?? 0);
-  const lineFor = (gid: number) =>
-    slate.find((g) => g.gameId === gid)?.curLine ?? "";
-  const [line, setLine] = useState<string>(
-    String(lineFor(slate[0]?.gameId ?? 0)),
-  );
   const [market, setMarket] = useState<"1H" | "full">("1H");
+  // The line to default to for a game depends on the market: the 1H line for
+  // first-half picks, the full-game total for full-game picks.
+  const defaultLine = (gid: number, mkt: "1H" | "full") => {
+    const g = slate.find((s) => s.gameId === gid);
+    const v = mkt === "full" ? g?.fullGameLine : g?.curLine;
+    return v ?? "";
+  };
+  const [line, setLine] = useState<string>(
+    String(defaultLine(slate[0]?.gameId ?? 0, "1H")),
+  );
   const [stake, setStake] = useState("1");
   const [price, setPrice] = useState("-110");
   const [note, setNote] = useState("");
@@ -21,7 +26,12 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
 
   function onGameChange(gid: number) {
     setGameId(gid);
-    setLine(String(lineFor(gid))); // re-default the line to the new game's line
+    setLine(String(defaultLine(gid, market))); // re-default to the new game's line
+  }
+
+  function onMarketChange(mkt: "1H" | "full") {
+    setMarket(mkt);
+    setLine(String(defaultLine(gameId, mkt))); // swap to that market's line
   }
 
   async function submit(e: React.FormEvent) {
@@ -80,12 +90,16 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
             onChange={(e) => onGameChange(Number(e.target.value))}
             className={field}
           >
-            {slate.map((g) => (
-              <option key={g.gameId} value={g.gameId}>
-                {g.away} @ {g.home} · under score {g.underScore ?? "—"} · line{" "}
-                {g.curLine ?? "—"}
-              </option>
-            ))}
+            {slate.map((g) => {
+              const shown = market === "full" ? g.fullGameLine : g.curLine;
+              const label = market === "full" ? "full-game" : "1H";
+              return (
+                <option key={g.gameId} value={g.gameId}>
+                  {g.away} @ {g.home}
+                  {shown !== null ? ` · ${label} line ${shown}` : ""}
+                </option>
+              );
+            })}
           </select>
         </label>
 
@@ -93,7 +107,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           Market
           <select
             value={market}
-            onChange={(e) => setMarket(e.target.value as "1H" | "full")}
+            onChange={(e) => onMarketChange(e.target.value as "1H" | "full")}
             className={field}
           >
             <option value="1H">First half</option>
@@ -101,7 +115,9 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           </select>
         </label>
         <label className={labelCls}>
-          {market === "full" ? "Your line (full game, under)" : "Your line (1H, under)"}
+          {market === "full"
+            ? "Your line (full game, under)"
+            : "Your line (1H, under)"}
           <input
             type="number"
             step={0.5}

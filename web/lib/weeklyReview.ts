@@ -110,7 +110,8 @@ export async function getWeeklyReview(
   const weeks = [...new Set([...resWeeks, ...pickWeeks])]
     .filter((w) => Number.isFinite(w))
     .sort((a, b) => a - b);
-  const wk = week && weeks.includes(week) ? week : (weeks[weeks.length - 1] ?? null);
+  const wk =
+    week && weeks.includes(week) ? week : (weeks[weeks.length - 1] ?? null);
 
   const r = res.filter((x) => Number(x.week) === wk);
   const isFull = (m: string | null) => m === "full";

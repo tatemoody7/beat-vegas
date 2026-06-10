@@ -39,6 +39,33 @@ def _valid_line_score(ls: Any) -> bool:
     )
 
 
+def _all_numbers(ls: Any) -> bool:
+    return isinstance(ls, list) and len(ls) > 0 and all(isinstance(x, (int, float)) for x in ls)
+
+
+def line_scores_trustworthy(game: Dict[str, Any], first_half: Tuple[int, int]) -> bool:
+    """Guard against corrupt/placeholder line scores (e.g. all-zero quarters that
+    yielded a real 27-point final). Reject when the quarter totals can't be
+    reconciled with the final score, or when the first half is 0 points despite
+    the game having scored. When the final score is unknown we can't check, so we
+    trust the line scores."""
+    home_pts = _get(game, "homePoints", "home_points")
+    away_pts = _get(game, "awayPoints", "away_points")
+    home_1h, away_1h = first_half
+    # A 0-point first half is implausible once the game has any points.
+    final_total = (home_pts or 0) + (away_pts or 0)
+    if (home_pts is not None or away_pts is not None) and final_total > 0 and (home_1h + away_1h) == 0:
+        return False
+    # Per-quarter totals must reconcile with the final score, when both are known.
+    home_ls = _get(game, "homeLineScores", "home_line_scores")
+    away_ls = _get(game, "awayLineScores", "away_line_scores")
+    if home_pts is not None and _all_numbers(home_ls) and sum(home_ls) != home_pts:
+        return False
+    if away_pts is not None and _all_numbers(away_ls) and sum(away_ls) != away_pts:
+        return False
+    return True
+
+
 def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, int]]:
     """Map game_id -> (home_1h, away_1h) using the cumulative running score on
     the last play of period 2. Requires per-play running scores to be present."""
@@ -70,6 +97,10 @@ def attach_first_half(
     gid = _get(game, "id")
     res = first_half_from_line_scores(game)
     source = "linescores"
+    # Reject line scores that disagree with the final score: fall through to PBP,
+    # else leave NULL — never persist a false 0.
+    if res is not None and not line_scores_trustworthy(game, res):
+        res = None
     if res is None and pbp_lookup and gid in pbp_lookup:
         res = pbp_lookup[gid]
         source = "pbp"

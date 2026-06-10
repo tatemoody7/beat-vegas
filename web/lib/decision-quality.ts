@@ -57,9 +57,7 @@ export function clvSummary(picks: DqPickRow[]): {
 } {
   const withClv = picks.filter((p) => p.clv != null);
   const n = withClv.length;
-  const avg = n
-    ? withClv.reduce((a, p) => a + (p.clv as number), 0) / n
-    : null;
+  const avg = n ? withClv.reduce((a, p) => a + (p.clv as number), 0) / n : null;
   const positive = withClv.filter((p) => (p.clv as number) > 0);
   const pos = tally(positive);
   const neg = tally(withClv.filter((p) => (p.clv as number) <= 0));
@@ -141,8 +139,14 @@ export function perFactorAttribution(
       else if (b.hitPct < ledgerHitPct - 1) weight = "over";
     }
     out.push({
-      key, label, n: b.n, wins: b.wins, decided: b.decided,
-      yourHitPct: b.hitPct, ledgerHitPct, weight,
+      key,
+      label,
+      n: b.n,
+      wins: b.wins,
+      decided: b.decided,
+      yourHitPct: b.hitPct,
+      ledgerHitPct,
+      weight,
     });
   }
   return out.sort((a, b) => b.n - a.n);
@@ -180,7 +184,10 @@ export async function getDecisionQuality(
     // factor_ledger may not exist yet (created lazily by the Phase-3 Python jobs).
     // Degrade to no ledger, but surface real DB problems (connection/permission/
     // typo) instead of silently masquerading them as "no ledger".
-    console.warn("getDecisionQuality: factor_ledger unavailable, degrading", err);
+    console.warn(
+      "getDecisionQuality: factor_ledger unavailable, degrading",
+      err,
+    );
     ledgerRows = [];
   }
   const ledger: LedgerRates = {};

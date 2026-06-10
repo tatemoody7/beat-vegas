@@ -204,7 +204,9 @@ export default async function LedgerPage({
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Beat my model</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
+                Beat my model
+              </h3>
               <dl className="space-y-1">
                 <div className="flex justify-between">
                   <dt
@@ -225,16 +227,22 @@ export default async function LedgerPage({
                     Against model
                   </dt>
                   <dd>
-                    {pct(dq.beatModel.against.hitPct)} ({dq.beatModel.against.n})
+                    {pct(dq.beatModel.against.hitPct)} ({dq.beatModel.against.n}
+                    )
                   </dd>
                 </div>
               </dl>
             </div>
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Beat the close</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
+                Beat the close
+              </h3>
               <dl className="space-y-1">
                 <div className="flex justify-between">
-                  <dt className="bv-stat-label" title="Average closing line value.">
+                  <dt
+                    className="bv-stat-label"
+                    title="Average closing line value."
+                  >
                     Avg CLV
                   </dt>
                   <dd>{dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)}</dd>
@@ -251,7 +259,9 @@ export default async function LedgerPage({
               </dl>
             </div>
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Timing</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
+                Timing
+              </h3>
               <dl className="space-y-1">
                 <div className="flex justify-between">
                   <dt

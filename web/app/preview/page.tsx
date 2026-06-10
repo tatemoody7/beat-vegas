@@ -5,6 +5,14 @@ import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic";
 
+// An injury string is "POS Name — Status". Only an actual absence (out/doubtful/
+// questionable/suspended) warrants the alert color; available players stay neutral.
+const ALERT_STATUS =
+  /\b(out|doubtful|questionable|suspended|injured reserve|ir)\b/i;
+function injuryColor(line: string): string {
+  return ALERT_STATUS.test(line) ? "var(--over-lean)" : "var(--text-muted)";
+}
+
 function TeamBlock({
   team,
   news,
@@ -16,11 +24,13 @@ function TeamBlock({
 }) {
   return (
     <div className="flex-1">
-      <div className="mb-1 text-sm font-semibold text-[var(--text)]">{team}</div>
+      <div className="mb-1 text-sm font-semibold text-[var(--text)]">
+        {team}
+      </div>
       {injuries.length > 0 && (
         <ul className="mb-2 space-y-0.5">
           {injuries.map((i, k) => (
-            <li key={k} className="text-xs text-[var(--over-lean)]">
+            <li key={k} className="text-xs" style={{ color: injuryColor(i) }}>
               {i}
             </li>
           ))}
@@ -82,7 +92,9 @@ export default async function PreviewPage({
       {preview.games.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
           No preview built for {season} yet. Run{" "}
-          <code className="text-[var(--text)]">scripts/research_preview.py</code>{" "}
+          <code className="text-[var(--text)]">
+            scripts/research_preview.py
+          </code>{" "}
           early in the week to pull the slate&apos;s news and injuries.
         </p>
       ) : (

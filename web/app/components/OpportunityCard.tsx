@@ -18,13 +18,19 @@ const TIER_DOT: Record<number, string> = {
 function FactorRow({ f }: { f: BoardFactor }) {
   const tint = factorTint(f);
   // position marker: under-favorable lean to the right, clamped to ±2 spreads.
-  const pct = Math.max(4, Math.min(96, 50 + (Math.max(-2, Math.min(2, f.lean)) / 2) * 50));
+  const pct = Math.max(
+    4,
+    Math.min(96, 50 + (Math.max(-2, Math.min(2, f.lean)) / 2) * 50),
+  );
   const text = f.sentence || `${f.label} — ${f.value}`;
   return (
     <div className="bv-fac-row" style={{ background: tint.bg }}>
       <span className="bv-fac-text">{text}</span>
       {f.hypothesis ? (
-        <span className="bv-fac-badge bv-fac-badge-amber" title="Tracks more 1H scoring on the proxy; unproven on real lines.">
+        <span
+          className="bv-fac-badge bv-fac-badge-amber"
+          title="Tracks more 1H scoring on the proxy; unproven on real lines."
+        >
           ⚠ unproven
         </span>
       ) : f.live ? (
@@ -36,7 +42,8 @@ function FactorRow({ f }: { f: BoardFactor }) {
               : "Real-line first-half under record when this factor is green."
           }
         >
-          {f.live.cooling ? "❄ " : ""}n={f.live.n} · {Math.round(f.live.mean * 100)}% ±
+          {f.live.cooling ? "❄ " : ""}n={f.live.n} ·{" "}
+          {Math.round(f.live.mean * 100)}% ±
           {Math.round(((f.live.hi - f.live.lo) / 2) * 100)}
         </span>
       ) : (
@@ -68,6 +75,9 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
   // Vegas line for the gap: live consensus, else the line at scoring time.
   const vegas = row.curLine ?? row.factors.line ?? null;
+  // It's a real market number only when a live consensus exists; otherwise the
+  // fallback is an estimate (e.g. the proxy line baked in at scoring time).
+  const vegasIsLive = row.curLine !== null;
   const gap = row.liveGap;
   const z = row.liveGapZ;
   // A gap only "counts" once it clears the BV line's own noise (|z| >= 1).
@@ -208,9 +218,15 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
                 <div
                   className="bv-stat"
-                  title="The sportsbook's first-half points total right now."
+                  title={
+                    vegasIsLive
+                      ? "The sportsbook's first-half points total right now."
+                      : "Estimated first-half line (proxy from the full-game total) — no live market line captured for this game yet."
+                  }
                 >
-                  <span className="bv-stat-label">Vegas</span>
+                  <span className="bv-stat-label">
+                    {vegasIsLive ? "Vegas" : "Est. line"}
+                  </span>
                   <span className="bv-stat-value">
                     {vegas !== null ? vegas.toFixed(1) : "—"}
                     {showMove && (

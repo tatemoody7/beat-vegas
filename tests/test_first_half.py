@@ -61,3 +61,58 @@ def test_attach_no_data():
     out = attach_first_half({"id": 22})
     assert out["first_half_total"] is None
     assert out["first_half_source"] is None
+
+
+def test_attach_rejects_false_zero_first_half():
+    # Placeholder all-zero line scores while the game actually scored 27 points:
+    # must not persist a false 0 — fall back to NULL.
+    game = {
+        "id": 30,
+        "homeLineScores": [0, 0, 0, 0],
+        "awayLineScores": [0, 0, 0, 0],
+        "homePoints": 17,
+        "awayPoints": 10,
+    }
+    out = attach_first_half(game)
+    assert out["first_half_total"] is None
+    assert out["first_half_source"] is None
+
+
+def test_attach_false_zero_falls_back_to_pbp():
+    game = {
+        "id": 31,
+        "homeLineScores": [0, 0, 0, 0],
+        "awayLineScores": [0, 0, 0, 0],
+        "homePoints": 17,
+        "awayPoints": 10,
+    }
+    out = attach_first_half(game, pbp_lookup={31: (7, 3)})
+    assert out["first_half_total"] == 10
+    assert out["first_half_source"] == "pbp"
+
+
+def test_attach_rejects_when_quarters_dont_reconcile():
+    # Quarter totals (24/14) disagree with the final score (17/10): untrustworthy.
+    game = {
+        "id": 32,
+        "homeLineScores": [10, 14, 0, 0],
+        "awayLineScores": [7, 7, 0, 0],
+        "homePoints": 17,
+        "awayPoints": 10,
+    }
+    out = attach_first_half(game)
+    assert out["first_half_total"] is None
+
+
+def test_attach_trusts_consistent_line_scores_with_points():
+    # Quarters reconcile with the final score → trusted, 1H = Q1+Q2.
+    game = {
+        "id": 33,
+        "homeLineScores": [7, 7, 0, 3],
+        "awayLineScores": [3, 0, 7, 0],
+        "homePoints": 17,
+        "awayPoints": 10,
+    }
+    out = attach_first_half(game)
+    assert out["first_half_total"] == 17  # home 14 + away 3
+    assert out["first_half_source"] == "linescores"

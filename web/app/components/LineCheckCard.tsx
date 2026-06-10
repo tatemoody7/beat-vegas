@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { LineCheckRow, Verdict } from "@/lib/lineCheck";
+import type { EvVerdict, LineCheckRow, Verdict } from "@/lib/lineCheck";
 
 const BOOK_LABELS: Record<string, string> = {
   hardrockbet: "Hard Rock",
@@ -48,9 +48,44 @@ const VERDICT: Record<Verdict, { text: string; color: string; blurb: string }> =
     },
   };
 
+// EV verdict is a separate axis from line quality: does HR's under PRICE clear
+// the market's no-vig fair-under at this number? Cyan = the brand accent (we
+// reserve green/red for under/over outcomes), neutral/dim for the rest.
+const EV: Record<EvVerdict, { text: string; color: string; blurb: string }> = {
+  pos: {
+    text: "+EV price",
+    color: "var(--accent)",
+    blurb:
+      "Hard Rock's under price beats the market's no-vig fair price at this number.",
+  },
+  fair: {
+    text: "Fair price",
+    color: "var(--neutral)",
+    blurb:
+      "Hard Rock's under is priced about in line with the market once the vig is removed.",
+  },
+  neg: {
+    text: "Pays the vig",
+    color: "var(--text-muted)",
+    blurb:
+      "Hard Rock's under price sits below the market's no-vig fair price beyond the standard vig.",
+  },
+  na: {
+    text: "No price yet",
+    color: "var(--text-dim)",
+    blurb: "Not enough two-sided prices at a comparable number to judge EV.",
+  },
+};
+
+const pct1 = (x: number | null) =>
+  x === null ? "—" : `${(100 * x).toFixed(1)}%`;
+const signedPct1 = (x: number | null) =>
+  x === null ? "—" : `${x >= 0 ? "+" : ""}${(100 * x).toFixed(1)}%`;
+
 export default function LineCheckCard({ row }: { row: LineCheckRow }) {
   const [open, setOpen] = useState(false);
   const v = VERDICT[row.verdict];
+  const ev = EV[row.evVerdict];
 
   return (
     <div className="bv-card p-4">
@@ -61,13 +96,24 @@ export default function LineCheckCard({ row }: { row: LineCheckRow }) {
             {row.matchup}
           </div>
         </div>
-        <span
-          className="bv-pill"
-          style={{ color: v.color, borderColor: v.color }}
-          title={v.blurb}
-        >
-          {v.text}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {row.evVerdict !== "na" && (
+            <span
+              className="bv-pill"
+              style={{ color: ev.color, borderColor: ev.color }}
+              title={ev.blurb}
+            >
+              {ev.text}
+            </span>
+          )}
+          <span
+            className="bv-pill"
+            style={{ color: v.color, borderColor: v.color }}
+            title={v.blurb}
+          >
+            {v.text}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
@@ -86,6 +132,31 @@ export default function LineCheckCard({ row }: { row: LineCheckRow }) {
           <div className="bv-stat-value">{row.median ?? "—"}</div>
         </div>
       </div>
+
+      {row.hrFairUnder !== null && (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--text-muted)]">
+          <span title="Hard Rock's no-vig fair under probability (de-vigged from its two-sided price).">
+            HR no-vig under{" "}
+            <span className="font-mono text-[var(--text)]">
+              {pct1(row.hrFairUnder)}
+            </span>
+          </span>
+          <span title="Hard Rock's two-way hold (the vig baked into its over/under prices).">
+            hold{" "}
+            <span className="font-mono text-[var(--text)]">
+              {pct1(row.hrHold)}
+            </span>
+          </span>
+          {row.ev !== null && (
+            <span title="Per-$1 EV of HR's under vs the market no-vig fair-under at a comparable number.">
+              EV{" "}
+              <span className="font-mono" style={{ color: ev.color }}>
+                {signedPct1(row.ev)}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-[var(--text-muted)]">
@@ -117,13 +188,19 @@ export default function LineCheckCard({ row }: { row: LineCheckRow }) {
             </thead>
             <tbody>
               {row.books.map((b) => {
-                const d = row.best !== null ? Number((b.line - row.best).toFixed(2)) : null;
+                const d =
+                  row.best !== null
+                    ? Number((b.line - row.best).toFixed(2))
+                    : null;
                 return (
                   <tr
                     key={b.book}
                     style={
                       b.isHR
-                        ? { background: "color-mix(in srgb, var(--accent) 12%, transparent)" }
+                        ? {
+                            background:
+                              "color-mix(in srgb, var(--accent) 12%, transparent)",
+                          }
                         : undefined
                     }
                   >

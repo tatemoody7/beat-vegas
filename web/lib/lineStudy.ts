@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 // Port of beatvegas/analysis/line_study.py — for a season, how often the 1H
@@ -71,7 +72,7 @@ async function openByGame(season: number): Promise<Map<number, number>> {
   return out;
 }
 
-export async function getLineStudy(
+async function getLineStudyUncached(
   season: number,
   minGames = 30,
 ): Promise<{ buckets: LineBucket[]; anyReal: boolean }> {
@@ -126,3 +127,10 @@ export async function getLineStudy(
   const anyReal = buckets.some((b) => b.line_source === "real_open");
   return { buckets, anyReal };
 }
+
+// History view — slow-changing, so cache the per-(season,minGames) computation.
+export const getLineStudy = unstable_cache(
+  getLineStudyUncached,
+  ["line-study"],
+  { revalidate: 3600 },
+);

@@ -22,7 +22,9 @@ export default async function RecordsPage({
   const seasons = await getRecordSeasons();
   const sp = await searchParams;
   const season = Number(sp.season) || seasons[0] || new Date().getFullYear();
-  const rows: RecordRow[] = seasons.length ? await getSeasonRecords(season) : [];
+  const rows: RecordRow[] = seasons.length
+    ? await getSeasonRecords(season)
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -105,7 +107,9 @@ export default async function RecordsPage({
                   </td>
                   <td
                     className="font-semibold"
-                    style={{ color: r.outcome ? OUTCOME_COLOR[r.outcome] : "#6b7280" }}
+                    style={{
+                      color: r.outcome ? OUTCOME_COLOR[r.outcome] : "#6b7280",
+                    }}
                   >
                     {r.outcome ?? "—"}
                   </td>

@@ -30,8 +30,8 @@ export default async function LineCheckPage({
         <div>
           <h1 className="bv-page-title">Line Check</h1>
           <p className="bv-page-sub">
-            Is Hard Rock giving you a good number? For an under, a higher total is
-            better — verdict is Hard Rock vs the best total in the market.
+            Is Hard Rock giving you a good number? For an under, a higher total
+            is better — verdict is Hard Rock vs the best total in the market.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -45,7 +45,9 @@ export default async function LineCheckPage({
       {priced.length > 0 && (
         <p className="mb-4 text-sm text-[var(--text-muted)]">
           Hard Rock has priced{" "}
-          <span className="font-semibold text-[var(--text)]">{priced.length}</span>{" "}
+          <span className="font-semibold text-[var(--text)]">
+            {priced.length}
+          </span>{" "}
           {market === "1h" ? "first-half" : "full-game"} game
           {priced.length === 1 ? "" : "s"} —{" "}
           <span style={{ color: "var(--under-strong)" }}>{good} good</span>.

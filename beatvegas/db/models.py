@@ -214,7 +214,8 @@ class Result(Base):
     under_hit = Column(Boolean)
     closing_line = Column(Float)
     closing_captured_at = Column(DateTime)  # when the closing snapshot landed
-    clv = Column(Float)
+    clv = Column(Float)  # points CLV (closing_line - bet_line)
+    clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
     units = Column(Float)
 
 
@@ -247,7 +248,8 @@ class ManualPick(Base):
     result = Column(String)  # under / over / push
     units = Column(Float)
     closing_line = Column(Float)
-    clv = Column(Float)
+    clv = Column(Float)  # points CLV (closing_line - bet_line)
+    clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
 
     # Decision-quality snapshot (Phase 4b). factors_json_at_pick freezes the
     # factor board at log time (forward-only); opening_line filled at grading.

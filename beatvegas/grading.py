@@ -38,3 +38,15 @@ def clv_under(bet_line: float, closing_line: float) -> Optional[float]:
     if bet_line is None or closing_line is None:
         return None
     return closing_line - bet_line
+
+
+def price_clv_under(
+    open_fair_under: Optional[float], close_fair_under: Optional[float]
+) -> Optional[float]:
+    """No-vig PRICE CLV for an UNDER, in probability points. Isolates the JUICE
+    dimension: positive = the under's no-vig fair price rose from open to close
+    (the market moved toward the under), so an early under locked the cheaper
+    side. Does NOT capture line movement — pair it with clv_under (points)."""
+    if open_fair_under is None or close_fair_under is None:
+        return None
+    return close_fair_under - open_fair_under

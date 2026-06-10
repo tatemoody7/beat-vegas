@@ -1,6 +1,7 @@
 from beatvegas.grading import (
     american_to_decimal,
     clv_under,
+    price_clv_under,
     under_result,
     units_won,
 )
@@ -31,3 +32,12 @@ def test_clv_under():
     # Line dropped after you bet -> negative CLV for an under.
     assert clv_under(25.0, 23.5) == -1.5
     assert clv_under(None, 24.0) is None
+
+
+def test_price_clv_under():
+    # Under's fair price rose open->close: positive (you locked the cheaper side).
+    assert round(price_clv_under(0.48, 0.50), 4) == 0.02
+    # Fell: negative.
+    assert round(price_clv_under(0.51, 0.49), 4) == -0.02
+    assert price_clv_under(None, 0.5) is None
+    assert price_clv_under(0.5, None) is None

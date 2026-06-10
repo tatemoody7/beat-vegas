@@ -1,11 +1,22 @@
 from datetime import datetime
 from types import SimpleNamespace as S
 
-from beatvegas.lines import closing_before_kickoff, consensus_open_close
+from beatvegas.lines import (
+    closing_before_kickoff,
+    consensus_fair_under_open_close,
+    consensus_open_close,
+    fair_under_before_kickoff,
+)
 
 
-def snap(book, line, day):
-    return S(book=book, line=line, captured_at=datetime(2024, 11, day, 12, 0))
+def snap(book, line, day, over=-110, under=-110):
+    return S(
+        book=book,
+        line=line,
+        captured_at=datetime(2024, 11, day, 12, 0),
+        over_price=over,
+        under_price=under,
+    )
 
 
 def test_consensus_uses_first_and_last_per_book():
@@ -54,3 +65,41 @@ def test_closing_handles_no_kickoff():
     opening, closing, closing_at = closing_before_kickoff([snap("dk", 27.0, 3)], None)
     assert (opening, closing) == (27.0, 27.0)
     assert closing_at == datetime(2024, 11, 3, 12, 0)
+
+
+def test_fair_under_open_close_flat_prices_is_half():
+    # All -110/-110: fair under is ~0.5 at open and close regardless of line.
+    snaps = [snap("dk", 24.5, 1), snap("dk", 26.0, 5)]
+    fo, fc = consensus_fair_under_open_close(snaps)
+    assert fo == fc  # no juice movement
+    assert abs(fo - 0.5) < 1e-6
+
+
+def test_fair_under_open_close_tracks_price_movement():
+    # dk opens with the under FAVORED (under -120, over +100 -> fair-under > 0.5)
+    # and closes balanced; fair-under should fall from open to close.
+    snaps = [
+        snap("dk", 25.0, 1, over=100, under=-120),
+        snap("dk", 25.0, 5, over=-110, under=-110),
+    ]
+    fo, fc = consensus_fair_under_open_close(snaps)
+    assert fo > fc
+    assert fo > 0.5
+    assert abs(fc - 0.5) < 1e-6
+
+
+def test_fair_under_skips_snaps_missing_prices():
+    snaps = [snap("dk", 25.0, 1, over=None, under=None)]
+    assert consensus_fair_under_open_close(snaps) == (None, None)
+
+
+def test_fair_under_before_kickoff_ignores_post_kickoff():
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("dk", 25.0, 1, over=100, under=-120),  # open, under favored
+        snap("dk", 25.0, 5, over=-110, under=-110),  # close, == kickoff
+        snap("dk", 25.0, 6, over=-120, under=100),  # POST-kickoff: ignored
+    ]
+    fo, fc = fair_under_before_kickoff(snaps, kickoff)
+    assert fo > fc
+    assert abs(fc - 0.5) < 1e-6  # the balanced close, not the post-kickoff snap

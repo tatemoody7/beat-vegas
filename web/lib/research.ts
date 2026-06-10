@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 // Port of the "Research" tab in beatvegas/dashboard/app.py — the edge question
@@ -53,7 +54,7 @@ const r2 = (v: number | null): number | null =>
 // question is whether the LINE moves toward our BV number by close — pure market
 // movement, independent of the model's own entry timing. predVersion supplies
 // the BV line.
-export async function getGapClvBuckets(
+async function getGapClvBucketsUncached(
   resultLedger = "market",
   predVersion = "gbm_v1",
 ): Promise<GapBucket[]> {
@@ -99,6 +100,12 @@ export async function getGapClvBuckets(
   });
 }
 
+export const getGapClvBuckets = unstable_cache(
+  getGapClvBucketsUncached,
+  ["gap-clv-buckets"],
+  { revalidate: 3600 },
+);
+
 // --- BV-line calibration audit: the per-segment OOF residual table emitted by
 // scripts/retrain.py into the latest model_runs row (metrics_json.bv_residual).
 export type BvCalibration = {
@@ -107,7 +114,7 @@ export type BvCalibration = {
   segments: { label: string; n: number; meanResidual: number | null }[];
 } | null;
 
-export async function getBvCalibration(): Promise<BvCalibration> {
+async function getBvCalibrationUncached(): Promise<BvCalibration> {
   const rows = await prisma.$queryRaw<{ metrics_json: string | null }[]>`
     SELECT metrics_json FROM model_runs
     WHERE metrics_json IS NOT NULL
@@ -160,7 +167,13 @@ export async function getBvCalibration(): Promise<BvCalibration> {
   return null;
 }
 
-export async function getEdgeStats(): Promise<EdgeStats> {
+export const getBvCalibration = unstable_cache(
+  getBvCalibrationUncached,
+  ["bv-calibration"],
+  { revalidate: 3600 },
+);
+
+async function getEdgeStatsUncached(): Promise<EdgeStats> {
   const rows = await prisma.$queryRaw<
     { first_half_total: number | bigint; full_game_total: number }[]
   >`
@@ -175,6 +188,12 @@ export async function getEdgeStats(): Promise<EdgeStats> {
   return { games: ratios.length, mean, median: median(ratios) };
 }
 
+export const getEdgeStats = unstable_cache(
+  getEdgeStatsUncached,
+  ["edge-stats"],
+  { revalidate: 3600 },
+);
+
 function metric(js: string | null, key: string): number | null {
   if (!js) return null;
   try {
@@ -185,7 +204,7 @@ function metric(js: string | null, key: string): number | null {
   }
 }
 
-export async function getModelRuns(): Promise<ModelRunRow[]> {
+async function getModelRunsUncached(): Promise<ModelRunRow[]> {
   const runs = await prisma.$queryRaw<
     {
       created_at: string | null;
@@ -211,3 +230,9 @@ export async function getModelRuns(): Promise<ModelRunRow[]> {
     notes: r.notes,
   }));
 }
+
+export const getModelRuns = unstable_cache(
+  getModelRunsUncached,
+  ["model-runs"],
+  { revalidate: 3600 },
+);

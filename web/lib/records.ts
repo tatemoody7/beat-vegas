@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 // Our own season records (plan Phase 1): one row per game, model-aligned —
@@ -40,7 +41,7 @@ export async function getRecordSeasons(): Promise<number[]> {
   return rows.map((r) => Number(r.season));
 }
 
-export async function getSeasonRecords(season: number): Promise<RecordRow[]> {
+async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
   const rows = await prisma.$queryRaw<
     {
       season: number | bigint;
@@ -82,7 +83,10 @@ export async function getSeasonRecords(season: number): Promise<RecordRow[]> {
       line,
       bvLine: num(r.bv_line),
       bvGap,
-      bvGapZ: bvGap !== null && bvSigma ? Math.round((bvGap / bvSigma) * 100) / 100 : null,
+      bvGapZ:
+        bvGap !== null && bvSigma
+          ? Math.round((bvGap / bvSigma) * 100) / 100
+          : null,
       underScore: num(r.under_score),
       rank: num(r.rank),
       firstHalfTotal: fh,
@@ -90,6 +94,13 @@ export async function getSeasonRecords(season: number): Promise<RecordRow[]> {
     };
   });
 }
+
+// History view — slow-changing (updates at most weekly), so cache the DB scan.
+export const getSeasonRecords = unstable_cache(
+  getSeasonRecordsUncached,
+  ["season-records"],
+  { revalidate: 3600 },
+);
 
 const CSV_COLUMNS: { key: keyof RecordRow; header: string }[] = [
   { key: "season", header: "season" },
@@ -116,6 +127,8 @@ function csvCell(v: unknown): string {
 
 export function recordsToCsv(rows: RecordRow[]): string {
   const head = CSV_COLUMNS.map((c) => c.header).join(",");
-  const body = rows.map((r) => CSV_COLUMNS.map((c) => csvCell(r[c.key])).join(",")).join("\n");
+  const body = rows
+    .map((r) => CSV_COLUMNS.map((c) => csvCell(r[c.key])).join(","))
+    .join("\n");
   return `${head}\n${body}\n`;
 }

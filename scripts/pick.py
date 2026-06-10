@@ -19,8 +19,8 @@ from typing import List, Optional
 from beatvegas.db.models import Game, ManualPick, OddsSnapshot
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.etl.match import resolve_game
-from beatvegas.grading import clv_under, under_result, units_won
-from beatvegas.lines import consensus_open_close
+from beatvegas.grading import clv_under, price_clv_under, under_result, units_won
+from beatvegas.lines import consensus_fair_under_open_close, consensus_open_close
 
 
 def _season_games(s, season: int) -> List[dict]:
@@ -92,7 +92,9 @@ def cmd_list(args) -> None:
             )
 
 
-def graded_pick_fields(actual_first_half, line, price, stake, opening, closing) -> dict:
+def graded_pick_fields(
+    actual_first_half, line, price, stake, opening, closing, fair_open=None, fair_close=None
+) -> dict:
     """Pure: the graded ManualPick fields for one pick + its line snapshots."""
     return {
         "actual_first_half_total": actual_first_half,
@@ -101,6 +103,7 @@ def graded_pick_fields(actual_first_half, line, price, stake, opening, closing) 
         "opening_line": opening,
         "closing_line": closing,
         "clv": clv_under(line, closing) if closing is not None else None,
+        "clv_prob": price_clv_under(fair_open, fair_close),
     }
 
 
@@ -138,8 +141,9 @@ def cmd_grade(args) -> None:
                 .all()
             )
             opening, closing = consensus_open_close(snaps)
+            fair_open, fair_close = consensus_fair_under_open_close(snaps)
             for k, v in graded_pick_fields(
-                actual, p.line, p.price, p.stake, opening, closing
+                actual, p.line, p.price, p.stake, opening, closing, fair_open, fair_close
             ).items():
                 setattr(p, k, v)
             p.graded = True

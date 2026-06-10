@@ -11,7 +11,8 @@ export type SlateOption = {
   away: string;
   home: string;
   underScore: number | null;
-  curLine: number | null; // consensus current; falls back to model line
+  curLine: number | null; // consensus current 1H line; falls back to model line
+  fullGameLine: number | null; // posted full-game total (for full-game picks)
   modelLine: number | null;
 };
 
@@ -47,6 +48,7 @@ export async function getSlate(season: number): Promise<SlateOption[]> {
       home: b.home,
       underScore: b.underScore,
       curLine: b.curLine ?? b.factors.line ?? null,
+      fullGameLine: b.fullGameTotal ?? null,
       modelLine: b.factors.line ?? null,
     }));
 }

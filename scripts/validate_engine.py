@@ -16,7 +16,12 @@ import json
 from datetime import datetime
 
 from beatvegas.backtest.bv_engine import mae_ablation, run_bv_backtest
-from beatvegas.backtest.engine import run_backtest
+from beatvegas.backtest.engine import config_return_series, run_backtest
+from beatvegas.backtest.overfit import (
+    deflated_sharpe_ratio,
+    pbo,
+    sr_variance_across_configs,
+)
 from beatvegas.db.models import ModelRun
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.etl.features import (
@@ -36,8 +41,25 @@ def main() -> None:
 
     df = build_feature_frame(min_games=2)
 
-    clf = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac).summary
+    clf_res = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
+    clf = clf_res.summary
     bv = run_bv_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
+
+    # Overfitting controls on the classifier selection (rank by under_prob), over a
+    # top-fraction grid (the trials), pooled across OOS seasons (doc Stage 3).
+    grid = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+    matrix, bet_by_cfg = config_return_series(clf_res.per_game, "under_prob", "under", grid)
+    _, primary_bets = config_return_series(clf_res.per_game, "under_prob", "under", [args.top_frac])
+    overfit = {
+        "pbo": round(pbo(matrix), 4),
+        "dsr": round(
+            deflated_sharpe_ratio(
+                primary_bets[0], len(grid), sr_variance_across_configs(bet_by_cfg)
+            ),
+            4,
+        ),
+        "n_trials": len(grid),
+    }
 
     pbp_family = set(FH_FACTOR_COLS) | set(MATCHUP_COLS)
     without_pbp = [c for c in BV_FEATURE_COLS if c not in pbp_family]
@@ -62,6 +84,12 @@ def main() -> None:
     )
     print(f"\n  BV by-season:\n{bv.by_season.to_string(index=False)}")
 
+    print(
+        f"\n--- overfitting controls (classifier selection, {overfit['n_trials']} configs) ---\n"
+        f"  PBO {overfit['pbo']} (>= 0.5 = no real selection skill) | "
+        f"DSR {overfit['dsr']} (< 0.95 = not significant after deflation)"
+    )
+
     promote = (bv.summary["top_roi"] >= clf["top_roi"]) and (bv.summary["top_under_pct"] >= 52.4)
     print(
         f"\nPROMOTION GATE: gbm_v2 {'PASSES' if promote else 'does NOT pass'} "
@@ -77,6 +105,7 @@ def main() -> None:
         "mae_full": round(mae_full, 3),
         "mae_without_pbp": round(mae_base, 3),
         "mae_delta_pbp": round(delta, 3),
+        "overfit": overfit,
         "promote": bool(promote),
     }
     with session_scope() as s:

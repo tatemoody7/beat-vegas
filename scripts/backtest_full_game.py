@@ -35,6 +35,12 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
 BREAKEVEN = 52.4
+WIN_PROFIT = 100 / 110  # units won on a winning -110 bet
+# top-fraction configurations we effectively explored — the trial set the
+# overfitting controls deflate against.
+TOP_FRAC_GRID = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+PBO_MAX = 0.5  # PBO at/above this = the selection is no better than chance
+DSR_MIN = 0.95  # DSR below this = the edge isn't significant after deflation
 
 
 def _reg() -> HistGradientBoostingRegressor:
@@ -77,7 +83,12 @@ def main() -> None:
         os.environ["DATABASE_URL"] = f"sqlite:///{os.path.abspath(args.db_path)}"
 
     # Imported after the optional DB override so the lazy engine binds correctly.
-    from beatvegas.backtest.engine import _roi
+    from beatvegas.backtest.engine import _roi, config_return_series
+    from beatvegas.backtest.overfit import (
+        deflated_sharpe_ratio,
+        pbo,
+        sr_variance_across_configs,
+    )
     from beatvegas.etl.features import build_feature_frame
     from beatvegas.model.bv_line import BV_FEATURE_COLS, _assert_market_blind
     from beatvegas.sources.cfbd import CFBDClient
@@ -171,16 +182,36 @@ def main() -> None:
         f"(breakeven {BREAKEVEN}%)"
     )
 
-    # --- GATE: the held-out final season -------------------------------------
+    # --- overfitting controls (across all OOS seasons, pooled) ----------------
+    # Each top-fraction is one configuration: PBO (CSCV) judges whether the
+    # in-sample-best threshold holds up out-of-sample; DSR deflates the primary
+    # config's bet-return Sharpe for the grid size + fat tails (doc Stage 3).
+    matrix, bet_by_cfg = config_return_series(per_game, "gap", "under", TOP_FRAC_GRID, WIN_PROFIT)
+    _, primary_bets = config_return_series(per_game, "gap", "under", [args.top_frac], WIN_PROFIT)
+    pbo_v = pbo(matrix)
+    dsr_v = deflated_sharpe_ratio(
+        primary_bets[0], len(TOP_FRAC_GRID), sr_variance_across_configs(bet_by_cfg)
+    )
+    n_trials = len(TOP_FRAC_GRID)
+    pbo_ok = (not np.isnan(pbo_v)) and pbo_v < PBO_MAX
+    dsr_ok = (not np.isnan(dsr_v)) and dsr_v > DSR_MIN
+    print(
+        f"\noverfitting controls (grid of {n_trials} top-fraction configs): "
+        f"PBO {pbo_v:.3f} ({'<' if pbo_ok else '>='} {PBO_MAX}) | "
+        f"DSR {dsr_v:.3f} ({'>' if dsr_ok else '<='} {DSR_MIN})"
+    )
+
+    # --- GATE: the held-out final season + overfitting controls ---------------
     gate_season = int(by_season["season"].max())
     gr = by_season[by_season["season"] == gate_season].iloc[0]
     under_ok = gr[f"top{pct}_under%"] > BREAKEVEN
     clv_ok = (not np.isnan(gr["top_clv"])) and gr["top_clv"] > 0
-    passes = bool(under_ok and clv_ok)
+    passes = bool(under_ok and clv_ok and pbo_ok and dsr_ok)
     print(
         f"\nGATE ({gate_season} holdout): under {gr[f'top{pct}_under%']}% "
         f"({'>' if under_ok else '<='} {BREAKEVEN}) "
         f"AND CLV {gr['top_clv']} ({'+' if clv_ok else 'not +'}) "
+        f"AND PBO {'ok' if pbo_ok else 'FAIL'} AND DSR {'ok' if dsr_ok else 'FAIL'} "
         f"-> {'PASSES -- proceed to build the live workflow' if passes else 'does NOT pass'}"
     )
     print(

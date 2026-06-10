@@ -1,9 +1,11 @@
+import { devigTwoWay, evUnder } from "@/lib/devig";
 import { prisma } from "@/lib/prisma";
 
 // "Line Check" — is Hard Rock giving Tate a good number vs the rest of the market?
 // He can only bet Hard Rock (Florida), so this is a quality/CLV check, not price
-// shopping. For an UNDER, a HIGHER total at HR is better. Verdict is HR vs the
-// BEST (highest) total available in the market.
+// shopping. For an UNDER, a HIGHER total at HR is better. The line verdict is HR
+// vs the BEST (highest) total available; the EV verdict (devig) asks whether HR's
+// under PRICE clears the market's no-vig fair-under at a comparable number.
 
 export type Market = "full_game" | "1h";
 
@@ -15,9 +17,17 @@ const MARKET_DB: Record<Market, string> = {
 // Hard Rock keys, FL preferred (mirror beatvegas/hardrock.py).
 const HR_KEYS = ["hardrockbet_fl", "hardrockbet"];
 
-export type BookLine = { book: string; line: number; isHR: boolean };
+export type BookLine = {
+  book: string;
+  line: number;
+  isHR: boolean;
+  underPrice: number | null;
+  fairUnder: number | null; // no-vig fair under prob from this book's two sides
+};
 
 export type Verdict = "good" | "fair" | "poor" | "no-hr";
+// EV verdict: HR's under price vs the market no-vig fair-under at HR's number.
+export type EvVerdict = "pos" | "fair" | "neg" | "na";
 
 export type LineCheckRow = {
   gameId: number;
@@ -28,6 +38,13 @@ export type LineCheckRow = {
   median: number | null;
   delta: number | null; // hrLine - best (<= 0; how far HR sits below the best)
   verdict: Verdict;
+  // Devig / EV layer:
+  hrUnderPrice: number | null;
+  hrFairUnder: number | null; // HR's own no-vig fair under
+  hrHold: number | null; // HR's two-way hold (overround)
+  marketFairUnder: number | null; // consensus no-vig fair-under at HR's line
+  ev: number | null; // per-$1 EV of HR's under vs marketFairUnder
+  evVerdict: EvVerdict;
   books: BookLine[]; // deduped, sorted by line desc (best first)
 };
 
@@ -46,6 +63,13 @@ function verdictFor(hr: number | null, best: number | null): Verdict {
   return "poor"; // shading the total down vs the field
 }
 
+export function evVerdictFor(ev: number | null): EvVerdict {
+  if (ev === null) return "na";
+  if (ev > 0.005) return "pos"; // HR's under clears the market's fair price
+  if (ev < -0.02) return "neg"; // worse than fair beyond the unavoidable vig
+  return "fair";
+}
+
 export async function getLineCheck(
   season: number,
   market: Market,
@@ -57,6 +81,8 @@ export async function getLineCheck(
       game_id: number | bigint;
       book: string | null;
       line: number | null;
+      over_price: number | bigint | null;
+      under_price: number | bigint | null;
       captured_at: string | null;
       week: number | bigint;
       away_team: string;
@@ -64,18 +90,25 @@ export async function getLineCheck(
     }[]
   >`
     SELECT DISTINCT ON (o.game_id, o.book)
-      o.game_id, o.book, o.line, CAST(o.captured_at AS TEXT) AS captured_at,
+      o.game_id, o.book, o.line, o.over_price, o.under_price,
+      CAST(o.captured_at AS TEXT) AS captured_at,
       g.week, g.away_team, g.home_team
     FROM odds_snapshots o JOIN games g ON g.id = o.game_id
     WHERE g.season = ${season} AND o.market = ${dbMarket}
     ORDER BY o.game_id, o.book, o.captured_at DESC
   `;
 
+  type BookObs = {
+    line: number;
+    overPrice: number | null;
+    underPrice: number | null;
+    capturedAt: string;
+  };
   type Acc = {
     week: number;
     matchup: string;
-    // deduped by lowercased book name -> latest line + captured_at
-    byBook: Map<string, { line: number; capturedAt: string }>;
+    // deduped by lowercased book name -> latest observation
+    byBook: Map<string, BookObs>;
   };
   const games = new Map<number, Acc>();
 
@@ -95,17 +128,29 @@ export async function getLineCheck(
     const prev = g.byBook.get(key);
     const cap = r.captured_at ?? "";
     if (!prev || cap > prev.capturedAt) {
-      g.byBook.set(key, { line: r.line, capturedAt: cap });
+      g.byBook.set(key, {
+        line: r.line,
+        overPrice: r.over_price === null ? null : Number(r.over_price),
+        underPrice: r.under_price === null ? null : Number(r.under_price),
+        capturedAt: cap,
+      });
     }
     games.set(gid, g);
   }
 
   const out: LineCheckRow[] = [];
   for (const [gameId, g] of games) {
+    const fairUnderOf = (o: BookObs): number | null =>
+      o.overPrice === null || o.underPrice === null
+        ? null
+        : devigTwoWay(o.overPrice, o.underPrice).fairUnder;
+
     const books: BookLine[] = [...g.byBook.entries()].map(([book, v]) => ({
       book,
       line: v.line,
       isHR: HR_KEYS.includes(book),
+      underPrice: v.underPrice,
+      fairUnder: fairUnderOf(v),
     }));
     if (books.length === 0) continue;
     books.sort((a, b) => b.line - a.line);
@@ -113,10 +158,33 @@ export async function getLineCheck(
     const lines = books.map((b) => b.line);
     const best = Math.max(...lines);
     const med = median(lines);
-    const hr = HR_KEYS.map((k) => g.byBook.get(k)?.line).find(
-      (l) => l !== undefined,
+    const hrObs = HR_KEYS.map((k) => g.byBook.get(k)).find(
+      (o) => o !== undefined,
     );
-    const hrLine = hr ?? null;
+    const hrLine = hrObs?.line ?? null;
+
+    // Devig / EV layer. Compare HR's under price to the market's no-vig fair
+    // under at a COMPARABLE number (other books within half a point of HR's
+    // line) — keeps it apples-to-apples rather than mixing different totals.
+    const hrUnderPrice = hrObs?.underPrice ?? null;
+    const hrTwoWay =
+      hrObs && hrObs.overPrice !== null && hrObs.underPrice !== null
+        ? devigTwoWay(hrObs.overPrice, hrObs.underPrice)
+        : null;
+    const comparable =
+      hrLine === null
+        ? []
+        : [...g.byBook.entries()]
+            .filter(([k]) => !HR_KEYS.includes(k))
+            .map(([, o]) => o)
+            .filter((o) => Math.abs(o.line - hrLine) <= 0.5)
+            .map(fairUnderOf)
+            .filter((f): f is number => f !== null);
+    const marketFairUnder = median(comparable);
+    const ev =
+      marketFairUnder !== null && hrUnderPrice !== null
+        ? evUnder(marketFairUnder, hrUnderPrice)
+        : null;
 
     out.push({
       gameId,
@@ -127,6 +195,12 @@ export async function getLineCheck(
       median: med,
       delta: hrLine === null ? null : Number((hrLine - best).toFixed(2)),
       verdict: verdictFor(hrLine, best),
+      hrUnderPrice,
+      hrFairUnder: hrTwoWay?.fairUnder ?? null,
+      hrHold: hrTwoWay?.hold ?? null,
+      marketFairUnder,
+      ev,
+      evVerdict: evVerdictFor(ev),
       books,
     });
   }

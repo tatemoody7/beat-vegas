@@ -1,0 +1,58 @@
+name: Backfill real 1H lines (Odds API historical)
+
+# Manual only. Pulls the TRUE near-kickoff 1H closing line per game from The Odds
+# API HISTORICAL endpoint into Neon, replacing the 0.52x proxy in the backtest.
+#
+# EXPENSIVE: the historical per-event totals_h1 market costs (markets x regions)
+# credits PER GAME at a higher historical multiplier — so this is gated by
+# season/week/limit and `dry_run` DEFAULTS TO TRUE. Always dry-run first, then run
+# a small `limit` and read the credit log before scaling.
+#
+# Prereq: the season's GAMES must already be in Neon (this only adds 1H_total
+# snapshots and matches them to existing Game rows). Idempotent — games that
+# already have a 1H_total snapshot are skipped.
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'season (e.g. 2024)'
+        required: true
+      week:
+        description: 'week (blank = whole season — watch credits!)'
+        default: ''
+      limit:
+        description: 'max games this run (credit cap; 0 = all)'
+        default: '10'
+      lead_min:
+        description: 'minutes before kickoff to snapshot as the 1H close'
+        default: '30'
+      dry_run:
+        description: 'true = list only, spend ZERO credits'
+        default: 'true'
+
+concurrency:
+  group: backfill-1h
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Backfill 1H history
+        run: |
+          ARGS="--season ${{ inputs.season }} --limit ${{ inputs.limit }} --lead-min ${{ inputs.lead_min }}"
+          if [ -n "${{ inputs.week }}" ]; then ARGS="$ARGS --week ${{ inputs.week }}"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          echo "running: backfill_1h_history.py $ARGS"
+          python scripts/backfill_1h_history.py $ARGS

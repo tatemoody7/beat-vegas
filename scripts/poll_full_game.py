@@ -169,6 +169,7 @@ def main() -> None:
     h1_rows = [r for r in h1_rows if _in_window(r)]
 
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
+    unmatched_names: List[str] = []
     matched_gids = set()
     hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: line}
     matchups: Dict[int, str] = {}
@@ -193,6 +194,7 @@ def main() -> None:
             gid = _resolve_gid(r, games, ids)
             if gid is None:
                 unmatched += 1
+                unmatched_names.append(f"{r['away_team']} @ {r['home_team']}")
                 continue
             matched += 1
             matched_gids.add(gid)
@@ -200,13 +202,20 @@ def main() -> None:
                 hr_rows.setdefault(gid, {})[r["book"]] = r["line"]
                 matchups[gid] = f"{r['away_team']} @ {r['home_team']}"
             prev = _latest_snapshot(s, gid, r["book"], "full_game_total")
-            if _changed(prev, r["line"], r.get("spread"), r["over_price"], r["under_price"]):
+            # A game's FIRST snapshot is its opener: prefer the source's true
+            # opening number when it carries one (CFBD `overUnderOpen`) so the
+            # fallback path doesn't mislabel a current/closing number as the
+            # opener and corrupt open->close CLV. Later snapshots track current.
+            line = r["line"]
+            if prev is None and r.get("line_open") is not None:
+                line = r["line_open"]
+            if _changed(prev, line, r.get("spread"), r["over_price"], r["under_price"]):
                 s.add(
                     OddsSnapshot(
                         game_id=gid,
                         book=r["book"],
                         market="full_game_total",
-                        line=r["line"],
+                        line=line,
                         spread=r.get("spread"),
                         over_price=r["over_price"],
                         under_price=r["under_price"],
@@ -223,7 +232,7 @@ def main() -> None:
                 if r.get("spread") is not None:
                     g.spread = r["spread"]
                 if g.full_game_total is None:
-                    g.full_game_total = r["line"]
+                    g.full_game_total = line
                     g.full_game_total_book = r["book"]
                 games_updated += 1
 
@@ -252,6 +261,9 @@ def main() -> None:
         f"unmatched={unmatched} new_fg={written_fg} new_h1={written_h1} "
         f"unchanged={skipped} games_updated={games_updated}"
     )
+    if unmatched_names:
+        uniq = sorted(set(unmatched_names))
+        print(f"unmatched events ({len(uniq)}): {uniq[:10]}" + (" ..." if len(uniq) > 10 else ""))
 
     if args.push:
         hr_new = {

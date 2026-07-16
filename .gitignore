@@ -23,3 +23,8 @@ config.yaml
 # Local agent tooling (not part of the project)
 .claude/
 .superpowers/
+
+# Deploy-and-verify poller state (local, per-machine)
+/.deploy-verify/
+.vercel
+.env*

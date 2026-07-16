@@ -139,7 +139,12 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
         SELECT p2.model_version FROM predictions p2
         JOIN games g2 ON g2.id = p2.game_id
         WHERE g2.season = ${season}
-        ORDER BY p2.created_at DESC LIMIT 1)
+        -- A real model version always outranks display-only derived_lines:
+        -- re-running post_derived_lines after a Sunday scoring must not hide
+        -- the model's picks behind "DERIVED — no model pick" cards.
+        ORDER BY (p2.model_version = 'derived_lines') ASC,
+                 p2.created_at DESC
+        LIMIT 1)
     ORDER BY p.rank
   `;
   const [lines, adjustments] = await Promise.all([

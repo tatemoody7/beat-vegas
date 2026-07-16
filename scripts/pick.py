@@ -26,16 +26,19 @@ from beatvegas.grading import (
     under_result,
     units_won,
 )
-from beatvegas.lines import consensus_fair_under_open_close, consensus_open_close
+from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
 
 
 def _season_games(s, season: int) -> List[dict]:
     rows = (
-        s.query(Game.id, Game.week, Game.home_team, Game.away_team)
+        s.query(Game.id, Game.week, Game.home_team, Game.away_team, Game.start_date)
         .filter(Game.season == season)
         .all()
     )
-    return [{"id": r[0], "week": r[1], "home_team": r[2], "away_team": r[3]} for r in rows]
+    return [
+        {"id": r[0], "week": r[1], "home_team": r[2], "away_team": r[3], "start_date": r[4]}
+        for r in rows
+    ]
 
 
 def _default_season(now: Optional[datetime] = None) -> int:
@@ -45,6 +48,7 @@ def _default_season(now: Optional[datetime] = None) -> int:
 
 def cmd_add(args) -> None:
     season = args.season or _default_season()
+    market = "full" if args.market == "full" else "1H"
     with session_scope() as s:
         games = _season_games(s, season)
         gid, score, n = resolve_game(args.home, args.away, games, week=args.week)
@@ -57,6 +61,30 @@ def cmd_add(args) -> None:
         elif n > 1:
             print(f"[warn] {n} games match (rematch?). Picked best; pass --week to be exact.")
         g = next((x for x in games if x["id"] == gid), None)
+
+        # Real-money integrity guards (override with --force if intentional).
+        if gid is not None and not args.force:
+            start = (g or {}).get("start_date")
+            if start is not None and start <= datetime.utcnow():
+                print(
+                    f"REFUSED: {args.away} @ {args.home} already kicked off "
+                    f"({start} UTC) — a post-kickoff pick isn't a real bet. "
+                    "Pass --force if you genuinely placed it pre-game."
+                )
+                return
+            dup = (
+                s.query(ManualPick)
+                .filter(ManualPick.game_id == gid, ManualPick.side == "under")
+                .filter((ManualPick.market == market) | (ManualPick.market.is_(None)))
+                .first()
+            )
+            if dup is not None:
+                print(
+                    f"REFUSED: pick #{dup.id} already logged on this game/market "
+                    f"(UNDER {dup.line}). Pass --force to log a second bet on it."
+                )
+                return
+
         pick = ManualPick(
             game_id=gid,
             season=season,
@@ -64,6 +92,7 @@ def cmd_add(args) -> None:
             home_team=(g or {}).get("home_team", args.home) if g else args.home,
             away_team=(g or {}).get("away_team", args.away) if g else args.away,
             side="under",
+            market=market,
             line=args.line,
             price=args.price,
             stake=args.stake,
@@ -75,7 +104,7 @@ def cmd_add(args) -> None:
         s.add(pick)
         s.flush()
         print(
-            f"logged pick #{pick.id}: UNDER {args.line} ({args.price}) "
+            f"logged pick #{pick.id}: {market} UNDER {args.line} ({args.price}) "
             f"{pick.away_team} @ {pick.home_team} [{season} wk{pick.week}] "
             f"stake={args.stake}u" + (f" (game {gid})" if gid else " (UNMATCHED)")
         )
@@ -148,8 +177,10 @@ def cmd_grade(args) -> None:
                 .filter(OddsSnapshot.game_id == p.game_id, OddsSnapshot.market == snap_market)
                 .all()
             )
-            opening, closing = consensus_open_close(snaps)
-            fair_open, fair_close = consensus_fair_under_open_close(snaps)
+            # Pre-kickoff snapshots only (mirrors grade.py): a poll that ran
+            # after the game started must not pollute your closing line / CLV.
+            opening, closing, _closing_at = closing_before_kickoff(snaps, g.start_date)
+            fair_open, fair_close = fair_under_before_kickoff(snaps, g.start_date)
             for k, v in graded_pick_fields(
                 actual, p.line, p.price, p.stake, opening, closing, fair_open, fair_close
             ).items():
@@ -201,6 +232,17 @@ def main() -> None:
     a.add_argument("--season", type=int)
     a.add_argument("--week", type=int)
     a.add_argument("--note")
+    a.add_argument(
+        "--market",
+        choices=("1h", "full"),
+        default="1h",
+        help="which total the bet is on: 1h (default) or full game",
+    )
+    a.add_argument(
+        "--force",
+        action="store_true",
+        help="log even if a pick already exists on this game/market or kickoff has passed",
+    )
     a.set_defaults(func=cmd_add)
 
     li = sub.add_parser("list", help="list logged picks")

@@ -44,10 +44,26 @@ export async function getMovementGames(
   }));
 }
 
-// "2025-10-13 12:00:00.000000" -> "10-13 12:00"
+// "2025-10-13 12:00:00.000000" (stored naive UTC) -> "10-13 08:00" in ET.
+// Without the conversion every point on the movement chart reads 4-5h late
+// for the Florida user actually timing these moves.
+const ET_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 function shortT(s: string): string {
-  const m = s.match(/^\d{4}-(\d{2}-\d{2})[ T](\d{2}:\d{2})/);
-  return m ? `${m[1]} ${m[2]}` : s;
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+  if (!m) return s;
+  const d = new Date(`${m[1]}T${m[2]}:00Z`);
+  if (Number.isNaN(d.getTime())) return s;
+  const p = Object.fromEntries(
+    ET_FMT.formatToParts(d).map((x) => [x.type, x.value]),
+  );
+  return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 
 export async function getMovement(gameId: number): Promise<Movement> {

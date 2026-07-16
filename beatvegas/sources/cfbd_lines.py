@@ -97,13 +97,26 @@ def open_close_lookup(
 
 def full_game_rows(client, season: int, season_type: str = "regular") -> List[Dict[str, Any]]:
     """Full-game total+spread rows from CFBD /lines, shaped like the DK rows
-    `poll_full_game` consumes. Each row carries `game_id` (CFBD id == Game.id)."""
+    `poll_full_game` consumes. Each row carries `game_id` (CFBD id == Game.id).
+
+    `line` is CFBD's CURRENT number (drifts toward the close as the week goes
+    on); `line_open` is the same provider's `overUnderOpen` when present. The
+    poller uses `line_open` for a game's FIRST snapshot so the CFBD fallback
+    doesn't mislabel a closing number as the opener (that corrupts open->close
+    CLV, the core edge measurement)."""
     rows: List[Dict[str, Any]] = []
     for g in client.lines(year=season, season_type=season_type):
         gid = _get(g, "id")
-        ou, sp, prov = pick_total_spread(_get(g, "lines") or [])
+        lines = _get(g, "lines") or []
+        ou, sp, prov = pick_total_spread(lines)
         if gid is None or ou is None:
             continue
+        opn = None
+        for ln in lines:
+            if _get(ln, "provider") == prov:
+                raw_open = _get(ln, "overUnderOpen", "over_under_open")
+                opn = float(raw_open) if raw_open is not None else None
+                break
         rows.append(
             {
                 "game_id": gid,
@@ -113,6 +126,7 @@ def full_game_rows(client, season: int, season_type: str = "regular") -> List[Di
                 "away_team": _get(g, "awayTeam", "away_team"),
                 "book": prov or "cfbd",
                 "line": float(ou),
+                "line_open": opn,
                 "spread": sp,
                 "over_price": None,
                 "under_price": None,

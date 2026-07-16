@@ -199,13 +199,19 @@ def _summary(session, model_version: str, label: str) -> None:
         return
     n = len(rows)
     unders = sum(1 for r in rows if r.under_hit)
+    # A push is neither a win nor a loss — leaving it in the denominator
+    # understates the under% every time a total lands exactly on the line.
+    pushes = sum(1 for r in rows if r.actual_first_half_total == r.line_used)
+    decided = n - pushes
     units = sum(r.units for r in rows)
     clvs = [r.clv for r in rows if r.clv is not None]
     clv_txt = f"  avg CLV={statistics.mean(clvs):+.2f}" if clvs else ""
     pclvs = [r.clv_prob for r in rows if r.clv_prob is not None]
     pclv_txt = f"  price-CLV={100 * statistics.mean(pclvs):+.2f}pp" if pclvs else ""
+    pct = f"{100 * unders / decided:.1f}%" if decided else "n/a"
+    push_txt = f" ({pushes}P)" if pushes else ""
     print(
-        f"{label}: UNDER {unders}/{n} ({100 * unders / n:.1f}%)  "
+        f"{label}: UNDER {unders}/{decided} ({pct}){push_txt}  "
         f"units={units:+.2f}{clv_txt}{pclv_txt}"
     )
 

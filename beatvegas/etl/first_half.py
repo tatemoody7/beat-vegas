@@ -66,6 +66,22 @@ def line_scores_trustworthy(game: Dict[str, Any], first_half: Tuple[int, int]) -
     return True
 
 
+def _play_home_away_score(p: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Running (home, away) score for one play. CFBD /plays carries the score
+    relative to the OFFENSE (offenseScore/defenseScore + offense/home team
+    names); older shapes carried homeScore/awayScore directly — accept both."""
+    hs = _get(p, "homeScore", "home_score")
+    as_ = _get(p, "awayScore", "away_score")
+    if hs is not None and as_ is not None:
+        return hs, as_
+    off_s = _get(p, "offenseScore", "offense_score")
+    def_s = _get(p, "defenseScore", "defense_score")
+    offense, home = _get(p, "offense"), _get(p, "home")
+    if off_s is None or def_s is None or offense is None or home is None:
+        return None, None
+    return (off_s, def_s) if offense == home else (def_s, off_s)
+
+
 def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, int]]:
     """Map game_id -> (home_1h, away_1h) using the cumulative running score on
     the last play of period 2. Requires per-play running scores to be present."""
@@ -78,8 +94,7 @@ def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, i
         if period is None or period > 2:
             continue
         gid = _get(p, "gameId", "game_id")
-        hs = _get(p, "homeScore", "home_score")
-        as_ = _get(p, "awayScore", "away_score")
+        hs, as_ = _play_home_away_score(p)
         if gid is None or hs is None or as_ is None:
             continue
         cur = best.get(gid)

@@ -19,7 +19,13 @@ from typing import List, Optional
 from beatvegas.db.models import Game, ManualPick, OddsSnapshot
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.etl.match import resolve_game
-from beatvegas.grading import clv_under, price_clv_under, under_result, units_won
+from beatvegas.grading import (
+    clv_under,
+    price_clv_under,
+    trusted_first_half_total,
+    under_result,
+    units_won,
+)
 from beatvegas.lines import consensus_fair_under_open_close, consensus_open_close
 
 
@@ -131,9 +137,11 @@ def cmd_grade(args) -> None:
                 actual = g.home_points + g.away_points
                 snap_market = "full_game_total"
             else:
-                if g.first_half_total is None:
-                    continue  # game not finished / no 1H result yet
-                actual = g.first_half_total
+                actual = trusted_first_half_total(
+                    g.first_half_total, g.home_points, g.away_points, g.first_half_source
+                )
+                if actual is None:
+                    continue  # not finished, or a known-false 0 — never grade it
                 snap_market = "1H_total"
             snaps = (
                 s.query(OddsSnapshot)

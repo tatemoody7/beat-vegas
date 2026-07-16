@@ -2,6 +2,7 @@ from beatvegas.grading import (
     american_to_decimal,
     clv_under,
     price_clv_under,
+    trusted_first_half_total,
     under_result,
     units_won,
 )
@@ -41,3 +42,17 @@ def test_price_clv_under():
     assert round(price_clv_under(0.51, 0.49), 4) == -0.02
     assert price_clv_under(None, 0.5) is None
     assert price_clv_under(0.5, None) is None
+
+
+def test_trusted_first_half_total_guards_false_zeros():
+    # The known corruption: line-score 0 on a game that really scored -> untrusted.
+    assert trusted_first_half_total(0, 24, 17) is None
+    assert trusted_first_half_total(0, 24, 17, source="linescores") is None
+    # A play-by-play 0 is a genuinely scoreless first half -> grades normally.
+    assert trusted_first_half_total(0, 10, 7, source="pbp") == 0
+    # 0-0 final (or unknown final) keeps a 0 first half.
+    assert trusted_first_half_total(0, 0, 0) == 0
+    assert trusted_first_half_total(0, None, None) == 0
+    # Normal values pass through; missing stays missing.
+    assert trusted_first_half_total(21, 45, 17) == 21
+    assert trusted_first_half_total(None, 45, 17) is None

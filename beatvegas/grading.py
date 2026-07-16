@@ -32,6 +32,29 @@ def units_won(actual_first_half_total: float, line: float, under_price: int = -1
     return -1.0
 
 
+def trusted_first_half_total(
+    first_half_total: Optional[float],
+    home_points: Optional[float],
+    away_points: Optional[float],
+    source: Optional[str] = None,
+) -> Optional[float]:
+    """The game's 1H total if it can be trusted for grading, else None.
+
+    A LINE-SCORE 0 with a non-zero final score is the known false-zero
+    corruption (placeholder all-zero quarters) — grading it would fabricate an
+    UNDER win. A play-by-play 0 is a genuinely scoreless first half (verified
+    against the running score) and grades normally, as does 0-0 in a 0-0
+    final."""
+    if first_half_total is None:
+        return None
+    if source == "pbp":
+        return first_half_total
+    final_total = (home_points or 0) + (away_points or 0)
+    if first_half_total == 0 and final_total > 0:
+        return None
+    return first_half_total
+
+
 def clv_under(bet_line: float, closing_line: float) -> Optional[float]:
     """Closing line value for an UNDER, in points. Positive = the line CLOSED
     HIGHER than where you bet it, i.e. you got the under at a softer number."""

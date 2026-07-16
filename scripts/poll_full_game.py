@@ -24,12 +24,13 @@ Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + clo
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from beatvegas.alerts.detect import detect_full_game_posted, format_posted_summary
 from beatvegas.alerts.imessage import send_imessage
-from beatvegas.alerts.push import send_push
+from beatvegas.alerts.push import push_configured, send_push
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
@@ -140,6 +141,17 @@ def main() -> None:
         "--dry-run-alerts", action="store_true", help="print the notification instead of sending it"
     )
     args = ap.parse_args()
+
+    # Preflight BEFORE spending API credits or writing snapshots: a --push run
+    # with no working push config would consume the first-appearance alert
+    # state and then silently fail to notify — the worst possible outcome.
+    if args.push and not args.dry_run_alerts and not push_configured():
+        print(
+            "[push] FATAL: --push requested but push is not configured "
+            "(set PUSHOVER_TOKEN/PUSHOVER_USER or config.yaml push:). "
+            "Refusing to capture, so the alert can still fire once configured."
+        )
+        sys.exit(2)
 
     if not try_init_db():
         return
@@ -256,6 +268,11 @@ def main() -> None:
         else:
             ok, detail = send_push("Beat Vegas", msg, url=BOARD_URL)
             print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {msg}")
+            if not ok:
+                # Snapshots are already committed (capture must not be lost),
+                # so this game won't re-alert — fail the run loudly instead of
+                # letting the workflow show green with the alert dropped.
+                sys.exit(1)
 
     if args.notify:
         acfg = load_config().get("alerts", {}) or {}

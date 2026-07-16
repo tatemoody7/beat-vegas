@@ -4,82 +4,13 @@ College football **full-game + first-half (1H) unders** research & decision-supp
 system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
-## How to resume / orient (read this first)
-- **LATEST (full-game + 1H Hard Rock pivot — SHIPPED to `main`, PRs #7→#8→#9):** the
-  system now covers **full-game unders AND 1H unders**, organized around Tate's weekly
-  Hard Rock workflow. **Decision-support, not a model-pick board** — the model number is
-  one reference chip (the full-game backtest `scripts/backtest_full_game.py` found **no
-  edge** on the thin 2023-25 regime; we *measure* the edge via CLV, not gate on it).
-  Pieces: **multi-book capture incl. Hard Rock** via The Odds API bulk `/odds`
-  (`odds.normalize_full_game` + `list_full_game_totals`; `poll_full_game --source oddsapi
-  --regions us,us2`; HR key is **`hardrockbet`**, FL-specific `hardrockbet_fl` when prices
-  diverge — `beatvegas/hardrock.py`). **Cloud push alerts** (Pushover; `alerts/push.py` +
-  `detect_full_game_posted`/`detect_first_half_posted`; `--push` on both pollers;
-  `.github/workflows/lines_watch.yml` = Sunday FG opener window every 10 min + daily 1H).
-  **Web views:** `/preview` (Week Preview — slate + ESPN news/injuries/QB-out from
-  `game_previews`, built by `scripts/research_preview.py`), `/line-check` (Hard Rock vs
-  best-available total, verdict + per-book detail), `/weekly-review` (market/model/you ×
-  full-game/1H scorecard + your picks + UNCONFIRMED trend scan). **Logging + grading both
-  markets:** additive `manual_picks.market` + `results.market`; `pick.py` grades full-game
-  OR 1H; `grade.py` adds the full-game market ledger (`market_fg`). New Neon schema applies
-  via `.github/workflows/migrate.yml` (workflow_dispatch → `init_db`). **Setup before
-  season:** Pushover (config `push.pushover` + GH secrets `PUSHOVER_TOKEN`/`PUSHOVER_USER`),
-  `odds_api.regions: "us,us2"` locally. Plan:
-  `~/.claude/plans/the-overall-plan-right-dreamy-stardust.md`; memory
-  `beat-vegas-hardrock-oddsapi`.
-- **EARLIER (web redesign + cleanup): the Next.js app got a plain-English rewrite and a
-  modern "sportsbook" visual system** (deep navy + electric-cyan; `.bv-*` classes in
-  `web/app/globals.css`; active-route nav in `MainNav.tsx`). The old **Streamlit
-  dashboard was removed** (Next.js is the product). Added a **Neon-isolated week-sim**
-  (`scripts/simulate_week.py` + `pg_sim.py`) for off-season dry-runs, and **lint/format
-  tooling** (Ruff for Python, ESLint+Prettier for `web/`). The prod **"Log pick" Neon
-  bug is fixed** (`web/lib/picks.ts`: `::timestamp` cast + boolean `graded`). All shipped
-  to `main` (PR #1, deployed via Vercel). See plan
-  `~/.claude/plans/session-handoff-week-1-eager-matsumoto.md`.
-- **LATEST (cloud + board): scheduled Neon writes run in GitHub Actions; derived-1H
-  lines show on the board.** The Mac's usual network (campus/fgcu) **can't reach Neon**
-  (5432 TLS filtered; 443 fine), so the Sunday capture+score runs in **GitHub Actions**
-  (`.github/workflows/sunday.yml` cron; `bootstrap.yml` one-time; `post-lines.yml` to
-  publish derived lines). **DK 403s GHA datacenter IPs**, so the cloud uses
-  `poll_full_game --source auto` → **CFBD `/lines` fallback** (`sources/cfbd_lines.py`).
-  Local jobs degrade gracefully via `store.try_init_db` (logs + exits 0, no traceback);
-  the iMessage heads-up is local notify-only (`scripts/notify_sunday.py` +
-  `deploy/com.beatvegas.sunday-notify.plist`). Two read paths to the posted lines:
-  `scripts/grade_lines.py` (terminal report) and `scripts/post_derived_lines.py` (writes
-  display-only `predictions` rows, `model_version=derived_lines`, model fields NULL,
-  `factors_json.line_kind="derived_fg"`) → board cards labeled **"DERIVED · no model
-  pick"**. The board query is **season-scoped** (`web/lib/board.ts`) so derived rows for
-  one season don't hide another's real model board; real in-season scoring auto-supersedes
-  derived rows. GH secrets set: `DATABASE_URL`/`CFBD_API_KEY`/`ODDS_API_KEY`.
-- **LATEST (opener capture): DraftKings free poller + spread-adjusted multiplier.**
-  Full-game totals open Sunday; retail 1H totals post later — so we capture the
-  **full-game opener from DK's free hidden API** (`beatvegas/sources/draftkings.py`,
-  `scripts/poll_full_game.py`) and **derive a 1H number** from it via a spread-aware
-  multiplier (`proxy_line.fh_share`/`proxy_total(total, spread=...)`). The Sunday
-  board ranks off that derived opener (`opening_line_lookup` returns `(lines, kinds)`;
-  kind `derived_fg` vs `observed_1h`, surfaced in `factors_json.line_kind`).
-  Scheduled by `scripts/run_sunday.sh` + `deploy/com.beatvegas.sunday.plist`
-  (Sun 12:30pm), which also texts a single "DK fired" heads-up (no picks). The
-  spread-adjusted multiplier is **gated**: `scripts/derive_multiplier.py` writes
-  `data/multiplier.json` ONLY if it beats flat 0.52 walk-forward; absent file =>
-  flat 0.52 (zero behavior change). Run `scripts/backfill.py` to populate
-  `Game.spread` (now captured from CFBD /lines) before fitting. Plan:
-  `~/.claude/plans/users-tatemoody-desktop-compass-artifac-jolly-whistle.md`.
-- **EARLIER (2026 pivot): mispricing system shipped.** Reframed from "prove unders
-  win" to "find games where the book mispriced the 1H under." The **predict-the-1H-
-  total engine is now PRIMARY**: `score_slate` ranks the board by the gap between
-  the line and our market-blind predicted 1H total (unders only), not the old
-  classifier probability. Validated +3.0% ROI vs the classifier's +1.4% (proxy OOS).
-  Full write-ups: `docs/PIVOT.md`; memory `beat-vegas-factor-pivot`; plan
-  `~/.claude/plans/we-need-to-pivot-lazy-bonbon.md`.
-- **Factor framework**: `beatvegas/factors/` ranks 117 factors by OOS relationship
-  to the 1H under (`scripts/rank_factors.py` → `factor_scores`). Includes 1H-specific
-  play-by-play factors (`fh_team_game`, from a free bulk PBP backfill).
-- Long-term memory (decisions, status) auto-loads from this project's memory dir.
-- **Phase B shipped**: Next.js app is live on Vercel (Neon-backed, password-gated)
-  at https://beat-vegas.vercel.app. The board reads Neon, orders by `rank` (= gap).
-- The **"BV line"** regressor (`docs/BV_LINE.md`) is the engine core, now promoted
-  from display-only to the primary ranking signal (gate passed — see Gotchas).
+## Current state (read this, then the pointers — don't restate history from memory)
+- **What ships today:** decision-support for **full-game + 1H unders on Hard Rock Bet** (the only FL book). The model number is a reference chip, not a pick gate; the edge is *measured* via CLV, not promised (full-game backtest found no edge on the thin 2023-25 regime).
+- **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); Pushover push alerts; web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: set Pushover config + GH secrets, `odds_api.regions: "us,us2"`.
+- **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
+- **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).
+- **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2: top-20% by gap = 54.0% under / +3.0% ROI OOS proxy); 117-factor framework in `beatvegas/factors/`.
+- **History & details live in:** git log + PR descriptions, `docs/` (`PIVOT.md`, `BV_LINE.md`), `~/.claude/plans/`, and this project's memory dir (auto-loads). Read those instead of reconstructing from this file.
 
 ## What it does
 Pulls free data (CFBD, **bulk play-by-play via cfbfastR parquet + CFBD /plays**,

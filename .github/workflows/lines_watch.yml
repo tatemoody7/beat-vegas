@@ -6,20 +6,25 @@ name: Hard Rock line watch (push alerts)
 #   - Sunday full-game opener: every 10 min across the ~11am ET drop window.
 #   - Mid-week 1H: once daily Mon–Fri (full upcoming-week slate).
 #
-# CREDIT BUDGET (free tier = 500/mo): full-game is a featured market (~2 credits/
-# whole-slate poll); the Sunday window is ~24 polls => ~48 credits/Sunday. The 1H
-# market is per-event (~2 credits PER GAME), so a full daily slate sweep can run
-# ~80-160 credits/day — that ALONE exceeds the free tier across a week and likely
-# needs a paid Odds API tier. Dial scope with poll_lines.py --days-ahead / --max-events.
+# CREDIT BUDGET (free tier = 500/mo), scoped to FIT the free tier:
+#   - Sunday opener window: */15 across 14:00-17:45 UTC = 16 polls x 2 credits
+#     (bulk totals, us+us2) = 32/Sunday ~= 138/mo.
+#   - 1H sweep: FRIDAY ONLY (1H lines are up by then; Saturday is the slate),
+#     --days-ahead 3 --max-events 40 at 2 credits/event (totals_h1 x us,us2)
+#     = <=80/run ~= 344/mo.
+#   Total ~= 482/mo. poll_lines.py's --credit-floor (default 60) additionally
+#   stops any sweep that would eat the Sunday reserve, and pushes a warning.
+#   For more cadence (daily sweeps, */10 Sundays), buy a paid Odds API tier
+#   and widen these crons + flags.
 
 on:
   schedule:
-    # Sunday full-game opener window — every 10 min, 14:00–17:50 UTC (covers
-    # ~10am–1pm EDT and ~9am–12:50pm EST so the 11am-local drop is caught in both
+    # Sunday full-game opener window — every 15 min, 14:00–17:45 UTC (covers
+    # ~10am–1pm EDT and ~9am–12:45pm EST so the 11am-local drop is caught in both
     # DST regimes). First-appearance detection means only the actual drop pushes.
-    - cron: '*/10 14-17 * * 0'
-    # Mid-week 1H sweep — once daily Mon–Fri at 17:00 UTC (~1pm ET).
-    - cron: '0 17 * * 1-5'
+    - cron: '*/15 14-17 * * 0'
+    # Weekly 1H sweep — Friday 17:00 UTC (~1pm ET), scoped to the weekend slate.
+    - cron: '0 17 * * 5'
   workflow_dispatch:
     inputs:
       market:
@@ -47,8 +52,15 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Full-game opener capture + Hard Rock push (Sunday window)
-        if: github.event.schedule == '*/10 14-17 * * 0' || github.event.inputs.market == 'full_game'
+        if: github.event.schedule == '*/15 14-17 * * 0' || github.event.inputs.market == 'full_game'
         run: python scripts/poll_full_game.py --source oddsapi --push
-      - name: 1H capture + Hard Rock push (mid-week daily)
-        if: github.event.schedule == '0 17 * * 1-5' || github.event.inputs.market == '1h'
-        run: python scripts/poll_lines.py --push --no-alerts
+      - name: 1H capture + Hard Rock push (Friday sweep)
+        if: github.event.schedule == '0 17 * * 5' || github.event.inputs.market == '1h'
+        run: python scripts/poll_lines.py --push --no-alerts --days-ahead 3 --max-events 40
+      - name: Alert on failure (red run = capture or push problem)
+        if: failure()
+        run: |
+          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
+            -F "title=Beat Vegas — lines_watch FAILED" \
+            -F "message=Run $GITHUB_RUN_ID failed (capture or push). Check Actions." \
+            https://api.pushover.net/1/messages.json || true

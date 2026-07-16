@@ -24,35 +24,80 @@ export async function POST(req: NextRequest) {
   }
   const b = body as Record<string, unknown>;
   const gameId = Number(b.gameId);
-  const line = Number(b.line);
-  if (!Number.isFinite(gameId)) {
+  // Number(null) is 0 and would pass isFinite — reject missing values first.
+  if (b.gameId == null || !Number.isFinite(gameId)) {
     return NextResponse.json({ error: "gameId required" }, { status: 400 });
   }
-  if (!Number.isFinite(line)) {
+  const line = Number(b.line);
+  if (b.line == null || !Number.isFinite(line) || line <= 0) {
     return NextResponse.json(
-      { error: "line required (number)" },
+      { error: "line required (positive number)" },
       { status: 400 },
     );
+  }
+  // stake/price: one NaN here would poison the whole season's units math.
+  let stake: number | undefined;
+  if (b.stake !== undefined) {
+    stake = Number(b.stake);
+    if (b.stake === null || !Number.isFinite(stake) || stake <= 0) {
+      return NextResponse.json(
+        { error: "stake must be a positive number" },
+        { status: 400 },
+      );
+    }
+  }
+  let price: number | undefined;
+  if (b.price !== undefined) {
+    price = Number(b.price);
+    // American odds are integers with |price| >= 100 (the column is an int).
+    if (
+      b.price === null ||
+      !Number.isInteger(price) ||
+      Math.abs(price) < 100
+    ) {
+      return NextResponse.json(
+        { error: "price must be integer American odds (e.g. -110)" },
+        { status: 400 },
+      );
+    }
   }
 
   // gameId must be in the current scored slate.
   const game = await prisma.games.findUnique({
     where: { id: gameId },
-    select: { season: true },
+    select: { season: true, start_date: true },
   });
   const slate = game ? await getSlate(game.season) : [];
-  if (!slate.some((g) => g.gameId === gameId)) {
+  if (!game || !slate.some((g) => g.gameId === gameId)) {
     return NextResponse.json(
       { error: "game is not in the current scored slate" },
       { status: 400 },
     );
   }
+  // A pick after kickoff isn't a real bet (start_date is naive UTC).
+  if (game.start_date && game.start_date <= new Date()) {
+    return NextResponse.json(
+      { error: "game has already kicked off" },
+      { status: 409 },
+    );
+  }
 
-  const stake = b.stake !== undefined ? Number(b.stake) : undefined;
-  const price = b.price !== undefined ? Number(b.price) : undefined;
   const note =
     typeof b.note === "string" && b.note.trim() ? b.note.trim() : undefined;
   const market = b.market === "full" ? "full" : "1H";
+
+  // One pick per game/market: a double-click must not double the record.
+  const dup = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT id FROM manual_picks
+    WHERE game_id = ${gameId} AND COALESCE(market, '1H') = ${market}
+    LIMIT 1
+  `;
+  if (dup.length > 0) {
+    return NextResponse.json(
+      { error: `a ${market} pick already exists on this game` },
+      { status: 409 },
+    );
+  }
 
   await createPick({ gameId, market, line, stake, price, note });
   return NextResponse.json({ ok: true }, { status: 201 });

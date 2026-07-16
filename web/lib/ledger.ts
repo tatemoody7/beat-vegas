@@ -58,6 +58,8 @@ type ResRow = {
   under_hit: number | boolean | null;
   units: number | null;
   clv: number | null;
+  actual_first_half_total: number | null;
+  line_used: number | null;
 };
 type RawPick = {
   graded: number | boolean | null;
@@ -71,19 +73,25 @@ type RawPick = {
   home_team: string | null;
 };
 
-// results have no push concept (under_hit is a bool), matching app.py which
-// passes no push_series for market/model.
+// results store under_hit as a bool, so a push looks like a loss there —
+// recover it from actual == line so pushes don't deflate the under%.
 function fromResults(rows: ResRow[]): Record3 | null {
   if (rows.length === 0) return null;
+  const isPush = (r: ResRow) =>
+    r.actual_first_half_total !== null &&
+    r.line_used !== null &&
+    Number(r.actual_first_half_total) === Number(r.line_used);
+  const pushes = rows.filter(isPush).length;
   const wins = rows.filter((r) => truthy(r.under_hit)).length;
   const unitsSum = rows.reduce((a, r) => a + (r.units ?? 0), 0);
   const clvs = rows.filter((r) => r.clv !== null).map((r) => r.clv as number);
-  return record(wins, rows.length, 0, unitsSum, clvs);
+  return record(wins, rows.length - pushes, pushes, unitsSum, clvs);
 }
 
 export async function getLedger(season: number): Promise<Ledger> {
   const res = await prisma.$queryRaw<ResRow[]>`
-    SELECT r.model_version, r.under_hit, r.units, r.clv
+    SELECT r.model_version, r.under_hit, r.units, r.clv,
+           r.actual_first_half_total, r.line_used
     FROM results r JOIN games g ON g.id = r.game_id
     WHERE g.season = ${season}
   `;

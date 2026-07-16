@@ -55,7 +55,9 @@ _BOARD_SQL = text(
         SELECT p2.model_version FROM predictions p2
         JOIN games g2 ON g2.id = p2.game_id
         WHERE g2.season = :season
-        ORDER BY p2.created_at DESC LIMIT 1)
+        ORDER BY (p2.model_version = 'derived_lines') ASC,
+                 p2.created_at DESC
+        LIMIT 1)
     ORDER BY p.rank
     """
 )
@@ -147,3 +149,34 @@ def test_empty_fetch_never_wipes_existing_rows(db, load_script):
             text("SELECT count(*) FROM predictions WHERE model_version='derived_lines'")
         ).scalar_one()
     assert count == 2
+
+
+def test_real_model_outranks_newer_derived_lines(db, load_script):
+    # Re-running post_derived_lines AFTER a Sunday scoring must not hide the
+    # model's picks: the board picks a real model version over derived_lines
+    # even when the derived rows carry a newer created_at.
+    from beatvegas.db.models import Prediction
+
+    store = db
+    mod = load_script("post_derived_lines")
+    _seed_games(store)
+
+    with store.session_scope() as s:
+        s.add(
+            Prediction(
+                game_id=1,
+                model_version="gbm_v1",
+                line_used=24.5,
+                rank=1,
+                created_at=datetime(2026, 8, 30, 12, 0, 0),
+            )
+        )
+    with store.session_scope() as s:
+        mod.write_derived_rows(
+            s, FETCHED, _gmeta(store), week=1, now=datetime(2026, 8, 30, 18, 0, 0)
+        )
+
+    with store.get_engine().connect() as conn:
+        rows = conn.execute(_BOARD_SQL, {"season": SEASON}).fetchall()
+    assert len(rows) == 1  # the gbm_v1 pick, not the two newer derived rows
+    assert rows[0][0] == 1

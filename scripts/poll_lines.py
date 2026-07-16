@@ -19,6 +19,8 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+import requests
+
 from beatvegas.alerts.detect import (
     detect_first_half_posted,
     detect_line_alerts,
@@ -149,9 +151,21 @@ def main() -> None:
         return
 
     # 2) Paid (markets x regions credits/event): fetch totals_h1 per event.
+    # A mid-loop HTTP error (expired key, 429, transient 5xx) must not discard
+    # what was already paid for: stop fetching, process the partial batch, and
+    # fail the run at the end so the workflow still shows red.
     rows = []
+    fetch_error: Optional[str] = None
     for i, ev in enumerate(in_window):
-        data = client.event_first_half_totals(ev["id"])
+        try:
+            data = client.event_first_half_totals(ev["id"])
+        except requests.RequestException as e:
+            fetch_error = f"{type(e).__name__}: {e}"
+            print(
+                f"[fetch] FAILED at event {i + 1}/{len(in_window)} ({fetch_error}) — "
+                "processing what was already fetched."
+            )
+            break
         if data:
             rows.extend(normalize_first_half([data], books=cfg.get("books") or None))
         if _credits_low():
@@ -290,6 +304,11 @@ def main() -> None:
                 "  (no games loaded for this season yet — run backfill --season "
                 f"{args.season} first)"
             )
+    if fetch_error:
+        # Partial batch was processed and written above; still fail the run so
+        # the workflow shows red (the sweep did NOT cover the slate).
+        print(f"[fetch] sweep incomplete ({fetch_error}) — failing the run.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

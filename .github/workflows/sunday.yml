@@ -7,11 +7,16 @@ name: Sunday opener capture + score
 
 on:
   schedule:
-    # GHA cron is UTC with no DST. 16:30 UTC ≈ 12:30 EDT (Aug–early Nov);
-    # 17:30 UTC ≈ 12:30 EST (Nov–Jan). Both fire in season; runs are idempotent
-    # (snapshots only written on change, predictions upserted).
-    - cron: '30 16 * * 0'
-    - cron: '30 17 * * 0'
+    # GHA cron is UTC with no DST. 18:00 UTC ≈ 2pm EDT / 1pm EST; 19:00 covers
+    # the other DST regime. Both fire in season; runs are idempotent (snapshots
+    # only written on change, predictions upserted).
+    #
+    # Deliberately AFTER lines_watch.yml's alert window (14:00-17:45 UTC): this
+    # job captures without --push, so if it ran inside the window it could write
+    # a Hard Rock snapshot first and consume the first-appearance state, eating
+    # the opener push that lines_watch exists to send.
+    - cron: '0 18 * * 0'
+    - cron: '0 19 * * 0'
   workflow_dispatch: {}
 
 concurrency:

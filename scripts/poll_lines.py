@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import statistics
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -25,7 +26,7 @@ from beatvegas.alerts.detect import (
     format_posted_summary,
 )
 from beatvegas.alerts.imessage import send_imessage
-from beatvegas.alerts.push import send_push
+from beatvegas.alerts.push import push_configured, send_push
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot, Prediction
 from beatvegas.db.store import session_scope, try_init_db
@@ -89,7 +90,25 @@ def main() -> None:
         action="store_true",
         help="send a cloud push when Hard Rock POSTS new 1H lines (the mid-week trigger)",
     )
+    ap.add_argument(
+        "--credit-floor",
+        type=int,
+        default=60,
+        help="stop per-event odds calls once remaining monthly credits hit this "
+        "floor (reserves budget for the Sunday opener window); 0 disables",
+    )
     args = ap.parse_args()
+
+    # Preflight BEFORE spending API credits or writing snapshots: a --push run
+    # with no working push config would consume the first-appearance alert
+    # state and then silently fail to notify.
+    if args.push and not args.dry_run_alerts and not push_configured():
+        print(
+            "[push] FATAL: --push requested but push is not configured "
+            "(set PUSHOVER_TOKEN/PUSHOVER_USER or config.yaml push:). "
+            "Refusing to capture, so the alert can still fire once configured."
+        )
+        sys.exit(2)
 
     if not try_init_db():
         return
@@ -107,12 +126,48 @@ def main() -> None:
             in_window.append(ev)
     in_window = in_window[: args.max_events]
 
-    # 2) Paid (1 credit/event): fetch totals_h1 per event, normalize.
+    def _credits_low() -> bool:
+        c = client.last_credits
+        return (
+            args.credit_floor > 0
+            and c is not None
+            and c.remaining is not None
+            and c.remaining <= args.credit_floor
+        )
+
+    # list_events is free but still returns the credit headers — bail before
+    # the paid loop if the month's budget is already at the reserve floor.
+    if _credits_low():
+        msg = (
+            f"Odds API credits at reserve floor ({client.last_credits.remaining} "
+            f"<= {args.credit_floor}) — skipping the 1H sweep to protect the "
+            "Sunday opener budget."
+        )
+        print(f"[credits] {msg}")
+        if args.push and not args.dry_run_alerts:
+            send_push("Beat Vegas — credits low", msg)
+        return
+
+    # 2) Paid (markets x regions credits/event): fetch totals_h1 per event.
     rows = []
-    for ev in in_window:
+    for i, ev in enumerate(in_window):
         data = client.event_first_half_totals(ev["id"])
         if data:
             rows.extend(normalize_first_half([data], books=cfg.get("books") or None))
+        if _credits_low():
+            print(
+                f"[credits] hit reserve floor ({client.last_credits.remaining} "
+                f"<= {args.credit_floor}) after "
+                f"{i + 1}/{len(in_window)} events — stopping "
+                "the sweep; processing what was fetched."
+            )
+            if args.push and not args.dry_run_alerts:
+                send_push(
+                    "Beat Vegas — credits low",
+                    f"1H sweep stopped at the {args.credit_floor}-credit reserve "
+                    f"floor ({client.last_credits.remaining} left this month).",
+                )
+            break
     written = matched = unmatched = skipped = 0
     unmatched_names = []
     this_poll_lines: Dict[int, List[float]] = {}
@@ -213,6 +268,11 @@ def main() -> None:
         else:
             ok, detail = send_push("Beat Vegas", pmsg, url=BOARD_URL)
             print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {pmsg}")
+            if not ok:
+                # Snapshots are already committed (capture must not be lost),
+                # so these games won't re-alert — fail the run loudly instead
+                # of letting the workflow show green with the alert dropped.
+                sys.exit(1)
 
     c = client.last_credits
     print(

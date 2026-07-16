@@ -43,6 +43,22 @@ def _push_cfg() -> Dict:
     return cfg
 
 
+def push_configured() -> bool:
+    """True when the configured provider has the credentials it needs to send.
+
+    Pollers run this BEFORE spending API credits: a `--push` run with no
+    Pushover token/user would otherwise capture snapshots (consuming the
+    first-appearance alert state) and then silently fail to notify."""
+    cfg = _push_cfg()
+    provider = (cfg.get("provider") or "pushover").lower()
+    if provider == "pushover":
+        po = cfg.get("pushover", {})
+        return bool(po.get("token") and po.get("user"))
+    if provider == "ntfy":
+        return bool(cfg.get("ntfy", {}).get("topic"))
+    return False
+
+
 def send_push(
     title: str, body: str, url: Optional[str] = None, timeout: int = 15
 ) -> Tuple[bool, str]:

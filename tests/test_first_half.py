@@ -116,3 +116,24 @@ def test_attach_trusts_consistent_line_scores_with_points():
     out = attach_first_half(game)
     assert out["first_half_total"] == 17  # home 14 + away 3
     assert out["first_half_source"] == "linescores"
+
+
+def test_plays_running_score_offense_defense_shape():
+    # Live CFBD /plays carries the score relative to the OFFENSE, not home/away.
+    plays = [
+        {"gameId": 9, "period": 1, "offense": "Home U", "home": "Home U",
+         "away": "Away U", "offenseScore": 7, "defenseScore": 0},
+        {"gameId": 9, "period": 2, "offense": "Away U", "home": "Home U",
+         "away": "Away U", "offenseScore": 3, "defenseScore": 7},
+        {"gameId": 9, "period": 3, "offense": "Home U", "home": "Home U",
+         "away": "Away U", "offenseScore": 14, "defenseScore": 10},
+    ]
+    assert first_half_from_plays(plays) == {9: (7, 3)}
+
+
+def test_plays_scoreless_half_yields_real_zero():
+    plays = [
+        {"gameId": 9, "period": 2, "offense": "Away U", "home": "Home U",
+         "away": "Away U", "offenseScore": 0, "defenseScore": 0},
+    ]
+    assert first_half_from_plays(plays) == {9: (0, 0)}

@@ -25,6 +25,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -36,3 +38,10 @@ jobs:
         run: python scripts/poll_full_game.py --source oddsapi
       - name: Score + rank the board
         run: python scripts/weekly_update.py
+      - name: Alert on failure (red run = no capture/scoring happened)
+        if: failure()
+        run: |
+          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
+            -F "title=Beat Vegas — Sunday capture FAILED" \
+            -F "message=Run $GITHUB_RUN_ID failed. The board may be stale — do not bet off it. Check Actions." \
+            https://api.pushover.net/1/messages.json || true

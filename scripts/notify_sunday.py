@@ -32,6 +32,25 @@ def board_reachable(url: str, timeout: int = 15) -> bool:
         return False
 
 
+def fresh_capture_count(url: str, timeout: int = 15):
+    """Full-game snapshots captured in the last 24h, via the board's ungated
+    /api/health (Neon itself is unreachable from the campus network). Returns
+    None when the check can't run — the message must then hedge, never assert
+    'board updated' on faith."""
+    try:
+        import requests
+
+        r = requests.get(f"{url.rstrip('/')}/api/health", timeout=timeout)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        if not data.get("ok"):
+            return None
+        return int(data.get("fullGameSnapshotsLast24h", 0))
+    except Exception:  # noqa: BLE001 — best-effort check, never raise
+        return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -40,12 +59,25 @@ def main() -> None:
     ap.add_argument("--url", default=DEFAULT_URL)
     args = ap.parse_args()
 
-    up = board_reachable(args.url)
-    msg = (
-        f"DK fired — this week's openers are in, board updated. {args.url}"
-        if up
-        else f"Sunday run complete — check the board: {args.url}"
-    )
+    fresh = fresh_capture_count(args.url)
+    if fresh:
+        msg = (
+            f"Openers are in — {fresh} full-game lines captured in the last 24h. "
+            f"Board updated: {args.url}"
+        )
+    elif fresh == 0:
+        msg = (
+            "⚠️ Sunday check: NO full-game lines captured in the last 24h — the "
+            f"cloud job may have failed. Don't bet off the board until you check: {args.url}"
+        )
+    else:  # health check unavailable — hedge, never assert success on faith
+        up = board_reachable(args.url)
+        msg = (
+            f"Sunday run finished but capture freshness is UNVERIFIED — check the "
+            f"board before betting: {args.url}"
+            if up
+            else f"Sunday check: the board itself is unreachable — investigate: {args.url}"
+        )
 
     acfg = load_config().get("alerts", {}) or {}
     recipient = acfg.get("imessage_to", "")

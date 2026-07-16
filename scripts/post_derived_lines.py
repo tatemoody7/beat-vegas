@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -87,8 +88,13 @@ def build_prediction_rows(
 
 def write_derived_rows(session, fetched, gmeta, week, now) -> int:
     """Build derived-1H rows and persist them, replacing any prior derived_lines
-    rows for the season's games (idempotent). Returns the number written."""
+    rows for the season's games (idempotent). Returns the number written.
+
+    Refuses to delete when there is nothing to insert: an empty fetch (DK 403,
+    CFBD not posted yet) must never blank the board's existing derived cards."""
     rows = build_prediction_rows(fetched, gmeta, week)
+    if not rows:
+        return 0
 
     season_ids = list(gmeta.keys())
     if season_ids:
@@ -138,6 +144,12 @@ def main() -> None:
         f"week={args.week if args.week is not None else 'all'} "
         f"derived_rows_written={n}"
     )
+    if n == 0:
+        # Nothing built (empty/failed fetch or no matching games): the previous
+        # board rows were left untouched, but the run did NOT do its job — fail
+        # loudly so the workflow shows red instead of a silent no-op.
+        print("[derived] 0 rows built — existing board rows preserved; failing the run.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

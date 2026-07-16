@@ -128,3 +128,22 @@ def test_postgres_type_coercion(db, load_script):
     # (the 500 class). Passing a Python int must not raise.
     with store.get_engine().connect() as conn:
         conn.execute(_BOARD_SQL, {"season": SEASON}).mappings().all()
+
+
+def test_empty_fetch_never_wipes_existing_rows(db, load_script):
+    # An empty fetch (DK 403 + CFBD not posted yet) must preserve the board's
+    # existing derived cards instead of deleting them and inserting nothing.
+    store = db
+    mod = load_script("post_derived_lines")
+    _seed_games(store)
+
+    with store.session_scope() as s:
+        assert mod.write_derived_rows(s, FETCHED, _gmeta(store), week=1, now=datetime.utcnow()) == 2
+    with store.session_scope() as s:
+        assert mod.write_derived_rows(s, [], _gmeta(store), week=1, now=datetime.utcnow()) == 0
+
+    with store.get_engine().connect() as conn:
+        count = conn.execute(
+            text("SELECT count(*) FROM predictions WHERE model_version='derived_lines'")
+        ).scalar_one()
+    assert count == 2

@@ -17,7 +17,13 @@ import statistics
 
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.grading import clv_under, price_clv_under, under_result, units_won
+from beatvegas.grading import (
+    clv_under,
+    price_clv_under,
+    trusted_first_half_total,
+    under_result,
+    units_won,
+)
 from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
 from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
@@ -112,12 +118,18 @@ def grade_market(session, closings) -> int:
     for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings.items():
         if closing is None:
             continue
-        actual = g.first_half_total
+        # Delete BEFORE the trust check so a previously-graded false zero is
+        # cleaned up (not just skipped) when grading is re-run.
         (
             session.query(Result)
             .filter(Result.game_id == gid, Result.model_version == MODEL_MARKET)
             .delete()
         )
+        actual = trusted_first_half_total(
+            g.first_half_total, g.home_points, g.away_points, g.first_half_source
+        )
+        if actual is None:
+            continue
         session.add(
             Result(
                 game_id=gid,
@@ -149,13 +161,17 @@ def grade_model(session, season: int, closings) -> int:
         if entry is None:
             continue
         g, (_open, closing), closing_at, (fair_open, fair_close) = entry
-        actual = g.first_half_total
         bet_line = p.line_used
         (
             session.query(Result)
             .filter(Result.game_id == p.game_id, Result.model_version == MODEL_VERSION)
             .delete()
         )
+        actual = trusted_first_half_total(
+            g.first_half_total, g.home_points, g.away_points, g.first_half_source
+        )
+        if actual is None:
+            continue
         session.add(
             Result(
                 game_id=p.game_id,

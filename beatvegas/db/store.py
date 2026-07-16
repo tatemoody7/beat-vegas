@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -95,6 +96,7 @@ def init_db(path: Optional[Path] = None) -> None:
     wait_for_db(engine)  # absorb Neon cold-start before any DDL
     Base.metadata.create_all(engine)
     _apply_migrations(engine)
+    _resync_sequences(engine)
 
 
 def try_init_db(path: Optional[Path] = None) -> bool:
@@ -103,17 +105,49 @@ def try_init_db(path: Optional[Path] = None) -> bool:
     On a network that can't carry the Postgres connection (e.g. the campus
     network where Neon's 5432 is filtered), log one clear line and return False
     so the caller can exit cleanly instead of dumping a raw traceback. Returns
-    True on success. SQLite never fails this way."""
+    True on success. SQLite never fails this way.
+
+    In GitHub Actions this re-raises instead: a GHA runner can always reach
+    Neon, so "unreachable" there is a real failure (bad secret, outage) and a
+    green no-op run would silently skip the capture the user bets off."""
     try:
         init_db(path)
         return True
     except OperationalError:
+        if os.environ.get("GITHUB_ACTIONS"):
+            print("[db] database unreachable from GitHub Actions — failing the run.")
+            raise
         print(
             "[db] database unreachable from this network — skipping this run. "
             "(If this is the local Mac on a blocked network, the cloud job "
             "handles Neon; see .github/workflows/sunday.yml.)"
         )
         return False
+
+
+def _resync_sequences(engine) -> None:
+    """Postgres only: bump each table's id sequence to MAX(id).
+
+    Rows deployed from SQLite carry explicit ids that never advance the serial
+    sequence, so the next ORM insert would collide on the pkey (the Neon
+    id-sequence gotcha). Running this on every init makes any writer safe to
+    start after an explicit-id deploy."""
+    if engine.url.get_backend_name().startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        seqs = conn.execute(
+            text("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'")
+        ).scalars()
+        for seq in seqs:
+            if not seq.endswith("_id_seq"):
+                continue
+            table = seq[: -len("_id_seq")]
+            max_id = conn.execute(text(f'SELECT MAX(id) FROM "{table}"')).scalar()
+            if max_id is not None:
+                conn.execute(
+                    text("SELECT setval(pg_get_serial_sequence(:t, 'id'), :n)"),
+                    {"t": table, "n": max_id},
+                )
 
 
 def _apply_migrations(engine) -> None:

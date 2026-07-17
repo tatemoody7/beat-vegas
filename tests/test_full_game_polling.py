@@ -45,6 +45,30 @@ def test_change_detection():
     assert _changed(prev, 55.5, None, -110, -110) is False
 
 
+def test_snapshot_duplicate_capture_rejected():
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+
+    def snap():
+        return OddsSnapshot(
+            game_id=1,
+            book="draftkings",
+            market="full_game_total",
+            line=55.5,
+            captured_at=datetime(2026, 9, 1, 12, 0),
+        )
+
+    with Session(eng) as s:
+        s.add(snap())
+        s.commit()
+        s.add(snap())
+        with pytest.raises(IntegrityError):
+            s.commit()
+
+
 def test_book_rank_precedence():
     mod = _load("poll_full_game")
     _book_rank = mod._book_rank

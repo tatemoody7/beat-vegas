@@ -161,6 +161,20 @@ def _apply_migrations(engine) -> None:
             for col, sqltype in cols.items():
                 if col not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
+    # Dedup backstop on the movement history (models.py uq_odds_snapshot covers
+    # fresh DBs; this covers existing ones). Fail-soft: if a legacy DB already
+    # holds duplicates, warn and keep running — the backstop is best-effort.
+    if "odds_snapshots" in existing:
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_odds_snapshot "
+                        "ON odds_snapshots (game_id, book, market, captured_at)"
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
+            print(f"[db] WARNING: could not add uq_odds_snapshot index: {e}")
 
 
 @contextmanager

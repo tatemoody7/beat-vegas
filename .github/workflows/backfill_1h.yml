@@ -50,9 +50,16 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Backfill 1H history
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_SEASON: ${{ inputs.season }}
+          IN_WEEK: ${{ inputs.week }}
+          IN_LIMIT: ${{ inputs.limit }}
+          IN_LEAD_MIN: ${{ inputs.lead_min }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          ARGS="--season ${{ inputs.season }} --limit ${{ inputs.limit }} --lead-min ${{ inputs.lead_min }}"
-          if [ -n "${{ inputs.week }}" ]; then ARGS="$ARGS --week ${{ inputs.week }}"; fi
-          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          ARGS="--season $IN_SEASON --limit $IN_LIMIT --lead-min $IN_LEAD_MIN"
+          if [ -n "$IN_WEEK" ]; then ARGS="$ARGS --week $IN_WEEK"; fi
+          if [ "$IN_DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           echo "running: backfill_1h_history.py $ARGS"
           python scripts/backfill_1h_history.py $ARGS

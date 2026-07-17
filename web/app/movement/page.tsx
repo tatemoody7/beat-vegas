@@ -60,7 +60,7 @@ export default async function MovementPage({
             <table className="bv-table">
               <thead>
                 <tr>
-                  <th>When checked</th>
+                  <th>When checked (ET)</th>
                   <th>Sportsbook</th>
                   <th>Line</th>
                 </tr>

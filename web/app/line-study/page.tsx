@@ -55,9 +55,9 @@ export default async function LineStudyPage({
 
       {buckets.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No line buckets hold ≥ {minGames} games for {season} yet — early in a
-          season there isn&apos;t enough graded history to bucket. Lower the
-          min-games filter or check back after a few weeks.
+          {/* One template literal — Next 16 dev can collapse the space after a
+              JSX expression ("2025yet"). */}
+          {`No line buckets hold ≥ ${minGames} games for ${season} yet — early in a season there isn't enough graded history to bucket. Lower the min-games filter or check back after a few weeks.`}
         </p>
       ) : (
         <LineStudyView buckets={buckets} breakeven={BREAKEVEN_PCT} />

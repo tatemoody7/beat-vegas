@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE, expectedToken, gateEnabled } from "@/lib/auth";
+import { AUTH_COOKIE, expectedToken, gateEnabled, safeEqual } from "@/lib/auth";
 
 // POST /api/login { password } — sets the auth cookie on a correct password.
 export async function POST(req: NextRequest) {
@@ -11,7 +11,10 @@ export async function POST(req: NextRequest) {
   } catch {
     password = undefined;
   }
-  if (password !== process.env.APP_PASSWORD) {
+  const ok =
+    typeof password === "string" &&
+    (await safeEqual(password, process.env.APP_PASSWORD!));
+  if (!ok) {
     return NextResponse.json({ error: "incorrect password" }, { status: 401 });
   }
 

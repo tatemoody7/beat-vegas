@@ -37,6 +37,7 @@ model games {
   first_half_source      String?          @db.VarChar
   full_game_total        Float?
   full_game_total_book   String?          @db.VarChar
+  spread                 Float?
   venues                 venues?          @relation(fields: [venue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   manual_picks           manual_picks[]
   odds_snapshots         odds_snapshots[]
@@ -67,12 +68,15 @@ model manual_picks {
   note                    String?   @db.VarChar
   model_score_at_pick     Int?
   model_line_at_pick      Float?
+  factors_json_at_pick    String?   @db.VarChar
+  opening_line            Float?
   graded                  Boolean?
   actual_first_half_total Int?
   result                  String?   @db.VarChar
   units                   Float?
   closing_line            Float?
   clv                     Float?
+  clv_prob                Float?
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([season], map: "ix_manual_picks_season")
@@ -97,11 +101,13 @@ model odds_snapshots {
   book        String?   @db.VarChar
   market      String?   @db.VarChar
   line        Float?
+  spread      Float?
   over_price  Int?
   under_price Int?
   captured_at DateTime? @db.Timestamp(6)
   games       games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([game_id, book, market, captured_at], map: "uq_odds_snapshot")
   @@index([captured_at], map: "ix_odds_snapshots_captured_at")
   @@index([game_id], map: "ix_odds_snapshots_game_id")
 }
@@ -140,6 +146,7 @@ model results {
   closing_line            Float?
   closing_captured_at     DateTime? @db.Timestamp(6)
   clv                     Float?
+  clv_prob                Float?
   units                   Float?
   games                   games?   @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 

@@ -35,8 +35,13 @@ function outcome(fh: number | null, line: number | null): RecordRow["outcome"] {
 }
 
 export async function getRecordSeasons(): Promise<number[]> {
+  // Seasons with CONTENT (a played game or a prediction) — a future season's
+  // backfilled schedule alone would default the view to an all-NULL grid.
   const rows = await prisma.$queryRaw<{ season: number | bigint }[]>`
-    SELECT DISTINCT season FROM games ORDER BY season DESC
+    SELECT DISTINCT g.season FROM games g
+    WHERE g.first_half_total IS NOT NULL
+       OR EXISTS (SELECT 1 FROM predictions p WHERE p.game_id = g.id)
+    ORDER BY g.season DESC
   `;
   return rows.map((r) => Number(r.season));
 }

@@ -19,7 +19,6 @@ export type BoardRow = {
   bvLine: number | null;
   bvLo: number | null;
   bvHi: number | null;
-  bvSigma: number | null;
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
@@ -66,13 +65,14 @@ type SnapRow = {
 
 // Opening/current consensus per game (app.py:158-169): for each game, take each
 // book's first capture → median across books = open; each book's last → current.
-async function consensusLines(): Promise<
-  Map<number, { open: number | null; cur: number | null }>
-> {
+// Season-scoped: an unbounded scan grows with every season of movement history.
+async function consensusLines(
+  season: number,
+): Promise<Map<number, { open: number | null; cur: number | null }>> {
   const snaps = await prisma.$queryRaw<SnapRow[]>`
-    SELECT game_id, book, line, CAST(captured_at AS TEXT) AS captured_at
-    FROM odds_snapshots
-    WHERE market = '1H_total'
+    SELECT s.game_id, s.book, s.line, CAST(s.captured_at AS TEXT) AS captured_at
+    FROM odds_snapshots s JOIN games g ON g.id = s.game_id
+    WHERE s.market = '1H_total' AND g.season = ${season}
   `;
   // game_id -> book -> sorted captures
   const byGame = new Map<number, Map<string, SnapRow[]>>();
@@ -148,7 +148,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
     ORDER BY p.rank
   `;
   const [lines, adjustments] = await Promise.all([
-    consensusLines(),
+    consensusLines(season),
     bvAdjustments(),
   ]);
   return preds.map((p) => {
@@ -190,7 +190,6 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
         adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
       bvHi:
         adj && num(p.bv_hi) !== null ? num(p.bv_hi)! + adj.delta : num(p.bv_hi),
-      bvSigma,
       liveGap,
       liveGapZ,
       bvAdjust: adj?.delta ?? null,

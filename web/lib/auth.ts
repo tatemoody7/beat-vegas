@@ -33,9 +33,21 @@ export async function expectedToken(): Promise<string | null> {
   return pw ? sha256Hex(pw) : null;
 }
 
+// Constant-time comparison: hash both sides to a fixed length first (no length
+// leak), then XOR every char (no early exit). Web Crypto only, so it runs in
+// Edge middleware and Node routes alike.
+export async function safeEqual(a: string, b: string): Promise<boolean> {
+  const [ha, hb] = await Promise.all([sha256Hex(a), sha256Hex(b)]);
+  let diff = 0;
+  for (let i = 0; i < ha.length; i++) {
+    diff |= ha.charCodeAt(i) ^ hb.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 // True if the request's cookie satisfies the gate (always true when disabled).
 export async function isAuthed(token: string | undefined): Promise<boolean> {
   const expected = await expectedToken();
   if (expected === null) return true;
-  return !!token && token === expected;
+  return !!token && (await safeEqual(token, expected));
 }

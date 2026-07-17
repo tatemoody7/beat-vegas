@@ -1,6 +1,8 @@
 import { getSeasons } from "@/lib/board";
 import { getLedger, Record3 } from "@/lib/ledger";
 import { getDecisionQuality } from "@/lib/decision-quality";
+import { resolveSeason } from "@/lib/season";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 
 export const dynamic = "force-dynamic";
@@ -77,11 +79,7 @@ export default async function LedgerPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
 
   const { market, model, you, picks } = await getLedger(season);
   const dq = await getDecisionQuality(season);
@@ -99,6 +97,8 @@ export default async function LedgerPage({
         line (the final line before kickoff) · Model = the model&apos;s under
         picks · You = your own logged bets.
       </p>
+
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <LedgerCard

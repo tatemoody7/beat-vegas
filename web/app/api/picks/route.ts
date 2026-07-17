@@ -50,11 +50,7 @@ export async function POST(req: NextRequest) {
   if (b.price !== undefined) {
     price = Number(b.price);
     // American odds are integers with |price| >= 100 (the column is an int).
-    if (
-      b.price === null ||
-      !Number.isInteger(price) ||
-      Math.abs(price) < 100
-    ) {
+    if (b.price === null || !Number.isInteger(price) || Math.abs(price) < 100) {
       return NextResponse.json(
         { error: "price must be integer American odds (e.g. -110)" },
         { status: 400 },

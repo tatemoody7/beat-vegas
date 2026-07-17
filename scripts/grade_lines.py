@@ -63,7 +63,9 @@ def main() -> None:
                 gid, _ = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
             meta = gmeta.get(gid)
             week = meta["week"] if meta else None
-            if args.week is not None and week != args.week:
+            # Keep unmatched rows (week=None) in a --week report: silently
+            # dropping them hides coverage gaps exactly when you're checking one.
+            if args.week is not None and week is not None and week != args.week:
                 continue
             total, spread = r["line"], r.get("spread")
             out.append(

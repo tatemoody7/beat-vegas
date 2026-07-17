@@ -51,15 +51,22 @@ def cmd_add(args) -> None:
     market = "full" if args.market == "full" else "1H"
     with session_scope() as s:
         games = _season_games(s, season)
-        gid, score, n = resolve_game(args.home, args.away, games, week=args.week)
+        gid, score, n, candidates = resolve_game(args.home, args.away, games, week=args.week)
         if gid is None:
             print(
                 f"No game found for '{args.away} @ {args.home}' in {season}. "
                 "Check spelling, or run backfill --season for this year. "
                 "You can still log it; it just won't grade until matched."
             )
-        elif n > 1:
-            print(f"[warn] {n} games match (rematch?). Picked best; pass --week to be exact.")
+        elif n > 1 and not args.force:
+            print(f"REFUSED: {n} games match '{args.away} @ {args.home}' in {season}:")
+            for c in candidates:
+                print(f"  wk{c.get('week')}: {c.get('away_team')} @ {c.get('home_team')}")
+            print(
+                "Pass --week to pin the game, or --force to accept the best guess — "
+                "a real-money pick must not attach to a guessed game."
+            )
+            return
         g = next((x for x in games if x["id"] == gid), None)
 
         # Real-money integrity guards (override with --force if intentional).
@@ -241,7 +248,10 @@ def main() -> None:
     a.add_argument(
         "--force",
         action="store_true",
-        help="log even if a pick already exists on this game/market or kickoff has passed",
+        help=(
+            "log even if a pick already exists on this game/market, kickoff has "
+            "passed, or the game match is ambiguous"
+        ),
     )
     a.set_defaults(func=cmd_add)
 

@@ -25,6 +25,16 @@ def test_pick_total_spread_empty():
 
 class _FakeClient:
     def lines(self, year, season_type="regular"):
+        if season_type == "postseason":
+            return [
+                {
+                    "id": 9,
+                    "homeTeam": "Boise State",
+                    "awayTeam": "Memphis",
+                    "startDate": "2026-12-22T20:00:00Z",
+                    "lines": [{"provider": "DraftKings", "overUnder": 52.5, "spread": -3.0}],
+                },
+            ]
         return [
             {
                 "id": 5,
@@ -39,7 +49,8 @@ class _FakeClient:
 
 def test_full_game_rows_shape_and_id():
     rows = full_game_rows(_FakeClient(), 2026)
-    assert len(rows) == 1  # game 6 dropped (no total)
+    # default "both": regular game 5 + bowl game 9; game 6 dropped (no total)
+    assert [r["game_id"] for r in rows] == [5, 9]
     r = rows[0]
     assert r["game_id"] == 5  # CFBD id == Game.id
     assert r["home_team"] == "LSU" and r["away_team"] == "Clemson"
@@ -48,6 +59,13 @@ def test_full_game_rows_shape_and_id():
     # same keys the DK full-game normalizer emits, so poll_full_game consumes both
     for k in ("event_id", "commence_time", "book", "line", "spread"):
         assert k in r
+
+
+def test_full_game_rows_single_type_override():
+    rows = full_game_rows(_FakeClient(), 2026, season_type="regular")
+    assert [r["game_id"] for r in rows] == [5]
+    bowls = full_game_rows(_FakeClient(), 2026, season_type="postseason")
+    assert [r["game_id"] for r in bowls] == [9]
 
 
 def test_pick_open_close_priority_and_open_fallback():

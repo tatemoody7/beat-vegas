@@ -40,6 +40,36 @@ def test_change_detection():
     assert _changed(prev, 56.0, -7.0, -110, -110) is True  # total moved
     assert _changed(prev, 55.5, -7.5, -110, -110) is True  # spread moved
     assert _changed(prev, 55.5, -7.0, -115, -110) is True  # price moved
+    # A source with no spread (Odds API totals rows) is "unknown", not "moved":
+    # a DK->oddsapi switch must not write a redundant snapshot.
+    assert _changed(prev, 55.5, None, -110, -110) is False
+
+
+def test_book_rank_precedence():
+    mod = _load("poll_full_game")
+    _book_rank = mod._book_rank
+    assert _book_rank("draftkings") < _book_rank("consensus") < _book_rank("hardrockbet")
+    assert _book_rank("DraftKings") == _book_rank("draftkings")  # CFBD spelling
+    assert _book_rank(None) == _book_rank("some-random-book")
+
+
+def test_auto_fallback_keeps_dk_1h_rows(monkeypatch):
+    mod = _load("poll_full_game")
+
+    class _DK:
+        def fetch_ncaaf(self):
+            return {"events": [{"id": 1}]}
+
+    h1_row = {"event_id": "1", "book": "draftkings", "line": 27.5}
+    monkeypatch.setattr(mod, "DraftKingsClient", _DK)
+    monkeypatch.setattr(mod, "normalize_full_game", lambda p: [])  # DK FG empty
+    monkeypatch.setattr(mod, "normalize_first_half", lambda p: [h1_row])
+    monkeypatch.setattr(mod, "CFBDClient", lambda: None)
+    monkeypatch.setattr(mod, "cfbd_full_game_rows", lambda c, season: [{"game_id": 5}])
+
+    fg, h1, source, _ = mod._fetch("auto", 2026)
+    assert source == "cfbd" and fg == [{"game_id": 5}]
+    assert h1 == [h1_row]  # DK 1H rows survive the CFBD fallback
 
 
 def test_full_game_snapshot_roundtrips_spread():

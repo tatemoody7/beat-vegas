@@ -25,8 +25,10 @@ from ..db.store import session_scope
 DEFAULT_SHARE = 0.52
 SHARE_CLAMP = (0.48, 0.56)
 # Fitted spread->share coefficients live in a derived artifact written ONLY when
-# scripts/derive_multiplier.py proves it beats the flat 0.52 (walk-forward MAE).
-# Absent file => flat 0.52 (no behavior change). data/ is gitignored, like the DB.
+# scripts/derive_multiplier.py proves it beats the flat 0.52 by a meaningful
+# walk-forward-MAE margin. Absent file => flat 0.52 (no behavior change). Unlike
+# the rest of data/, multiplier.json IS git-tracked — committing it is how the
+# fitted curve reaches the cloud jobs.
 _COEFFS_PATH = REPO_ROOT / "data" / "multiplier.json"
 
 

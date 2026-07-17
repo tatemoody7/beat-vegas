@@ -73,12 +73,11 @@ def _latest_snapshot(session, game_id: int, book: str, market: str):
 def _changed(prev, line, spread, over, under) -> bool:
     if prev is None:
         return True
-    return (
-        prev.line != line
-        or prev.spread != spread
-        or prev.over_price != over
-        or prev.under_price != under
-    )
+    # spread=None means the source doesn't carry one (Odds API totals rows), not
+    # that it moved — otherwise every DK->oddsapi source switch would write a
+    # redundant snapshot for an unchanged number.
+    spread_moved = spread is not None and prev.spread != spread
+    return prev.line != line or spread_moved or prev.over_price != over or prev.under_price != under
 
 
 def _fetch(
@@ -92,6 +91,7 @@ def _fetch(
         # the DK path (no CFBD game id). 1H is captured separately (poll_lines).
         events = OddsAPIClient().list_full_game_totals(regions=regions)
         return oa_normalize_full_game(events), [], "oddsapi", len(events)
+    h1: List[Dict] = []
     if source in ("dk", "auto"):
         payload = DraftKingsClient().fetch_ncaaf()
         dk_events = len(payload.get("events", []) or [])
@@ -99,9 +99,21 @@ def _fetch(
         h1 = normalize_first_half(payload)
         if fg or source == "dk":
             return fg, h1, "dk", dk_events
-    # cfbd (explicit, or auto-fallback when DK returned nothing)
+    # cfbd (explicit, or auto-fallback when DK returned no FULL-GAME rows).
+    # Keep any DK 1H rows: they're already fetched and CFBD carries no 1H.
     fg = cfbd_full_game_rows(CFBDClient(), season)
-    return fg, [], "cfbd", dk_events
+    return fg, h1, "cfbd", dk_events
+
+
+# Which book's number to trust for Game.full_game_total / Game.spread when one
+# run carries several (multi-book oddsapi pulls): DK (sharp, fresh) beats CFBD's
+# consensus, which beats everything else. Lowercased so it covers both DK-API
+# "draftkings" and CFBD-provider "DraftKings" spellings.
+_BOOK_PRIORITY = {"draftkings": 0, "consensus": 1}
+
+
+def _book_rank(book: Optional[str]) -> int:
+    return _BOOK_PRIORITY.get((book or "").lower(), len(_BOOK_PRIORITY))
 
 
 def _resolve_gid(r: Dict, games: List[Dict], ids: set) -> Optional[int]:
@@ -175,6 +187,7 @@ def main() -> None:
     matched_gids = set()
     hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: line}
     matchups: Dict[int, str] = {}
+    best_row: Dict[int, Dict] = {}  # gid -> highest-priority book's row this run
 
     with session_scope() as s:
         games = _candidate_games(s, args.season)
@@ -227,16 +240,25 @@ def main() -> None:
                 written_fg += 1
             else:
                 skipped += 1
-            # Keep the game's spread current and fill total only if missing, so
-            # an upcoming slate is scorable before CFBD posts its closing number.
+            # Remember the best-book row per game (not feed order): the Game
+            # update below must not depend on which book happened to come last.
+            cur = best_row.get(gid)
+            if cur is None or _book_rank(r["book"]) < _book_rank(cur["book"]):
+                best_row[gid] = {**r, "line": line}
+
+        # Keep each game's spread current and fill total only if missing, so an
+        # upcoming slate is scorable before CFBD posts its closing number — from
+        # the highest-priority book this run, not the last row iterated.
+        for gid, r in best_row.items():
             g = s.query(Game).filter(Game.id == gid).one_or_none()
-            if g is not None:
-                if r.get("spread") is not None:
-                    g.spread = r["spread"]
-                if g.full_game_total is None:
-                    g.full_game_total = line
-                    g.full_game_total_book = r["book"]
-                games_updated += 1
+            if g is None:
+                continue
+            if r.get("spread") is not None:
+                g.spread = r["spread"]
+            if g.full_game_total is None:
+                g.full_game_total = r["line"]
+                g.full_game_total_book = r["book"]
+            games_updated += 1
 
         for r in h1_rows:
             gid = _resolve_gid(r, games, ids)

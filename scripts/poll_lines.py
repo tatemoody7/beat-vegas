@@ -167,7 +167,13 @@ def main() -> None:
             )
             break
         if data:
-            rows.extend(normalize_first_half([data], books=cfg.get("books") or None))
+            # Stamp rows with the actual fetch moment: a long sweep can span
+            # minutes, and bucketing every snapshot to run-start misorders
+            # intra-run line movement.
+            fetched_at = datetime.utcnow()
+            for row in normalize_first_half([data], books=cfg.get("books") or None):
+                row["fetched_at"] = fetched_at
+                rows.append(row)
         if _credits_low():
             print(
                 f"[credits] hit reserve floor ({client.last_credits.remaining} "
@@ -245,7 +251,7 @@ def main() -> None:
                     line=r["line"],
                     over_price=r["over_price"],
                     under_price=r["under_price"],
-                    captured_at=now,
+                    captured_at=r.get("fetched_at") or now,
                 )
             )
             written += 1

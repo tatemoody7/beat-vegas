@@ -11,10 +11,11 @@ export default function SeasonFallbackNotice({
   if (fallbackFrom === null) return null;
   return (
     <p className="bv-card mb-4 border-l-2 border-[var(--accent)] p-3 text-sm text-[var(--text-muted)]">
-      No {fallbackFrom} data yet — showing{" "}
-      <span className="font-semibold text-[var(--text)]">{season}</span>. This
-      board fills in once the {fallbackFrom} season&apos;s first lines and
-      predictions land.
+      {/* Template literals, not JSX text nodes around {expr} — Next 16 dev has
+          collapsed the space after an expression before ("2026season's"). */}
+      {`No ${fallbackFrom} data yet — showing `}
+      <span className="font-semibold text-[var(--text)]">{season}</span>
+      {`. This view fills in once the ${fallbackFrom} season's first lines and predictions land.`}
     </p>
   );
 }

@@ -93,9 +93,9 @@ export default async function LedgerPage({
         )}
       </div>
       <p className="bv-page-sub mb-5">
-        Settled results for {season} · Market = how the under did at the closing
-        line (the final line before kickoff) · Model = the model&apos;s under
-        picks · You = your own logged bets.
+        {/* One template literal — Next 16 dev can collapse the space after a
+            JSX expression ("2025· Market"). */}
+        {`Settled results for ${season} · Market = how the under did at the closing line (the final line before kickoff) · Model = the model's under picks · You = your own logged bets.`}
       </p>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />

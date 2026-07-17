@@ -52,8 +52,10 @@ class OddsAPIClient:
         endpoint. `totals` is a FEATURED market, so this costs (1 x n_regions)
         credits TOTAL for the whole slate — cheap vs the per-event 1H calls.
 
-        Hard Rock (Florida) is `hardrockbet_fl`, which lives in the `us2` region,
-        so pass regions='us,us2' to capture it alongside the rest of the market."""
+        Hard Rock's LIVE book key is `hardrockbet` (the docs' FL-specific
+        `hardrockbet_fl` has not appeared in responses; hardrock.py accepts
+        both). It lives in the `us2` region only — verified empirically — so
+        pass regions='us,us2' to capture it alongside the rest of the market."""
         url = f"{self.base_url}/sports/{self.sport}/odds"
         params = {
             "apiKey": self.api_key,

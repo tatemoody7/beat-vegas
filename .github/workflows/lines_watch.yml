@@ -16,6 +16,10 @@ name: Hard Rock line watch (push alerts)
 #   stops any sweep that would eat the Sunday reserve, and pushes a warning.
 #   For more cadence (daily sweeps, */10 Sundays), buy a paid Odds API tier
 #   and widen these crons + flags.
+#
+# GHA cron routinely fires 5-20+ min late (accepted, not fixable): the */15
+# Sunday window plus first-appearance detection absorbs the drift — a late poll
+# still catches the drop, just minutes later.
 
 on:
   schedule:

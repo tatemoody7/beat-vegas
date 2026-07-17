@@ -1,6 +1,8 @@
 import { getSeasons } from "@/lib/board";
 import { BREAKEVEN_PCT, getLineStudy } from "@/lib/lineStudy";
+import { resolveSeason } from "@/lib/season";
 import LineStudyView from "@/app/components/LineStudyView";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import MinGamesSelect from "@/app/components/MinGamesSelect";
 
@@ -13,11 +15,7 @@ export default async function LineStudyPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const minGames = sp.minGames ? Number(sp.minGames) : 30;
 
   const { buckets, anyReal } = await getLineStudy(season, minGames);
@@ -53,9 +51,13 @@ export default async function LineStudyPage({
             " until real lines build up."}
       </p>
 
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
       {buckets.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No line buckets with ≥ {minGames} games for {season}.
+          {/* One template literal — Next 16 dev can collapse the space after a
+              JSX expression ("2025yet"). */}
+          {`No line buckets hold ≥ ${minGames} games for ${season} yet — early in a season there isn't enough graded history to bucket. Lower the min-games filter or check back after a few weeks.`}
         </p>
       ) : (
         <LineStudyView buckets={buckets} breakeven={BREAKEVEN_PCT} />

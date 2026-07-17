@@ -170,6 +170,13 @@ class OddsSnapshot(Base):
     full movement history; the earliest captured_at = posting time."""
 
     __tablename__ = "odds_snapshots"
+    # DB-level backstop against duplicate captures: GHA concurrency groups
+    # already serialize the writers, but one misconfigured/parallel run must not
+    # silently double the movement history. (Each poll writes at most one row
+    # per (game, book, market), so legit rows never share a captured_at.)
+    __table_args__ = (
+        UniqueConstraint("game_id", "book", "market", "captured_at", name="uq_odds_snapshot"),
+    )
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     book = Column(String)

@@ -49,8 +49,9 @@ export default async function MovementPage({
 
       {!movement || movement.points.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          Nothing to chart for {season} yet — a movement chart appears once a
-          game&apos;s line has been checked more than once.
+          {/* One template literal — Next 16 dev can collapse the space after a
+              JSX expression ("2025yet"). */}
+          {`Nothing to chart for ${season} yet — a movement chart appears once a game's line has been checked more than once.`}
         </p>
       ) : (
         <div className="flex flex-col gap-5">

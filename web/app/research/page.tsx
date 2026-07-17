@@ -40,9 +40,11 @@ export default async function ResearchPage() {
           </div>
           <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
             First halves end up worth{" "}
-            <b className="text-[var(--text)]">~52% of the full-game total</b> —
-            right where sportsbooks set the first-half line. Betting every
-            first-half under, or only the model&apos;s picks, did{" "}
+            <b className="text-[var(--text)]">~52% of the full-game total</b>
+            {/* Template literal — Next 16 dev can also collapse the space
+                after an element when the text that follows carries an HTML
+                entity ("total— right"). */}
+            {` — right where sportsbooks set the first-half line. Betting every first-half under, or only the model's picks, did `}
             <b className="text-gray-200">not</b> reliably beat the −110
             break-even (you need to win 52.4%) against an estimated line, and
             the apparent edge sits inside the ±1.5-point margin of that
@@ -72,10 +74,11 @@ export default async function ResearchPage() {
       <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
         Edge = Vegas line − our number (toward the under). If our number really
         finds value, the line on our biggest-edge picks should drift{" "}
-        <i>toward</i> us before kickoff — i.e. average line value rises with the
-        size of the edge. If it&apos;s flat or negative, the big edges are blind
-        spots, not real value. Positive line value = the under closed at a more
-        favorable number than we bet.
+        <i>toward</i>
+        {/* Template literal — Next 16 dev can also collapse the space after an
+            element when the text that follows carries an HTML entity
+            ("towardus"). */}
+        {` us before kickoff — i.e. average line value rises with the size of the edge. If it's flat or negative, the big edges are blind spots, not real value. Positive line value = the under closed at a more favorable number than we bet.`}
       </p>
 
       {gapGraded === 0 ? (
@@ -143,12 +146,9 @@ export default async function ResearchPage() {
             How accurate is our number? (on unseen games)
           </h2>
           <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
-            Average miss = actual first-half points − our number, per segment (
-            {calib.n.toLocaleString()} games). Near 0 = on target. A steady
-            positive miss means our number runs low (it would wrongly scream
-            &quot;under&quot;); the first post-2023 season can&apos;t be
-            corrected from data that doesn&apos;t exist yet — so it&apos;s shown
-            here, not hidden.
+            {/* One template literal — Next 16 dev can collapse the space after
+                a JSX expression ("1,234games"). */}
+            {`Average miss = actual first-half points − our number, per segment (${calib.n.toLocaleString()} games). Near 0 = on target. A steady positive miss means our number runs low (it would wrongly scream "under"); the first post-2023 season can't be corrected from data that doesn't exist yet — so it's shown here, not hidden.`}
           </p>
           <div className="bv-table-wrap">
             <table className="bv-table">

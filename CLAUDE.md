@@ -6,6 +6,13 @@ Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
 - **What ships today:** decision-support for **full-game + 1H unders on Hard Rock Bet** (the only FL book). The model number is a reference chip, not a pick gate; the edge is *measured* via CLV, not promised (full-game backtest found no edge on the thin 2023-25 regime).
+- **2026-07-17 (review closed):** the pre-season readiness review is fully worked
+  off — blockers (PR #16), 13 should-fixes (PR #17), and the remainder (S8 strict
+  pick matching, S15 postseason capture, S16 multiplier margin gate — fitted curve
+  REVERTED to flat 0.52, S17-S19, S21-S22, nits). Accepted as-is: GHA cron lag
+  (S20), sunday.yml DST double-fire (N12), ntfy alt path (N13), plaintext local
+  keys (N14), no login rate limit (store-less). Odds API totals rows carry no
+  spread by design (spreads market would double credits).
 - **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); Pushover push alerts; web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: set Pushover config + GH secrets, `odds_api.regions: "us,us2"`.
 - **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
 - **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).
@@ -36,7 +43,7 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 cp config.example.yaml config.yaml   # add CFBD + Odds API keys (gitignored)
-pytest -q                            # 104 tests
+pytest -q                            # 226 tests (plus 32 vitest in web/)
 ```
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
 (score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
@@ -52,7 +59,7 @@ games+spread push), `grade_lines.py` (terminal derived-1H report), `post_derived
 (writes display-only `derived_lines` predictions for the board), `notify_sunday.py` (local
 iMessage heads-up). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
 `~/.cache/beatvegas/pg_sim`) + `simulate_week.py` (replay a real week into it, rendered by
-the real Next.js app, Neon-isolated). 104 tests. **Lint/format**: `ruff check` + `ruff
+the real Next.js app, Neon-isolated). 226 tests. **Lint/format**: `ruff check` + `ruff
 format` for Python (`[tool.ruff]` in `pyproject.toml`, pragmatic F/E/I/B set — NOT pyupgrade,
 which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/`
 (ESLint flat config via Next 16's native arrays + Prettier).

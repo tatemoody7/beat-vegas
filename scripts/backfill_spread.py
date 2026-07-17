@@ -18,6 +18,7 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game
 from beatvegas.db.store import init_db, session_scope
 from beatvegas.sources.cfbd import CFBDClient
+from beatvegas.sources.cfbd_lines import DEFAULT_SEASON_TYPE, _season_types
 
 # Same provider priority backfill.py uses to pick one number per game.
 PROVIDER_PRIORITY = ["consensus", "DraftKings", "Bovada", "ESPN Bet", "William Hill (US)"]
@@ -46,11 +47,12 @@ def _pick_spread(lines):
 
 def backfill_season(client: CFBDClient, season: int, season_type: str) -> int:
     spread_by_game = {}
-    for g in client.lines(year=season, season_type=season_type):
-        gid = _get(g, "id")
-        sp = _pick_spread(_get(g, "lines") or [])
-        if gid is not None and sp is not None:
-            spread_by_game[gid] = sp
+    for st in _season_types(season_type):
+        for g in client.lines(year=season, season_type=st):
+            gid = _get(g, "id")
+            sp = _pick_spread(_get(g, "lines") or [])
+            if gid is not None and sp is not None:
+                spread_by_game[gid] = sp
     updated = 0
     with session_scope() as s:
         for gid, sp in spread_by_game.items():
@@ -67,7 +69,7 @@ def main() -> None:
     ap.add_argument("--season", type=int, help="single season override")
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
     ap.add_argument("--end", type=int, default=cfg.get("end_season", 2024))
-    ap.add_argument("--season-type", default=cfg.get("season_type", "regular"))
+    ap.add_argument("--season-type", default=cfg.get("season_type", DEFAULT_SEASON_TYPE))
     args = ap.parse_args()
 
     init_db()

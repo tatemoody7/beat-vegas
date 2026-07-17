@@ -19,7 +19,12 @@ from typing import Any, Dict, Optional
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, Team, Venue
 from beatvegas.db.store import init_db, session_scope, upsert
-from beatvegas.etl.first_half import attach_first_half, first_half_from_plays
+from beatvegas.etl.first_half import (
+    attach_first_half,
+    first_half_from_line_scores,
+    first_half_from_plays,
+    line_scores_trustworthy,
+)
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import pick_total_spread as _pick_total
 
@@ -40,6 +45,18 @@ def _parse_dt(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
+def _needs_pbp(g: Dict[str, Any]) -> bool:
+    """A finished game whose line scores can't produce a trusted 1H total."""
+    finished = (
+        _get(g, "homePoints", "home_points") is not None
+        or _get(g, "awayPoints", "away_points") is not None
+    )
+    if not finished:
+        return False
+    fh = first_half_from_line_scores(g)
+    return fh is None or not line_scores_trustworthy(g, fh)
+
+
 def backfill_season(
     client: CFBDClient, season: int, season_type: str, use_pbp: bool
 ) -> Dict[str, int]:
@@ -52,25 +69,29 @@ def backfill_season(
         if gid is not None and ou is not None:
             total_by_game[gid] = (ou, sp, prov)
 
-    # Optional play-by-play fallback, fetched per week only if needed.
+    # Play-by-play fallback. --use-pbp fetches every week; otherwise fetch ONLY
+    # the weeks holding finished games whose line scores are missing or fail the
+    # trust guard (e.g. a genuine 0-0 first half, which line_scores_trustworthy
+    # must reject as a *linescore* but PBP can confirm as real). This keeps the
+    # default run cheap while never leaving a resolvable game NULL.
     pbp_lookup: Dict[int, Any] = {}
     if use_pbp:
         weeks = sorted({_get(g, "week") for g in games if _get(g, "week") is not None})
-        for wk in weeks:
-            try:
-                pbp_lookup.update(
-                    first_half_from_plays(
-                        client.plays(year=season, week=wk, season_type=season_type)
-                    )
-                )
-            except Exception as e:  # noqa: BLE001 - log and continue
-                print(f"  [warn] plays {season} wk{wk}: {e}")
+    else:
+        weeks = sorted({_get(g, "week") for g in games if _needs_pbp(g)} - {None})
+    for wk in weeks:
+        try:
+            pbp_lookup.update(
+                first_half_from_plays(client.plays(year=season, week=wk, season_type=season_type))
+            )
+        except Exception as e:  # noqa: BLE001 - log and continue
+            print(f"  [warn] plays {season} wk{wk}: {e}")
 
     game_rows, team_rows = [], {}
     n_with_1h = 0
     for g in games:
         gid = _get(g, "id")
-        fh = attach_first_half(g, pbp_lookup if use_pbp else None)
+        fh = attach_first_half(g, pbp_lookup or None)
         if fh["first_half_total"] is not None:
             n_with_1h += 1
         ou, sp, prov = total_by_game.get(gid, (None, None, None))
@@ -140,7 +161,7 @@ def main() -> None:
     ap.add_argument("--season", type=int, help="single season override")
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
     ap.add_argument("--end", type=int, default=cfg.get("end_season", 2024))
-    ap.add_argument("--season-type", default=cfg.get("season_type", "regular"))
+    ap.add_argument("--season-type", default=cfg.get("season_type", "both"))
     ap.add_argument(
         "--use-pbp", action="store_true", help="fill first-half gaps via play-by-play (slower)"
     )
@@ -151,12 +172,16 @@ def main() -> None:
 
     print(f"venues: {backfill_venues(client)} loaded")
     seasons = [args.season] if args.season else range(args.start, args.end + 1)
+    # "both" iterates the two types separately: postseason week numbers restart
+    # at 1, so the per-week /plays fetches must never mix types in one pass.
+    season_types = ["regular", "postseason"] if args.season_type == "both" else [args.season_type]
     for season in seasons:
-        stats = backfill_season(client, season, args.season_type, args.use_pbp)
-        print(
-            f"{season}: {stats['games']} games, {stats['with_1h']} with 1H, "
-            f"{stats['with_total']} with full-game total"
-        )
+        for st in season_types:
+            stats = backfill_season(client, season, st, args.use_pbp)
+            print(
+                f"{season} {st}: {stats['games']} games, {stats['with_1h']} with 1H, "
+                f"{stats['with_total']} with full-game total"
+            )
 
 
 if __name__ == "__main__":

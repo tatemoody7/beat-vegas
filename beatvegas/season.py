@@ -26,10 +26,15 @@ def detect_week(season: int, now: Optional[datetime] = None) -> Optional[int]:
             .all()
         )
     counts: Dict[int, int] = {}
+    nearest: Dict[int, float] = {}
     for wk, dt in rows:
         if wk is not None and dt is not None and lo <= dt <= hi:
             counts[wk] = counts.get(wk, 0) + 1
-    return max(counts, key=counts.get) if counts else None
+            delta = abs((dt - now).total_seconds())
+            nearest[wk] = min(delta, nearest.get(wk, delta))
+    # Ties near week boundaries break toward the week kicking off nearest to
+    # now, not dict insertion order.
+    return max(counts, key=lambda wk: (counts[wk], -nearest[wk])) if counts else None
 
 
 def active(now: Optional[datetime] = None) -> Tuple[int, Optional[int]]:

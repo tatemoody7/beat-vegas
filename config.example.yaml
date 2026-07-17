@@ -13,7 +13,7 @@ backfill:
   start_season: 2015
   end_season: 2024
   # 'regular' or 'both' (regular + postseason)
-  season_type: "regular"
+  season_type: "both" # regular + postseason (bowls/playoff); "regular" to exclude bowls
 
 proxy_line:
   # Fallback ratio used before empirical calibration runs.

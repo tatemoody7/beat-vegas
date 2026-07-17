@@ -19,6 +19,7 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     env:
+      # No ODDS_API_KEY on purpose: research_preview.py reads ESPN + the DB only.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
     steps:

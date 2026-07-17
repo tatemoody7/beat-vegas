@@ -54,7 +54,11 @@ def line_scores_trustworthy(game: Dict[str, Any], first_half: Tuple[int, int]) -
     home_1h, away_1h = first_half
     # A 0-point first half is implausible once the game has any points.
     final_total = (home_pts or 0) + (away_pts or 0)
-    if (home_pts is not None or away_pts is not None) and final_total > 0 and (home_1h + away_1h) == 0:
+    if (
+        (home_pts is not None or away_pts is not None)
+        and final_total > 0
+        and (home_1h + away_1h) == 0
+    ):
         return False
     # Per-quarter totals must reconcile with the final score, when both are known.
     home_ls = _get(game, "homeLineScores", "home_line_scores")

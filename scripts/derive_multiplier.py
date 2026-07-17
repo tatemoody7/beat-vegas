@@ -6,9 +6,10 @@ The research says the 1H share of the full-game total rises with spread magnitud
 1H points, validate walk-forward (each season scored by a model fit on PRIOR
 seasons only), and compare the predicted-1H-line MAE to the flat-0.52 baseline.
 
-If — and only if — the fitted curve wins, we write data/multiplier.json, which
-proxy_line.fh_share() then loads. No improvement => no file => flat 0.52 stays
-(zero behavior change). Requires Game.spread (run scripts/backfill.py first).
+If — and only if — the fitted curve wins by MIN_ADOPT_MARGIN, we write
+data/multiplier.json, which proxy_line.fh_share() then loads. No meaningful
+improvement => no file => flat 0.52 stays (zero behavior change). Requires
+Game.spread (run scripts/backfill.py first).
 
     python scripts/derive_multiplier.py
     python scripts/derive_multiplier.py --write   # persist if it wins (default on)
@@ -31,6 +32,11 @@ from beatvegas.etl.proxy_line import (
 )
 
 _OUT = REPO_ROOT / "data" / "multiplier.json"
+
+# Adoption is gated on a MEANINGFUL walk-forward win, not any win: on ~10k games
+# a 0.03-MAE edge is noise, and adopting it shifts every derived 1H line ~0.3-0.5
+# lower. The fitted curve must beat flat 0.52 by at least this much.
+MIN_ADOPT_MARGIN = 0.05
 
 
 def _predict_line(full_total, spread, coeffs):
@@ -98,7 +104,7 @@ def main() -> None:
         share = min(max(final["a"] + final["b"] * sp, SHARE_CLAMP[0]), SHARE_CLAMP[1])
         print(f"  |spread|={sp:>2}  share={share:.3f}")
 
-    if fit_mae < flat_mae and not args.no_write:
+    if fit_mae < flat_mae - MIN_ADOPT_MARGIN and not args.no_write:
         _OUT.parent.mkdir(parents=True, exist_ok=True)
         _OUT.write_text(
             json.dumps(
@@ -116,7 +122,12 @@ def main() -> None:
     else:
         print(
             "NOT adopted — flat 0.52 stays "
-            + ("(--no-write set)." if args.no_write else "(no MAE improvement).")
+            + (
+                "(--no-write set)."
+                if args.no_write
+                else f"(needs to beat flat by >{MIN_ADOPT_MARGIN} MAE; "
+                f"margin was {flat_mae - fit_mae:+.3f})."
+            )
         )
 
 

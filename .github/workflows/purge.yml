@@ -21,8 +21,11 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - name: Guard on confirmation input
+        # Input goes through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          if [ "${{ github.event.inputs.confirm }}" != "purge" ]; then
+          if [ "$IN_CONFIRM" != "purge" ]; then
             echo "confirm input was not 'purge' — aborting."; exit 1
           fi
       - uses: actions/checkout@v5

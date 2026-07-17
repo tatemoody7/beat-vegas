@@ -78,28 +78,53 @@ RGAMES = [
 
 
 def test_resolve_simple_nickname():
-    gid, _, n = resolve_game("Bama", "LSU", RGAMES)
+    # "Bama" ≈ 0.727 vs "Alabama" — must clear the 0.72 floor.
+    gid, _, n, _ = resolve_game("Bama", "LSU", RGAMES)
     assert gid == 3 and n == 1
 
 
 def test_resolve_orientation_agnostic():
     # typed home/away reversed from CFBD storage still resolves
-    gid, _, _ = resolve_game("LSU", "Alabama", RGAMES)
+    gid, _, _, _ = resolve_game("LSU", "Alabama", RGAMES)
     assert gid == 3
 
 
 def test_resolve_ambiguous_then_week():
     # Ohio State appears in two games -> ambiguous without a week
-    gid, _, n = resolve_game("Ohio State", "Penn State", RGAMES)
+    gid, _, n, _ = resolve_game("Ohio State", "Penn State", RGAMES)
     assert gid == 1  # only game 1 has both teams
     # Both Ohio State games would match a vague query; week pins it.
-    gid2, _, n2 = resolve_game("Ohio State", "Michigan", RGAMES, week=13)
+    gid2, _, n2, _ = resolve_game("Ohio State", "Michigan", RGAMES, week=13)
     assert gid2 == 2 and n2 == 1
 
 
 def test_resolve_no_match():
-    gid, score, n = resolve_game("Oregon", "Washington", RGAMES)
+    gid, score, n, cands = resolve_game("Oregon", "Washington", RGAMES)
+    assert gid is None and n == 0 and cands == []
+
+
+def test_resolve_rejects_loose_partial_match():
+    # "Pitt" vs a fabricated "Pittsford" style loose overlap: anything scoring
+    # in the old 0.6-0.72 band must no longer attach. "Alaba" vs "Alabama"
+    # scores ~0.83 (fine); "Ala" vs "Alabama" ~0.6 (rejected).
+    gid, _, n, _ = resolve_game("Ala", "LSU", RGAMES)
     assert gid is None and n == 0
+
+
+def test_resolve_rematch_returns_candidates():
+    games = RGAMES + [{"id": 4, "week": 15, "home_team": "Ohio State", "away_team": "Michigan"}]
+    gid, _, n, cands = resolve_game("Ohio State", "Michigan", games)
+    assert n == 2
+    assert {c["id"] for c in cands} == {2, 4}
+
+
+def test_parse_dt_converts_non_utc_offsets():
+    from beatvegas.etl.match import _parse_dt
+
+    # A +05:00 timestamp must convert to UTC, not just drop the offset.
+    assert _parse_dt("2024-11-30T22:00:00+05:00") == datetime(2024, 11, 30, 17, 0)
+    assert _parse_dt("2024-11-30T17:00:00Z") == datetime(2024, 11, 30, 17, 0)
+    assert _parse_dt("2024-11-30T17:00:00") == datetime(2024, 11, 30, 17, 0)
 
 
 # --- odds normalizer ---------------------------------------------------

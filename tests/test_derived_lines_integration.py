@@ -30,10 +30,26 @@ FETCHED = [
 
 def _seed_games(store):
     with store.session_scope() as s:
-        s.add(Game(id=1, season=SEASON, week=1, home_team="LSU", away_team="Clemson",
-                   full_game_total=50.5))
-        s.add(Game(id=2, season=SEASON, week=1, home_team="Auburn", away_team="Baylor",
-                   full_game_total=59.5))
+        s.add(
+            Game(
+                id=1,
+                season=SEASON,
+                week=1,
+                home_team="LSU",
+                away_team="Clemson",
+                full_game_total=50.5,
+            )
+        )
+        s.add(
+            Game(
+                id=2,
+                season=SEASON,
+                week=1,
+                home_team="Auburn",
+                away_team="Baylor",
+                full_game_total=59.5,
+            )
+        )
 
 
 def _gmeta(store):
@@ -113,13 +129,17 @@ def test_postgres_type_coercion(db, load_script):
         mod.write_derived_rows(s, FETCHED, _gmeta(store), week=1, now=datetime.utcnow())
 
     with store.get_engine().connect() as conn:
-        t = conn.execute(
-            text(
-                "SELECT pg_typeof(rank) rank_t, pg_typeof(line_used) line_t, "
-                "pg_typeof(created_at) ts_t, factors_json "
-                "FROM predictions WHERE model_version='derived_lines' LIMIT 1"
+        t = (
+            conn.execute(
+                text(
+                    "SELECT pg_typeof(rank) rank_t, pg_typeof(line_used) line_t, "
+                    "pg_typeof(created_at) ts_t, factors_json "
+                    "FROM predictions WHERE model_version='derived_lines' LIMIT 1"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert t["rank_t"] == "integer"
     assert t["line_t"] == "double precision"

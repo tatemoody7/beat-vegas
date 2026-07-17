@@ -37,7 +37,9 @@ def outcome_of(first_half_total, line) -> Tuple[Optional[bool], Optional[str]]:
     return (None, "push")
 
 
-def record_fields(row: pd.Series, model_version: str, feature_cols: List[str] = FEATURE_COLS) -> dict:
+def record_fields(
+    row: pd.Series, model_version: str, feature_cols: List[str] = FEATURE_COLS
+) -> dict:
     """The frozen GameRecord fields for one scored game (excludes captured_at)."""
     feats = {c: _clean(row.get(c)) for c in feature_cols}
     us = row.get("under_score")
@@ -56,7 +58,9 @@ def record_fields(row: pd.Series, model_version: str, feature_cols: List[str] = 
     }
 
 
-def snapshot_slate(session, scored: pd.DataFrame, model_version: str, now, feature_cols=FEATURE_COLS) -> int:
+def snapshot_slate(
+    session, scored: pd.DataFrame, model_version: str, now, feature_cols=FEATURE_COLS
+) -> int:
     """Freeze a GameRecord per game; skip games already snapshotted (immutable)."""
     existing = {
         gid

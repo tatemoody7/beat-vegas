@@ -55,8 +55,9 @@ export default async function WeeklyReviewPage({
 
       {review.week === null ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          Nothing graded for {season} yet. The review fills in after a
-          week&apos;s games finish and grading runs.
+          {/* One template literal — Next 16 dev can collapse the space after a
+              JSX expression ("2025yet"). */}
+          {`Nothing graded for ${season} yet. The review fills in after a week's games finish and grading runs.`}
         </p>
       ) : (
         <>

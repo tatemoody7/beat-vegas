@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { getRecordSeasons, getSeasonRecords, RecordRow } from "@/lib/records";
+import { resolveSeason } from "@/lib/season";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ export default async function RecordsPage({
 }) {
   const seasons = await getRecordSeasons();
   const sp = await searchParams;
-  const season = Number(sp.season) || seasons[0] || new Date().getFullYear();
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const rows: RecordRow[] = seasons.length
     ? await getSeasonRecords(season)
     : [];
@@ -52,6 +54,8 @@ export default async function RecordsPage({
           Download CSV
         </a>
       </div>
+
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">

@@ -14,6 +14,16 @@ from typing import Any, Dict, List, Optional, Tuple
 # Provider priority for picking a single full-game line per game.
 PROVIDER_PRIORITY = ["consensus", "DraftKings", "Bovada", "ESPN Bet", "William Hill (US)"]
 
+# "both" = regular season + bowls/playoff. Iterated as two explicit fetches
+# (rather than CFBD's own `seasonType=both`) because postseason week numbers
+# restart at 1 — callers that key anything by week must never see mixed types
+# in one response without the season_type tag CFBD includes per game.
+DEFAULT_SEASON_TYPE = "both"
+
+
+def _season_types(season_type: str) -> Tuple[str, ...]:
+    return ("regular", "postseason") if season_type == "both" else (season_type,)
+
 
 def _get(d: Dict[str, Any], *names: str) -> Any:
     for n in names:
@@ -77,25 +87,28 @@ def pick_open_close(
 
 
 def open_close_lookup(
-    client, season: int, season_type: str = "regular"
+    client, season: int, season_type: str = DEFAULT_SEASON_TYPE
 ) -> Dict[int, Tuple[float, float, str]]:
     """{game_id: (open_total, close_total, provider)} for a season from CFBD /lines.
 
     game_id is the CFBD id (== Game.id), so callers can join by id without fuzzy
     name matching. Games with no usable total are omitted."""
     out: Dict[int, Tuple[float, float, str]] = {}
-    for g in client.lines(year=season, season_type=season_type):
-        gid = _get(g, "id")
-        if gid is None:
-            continue
-        o, c, prov = pick_open_close(_get(g, "lines") or [])
-        if o is None:
-            continue
-        out[int(gid)] = (o, c, prov or "cfbd")
+    for st in _season_types(season_type):
+        for g in client.lines(year=season, season_type=st):
+            gid = _get(g, "id")
+            if gid is None:
+                continue
+            o, c, prov = pick_open_close(_get(g, "lines") or [])
+            if o is None:
+                continue
+            out[int(gid)] = (o, c, prov or "cfbd")
     return out
 
 
-def full_game_rows(client, season: int, season_type: str = "regular") -> List[Dict[str, Any]]:
+def full_game_rows(
+    client, season: int, season_type: str = DEFAULT_SEASON_TYPE
+) -> List[Dict[str, Any]]:
     """Full-game total+spread rows from CFBD /lines, shaped like the DK rows
     `poll_full_game` consumes. Each row carries `game_id` (CFBD id == Game.id).
 
@@ -104,6 +117,13 @@ def full_game_rows(client, season: int, season_type: str = "regular") -> List[Di
     poller uses `line_open` for a game's FIRST snapshot so the CFBD fallback
     doesn't mislabel a closing number as the opener (that corrupts open->close
     CLV, the core edge measurement)."""
+    rows: List[Dict[str, Any]] = []
+    for st in _season_types(season_type):
+        rows.extend(_full_game_rows_one_type(client, season, st))
+    return rows
+
+
+def _full_game_rows_one_type(client, season: int, season_type: str) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for g in client.lines(year=season, season_type=season_type):
         gid = _get(g, "id")

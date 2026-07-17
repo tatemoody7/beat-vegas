@@ -37,7 +37,12 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Post derived lines
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_SEASON: ${{ inputs.season }}
+          IN_SOURCE: ${{ inputs.source }}
+          IN_WEEK: ${{ inputs.week }}
         run: |
-          ARGS="--season ${{ inputs.season }} --source ${{ inputs.source }}"
-          if [ -n "${{ inputs.week }}" ]; then ARGS="$ARGS --week ${{ inputs.week }}"; fi
+          ARGS="--season $IN_SEASON --source $IN_SOURCE"
+          if [ -n "$IN_WEEK" ]; then ARGS="$ARGS --week $IN_WEEK"; fi
           python scripts/post_derived_lines.py $ARGS

@@ -14,9 +14,7 @@ from beatvegas.etl.features import _merge_venue_meta
 
 
 def test_merge_venue_meta_handles_object_venue_id():
-    games = pd.DataFrame(
-        {"id": [1, 2, 3], "venue_id": pd.Series([10, None, 11], dtype=object)}
-    )
+    games = pd.DataFrame({"id": [1, 2, 3], "venue_id": pd.Series([10, None, 11], dtype=object)})
     venues = pd.DataFrame({"venue_id": [10, 11], "venue_elevation": [5.0, 9.0]})
 
     out = _merge_venue_meta(games, venues)

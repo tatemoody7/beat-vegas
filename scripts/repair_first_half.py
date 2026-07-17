@@ -85,9 +85,7 @@ def repair(use_pbp: bool, dry_run: bool) -> None:
             for season, stype, wk in sorted(weeks):
                 try:
                     pbp_lookup.update(
-                        first_half_from_plays(
-                            client.plays(year=season, week=wk, season_type=stype)
-                        )
+                        first_half_from_plays(client.plays(year=season, week=wk, season_type=stype))
                     )
                 except Exception as e:  # noqa: BLE001 - log and continue
                     print(f"  [warn] plays {season} wk{wk}: {e}")
@@ -97,14 +95,20 @@ def repair(use_pbp: bool, dry_run: bool) -> None:
             old = g.first_half_total
             cg = cfbd_by_id.get(g.id)
             if cg is None:
-                print(f"  {g.season} wk{g.week} {g.away_team} @ {g.home_team}: not in CFBD — left as is")
+                print(
+                    f"  {g.season} wk{g.week} {g.away_team} @ {g.home_team}: not in CFBD — left as is"
+                )
                 missing += 1
                 continue
             fh = attach_first_half(cg, pbp_lookup if use_pbp else None)
             new_total = fh["first_half_total"]
             if new_total is None and old is None:
                 continue  # still unrecoverable; nothing to change or report
-            label = "→ NULL (untrusted)" if new_total is None else f"→ {new_total} ({fh['first_half_source']})"
+            label = (
+                "→ NULL (untrusted)"
+                if new_total is None
+                else f"→ {new_total} ({fh['first_half_source']})"
+            )
             print(f"  {g.season} wk{g.week} {g.away_team} @ {g.home_team}: {old} {label}")
             if not dry_run:
                 for col in _FH_COLS:
@@ -115,7 +119,9 @@ def repair(use_pbp: bool, dry_run: bool) -> None:
                 fixed += 1
 
         verb = "would repair" if dry_run else "repaired"
-        print(f"{verb} {fixed + nulled}/{len(bad)}: {fixed} real totals, {nulled} nulled, {missing} missing")
+        print(
+            f"{verb} {fixed + nulled}/{len(bad)}: {fixed} real totals, {nulled} nulled, {missing} missing"
+        )
 
 
 def main() -> None:

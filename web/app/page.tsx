@@ -1,5 +1,7 @@
 import { getBoard, getSeasons } from "@/lib/board";
+import { resolveSeason } from "@/lib/season";
 import OpportunityCard from "@/app/components/OpportunityCard";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import SortSelect from "@/app/components/SortSelect";
 
@@ -12,11 +14,7 @@ export default async function Home({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const sort = sp.sort === "gap" ? "gap" : sp.sort === "gapz" ? "gapz" : "rank";
 
   const rows = await getBoard(season);
@@ -73,6 +71,8 @@ export default async function Home({
           )}
         </div>
       </div>
+
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">

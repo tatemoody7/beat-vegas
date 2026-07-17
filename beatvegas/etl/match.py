@@ -8,7 +8,7 @@ against same-window CFBD games and require a confident name match on both teams.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -41,9 +41,12 @@ def _parse_dt(s: Any) -> Optional[datetime]:
     if not s:
         return None
     try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).replace(tzinfo=None)
+        dt = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def match_event(
@@ -84,13 +87,17 @@ def resolve_game(
     away: str,
     games: List[Dict[str, Any]],
     week: Optional[int] = None,
-    min_team_score: float = 0.6,
-) -> Tuple[Optional[int], float, int]:
+    min_team_score: float = 0.72,
+) -> Tuple[Optional[int], float, int, List[Dict[str, Any]]]:
     """Resolve a game id from typed team names (no kickoff time needed).
 
-    Returns (game_id, score, n_close). n_close > 1 means genuinely ambiguous —
-    two games scored within a hair of each other (a true rematch) — so pass
-    `week` to disambiguate. Either orientation is accepted."""
+    Returns (game_id, score, n_close, candidates). n_close > 1 means genuinely
+    ambiguous — two games scored within a hair of each other (a true rematch) —
+    and `candidates` lists those near-tie games so the caller can show them;
+    pass `week` to disambiguate. Either orientation is accepted.
+
+    The 0.72 floor keeps common nicknames working ("Bama" vs "Alabama" ≈ 0.727)
+    while rejecting the loose partial matches 0.6 let through."""
     hits = []
     for g in games:
         if week is not None and g.get("week") not in (None, week):
@@ -100,12 +107,12 @@ def resolve_game(
         b = (name_score(ga, home), name_score(gh, away))
         best = max(a, b, key=lambda t: min(t))
         if min(best) >= min_team_score:
-            hits.append((g.get("id"), best[0] + best[1]))
+            hits.append((g, best[0] + best[1]))
     if not hits:
-        return None, 0.0, 0
+        return None, 0.0, 0, []
     hits.sort(key=lambda t: t[1], reverse=True)
     top = hits[0][1]
     # Only near-ties (within 0.15 of the best combined score) count as ambiguous;
     # weak partial matches above the nickname threshold don't.
-    n_close = sum(1 for _, sc in hits if top - sc <= 0.15)
-    return hits[0][0], top, n_close
+    close = [g for g, sc in hits if top - sc <= 0.15]
+    return hits[0][0].get("id"), top, len(close), close

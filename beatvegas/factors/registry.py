@@ -97,12 +97,8 @@ _FACTORS: List[Factor] = [
     # --- situational (schedule-derived, leak-free) --------------------------
     Factor("home_rest_days", "situational", "Home days of rest"),
     Factor("away_rest_days", "situational", "Away days of rest"),
-    Factor(
-        "home_short_week", "situational", "Home on a short week (<6 days)", tier=2, binary=True
-    ),
-    Factor(
-        "away_short_week", "situational", "Away on a short week (<6 days)", tier=2, binary=True
-    ),
+    Factor("home_short_week", "situational", "Home on a short week (<6 days)", tier=2, binary=True),
+    Factor("away_short_week", "situational", "Away on a short week (<6 days)", tier=2, binary=True),
     Factor("home_off_bye", "situational", "Home off a bye (>9 days)"),
     Factor("away_off_bye", "situational", "Away off a bye (>9 days)"),
     Factor("away_travel_dist", "situational", "Away travel distance (miles)"),

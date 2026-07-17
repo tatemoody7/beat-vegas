@@ -30,13 +30,17 @@ def test_graded_pick_fields_includes_opening_line():
     from pick import graded_pick_fields  # scripts/ is on sys.path (conftest)
 
     fields = graded_pick_fields(
-        actual_first_half=20, line=24.5, price=-110, stake=1.0,
-        opening=26.0, closing=25.0,
+        actual_first_half=20,
+        line=24.5,
+        price=-110,
+        stake=1.0,
+        opening=26.0,
+        closing=25.0,
     )
-    assert fields["result"] == "under"          # 20 < 24.5
+    assert fields["result"] == "under"  # 20 < 24.5
     assert fields["opening_line"] == 26.0
     assert fields["closing_line"] == 25.0
-    assert fields["clv"] == 25.0 - 24.5          # clv_under(line, closing)
+    assert fields["clv"] == 25.0 - 24.5  # clv_under(line, closing)
     assert fields["actual_first_half_total"] == 20
     assert fields["units"] != 0
 
@@ -45,10 +49,14 @@ def test_graded_pick_fields_no_snapshots():
     from pick import graded_pick_fields
 
     fields = graded_pick_fields(
-        actual_first_half=30, line=24.5, price=-110, stake=1.0,
-        opening=None, closing=None,
+        actual_first_half=30,
+        line=24.5,
+        price=-110,
+        stake=1.0,
+        opening=None,
+        closing=None,
     )
-    assert fields["result"] == "over"            # 30 > 24.5
+    assert fields["result"] == "over"  # 30 > 24.5
     assert fields["opening_line"] is None
     assert fields["closing_line"] is None
     assert fields["clv"] is None

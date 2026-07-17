@@ -15,7 +15,7 @@ export type MovementPoint = { t: string } & Record<string, number | string>;
 export type Movement = {
   books: string[];
   points: MovementPoint[]; // pivoted: one row per captured_at, a column per book
-  rows: { captured_at: string; book: string; line: number }[]; // raw, ordered
+  rows: { captured_at: string; book: string; line: number }[]; // ET-formatted, ordered
 };
 
 // Games with >1 snapshot for the season, labeled + sorted by week (app.py:180-186).
@@ -55,7 +55,7 @@ const ET_FMT = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   hour12: false,
 });
-function shortT(s: string): string {
+export function shortT(s: string): string {
   const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
   if (!m) return s;
   const d = new Date(`${m[1]}T${m[2]}:00Z`);
@@ -85,7 +85,7 @@ export async function getMovement(gameId: number): Promise<Movement> {
     const book = s.book ?? "?";
     const t = shortT(s.captured_at);
     books.add(book);
-    rows.push({ captured_at: s.captured_at, book, line: s.line });
+    rows.push({ captured_at: t, book, line: s.line });
     const pt = byTime.get(t) ?? { t };
     pt[book] = s.line; // ordered ascending → last write wins (aggfunc="last")
     byTime.set(t, pt);

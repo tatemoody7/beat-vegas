@@ -81,7 +81,9 @@ def _changed(prev, line, spread, over, under) -> bool:
     )
 
 
-def _fetch(source: str, season: int, regions: str = "us,us2") -> Tuple[List[Dict], List[Dict], str, int]:
+def _fetch(
+    source: str, season: int, regions: str = "us,us2"
+) -> Tuple[List[Dict], List[Dict], str, int]:
     """Return (full_game_rows, first_half_rows, source_used, event_count)."""
     dk_events = 0
     if source == "oddsapi":
@@ -267,9 +269,7 @@ def main() -> None:
 
     if args.push:
         hr_new = {
-            gid: line
-            for gid, bl in hr_rows.items()
-            if (line := pick_hr_line(bl)) is not None
+            gid: line for gid, bl in hr_rows.items() if (line := pick_hr_line(bl)) is not None
         }
         alerts = detect_full_game_posted(hr_prev_ids, hr_new, matchups)
         msg = format_posted_summary(alerts)

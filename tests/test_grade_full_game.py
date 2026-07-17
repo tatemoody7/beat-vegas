@@ -40,13 +40,19 @@ def test_grade_market_fg_full_game():
         # full-game opener 52.0, close 50.0 (both before kickoff)
         s.add(
             OddsSnapshot(
-                game_id=1, book="hardrockbet", market="full_game_total", line=52.0,
+                game_id=1,
+                book="hardrockbet",
+                market="full_game_total",
+                line=52.0,
                 captured_at=datetime(2026, 8, 25, 12),
             )
         )
         s.add(
             OddsSnapshot(
-                game_id=1, book="hardrockbet", market="full_game_total", line=50.0,
+                game_id=1,
+                book="hardrockbet",
+                market="full_game_total",
+                line=50.0,
                 captured_at=datetime(2026, 8, 31, 12),
             )
         )
@@ -72,8 +78,14 @@ def test_grade_market_fg_skips_unfinished():
     with Session(eng) as s:
         s.add(
             Game(
-                id=2, season=2026, week=1, home_team="A", away_team="B",
-                start_date=datetime(2026, 9, 1, 12), home_points=None, away_points=None,
+                id=2,
+                season=2026,
+                week=1,
+                home_team="A",
+                away_team="B",
+                start_date=datetime(2026, 9, 1, 12),
+                home_points=None,
+                away_points=None,
             )
         )
         s.commit()

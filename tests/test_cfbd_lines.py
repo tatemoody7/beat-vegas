@@ -67,7 +67,10 @@ def test_pick_open_close_empty():
 class _FakeOpenClose:
     def lines(self, year, season_type="regular"):
         return [
-            {"id": 7, "lines": [{"provider": "DraftKings", "overUnderOpen": 55.5, "overUnder": 54.0}]},
+            {
+                "id": 7,
+                "lines": [{"provider": "DraftKings", "overUnderOpen": 55.5, "overUnder": 54.0}],
+            },
             {"id": 8, "lines": []},  # no total -> omitted
         ]
 

@@ -100,9 +100,7 @@ def write_derived_rows(session, fetched, gmeta, week, now) -> int:
     if season_ids:
         (
             session.query(Prediction)
-            .filter(
-                Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(season_ids)
-            )
+            .filter(Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(season_ids))
             .delete(synchronize_session=False)
         )
     for d in rows:

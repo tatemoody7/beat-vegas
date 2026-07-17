@@ -32,17 +32,42 @@ def test_games_needing_skips_already_captured_and_respects_week_limit():
     with Session(eng) as s:
         s.add_all(
             [
-                Game(id=1, season=2024, week=8, home_team="Auburn", away_team="Missouri",
-                     start_date=datetime(2024, 10, 19, 19, 0)),
-                Game(id=2, season=2024, week=8, home_team="Iowa", away_team="Penn State",
-                     start_date=datetime(2024, 10, 19, 16, 0)),
-                Game(id=3, season=2024, week=9, home_team="Texas", away_team="Vandy",
-                     start_date=datetime(2024, 10, 26, 12, 0)),
+                Game(
+                    id=1,
+                    season=2024,
+                    week=8,
+                    home_team="Auburn",
+                    away_team="Missouri",
+                    start_date=datetime(2024, 10, 19, 19, 0),
+                ),
+                Game(
+                    id=2,
+                    season=2024,
+                    week=8,
+                    home_team="Iowa",
+                    away_team="Penn State",
+                    start_date=datetime(2024, 10, 19, 16, 0),
+                ),
+                Game(
+                    id=3,
+                    season=2024,
+                    week=9,
+                    home_team="Texas",
+                    away_team="Vandy",
+                    start_date=datetime(2024, 10, 26, 12, 0),
+                ),
             ]
         )
         # Game 1 already has a 1H snapshot -> must be skipped (idempotent).
-        s.add(OddsSnapshot(game_id=1, book="fanduel", market="1H_total", line=24.5,
-                           captured_at=datetime(2024, 10, 19, 18, 0)))
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="fanduel",
+                market="1H_total",
+                line=24.5,
+                captured_at=datetime(2024, 10, 19, 18, 0),
+            )
+        )
         s.commit()
 
         wk8 = bf.games_needing_backfill(s, 2024, week=8, limit=0)
@@ -57,13 +82,25 @@ def test_games_needing_skips_already_captured_and_respects_week_limit():
 
 def test_match_game_to_event_finds_the_right_event():
     bf = _load("backfill_1h_history")
-    game = {"id": 7, "home_team": "Auburn", "away_team": "Missouri",
-            "start_date": datetime(2024, 10, 19, 19, 0)}
+    game = {
+        "id": 7,
+        "home_team": "Auburn",
+        "away_team": "Missouri",
+        "start_date": datetime(2024, 10, 19, 19, 0),
+    }
     events = [
-        {"id": "evtX", "home_team": "Georgia Bulldogs", "away_team": "Florida Gators",
-         "commence_time": "2024-10-19T16:00:00Z"},
-        {"id": "evtY", "home_team": "Auburn Tigers", "away_team": "Missouri Tigers",
-         "commence_time": "2024-10-19T19:00:00Z"},
+        {
+            "id": "evtX",
+            "home_team": "Georgia Bulldogs",
+            "away_team": "Florida Gators",
+            "commence_time": "2024-10-19T16:00:00Z",
+        },
+        {
+            "id": "evtY",
+            "home_team": "Auburn Tigers",
+            "away_team": "Missouri Tigers",
+            "commence_time": "2024-10-19T19:00:00Z",
+        },
     ]
     event_id, score = bf._match_game_to_event(game, events)
     assert event_id == "evtY"
@@ -72,10 +109,18 @@ def test_match_game_to_event_finds_the_right_event():
 
 def test_match_game_to_event_no_match():
     bf = _load("backfill_1h_history")
-    game = {"id": 7, "home_team": "Auburn", "away_team": "Missouri",
-            "start_date": datetime(2024, 10, 19, 19, 0)}
+    game = {
+        "id": 7,
+        "home_team": "Auburn",
+        "away_team": "Missouri",
+        "start_date": datetime(2024, 10, 19, 19, 0),
+    }
     events = [
-        {"id": "evtX", "home_team": "Georgia Bulldogs", "away_team": "Florida Gators",
-         "commence_time": "2024-10-19T16:00:00Z"},
+        {
+            "id": "evtX",
+            "home_team": "Georgia Bulldogs",
+            "away_team": "Florida Gators",
+            "commence_time": "2024-10-19T16:00:00Z",
+        },
     ]
     assert bf._match_game_to_event(game, events) == (None, 0.0)

@@ -57,9 +57,7 @@ def purge(floor: int, execute: bool) -> int:
     init_db()
     total = 0
     with session_scope() as s:
-        game_ids = [
-            gid for (gid,) in s.query(M.Game.id).filter(M.Game.season < floor).all()
-        ]
+        game_ids = [gid for (gid,) in s.query(M.Game.id).filter(M.Game.season < floor).all()]
         print(f"games with season < {floor}: {len(game_ids)}")
 
         # Children first (FK-safe). Game-linked tables join via game_id.

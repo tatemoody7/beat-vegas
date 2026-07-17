@@ -11,10 +11,34 @@ def _frame():
     return pd.DataFrame(
         [
             # id, season, proxy_line, first_half_total, under_prob
-            {"id": 1, "season": 2024, "proxy_line": 24.5, "first_half_total": 20, "under_prob": 0.9},
-            {"id": 2, "season": 2024, "proxy_line": 24.5, "first_half_total": 28, "under_prob": 0.8},
-            {"id": 3, "season": 2024, "proxy_line": 24.5, "first_half_total": 23, "under_prob": 0.7},
-            {"id": 4, "season": 2024, "proxy_line": 24.5, "first_half_total": 27, "under_prob": 0.6},
+            {
+                "id": 1,
+                "season": 2024,
+                "proxy_line": 24.5,
+                "first_half_total": 20,
+                "under_prob": 0.9,
+            },
+            {
+                "id": 2,
+                "season": 2024,
+                "proxy_line": 24.5,
+                "first_half_total": 28,
+                "under_prob": 0.8,
+            },
+            {
+                "id": 3,
+                "season": 2024,
+                "proxy_line": 24.5,
+                "first_half_total": 23,
+                "under_prob": 0.7,
+            },
+            {
+                "id": 4,
+                "season": 2024,
+                "proxy_line": 24.5,
+                "first_half_total": 27,
+                "under_prob": 0.6,
+            },
         ]
     )
 

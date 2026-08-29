@@ -19,6 +19,7 @@ import pandas as pd
 
 from beatvegas.db.models import Game, Team, TeamTempo, Venue, Weather
 from beatvegas.db.store import init_db, session_scope, upsert
+from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient  # noqa: F401  (ensures key check)
 from beatvegas.sources.teamrankings import fetch_tempo, map_to_cfbd
 from beatvegas.sources.weather import fetch_weather_series
@@ -141,7 +142,7 @@ def main() -> None:
     ap.add_argument("--tempo", action="store_true")
     ap.add_argument("--weather", action="store_true")
     ap.add_argument("--start", type=int, default=2015)
-    ap.add_argument("--end", type=int, default=2025)
+    ap.add_argument("--end", type=int, default=current_season())
     args = ap.parse_args()
     if not (args.tempo or args.weather):
         args.tempo = args.weather = True

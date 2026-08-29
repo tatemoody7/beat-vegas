@@ -84,6 +84,14 @@ def main() -> None:
         help="hard cap on per-event odds calls (credit safety)",
     )
     ap.add_argument(
+        "--hours-back",
+        type=float,
+        default=24.0,
+        help="window lower bound: include events that kicked off up to N hours "
+        "ago (0 = upcoming games only, so closing-line runs don't spend the "
+        "event cap on in-play games)",
+    )
+    ap.add_argument(
         "--dry-run-alerts", action="store_true", help="print alerts instead of sending iMessages"
     )
     ap.add_argument("--no-alerts", action="store_true", help="disable alerts")
@@ -124,7 +132,7 @@ def main() -> None:
     in_window = []
     for ev in all_events:
         dt = _parse_dt(ev.get("commence_time"))
-        if dt is None or now - timedelta(days=1) <= dt <= horizon:
+        if dt is None or now - timedelta(hours=args.hours_back) <= dt <= horizon:
             in_window.append(ev)
     in_window = in_window[: args.max_events]
 

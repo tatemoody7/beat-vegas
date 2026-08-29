@@ -43,6 +43,17 @@ jobs:
         run: python scripts/poll_full_game.py --source oddsapi
       - name: Score + rank the board
         run: python scripts/weekly_update.py
+      - name: Post derived 1H lines for the active week
+        # Idempotent replace (post_derived_lines deletes the season's derived
+        # rows, then inserts the week's fresh ones). Skips cleanly off-season —
+        # the script exits 1 on zero rows, which would redden every dead Sunday.
+        run: |
+          read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
+          if [ -z "$WEEK" ]; then
+            echo "no active week — skipping derived-lines post"
+            exit 0
+          fi
+          python scripts/post_derived_lines.py --season "$SEASON" --week "$WEEK"
       - name: Alert on failure (red run = no capture/scoring happened)
         if: failure()
         run: |

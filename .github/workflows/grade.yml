@@ -1,0 +1,54 @@
+name: Weekly grading (results + ledger)
+
+# Refreshes final scores from CFBD and grades the market/model/pick ledgers,
+# writing to Neon. Runs in the cloud because the local Mac's usual network
+# can't reach Neon (port 5432 filtered). Monday morning: Saturday finals are
+# in CFBD by early Sunday, so hours of GHA cron lag still land Monday US time.
+# grade.py is delete-then-rewrite idempotent — late Sun/Mon games simply grade
+# on the following Monday's run. Off-season every step is a green no-op.
+# Grading-only by design: enrich/scoring runs Sundays (sunday.yml), and a red
+# run here must mean exactly "the ledger is stale".
+# No ODDS_API_KEY: grading reads snapshots already in Neon.
+
+on:
+  schedule:
+    # 12:00 UTC Monday = 8am EDT / 7am EST.
+    - cron: '0 12 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: grade
+  cancel-in-progress: false
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Resolve season
+        id: season
+        run: |
+          echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
+      - name: Refresh final scores (CFBD)
+        run: python scripts/backfill.py --season ${{ steps.season.outputs.season }}
+      - name: Grade market vs model ledger
+        run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
+      - name: Grade my picks
+        run: python scripts/pick.py grade --season ${{ steps.season.outputs.season }}
+      - name: Alert on failure (red run = the ledger is stale)
+        if: failure()
+        run: |
+          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
+            -F "title=Beat Vegas — grading FAILED" \
+            -F "message=Run $GITHUB_RUN_ID failed. Results/ledger may be stale. Check Actions." \
+            https://api.pushover.net/1/messages.json || true

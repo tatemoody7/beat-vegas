@@ -11,7 +11,9 @@ database:
 
 backfill:
   start_season: 2015
-  end_season: 2024
+  # Bump each August — or delete this line: scripts fall back to the current
+  # season when end_season is unset.
+  end_season: 2026
   # 'regular' or 'both' (regular + postseason)
   season_type: "both" # regular + postseason (bowls/playoff); "regular" to exclude bowls
 

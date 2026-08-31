@@ -17,6 +17,7 @@ import argparse
 from beatvegas.config import load_config
 from beatvegas.db.models import Game
 from beatvegas.db.store import init_db, session_scope
+from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import DEFAULT_SEASON_TYPE, _season_types
 
@@ -68,7 +69,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, help="single season override")
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
-    ap.add_argument("--end", type=int, default=cfg.get("end_season", 2024))
+    ap.add_argument("--end", type=int, default=cfg.get("end_season") or current_season())
     ap.add_argument("--season-type", default=cfg.get("season_type", DEFAULT_SEASON_TYPE))
     args = ap.parse_args()
 

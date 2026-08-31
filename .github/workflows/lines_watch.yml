@@ -2,20 +2,23 @@ name: Hard Rock line watch (push alerts)
 
 # Fires a phone push (Pushover) the moment Hard Rock POSTS a line, so Tate can bet
 # the opener before it moves. Runs in the cloud: GHA reaches the Odds API (HTTPS)
-# AND Neon, and runs even when the Mac is asleep. Two cadences:
-#   - Sunday full-game opener: every 10 min across the ~11am ET drop window.
-#   - Mid-week 1H: once daily Mon–Fri (full upcoming-week slate).
+# AND Neon, and runs even when the Mac is asleep. Three cadences:
+#   - Sunday full-game opener: every 15 min across the ~11am ET drop window.
+#   - Friday 1H sweep: the weekend slate's 1H lines.
+#   - Saturday closing capture (x2): 1H lines shortly before the noon and
+#     evening kickoff waves, so CLV grades against a real closing number.
 #
-# CREDIT BUDGET (free tier = 500/mo), scoped to FIT the free tier:
-#   - Sunday opener window: */15 across 14:00-17:45 UTC = 16 polls x 2 credits
-#     (bulk totals, us+us2) = 32/Sunday ~= 138/mo.
-#   - 1H sweep: FRIDAY ONLY (1H lines are up by then; Saturday is the slate),
-#     --days-ahead 3 --max-events 40 at 2 credits/event (totals_h1 x us,us2)
-#     = <=80/run ~= 344/mo.
-#   Total ~= 482/mo. poll_lines.py's --credit-floor (default 60) additionally
-#   stops any sweep that would eat the Sunday reserve, and pushes a warning.
-#   For more cadence (daily sweeps, */10 Sundays), buy a paid Odds API tier
-#   and widen these crons + flags.
+# CREDIT BUDGET (free tier = 500/mo), worst case in-season (4.35 wk/mo,
+# 2 credits per per-event 1H call = totals_h1 x us,us2; 2 per bulk FG poll):
+#   - Sunday opener window: 16 polls x 2               ~= 139/mo
+#   - sunday.yml double-fire: 2 x 2                    ~=  17/mo
+#   - Friday sweep: --max-events 18 -> <=36/run        ~= 157/mo
+#   - Sat closes: 2 runs x --max-events 10 -> <=40/wk  ~= 174/mo
+#   Total ~= 487/mo worst case; real usage runs far lower (most runs poll
+#   fewer events than the cap). poll_lines.py's --credit-floor (default 60)
+#   additionally stops any sweep that would eat the Sunday reserve, and pushes
+#   a warning. Off-season the per-event polls cost 0 (no events in window).
+#   For more cadence or wider caps, buy a paid Odds API tier.
 #
 # GHA cron routinely fires 5-20+ min late (accepted, not fixable): the */15
 # Sunday window plus first-appearance detection absorbs the drift — a late poll
@@ -29,10 +32,15 @@ on:
     - cron: '*/15 14-17 * * 0'
     # Weekly 1H sweep — Friday 17:00 UTC (~1pm ET), scoped to the weekend slate.
     - cron: '0 17 * * 5'
+    # Saturday closing capture — before the ~12pm ET wave (14:30 UTC = 10:30am
+    # EDT) and before the 7/8pm ET wave (22:00 UTC = 6pm EDT). The 3:30 wave's
+    # closing number comes from the morning run (free-tier compromise).
+    - cron: '30 14 * * 6'
+    - cron: '0 22 * * 6'
   workflow_dispatch:
     inputs:
       market:
-        description: 'manual run: full_game | 1h'
+        description: 'manual run: full_game | 1h | 1h_close'
         default: full_game
 
 concurrency:
@@ -60,7 +68,10 @@ jobs:
         run: python scripts/poll_full_game.py --source oddsapi --push
       - name: 1H capture + Hard Rock push (Friday sweep)
         if: github.event.schedule == '0 17 * * 5' || github.event.inputs.market == '1h'
-        run: python scripts/poll_lines.py --push --no-alerts --days-ahead 3 --max-events 40
+        run: python scripts/poll_lines.py --push --no-alerts --days-ahead 3 --max-events 18
+      - name: 1H closing capture (Saturday, upcoming games only)
+        if: github.event.schedule == '30 14 * * 6' || github.event.schedule == '0 22 * * 6' || github.event.inputs.market == '1h_close'
+        run: python scripts/poll_lines.py --push --no-alerts --days-ahead 1 --hours-back 0 --max-events 10
       - name: Alert on failure (red run = capture or push problem)
         if: failure()
         run: |

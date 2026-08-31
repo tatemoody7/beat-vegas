@@ -25,6 +25,7 @@ from beatvegas.etl.first_half import (
     first_half_from_plays,
     line_scores_trustworthy,
 )
+from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import pick_total_spread as _pick_total
 
@@ -160,7 +161,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, help="single season override")
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
-    ap.add_argument("--end", type=int, default=cfg.get("end_season", 2024))
+    ap.add_argument("--end", type=int, default=cfg.get("end_season") or current_season())
     ap.add_argument("--season-type", default=cfg.get("season_type", "both"))
     ap.add_argument(
         "--use-pbp", action="store_true", help="fill first-half gaps via play-by-play (slower)"

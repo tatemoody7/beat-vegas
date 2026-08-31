@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       season:
-        description: "Season"
+        description: "Season (blank = current season)"
         required: false
-        default: "2026"
+        default: ""
       week:
         description: "Week filter (blank = all posted)"
         required: false
-        default: "1"
+        default: ""
       source:
         description: "dk | cfbd | auto"
         required: false
@@ -43,6 +43,7 @@ jobs:
           IN_SOURCE: ${{ inputs.source }}
           IN_WEEK: ${{ inputs.week }}
         run: |
-          ARGS="--season $IN_SEASON --source $IN_SOURCE"
+          ARGS="--source $IN_SOURCE"
+          if [ -n "$IN_SEASON" ]; then ARGS="$ARGS --season $IN_SEASON"; fi
           if [ -n "$IN_WEEK" ]; then ARGS="$ARGS --week $IN_WEEK"; fi
           python scripts/post_derived_lines.py $ARGS

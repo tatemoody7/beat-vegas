@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { MovementPoint } from "@/lib/movement";
+import { bookLabel } from "@/lib/books";
 
 // One color-coded line per book. Books are sampled at different times, so
 // connectNulls bridges the per-book gaps (mirrors Streamlit's line chart).
@@ -77,7 +78,7 @@ export default function MovementChart({
               key={b}
               type="monotone"
               dataKey={b}
-              name={b}
+              name={bookLabel(b)}
               stroke={COLORS[i % COLORS.length]}
               strokeWidth={2}
               dot={{ r: 2 }}
@@ -94,7 +95,7 @@ export default function MovementChart({
               className="inline-block h-2 w-3 rounded-sm"
               style={{ background: COLORS[i % COLORS.length] }}
             />
-            {b}
+            {bookLabel(b)}
           </span>
         ))}
       </div>

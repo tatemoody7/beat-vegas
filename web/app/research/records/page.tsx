@@ -7,10 +7,27 @@ import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 export const dynamic = "force-dynamic";
 
 const OUTCOME_COLOR: Record<string, string> = {
-  under: "#16a34a",
-  over: "#dc2626",
-  push: "#6b7280",
+  under: "var(--under-strong)",
+  over: "var(--over)",
+  push: "var(--text-dim)",
 };
+
+// Plain-English legend for the terse column headers (title attrs are invisible
+// on touch devices).
+const LEGEND: [string, string][] = [
+  ["Total", "the full-game points total the books posted"],
+  ["1H line", "the first-half total the model was scored against"],
+  [
+    "Our #",
+    "the model’s own first-half prediction (it never sees the Vegas line)",
+  ],
+  [
+    "Gap",
+    "1H line minus our number; positive = Vegas above us = leans under. 1.75+ is the bettable band",
+  ],
+  ["Gap σ", "the same gap divided by ~12 pts of per-game noise — context only"],
+  ["Score", "the model’s 0–100 under lean; 50 = coin flip"],
+];
 
 function fmt(v: number | null, digits = 1): string {
   return v === null ? "—" : v.toFixed(digits);
@@ -56,6 +73,15 @@ export default async function RecordsPage({
       </div>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
+      <dl className="bv-card mb-4 grid grid-cols-1 gap-x-6 gap-y-1 p-3 text-xs sm:grid-cols-2">
+        {LEGEND.map(([k, v]) => (
+          <div key={k} className="flex gap-2">
+            <dt className="shrink-0 font-semibold text-[var(--text)]">{k}</dt>
+            <dd className="text-[var(--text-muted)]">{v}</dd>
+          </div>
+        ))}
+      </dl>
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
@@ -112,7 +138,9 @@ export default async function RecordsPage({
                   <td
                     className="font-semibold"
                     style={{
-                      color: r.outcome ? OUTCOME_COLOR[r.outcome] : "#6b7280",
+                      color: r.outcome
+                        ? OUTCOME_COLOR[r.outcome]
+                        : "var(--text-dim)",
                     }}
                   >
                     {r.outcome ?? "—"}

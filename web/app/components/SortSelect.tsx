@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 export const SORTS = [
   { value: "rank", label: "Best lean first" },
   { value: "gap", label: "Biggest edge vs Vegas" },
-  { value: "gapz", label: "Biggest edge (within normal range)" },
+  { value: "gapz", label: "Biggest edge (noise-adjusted)" },
 ] as const;
 
 export default function SortSelect({ current }: { current: string }) {

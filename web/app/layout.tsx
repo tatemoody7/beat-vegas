@@ -54,6 +54,13 @@ export default function RootLayout({
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {children}
         </main>
+        <footer className="mx-auto w-full max-w-7xl px-6 py-6 text-xs text-[var(--text-dim)]">
+          <Link href="/glossary" className="bv-nav-link">
+            Glossary — every term in plain English
+          </Link>
+          <span className="mx-2">·</span>
+          Research and decision support only. It never places bets.
+        </footer>
       </body>
     </html>
   );

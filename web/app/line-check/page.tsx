@@ -1,5 +1,7 @@
 import { getSeasons } from "@/lib/board";
 import { getLineCheck, type Market } from "@/lib/lineCheck";
+import { resolveSeason } from "@/lib/season";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import MarketToggle from "@/app/components/MarketToggle";
 import LineCheckCard from "@/app/components/LineCheckCard";
@@ -13,11 +15,7 @@ export default async function LineCheckPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const market: Market = sp.market === "1h" ? "1h" : "full_game";
 
   const rows = await getLineCheck(season, market);
@@ -42,6 +40,8 @@ export default async function LineCheckPage({
         </div>
       </div>
 
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
       {priced.length > 0 && (
         <p className="mb-4 text-sm text-[var(--text-muted)]">
           Hard Rock has priced{" "}
@@ -56,9 +56,7 @@ export default async function LineCheckPage({
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No {market === "1h" ? "first-half" : "full-game"} lines captured for{" "}
-          {season} yet. They appear once the cloud poller records Hard Rock and
-          the rest of the market.
+          {`No ${market === "1h" ? "first-half" : "full-game"} lines captured for ${season} yet. ${market === "1h" ? "First-half lines are swept Friday afternoon and Saturday morning." : "Full-game openers are captured Sunday afternoon."}`}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">

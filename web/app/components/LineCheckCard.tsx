@@ -3,23 +3,7 @@
 import { useState } from "react";
 import type { EvVerdict, LineCheckRow, Verdict } from "@/lib/lineCheck";
 
-const BOOK_LABELS: Record<string, string> = {
-  hardrockbet: "Hard Rock",
-  hardrockbet_fl: "Hard Rock (FL)",
-  draftkings: "DraftKings",
-  fanduel: "FanDuel",
-  betmgm: "BetMGM",
-  betrivers: "BetRivers",
-  bovada: "Bovada",
-  betparx: "betPARX",
-  ballybet: "Bally Bet",
-  betonlineag: "BetOnline",
-  lowvig: "LowVig",
-  espnbet: "ESPN Bet",
-  caesars: "Caesars",
-};
-
-const label = (b: string) => BOOK_LABELS[b] ?? b;
+import { bookLabel as label } from "@/lib/books";
 
 // Verdict drives the pill. Good under value = HR at/above the best total. Reuses
 // the under/over semantic tokens (the verdict is about under favorability), not a

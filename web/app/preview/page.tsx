@@ -1,5 +1,7 @@
 import { getSeasons } from "@/lib/board";
 import { getPreview } from "@/lib/preview";
+import { resolveSeason } from "@/lib/season";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
 
@@ -60,11 +62,7 @@ export default async function PreviewPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const wantWeek = sp.week ? Number(sp.week) : undefined;
 
   const preview = await getPreview(season, wantWeek);
@@ -75,8 +73,8 @@ export default async function PreviewPage({
         <div>
           <h1 className="bv-page-title">Week Preview</h1>
           <p className="bv-page-sub">
-            This week&apos;s games with the latest news and injuries — the
-            research read before lines drop. Display only (unofficial ESPN).
+            This week’s games with the latest news and injuries — the research
+            read before lines drop. Display only (unofficial ESPN).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -89,13 +87,11 @@ export default async function PreviewPage({
         </div>
       </div>
 
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
       {preview.games.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No preview built for {season} yet. Run{" "}
-          <code className="text-[var(--text)]">
-            scripts/research_preview.py
-          </code>{" "}
-          early in the week to pull the slate&apos;s news and injuries.
+          {`No preview for ${season} yet. News and injuries are pulled automatically on Tuesday and Friday mornings.`}
         </p>
       ) : (
         <div className="grid gap-4">

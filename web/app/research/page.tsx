@@ -51,7 +51,7 @@ export default async function ResearchPage() {
             estimate.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            <b className="text-[var(--text)]">Bottom line:</b> we can&apos;t{" "}
+            <b className="text-[var(--text)]">Bottom line:</b> we can’t{" "}
             <i>confirm</i> an edge on free past data — there are no past
             first-half lines to check against. The real test is the live record,
             built from real first-half lines captured this season.
@@ -59,9 +59,8 @@ export default async function ResearchPage() {
         </>
       ) : (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          Load history with{" "}
-          <code className="text-[var(--text)]">scripts/backfill.py</code> to see
-          this.
+          No game history loaded yet — this fills in once past seasons are in
+          the database.
         </p>
       )}
 
@@ -84,10 +83,8 @@ export default async function ResearchPage() {
       {gapGraded === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
           No settled games with our number and a real closing line yet. This
-          fills in as real first-half lines are checked (
-          <code className="text-[var(--text)]">scripts/poll_lines.py</code>) and
-          settled (<code className="text-[var(--text)]">scripts/grade.py</code>)
-          through the season.
+          fills in through the season as first-half lines are captured before
+          kickoff and the games are graded on Mondays.
         </p>
       ) : (
         <div className="bv-table-wrap">
@@ -206,8 +203,7 @@ export default async function ResearchPage() {
 
       {runs.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No runs logged yet — run{" "}
-          <code className="text-[var(--text)]">scripts/retrain.py</code>.
+          No model training runs logged yet.
         </p>
       ) : (
         <div className="bv-table-wrap">

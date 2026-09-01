@@ -1,4 +1,5 @@
 import { BoardRow } from "@/lib/board";
+import { BET_GAP_PTS } from "@/lib/verdict";
 import {
   BoardFactor,
   buildChips,
@@ -79,11 +80,12 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
   // fallback is an estimate (e.g. the proxy line baked in at scoring time).
   const vegasIsLive = row.curLine !== null;
   const gap = row.liveGap;
-  const z = row.liveGapZ;
-  // A gap only "counts" once it clears the BV line's own noise (|z| >= 1).
-  const significant = z !== null && Math.abs(z) >= 1;
-  // Positive gap (Vegas above our BV number) = an under-leaning gap — but grey it
-  // out when it's within noise, so a noisy gap doesn't read as an edge.
+  // A gap "counts" once it reaches the validated bettable band (top ~20% of a
+  // season's gaps, in points). sigma (~12 pts) is per-game outcome noise and can
+  // never be cleared, so it is not the test here.
+  const significant = gap !== null && Math.abs(gap) >= BET_GAP_PTS;
+  // Positive gap (Vegas above our BV number) = an under-leaning gap — grey it
+  // out below the bettable band so a small gap doesn't read as an edge.
   const gapColor =
     gap === null || !significant ? "#6b7280" : gap > 0 ? "#65a30d" : "#dc2626";
   const qbOut = row.factors.qb_out_home || row.factors.qb_out_away;
@@ -239,18 +241,22 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
                 <div
                   className="bv-stat"
-                  title="Edge vs Vegas: how far the Vegas line sits above our number. Only a 'clear signal' once it clears our model's own margin of error."
+                  title={`Edge vs Vegas: how far the Vegas line sits above our number, in points. Gaps of ${BET_GAP_PTS}+ points are the top ~20% of a season — the band the backtest says is worth betting (about 54% under). Smaller gaps are a lean, not a bet.`}
                 >
                   <span className="bv-stat-label">Edge vs Vegas</span>
                   <span className="bv-stat-value" style={{ color: gapColor }}>
                     {gap !== null
                       ? `${gap > 0 ? "+" : ""}${gap.toFixed(1)}`
                       : "—"}
-                    {z !== null && (
+                    {gap !== null && (
                       <span
                         className={`ml-1 text-xs font-normal ${significant ? "text-[var(--text-muted)]" : "text-[var(--text-dim)]"}`}
                       >
-                        {significant ? "clear signal" : "within normal range"}
+                        {significant
+                          ? gap > 0
+                            ? "bettable band"
+                            : "leans over"
+                          : "small lean"}
                       </span>
                     )}
                   </span>

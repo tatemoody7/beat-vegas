@@ -3,6 +3,9 @@ import { getMovement, getMovementGames } from "@/lib/movement";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import GameSelect from "@/app/components/GameSelect";
 import MovementChart from "@/app/components/MovementChart";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
+import { bookLabel } from "@/lib/books";
+import { resolveSeason } from "@/lib/season";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +16,7 @@ export default async function MovementPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
 
   const games = await getMovementGames(season);
   const requestedGame = sp.game ? Number(sp.game) : NaN;
@@ -47,6 +46,8 @@ export default async function MovementPage({
         </div>
       </div>
 
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
       {!movement || movement.points.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
           {/* One template literal — Next 16 dev can collapse the space after a
@@ -72,7 +73,9 @@ export default async function MovementPage({
                     <td className="text-[var(--text-muted)]">
                       {r.captured_at}
                     </td>
-                    <td className="text-[var(--text-muted)]">{r.book}</td>
+                    <td className="text-[var(--text-muted)]">
+                      {bookLabel(r.book)}
+                    </td>
                     <td className="font-mono text-[var(--text)]">{r.line}</td>
                   </tr>
                 ))}

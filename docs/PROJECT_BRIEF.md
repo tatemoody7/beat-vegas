@@ -24,8 +24,9 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 - No free source has *historical* 1H betting lines, so the backtest grades against
   a **proxy** (0.52 × full-game total). Directional, not proof.
 - **Blanket** 1H unders ≈ breakeven (no edge). The edge, if any, is in **selection**.
-- After backfilling history, **pace + weather** lifted the top-20% model picks to
-  ~**53.7% / +2.45% ROI** (2018–25). Rest/travel/returning-production were flat.
+- After backfilling history, **pace + weather** lifted the top-20% classifier picks to
+  ~53.7% / +2.45% ROI; the gbm_v2 **gap ranking** now grades **54.0% / +3.0% ROI**
+  (2018–25 OOS, proxy-graded). Rest/travel/returning-production were flat.
 - The signal is **decaying** recently (≈57–59% in 2018–21 → ≈50% in 2023–25).
 - Verdict: a genuinely useful *research* tool; **not** a proven money-maker. Real
   first-half lines collected this season are the only true test.
@@ -33,7 +34,10 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   1H totals are systematically soft. So we stopped assuming it and instead **make our
   own number** — the **BV line** (an independent, calibrated 1H projection) — and rank
   games by the **gap** to the real Vegas line, validating with CLV. Live now. See
-  `BV_LINE.md`. The gap is shown for research only; it does not drive the score yet.
+  `BV_LINE.md`. Since Phase 3 the gap is the **primary ranking**; the classifier's
+  Under Score is a secondary lean. The 2026 landing page (`/`, "This Week") turns
+  this into a plain-English BET / WATCH / PASS verdict per game under the rules in
+  `BETTING_POLICY.md`; the ranked research board lives at `/board`.
 
 ## Architecture (plain English)
 - A **local engine** on my Mac scrapes data, scores games, sends alerts, and runs
@@ -61,7 +65,8 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   help, situational/returning not). Ideas: specific coordinator/scheme changes,
   1Q-only splits, opponent-adjusted pace, garbage-time-free 1H efficiency.
 - How to present "confidence" honestly when the edge is marginal/decaying.
-- Bankroll/staking views (Kelly fractions, unit sizing) — research-only.
+- ~~Bankroll/staking views~~ — decided 2026-09-01: flat units, see `BETTING_POLICY.md`
+  (Kelly stays an advisory chip only).
 - What "good" looks like for the live tracking after N weeks of real lines.
 - Whether/when a paid 1H-line history feed would be worth it to validate the proxy.
 

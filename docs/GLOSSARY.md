@@ -22,8 +22,21 @@
 - **Gap** — `Vegas 1H line − BV line` (under direction). Positive = Vegas above our
   number = a candidate under. Big gaps can be model *blind spots*, not edges.
 - **Prediction band / gap-in-σ** — the BV line is noisy (σ ≈ 12 pts), so it ships an
-  80% band (`bv_lo`–`bv_hi`) and reports each gap in σ (`bv_gap_z`). A gap **under
-  ~1σ is noise, not an edge** — the UI flags it as such.
+  80% band (`bv_lo`–`bv_hi`) and reports each gap in σ (`bv_gap_z`). σ is the
+  noise of a single game's outcome — no gap ever reaches 1σ — so it is context
+  ("any one game is near a coin flip"), **not** the bet gate.
+- **Bettable gap** — the validated selection rule in points: the top 20% of a
+  season's games by gap (≈ **≥ 1.75 pts**; ≥ 3.0 pts ≈ top 10%). This is what the
+  This Week page calls **BET** when a live line and a fair-or-better Hard Rock
+  price are also present. See `BETTING_POLICY.md`.
+- **BET / WATCH / PASS** — the This Week page's verdict per game. BET = bettable
+  gap + live 1H line + Hard Rock price not worse than market. WATCH = a smaller
+  lean, a good price alone ("price edge only"), or a bettable gap against an
+  *estimated* line. PASS = nothing to act on.
+- **Paper pick** — a pick logged with stake 0 (`manual_picks.is_paper`): graded
+  for record and CLV but kept out of the real-money ledger.
+- **Unit** — one standard bet. 2026: **$10 flat**, every bet, on a $100 roll (see
+  `BETTING_POLICY.md` for the acknowledged risk).
 - **Market-blind (rule)** — the BV regressor is forbidden from training on any Vegas
   number (full-game total, 1H line). Enforced by a guard test; keeps the gap from
   being circular. (The 0–100 classifier is allowed to be market-relative — different job.)
@@ -48,8 +61,9 @@
 - **ESPN hidden API** — news/injuries for card context (display only, unofficial).
 
 ## What moved the model (and what didn't)
-- **Helped:** pace (tempo) + weather — lifted top-20% model picks to
-  ~53.7% under / +2.45% ROI (2018–25, proxy-graded).
+- **Helped:** pace (tempo) + weather — lifted top-20% classifier picks to
+  ~53.7% under / +2.45% ROI; the gbm_v2 gap ranking grades 54.0% / +3.0% ROI
+  (2018–25 OOS, proxy-graded).
 - **Flat:** rest/travel/time-zone/kickoff (situational) and returning production —
   kept as on-card *context*, not model inputs.
 - **Caveat:** edge is small and **decaying** — ~57–59% (2018–21) → ~50% (2023–25),

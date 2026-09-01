@@ -28,12 +28,18 @@ anywhere, we genuinely diverge with value.
 - **Is noisy, and says so.** Stripped of the market's number, the BV line's own
   error bar is wide — out-of-fold **σ ≈ 12 points**. So it ships with an **80%
   prediction band** (`bv_lo`–`bv_hi`) and reports each gap in units of that noise
-  (`bv_gap_z`). A gap inside ~1σ is **noise, not an edge**, and the card says so.
+  (`bv_gap_z`). **σ is per-game OUTCOME noise (~12 pts), not the uncertainty of
+  the estimate** — a gap never clears 1σ (the 2025 max was 6.1 pts = 0.5σ), so σ
+  is context ("any single game is near a coin flip"), not a gate. The bettable
+  band is defined in **points** by the validated rule: top 20% of a season by gap
+  ≈ **≥ 1.75 pts** (80th pct 1.2–1.8, 90th 2.2–3.0 across 2023–25). See
+  `BETTING_POLICY.md` and `web/lib/verdict.ts`.
 - **Isn't:** the old `proj_1h_total` "Hist proj" chip — a *naive* 1H-scoring-history
   formula. It stays as a separate, clearly-labeled context chip. Don't conflate them.
-- **Isn't:** an input to the score. The 0–100 **Under Score still comes only from the
-  classifier.** The gap is **display + a "Biggest gaps" sort** — nothing more — until
-  CLV proves it out (see "Honesty").
+- **Is (since Phase 3):** the **primary ranking.** `score_slate` sorts the board by
+  `bv_gap` (gate passed in `validate_engine.py`: top-20% by gap = 54.0% under /
+  +3.0% ROI OOS vs the classifier's 53.1% / +1.4%). The 0–100 Under Score still
+  comes only from the classifier and is a secondary lean on the card.
 
 ## Where it shows up
 - **Opportunities cards** (web + Streamlit): each card shows `BV (lo–hi) · Vegas ·
@@ -120,6 +126,7 @@ python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB
   sharp money the model can't see. A huge gap may mean *we're* missing something.
 - **CLV, not win rate, is the verdict.** On the biggest-gap bucket: lines moving
   *toward* our number before close = real signal; moving away = noise/blind spots.
-- The gap **never feeds the Under Score or rank** until the gap-vs-CLV table earns it.
+- The gap **drives the rank** (Phase 3 gate passed) but never feeds the Under Score;
+  the gap-vs-CLV table is how we keep checking that decision in-season.
 - Early on, the live CLV sample is tiny (only real 1H lines collected so far) and may
   read flat — that's *insufficient data*, not a verdict. It sharpens through the season.

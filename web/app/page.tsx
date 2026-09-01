@@ -16,12 +16,16 @@ export const dynamic = "force-dynamic"; // always read live DB
 export default async function ThisWeekPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; week?: string }>;
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
-  const tw = await getThisWeek(season);
+  const reqWeek = Number(sp.week);
+  const tw = await getThisWeek(
+    season,
+    Number.isFinite(reqWeek) ? reqWeek : undefined,
+  );
 
   const actionable = tw.games.filter((g) => g.verdict.verdict !== "PASS");
   const passes = tw.games.filter((g) => g.verdict.verdict === "PASS");

@@ -2,20 +2,27 @@
 // a confidence read, and 2–3 sentences saying WHY. Pure — no DB — so the rules
 // are unit-tested and easy to tune.
 //
-// Thresholds mirror beatvegas/model/score.py — keep the two in sync:
-//   OPPORTUNITY_Z (score.py line 33) marks a gap worth watching;
-//   BET_Z is the "clears the BV line's own noise" bar from docs/BV_LINE.md that
-//   OpportunityCard already uses to call a gap a "clear signal".
+// Gates come from the VALIDATED selection rule, not from sigma. The backtest
+// (scripts/validate_engine.py → beatvegas/backtest/bv_engine.py) bets the top
+// 20% of each season's games by bv_gap and grades 54.0% under / +3.0% ROI
+// OOS. In Neon the season 80th-percentile gap is 1.2–1.8 pts and the 90th is
+// 2.2–3.0 pts (2023–25), so BET_GAP_PTS ≈ the top-20% cutoff and
+// STRONG_GAP_PTS ≈ the top-10%. bv_sigma (~11.9 pts) is the per-GAME outcome
+// noise — a gap can never clear it, so it is context ("any single game is
+// near a coin flip"), not a gate. MODEL_BET_THRESHOLD mirrors score.py.
 // Betting policy (docs/BETTING_POLICY.md): 1H unders only, ≤ WEEKLY_BET_CAP
 // bets a week, flat 1 unit each. Zero bets is a valid week.
 
 import type { BoardFactor } from "@/lib/score";
 import type { EvVerdict } from "@/lib/lineCheck";
 
-export const OPPORTUNITY_Z = 0.5;
-export const BET_Z = 1.0;
+export const BET_GAP_PTS = 1.75;
+export const STRONG_GAP_PTS = 3.0;
+export const WATCH_GAP_PTS = 1.0;
 export const MODEL_BET_THRESHOLD = 53;
 export const WEEKLY_BET_CAP = 5;
+// What the validated rule earned OOS — quoted, never promised.
+export const BACKTEST_UNDER_PCT = 54.0;
 // weekly_update.py --min-games: the model needs this many games played by both
 // teams, so weeks 1–2 have no model read at all.
 export const MIN_GAMES_FOR_MODEL = 2;
@@ -108,13 +115,15 @@ function gapSentence(i: VerdictInput): string {
       : i.gap < 0
         ? "below our number, which leans over"
         : "right on our number";
-  const noise =
-    i.z === null
-      ? ""
-      : Math.abs(i.z) >= BET_Z
-        ? ` — that’s ${fmt(Math.abs(i.z))}× our margin of error, a clear signal.`
-        : ` — that’s only ${fmt(Math.abs(i.z))}× our margin of error, inside the noise.`;
-  return `${src} the first half at ${fmt(line)}; our number is ${fmt(i.bvLine)}. The line is ${fmt(Math.abs(i.gap))} points ${dir}${noise}`;
+  const size =
+    i.gap >= STRONG_GAP_PTS
+      ? ` Gaps this big are the top ~10% of a season — historically the strongest under spots, about ${fmt(BACKTEST_UNDER_PCT)}% under; still close to a coin flip on any single game.`
+      : i.gap >= BET_GAP_PTS
+        ? ` That puts it in the top ~20% of gaps — the group that went under about ${fmt(BACKTEST_UNDER_PCT)}% of the time in the backtest. A small edge, so any single game is still close to a coin flip.`
+        : i.gap >= WATCH_GAP_PTS
+          ? " That is a small lean — below the gap size the backtest says is worth betting."
+          : "";
+  return `${src} the first half at ${fmt(line)}; our number is ${fmt(i.bvLine)}. The line is ${fmt(Math.abs(i.gap))} points ${dir}.${size}`;
 }
 
 // The 1–2 strongest real (non-hypothesis, tier 1–2) drivers on the factor
@@ -138,8 +147,8 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
 
 export function verdictFor(i: VerdictInput): VerdictResult {
   const hasModel = !i.derived && i.underScore !== null && i.bvLine !== null;
-  const gapUnder = (i.gap ?? 0) > 0;
-  const z = i.z ?? 0;
+  const gap = i.gap ?? 0;
+  const gapUnder = gap > 0;
   const pricePos = i.evVerdict === "pos";
   const priceNeg = i.evVerdict === "neg";
 
@@ -187,24 +196,22 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
 
   // --- Model rows -----------------------------------------------------------
-  const clear = gapUnder && z >= BET_Z && i.liveLine !== null;
+  const clear = gap >= BET_GAP_PTS && i.liveLine !== null;
   if (clear && !priceNeg) {
     const confidence: Confidence =
-      z >= 1.5 &&
-      (pricePos || i.evVerdict === "fair") &&
-      i.underScore! >= MODEL_BET_THRESHOLD
+      gap >= STRONG_GAP_PTS && i.underScore! >= MODEL_BET_THRESHOLD
         ? "high"
         : "medium";
     return {
       verdict: "BET",
       confidence,
       headline: pricePos
-        ? "Clear model edge AND a good Hard Rock price — the strongest kind of spot."
-        : "Clear model edge at a fair price.",
+        ? "Model edge in the bettable range AND a good Hard Rock price — the strongest kind of spot."
+        : "Model edge in the bettable range at a fair price.",
       why,
       flags,
       priceEdgeOnly: false,
-      strength: 100 + z * 10 + (i.ev ?? 0) * 100,
+      strength: 100 + gap * 10 + (i.ev ?? 0) * 100,
     };
   }
   if (clear && priceNeg) {
@@ -212,24 +219,36 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       verdict: "WATCH",
       confidence: "medium",
       headline:
-        "Clear model edge, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
+        "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
       why,
       flags,
       priceEdgeOnly: false,
-      strength: 60 + z * 10,
+      strength: 60 + gap * 10,
     };
   }
-  if ((gapUnder && z >= OPPORTUNITY_Z) || pricePos) {
+  if (gap >= BET_GAP_PTS && i.liveLine === null) {
+    return {
+      verdict: "WATCH",
+      confidence: "low",
+      headline:
+        "Model edge vs an ESTIMATED line — no book has posted a first-half total yet. Re-check once a real line is up.",
+      why,
+      flags,
+      priceEdgeOnly: false,
+      strength: 50 + gap * 10,
+    };
+  }
+  if (gap >= WATCH_GAP_PTS || pricePos) {
     return {
       verdict: "WATCH",
       confidence: "low",
       headline: pricePos
         ? "Small model lean plus a good Hard Rock price — worth a look, not a strong case."
-        : "Small model lean — the gap is inside our margin of error.",
+        : "Small model lean — below the gap size the backtest says is worth betting.",
       why,
       flags,
       priceEdgeOnly: false,
-      strength: 30 + z * 10 + (i.ev ?? 0) * 100,
+      strength: 30 + gap * 10 + (i.ev ?? 0) * 100,
     };
   }
   return {
@@ -241,7 +260,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     why,
     flags,
     priceEdgeOnly: false,
-    strength: z,
+    strength: gap,
   };
 }
 

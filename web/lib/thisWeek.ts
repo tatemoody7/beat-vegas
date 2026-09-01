@@ -45,14 +45,24 @@ function envNum(name: string, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export async function getThisWeek(season: number): Promise<ThisWeek> {
+export async function getThisWeek(
+  season: number,
+  requestedWeek?: number,
+): Promise<ThisWeek> {
   const [board, checks, { picks, record, paperRecord }] = await Promise.all([
     getBoard(season),
     getLineCheck(season, "1h"),
     getPicks(season),
   ]);
 
-  const week = board.length ? Math.max(...board.map((b) => b.week)) : null;
+  // Default to the latest scored week; ?week= lets Tate review a past one.
+  const weeks = new Set(board.map((b) => b.week));
+  const week =
+    requestedWeek !== undefined && weeks.has(requestedWeek)
+      ? requestedWeek
+      : board.length
+        ? Math.max(...board.map((b) => b.week))
+        : null;
   const rows = board.filter((b) => b.week === week);
   const checkById = new Map(checks.map((c) => [c.gameId, c]));
   const noModel =

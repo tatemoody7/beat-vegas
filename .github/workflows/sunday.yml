@@ -39,8 +39,30 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
+      - name: Resolve active week
+        id: active
+        run: |
+          read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
+          echo "season=$SEASON" >> "$GITHUB_OUTPUT"
+          echo "week=$WEEK" >> "$GITHUB_OUTPUT"
       - name: Capture full-game openers (multi-book incl. Hard Rock)
         run: python scripts/poll_full_game.py --source oddsapi
+      - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
+        # combined_sec_play / combined_plays are model inputs joined on exact
+        # (season, week, team) — without this row the upcoming week scores with
+        # pace = NaN. Unofficial scrape: a TeamRankings outage must not block
+        # scoring, so this step is non-fatal (the board still posts; pace chips
+        # read "no data").
+        if: steps.active.outputs.week != ''
+        continue-on-error: true
+        run: python scripts/enrich_tempo.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }} --date "$(date -u +%F)"
+      - name: Refresh weather forecasts for the active week (Open-Meteo)
+        # wx_* are model inputs joined on game_id; the forecast API covers the
+        # coming Saturday from Sunday (16-day horizon). Non-fatal for the same
+        # reason as pace.
+        if: steps.active.outputs.week != ''
+        continue-on-error: true
+        run: python scripts/enrich_weather.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }}
       - name: Score + rank the board
         run: python scripts/weekly_update.py
       - name: Post derived 1H lines for the active week
@@ -48,12 +70,11 @@ jobs:
         # rows, then inserts the week's fresh ones). Skips cleanly off-season —
         # the script exits 1 on zero rows, which would redden every dead Sunday.
         run: |
-          read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
-          if [ -z "$WEEK" ]; then
+          if [ -z "${{ steps.active.outputs.week }}" ]; then
             echo "no active week — skipping derived-lines post"
             exit 0
           fi
-          python scripts/post_derived_lines.py --season "$SEASON" --week "$WEEK"
+          python scripts/post_derived_lines.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
       - name: Alert on failure (red run = no capture/scoring happened)
         if: failure()
         run: |

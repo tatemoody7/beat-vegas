@@ -424,9 +424,10 @@ def build_feature_frame(
     # Era flag: post-2023 running-clock rule (leak-free; season known pre-kickoff).
     df["era_post2023"] = (df["season"] >= 2023).astype(float)
 
-    # --- display enrichment: pace (TeamRankings) + weather (Open-Meteo) ----
-    # Joined for the card factor payload, NOT added to FEATURE_COLS (history
-    # has no tempo/weather yet, so they'd be inert as model inputs).
+    # --- pace (TeamRankings) + weather (Open-Meteo): real model inputs -----
+    # combined_sec_play/combined_plays/wx_* are in FEATURE_COLS. In-season the
+    # upcoming week's rows come from enrich_tempo.py / enrich_weather.py
+    # (sunday.yml) — a missing row means NaN inputs, not an error.
     df = _merge_tempo_weather(df)
 
     # --- situational features (schedule-derived; real model inputs) ---

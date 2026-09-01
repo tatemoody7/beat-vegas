@@ -258,7 +258,10 @@ export default async function LedgerPage({
                   >
                     Avg CLV
                   </dt>
-                  <dd>{dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)}</dd>
+                  <dd>
+                    {dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)}{" "}
+                    <span className="text-[var(--text-dim)]">({dq.clv.n})</span>
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt
@@ -267,7 +270,10 @@ export default async function LedgerPage({
                   >
                     % positive
                   </dt>
-                  <dd>{pct(dq.clv.pctPositive)}</dd>
+                  <dd>
+                    {pct(dq.clv.pctPositive)}{" "}
+                    <span className="text-[var(--text-dim)]">({dq.clv.n})</span>
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt
@@ -279,7 +285,10 @@ export default async function LedgerPage({
                   <dd>
                     {dq.clv.avgPricePp == null
                       ? "—"
-                      : `${dq.clv.avgPricePp >= 0 ? "+" : ""}${dq.clv.avgPricePp.toFixed(2)}pp`}
+                      : `${dq.clv.avgPricePp >= 0 ? "+" : ""}${dq.clv.avgPricePp.toFixed(2)}pp`}{" "}
+                    <span className="text-[var(--text-dim)]">
+                      ({dq.clv.nPrice})
+                    </span>
                   </dd>
                 </div>
               </dl>
@@ -296,7 +305,12 @@ export default async function LedgerPage({
                   >
                     ≥ open
                   </dt>
-                  <dd>{pct(dq.timing.pctAtOrBetterThanOpen)}</dd>
+                  <dd>
+                    {pct(dq.timing.pctAtOrBetterThanOpen)}{" "}
+                    <span className="text-[var(--text-dim)]">
+                      ({dq.timing.nOpen})
+                    </span>
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt
@@ -305,7 +319,12 @@ export default async function LedgerPage({
                   >
                     Beat close
                   </dt>
-                  <dd>{pct(dq.timing.pctBeatingClose)}</dd>
+                  <dd>
+                    {pct(dq.timing.pctBeatingClose)}{" "}
+                    <span className="text-[var(--text-dim)]">
+                      ({dq.timing.nClose})
+                    </span>
+                  </dd>
                 </div>
               </dl>
             </div>

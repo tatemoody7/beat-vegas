@@ -30,12 +30,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-xs rounded-xl border border-gray-800 bg-gray-950 p-6"
-      >
-        <h1 className="text-lg font-semibold">Beat Vegas</h1>
-        <p className="mb-4 text-sm text-gray-500">
+      <form onSubmit={submit} className="bv-card w-full max-w-xs p-6">
+        <h1 className="font-[family-name:var(--font-display)] text-lg font-extrabold tracking-tight">
+          <span className="text-[var(--accent)]">BEAT</span>
+          <span className="text-[var(--text)]"> VEGAS</span>
+        </h1>
+        <p className="mb-4 text-sm text-[var(--text-muted)]">
           Enter the password to continue.
         </p>
         <input
@@ -44,14 +44,15 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-gray-100 focus:border-gray-500 focus:outline-none"
+          className="bv-input w-full"
         />
-        {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-4 w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-        >
+        {/* Amber, not red — red is reserved for over outcomes. */}
+        {err && (
+          <p role="alert" className="mt-2 text-sm text-[#e0a44a]">
+            {err}
+          </p>
+        )}
+        <button type="submit" disabled={busy} className="bv-btn mt-4 w-full">
           {busy ? "…" : "Unlock"}
         </button>
       </form>

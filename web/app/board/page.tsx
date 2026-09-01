@@ -1,5 +1,6 @@
 import { getBoard, getSeasons } from "@/lib/board";
 import { resolveSeason } from "@/lib/season";
+import { BET_GAP_PTS } from "@/lib/verdict";
 import OpportunityCard from "@/app/components/OpportunityCard";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
@@ -29,13 +30,12 @@ export default async function BoardPage({
   const derivedBoard =
     rows.length > 0 && rows.every((r) => r.factors.line_kind === "derived_fg");
 
-  // Count of games showing a clear edge (not derived, significant gap).
+  // Games in the bettable band (not derived, gap at/above the validated cutoff).
   const edgeCount = rows.filter(
     (r) =>
       r.factors.line_kind !== "derived_fg" &&
-      r.liveGapZ !== null &&
-      Math.abs(r.liveGapZ) >= 1 &&
-      (r.liveGap ?? 0) > 0,
+      r.liveGap !== null &&
+      r.liveGap >= BET_GAP_PTS,
   ).length;
 
   return (
@@ -60,7 +60,7 @@ export default async function BoardPage({
               <span className="font-mono font-semibold text-[var(--accent)]">
                 {edgeCount}
               </span>{" "}
-              with a clear edge
+              in the bettable band
             </p>
           )}
         </div>
@@ -76,10 +76,7 @@ export default async function BoardPage({
 
       {rows.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No predictions for {season}. Score a slate (
-          <code className="text-[var(--text)]">scripts/weekly_update.py</code>)
-          or point <code className="text-[var(--text)]">DATABASE_URL</code> at a
-          DB that has them.
+          {`Nothing on the board for ${season} yet. It fills in automatically on Sunday afternoon once the week’s opening lines post.`}
         </p>
       ) : (
         <div className="flex flex-col gap-3.5">

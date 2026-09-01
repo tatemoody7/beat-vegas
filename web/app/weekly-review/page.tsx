@@ -1,6 +1,8 @@
 import { getSeasons } from "@/lib/board";
 import { getWeeklyReview } from "@/lib/weeklyReview";
 import { getTrends } from "@/lib/trends";
+import { resolveSeason } from "@/lib/season";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
 
@@ -20,11 +22,7 @@ export default async function WeeklyReviewPage({
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
-  const requested = sp.season ? Number(sp.season) : NaN;
-  const season =
-    Number.isFinite(requested) && seasons.includes(requested)
-      ? requested
-      : (seasons[0] ?? new Date().getFullYear());
+  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const wantWeek = sp.week ? Number(sp.week) : undefined;
 
   const [review, trends] = await Promise.all([
@@ -52,6 +50,8 @@ export default async function WeeklyReviewPage({
           )}
         </div>
       </div>
+
+      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {review.week === null ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
@@ -119,7 +119,7 @@ export default async function WeeklyReviewPage({
           </h2>
           {review.picks.length === 0 ? (
             <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-              You didn&apos;t log any picks for week {review.week}.
+              You didn’t log any picks for week {review.week}.
             </p>
           ) : (
             <div className="bv-table-wrap">
@@ -200,9 +200,7 @@ export default async function WeeklyReviewPage({
       </p>
       {trends.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No factor-ranking run found yet. Run{" "}
-          <code className="text-[var(--text)]">scripts/rank_factors.py</code> to
-          populate candidate trends.
+          No factor ranking has been run yet — this table fills in once one is.
         </p>
       ) : (
         <div className="bv-table-wrap">

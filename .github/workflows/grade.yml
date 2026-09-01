@@ -6,8 +6,9 @@ name: Weekly grading (results + ledger)
 # in CFBD by early Sunday, so hours of GHA cron lag still land Monday US time.
 # grade.py is delete-then-rewrite idempotent — late Sun/Mon games simply grade
 # on the following Monday's run. Off-season every step is a green no-op.
-# Grading-only by design: enrich/scoring runs Sundays (sunday.yml), and a red
-# run here must mean exactly "the ledger is stale".
+# Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
+# ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
+# (sunday.yml). A red run here means "the ledger or PBP factors are stale".
 # No ODDS_API_KEY: grading reads snapshots already in Neon.
 
 on:
@@ -41,10 +42,19 @@ jobs:
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
       - name: Refresh final scores (CFBD)
         run: python scripts/backfill.py --season ${{ steps.season.outputs.season }}
+      - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
+        # fh_team_game feeds the season-to-date FH factors the Sunday scorer
+        # reads; without this the current season never accrues PBP rows. ~20
+        # CFBD calls, upsert by (game_id, off_team), fail-silent per season.
+        run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }}
       - name: Grade market vs model ledger
         run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
       - name: Grade my picks
         run: python scripts/pick.py grade --season ${{ steps.season.outputs.season }}
+      - name: Grade frozen game records
+        run: python scripts/grade_records.py
+      - name: Grade factor credibility ledger (real lines only)
+        run: python scripts/grade_factor_ledger.py
       - name: Alert on failure (red run = the ledger is stale)
         if: failure()
         run: |

@@ -63,6 +63,7 @@ model manual_picks {
   line                    Float?
   price                   Int?
   stake                   Float?
+  is_paper                Boolean?
   book                    String?   @db.VarChar
   placed_at               DateTime? @db.Timestamp(6)
   note                    String?   @db.VarChar

@@ -81,7 +81,7 @@ export default async function LedgerPage({
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
 
-  const { market, model, you, picks } = await getLedger(season);
+  const { market, model, you, paper, picks } = await getLedger(season);
   const dq = await getDecisionQuality(season);
 
   return (
@@ -100,7 +100,9 @@ export default async function LedgerPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div
+        className={`grid grid-cols-1 gap-3 ${paper ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+      >
         <LedgerCard
           title="Market"
           rec={market}
@@ -112,6 +114,9 @@ export default async function LedgerPage({
           emptyHint="Fills in once the week is scored and settled."
         />
         <LedgerCard title="You" rec={you} emptyHint="Log bets in My Picks." />
+        {paper && (
+          <LedgerCard title="You — paper (no money)" rec={paper} emptyHint="" />
+        )}
       </div>
 
       <h2 className="mb-2 mt-7 text-sm font-semibold text-[var(--text)]">
@@ -149,6 +154,14 @@ export default async function LedgerPage({
                   </td>
                   <td className="text-[var(--text-muted)]">
                     {p.line !== null ? `under ${p.line}` : "—"}
+                    {p.isPaper && (
+                      <span
+                        className="bv-fac-badge bv-fac-badge-amber ml-1"
+                        title="Paper pick — nothing at risk; kept out of the You card."
+                      >
+                        PAPER
+                      </span>
+                    )}
                   </td>
                   <td className="text-[var(--text-dim)]">{p.price ?? "—"}</td>
                   <td>

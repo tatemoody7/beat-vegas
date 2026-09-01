@@ -5,6 +5,16 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-01 (week-1 audit, PRs #23-#26):** landing page `/` is the plain-English
+  **This Week** verdict page (BET / WATCH / PASS + why + bankroll strip,
+  `web/lib/verdict.ts`); the ranked board moved to `/board`. Betting rules live in
+  `docs/BETTING_POLICY.md` ($100 roll, $10 flat units, ≤5 bets/wk, 1H unders only).
+  **Gates are in POINTS from the validated top-20%-by-gap rule (≥1.75 pts) — never
+  σ:** `bv_sigma` ≈ 12 pts is per-game outcome noise, so a 1σ gap never occurs.
+  Paper picks (`manual_picks.is_paper`, stake forced 0) sit apart from the real
+  ledger. Sunday job now refreshes pace/weather before scoring; Monday job refreshes
+  1H PBP and grades `game_records` + the factor ledger. The model cannot score
+  weeks 1–2 (needs 2 games/team) — by design.
 - **What ships today:** decision-support for **full-game + 1H unders on Hard Rock Bet** (the only FL book). The model number is a reference chip, not a pick gate; the edge is *measured* via CLV, not promised (full-game backtest found no edge on the thin 2023-25 regime).
 - **2026-07-17 (review closed):** the pre-season readiness review is fully worked
   off — blockers (PR #16), 13 should-fixes (PR #17), and the remainder (S8 strict

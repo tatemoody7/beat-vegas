@@ -17,7 +17,7 @@ export default async function PicksPage({
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
 
-  const [slate, { picks, record }] = await Promise.all([
+  const [slate, { picks, record, paperRecord }] = await Promise.all([
     getSlate(season),
     getPicks(season),
   ]);
@@ -80,6 +80,15 @@ export default async function PicksPage({
           <p className="text-xs text-[var(--text-dim)]">
             No settled picks yet — log some below; results fill in after the
             games finish.
+          </p>
+        )}
+        {paperRecord && (
+          <p
+            className="mt-3 text-xs text-[var(--text-muted)]"
+            title="Paper picks are tracked with nothing at risk and kept out of the record above."
+          >
+            <span className="bv-fac-badge bv-fac-badge-amber mr-1">PAPER</span>
+            {`${paperRecord.record} · ${paperRecord.hit} under · avg line value ${paperRecord.clv}`}
           </p>
         )}
       </div>

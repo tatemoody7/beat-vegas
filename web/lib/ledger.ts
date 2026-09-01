@@ -22,12 +22,14 @@ export type PickRow = {
   units: number | null;
   clv: number | null;
   graded: boolean;
+  isPaper: boolean;
 };
 
 export type Ledger = {
   market: Record3 | null;
   model: Record3 | null;
-  you: Record3 | null;
+  you: Record3 | null; // real-money picks only
+  paper: Record3 | null; // paper picks (stake 0) — never merged into "you"
   picks: PickRow[];
 };
 
@@ -71,6 +73,7 @@ type RawPick = {
   price: number | bigint | null;
   away_team: string | null;
   home_team: string | null;
+  is_paper: number | boolean | null;
 };
 
 // results store under_hit as a bool, so a push looks like a loss there —
@@ -99,24 +102,25 @@ export async function getLedger(season: number): Promise<Ledger> {
     WHERE g.season = ${season}
   `;
   const mine = await prisma.$queryRaw<RawPick[]>`
-    SELECT graded, result, units, clv, week, line, price, away_team, home_team
+    SELECT graded, result, units, clv, week, line, price, away_team, home_team,
+           is_paper
     FROM manual_picks WHERE season = ${season}
   `;
 
   const market = fromResults(res.filter((r) => r.model_version === "market"));
   const model = fromResults(res.filter((r) => r.model_version === "gbm_v1"));
 
+  const fromPicks = (rows: RawPick[]): Record3 | null => {
+    if (rows.length === 0) return null;
+    const wins = rows.filter((p) => p.result === "under").length;
+    const pushes = rows.filter((p) => p.result === "push").length;
+    const unitsSum = rows.reduce((a, p) => a + (p.units ?? 0), 0);
+    const clvs = rows.filter((p) => p.clv !== null).map((p) => p.clv as number);
+    return record(wins, rows.length - pushes, pushes, unitsSum, clvs);
+  };
   const graded = mine.filter((p) => truthy(p.graded));
-  let you: Record3 | null = null;
-  if (graded.length) {
-    const wins = graded.filter((p) => p.result === "under").length;
-    const pushes = graded.filter((p) => p.result === "push").length;
-    const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
-    const clvs = graded
-      .filter((p) => p.clv !== null)
-      .map((p) => p.clv as number);
-    you = record(wins, graded.length - pushes, pushes, unitsSum, clvs);
-  }
+  const you = fromPicks(graded.filter((p) => !truthy(p.is_paper)));
+  const paper = fromPicks(graded.filter((p) => truthy(p.is_paper)));
 
   const picks: PickRow[] = mine.map((p) => ({
     week: p.week === null ? null : Number(p.week),
@@ -128,6 +132,7 @@ export async function getLedger(season: number): Promise<Ledger> {
     units: p.units,
     clv: p.clv,
     graded: truthy(p.graded),
+    isPaper: truthy(p.is_paper),
   }));
   // pending first, then by week
   picks.sort(
@@ -135,5 +140,5 @@ export async function getLedger(season: number): Promise<Ledger> {
       Number(a.graded) - Number(b.graded) || (a.week ?? 0) - (b.week ?? 0),
   );
 
-  return { market, model, you, picks };
+  return { market, model, you, paper, picks };
 }

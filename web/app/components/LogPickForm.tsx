@@ -20,6 +20,9 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
     String(defaultLine(slate[0]?.gameId ?? 0, "1H")),
   );
   const [stake, setStake] = useState("1");
+  // Paper pick: tracked for record + line value with nothing at risk. Off by
+  // default — real money is live; tick it deliberately.
+  const [isPaper, setIsPaper] = useState(false);
   const [price, setPrice] = useState("-110");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,7 +54,8 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           gameId,
           market,
           line: Number(line),
-          stake: Number(stake) || 1,
+          stake: isPaper ? 0 : Number(stake) || 1,
+          isPaper,
           price: Number(price) || -110,
           note,
         }),
@@ -139,14 +143,22 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           />
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className={labelCls} title="1 unit = one standard bet.">
+          <label
+            className={labelCls}
+            title={
+              isPaper
+                ? "Paper pick — nothing at risk, stake is recorded as 0."
+                : "1 unit = one standard bet."
+            }
+          >
             Stake (units)
             <input
               type="number"
               step={0.5}
-              value={stake}
+              value={isPaper ? "0" : stake}
+              disabled={isPaper}
               onChange={(e) => setStake(e.target.value)}
-              className={field}
+              className={`${field} disabled:opacity-50`}
             />
           </label>
           <label className={labelCls} title="The odds / price (e.g. −110).">
@@ -194,6 +206,21 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
           </div>
         )}
 
+        <label
+          className="flex items-center gap-2 text-xs text-[var(--text-muted)] sm:col-span-2"
+          title="Track this pick for record and line value without betting it. Paper picks are kept in a separate record and never count toward your real units."
+        >
+          <input
+            type="checkbox"
+            checked={isPaper}
+            onChange={(e) => setIsPaper(e.target.checked)}
+          />
+          Paper pick (no money on it)
+          {isPaper && (
+            <span className="bv-fac-badge bv-fac-badge-amber">PAPER</span>
+          )}
+        </label>
+
         <label className={`${labelCls} sm:col-span-2`}>
           Reason / note (why you took it — for later review)
           <input
@@ -213,7 +240,7 @@ export default function LogPickForm({ slate }: { slate: SlateOption[] }) {
       )}
 
       <button type="submit" disabled={busy} className="bv-btn mt-4">
-        {busy ? "Logging…" : "Log pick"}
+        {busy ? "Logging…" : isPaper ? "Log paper pick" : "Log pick"}
       </button>
     </form>
   );

@@ -23,6 +23,7 @@ export type ReviewPick = {
   result: string | null; // under/over/push/pending
   units: number | null;
   clv: number | null;
+  isPaper: boolean;
 };
 
 export type WeeklyReview = {
@@ -59,6 +60,8 @@ type ResRow = {
   units: number | null;
   clv: number | null;
   week: number | bigint | null;
+  actual_first_half_total: number | null;
+  line_used: number | null;
 };
 type PickRow = {
   market: string | null;
@@ -70,14 +73,24 @@ type PickRow = {
   home_team: string | null;
   line: number | null;
   graded: number | boolean | null;
+  is_paper: number | boolean | null;
 };
 
+// Mirrors ledger.ts::fromResults: under_hit is a bool, so recover pushes from
+// actual == line, and drop NULL under_hit (never graded) instead of counting
+// it as a loss.
 function fromResults(rows: ResRow[]): (Record3 & { n: number }) | null {
-  if (rows.length === 0) return null;
-  const wins = rows.filter((r) => truthy(r.under_hit)).length;
-  const unitsSum = rows.reduce((a, r) => a + (r.units ?? 0), 0);
-  const clvs = rows.filter((r) => r.clv !== null).map((r) => r.clv as number);
-  return rec(wins, rows.length, 0, unitsSum, clvs);
+  const isPush = (r: ResRow) =>
+    r.actual_first_half_total !== null &&
+    r.line_used !== null &&
+    Number(r.actual_first_half_total) === Number(r.line_used);
+  const usable = rows.filter((r) => r.under_hit !== null || isPush(r));
+  if (usable.length === 0) return null;
+  const pushes = usable.filter(isPush).length;
+  const wins = usable.filter((r) => truthy(r.under_hit)).length;
+  const unitsSum = usable.reduce((a, r) => a + (r.units ?? 0), 0);
+  const clvs = usable.filter((r) => r.clv !== null).map((r) => r.clv as number);
+  return rec(wins, usable.length - pushes, pushes, unitsSum, clvs);
 }
 
 function fromPicks(rows: PickRow[]): (Record3 & { n: number }) | null {
@@ -94,12 +107,14 @@ export async function getWeeklyReview(
   week?: number,
 ): Promise<WeeklyReview> {
   const res = await prisma.$queryRaw<ResRow[]>`
-    SELECT r.model_version, r.under_hit, r.units, r.clv, g.week
+    SELECT r.model_version, r.under_hit, r.units, r.clv, g.week,
+           r.actual_first_half_total, r.line_used
     FROM results r JOIN games g ON g.id = r.game_id
     WHERE g.season = ${season}
   `;
   const mine = await prisma.$queryRaw<PickRow[]>`
-    SELECT market, result, units, clv, week, away_team, home_team, line, graded
+    SELECT market, result, units, clv, week, away_team, home_team, line, graded,
+           is_paper
     FROM manual_picks WHERE season = ${season}
   `;
 
@@ -115,8 +130,10 @@ export async function getWeeklyReview(
 
   const r = res.filter((x) => Number(x.week) === wk);
   const isFull = (m: string | null) => m === "full";
+  // "You" = real-money picks only; paper picks (stake 0) stay out of the
+  // scorecard so they can't flatter the record.
   const gradedMine = mine.filter(
-    (p) => truthy(p.graded) && Number(p.week) === wk,
+    (p) => truthy(p.graded) && !truthy(p.is_paper) && Number(p.week) === wk,
   );
 
   const lines: ReviewLine[] = [
@@ -158,6 +175,7 @@ export async function getWeeklyReview(
       result: truthy(p.graded) ? p.result : "pending",
       units: p.units,
       clv: p.clv,
+      isPaper: truthy(p.is_paper),
     }));
 
   return { week: wk, weeks, lines, picks };

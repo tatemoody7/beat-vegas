@@ -241,6 +241,9 @@ class ManualPick(Base):
     line = Column(Float)  # the total you bet (1H or full-game per `market`)
     price = Column(Integer, default=-110)
     stake = Column(Float, default=1.0)
+    # Paper pick: tracked for record/CLV with nothing at risk (stake forced to
+    # 0 so units math self-protects even where a consumer forgets to filter).
+    is_paper = Column(Boolean, default=False)
     book = Column(String)
     placed_at = Column(DateTime)
     note = Column(String)  # your reason — for later review

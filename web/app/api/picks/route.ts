@@ -35,9 +35,14 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // Paper pick: nothing at risk. Stake is forced to 0 server-side (never
+  // trust the client's number) so the season's units math can't be polluted.
+  const isPaper = b.isPaper === true;
   // stake/price: one NaN here would poison the whole season's units math.
   let stake: number | undefined;
-  if (b.stake !== undefined) {
+  if (isPaper) {
+    stake = 0;
+  } else if (b.stake !== undefined) {
     stake = Number(b.stake);
     if (b.stake === null || !Number.isFinite(stake) || stake <= 0) {
       return NextResponse.json(
@@ -95,6 +100,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await createPick({ gameId, market, line, stake, price, note });
+  await createPick({ gameId, market, line, stake, price, note, isPaper });
   return NextResponse.json({ ok: true }, { status: 201 });
 }

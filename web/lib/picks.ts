@@ -34,6 +34,7 @@ export type PickFull = {
   units: number | null;
   clv: number | null;
   graded: boolean;
+  isPaper: boolean; // tracked with nothing at risk (stake 0)
 };
 
 // Current week's scored games (max week present in the season's predictions).
@@ -80,14 +81,38 @@ type RawPick = {
   units: number | null;
   clv: number | null;
   graded: number | boolean | null;
+  is_paper: number | boolean | null;
 };
 
-export async function getPicks(
-  season: number,
-): Promise<{ picks: PickFull[]; record: Record3 | null }> {
+// Running record over graded picks (mirrors ledger _record).
+export function recordFromPicks(
+  graded: Pick<PickFull, "result" | "units" | "clv">[],
+): Record3 | null {
+  if (graded.length === 0) return null;
+  const wins = graded.filter((p) => p.result === "under").length;
+  const pushes = graded.filter((p) => p.result === "push").length;
+  const decided = graded.length - pushes;
+  const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
+  const clvs = graded.filter((p) => p.clv !== null).map((p) => p.clv as number);
+  return {
+    record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
+    hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
+    units: signed(unitsSum),
+    clv: clvs.length
+      ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
+      : "—",
+  };
+}
+
+export async function getPicks(season: number): Promise<{
+  picks: PickFull[];
+  record: Record3 | null; // real-money picks only
+  paperRecord: Record3 | null; // paper picks, kept apart so they never flatter the real ledger
+}> {
   const rows = await prisma.$queryRaw<RawPick[]>`
     SELECT id, week, away_team, home_team, market, line, stake, price, note,
-           model_score_at_pick, model_line_at_pick, result, units, clv, graded
+           model_score_at_pick, model_line_at_pick, result, units, clv, graded,
+           is_paper
     FROM manual_picks WHERE season = ${season}
   `;
 
@@ -108,31 +133,15 @@ export async function getPicks(
     units: r.units,
     clv: r.clv,
     graded: truthy(r.graded),
+    isPaper: truthy(r.is_paper),
   }));
   // pending first, then newest (highest id) first within each group
   picks.sort((a, b) => Number(a.graded) - Number(b.graded) || b.id - a.id);
 
-  // Running "You" record over graded picks (mirrors ledger _record).
   const graded = picks.filter((p) => p.graded);
-  let record: Record3 | null = null;
-  if (graded.length) {
-    const wins = graded.filter((p) => p.result === "under").length;
-    const pushes = graded.filter((p) => p.result === "push").length;
-    const decided = graded.length - pushes;
-    const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
-    const clvs = graded
-      .filter((p) => p.clv !== null)
-      .map((p) => p.clv as number);
-    record = {
-      record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
-      hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
-      units: signed(unitsSum),
-      clv: clvs.length
-        ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
-        : "—",
-    };
-  }
-  return { picks, record };
+  const record = recordFromPicks(graded.filter((p) => !p.isPaper));
+  const paperRecord = recordFromPicks(graded.filter((p) => p.isPaper));
+  return { picks, record, paperRecord };
 }
 
 export type CreatePickInput = {
@@ -142,6 +151,7 @@ export type CreatePickInput = {
   stake?: number;
   price?: number;
   note?: string;
+  isPaper?: boolean; // caller (the API route) forces stake 0 when true
 };
 
 // Insert a ManualPick, freezing the model's current score+line onto it.
@@ -174,22 +184,23 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   const modelLine = pred[0]?.line_used ?? null;
   const factorsAtPick = pred[0]?.factors_json ?? null;
 
-  const stake = input.stake ?? 1.0;
+  const isPaper = input.isPaper === true;
+  const stake = isPaper ? 0 : (input.stake ?? 1.0);
   const price = input.price ?? -110;
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();
 
-  // Postgres is strict: cast the ISO string to a timestamp and use a real
-  // boolean for `graded` (SQLite tolerated a text date + integer 0; Neon/PG won't).
+  // Postgres is strict: cast the ISO string to a timestamp and use real
+  // booleans (SQLite tolerated a text date + integer 0; Neon/PG won't).
   await prisma.$executeRaw`
     INSERT INTO manual_picks
       (game_id, season, week, home_team, away_team, side, market, line, price,
-       stake, placed_at, note, model_score_at_pick, model_line_at_pick,
+       stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
        factors_json_at_pick, graded)
     VALUES
       (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
        ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
-       ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+       ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
        ${factorsAtPick}, false)
   `;
 }

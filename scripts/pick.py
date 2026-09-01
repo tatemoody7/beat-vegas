@@ -92,6 +92,9 @@ def cmd_add(args) -> None:
                 )
                 return
 
+        # Paper pick: stake forced to 0 so units math stays clean; CLV/result
+        # still grade normally.
+        stake = 0.0 if args.paper else args.stake
         pick = ManualPick(
             game_id=gid,
             season=season,
@@ -102,7 +105,8 @@ def cmd_add(args) -> None:
             market=market,
             line=args.line,
             price=args.price,
-            stake=args.stake,
+            stake=stake,
+            is_paper=bool(args.paper),
             book=args.book,
             placed_at=datetime.utcnow(),
             note=args.note,
@@ -111,9 +115,10 @@ def cmd_add(args) -> None:
         s.add(pick)
         s.flush()
         print(
-            f"logged pick #{pick.id}: {market} UNDER {args.line} ({args.price}) "
-            f"{pick.away_team} @ {pick.home_team} [{season} wk{pick.week}] "
-            f"stake={args.stake}u" + (f" (game {gid})" if gid else " (UNMATCHED)")
+            f"logged {'PAPER ' if args.paper else ''}pick #{pick.id}: {market} UNDER "
+            f"{args.line} ({args.price}) {pick.away_team} @ {pick.home_team} "
+            f"[{season} wk{pick.week}] stake={stake}u"
+            + (f" (game {gid})" if gid else " (UNMATCHED)")
         )
 
 
@@ -128,8 +133,9 @@ def cmd_list(args) -> None:
             return
         for p in rows:
             status = f"{p.result} ({p.units:+.2f}u, CLV {p.clv:+.1f})" if p.graded else "pending"
+            tag = "[PAPER] " if p.is_paper else ""
             print(
-                f"#{p.id} [{p.season} wk{p.week}] UNDER {p.line} {p.price} "
+                f"#{p.id} {tag}[{p.season} wk{p.week}] UNDER {p.line} {p.price} "
                 f"{p.away_team} @ {p.home_team} stake={p.stake}u -> {status}"
             )
 
@@ -207,21 +213,29 @@ def cmd_summary(args) -> None:
         if not rows:
             print("no graded picks yet")
             return
-        n = len(rows)
-        wins = sum(1 for p in rows if p.result == "under")
-        pushes = sum(1 for p in rows if p.result == "push")
-        units = sum(p.units for p in rows)
-        staked = sum(p.stake for p in rows)
-        clvs = [p.clv for p in rows if p.clv is not None]
-        decided = n - pushes
-        hit = f"{100 * wins / decided:.1f}%" if decided else "n/a"
-        roi = f"{100 * units / staked:+.1f}%" if staked else "n/a"
-        print(
-            f"YOUR RECORD: {wins}-{decided - wins}"
-            + (f"-{pushes}P" if pushes else "")
-            + f"  hit={hit}  units={units:+.2f}  ROI={roi}"
-            + (f"  avg CLV={sum(clvs) / len(clvs):+.2f}" if clvs else "")
-        )
+        # Real and paper picks are separate records: paper has no stake, so its
+        # ROI is meaningless and its wins must not flatter the real ledger.
+        for label, subset in (
+            ("YOUR RECORD", [p for p in rows if not p.is_paper]),
+            ("PAPER RECORD", [p for p in rows if p.is_paper]),
+        ):
+            if not subset:
+                continue
+            n = len(subset)
+            wins = sum(1 for p in subset if p.result == "under")
+            pushes = sum(1 for p in subset if p.result == "push")
+            units = sum(p.units for p in subset)
+            staked = sum(p.stake for p in subset)
+            clvs = [p.clv for p in subset if p.clv is not None]
+            decided = n - pushes
+            hit = f"{100 * wins / decided:.1f}%" if decided else "n/a"
+            roi = f"{100 * units / staked:+.1f}%" if staked else "n/a"
+            print(
+                f"{label}: {wins}-{decided - wins}"
+                + (f"-{pushes}P" if pushes else "")
+                + f"  hit={hit}  units={units:+.2f}  ROI={roi}"
+                + (f"  avg CLV={sum(clvs) / len(clvs):+.2f}" if clvs else "")
+            )
 
 
 def main() -> None:
@@ -244,6 +258,11 @@ def main() -> None:
         choices=("1h", "full"),
         default="1h",
         help="which total the bet is on: 1h (default) or full game",
+    )
+    a.add_argument(
+        "--paper",
+        action="store_true",
+        help="paper pick: tracked for record + CLV with nothing at risk (stake forced to 0)",
     )
     a.add_argument(
         "--force",

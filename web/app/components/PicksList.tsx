@@ -60,6 +60,14 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
               </td>
               <td className="text-[var(--text-muted)]">
                 {p.market === "full" ? "Full game" : "1H"}
+                {p.isPaper && (
+                  <span
+                    className="bv-fac-badge bv-fac-badge-amber ml-1"
+                    title="Paper pick — nothing at risk; kept out of your real record."
+                  >
+                    PAPER
+                  </span>
+                )}
               </td>
               <td className="text-[var(--text-muted)]">
                 {p.line !== null ? `under ${p.line}` : "—"}

@@ -38,6 +38,7 @@ _MIGRATIONS = {
         "opening_line": "FLOAT",
         "market": "VARCHAR",
         "clv_prob": "FLOAT",
+        "is_paper": "BOOLEAN",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},

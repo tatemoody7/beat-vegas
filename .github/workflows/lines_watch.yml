@@ -11,10 +11,11 @@ name: Hard Rock line watch (push alerts)
 # CREDIT BUDGET (free tier = 500/mo), worst case in-season (4.35 wk/mo,
 # 2 credits per per-event 1H call = totals_h1 x us,us2; 2 per bulk FG poll):
 #   - Sunday opener window: 16 polls x 2               ~= 139/mo
-#   - sunday.yml double-fire: 2 x 2                    ~=  17/mo
+#   - sunday.yml double-fire: 2 x 3 (us,us2,us_ex —     ~=  26/mo
+#     no-vig exchanges as a price-comparison source)
 #   - Friday sweep: --max-events 18 -> <=36/run        ~= 157/mo
 #   - Sat closes: 2 runs x --max-events 10 -> <=40/wk  ~= 174/mo
-#   Total ~= 487/mo worst case; real usage runs far lower (most runs poll
+#   Total ~= 496/mo worst case; real usage runs far lower (most runs poll
 #   fewer events than the cap). poll_lines.py's --credit-floor (default 60)
 #   additionally stops any sweep that would eat the Sunday reserve, and pushes
 #   a warning. Off-season the per-event polls cost 0 (no events in window).

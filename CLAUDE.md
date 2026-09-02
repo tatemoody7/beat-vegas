@@ -14,7 +14,12 @@ Research only — it never places bets or automates gambling.
   Paper picks (`manual_picks.is_paper`, stake forced 0) sit apart from the real
   ledger. Sunday job now refreshes pace/weather before scoring; Monday job refreshes
   1H PBP and grades `game_records` + the factor ledger. The model cannot score
-  weeks 1–2 (needs 2 games/team) — by design.
+  weeks 1–2 (needs 2 games/team) — by design. **Florida platforms (verified
+  2026-09-01):** Hard Rock Bet is still the only sportsbook; "FanDuel in Florida"
+  = FanDuel Predicts (CFTC prediction market), not a sportsbook. Exchanges
+  (Kalshi/Novig/ProphetX/BetOpenly, Odds API `us_ex`) are captured on the Sunday
+  full-game poll only as a no-vig PRICE-COMPARISON source (`web/lib/books.ts`
+  `EXCHANGE_KEYS`) — never bet there (no 1H totals). See `docs/BETTING_POLICY.md`.
 - **What ships today:** decision-support for **full-game + 1H unders on Hard Rock Bet** (the only FL book). The model number is a reference chip, not a pick gate; the edge is *measured* via CLV, not promised (full-game backtest found no edge on the thin 2023-25 regime).
 - **2026-07-17 (review closed):** the pre-season readiness review is fully worked
   off — blockers (PR #16), 13 should-fixes (PR #17), and the remainder (S8 strict

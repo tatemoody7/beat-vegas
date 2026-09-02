@@ -46,6 +46,10 @@ const TERMS: { term: string; body: string }[] = [
     body: "The odds you are paid (e.g. −110). Taking every book’s two-way prices and removing the vig gives the market’s fair price. If Hard Rock pays better than that, the price is +EV (good); worse means you are paying extra vig.",
   },
   {
+    term: "Prediction market / exchange",
+    body: "Apps like Kalshi, Polymarket and FanDuel Predicts where you trade contracts against other people instead of a bookmaker, so prices carry almost no vig. Legal in Florida, but they don’t offer first-half totals — so we never bet there. Their full-game prices feed the market fair price that Hard Rock is judged against.",
+  },
+  {
     term: "Line value (CLV)",
     body: "Closing-line value: did the line move your way after you bet? For an under, the total going down after you bet is good. Positive line value over many bets is the earliest sign of a real edge — it shows up long before win rate does.",
   },

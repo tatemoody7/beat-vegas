@@ -37,6 +37,11 @@
   for record and CLV but kept out of the real-money ledger.
 - **Unit** — one standard bet. 2026: **$10 flat**, every bet, on a $100 roll (see
   `BETTING_POLICY.md` for the acknowledged risk).
+- **Prediction market / exchange** — a CFTC-regulated venue (Kalshi, Polymarket,
+  FanDuel Predicts, Novig, ProphetX) where you trade event contracts against
+  other people instead of a bookmaker, so prices carry ~no vig. Legal in
+  Florida; no first-half totals, so we never bet there — we use their prices
+  (Odds API region `us_ex`, Sunday capture) to sharpen the market fair price.
 - **Market-blind (rule)** — the BV regressor is forbidden from training on any Vegas
   number (full-game total, 1H line). Enforced by a guard test; keeps the gap from
   being circular. (The 0–100 classifier is allowed to be market-relative — different job.)

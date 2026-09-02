@@ -1,3 +1,4 @@
+import { isExchange } from "@/lib/books";
 import { devigTwoWay, evUnder } from "@/lib/devig";
 import { prisma } from "@/lib/prisma";
 
@@ -21,6 +22,7 @@ export type BookLine = {
   book: string;
   line: number;
   isHR: boolean;
+  isExchange: boolean; // no-vig CFTC exchange (comparison only, never bet)
   underPrice: number | null;
   fairUnder: number | null; // no-vig fair under prob from this book's two sides
 };
@@ -149,6 +151,7 @@ export async function getLineCheck(
       book,
       line: v.line,
       isHR: HR_KEYS.includes(book),
+      isExchange: isExchange(book),
       underPrice: v.underPrice,
       fairUnder: fairUnderOf(v),
     }));

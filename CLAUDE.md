@@ -128,8 +128,11 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
 - Features must stay **leak-free** (only pre-kickoff info; season-to-date shifted).
 - Numeric model columns must be clean floats (NaN, never `pd.NA`/None/bool) — see
   `features.build_feature_frame` coercion; `bool(NaN)` is `True` (bit us on dome).
-- ESPN/TeamRankings/**DraftKings** are **unofficial** — keep isolated in `sources/`,
-  fail-silent. DK's hidden API returns **403 without browser-like headers** (set in
+- ESPN/TeamRankings/**DraftKings**/**Rotowire** are **unofficial** — keep isolated in
+  `sources/`, fail-silent. **ESPN: use host `site.web.api.espn.com`** — `site.api.espn.com`
+  is Akamai-403 from every network we run on (Mac, GHA, fetchers), and ESPN publishes
+  **no college injuries** on any endpoint (core API returns 0 for every FBS team).
+  Injuries come from `sources/rotowire.py` (one JSON call for the whole slate). DK's hidden API returns **403 without browser-like headers** (set in
   `draftkings.py::_HEADERS`); the host, operator key (`dkusoh`) and league id (`87637`)
   drift — if capture goes empty mid-season, re-discover the `leagues/{id}` XHR in
   DevTools. Schema is `events`/`markets`/`selections` (the old `eventgroups` endpoint

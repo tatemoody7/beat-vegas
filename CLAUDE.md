@@ -127,7 +127,10 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   is dead). The default payload carries only main full-game markets (1H totals post
   later via a subcategory query), which is exactly the Sunday opener we want.
 - **Neon is UNREACHABLE from the campus/fgcu network** (port 5432 TLS data filtered;
-  HTTPS/443 works). So **Neon-writing scheduled jobs run in GitHub Actions**
+  HTTPS/443 works — and so does **Neon's HTTPS SQL endpoint**: `POST https://<pooler-host>/sql`
+  with header `Neon-Connection-String: $DATABASE_URL` and body `{"query": "..."}` returns
+  rows as JSON from campus in <1s. Use it for ad-hoc reads/small writes when 5432 is blocked;
+  the SQLAlchemy scripts still need GHA). So **Neon-writing scheduled jobs run in GitHub Actions**
   (`.github/workflows/sunday.yml` cron + `bootstrap.yml` one-time), not local launchd.
   **DK's API 403s GHA datacenter IPs** (confirmed), so the cloud job uses
   `poll_full_game --source auto` → **CFBD /lines fallback** (`sources/cfbd_lines.py`,
@@ -137,6 +140,24 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   `deploy/com.beatvegas.sunday-notify.plist`). Secrets `DATABASE_URL`/`CFBD_API_KEY`/
   `ODDS_API_KEY` are set as GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
+- **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
+  scheduled runs; `research_preview` 10h late; no GitHub incident posted). Anything that must
+  happen at a time is DISPATCHED from the Mac (`gh workflow run <wf> -f market=1h`, then poll
+  `gh run list --limit 1`) — the Friday card task does this itself. Cron stays as a backup.
+- **Friday 1H sweep is RANKED before the credit cap** (`beatvegas/sweep.py`): close spread
+  (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
+  first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never
+  reached the evening games the card wants.
+- **ESPN: send NO custom headers.** Akamai 403s a bare spoofed UA (`Mozilla/5.0`, or a Chrome UA
+  without client hints); requests' default UA is served. The spoof blanked every preview until
+  2026-09-02. `research_preview.py` now exits 3 when the team list is empty instead of writing
+  455 blank rows. ESPN's CFB `/injuries` feed is usually EMPTY (no official CFB injury reports)
+  — the QB-out flag is real but rare; check starters by hand before betting.
+- **TeamRankings → CFBD mapping is exact-first** (`teamrankings.map_to_cfbd`). `name_score`
+  scores a prefix school as a perfect match ("Kansas St" → Kansas AND Kansas State at 1.0) and
+  the old first-scanned tie-break dropped 26 FBS teams/season and stored Ole Miss's tempo under
+  Mississippi State (2023-25). Same exact-first rule in `espn.best_team_id`. Any new
+  TeamRankings abbreviation goes in `_ALIASES` with the CFBD spelling from the `teams` table.
 - `config.yaml` (keys + phone) and `data/*.db|*.log|cache/|pbp_cache/` are gitignored —
   keep it that way (`pbp_cache/` holds 56MB parquet files per season).
 - **Neon id-sequence**: rows seeded from SQLite carry explicit ids without advancing

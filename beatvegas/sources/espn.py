@@ -3,6 +3,11 @@
 DISPLAY CONTEXT ONLY — never a model feature. The API is unofficial (can change
 without notice) and CFB injury reporting is unreliable, so every call fails silent
 (returns empty) rather than raising. Results are cached by the dashboard.
+
+Request headers: send NONE. ESPN's Akamai edge returns 403 "Access Denied" for a
+bare spoofed browser UA ("Mozilla/5.0" — and for a full Chrome UA without the
+matching client-hint headers), while requests' default UA is served normally.
+The spoof silently blanked every week-1 preview (0 of 455 games had news).
 """
 
 from __future__ import annotations
@@ -13,17 +18,21 @@ from typing import Dict, List, Optional
 import requests
 
 from ..config import REPO_ROOT
-from ..etl.match import name_score
+from ..etl.match import _norm, name_score
 
-_UA = {"User-Agent": "Mozilla/5.0"}
 _SITE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
 _CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football"
 _CACHE = REPO_ROOT / "data" / "cache"
 
+# Per-process memo of the team list. An empty result is memoised too: a blocked
+# /teams call must cost ONE request per run, not one per game per side (the
+# week-1 preview made 1,820 doomed calls because only success was cached).
+_TEAM_MEMO: Optional[List[dict]] = None
+
 
 def _get(url: str, params: Optional[dict] = None, timeout: int = 12):
     try:
-        r = requests.get(url, params=params or {}, headers=_UA, timeout=timeout)
+        r = requests.get(url, params=params or {}, timeout=timeout)
         if r.status_code == 200:
             return r.json()
     except requests.RequestException:
@@ -31,11 +40,20 @@ def _get(url: str, params: Optional[dict] = None, timeout: int = 12):
     return None
 
 
+def _reset_team_memo() -> None:
+    global _TEAM_MEMO
+    _TEAM_MEMO = None
+
+
 def _teams() -> List[dict]:
     """Cached ESPN team list (id, location, displayName)."""
+    global _TEAM_MEMO
+    if _TEAM_MEMO is not None:
+        return _TEAM_MEMO
     fp = _CACHE / "espn_teams.json"
     if fp.exists():
-        return json.loads(fp.read_text())
+        _TEAM_MEMO = json.loads(fp.read_text())
+        return _TEAM_MEMO
     data = _get(f"{_SITE}/teams", {"limit": 1000})
     out = []
     if data:
@@ -54,16 +72,35 @@ def _teams() -> List[dict]:
     if out:
         _CACHE.mkdir(parents=True, exist_ok=True)
         fp.write_text(json.dumps(out))
+    _TEAM_MEMO = out
     return out
 
 
-def espn_team_id(school: str, min_score: float = 0.8) -> Optional[str]:
-    best, best_s = None, 0.0
-    for t in _teams():
-        s = max(name_score(school, t["location"]), name_score(school, t["displayName"]))
-        if s > best_s:
-            best, best_s = t["id"], s
+def teams_available() -> bool:
+    """False when the ESPN team list is empty (blocked or down) — callers that
+    write per-game rows should refuse rather than persist blanks."""
+    return bool(_teams())
+
+
+def best_team_id(school: str, teams: List[dict], min_score: float = 0.8) -> Optional[str]:
+    """ESPN id for a CFBD school. Exact match on `location` first; fuzzy only as
+    a fallback, with ties going to the longer location so a prefix school
+    ("Miami") never claims "Miami (OH)"."""
+    key = _norm(school)
+    for t in teams:
+        if _norm(t.get("location", "")) == key:
+            return t["id"]
+    best, best_s, best_len = None, 0.0, -1
+    for t in teams:
+        loc = t.get("location", "")
+        s = max(name_score(school, loc), name_score(school, t.get("displayName", "")))
+        if s > best_s or (s == best_s and len(loc) > best_len):
+            best, best_s, best_len = t["id"], s, len(loc)
     return best if best_s >= min_score else None
+
+
+def espn_team_id(school: str, min_score: float = 0.8) -> Optional[str]:
+    return best_team_id(school, _teams(), min_score=min_score)
 
 
 def team_news(espn_id: str, limit: int = 4) -> List[str]:

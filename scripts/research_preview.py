@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime
 
 from beatvegas.db.models import Game, GamePreview
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.season import current_season
-from beatvegas.sources.espn import game_context, qb_out_flags
+from beatvegas.sources.espn import game_context, qb_out_flags, teams_available
 
 
 def _upcoming_week(s, season: int) -> int:
@@ -37,6 +38,15 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument("--week", type=int, default=None, help="default: the upcoming week")
     args = ap.parse_args()
+
+    # ESPN blocked or down => every game would be written as a blank preview
+    # and the QB-out gate would read 'clear' for the whole slate. Go red instead.
+    if not teams_available():
+        print(
+            "[espn] FATAL: ESPN team list is empty (HTTP block or outage) — refusing "
+            "to write blank previews. Fix the source, then re-run."
+        )
+        sys.exit(3)
 
     if not try_init_db():
         return

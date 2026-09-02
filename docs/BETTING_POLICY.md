@@ -84,7 +84,7 @@ bet many small edges rather than one big one. It is not a gate.
 | Sunday ~1–2pm    | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 10am–1:45pm  | Hard Rock opener push alerts (every 15 min)             | `lines_watch.yml`   |
 | Tue / Fri 9am    | ESPN news + injuries → Week Preview                     | `research_preview.yml` |
-| Friday 1pm       | First-half line sweep (max 18 events, credit-guarded)   | `lines_watch.yml`   |
+| Friday 1pm       | First-half line sweep (18 events, ranked by bettability, credit-guarded); cron is unreliable, so the Friday card re-dispatches it | `lines_watch.yml` / card task |
 | Friday evening   | **Bet card**: This Week page reviewed, picks logged, text sent | Tate + Claude   |
 | Sat 10:30am, 6pm | Closing 1H lines captured (for CLV)                     | `lines_watch.yml`   |
 | Monday 8am       | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |

@@ -117,6 +117,8 @@ def main() -> None:
         "mae_delta_pbp": round(delta, 3),
         "overfit": overfit,
         "promote": bool(promote),
+        "fbs_only": bool(args.fbs_only),
+        "n_games": int(len(df)),
     }
     with session_scope() as s:
         s.add(
@@ -125,7 +127,10 @@ def main() -> None:
                 train_window=f"{sorted(df['season'].unique())[0]}-{sorted(df['season'].unique())[-1]}",
                 test_window=f"{args.first_test_season}+",
                 metrics_json=json.dumps(metrics),
-                notes="predict-total engine validation",
+                notes=(
+                    "predict-total engine validation "
+                    f"({'FBS-vs-FBS only' if args.fbs_only else 'all divisions'})"
+                ),
                 created_at=datetime.utcnow(),
             )
         )

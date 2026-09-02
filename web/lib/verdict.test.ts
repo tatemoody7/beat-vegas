@@ -199,6 +199,25 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.why[3]).toBe("Both offenses play fast — works against the under.");
   });
 
+  it("does not double the '— helps the under' tail the board already words", () => {
+    const v = verdictFor({
+      ...base,
+      factorBoard: [
+        factor({ sentence: "Combined PPA allowed 0.15 — helps the under." }),
+        factor({
+          key: "pace",
+          lean: -0.9,
+          color: "red",
+          sentence: "Both 1H offenses average 30.8 pts — hurts the under.",
+        }),
+      ],
+    });
+    expect(v.why[2]).toBe("Combined PPA allowed 0.15 — helps the under.");
+    expect(v.why[3]).toBe(
+      "Both 1H offenses average 30.8 pts — works against the under.",
+    );
+  });
+
   it("surfaces QB-out and manual adjustments as flags, not silently", () => {
     const v = verdictFor({
       ...base,

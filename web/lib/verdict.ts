@@ -189,7 +189,16 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
   return usable.slice(0, 2).map((f) => {
     const tail =
       f.color === "green" ? "helps the under." : "works against the under.";
-    const s = f.sentence.trim().replace(/[.]+$/, "");
+    // board.py already words most sentences "<fact> — helps the under."; strip
+    // that tail so we never render "— helps the under — helps the under."
+    const s = f.sentence
+      .trim()
+      .replace(/[.]+$/, "")
+      .replace(
+        /\s+[—–-]+\s+(helps|hurts|works against|is neutral for)\b[^—–]*$/i,
+        "",
+      )
+      .trim();
     return `${s} — ${tail}`;
   });
 }

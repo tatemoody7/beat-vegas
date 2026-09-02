@@ -25,10 +25,10 @@ Research only — it never places bets or automates gambling.
   off — blockers (PR #16), 13 should-fixes (PR #17), and the remainder (S8 strict
   pick matching, S15 postseason capture, S16 multiplier margin gate — fitted curve
   REVERTED to flat 0.52, S17-S19, S21-S22, nits). Accepted as-is: GHA cron lag
-  (S20), sunday.yml DST double-fire (N12), ntfy alt path (N13), plaintext local
-  keys (N14), no login rate limit (store-less). Odds API totals rows carry no
+  (S20), sunday.yml DST double-fire (N12), plaintext local keys (N14), no login
+  rate limit (store-less); N13 is moot since the push-notification layer was removed 2026-09-02. Odds API totals rows carry no
   spread by design (spreads market would double credits).
-- **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); Pushover push alerts; web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: set Pushover config + GH secrets, `odds_api.regions: "us,us2"`.
+- **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: GH secrets set, `odds_api.regions: "us,us2"`. (The phone push-notification layer shipped here was removed 2026-09-02 — failure alerts are GitHub's failed-run email + the routines.)
 - **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
 - **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).
 - **2026-09-02 (FBS-only training):** the `games` table holds every CFBD game incl.
@@ -58,14 +58,16 @@ TeamRankings tempo, Open-Meteo weather, The Odds API 1H totals), derives ground-
 1H points, builds leak-free features (incl. **1H-specific PBP factors**: EPA/success/
 explosive/opening-drive/havoc/redzone/4th-down), predicts each game's 1H total with a
 market-blind regressor, ranks the board by line-vs-prediction **gap** (the mispricing
-signal), tracks line movement, sends iMessage alerts, and grades market vs model vs
+signal), tracks line movement, and grades market vs model vs
 the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`).
 
 ## Architecture
-- **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade → push,
+- **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade,
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
-  `grade.yml`, `research_preview.yml`; Pushover on failure). Nothing is scheduled on
-  the Mac; two Claude routines (Friday card, Sunday ops/recap) re-dispatch dropped crons.
+  `grade.yml`, `research_preview.yml`). No notification code: GitHub emails failed
+  runs; the routines re-dispatch and text. Nothing is scheduled on the Mac; three
+  Claude routines (Friday card, Sunday ops/recap, Monday coaching) check each workflow
+  and re-dispatch dropped crons.
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
@@ -83,7 +85,7 @@ pytest -q                            # run `pytest -q` / `cd web && npx vitest r
 Inside a **git worktree** run tests as `PYTHONPATH=. python -m pytest -q` — the venv's
 editable install points at the main checkout, so a bare `pytest` imports the wrong tree.
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
-(score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
+(score), `poll_lines.py` (1H lines), `grade.py`, `pick.py`, `line_study.py`,
 `retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py`, `seed_demo.py`.
 **Pivot scripts**: `backfill_pbp.py` (1H PBP aggregates → `fh_team_game`),
 `backfill_context.py` (venue/talent/roster), `rank_factors.py` (factor ranking →
@@ -165,7 +167,7 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   DK only works from the Mac, which can't write Neon). Local jobs degrade gracefully via
   `store.try_init_db` (logs "unreachable", exits 0). The Sunday ops routine (`cfb-sunday-ops`)
   reads `GET /api/health` over HTTPS to confirm capture. Secrets `DATABASE_URL`/`CFBD_API_KEY`/
-  `ODDS_API_KEY`/`PUSHOVER_TOKEN`/`PUSHOVER_USER` are set as GH secrets. Pushing `.github/workflows/` needs the gh
+  `ODDS_API_KEY` are the only GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
   scheduled runs; `research_preview` 10h late; no GitHub incident posted). Anything that must

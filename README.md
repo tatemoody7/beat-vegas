@@ -3,8 +3,7 @@
 Research & analysis system for **college football full-game + first-half (1H)
 unders**, built around **Hard Rock Bet** (the only book bettable from Florida).
 It pulls the week's slate + news, captures Hard Rock vs the rest of the market,
-pushes a phone alert the moment lines drop, logs your bets, and reviews each week
-(market vs model vs you, with CLV). Decision-support — you pick the games.
+logs your bets, and reviews each week (market vs model vs you, with CLV). Decision-support — you pick the games.
 
 > **Research / decision-support only.** This project never places bets and never
 > automates any gambling activity. It exists to inform your own decisions.
@@ -57,7 +56,7 @@ python scripts/backfill.py --season 2026                 # schedule + finals
 python scripts/enrich_tempo.py --season 2026 --week 5    # TeamRankings pace
 python scripts/enrich_weather.py --season 2026 --week 5  # Open-Meteo weather
 python scripts/poll_full_game.py --source oddsapi        # full-game openers (prod source)
-python scripts/poll_lines.py --no-alerts                 # 1H totals + movement
+python scripts/poll_lines.py                             # 1H totals + movement
 python scripts/weekly_update.py                          # score + rank the board
 python scripts/grade.py --season 2026                    # grade unders vs real close + CLV
 python scripts/backtest.py                               # the proxy-graded edge gate
@@ -90,15 +89,14 @@ never eaten. The schedule below is sized to stay under 500/month worst case.
 ## How it runs
 
 Nothing runs on the Mac on a schedule. The engine runs in **GitHub Actions**
-(`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY` /
-`PUSHOVER_*`) because the campus network cannot reach Neon:5432; every workflow
-sends a **Pushover** push on failure. GitHub cron is best-effort (it drops most
-single-slot runs), so each job has retry slots and two Claude routines re-dispatch
-anything that is missing.
+(`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY`)
+because the campus network cannot reach Neon:5432. Failures: GitHub emails every
+failed run, and the Claude routines below check each workflow before they need it.
+GitHub cron is best-effort (it drops most single-slot runs), so each job has retry
+slots and the routines re-dispatch anything that is missing.
 
 | When (ET)                          | Workflow / routine     | What                                                                 |
 | ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
-| Sun 10:00am–1:45pm, every 15 min   | `lines_watch.yml`      | Hard Rock full-game opener capture; push the moment a line appears  |
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
 | Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
 | Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |

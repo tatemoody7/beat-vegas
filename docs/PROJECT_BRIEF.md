@@ -16,7 +16,7 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   The Odds API (live 1H totals).
 - Derives **actual 1H points** for every game, builds **leak-free** pre-kickoff
   features, and a model scores each upcoming game **0–100** for under value.
-- Tracks **line movement**, learns when 1H totals post, and **alerts via iMessage**.
+- Tracks **line movement** and learns when 1H totals post.
 - Grades **market vs model vs my own picks** with units + CLV, and a "Line Study"
   ranks which opening line numbers cash unders most.
 
@@ -43,17 +43,18 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 
 ## Architecture (plain English)
 - The **engine** (Python) runs in **GitHub Actions** on a weekly rhythm: Sunday
-  opener capture + pace/weather + scoring, Friday/Saturday first-half line sweeps
-  with phone push alerts, Monday grading, Tue/Fri news + injuries. Nothing runs on
-  the Mac on a schedule; the campus network cannot reach the database anyway.
+  opener capture + pace/weather + scoring, Friday/Saturday first-half line sweeps,
+  Monday grading, Tue/Fri news + injuries. Nothing runs on the Mac on a schedule;
+  the campus network cannot reach the database anyway. Failed runs are reported by
+  GitHub's email and re-checked by the Claude routines.
 - Data lives in **Neon Postgres** (SQLite only for local dev/backtests).
 - The product is the **Next.js web app on Vercel** (writable, password-protected,
   viewable from any device). Two Claude routines text Tate: the Friday bet card and
   the Sunday ops/recap.
 
 ## Status & roadmap
-- **Done:** data pipeline, backtest, 0–100 scoring, line tracking + Pushover push
-  alerts, free enrichments, historical pace/weather backfill, private GitHub repo,
+- **Done:** data pipeline, backtest, 0–100 scoring, line tracking, free
+  enrichments, historical pace/weather backfill, private GitHub repo,
   Neon Postgres, GitHub Actions running the weekly engine.
 - **Done:** Next.js app live on Vercel backed by Neon Postgres, password gate
   (the old Streamlit dashboard was removed).

@@ -148,7 +148,11 @@ def _rows_for_market(
     Each row: event_id, commence_time, home_team, away_team, book, line,
     over_price, under_price, last_update."""
     book_filter = set(books) if books else None
-    rows: List[Dict[str, Any]] = []
+    # Keyed by (event, book): with several regions requested the API can list
+    # the same bookmaker key twice for one event, and two rows sharing
+    # (game_id, book, market, captured_at) violate uq_odds_snapshot on insert.
+    # Keep the freshest quote (latest last_update).
+    by_key: Dict[tuple, Dict[str, Any]] = {}
     for ev in events:
         for bm in ev.get("bookmakers", []):
             if book_filter and bm.get("key") not in book_filter:
@@ -165,20 +169,22 @@ def _rows_for_market(
                         under_price, line = oc.get("price"), oc.get("point")
                 if line is None:
                     continue
-                rows.append(
-                    {
-                        "event_id": ev.get("id"),
-                        "commence_time": ev.get("commence_time"),
-                        "home_team": ev.get("home_team"),
-                        "away_team": ev.get("away_team"),
-                        "book": bm.get("key"),
-                        "line": float(line),
-                        "over_price": over_price,
-                        "under_price": under_price,
-                        "last_update": mkt.get("last_update") or bm.get("last_update"),
-                    }
-                )
-    return rows
+                row = {
+                    "event_id": ev.get("id"),
+                    "commence_time": ev.get("commence_time"),
+                    "home_team": ev.get("home_team"),
+                    "away_team": ev.get("away_team"),
+                    "book": bm.get("key"),
+                    "line": float(line),
+                    "over_price": over_price,
+                    "under_price": under_price,
+                    "last_update": mkt.get("last_update") or bm.get("last_update"),
+                }
+                key = (row["event_id"], row["book"])
+                prev = by_key.get(key)
+                if prev is None or (row["last_update"] or "") >= (prev["last_update"] or ""):
+                    by_key[key] = row
+    return list(by_key.values())
 
 
 def normalize_first_half(

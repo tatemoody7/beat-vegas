@@ -163,6 +163,47 @@ def test_oddsapi_normalize_full_game_multibook_incl_hardrock():
     assert all(r["event_id"] == "evt1" for r in rows)
 
 
+def test_oddsapi_normalize_dedupes_book_listed_twice():
+    """Requesting several regions (us,us2,us_ex) can list one bookmaker key twice
+    for an event; two rows sharing (game, book, market, captured_at) violate
+    uq_odds_snapshot on insert (live Sunday failure 2026-09-02). Keep the
+    freshest quote."""
+    from beatvegas.sources.odds import normalize_full_game
+
+    def bm(key, point, last_update):
+        return {
+            "key": key,
+            "markets": [
+                {
+                    "key": "totals",
+                    "last_update": last_update,
+                    "outcomes": [
+                        {"name": "Over", "price": -110, "point": point},
+                        {"name": "Under", "price": -110, "point": point},
+                    ],
+                }
+            ],
+        }
+
+    events = [
+        {
+            "id": "evt1",
+            "commence_time": "2026-09-05T20:00:00Z",
+            "home_team": "Ohio State",
+            "away_team": "Ball State",
+            "bookmakers": [
+                bm("fanduel", 61.5, "2026-09-02T01:30:00Z"),
+                bm("kalshi", 61.5, "2026-09-02T01:35:00Z"),
+                bm("fanduel", 62.0, "2026-09-02T01:35:00Z"),  # same key again, fresher
+            ],
+        }
+    ]
+    rows = normalize_full_game(events)
+    books = [r["book"] for r in rows]
+    assert sorted(books) == ["fanduel", "kalshi"]
+    assert next(r for r in rows if r["book"] == "fanduel")["line"] == 62.0
+
+
 def test_full_game_opener_consensus_with_spread():
     _full_game_opener = _load("weekly_update")._full_game_opener
 

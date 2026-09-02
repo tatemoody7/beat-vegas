@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime
 
 from beatvegas.db.models import Game, GamePreview, Team
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.season import current_season
 from beatvegas.sources import rotowire
-from beatvegas.sources.espn import espn_team_id, team_news
+from beatvegas.sources.espn import espn_team_id, team_news, teams_available
 
 
 def _upcoming_week(s, season: int) -> int:
@@ -44,19 +45,28 @@ def main() -> None:
     ap.add_argument("--week", type=int, default=None, help="default: the upcoming week")
     args = ap.parse_args()
 
+    # Sources first, DB second: if BOTH are empty every row would be a blank
+    # preview and the QB-out gate would read "clear" for the whole slate — go red
+    # instead of writing it. One empty source is a loud warning, not a stop.
+    report = rotowire.fetch_injury_report()  # one call for the whole slate
+    espn_ok = teams_available()
+    if not report:
+        print("[rotowire] WARNING: injury report empty/unreachable — injuries will be blank")
+    if not espn_ok:
+        print("[espn] WARNING: team list empty (blocked or down) — news will be blank")
+    if not report and not espn_ok:
+        print("[espn] FATAL: both sources empty — refusing to write a blank slate. Fix, re-run.")
+        sys.exit(3)
+
     if not try_init_db():
         return
 
     now = datetime.utcnow()
     n = with_news = with_inj = qb_outs = 0
 
-    # One report for the whole slate, grouped by our school names.
-    report = rotowire.fetch_injury_report()
     with session_scope() as s:
         schools = [t[0] for t in s.query(Team.school).distinct().all()]
     inj_by_school = rotowire.by_school(report, schools)
-    if not report:
-        print("[rotowire] WARNING: injury report empty/unreachable — injuries will be blank")
 
     news_cache: dict = {}
 

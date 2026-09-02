@@ -16,7 +16,18 @@ export type TrendRow = {
   n: number | null;
 };
 
+// factor_scores is written by scripts/rank_factors.py and is NOT in the Prisma
+// schema — degrade to "no ranking yet" when the table is absent.
 export async function getTrends(limit = 8): Promise<TrendRow[]> {
+  try {
+    return await getTrendsUnsafe(limit);
+  } catch (e) {
+    console.warn("factor_scores unavailable:", (e as Error)?.message ?? e);
+    return [];
+  }
+}
+
+async function getTrendsUnsafe(limit: number): Promise<TrendRow[]> {
   const rows = await prisma.$queryRaw<
     {
       factor: string | null;

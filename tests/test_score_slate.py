@@ -91,6 +91,8 @@ def test_score_slate_scores_the_unplayed_target_week(monkeypatch):
     for col in ("bv_line", "bv_gap", "under_score", "under_prob", "line", "rank"):
         assert pd.notna(r[col]), col
     assert r["line_kind"] == "proxy"
+    assert "is_opportunity" not in out.columns  # sigma gate removed (point gates in verdict)
+    assert "is_opportunity" not in score_mod._factors(r, float(r["line"]))
 
     train = seen["train"]
     assert train["under"].notna().all()

@@ -1,27 +1,34 @@
 import { getBoard, type BoardRow } from "@/lib/board";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
-import { getPicks, type PickFull } from "@/lib/picks";
-import type { Record3 } from "@/lib/ledger";
+import { getPicks, isRealFirstHalf, type PickFull } from "@/lib/picks";
+import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
+import type { Record3 } from "@/lib/record";
 import { verdictFor, WEEKLY_BET_CAP, type VerdictResult } from "@/lib/verdict";
+import { defaultWeek, weeksOf } from "@/lib/week";
 
-// "This Week" data layer: composes the board, the Hard Rock price check and
-// the pick ledger into one verdict per game plus a bankroll strip. Reads only.
+// "This Week" data layer: composes the board, the Hard Rock price check, the
+// injury/news preview and the pick ledger into one verdict per game plus a
+// bankroll strip. Reads only.
 
 export type ThisWeekGame = {
   row: BoardRow;
   check: LineCheckRow | null;
   verdict: VerdictResult;
-  /** A real-money pick already logged on this game/1H this season. */
+  /** Injuries + news for the game (unofficial), when the preview job has run. */
+  preview: PreviewGame | null;
+  /** A real-money 1H pick already logged on this game this season. */
   picked: boolean;
+  /** Kickoff has passed (no more bets). */
+  kickedOff: boolean;
 };
 
 export type Bankroll = {
   startUsd: number;
   unitUsd: number;
-  /** Signed units from graded real-money picks this season. */
+  /** Signed units from graded real-money 1H picks this season. */
   realUnits: number;
   currentUsd: number;
-  /** Real-money picks logged for the displayed week (pending or graded). */
+  /** Real-money 1H picks logged for the displayed week (pending or graded). */
   weekBets: number;
   cap: number;
   real: Record3 | null;
@@ -31,6 +38,8 @@ export type Bankroll = {
 export type ThisWeek = {
   season: number;
   week: number | null;
+  /** Weeks that have games on the board (for the week selector). */
+  weeks: number[];
   /** Every row is a derived reference line — the model has no read this week. */
   noModel: boolean;
   games: ThisWeekGame[];
@@ -48,6 +57,7 @@ function envNum(name: string, fallback: number): number {
 export async function getThisWeek(
   season: number,
   requestedWeek?: number,
+  now: Date = new Date(),
 ): Promise<ThisWeek> {
   const [board, checks, { picks, record, paperRecord }] = await Promise.all([
     getBoard(season),
@@ -55,15 +65,18 @@ export async function getThisWeek(
     getPicks(season),
   ]);
 
-  // Default to the latest scored week; ?week= lets Tate review a past one.
-  const weeks = new Set(board.map((b) => b.week));
+  // Default to the week you are about to bet (earliest week with a game still
+  // to kick off — lib/week.ts); ?week= lets Tate review a past one.
+  const weeks = weeksOf(board);
   const week =
-    requestedWeek !== undefined && weeks.has(requestedWeek)
+    requestedWeek !== undefined && weeks.includes(requestedWeek)
       ? requestedWeek
-      : board.length
-        ? Math.max(...board.map((b) => b.week))
-        : null;
+      : defaultWeek(board, now);
   const rows = board.filter((b) => b.week === week);
+  const previews =
+    week === null
+      ? new Map<number, PreviewGame>()
+      : await getPreviewByGame(season, week);
   const checkById = new Map(checks.map((c) => [c.gameId, c]));
   const noModel =
     rows.length > 0 &&
@@ -71,13 +84,11 @@ export async function getThisWeek(
       (r) => r.factors.line_kind === "derived_fg" || r.underScore === null,
     );
 
-  const realPicks = picks.filter((p) => !p.isPaper);
-  // PickFull carries team names, not game ids — match on the matchup.
-  const pickedKey = new Set(
-    realPicks
-      .filter((p) => p.market === "1H")
-      .map((p) => `${p.away}@${p.home}`),
-  );
+  // Only real-money FIRST-HALF picks count toward the record, the bankroll and
+  // the weekly cap (full game is context, paper is tracked apart).
+  const real1H = picks.filter(isRealFirstHalf);
+  const pickedGames = new Set(real1H.map((p) => p.gameId));
+  const pickedKey = new Set(real1H.map((p) => `${p.away}@${p.home}`));
 
   const games: ThisWeekGame[] = rows.map((row) => {
     const check = checkById.get(row.gameId) ?? null;
@@ -95,17 +106,22 @@ export async function getThisWeek(
       hrUnderPrice: check?.hrUnderPrice ?? null,
       ev: check?.ev ?? null,
       evVerdict: check?.evVerdict ?? "na",
+      fhShare: row.factors.fh_share ?? null,
       qbOut: Boolean(row.factors.qb_out_home || row.factors.qb_out_away),
       qbOutDetail: row.factors.qb_out_detail ?? null,
       bvAdjust: row.bvAdjust,
       bvAdjustReason: row.bvAdjustReason,
       factorBoard: row.factors.factor_board,
     });
+    const start = row.startDate ? new Date(row.startDate).getTime() : NaN;
     return {
       row,
       check,
       verdict,
-      picked: pickedKey.has(`${row.away}@${row.home}`),
+      preview: previews.get(row.gameId) ?? null,
+      picked:
+        pickedGames.has(row.gameId) || pickedKey.has(`${row.away}@${row.home}`),
+      kickedOff: Number.isFinite(start) && start <= now.getTime(),
     };
   });
 
@@ -125,7 +141,7 @@ export async function getThisWeek(
 
   const startUsd = envNum("BANKROLL_USD", 100);
   const unitUsd = envNum("UNIT_USD", 10);
-  const realUnits = realPicks
+  const realUnits = real1H
     .filter((p: PickFull) => p.graded)
     .reduce((a, p) => a + (p.units ?? 0), 0);
   const bankroll: Bankroll = {
@@ -133,11 +149,11 @@ export async function getThisWeek(
     unitUsd,
     realUnits,
     currentUsd: Math.round((startUsd + realUnits * unitUsd) * 100) / 100,
-    weekBets: realPicks.filter((p) => p.week === week).length,
+    weekBets: real1H.filter((p) => p.week === week).length,
     cap: WEEKLY_BET_CAP,
     real: record,
     paper: paperRecord,
   };
 
-  return { season, week, noModel, games, counts, bankroll };
+  return { season, week, weeks, noModel, games, counts, bankroll };
 }

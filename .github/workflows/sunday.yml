@@ -17,6 +17,10 @@ on:
     # the opener push that lines_watch exists to send.
     - cron: '0 18 * * 0'
     - cron: '0 19 * * 0'
+    # Third slot: GitHub cron is best-effort (17 of 19 scheduled runs were
+    # dropped Aug 28-30 2026). Costs 3 credits when it fires; the local
+    # Sunday backstop task also re-kicks this workflow if none ran today.
+    - cron: '30 20 * * 0'
   workflow_dispatch: {}
 
 concurrency:

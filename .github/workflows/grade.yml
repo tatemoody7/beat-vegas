@@ -13,8 +13,12 @@ name: Weekly grading (results + ledger)
 
 on:
   schedule:
-    # 12:00 UTC Monday = 8am EDT / 7am EST.
+    # 12:00 UTC Monday = 8am EDT / 7am EST. GitHub cron is best-effort (it
+    # dropped 17 of 19 scheduled runs Aug 28-30 2026), so two retries follow;
+    # grading is delete-then-rewrite idempotent and spends no API credits.
     - cron: '0 12 * * 1'
+    - cron: '0 14 * * 1'
+    - cron: '0 17 * * 1'
   workflow_dispatch: {}
 
 concurrency:

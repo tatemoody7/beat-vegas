@@ -53,7 +53,6 @@ export type VerdictInput = {
   fallbackLine: number | null;
   /** Consensus gap (liveLine − bvLine), or the gap stored at scoring time. */
   gap: number | null;
-  z: number | null;
   /** Hard Rock price check (lib/lineCheck.ts). */
   hrLine: number | null;
   hrUnderPrice: number | null;
@@ -219,7 +218,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   const flags: string[] = [];
   if (i.qbOut) {
     flags.push(
-      `QB OUT (live ESPN, unofficial): ${i.qbOutDetail ?? "a starting quarterback is listed out"}. The model’s number does not know this — re-check before betting.`,
+      `QB OUT (live Rotowire, unofficial): ${i.qbOutDetail ?? "a starting quarterback is listed out"}. The model’s number does not know this — re-check before betting.`,
     );
   }
   if (i.bvAdjust !== null && i.bvAdjust !== 0) {

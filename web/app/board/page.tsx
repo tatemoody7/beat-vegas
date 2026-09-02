@@ -76,7 +76,7 @@ export default async function BoardPage({
             </p>
           )}
         </div>
-        <div className="bv-toolbar flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <SortSelect current={sort} />
           {weeks.length > 0 && week !== null && (
             <WeekSelect weeks={weeks} current={week} />

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 // Moved: this view now lives at /board (nav consolidation). Bookmarks still work.
+// `?game=` is dropped on purpose: /board has no per-game target (movement is an
+// expandable row on each card), so only season/week carry over.
 export default async function Moved({
   searchParams,
 }: {

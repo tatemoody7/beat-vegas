@@ -1,0 +1,54 @@
+name: CI
+
+# Pull-request / main gate: the web app's unit tests, lint and type-check, and
+# the Python engine's ruff + unit tests. No secrets and no database: the Python
+# tests that need Postgres are marked `integration` (deselected here) or skip
+# themselves when the local pg_sim sandbox is unavailable (tests/conftest.py).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Unit tests (vitest)
+        run: npx vitest run
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npx tsc --noEmit
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        # ruff is a project dependency (requirements.txt), so no separate install.
+        run: pip install -e .
+      - name: Lint (ruff)
+        run: python -m ruff check .
+      - name: Unit tests (pytest, no DB)
+        run: python -m pytest -q -m "not integration"

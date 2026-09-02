@@ -13,16 +13,6 @@ export const fmt = (n: number | null | undefined, dp = 1): string =>
 export const pct = (v: number | null | undefined, dp = 1): string =>
   v === null || v === undefined ? "—" : `${v.toFixed(dp)}%`;
 
-/** Percent string from a 0–1 fraction: "54.0%". */
-export const pctOfFraction = (v: number | null | undefined, dp = 1): string =>
-  v === null || v === undefined ? "—" : `${(100 * v).toFixed(dp)}%`;
-
-/** Signed percent from a 0–1 fraction: "+1.2%". */
-export const signedPctOfFraction = (
-  v: number | null | undefined,
-  dp = 1,
-): string => (v === null || v === undefined ? "—" : `${signed(100 * v, dp)}%`);
-
 /** American odds: "+105" / "-110". */
 export const american = (p: number): string => (p > 0 ? `+${p}` : `${p}`);
 

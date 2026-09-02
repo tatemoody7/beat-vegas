@@ -1,89 +1,15 @@
-import { getSeasons } from "@/lib/board";
-import { getMovement, getMovementGames } from "@/lib/movement";
-import SeasonSelect from "@/app/components/SeasonSelect";
-import GameSelect from "@/app/components/GameSelect";
-import MovementChart from "@/app/components/MovementChart";
-import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
-import { bookLabel } from "@/lib/books";
-import { resolveSeason } from "@/lib/season";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function MovementPage({
+// Moved: this view now lives at /board (nav consolidation). Bookmarks still work.
+export default async function Moved({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; game?: string }>;
+  searchParams: Promise<{ season?: string; week?: string }>;
 }) {
-  const seasons = await getSeasons();
   const sp = await searchParams;
-  const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
-
-  const games = await getMovementGames(season);
-  const requestedGame = sp.game ? Number(sp.game) : NaN;
-  const selected =
-    Number.isFinite(requestedGame) && games.some((g) => g.id === requestedGame)
-      ? requestedGame
-      : (games[0]?.id ?? null);
-
-  const movement = selected !== null ? await getMovement(selected) : null;
-
-  return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="bv-page-title">Line Movement</h1>
-          <p className="bv-page-sub">
-            First-half line at each sportsbook over time — {season}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {games.length > 0 && selected !== null && (
-            <GameSelect games={games} current={selected} />
-          )}
-          {seasons.length > 0 && (
-            <SeasonSelect seasons={seasons} current={season} />
-          )}
-        </div>
-      </div>
-
-      <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
-
-      {!movement || movement.points.length === 0 ? (
-        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          {/* One template literal — Next 16 dev can collapse the space after a
-              JSX expression ("2025yet"). */}
-          {`Nothing to chart for ${season} yet — a movement chart appears once a game's line has been checked more than once.`}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-5">
-          <MovementChart points={movement.points} books={movement.books} />
-
-          <div className="bv-table-wrap">
-            <table className="bv-table">
-              <thead>
-                <tr>
-                  <th>When checked (ET)</th>
-                  <th>Sportsbook</th>
-                  <th>Line</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movement.rows.map((r, i) => (
-                  <tr key={i}>
-                    <td className="text-[var(--text-muted)]">
-                      {r.captured_at}
-                    </td>
-                    <td className="text-[var(--text-muted)]">
-                      {bookLabel(r.book)}
-                    </td>
-                    <td className="font-mono text-[var(--text)]">{r.line}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const q = new URLSearchParams();
+  if (sp.season) q.set("season", sp.season);
+  if (sp.week) q.set("week", sp.week);
+  const qs = q.toString();
+  redirect(`/board${qs ? `?${qs}` : ""}`);
 }

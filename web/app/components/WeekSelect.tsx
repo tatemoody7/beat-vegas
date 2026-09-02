@@ -2,12 +2,15 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+// ?week= selector. `allowAll` adds an "All weeks" option (value "all").
 export default function WeekSelect({
   weeks,
   current,
+  allowAll = false,
 }: {
   weeks: number[];
-  current: number;
+  current: number | "all";
+  allowAll?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -22,7 +25,8 @@ export default function WeekSelect({
   return (
     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
       Week
-      <select value={current} onChange={onChange} className="bv-select">
+      <select value={String(current)} onChange={onChange} className="bv-select">
+        {allowAll && <option value="all">All weeks</option>}
         {weeks.map((w) => (
           <option key={w} value={w}>
             {w}

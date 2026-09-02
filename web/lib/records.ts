@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { MODEL_VERSION } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 
 // Our own season records (plan Phase 1): one row per game, model-aligned —
@@ -35,7 +36,7 @@ function outcome(fh: number | null, line: number | null): RecordRow["outcome"] {
 }
 
 export async function getRecordSeasons(): Promise<number[]> {
-  // Seasons with content THIS GRID can show: a played game or a gbm_v1 row
+  // Seasons with content THIS GRID can show: a played game or a model row
   // (the grid's own JOIN below). Display-only derived_lines predictions must
   // NOT qualify — 8 June reference lines made prod default to 888 all-NULL
   // 2026 rows.
@@ -43,7 +44,7 @@ export async function getRecordSeasons(): Promise<number[]> {
     SELECT DISTINCT g.season FROM games g
     WHERE g.first_half_total IS NOT NULL
        OR EXISTS (SELECT 1 FROM predictions p
-                  WHERE p.game_id = g.id AND p.model_version = 'gbm_v1')
+                  WHERE p.game_id = g.id AND p.model_version = ${MODEL_VERSION})
     ORDER BY g.season DESC
   `;
   return rows.map((r) => Number(r.season));
@@ -72,7 +73,7 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
            p.under_score, p.rank
     FROM games g
     LEFT JOIN predictions p
-      ON p.game_id = g.id AND p.model_version = 'gbm_v1'
+      ON p.game_id = g.id AND p.model_version = ${MODEL_VERSION}
     WHERE g.season = ${season}
     ORDER BY g.week, p.rank NULLS LAST, g.id
   `;

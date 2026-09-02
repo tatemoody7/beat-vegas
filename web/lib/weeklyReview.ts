@@ -1,182 +1,176 @@
-import { prisma } from "@/lib/prisma";
-import type { Record3 } from "@/lib/ledger";
+import { loadResults, recordFromResults } from "@/lib/ledger";
+import { MARKET_LEDGER_1H, MARKET_LEDGER_FG, MODEL_VERSION } from "@/lib/model";
+import {
+  isPaperFirstHalf,
+  isRealFirstHalf,
+  loadPicks,
+  type PickFull,
+} from "@/lib/picks";
+import { recordFrom, type Record3 } from "@/lib/record";
+import type { PickReason } from "@/lib/verdict";
 
-// Post-week review: how the MARKET, the MODEL, and YOU did — split by market
-// (full game vs first half) — with win%, units, and CLV, for a chosen week.
+// Results data: how the MARKET, the MODEL and YOU did — for one week (the
+// scorecard), week by week, and by the reason each pick was logged.
 //   Market 1H   = results.model_version='market'
 //   Market full = results.model_version='market_fg'
-//   Model 1H    = results.model_version='gbm_v1' (no full-game model — reference app)
-//   You         = graded manual_picks, split by manual_picks.market
+//   Model 1H    = results.model_version=MODEL_VERSION (no full-game model)
+//   You         = graded manual_picks (real 1H vs paper 1H; full game shown as context)
 
 export type ReviewLine = {
-  entity: "Market" | "Model" | "You";
+  entity: "Market" | "Model" | "You" | "You (paper)";
   market: "Full game" | "First half";
-  rec: (Record3 & { n: number }) | null;
+  rec: Record3 | null;
 };
 
-export type ReviewPick = {
-  week: number | null;
-  market: string;
-  away: string | null;
-  home: string | null;
-  line: number | null;
-  result: string | null; // under/over/push/pending
-  units: number | null;
-  clv: number | null;
-  isPaper: boolean;
+export type WeekRow = {
+  week: number;
+  real: Record3 | null;
+  paper: Record3 | null;
+  /** Real-money 1H picks logged that week (pending included). */
+  realBets: number;
+  paperBets: number;
+};
+
+export type ReasonRow = {
+  reason: PickReason | "untagged";
+  real: Record3 | null;
+  paper: Record3 | null;
+  realBets: number;
+  paperBets: number;
 };
 
 export type WeeklyReview = {
+  /** The week shown in the scorecard; null when nothing is graded yet. */
   week: number | null;
+  /** Weeks with a graded result or a logged pick. */
   weeks: number[];
   lines: ReviewLine[];
-  picks: ReviewPick[];
+  byWeek: WeekRow[];
+  byReason: ReasonRow[];
+  /** Picks for the selected week (or all, when week is "all"). */
+  picks: PickFull[];
 };
 
-const signed = (n: number, dp = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
-const truthy = (v: unknown) => v === true || Number(v) === 1;
+export const REASON_LABEL: Record<ReasonRow["reason"], string> = {
+  model_gap: "Model gap (Hard Rock's number 1.75+ above ours)",
+  price_edge: "Price edge only (no model read)",
+  manual: "Your own call",
+  untagged: "Logged before tracking (no reason stored)",
+};
 
-function rec(
-  wins: number,
-  decided: number,
-  pushes: number,
-  unitsSum: number,
-  clvs: number[],
-): Record3 & { n: number } {
-  return {
-    n: decided + pushes,
-    record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
-    hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
-    units: signed(unitsSum),
-    clv: clvs.length
-      ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
-      : "—",
-  };
+const graded = (ps: PickFull[]) => ps.filter((p) => p.graded);
+
+/** Pure: week-by-week table over every pick. */
+export function weekRows(picks: PickFull[]): WeekRow[] {
+  const weeks = [
+    ...new Set(picks.map((p) => p.week).filter((w): w is number => w !== null)),
+  ].sort((a, b) => a - b);
+  return weeks.map((week) => {
+    const wk = picks.filter((p) => p.week === week);
+    return {
+      week,
+      real: recordFrom(graded(wk).filter(isRealFirstHalf)),
+      paper: recordFrom(graded(wk).filter(isPaperFirstHalf)),
+      realBets: wk.filter(isRealFirstHalf).length,
+      paperBets: wk.filter(isPaperFirstHalf).length,
+    };
+  });
 }
 
-type ResRow = {
-  model_version: string | null;
-  under_hit: number | boolean | null;
-  units: number | null;
-  clv: number | null;
-  week: number | bigint | null;
-  actual_first_half_total: number | null;
-  line_used: number | null;
-};
-type PickRow = {
-  market: string | null;
-  result: string | null;
-  units: number | null;
-  clv: number | null;
-  week: number | bigint | null;
-  away_team: string | null;
-  home_team: string | null;
-  line: number | null;
-  graded: number | boolean | null;
-  is_paper: number | boolean | null;
-};
+const REASON_ORDER: ReasonRow["reason"][] = [
+  "model_gap",
+  "price_edge",
+  "manual",
+  "untagged",
+];
 
-// Mirrors ledger.ts::fromResults: under_hit is a bool, so recover pushes from
-// actual == line, and drop NULL under_hit (never graded) instead of counting
-// it as a loss.
-function fromResults(rows: ResRow[]): (Record3 & { n: number }) | null {
-  const isPush = (r: ResRow) =>
-    r.actual_first_half_total !== null &&
-    r.line_used !== null &&
-    Number(r.actual_first_half_total) === Number(r.line_used);
-  const usable = rows.filter((r) => r.under_hit !== null || isPush(r));
-  if (usable.length === 0) return null;
-  const pushes = usable.filter(isPush).length;
-  const wins = usable.filter((r) => truthy(r.under_hit)).length;
-  const unitsSum = usable.reduce((a, r) => a + (r.units ?? 0), 0);
-  const clvs = usable.filter((r) => r.clv !== null).map((r) => r.clv as number);
-  return rec(wins, usable.length - pushes, pushes, unitsSum, clvs);
-}
-
-function fromPicks(rows: PickRow[]): (Record3 & { n: number }) | null {
-  if (rows.length === 0) return null;
-  const wins = rows.filter((p) => p.result === "under").length;
-  const pushes = rows.filter((p) => p.result === "push").length;
-  const unitsSum = rows.reduce((a, p) => a + (p.units ?? 0), 0);
-  const clvs = rows.filter((p) => p.clv !== null).map((p) => p.clv as number);
-  return rec(wins, rows.length - pushes, pushes, unitsSum, clvs);
+/** Pure: by-reason table; rows with no picks at all are omitted. */
+export function reasonRows(picks: PickFull[]): ReasonRow[] {
+  return REASON_ORDER.map((reason) => {
+    const rs = picks.filter((p) => (p.reason ?? "untagged") === reason);
+    return {
+      reason,
+      real: recordFrom(graded(rs).filter(isRealFirstHalf)),
+      paper: recordFrom(graded(rs).filter(isPaperFirstHalf)),
+      realBets: rs.filter(isRealFirstHalf).length,
+      paperBets: rs.filter(isPaperFirstHalf).length,
+    };
+  }).filter((r) => r.realBets + r.paperBets > 0);
 }
 
 export async function getWeeklyReview(
   season: number,
-  week?: number,
+  week?: number | "all",
 ): Promise<WeeklyReview> {
-  const res = await prisma.$queryRaw<ResRow[]>`
-    SELECT r.model_version, r.under_hit, r.units, r.clv, g.week,
-           r.actual_first_half_total, r.line_used
-    FROM results r JOIN games g ON g.id = r.game_id
-    WHERE g.season = ${season}
-  `;
-  const mine = await prisma.$queryRaw<PickRow[]>`
-    SELECT market, result, units, clv, week, away_team, home_team, line, graded,
-           is_paper
-    FROM manual_picks WHERE season = ${season}
-  `;
+  const [res, picks] = await Promise.all([
+    loadResults(season),
+    loadPicks(season),
+  ]);
 
   const resWeeks = res.map((r) => Number(r.week));
-  const pickWeeks = mine
-    .filter((p) => truthy(p.graded))
-    .map((p) => Number(p.week));
+  const pickWeeks = picks.map((p) => Number(p.week));
   const weeks = [...new Set([...resWeeks, ...pickWeeks])]
     .filter((w) => Number.isFinite(w))
     .sort((a, b) => a - b);
   const wk =
-    week && weeks.includes(week) ? week : (weeks[weeks.length - 1] ?? null);
+    week === "all"
+      ? null
+      : week !== undefined && weeks.includes(week)
+        ? week
+        : (weeks[weeks.length - 1] ?? null);
 
-  const r = res.filter((x) => Number(x.week) === wk);
-  const isFull = (m: string | null) => m === "full";
-  // "You" = real-money picks only; paper picks (stake 0) stay out of the
-  // scorecard so they can't flatter the record.
-  const gradedMine = mine.filter(
-    (p) => truthy(p.graded) && !truthy(p.is_paper) && Number(p.week) === wk,
-  );
+  const inWeek = <T extends { week: number | bigint | null }>(rows: T[]) =>
+    wk === null ? rows : rows.filter((x) => Number(x.week) === wk);
+  const r = inWeek(res);
+  const mine = inWeek(picks);
+  const gradedMine = graded(mine);
+  const isFull = (p: PickFull) => p.market === "full";
 
   const lines: ReviewLine[] = [
     {
       entity: "Market",
       market: "Full game",
-      rec: fromResults(r.filter((x) => x.model_version === "market_fg")),
+      rec: recordFromResults(
+        r.filter((x) => x.model_version === MARKET_LEDGER_FG),
+      ),
     },
     {
       entity: "Market",
       market: "First half",
-      rec: fromResults(r.filter((x) => x.model_version === "market")),
+      rec: recordFromResults(
+        r.filter((x) => x.model_version === MARKET_LEDGER_1H),
+      ),
     },
     {
       entity: "Model",
       market: "First half",
-      rec: fromResults(r.filter((x) => x.model_version === "gbm_v1")),
-    },
-    {
-      entity: "You",
-      market: "Full game",
-      rec: fromPicks(gradedMine.filter((p) => isFull(p.market))),
+      rec: recordFromResults(
+        r.filter((x) => x.model_version === MODEL_VERSION),
+      ),
     },
     {
       entity: "You",
       market: "First half",
-      rec: fromPicks(gradedMine.filter((p) => !isFull(p.market))),
+      rec: recordFrom(gradedMine.filter(isRealFirstHalf)),
+    },
+    {
+      entity: "You (paper)",
+      market: "First half",
+      rec: recordFrom(gradedMine.filter(isPaperFirstHalf)),
+    },
+    {
+      entity: "You (paper)",
+      market: "Full game",
+      rec: recordFrom(gradedMine.filter((p) => isFull(p) && p.isPaper)),
     },
   ];
 
-  const picks: ReviewPick[] = mine
-    .filter((p) => Number(p.week) === wk)
-    .map((p) => ({
-      week: p.week === null ? null : Number(p.week),
-      market: isFull(p.market) ? "Full game" : "1H",
-      away: p.away_team,
-      home: p.home_team,
-      line: p.line,
-      result: truthy(p.graded) ? p.result : "pending",
-      units: p.units,
-      clv: p.clv,
-      isPaper: truthy(p.is_paper),
-    }));
-
-  return { week: wk, weeks, lines, picks };
+  return {
+    week: wk,
+    weeks,
+    lines,
+    byWeek: weekRows(picks),
+    byReason: reasonRows(picks),
+    picks: mine,
+  };
 }

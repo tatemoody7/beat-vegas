@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
+import { median } from "@/lib/format";
 
 // Opportunities board data layer — ports the SQL in beatvegas/dashboard/app.py
 // (the predictions+games board query and the odds_snapshots consensus logic).
@@ -7,6 +8,8 @@ import { Factors, parseFactors } from "@/lib/score";
 export type BoardRow = {
   gameId: number;
   week: number;
+  /** Kickoff (stored naive UTC); null when unknown. */
+  startDate: Date | null;
   away: string;
   home: string;
   underScore: number | null;
@@ -22,7 +25,7 @@ export type BoardRow = {
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
-  // gap in units of the BV line's own noise (σ). |z|<1 = within noise.
+  // gap in units of the BV line's own noise (σ) — context only, never a gate.
   liveGapZ: number | null;
   // manual display-only nudge applied to the BV line (e.g. confirmed QB-out).
   bvAdjust: number | null;
@@ -31,13 +34,6 @@ export type BoardRow = {
 
 const num = (v: unknown): number | null =>
   v === null || v === undefined ? null : Number(v);
-
-function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
 
 type PredRow = {
   game_id: number | bigint;
@@ -51,6 +47,7 @@ type PredRow = {
   bv_hi: number | null;
   bv_sigma: number | null;
   week: number | bigint;
+  start_date: Date | null;
   away_team: string | null;
   home_team: string | null;
   full_game_total: number | null;
@@ -63,16 +60,28 @@ type SnapRow = {
   captured_at: string | null; // CAST to TEXT — Prisma can't coerce SQLite DateTime via raw select
 };
 
-// Opening/current consensus per game (app.py:158-169): for each game, take each
+export type ConsensusLine = { open: number | null; cur: number | null };
+
+// Opening/current consensus per game (mirrors beatvegas/lines.py
+// consensus_open_close + closing_before_kickoff): for each game, take each
 // book's first capture → median across books = open; each book's last → current.
+// Only PRE-KICKOFF snapshots count (a poll that ran after the game started is
+// not a closing line), the CFBD synthetic "consensus" row is dropped (it would
+// double-count the real books), and book keys are case-folded so a legacy
+// "DraftKings" row and an Odds API "draftkings" row are one book.
 // Season-scoped: an unbounded scan grows with every season of movement history.
-async function consensusLines(
+export async function consensusLines(
   season: number,
-): Promise<Map<number, { open: number | null; cur: number | null }>> {
+  market = "1H_total",
+): Promise<Map<number, ConsensusLine>> {
   const snaps = await prisma.$queryRaw<SnapRow[]>`
-    SELECT s.game_id, s.book, s.line, CAST(s.captured_at AS TEXT) AS captured_at
+    SELECT s.game_id, LOWER(s.book) AS book, s.line,
+           CAST(s.captured_at AS TEXT) AS captured_at
     FROM odds_snapshots s JOIN games g ON g.id = s.game_id
-    WHERE s.market = '1H_total' AND g.season = ${season}
+    WHERE s.market = ${market} AND g.season = ${season}
+      AND (g.start_date IS NULL OR s.captured_at IS NULL
+           OR s.captured_at <= g.start_date)
+      AND LOWER(COALESCE(s.book, '')) <> 'consensus'
   `;
   // game_id -> book -> sorted captures
   const byGame = new Map<number, Map<string, SnapRow[]>>();
@@ -85,7 +94,7 @@ async function consensusLines(
     if (!bm.has(book)) bm.set(book, []);
     bm.get(book)!.push(s);
   }
-  const out = new Map<number, { open: number | null; cur: number | null }>();
+  const out = new Map<number, ConsensusLine>();
   for (const [gid, books] of byGame) {
     const firsts: number[] = [];
     const lasts: number[] = [];
@@ -132,7 +141,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi, p.bv_sigma,
-           g.week, g.away_team, g.home_team, g.full_game_total
+           g.week, g.start_date, g.away_team, g.home_team, g.full_game_total
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
       AND p.model_version = (
@@ -176,6 +185,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
     return {
       gameId: gid,
       week: Number(p.week),
+      startDate: p.start_date ?? null,
       away: p.away_team ?? "?",
       home: p.home_team ?? "?",
       underScore: num(p.under_score),

@@ -23,7 +23,7 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "Bettable band (1.75+ points)",
-    body: "The top ~20% of a season’s gaps. In the backtest that group went under about 54% of the time — a small edge over the 52.4% break-even. 3.0+ points is the top ~10%.",
+    body: "The top ~20% of a season’s gaps — the ranking rule the backtest validated for picking games out. It is not a proven win rate: against a fair estimated line the backtest shows no confirmed edge, and only closing-line value against real lines can prove one. 3.0+ points is the top ~10%. The gap that matters is Hard Rock’s own number minus ours.",
   },
   {
     term: "Margin of error (σ ≈ 12 points)",
@@ -31,7 +31,7 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "BET / WATCH / PASS",
-    body: "The This Week verdict. BET = bettable gap, a real (live) first-half line, and a Hard Rock price no worse than the market. WATCH = a smaller lean, a good price on its own, or a bettable gap against an estimated line. PASS = nothing to act on.",
+    body: "The This Week verdict. BET = a model read, Hard Rock’s own posted first-half line 1.75+ points above our number, and a Hard Rock price no worse than the market. WATCH = a smaller lean, a good price on its own, the market clearing the bar while Hard Rock does not, or Hard Rock not yet posted. PASS = nothing to act on.",
   },
   {
     term: "Under score (0–100)",
@@ -39,7 +39,7 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "Live line vs estimated line",
-    body: "A live line is a first-half total a sportsbook has actually posted. An estimated line is our reference number (about 52% of the full-game total) used before books post. We never call BET on an estimate.",
+    body: "A live line is a first-half total a sportsbook has actually posted. An estimated line is our reference number worked out from the full-game total (about half of it: 49.75% of the total, 53.75% when one side is a 21+ point favorite) used before books post. We never call BET on an estimate.",
   },
   {
     term: "Price / fair price / +EV",
@@ -55,11 +55,15 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "Unit",
-    body: "One standard bet. This season 1 unit = $10, flat, on every bet. Profit and loss are shown in units so results read the same regardless of dollars.",
+    body: "One standard bet. This season 1 unit = $10, flat, on every bet. Profit and loss are shown in units so results read the same regardless of dollars. ROI = units won ÷ units staked.",
   },
   {
     term: "Paper pick",
-    body: "A pick logged with nothing at risk. It is graded for record and line value like a real bet but kept in a separate record, so it can never flatter your real numbers.",
+    body: "A pick logged with nothing at risk (one notional unit, so its record reads in units). It is graded for record and line value like a real bet but kept in a separate record, so it can never flatter your real numbers.",
+  },
+  {
+    term: "Pick reason (model gap / price edge / your call)",
+    body: "Why a pick was logged, frozen at the moment you logged it. Model gap = the model had a read and Hard Rock’s number was 1.75+ above ours. Price edge = no model read, only a Hard Rock price better than the market’s fair price. Your call = anything else. Results groups your record by reason so you can see which kind of bet is actually paying.",
   },
   {
     term: "Derived / reference line",
@@ -75,7 +79,7 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "Proxy-graded backtest",
-    body: "Free data has no historical first-half lines, so past seasons were graded against an estimated line (52% of the full-game total). That makes the backtest directional, not proof. Real lines collected this season are the true test.",
+    body: "Free data has no historical first-half lines, so past seasons were graded against an estimated line (a step share of the full-game total: 49.75%, or 53.75% at 21+ point spreads, FBS-only). Against that fair estimate the top-20% gap band shows no confirmed edge, so the backtest validates the ranking rule, not a profit. Real lines collected this season are the true test.",
   },
 ];
 
@@ -98,11 +102,11 @@ export default function GlossaryPage() {
         ))}
       </dl>
       <p className="mt-6 text-xs text-[var(--text-dim)]">
-        The betting rules themselves live in{" "}
+        {`The betting rules themselves live in `}
         <Link href="/" className="bv-nav-link">
           This Week
         </Link>
-        {" — bankroll strip at the top."}
+        {` — bankroll strip at the top.`}
       </p>
     </div>
   );

@@ -23,46 +23,48 @@ def main() -> None:
     args = ap.parse_args()
     init_db()
 
+    # Read, then fetch OUTSIDE any session: hundreds of Open-Meteo calls inside
+    # one transaction trip Neon's idle-in-transaction timeout and lose the batch.
     with session_scope() as s:
-        games = s.query(Game).filter(Game.season == args.season, Game.week == args.week).all()
-        venues = {v.id: v for v in s.query(Venue).all()}
-        rows, fetched, domes, skipped = [], 0, 0, 0
-        for g in games:
-            v = venues.get(g.venue_id)
-            if g.start_date is None or v is None:
-                skipped += 1
-                continue
-            if v.dome:
-                rows.append(
-                    {
-                        "game_id": g.id,
-                        "temperature_f": 72.0,
-                        "wind_mph": 0.0,
-                        "precipitation": 0.0,
-                        "dome": True,
-                    }
-                )
-                domes += 1
-                continue
-            w = fetch_weather(
-                v.latitude,
-                v.longitude,
-                g.start_date.date().isoformat(),
-                hour=g.start_date.hour or 19,
-            )
-            if w is None:
-                skipped += 1
-                continue
+        games = [
+            (g.id, g.venue_id, g.start_date)
+            for g in s.query(Game).filter(Game.season == args.season, Game.week == args.week)
+        ]
+        venues = {v.id: (v.dome, v.latitude, v.longitude) for v in s.query(Venue).all()}
+    rows, fetched, domes, skipped = [], 0, 0, 0
+    for gid, vid, start in games:
+        v = venues.get(vid)
+        if start is None or v is None:
+            skipped += 1
+            continue
+        dome, lat, lon = v
+        if dome:
             rows.append(
                 {
-                    "game_id": g.id,
-                    "temperature_f": w["temperature_f"],
-                    "wind_mph": w["wind_mph"],
-                    "precipitation": w["precipitation"],
-                    "dome": False,
+                    "game_id": gid,
+                    "temperature_f": 72.0,
+                    "wind_mph": 0.0,
+                    "precipitation": 0.0,
+                    "dome": True,
                 }
             )
-            fetched += 1
+            domes += 1
+            continue
+        w = fetch_weather(lat, lon, start.date().isoformat(), hour=start.hour or 19)
+        if w is None:
+            skipped += 1
+            continue
+        rows.append(
+            {
+                "game_id": gid,
+                "temperature_f": w["temperature_f"],
+                "wind_mph": w["wind_mph"],
+                "precipitation": w["precipitation"],
+                "dome": False,
+            }
+        )
+        fetched += 1
+    with session_scope() as s:
         n = upsert(s, Weather, rows, ["game_id"])
     print(
         f"weather: {n} games stored ({fetched} fetched, {domes} domes, "

@@ -14,6 +14,12 @@ import requests
 
 from ..config import cfbd_api_key, load_config
 
+# Transient failures worth a second look. requests.Timeout covers both
+# ConnectTimeout and ReadTimeout (the Aug 30 2026 Sunday run died on ONE
+# ReadTimeout); ConnectionError covers resets and DNS blips.
+_RETRY_EXC = (requests.Timeout, requests.ConnectionError)
+_BACKOFF_SECONDS = (2, 4)  # between attempts 1->2 and 2->3
+
 
 class CFBDClient:
     def __init__(
@@ -21,7 +27,7 @@ class CFBDClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: int = 30,
-        max_retries: int = 4,
+        max_retries: int = 3,
     ):
         cfg = load_config().get("cfbd", {}) or {}
         self.api_key = api_key or cfbd_api_key()
@@ -39,17 +45,27 @@ class CFBDClient:
         )
 
     def _get(self, path: str, params: Dict[str, Any]) -> Any:
+        """GET with retries: up to `max_retries` attempts (default 3) on a
+        timeout / connection error / 429 / 5xx, sleeping 2s then 4s between
+        them. Other 4xx (bad key, bad params) raise immediately. The final
+        failure is re-raised as-is so the caller sees the real cause."""
         params = {k: v for k, v in params.items() if v is not None}
         url = f"{self.base_url}{path}"
+        last_exc: Optional[Exception] = None
         for attempt in range(self.max_retries):
-            resp = self._session.get(url, params=params, timeout=self.timeout)
-            if resp.status_code == 429 or resp.status_code >= 500:
-                time.sleep(2**attempt)  # backoff on rate-limit/server error
-                continue
-            resp.raise_for_status()
-            return resp.json()
-        resp.raise_for_status()
-        return resp.json()
+            try:
+                resp = self._session.get(url, params=params, timeout=self.timeout)
+            except _RETRY_EXC as e:
+                last_exc = e
+            else:
+                if resp.status_code != 429 and resp.status_code < 500:
+                    resp.raise_for_status()
+                    return resp.json()
+                last_exc = requests.HTTPError(f"CFBD {resp.status_code} for {path}", response=resp)
+            if attempt < self.max_retries - 1:
+                time.sleep(_BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)])
+        assert last_exc is not None
+        raise last_exc
 
     # --- endpoints -------------------------------------------------------
     def games(

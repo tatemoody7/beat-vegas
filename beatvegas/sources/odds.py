@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from ..config import load_config, odds_api_key
+from ..hardrock import normalize_book
 
 
 @dataclass
@@ -46,6 +47,14 @@ class OddsAPIClient:
         )
         self.last_credits = c
         return c
+
+    def credits_low(self, floor: int) -> bool:
+        """True once the month's remaining credits (from the LAST response's
+        x-requests-remaining header) are at or below `floor`. Unknown (no call
+        yet / header missing) is NOT low; floor <= 0 disables the guard. Call a
+        free endpoint (list_events) first to learn the balance."""
+        c = self.last_credits
+        return floor > 0 and c is not None and c.remaining is not None and c.remaining <= floor
 
     def list_full_game_totals(self, regions: Optional[str] = None) -> List[Dict[str, Any]]:
         """Full-game `totals` for every book in `regions`, from the BULK /odds
@@ -151,7 +160,8 @@ def _rows_for_market(
     # Keyed by (event, book): with several regions requested the API can list
     # the same bookmaker key twice for one event, and two rows sharing
     # (game_id, book, market, captured_at) violate uq_odds_snapshot on insert.
-    # Keep the freshest quote (latest last_update).
+    # Keep the freshest quote (latest last_update). `book` is the canonical
+    # key (hardrock.normalize_book), so hardrockbet_fl folds into hardrockbet.
     by_key: Dict[tuple, Dict[str, Any]] = {}
     for ev in events:
         for bm in ev.get("bookmakers", []):
@@ -174,7 +184,7 @@ def _rows_for_market(
                     "commence_time": ev.get("commence_time"),
                     "home_team": ev.get("home_team"),
                     "away_team": ev.get("away_team"),
-                    "book": bm.get("key"),
+                    "book": normalize_book(bm.get("key")),
                     "line": float(line),
                     "over_price": over_price,
                     "under_price": under_price,

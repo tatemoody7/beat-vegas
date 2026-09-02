@@ -9,213 +9,164 @@ pushes a phone alert the moment lines drop, logs your bets, and reviews each wee
 > **Research / decision-support only.** This project never places bets and never
 > automates any gambling activity. It exists to inform your own decisions.
 
-## Status
+## Status (honest)
 
-**Phase 1 (edge gate) — done. Verdict: no edge confirmable on free historical data.**
-Across 10 seasons (9,492 games) first halves realize ~52.4% of the full-game
-total — right where books price the 1H line. Blanket *and* model-selected 1H
-unders do not reliably beat the -110 breakeven, and the apparent signal is
-inside the ±1.5 pt uncertainty of the synthetic proxy line. See
-`beatvegas/backtest/` and the `scripts/backtest.py` output.
-
-**Why:** no free source has *historical* first-half lines, so the backtest can
-only grade against a proxy. The true edge (if any) lives in the gap between the
-real 1H line and actual results — invisible to a proxy.
-
-**Phase 2 (current) — collect REAL 1H lines going forward and grade them.**
-Built & tested:
-- The Odds API client + normalizer for `totals_h1` (`beatvegas/sources/odds.py`)
-- Event→CFBD game matcher (`beatvegas/etl/match.py`)
-- Line poller with movement dedupe (`scripts/poll_lines.py`) + a **near-kickoff
-  poll** (`scripts/poll_kickoff_lines.py`) so the closing line — and therefore CLV —
-  is fresh
-- Consensus open/close grading + CLV ledger (`scripts/grade.py`, `beatvegas/grading.py`)
-
-This is the path that can actually prove or kill the edge, starting when lines
-post for the season.
+**No edge is confirmable on free historical data.** No free source carries
+*historical* first-half lines, so the backtest grades against a **proxy** 1H line:
+a step share of the full-game total — **0.4975 below a 21-point spread, 0.5375 at
+21+** — fitted MAE-optimally on FBS-vs-FBS games (`data/multiplier.json`,
+`scripts/derive_multiplier.py`). Against that fair proxy, blanket *and*
+model-selected 1H unders show no confirmed edge. (The 52.4% figure you will see on
+the Line Study page is the **-110 breakeven** win rate — a different thing from any
+first-half share.) The true edge, if any, lives in the gap between the **real** 1H
+line and actual results, so the season's job is to collect real Hard Rock lines and
+measure closing-line value (CLV). See `docs/BETTING_POLICY.md`.
 
 **The product: the "BV line" (make our own number first).** We don't assume Vegas
-is soft (that thesis was refuted). Instead a **market-blind** regressor projects an
-independent 1H total (`beatvegas/model/bv_line.py`), we rank games by the **gap** to
-the real Vegas line, and validate with **CLV**. The BV line is noisy (σ ≈ 12 pts) so
-it ships an 80% prediction band and reports gaps in σ — a sub-1σ gap is noise, not an
-edge. The gap is research-only; it never drives the 0–100 score until CLV earns it.
-Full write-up: **`docs/BV_LINE.md`**. Live on the web app (below).
+is soft (that thesis was refuted). A **market-blind** regressor projects an
+independent 1H total (`beatvegas/model/bv_line.py`); the board ranks games by the
+**gap** to the real Vegas line, and the This Week page turns the gap + Hard Rock's
+price into a plain-English BET / WATCH / PASS verdict (`web/lib/verdict.ts`). The
+BV line is noisy (σ ≈ 12 pts on any single game), so gates are in points from the
+validated top-20% ranking rule (≥ 1.75), never in σ. Full write-up: `docs/BV_LINE.md`.
 
-### Earlier Phase 1 components
-- CFBD REST client (`sources/cfbd.py`), 1H points ETL (`etl/first_half.py`)
-- Historical backfill (`scripts/backfill.py`)
-- Leak-free features (`etl/features.py`), proxy calibration (`etl/proxy_line.py`)
-- Walk-forward backtest (`backtest/engine.py`)
+Components: CFBD REST client (`sources/cfbd.py`), 1H points ETL (`etl/first_half.py`),
+leak-free features (`etl/features.py`), walk-forward backtest (`backtest/engine.py`),
+The Odds API client for `totals_h1` (`sources/odds.py`), event→game matcher
+(`etl/match.py`), line poller with movement dedupe (`scripts/poll_lines.py`),
+open/close grading + CLV ledger (`scripts/grade.py`, `beatvegas/grading.py`).
 
 ## Setup
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .                 # installs all deps from requirements.txt
+cp config.example.yaml config.yaml   # CFBD key (free: https://collegefootballdata.com/key)
+                                     # + Odds API key (free: https://the-odds-api.com/)
+pytest -q                            # or, inside a git worktree: PYTHONPATH=. python -m pytest -q
 ```
 
-Get a **free** CFBD API key at https://collegefootballdata.com/key, then either:
+Keys can also come from the environment (`CFBD_API_KEY`, `ODDS_API_KEY`,
+`DATABASE_URL`). `config.example.yaml` is what production reads for
+`odds_api.regions` (GitHub Actions has no `config.yaml`) — treat it as prod config.
+
+## Run (by hand)
 
 ```bash
-cp config.example.yaml config.yaml   # put the key in cfbd.api_key
-# or:
-export CFBD_API_KEY=your_key_here
-```
-
-## Run
-
-```bash
-python scripts/backfill.py                 # load seasons from config (2015–2024)
-python scripts/backfill.py --season 2023   # one season
-python scripts/backfill.py --use-pbp       # fill 1H gaps via play-by-play
-python scripts/backtest.py                 # the edge gate (walk-forward)
-pytest -q                                  # tests
-```
-
-Data lands in `data/beatvegas.db` (gitignored). The backfill is idempotent.
-
-### In-season real-line workflow (Phase 2)
-Needs a free Odds API key (https://the-odds-api.com/) in `config.yaml`
-(`odds_api.api_key`) or `ODDS_API_KEY`.
-
-```bash
-python scripts/backfill.py --season 2026          # load schedule/games
+python scripts/backfill.py --season 2026                 # schedule + finals
 python scripts/enrich_tempo.py --season 2026 --week 5    # TeamRankings pace
 python scripts/enrich_weather.py --season 2026 --week 5  # Open-Meteo weather
-python scripts/poll_lines.py                      # 1–2x/day: capture 1H totals + movement + alerts
-python scripts/poll_lines.py --dry-run-alerts     # print alerts instead of texting
-python scripts/backfill.py --season 2026           # re-run after games for actual 1H pts
-python scripts/grade.py --season 2026              # grade unders vs real closing line + CLV
+python scripts/poll_full_game.py --source oddsapi        # full-game openers (prod source)
+python scripts/poll_lines.py --no-alerts                 # 1H totals + movement
+python scripts/weekly_update.py                          # score + rank the board
+python scripts/grade.py --season 2026                    # grade unders vs real close + CLV
+python scripts/backtest.py                               # the proxy-graded edge gate
 ```
+
+Data lands in Neon when `DATABASE_URL` is set, else `data/beatvegas.db`
+(gitignored). Every script is idempotent.
 
 **Log your own bets** (graded vs the same real lines, so your intuition is
 measured next to the market):
 ```bash
-python scripts/pick.py add --home "Ohio State" --away "Michigan" --line 24.5
+python scripts/pick.py add --home "Ohio State" --away "Michigan" --line 24.5 --market 1h
 python scripts/pick.py grade --season 2026     # after games finish
 python scripts/pick.py summary                 # your hit rate, units, CLV
 ```
 
-**Line Study** — rank how often the under cashed by opening-line value (tests
-"which line number hits most"); real opening lines where captured, else proxy:
+**Line Study** — how often the under cashed by opening-line value (real opening
+lines where captured, else proxy):
 ```bash
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
-**Dashboard:** the product face is the Next.js app in `web/` (see *Web app* below) —
-opportunity board, line-movement charts, Line Study, market + your-picks ledger with
-CLV, and the research verdict.
+**Credit budget (Odds API free tier = 500/month):** `totals_h1` is served only
+per-event, so a 1H sweep costs `markets × regions` credits **per game** with a posted
+1H line (2 with `us,us2`); listing events is free; full-game totals are one bulk
+call. `poll_lines.py` caps events (`--max-events`, ranked by bettability in
+`beatvegas/sweep.py`) and stops at `--credit-floor` so the Sunday opener reserve is
+never eaten. The schedule below is sized to stay under 500/month worst case.
 
-**Credit budget (free tier = 500/month):** `totals_h1` is an Odds API
-*additional market*, served only per-event. `poll_lines.py` lists events for
-free, then spends **1 credit per game that has a 1H total posted**, but only for
-games kicking off within `--days-ahead` (default 8). Games with no posted 1H
-market cost 0 credits. A ~10-game Saturday slate polled daily for its game-week
-≈ well under 500/month. Widen/narrow with `--days-ahead` and `--max-events`.
+## How it runs
+
+Nothing runs on the Mac on a schedule. The engine runs in **GitHub Actions**
+(`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY` /
+`PUSHOVER_*`) because the campus network cannot reach Neon:5432; every workflow
+sends a **Pushover** push on failure. GitHub cron is best-effort (it drops most
+single-slot runs), so each job has retry slots and two Claude routines re-dispatch
+anything that is missing.
+
+| When (ET)                          | Workflow / routine     | What                                                                 |
+| ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
+| Sun 10:00am–1:45pm, every 15 min   | `lines_watch.yml`      | Hard Rock full-game opener capture; push the moment a line appears  |
+| Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
+| Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
+| Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
+| Fri 1pm (retry 2:30pm)             | `lines_watch.yml`      | 1H sweep of the weekend slate (18 events, credit-guarded)            |
+| Fri 6pm                            | routine `cfb-friday-card` | Verify/kick the sweep + preview, build the bet card, log paper picks, text |
+| Sat 10:30am (retry 11:15), 6pm (retry 6:45) | `lines_watch.yml` | Closing 1H lines for CLV                                          |
+| Mon 8am / 10am / 1pm               | `grade.yml`            | Finals + 1H play-by-play → grade market / model / picks / records    |
+| Mon 9am                            | routine `monday-coaching` | Includes a one-line grading check (kicks `grade.yml` if cron dropped it) |
+
+Manual-only workflows: `post-lines.yml` (derived lines for the board),
+`migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
+`enrich_tempo.yml` (re-backfill pace). Dispatch any workflow from the Mac with
+`gh workflow run <file> --ref main` (add `-f market=1h|1h_close|full_game` for
+`lines_watch.yml`).
 
 ## Web app (Next.js → Vercel + Neon)
 
-The product face is a Next.js app in `web/` (App Router + TypeScript + Tailwind +
-Prisma + Recharts), deployed on **Vercel**, reading/writing a **Neon Postgres**
-database, behind a simple password gate. Views: Opportunities, Line Study,
-Movement, Ledger, Research, and writable My Picks. It uses a plain-English,
-modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*`
-classes in `web/app/globals.css`).
+The product is the Next.js app in `web/` (App Router + TypeScript + Tailwind +
+Prisma + Recharts), deployed on **Vercel**, reading/writing **Neon Postgres**,
+behind a simple password gate, at **https://beat-vegas.vercel.app**. Five tabs:
+**This Week** (BET / WATCH / PASS verdicts + bankroll strip), **Board** (ranked
+research board with model/derived numbers and factor chips), **Results** (market /
+model / your-picks ledgers with CLV), **Research** (calibration, gap-vs-CLV,
+model runs), **Glossary**. Plain-English, modern-sportsbook design system (deep navy +
+electric-cyan accent; `.bv-*` classes in `web/app/globals.css`).
 
-**Architecture:** Neon Postgres is the single source of truth. The local Python
-engine (`run_daily.sh` etc.) writes to Neon; the Vercel app reads it and writes
-manual picks. `web/lib/*.ts` hold the SQL/scoring logic; API routes under
-`web/app/api/` mirror those queries.
+**Architecture:** Neon Postgres is the single source of truth. GitHub Actions writes
+it; the Vercel app reads it and writes manual picks. `web/lib/*.ts` hold the
+SQL/scoring logic; API routes under `web/app/api/` mirror those queries.
+`GET /api/health` (ungated, aggregate timestamps only) tells the Sunday routine
+whether today's opener capture landed.
 
 ### Local dev
 ```bash
 cd web
 npm install
 npm run dev            # http://localhost:3000
+npx vitest run         # tests
 ```
-`web/.env` holds `DATABASE_URL` (gitignored). It currently points at **Neon**, so
-what you see locally is the live production data — and Postgres-specific issues
-surface *before* you push. Leave `APP_PASSWORD` unset locally to keep the gate
-off; set it to require the login. (To dev fully offline, point `DATABASE_URL` at
-`file:../../data/demo.db` and set the Prisma datasource `provider` back to
-`sqlite`.)
+`web/.env` holds `DATABASE_URL` (gitignored): Neon (prod data) or the local
+Postgres sandbox from `scripts/simulate_week.py` (use this on the campus network,
+which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the gate off.
 
 ### Deploy loop
-1. Edit code in `web/`, test with `npm run dev`.
-2. Commit and **push to `main`** → Vercel auto-builds (`prisma generate &&
-   next build`) and deploys to production (**https://beat-vegas.vercel.app**) in
-   ~1 minute. Pushing any *other* branch makes a Preview URL, not production.
+1. Edit code in `web/`, `npm run lint` / `npm run format`, test with `npm run dev`.
+2. Commit and **push to `main`** → Vercel auto-builds and deploys production in
+   ~1 minute. Any other branch makes a Preview URL, not production.
 3. Live env vars (Vercel → Settings → Environment Variables): `DATABASE_URL`
-   (Neon) and `APP_PASSWORD` (the login).
+   (Neon), `APP_PASSWORD`, `BANKROLL_USD`, `UNIT_USD`.
 
 **Gotchas:**
 - **Commit author must be GitHub-linked.** Vercel blocks deploys whose commit
-  author email isn't tied to the repo's GitHub account. This repo's git author is
-  set to the GitHub noreply email — keep it that way (`git config user.email`).
+  author email isn't tied to the repo's GitHub account (`git config user.email`).
 - **Schema changes start in Python** (it owns the SQLAlchemy schema): edit
-  `beatvegas/db/models.py` + migrations, run against Neon, then
+  `beatvegas/db/models.py` + `_MIGRATIONS`, run `migrate.yml`, then
   `cd web && npx prisma db pull && npx prisma generate`, then push.
-- **Fresh data** (predictions, lines, grades) comes from the local engine writing
-  to Neon, which needs a network allowing outbound Postgres (port 5432). Some
-  campus/corporate networks let the TCP connect but drop the data path — run the
-  daily chain off such networks (home/hotspot). The deployed site is unaffected.
-
-### One-time data migration (SQLite → Neon)
-```bash
-DATABASE_URL="postgresql://…neon…" python scripts/migrate_to_postgres.py --sqlite data/demo.db --wipe
-```
 
 ## Data sources (all free)
 - **CollegeFootballData** — games, line scores, play-by-play, advanced stats, SP+, full-game lines, venues
-- **TeamRankings** — tempo (seconds/play), 1Q/1H scoring (Phase 1 enrichment)
-- **Open-Meteo** — weather by venue (Phase 1 enrichment)
-- Free odds pages — current-season 1H totals for live tracking (Phase 3)
-
-## Auto-run (set and forget)
-A daily job runs the whole chain — refresh data → enrich pace/weather → capture
-lines + alert → score the slate → grade market/model/you — so you just open the
-dashboard and log picks.
-
-```bash
-bash scripts/run_daily.sh --dry-run     # test on demo DB, alerts printed not sent
-# install the 8am daily launchd job:
-cp deploy/com.beatvegas.daily.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.beatvegas.daily.plist
-# stop it later:  launchctl unload ~/Library/LaunchAgents/com.beatvegas.daily.plist
-
-# (optional) near-kickoff line poll every 30 min for fresh closing lines / CLV:
-cp deploy/com.beatvegas.kickoff.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.beatvegas.kickoff.plist
-```
-Caveats: only runs while the Mac is awake; first run may prompt to allow Messages
-automation; logs to `data/run_daily.log`. If a root `.env` with `DATABASE_URL` is
-present, the live chain writes to **Neon** (the same DB the Vercel app reads);
-otherwise local SQLite. `--dry-run` always stays on `data/demo.db`.
-
-**Weekly loop pieces** (also runnable individually):
-`weekly_update.py` (score + log model picks) · `grade.py` (grade market + model) ·
-`pick.py grade` (grade your picks) · `retrain.py` (log a model_runs metrics row to
-track whether it sharpens as seasons accrue).
-
-## iMessage alerts
-`poll_lines.py` texts you when a 1H total is **newly posted** or the consensus
-**moves ≥ threshold**, via AppleScript → Messages.app (works unattended; a plain
-script can't use MCP). Set the recipient + threshold in `config.yaml`:
-```yaml
-alerts:
-  imessage_to: "you@example.com"   # or your phone number
-  line_move_threshold: 1.0
-```
-First run may trigger a macOS Automation permission prompt for Messages. Use
-`--dry-run-alerts` to preview, `--no-alerts` to disable.
+- **The Odds API** — full-game totals (bulk) and first-half totals (per event); Hard Rock via region `us2`, no-vig exchanges via `us_ex` (price comparison only)
+- **TeamRankings** — tempo (seconds/play); unofficial, fail-silent
+- **Open-Meteo** — weather forecasts by venue
+- **Rotowire** (injuries) + **ESPN** (news) — unofficial, display-only, never a model input
 
 ## Free enrichments
 - **Situational** (`etl/situational.py`): rest, short week, off-bye, travel distance,
   time-zone shift, kickoff hour — model features + a "Spot" card chip.
 - **Returning production** (CFBD `/player/returning`): roster-churn prior + chip.
-- **News/injuries** (`sources/espn.py`, ESPN hidden API): display-only "📰 News"
-  expander on the My Picks tab; fail-silent.
 - **Historical pace/weather** (`scripts/backfill_enrichment.py`): backfills
   TeamRankings tempo + Open-Meteo weather so they feed the model.
   ```bash
@@ -223,12 +174,12 @@ First run may trigger a macOS Automation permission prompt for Messages. Use
   ```
   (Weather is slow — one ranged call per venue; safe to re-run, idempotent.)
 
-Backtest impact (top-20% of picks, 2018–2025): baseline +0.97% ROI → **+2.45%**
-with pace + weather. Pace/weather carried the lift; situational/returning were flat
-(kept as context). Still proxy-graded until real lines accrue.
+Pace + weather were the only inputs that moved 1H-total prediction error;
+situational/returning were flat (kept as context). All of it is still proxy-graded
+until real lines accrue.
 
 ## Methodology note
-Free sources have **no historical 1H betting line**. The backtest therefore
-grades actual 1H points (from CFBD) against a **calibrated proxy 1H total**
-derived from the full-game total, and stress-tests across a ±1.5 pt band. Real
-1H lines are collected going forward to validate the proxy.
+Free sources have **no historical 1H betting line**. The backtest therefore grades
+actual 1H points (from CFBD) against the calibrated step-share proxy described
+above and stress-tests across a ±1.5 pt band. Real 1H lines are collected every
+week of the season to validate — or kill — the proxy.

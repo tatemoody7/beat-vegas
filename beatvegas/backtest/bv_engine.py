@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
+from ..etl.features import training_frame
 from ..model.bv_line import (
     TARGET,
     _assert_market_blind,
@@ -43,6 +44,7 @@ def run_bv_backtest(
     df: pd.DataFrame, first_test_season: int = 2018, top_frac: float = 0.20, min_train: int = 500
 ) -> BvBacktestResult:
     """Walk-forward gap ranking + MAE for the BV regressor engine."""
+    df = training_frame(df)  # played games only
     seasons = sorted(df["season"].unique())
     preds = []
     for ts in [s for s in seasons if s >= first_test_season]:
@@ -107,6 +109,7 @@ def mae_ablation(
     Used to ask: does a column family improve 1H-total accuracy? Compare the MAE
     on the full BV feature set vs the set minus that family. Market-blind."""
     _assert_market_blind(cols)
+    df = training_frame(df)  # played games only
     seasons = sorted(df["season"].unique())
     errs = []
     for ts in [s for s in seasons if s >= first_test_season]:

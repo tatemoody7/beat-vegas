@@ -7,6 +7,8 @@ Two feature families, both strictly using pre-kickoff information:
      joined from season-1 — a stable preseason prior with zero same-season leak.
 
 Target: under = realized 1H total < proxy 1H line (0.52 * full-game total).
+Unplayed games (no 1H result yet) stay in the frame with under = NaN so the
+upcoming slate can be scored; trainers/graders go through training_frame().
 """
 
 from __future__ import annotations
@@ -301,6 +303,29 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def apply_min_games(df: pd.DataFrame, min_games: int) -> pd.DataFrame:
+    """Keep games where BOTH teams have played >= min_games this season."""
+    return df[(df["h_games_played"] >= min_games) & (df["a_games_played"] >= min_games)]
+
+
+def played_mask(df: pd.DataFrame) -> pd.Series:
+    """Rows with a realized 1H result — i.e. a defined `under` target."""
+    if "under" in df.columns:
+        return df["under"].notna()
+    return df["first_half_total"].notna()
+
+
+def training_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """The rows a trainer/grader may use: played games only, `under` as int.
+
+    build_feature_frame keeps the upcoming (unplayed) slate so it can be scored;
+    every fit / backtest / factor scan must go through this (or played_mask) so a
+    NaN target never reaches a model or a hit-rate."""
+    out = df[played_mask(df)].copy()
+    out["under"] = out["under"].astype(int)
+    return out
+
+
 def build_feature_frame(
     min_games: int = 2,
     seasons: Optional[range] = None,
@@ -399,10 +424,14 @@ def build_feature_frame(
     df["home_fh_pa"] = df["h_fh_pa_std"]
     df["away_fh_pf"] = df["a_fh_pf_std"]
     df["away_fh_pa"] = df["a_fh_pa_std"]
+    # Same convention as the fh_* block: <side>_full_pa is that team's OWN
+    # points allowed (the registry describes it that way). The two columns used
+    # to be crossed (home <- away's PA and vice versa) — a label fix only; the
+    # model saw both columns either way, so its information content is unchanged.
     df["home_full_pf"] = df["h_full_pf_std"]
-    df["home_full_pa"] = df["a_full_pa_std"]  # opponent allows
+    df["home_full_pa"] = df["h_full_pa_std"]
     df["away_full_pf"] = df["a_full_pf_std"]
-    df["away_full_pa"] = df["h_full_pa_std"]
+    df["away_full_pa"] = df["a_full_pa_std"]
 
     # Expected 1H points: blend each team's offense with opponent's defense.
     df["exp_1h_home"] = (df["h_fh_pf_std"] + df["a_fh_pa_std"]) / 2
@@ -464,16 +493,24 @@ def build_feature_frame(
             df["mm_havoc"] = df["home_fh_def_havoc_suffered"] + df["away_fh_def_havoc_suffered"]
 
     # --- target + filters --------------------------------------------
-    df = df[
-        df["full_game_total"].notna() & df["first_half_total"].notna() & (df["full_game_total"] > 0)
-    ].copy()
+    # UNPLAYED games stay in the frame: the upcoming week has a full-game total
+    # (the Sunday opener) but no 1H result yet, and it is exactly what
+    # score_slate must score. Those rows carry `under` = NaN; anything that
+    # trains or grades must drop them (training_frame / played_mask).
+    df["full_game_total"] = pd.to_numeric(df["full_game_total"], errors="coerce")
+    df["first_half_total"] = pd.to_numeric(df["first_half_total"], errors="coerce")
+    df = df[df["full_game_total"].notna() & (df["full_game_total"] > 0)].copy()
     df["proxy_line"] = df.apply(
         lambda r: proxy_total(r["full_game_total"], spread=r.get("spread")), axis=1
     )
-    df = df[df["first_half_total"] != df["proxy_line"]]  # drop pushes
-    df["under"] = (df["first_half_total"] < df["proxy_line"]).astype(int)
+    played = df["first_half_total"].notna()
+    df = df[~(played & (df["first_half_total"] == df["proxy_line"]))]  # drop pushes (played only)
+    played = df["first_half_total"].notna()
+    df["under"] = np.where(
+        played, (df["first_half_total"] < df["proxy_line"]).astype(float), np.nan
+    )
 
-    df = df[(df["h_games_played"] >= min_games) & (df["a_games_played"] >= min_games)]
+    df = apply_min_games(df, min_games)
     if seasons is not None:
         df = df[df["season"].isin(list(seasons))]
 

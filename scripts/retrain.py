@@ -17,7 +17,7 @@ from datetime import datetime
 from beatvegas.backtest.engine import run_backtest
 from beatvegas.db.models import ModelRun
 from beatvegas.db.store import init_db, session_scope
-from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.features import build_feature_frame, training_frame
 from beatvegas.model.bv_line import residual_report
 from beatvegas.model.score import MODEL_VERSION
 
@@ -30,7 +30,7 @@ def main() -> None:
     args = ap.parse_args()
     init_db()
 
-    df = build_feature_frame(min_games=2)
+    df = training_frame(build_feature_frame(min_games=2))  # played games only
     res = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
     seasons = sorted(df["season"].unique().tolist())
     metrics = res.summary

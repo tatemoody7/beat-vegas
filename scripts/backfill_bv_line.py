@@ -19,7 +19,7 @@ from typing import Dict
 
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import init_db, session_scope
-from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.features import build_feature_frame, training_frame
 from beatvegas.lines import consensus_open_close
 from beatvegas.model.score import score_slate, store_predictions
 
@@ -56,7 +56,9 @@ def main() -> None:
     args = ap.parse_args()
     init_db()
 
-    df = build_feature_frame(min_games=args.min_games)
+    # Historical backfill: played games only (the frame also carries the
+    # unplayed upcoming slate, which weekly_update scores — not this script).
+    df = training_frame(build_feature_frame(min_games=args.min_games))
     seasons = sorted(int(s) for s in df["season"].unique() if s >= args.start_season)
     print(f"backfilling BV line for seasons {seasons[0]}..{seasons[-1]}")
 

@@ -1,5 +1,8 @@
 import { BoardRow } from "@/lib/board";
+import { bookLabel } from "@/lib/books";
+import type { Movement } from "@/lib/movement";
 import { BET_GAP_PTS } from "@/lib/verdict";
+import MovementChart from "@/app/components/MovementChart";
 import {
   BoardFactor,
   buildChips,
@@ -60,7 +63,50 @@ function FactorRow({ f }: { f: BoardFactor }) {
   );
 }
 
-export default function OpportunityCard({ row }: { row: BoardRow }) {
+// Line-movement history for the card, as an expandable row (one query for the
+// whole week in lib/movement.ts::getMovements).
+function MovementRow({ m }: { m: Movement }) {
+  return (
+    <details className="mt-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-2)] px-3 py-2">
+      <summary className="cursor-pointer text-xs font-medium text-[var(--text-muted)]">
+        {`Line movement · ${m.rows.length} updates across ${m.books.length} book${m.books.length === 1 ? "" : "s"}`}
+      </summary>
+      <div className="mt-2 flex flex-col gap-3">
+        <MovementChart points={m.points} books={m.books} />
+        <div className="bv-table-wrap">
+          <table className="bv-table">
+            <thead>
+              <tr>
+                <th>When checked (ET)</th>
+                <th>Sportsbook</th>
+                <th>1H line</th>
+              </tr>
+            </thead>
+            <tbody>
+              {m.rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="text-[var(--text-muted)]">{r.captured_at}</td>
+                  <td className="text-[var(--text-muted)]">
+                    {bookLabel(r.book)}
+                  </td>
+                  <td className="font-mono text-[var(--text)]">{r.line}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+export default function OpportunityCard({
+  row,
+  movement = null,
+}: {
+  row: BoardRow;
+  movement?: Movement | null;
+}) {
   const color = scoreColor(row.underScore);
   const chips = buildChips(row.factors);
   const tierGroups = groupFactorBoard(row.factors.factor_board);
@@ -241,7 +287,7 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
 
                 <div
                   className="bv-stat"
-                  title={`Edge vs Vegas: how far the Vegas line sits above our number, in points. Gaps of ${BET_GAP_PTS}+ points are the top ~20% of a season — the band the backtest says is worth betting (about 54% under). Smaller gaps are a lean, not a bet.`}
+                  title={`Edge vs Vegas: how far the Vegas line sits above our number, in points. Gaps of ${BET_GAP_PTS}+ points are the top ~20% of a season — the ranking band the backtest validated, not a proven win rate (against a fair estimated line it showed no confirmed edge; only real-line closing-line value can). Smaller gaps are a lean, not a bet.`}
                 >
                   <span className="bv-stat-label">Edge vs Vegas</span>
                   <span className="bv-stat-value" style={{ color: gapColor }}>
@@ -275,6 +321,10 @@ export default function OpportunityCard({ row }: { row: BoardRow }) {
                 </div>
               </div>
             </>
+          )}
+
+          {movement && movement.points.length > 1 && (
+            <MovementRow m={movement} />
           )}
 
           {/* Green/red factor board — the story behind the rank (explainer

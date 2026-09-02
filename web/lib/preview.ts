@@ -33,7 +33,36 @@ function arr(jsonStr: string | null, key: "home" | "away"): string[] {
   }
 }
 
+const EMPTY: Preview = { week: null, weeks: [], games: [] };
+
+// game_previews is written by scripts/research_preview.py and is NOT in the
+// Prisma schema; on a fresh database (or before the first Tuesday pull) the
+// table may not exist. Degrade to "no preview" instead of a 500.
 export async function getPreview(
+  season: number,
+  week?: number,
+): Promise<Preview> {
+  try {
+    return await getPreviewUnsafe(season, week);
+  } catch (e) {
+    console.warn("game_previews unavailable:", (e as Error)?.message ?? e);
+    return EMPTY;
+  }
+}
+
+/** Previews for one week keyed by game id — for the This Week cards. */
+export async function getPreviewByGame(
+  season: number,
+  week: number,
+): Promise<Map<number, PreviewGame>> {
+  const p = await getPreview(season, week);
+  const out = new Map<number, PreviewGame>();
+  if (p.week !== week) return out; // fell back to another week: no match
+  for (const g of p.games) out.set(g.gameId, g);
+  return out;
+}
+
+async function getPreviewUnsafe(
   season: number,
   week?: number,
 ): Promise<Preview> {

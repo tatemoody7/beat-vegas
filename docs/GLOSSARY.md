@@ -71,19 +71,22 @@
   actually carries CFB injuries. Display only.
 
 ## What moved the model (and what didn't)
-- **Helped:** pace (tempo) + weather — lifted top-20% classifier picks to
-  ~53.7% under / +2.45% ROI; the gbm_v2 gap ranking grades 54.0% / +3.0% ROI
-  (2018–25 OOS, proxy-graded).
+- **Helped:** pace (tempo) + weather — the only inputs that moved 1H-total
+  prediction error. Proxy-graded selection stats (the old 54% / +3% ROI reads) were
+  a flat-0.52 artefact and are no longer quoted as an edge; against the fair step
+  proxy the backtest shows no confirmed edge. Only real-line CLV can.
 - **Flat:** rest/travel/time-zone/kickoff (situational) and returning production —
   kept as on-card *context*, not model inputs.
-- **Caveat:** edge is small and **decaying** — ~57–59% (2018–21) → ~50% (2023–25),
-  consistent with defenses adapting to tempo.
+- **Caveat:** the edge is small and unconfirmed; the system measures it (CLV on
+  real Hard Rock lines), it does not promise it.
 
 ## Key facts / decisions
 - Free data only. Research/decision-support only — never auto-bets.
 - DB: SQLite locally, **Neon Postgres** in the cloud (`DATABASE_URL`).
-- Dashboard: Streamlit (local) → **Next.js on Vercel** (the product), password-gated.
-- Engine runs on the Mac (scrape → score → grade → iMessage alerts), daily via launchd.
+- Product: the **Next.js app on Vercel** (Neon-backed, password-gated).
+- Engine: the Python scripts run in **GitHub Actions** (`.github/workflows/`) — Sunday
+  capture + score, Friday/Saturday 1H sweeps with Pushover alerts, Monday grading,
+  Tue/Fri research preview. Two Claude routines (Friday card, Sunday ops/recap) text Tate.
 - Repo (private): https://github.com/tatemoody7/beat-vegas
 - The real test of the edge = **real first-half lines collected this season**,
   graded vs the model and my own picks.

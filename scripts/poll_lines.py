@@ -33,7 +33,7 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, TeamTempo, Weather
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
+from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, normalize_book, pick_hr_line
 from beatvegas.lines import consensus_open_close
 from beatvegas.season import current_season
 from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
@@ -168,13 +168,7 @@ def main() -> None:
     )
 
     def _credits_low() -> bool:
-        c = client.last_credits
-        return (
-            args.credit_floor > 0
-            and c is not None
-            and c.remaining is not None
-            and c.remaining <= args.credit_floor
-        )
+        return client.credits_low(args.credit_floor)
 
     # list_events is free but still returns the credit headers — bail before
     # the paid loop if the month's budget is already at the reserve floor.
@@ -212,6 +206,7 @@ def main() -> None:
             fetched_at = datetime.utcnow()
             for row in normalize_first_half([data], books=cfg.get("books") or None):
                 row["fetched_at"] = fetched_at
+                row["book"] = normalize_book(row["book"])  # one spelling per book
                 rows.append(row)
         if _credits_low():
             print(

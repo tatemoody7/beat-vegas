@@ -3,6 +3,24 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { PickFull } from "@/lib/picks";
+import type { PickReason } from "@/lib/verdict";
+
+const REASON_SHORT: Record<PickReason, string> = {
+  model_gap: "model gap",
+  price_edge: "price edge",
+  manual: "your call",
+};
+
+// "BET · model gap · HR gap +2.2" — the decision frozen at log time; legacy
+// picks (before the tracking columns) show a dash.
+function loggedAs(p: PickFull): string {
+  if (!p.verdictAtPick && !p.reason) return "—";
+  const parts = [p.verdictAtPick, p.reason ? REASON_SHORT[p.reason] : null];
+  if (p.gapAtPick !== null) {
+    parts.push(`HR gap ${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)}`);
+  }
+  return parts.filter(Boolean).join(" · ");
+}
 
 export default function PicksList({ picks }: { picks: PickFull[] }) {
   const router = useRouter();
@@ -21,7 +39,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
   if (picks.length === 0) {
     return (
       <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-        No logged picks yet.
+        No picks logged for this selection. Log bets from the This Week cards.
       </p>
     );
   }
@@ -40,6 +58,9 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
             <th>Your line</th>
             <th title="The under score and our number at the time you logged the pick.">
               Model @ pick
+            </th>
+            <th title="The This Week verdict, the reason, and Hard Rock’s gap vs our number when you logged it.">
+              Logged as
             </th>
             <th>Result</th>
             <th title="Profit in units. 1 unit = one standard bet.">Units</th>
@@ -76,15 +97,18 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 {p.modelScore !== null ? `${p.modelScore}` : "—"}
                 {p.modelLine !== null ? ` @ ${p.modelLine}` : ""}
               </td>
+              <td className="text-xs text-[var(--text-muted)]">
+                {loggedAs(p)}
+              </td>
               <td>
                 <span
                   style={{
                     color:
                       p.result === "under"
-                        ? "#16a34a"
+                        ? "var(--under-strong)"
                         : p.result === "over"
-                          ? "#dc2626"
-                          : "#9ca3af",
+                          ? "var(--over)"
+                          : "var(--text-dim)",
                   }}
                 >
                   {p.result}
@@ -95,10 +119,10 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 style={{
                   color:
                     p.units === null
-                      ? "#9ca3af"
+                      ? "var(--text-dim)"
                       : p.units >= 0
-                        ? "#16a34a"
-                        : "#dc2626",
+                        ? "var(--under-strong)"
+                        : "var(--over)",
                 }}
               >
                 {num(p.units)}

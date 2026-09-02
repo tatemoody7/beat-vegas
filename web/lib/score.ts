@@ -60,7 +60,6 @@ export type Factors = {
   fh_share?: number | null;
   // primary-engine fields (gbm_v2 gap ranking, Phase 3)
   rank_basis?: string | null;
-  is_opportunity?: boolean | null;
   // genuine 1H-scoring signal (corr_1h drivers) from PBP
   fh_off_epa_home?: number | null;
   fh_off_epa_away?: number | null;

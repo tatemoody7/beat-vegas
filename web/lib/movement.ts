@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // Port of the "Line movement" tab in beatvegas/dashboard/app.py — per-game 1H
@@ -66,23 +67,20 @@ export function shortT(s: string): string {
   return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 
-export async function getMovement(gameId: number): Promise<Movement> {
-  const snaps = await prisma.$queryRaw<
-    { captured_at: string | null; book: string | null; line: number | null }[]
-  >`
-    SELECT CAST(captured_at AS TEXT) AS captured_at, book, line
-    FROM odds_snapshots
-    WHERE game_id = ${gameId} AND market = '1H_total'
-    ORDER BY captured_at
-  `;
+type MoveSnap = {
+  game_id: number | bigint;
+  captured_at: string | null;
+  book: string | null;
+  line: number | null;
+};
 
+function pivot(snaps: MoveSnap[]): Movement {
   const books = new Set<string>();
   const byTime = new Map<string, MovementPoint>();
   const rows: Movement["rows"] = [];
-
   for (const s of snaps) {
     if (s.line === null || s.captured_at === null) continue;
-    const book = s.book ?? "?";
+    const book = (s.book ?? "?").toLowerCase();
     const t = shortT(s.captured_at);
     books.add(book);
     rows.push({ captured_at: t, book, line: s.line });
@@ -90,10 +88,41 @@ export async function getMovement(gameId: number): Promise<Movement> {
     pt[book] = s.line; // ordered ascending → last write wins (aggfunc="last")
     byTime.set(t, pt);
   }
+  return { books: [...books], points: [...byTime.values()], rows };
+}
 
-  return {
-    books: [...books],
-    points: [...byTime.values()],
-    rows,
-  };
+export async function getMovement(gameId: number): Promise<Movement> {
+  const snaps = await prisma.$queryRaw<MoveSnap[]>`
+    SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line
+    FROM odds_snapshots
+    WHERE game_id = ${gameId} AND market = '1H_total'
+    ORDER BY captured_at
+  `;
+  return pivot(snaps);
+}
+
+// One query for a whole week's board: game id -> movement (only games with
+// more than one snapshot, i.e. something to chart).
+export async function getMovements(
+  gameIds: number[],
+): Promise<Map<number, Movement>> {
+  const out = new Map<number, Movement>();
+  if (gameIds.length === 0) return out;
+  const snaps = await prisma.$queryRaw<MoveSnap[]>`
+    SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line
+    FROM odds_snapshots
+    WHERE game_id IN (${Prisma.join(gameIds)}) AND market = '1H_total'
+    ORDER BY game_id, captured_at
+  `;
+  const byGame = new Map<number, MoveSnap[]>();
+  for (const s of snaps) {
+    const gid = Number(s.game_id);
+    if (!byGame.has(gid)) byGame.set(gid, []);
+    byGame.get(gid)!.push(s);
+  }
+  for (const [gid, rows] of byGame) {
+    if (rows.length < 2) continue;
+    out.set(gid, pivot(rows));
+  }
+  return out;
 }

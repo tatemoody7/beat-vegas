@@ -27,7 +27,7 @@ def _oof_preds(
         + _SEG_COLS
         + cols
     )
-    sub = df.dropna(subset=cols)
+    sub = df.dropna(subset=cols + ["under"])  # played games only
     preds = []
     for ts in sorted(s for s in sub["season"].unique() if s >= first_test_season):
         train = sub[sub["season"] < ts]

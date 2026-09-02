@@ -21,7 +21,7 @@ import pandas as pd
 from ..backtest.engine import BREAKEVEN, _new_model
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
-from ..etl.features import FEATURE_COLS, build_feature_frame
+from ..etl.features import FEATURE_COLS, build_feature_frame, training_frame
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
 from ..factors.board import build_factor_board, factor_references
@@ -30,7 +30,15 @@ from .bv_line import bv_line_for_slate, residual_band
 
 MODEL_VERSION = "gbm_v1"
 MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
-OPPORTUNITY_Z = 0.5  # gap >= 0.5 residual-sigma toward under = flagged
+
+# Verdict gates, in POINTS of bv_gap (line - our 1H number), from the validated
+# top-20%-by-gap selection rule — never in sigmas: bv_sigma (~12 pts) is the
+# per-GAME outcome noise, so a 1-sigma gap never occurs. Mirrored by
+# web/lib/verdict.ts; tests/test_gate_parity.py keeps the two in lock-step.
+BET_GAP_PTS = 1.75  # ~ the season's top-20% gap cutoff -> BET
+STRONG_GAP_PTS = 3.0  # ~ top-10% -> high confidence
+WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
+WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:
@@ -131,13 +139,9 @@ def _factors(
         "line": _f(line),
         "line_kind": (row.get("line_kind") if isinstance(row.get("line_kind"), str) else None),
         "edge": _f(line - proj) if (line is not None and proj is not None) else None,
-        # primary-engine fields (gbm_v2 gap ranking)
+        # primary-engine fields (gbm_v2 gap ranking). The BET/WATCH/PASS verdict
+        # is derived downstream from bv_gap against the point gates above.
         "rank_basis": "bv_gap",
-        "is_opportunity": (
-            bool(row.get("is_opportunity"))
-            if row.get("is_opportunity") is not None and not pd.isna(row.get("is_opportunity"))
-            else None
-        ),
         # genuine 1H-scoring signal chips (corr_1h drivers)
         "fh_off_epa_home": _f(row.get("home_fh_off_epa")),
         "fh_off_epa_away": _f(row.get("away_fh_off_epa")),
@@ -160,7 +164,11 @@ def score_slate(
 ) -> pd.DataFrame:
     if df is None:
         df = build_feature_frame(min_games=2)
-    train = df[df["season"] < target_season]
+    # Train on PLAYED prior-season games only: the frame keeps unplayed rows
+    # (NaN `under`) so the upcoming slate can be scored, and a NaN target must
+    # never reach a fit. Target rows keep their NaN `under` — they have no
+    # outcome yet; that is the point.
+    train = training_frame(df[df["season"] < target_season])
     target = df[df["season"] == target_season].copy()
     if target_week is not None:
         target = target[target["week"] == target_week]
@@ -201,16 +209,10 @@ def score_slate(
     target["bv_hi"] = (target["bv_line"] + hi_off).round(2) if hi_off is not None else None
     target["bv_gap_z"] = (target["bv_gap"] / sigma).round(2) if sigma else None
 
-    # PRIMARY ENGINE (gbm_v2, validated Phase 3): an under opportunity is a game
-    # where the book's line sits materially ABOVE our predicted 1H total —
-    # measured in residual-sigmas (bv_gap_z), so it's noise-aware. Rank the board
-    # by the raw gap (unders only). under_prob/under_score remain a secondary
-    # classifier lean on the card.
-    if sigma:
-        target["is_opportunity"] = target["bv_gap_z"] >= OPPORTUNITY_Z
-    else:
-        target["is_opportunity"] = target["bv_gap"] > 0
-
+    # PRIMARY ENGINE (gbm_v2, validated Phase 3): rank the board by the raw gap
+    # (line ABOVE our predicted 1H total = under lean). The BET/WATCH/PASS call is
+    # made downstream against the POINT gates (BET_GAP_PTS etc.), not a sigma
+    # threshold. under_prob/under_score remain a secondary classifier lean.
     target = target.sort_values("bv_gap", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
     # Stash historical board references (median/spread per factor) on the frame

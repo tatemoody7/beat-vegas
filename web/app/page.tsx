@@ -7,12 +7,14 @@ import BankrollStrip from "@/app/components/BankrollStrip";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import VerdictCard from "@/app/components/VerdictCard";
+import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
 // Landing page: one plain-English verdict per game (BET / WATCH / PASS), how
-// sure we are, why, and the bankroll/discipline strip. The full research
-// board lives at /board.
+// sure we are, why, injuries/news, every book's number, and a "log this bet"
+// button that freezes the verdict onto the pick. The full research board lives
+// at /board; settled results at /results.
 export default async function ThisWeekPage({
   searchParams,
 }: {
@@ -38,12 +40,17 @@ export default async function ThisWeekPage({
             {tw.week !== null ? `This Week · Week ${tw.week}` : "This Week"}
           </h1>
           <p className="bv-page-sub mt-1">
-            {`One verdict per game. BET = clear model edge at a fair-or-better Hard Rock price. WATCH = something is there but not enough. PASS = nothing to act on.`}
+            {`One verdict per game. BET = Hard Rock’s own first-half number sits 1.75+ points above ours at a fair-or-better price. WATCH = something is there but not enough. PASS = nothing to act on.`}
           </p>
         </div>
-        {seasons.length > 0 && (
-          <SeasonSelect seasons={seasons} current={season} />
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {tw.weeks.length > 0 && tw.week !== null && (
+            <WeekSelect weeks={tw.weeks} current={tw.week} />
+          )}
+          {seasons.length > 0 && (
+            <SeasonSelect seasons={seasons} current={season} />
+          )}
+        </div>
       </div>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
@@ -82,6 +89,10 @@ export default async function ThisWeekPage({
             {` pass · `}
             <Link href="/board" className="bv-nav-link">
               full research board →
+            </Link>
+            {` · `}
+            <Link href="/results" className="bv-nav-link">
+              results →
             </Link>
           </p>
 

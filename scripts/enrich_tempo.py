@@ -14,7 +14,7 @@ import argparse
 from datetime import datetime
 
 from beatvegas.db.models import Team, TeamTempo
-from beatvegas.db.store import init_db, session_scope, upsert
+from beatvegas.db.store import session_scope, try_init_db, upsert
 from beatvegas.sources.teamrankings import fetch_tempo, map_to_cfbd
 
 
@@ -24,7 +24,8 @@ def main() -> None:
     ap.add_argument("--week", type=int, required=True)
     ap.add_argument("--date", help="as-of date YYYY-MM-DD (leak-free)")
     args = ap.parse_args()
-    init_db()
+    if not try_init_db():
+        return
 
     df = fetch_tempo(date=args.date)
     now = datetime.utcnow()

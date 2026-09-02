@@ -4,9 +4,9 @@ name: Hard Rock line watch (push alerts)
 # the opener before it moves. Runs in the cloud: GHA reaches the Odds API (HTTPS)
 # AND Neon, and runs even when the Mac is asleep. Three cadences:
 #   - Sunday full-game opener: every 15 min across the ~11am ET drop window.
-#   - Friday 1H sweep: the weekend slate's 1H lines.
-#   - Saturday closing capture (x2): 1H lines shortly before the noon and
-#     evening kickoff waves, so CLV grades against a real closing number.
+#   - Friday 1H sweep: the weekend slate's 1H lines (primary slot + one retry).
+#   - Saturday closing capture (x2, each with one retry): 1H lines shortly before
+#     the noon and evening kickoff waves, so CLV grades against a real close.
 #
 # CREDIT BUDGET (free tier = 500/mo), worst case in-season (4.35 wk/mo,
 # 2 credits per per-event 1H call = totals_h1 x us,us2; 2 per bulk FG poll):
@@ -20,25 +20,43 @@ name: Hard Rock line watch (push alerts)
 #   fewer events than the cap). poll_lines.py's --credit-floor (default 60)
 #   additionally stops any sweep that would eat the Sunday reserve, and pushes
 #   a warning. Off-season the per-event polls cost 0 (no events in window).
+#   RETRY SLOTS (Fri 18:30Z, Sat 15:15Z / 22:45Z) exist because GHA cron drops
+#   ~90% of single-slot runs. They only spend credits when they actually run
+#   a sweep — and a sweep after a successful primary re-polls only events whose
+#   number moved (snapshots are written on change), so the worst case above is
+#   the bound, not the expectation. The Friday card routine no longer
+#   double-dispatches the sweep: it checks `gh run list` for a successful 1h
+#   run today first and only dispatches when none exists.
 #   For more cadence or wider caps, buy a paid Odds API tier.
 #
 # GHA cron routinely fires 5-20+ min late (accepted, not fixable): the */15
 # Sunday window plus first-appearance detection absorbs the drift — a late poll
 # still catches the drop, just minutes later.
+#
+# STEP GATING: the "resolve" step maps the firing schedule (or the manual
+# `market` input) to ONE market output; the poll steps gate on that output, so
+# editing a cron string below can never silently disable a step (an unmapped
+# cron fails the run loudly instead).
 
 on:
   schedule:
     # Sunday full-game opener window — every 15 min, 14:00–17:45 UTC (covers
     # ~10am–1pm EDT and ~9am–12:45pm EST so the 11am-local drop is caught in both
     # DST regimes). First-appearance detection means only the actual drop pushes.
+    # Must END before sunday.yml's 18:00 UTC slot (see that file's header).
     - cron: '*/15 14-17 * * 0'
-    # Weekly 1H sweep — Friday 17:00 UTC (~1pm ET), scoped to the weekend slate.
+    # Weekly 1H sweep — Friday 17:00 UTC (~1pm ET) + retry 18:30 UTC (~2:30pm ET),
+    # scoped to the weekend slate.
     - cron: '0 17 * * 5'
+    - cron: '30 18 * * 5'
     # Saturday closing capture — before the ~12pm ET wave (14:30 UTC = 10:30am
-    # EDT) and before the 7/8pm ET wave (22:00 UTC = 6pm EDT). The 3:30 wave's
-    # closing number comes from the morning run (free-tier compromise).
+    # EDT, retry 15:15) and before the 7/8pm ET wave (22:00 UTC = 6pm EDT, retry
+    # 22:45). The 3:30 wave's closing number comes from the morning run
+    # (free-tier compromise).
     - cron: '30 14 * * 6'
+    - cron: '15 15 * * 6'
     - cron: '0 22 * * 6'
+    - cron: '45 22 * * 6'
   workflow_dispatch:
     inputs:
       market:
@@ -52,6 +70,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
@@ -59,6 +78,43 @@ jobs:
       PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
       PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
+      - name: Resolve market from schedule / input
+        id: resolve
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_MARKET: ${{ inputs.market }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          retry_since=""
+          case "$SCHEDULE" in
+            '*/15 14-17 * * 0')  market=full_game ;;
+            '0 17 * * 5')        market=1h ;;
+            '30 18 * * 5')       market=1h;       retry_since="$(date -u +%F)T16:30:00Z" ;;
+            '30 14 * * 6')       market=1h_close ;;
+            '15 15 * * 6')       market=1h_close; retry_since="$(date -u +%F)T14:00:00Z" ;;
+            '0 22 * * 6')        market=1h_close ;;
+            '45 22 * * 6')       market=1h_close; retry_since="$(date -u +%F)T21:30:00Z" ;;
+            '')                  market="$INPUT_MARKET" ;;   # workflow_dispatch
+            *) echo "::error::unmapped cron '$SCHEDULE' - add it to the resolve step"; exit 1 ;;
+          esac
+          case "$market" in
+            full_game|1h|1h_close) ;;
+            *) echo "::error::unknown market '$market'"; exit 1 ;;
+          esac
+          # A retry slot only spends credits when the primary slot did not land:
+          # skip if a SCHEDULED run of this workflow already succeeded since the
+          # primary slot's window opened (Odds API free tier, see header budget).
+          if [ -n "$retry_since" ]; then
+            done_already=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" \
+              --event schedule --status success --json createdAt \
+              --jq "[.[] | select(.createdAt >= \"$retry_since\")] | length" 2>/dev/null || echo 0)
+            if [ "${done_already:-0}" -gt 0 ]; then
+              echo "primary slot already succeeded since $retry_since; retry slot skipping"
+              market=skip
+            fi
+          fi
+          echo "market=$market" >> "$GITHUB_OUTPUT"
+          echo "resolved market=$market (schedule='$SCHEDULE')"
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
@@ -66,13 +122,13 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Full-game opener capture + Hard Rock push (Sunday window)
-        if: github.event.schedule == '*/15 14-17 * * 0' || github.event.inputs.market == 'full_game'
+        if: steps.resolve.outputs.market == 'full_game'
         run: python scripts/poll_full_game.py --source oddsapi --push
       - name: 1H capture + Hard Rock push (Friday sweep)
-        if: github.event.schedule == '0 17 * * 5' || github.event.inputs.market == '1h'
+        if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --push --no-alerts --days-ahead 3 --max-events 18
       - name: 1H closing capture (Saturday, upcoming games only)
-        if: github.event.schedule == '30 14 * * 6' || github.event.schedule == '0 22 * * 6' || github.event.inputs.market == '1h_close'
+        if: steps.resolve.outputs.market == '1h_close'
         run: python scripts/poll_lines.py --push --no-alerts --days-ahead 1 --hours-back 0 --max-events 10
       - name: Alert on failure (red run = capture or push problem)
         if: failure()

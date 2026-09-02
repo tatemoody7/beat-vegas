@@ -1,5 +1,9 @@
 import { unstable_cache } from "next/cache";
+import { median } from "@/lib/format";
+import { MARKET_LEDGER_1H, MODEL_VERSION } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
+import { hasFbsSeason, isFbsGame } from "@/lib/proxy";
+import { Prisma } from "@prisma/client";
 
 // Port of the "Research" tab in beatvegas/dashboard/app.py — the edge question
 // (realized 1H/full-game ratio) + model_runs over time.
@@ -16,12 +20,6 @@ export type ModelRunRow = {
   top_roi: number | null;
   notes: string | null;
 };
-
-function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
 
 // --- Gap vs CLV: do our biggest BV-vs-Vegas gaps earn positive closing-line
 // value? The verdict on the whole "make our own number" method. Gap is in the
@@ -55,9 +53,14 @@ const r2 = (v: number | null): number | null =>
 // movement, independent of the model's own entry timing. predVersion supplies
 // the BV line.
 async function getGapClvBucketsUncached(
-  resultLedger = "market",
-  predVersion = "gbm_v1",
+  season?: number,
+  resultLedger: string = MARKET_LEDGER_1H,
+  predVersion: string = MODEL_VERSION,
 ): Promise<GapBucket[]> {
+  // Season-scoped when asked (the Research page has a season selector); an
+  // undefined season keeps the all-time view.
+  const seasonFilter =
+    season === undefined ? Prisma.empty : Prisma.sql`AND g.season = ${season}`;
   const rows = await prisma.$queryRaw<
     {
       gap: number | null;
@@ -69,11 +72,13 @@ async function getGapClvBucketsUncached(
     SELECT (r.line_used - p.bv_line) AS gap, r.clv, r.units, r.under_hit
     FROM results r
     JOIN predictions p ON p.game_id = r.game_id
+    JOIN games g ON g.id = r.game_id
     WHERE r.model_version = ${resultLedger}
       AND p.model_version = ${predVersion}
       AND r.clv IS NOT NULL
       AND p.bv_line IS NOT NULL
       AND r.line_used IS NOT NULL
+      ${seasonFilter}
   `;
   return GAP_BUCKETS.map((b) => {
     const inB = rows.filter(
@@ -173,19 +178,35 @@ export const getBvCalibration = unstable_cache(
   { revalidate: 3600 },
 );
 
-async function getEdgeStatsUncached(): Promise<EdgeStats> {
+// Realized 1H share of the full-game total. FBS-vs-FBS only (etl/fbs.py) —
+// lower-division games run a higher share and would bias the read.
+async function getEdgeStatsUncached(season?: number): Promise<EdgeStats> {
+  const seasonFilter =
+    season === undefined ? Prisma.empty : Prisma.sql`AND season = ${season}`;
   const rows = await prisma.$queryRaw<
-    { first_half_total: number | bigint; full_game_total: number }[]
+    {
+      season: number | bigint;
+      home_team: string | null;
+      away_team: string | null;
+      first_half_total: number | bigint;
+      full_game_total: number;
+    }[]
   >`
-    SELECT first_half_total, full_game_total FROM games
+    SELECT season, home_team, away_team, first_half_total, full_game_total
+    FROM games
     WHERE first_half_total IS NOT NULL AND full_game_total > 0
+      ${seasonFilter}
   `;
-  if (rows.length === 0) return null;
-  const ratios = rows.map(
-    (r) => Number(r.first_half_total) / r.full_game_total,
-  );
+  const ratios = rows
+    .filter(
+      (r) =>
+        !hasFbsSeason(Number(r.season)) ||
+        isFbsGame(Number(r.season), r.home_team, r.away_team),
+    )
+    .map((r) => Number(r.first_half_total) / r.full_game_total);
+  if (ratios.length === 0) return null;
   const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-  return { games: ratios.length, mean, median: median(ratios) };
+  return { games: ratios.length, mean, median: median(ratios) ?? mean };
 }
 
 export const getEdgeStats = unstable_cache(

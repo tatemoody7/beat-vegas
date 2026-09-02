@@ -22,9 +22,16 @@ on:
         required: false
         default: "auto"
 
+# Shares sunday.yml's concurrency group: both write derived_lines with a
+# delete-then-insert, so they must never overlap.
+concurrency:
+  group: sunday
+  cancel-in-progress: false
+
 jobs:
   post-lines:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}

@@ -14,8 +14,9 @@ total from the full feature set (it never sees a Vegas number:
 gap = line − predicted_1H_total      (+gap = line ABOVE our number = under lean)
 ```
 
-An **opportunity** is flagged when the gap exceeds half a residual-sigma
-(`bv_gap_z >= 0.5`) — noise-aware, so a small gap on a noisy line isn't oversold.
+Verdict gates are in **points** (BET at a gap ≥ 1.75, the validated top-20% band —
+see `BETTING_POLICY.md`); the earlier `bv_gap_z >= 0.5` flag was dropped in 2026-09
+because σ ≈ 12 is per-game outcome noise and a σ-based gate never fired.
 `score_slate` (`beatvegas/model/score.py`) sorts by `bv_gap` and stores the gap-ranked
 predictions; the old classifier `under_score` survives as a secondary lean on the card.
 

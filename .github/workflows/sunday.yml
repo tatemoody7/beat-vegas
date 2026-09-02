@@ -3,7 +3,8 @@ name: Sunday opener capture + score
 # Captures the full-game opener and re-scores the board, writing to Neon. Runs in
 # the cloud because the local Mac's usual network can't reach Neon (port 5432
 # filtered). GHA runners reach Neon fine and run even when the Mac is asleep.
-# The "DK fired" iMessage stays local (deploy/com.beatvegas.sunday-notify.plist).
+# The Sunday 4:45pm ET Claude routine (cfb-sunday-ops) re-dispatches this
+# workflow if cron dropped it and texts the recap; no local launchd job remains.
 
 on:
   schedule:
@@ -18,8 +19,9 @@ on:
     - cron: '0 18 * * 0'
     - cron: '0 19 * * 0'
     # Third slot: GitHub cron is best-effort (17 of 19 scheduled runs were
-    # dropped Aug 28-30 2026). Costs 3 credits when it fires; the local
-    # Sunday backstop task also re-kicks this workflow if none ran today.
+    # dropped Aug 28-30 2026). Costs 3 credits when it fires; the Sunday
+    # 4:45pm ET routine (cfb-sunday-ops) also re-kicks this workflow if none
+    # ran today.
     - cron: '30 20 * * 0'
   workflow_dispatch: {}
 
@@ -30,6 +32,7 @@ concurrency:
 jobs:
   capture-and-score:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
@@ -57,6 +60,7 @@ jobs:
         # window and the 1H sweeps stay us,us2 to fit the free tier.
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
+        id: pace
         # combined_sec_play / combined_plays are model inputs joined on exact
         # (season, week, team) — without this row the upcoming week scores with
         # pace = NaN. Unofficial scrape: a TeamRankings outage must not block
@@ -67,6 +71,7 @@ jobs:
         timeout-minutes: 5
         run: python scripts/enrich_tempo.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }} --date "$(date -u +%F)"
       - name: Refresh weather forecasts for the active week (Open-Meteo)
+        id: weather
         # wx_* are model inputs joined on game_id; the forecast API covers the
         # coming Saturday from Sunday (16-day horizon). Non-fatal for the same
         # reason as pace.
@@ -88,6 +93,24 @@ jobs:
             exit 0
           fi
           python scripts/post_derived_lines.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
+      - name: Warn when the board scored WITHOUT pace/weather
+        # The enrichment steps are continue-on-error so an unofficial-source
+        # outage never blocks the board, but a silent miss means the week
+        # scored with pace/wx = NaN. Surface it (summary + Pushover WARNING,
+        # not a failure) whenever either step did not succeed.
+        if: steps.active.outputs.week != '' && (steps.pace.outcome != 'success' || steps.weather.outcome != 'success')
+        env:
+          PACE_OUTCOME: ${{ steps.pace.outcome }}
+          WX_OUTCOME: ${{ steps.weather.outcome }}
+        run: |
+          MSG="scored WITHOUT pace/weather (pace=$PACE_OUTCOME, weather=$WX_OUTCOME)"
+          echo "::warning::$MSG"
+          echo "## WARNING: $MSG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Board posted; pace/wx chips may read 'no data' for the active week. Re-run the failed enrichment or re-dispatch sunday.yml." >> "$GITHUB_STEP_SUMMARY"
+          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
+            -F "title=Beat Vegas — Sunday WARNING" \
+            -F "message=Run $GITHUB_RUN_ID $MSG. Board is posted but pace/weather inputs are missing." \
+            https://api.pushover.net/1/messages.json || true
       - name: Alert on failure (red run = no capture/scoring happened)
         if: failure()
         run: |

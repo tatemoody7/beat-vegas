@@ -1,3 +1,5 @@
+import { MODEL_BET_THRESHOLD } from "@/lib/verdict";
+
 // Port of the score-color + chip logic from beatvegas/dashboard/app.py and
 // beatvegas/model/score.py::_factors. Keep faithful to those so the web board
 // matches the Streamlit view exactly.
@@ -80,7 +82,7 @@ export function parseFactors(raw: string | null | undefined): Factors {
 export function scoreColor(score: number | null | undefined): string {
   if (score === null || score === undefined) return "#6b7280"; // grey
   if (score >= 60) return "#16a34a"; // strong under (green)
-  if (score >= 53) return "#65a30d"; // lean under (lime)
+  if (score >= MODEL_BET_THRESHOLD) return "#65a30d"; // lean under (lime)
   if (score >= 47) return "#ca8a04"; // neutral (amber)
   if (score >= 40) return "#ea580c"; // lean over (orange)
   return "#dc2626"; // over (red)
@@ -91,7 +93,7 @@ export function scoreColor(score: number | null | undefined): string {
 export function scoreLabel(score: number | null | undefined): string {
   if (score === null || score === undefined) return "no read";
   if (score >= 60) return "Strong under";
-  if (score >= 53) return "Lean under";
+  if (score >= MODEL_BET_THRESHOLD) return "Lean under";
   if (score >= 47) return "Coin flip";
   if (score >= 40) return "Lean over";
   return "Over";

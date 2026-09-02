@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from beatvegas.etl.match import _norm, match_event, name_score, resolve_game
 from beatvegas.sources.odds import normalize_first_half
 
@@ -165,3 +167,22 @@ def test_normalize_book_filter_and_missing_market():
     ev = dict(SAMPLE_EVENT)
     rows = normalize_first_half([ev], books=["fanduel"])
     assert rows == []  # draftkings filtered out
+
+
+# --- CFBD abbreviations / renamed schools vs Odds API spelled-out names ------
+
+
+@pytest.mark.parametrize(
+    "cfbd, odds",
+    [
+        ("App State", "Appalachian State Mountaineers"),
+        ("SE Louisiana", "Southeastern Louisiana Lions"),
+        ("The Citadel", "Citadel Bulldogs"),
+        ("Houston Christian", "Houston Baptist Huskies"),
+        ("Long Island University", "LIU Sharks"),
+        ("Kansas", "Kansas Jayhawks"),
+    ],
+)
+def test_name_score_handles_cfbd_abbreviations_and_renames(cfbd, odds):
+    # All five were unmatched in the 2026-09-02 Sunday capture.
+    assert name_score(cfbd, odds) >= 0.99

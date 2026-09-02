@@ -38,6 +38,13 @@ describe("parsePickBody", () => {
     const r2 = parsePickBody({ ...good, isPaper: true, stake: 3 });
     expect(r2.ok && r2.pick.stake).toBe(1);
   });
+  it("real picks are ALWAYS 1 flat unit — the client's stake is ignored, never rejected", () => {
+    for (const stake of [3, 0, -2, null, "abc", NaN]) {
+      const r = parsePickBody({ ...good, stake });
+      expect(r.ok).toBe(true);
+      expect(r.ok && r.pick.stake).toBe(1);
+    }
+  });
   it("rejects a real-money full-game pick but allows it as paper", () => {
     const real = parsePickBody({ ...good, market: "full" });
     expect(real.ok).toBe(false);
@@ -100,6 +107,27 @@ describe("checkPolicy", () => {
     expect(
       checkPolicy({ ...pick, isPaper: true }, { ...ctx, realWeekCount: 9 }),
     ).toEqual({ ok: true });
+  });
+  it("real money only on a BET verdict; paper and verdict-less picks pass", () => {
+    const watchReal = checkPolicy({ ...pick, verdict: "WATCH" }, ctx);
+    expect(watchReal).toMatchObject({ ok: false, status: 409 });
+    if (!watchReal.ok) {
+      expect(watchReal.error).toBe(
+        "WATCH is not a bet — policy allows real money on BET verdicts only. Log it as a paper pick.",
+      );
+    }
+    expect(checkPolicy({ ...pick, verdict: "PASS" }, ctx)).toMatchObject({
+      ok: false,
+      status: 409,
+    });
+    expect(
+      checkPolicy({ ...pick, verdict: "WATCH", isPaper: true }, ctx),
+    ).toEqual({ ok: true });
+    expect(checkPolicy({ ...pick, verdict: "BET" }, ctx)).toEqual({ ok: true });
+    // Backwards compat: no verdict on the request → not gated.
+    expect(checkPolicy({ ...pick, verdict: undefined }, ctx)).toEqual({
+      ok: true,
+    });
   });
   it("rejects off-slate, post-kickoff and duplicate picks", () => {
     expect(checkPolicy(pick, { ...ctx, inSlate: false })).toMatchObject({

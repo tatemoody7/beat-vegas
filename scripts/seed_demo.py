@@ -7,7 +7,7 @@ Copies the real DB to data/demo.db, then for a real past week synthesizes:
   - a handful of sample manual picks (graded)
 
 Your real beatvegas.db is never touched. Launch the dashboard against the demo
-DB with:  BEATVEGAS_DB=data/demo.db streamlit run beatvegas/dashboard/app.py
+DB with:  python scripts/simulate_week.py  # replays a week into the local sandbox using these helpers
 
 The synthesize/grade/score steps are exposed as importable functions so the week
 simulator (scripts/simulate_week.py -> beatvegas/pipeline.py) reuses them against

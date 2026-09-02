@@ -7,9 +7,13 @@ export const dynamic = "force-dynamic";
 // CSV export of a season's records (opens in Excel/Sheets). XLSX is a future
 // add (needs a spreadsheet lib); CSV imports natively into both.
 export async function GET(req: NextRequest) {
-  const season = Number(req.nextUrl.searchParams.get("season"));
-  if (!Number.isFinite(season)) {
-    return new Response("bad season", { status: 400 });
+  // Number(null) is 0 and Number("2025.5") is finite — require a real season.
+  const raw = req.nextUrl.searchParams.get("season");
+  const season = raw === null || raw.trim() === "" ? NaN : Number(raw);
+  if (!Number.isInteger(season) || season < 2000) {
+    return new Response("bad season (integer year >= 2000 required)", {
+      status: 400,
+    });
   }
   const rows = await getSeasonRecords(season);
   const csv = recordsToCsv(rows);

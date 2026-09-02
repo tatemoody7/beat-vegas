@@ -23,6 +23,7 @@ Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + clo
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -286,6 +287,17 @@ def main() -> None:
     if unmatched_names:
         uniq = sorted(set(unmatched_names))
         print(f"unmatched events ({len(uniq)}): {uniq[:10]}" + (" ..." if len(uniq) > 10 else ""))
+
+    # Fail LOUD when nothing was captured: a dead key, an empty feed, or every
+    # event unmatched must not leave sunday.yml green with an empty board
+    # (see post_derived_lines.py for the same rule). Off-season runs are
+    # skipped by the workflow before this script runs.
+    if not fg_rows:
+        print("::error::no full-game rows came back from the source — nothing captured")
+        sys.exit(1)
+    if matched == 0:
+        print("::error::no events matched a CFBD game — nothing captured")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

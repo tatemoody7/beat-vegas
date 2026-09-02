@@ -61,7 +61,7 @@ def test_enrich_qb_out_flags_from_rotowire(monkeypatch, capsys):
     assert by_gid.loc[1, "qb_out_detail"] == "Michigan State: QB Sam Starter — Out"
     assert bool(by_gid.loc[2, "qb_out_home"]) is False  # Probable QB is not out
     assert bool(by_gid.loc[2, "qb_out_away"]) is False
-    assert by_gid.loc[2, "qb_out_detail"] is None
+    assert by_gid.loc[2, "qb_out_detail"] is None or pd.isna(by_gid.loc[2, "qb_out_detail"])
     assert "qb-out flags: 1/2" in capsys.readouterr().out
 
 

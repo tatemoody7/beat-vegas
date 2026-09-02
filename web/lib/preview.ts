@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
-// Week research preview: this week's games + ESPN news/injuries/QB-out, pulled by
-// scripts/research_preview.py into game_previews. DISPLAY ONLY (unofficial ESPN).
+// Week research preview: this week's games + injuries/QB-out (Rotowire's college
+// injury report) and team news (ESPN), pulled by scripts/research_preview.py
+// into game_previews. DISPLAY ONLY — both sources are unofficial.
 
 export type PreviewGame = {
   gameId: number;

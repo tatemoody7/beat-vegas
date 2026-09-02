@@ -14,13 +14,31 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _PUNCT = re.compile(r"[^a-z0-9 ]+")
 
+# Odds API spells schools out (or uses a stale name); CFBD abbreviates. Both
+# sides are normalized through this map so orientation never matters. Found
+# live on 2026-09-02 (all five were unmatched in the Sunday capture; App State
+# is an FBS team and would never have reached the Friday sweep).
+_SCHOOL_ALIASES = {
+    "appalachian state": "app state",
+    "southeastern louisiana": "se louisiana",
+    "citadel": "the citadel",
+    "houston baptist": "houston christian",
+    "liu": "long island university",
+}
+
 
 def _norm(name: Optional[str]) -> str:
     if not name:
         return ""
     s = name.lower().replace("&", "and").replace(".", "")
     s = _PUNCT.sub(" ", s)
-    return re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"\s+", " ", s).strip()
+    # Alias the school part whether or not a mascot is appended.
+    for src, dst in _SCHOOL_ALIASES.items():
+        if s == src or s.startswith(src + " "):
+            s = dst + s[len(src) :]
+            break
+    return s
 
 
 def name_score(cfbd_school: str, odds_name: str) -> float:

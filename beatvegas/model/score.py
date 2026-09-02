@@ -28,7 +28,7 @@ from ..factors.board import build_factor_board, factor_references
 from ..factors.ledger import load_ledger
 from .bv_line import bv_line_for_slate, residual_band
 
-MODEL_VERSION = "gbm_v1"
+MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the engine itself is the gbm_v2 gap ranker
 MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
 
 # Verdict gates, in POINTS of bv_gap (line - our 1H number), from the validated
@@ -39,6 +39,12 @@ BET_GAP_PTS = 1.75  # ~ the season's top-20% gap cutoff -> BET
 STRONG_GAP_PTS = 3.0  # ~ top-10% -> high confidence
 WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
 WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
+# Hard Rock's 1H total more than this far BELOW the market's = off-market
+# number: giving up points on an under + void risk under HR house rules. WATCH.
+HR_OFF_MARKET_PTS = 0.5
+# weekly_update --min-games: both teams need this many games for a model read,
+# so weeks 1-2 have no model by design.
+MIN_GAMES_FOR_MODEL = 2
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:

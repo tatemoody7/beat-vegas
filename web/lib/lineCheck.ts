@@ -16,8 +16,9 @@ const MARKET_DB: Record<Market, string> = {
   "1h": "1H_total",
 };
 
-// Hard Rock keys, FL preferred (mirror beatvegas/hardrock.py).
-const HR_KEYS = ["hardrockbet_fl", "hardrockbet"];
+// Hard Rock's live Odds API key (mirror beatvegas/hardrock.py). The docs'
+// `hardrockbet_fl` never appears in the feed, so it is not listed.
+const HR_KEYS = ["hardrockbet"];
 
 export type BookLine = {
   book: string;
@@ -43,8 +44,6 @@ export type LineCheckRow = {
   verdict: Verdict;
   // Devig / EV layer:
   hrUnderPrice: number | null;
-  hrFairUnder: number | null; // HR's own no-vig fair under
-  hrHold: number | null; // HR's two-way hold (overround)
   marketFairUnder: number | null; // consensus no-vig fair-under at HR's line
   ev: number | null; // per-$1 EV of HR's under vs marketFairUnder
   evVerdict: EvVerdict;
@@ -167,10 +166,6 @@ export async function getLineCheck(
     // under at a COMPARABLE number (other books within half a point of HR's
     // line) — keeps it apples-to-apples rather than mixing different totals.
     const hrUnderPrice = hrObs?.underPrice ?? null;
-    const hrTwoWay =
-      hrObs && hrObs.overPrice !== null && hrObs.underPrice !== null
-        ? devigTwoWay(hrObs.overPrice, hrObs.underPrice)
-        : null;
     const comparable =
       hrLine === null
         ? []
@@ -196,8 +191,6 @@ export async function getLineCheck(
       delta: hrLine === null ? null : Number((hrLine - best).toFixed(2)),
       verdict: verdictFor(hrLine, best),
       hrUnderPrice,
-      hrFairUnder: hrTwoWay?.fairUnder ?? null,
-      hrHold: hrTwoWay?.hold ?? null,
       marketFairUnder,
       ev,
       evVerdict: evVerdictFor(ev),

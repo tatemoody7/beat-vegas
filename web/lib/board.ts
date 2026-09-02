@@ -15,7 +15,6 @@ export type BoardRow = {
   underScore: number | null;
   underProb: number | null;
   rank: number | null;
-  fullGameTotal: number | null;
   factors: Factors;
   openLine: number | null;
   curLine: number | null;
@@ -25,8 +24,6 @@ export type BoardRow = {
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
-  // gap in units of the BV line's own noise (σ) — context only, never a gate.
-  liveGapZ: number | null;
   // manual display-only nudge applied to the BV line (e.g. confirmed QB-out).
   bvAdjust: number | null;
   bvAdjustReason: string | null;
@@ -45,12 +42,10 @@ type PredRow = {
   bv_gap: number | null;
   bv_lo: number | null;
   bv_hi: number | null;
-  bv_sigma: number | null;
   week: number | bigint;
   start_date: Date | null;
   away_team: string | null;
   home_team: string | null;
-  full_game_total: number | null;
 };
 
 type SnapRow = {
@@ -112,9 +107,11 @@ export async function consensusLines(
 }
 
 // Latest manual BV adjustment per game (display-only nudge, e.g. QB-out).
-async function bvAdjustments(): Promise<
-  Map<number, { delta: number; reason: string | null }>
-> {
+// Season-scoped like every other board read: an unbounded scan grows with each
+// season of nudges and the board only ever needs this season's games.
+async function bvAdjustments(
+  season: number,
+): Promise<Map<number, { delta: number; reason: string | null }>> {
   const rows = await prisma.$queryRaw<
     {
       game_id: number | bigint;
@@ -123,8 +120,11 @@ async function bvAdjustments(): Promise<
       created_at: string | null;
     }[]
   >`
-    SELECT game_id, delta_pts, reason, CAST(created_at AS TEXT) AS created_at
-    FROM bv_adjustments ORDER BY created_at
+    SELECT a.game_id, a.delta_pts, a.reason,
+           CAST(a.created_at AS TEXT) AS created_at
+    FROM bv_adjustments a JOIN games g ON g.id = a.game_id
+    WHERE g.season = ${season}
+    ORDER BY a.created_at
   `;
   const out = new Map<number, { delta: number; reason: string | null }>();
   for (const r of rows) {
@@ -140,8 +140,8 @@ async function bvAdjustments(): Promise<
 export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
-           p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi, p.bv_sigma,
-           g.week, g.start_date, g.away_team, g.home_team, g.full_game_total
+           p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
+           g.week, g.start_date, g.away_team, g.home_team
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
       AND p.model_version = (
@@ -158,7 +158,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
   `;
   const [lines, adjustments] = await Promise.all([
     consensusLines(season),
-    bvAdjustments(),
+    bvAdjustments(season),
   ]);
   return preds.map((p) => {
     const gid = Number(p.game_id);
@@ -171,17 +171,12 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       rawBv !== null && adj
         ? Math.round((rawBv + adj.delta) * 100) / 100
         : rawBv;
-    const bvSigma = num(p.bv_sigma);
     // Prefer the gap vs the live consensus; fall back to the gap baked in at
     // scoring time (bv_gap = line_used − bv_line) when no live line exists.
     const liveGap =
       curLine !== null && bvLine !== null
         ? Math.round((curLine - bvLine) * 100) / 100
         : num(p.bv_gap);
-    const liveGapZ =
-      liveGap !== null && bvSigma && bvSigma > 0
-        ? Math.round((liveGap / bvSigma) * 100) / 100
-        : null;
     return {
       gameId: gid,
       week: Number(p.week),
@@ -191,7 +186,6 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       underScore: num(p.under_score),
       underProb: p.under_probability ?? null,
       rank: num(p.rank),
-      fullGameTotal: p.full_game_total ?? null,
       factors: parseFactors(p.factors_json),
       openLine: l?.open ?? null,
       curLine,
@@ -201,7 +195,6 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       bvHi:
         adj && num(p.bv_hi) !== null ? num(p.bv_hi)! + adj.delta : num(p.bv_hi),
       liveGap,
-      liveGapZ,
       bvAdjust: adj?.delta ?? null,
       bvAdjustReason: adj?.reason ?? null,
     };

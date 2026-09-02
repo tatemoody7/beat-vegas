@@ -31,9 +31,9 @@ the bet card follows. Change it here first, then in code.
   confirmed edge**; only real-line CLV this season can show one.
 - Full-game is decision-support only. Its backtest on real lines found no
   edge; it stays on the board as context.
-- Bets are placed on Hard Rock Bet (the only Florida book). Always check the
-  Line Check page first: a Hard Rock price worse than the market's fair price
-  turns a BET into a WATCH.
+- Bets are placed on Hard Rock Bet (the only Florida book). Every This Week card shows
+  Hard Rock's price against the market's fair price: a worse price turns a BET
+  into a WATCH.
 
 ## Where you can legally bet in Florida (checked 2026-09-01)
 
@@ -49,7 +49,7 @@ the bet card follows. Change it here first, then in code.
   carry our real-money market. **Use: price comparison only.** Kalshi,
   Polymarket, Novig and ProphetX flow into the Sunday full-game capture via
   The Odds API region `us_ex` and sharpen the "market fair price" Hard Rock
-  is judged against on Line Check. FanDuel Predicts is not in any feed we use.
+  is judged against on each This Week card. FanDuel Predicts is not in any feed we use.
 - **Sweepstakes / DFS** — Fliff (sweepstakes book; its lines are in our feed),
   PrizePicks, Underdog, DraftKings Pick6. Not used.
 
@@ -66,6 +66,10 @@ A game is BET when all of these hold:
 3. A **live** first-half line has actually been captured — never an estimate.
 4. Hard Rock's under price is fair or better vs the market's no-vig fair
    price.
+5. Hard Rock's first-half total is **not more than 0.5 points below the
+   market's** — a lower number is a worse under, and Hard Rock's house rules
+   can void bets on lines that differ materially from the general market.
+   Off-market numbers are WATCH until Hard Rock moves back toward the market.
 
 Sigma (~12 points) is the noise of any single game's outcome. It is why
 every card says "still close to a coin flip on any single game" and why we
@@ -76,7 +80,7 @@ bet many small edges rather than one big one. It is not a gate.
 - Any bet is a **price bet**, not a model bet: Hard Rock's under paying
   better than the market's fair price. These show as WATCH — "price edge
   only". Fewer bets is the right answer; the bar is high.
-- Before any bet: read the Week Preview injury lines (unofficial ESPN) — the
+- Before any bet: read the injuries and news block on each This Week card (unofficial Rotowire / ESPN) — the
   number does not know about a starting QB being out.
 
 ## Weekly rhythm
@@ -88,13 +92,13 @@ Claude routines re-dispatch whatever is still missing before they need it.
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
-| Tue / Fri 9am                | News + injuries / QB-out → Week Preview                 | `research_preview.yml` |
+| Tue / Fri 9am                | News + injuries / QB-out → This Week cards                 | `research_preview.yml` |
 | Fri 1pm (retry 2:30pm)       | First-half line sweep (18 events, ranked by bettability, credit-guarded) | `lines_watch.yml` |
 | Fri 6pm                      | **Bet card routine**: verify/kick sweep + preview (never double-dispatch), build the card, log paper picks, text | `cfb-friday-card` |
 | Sat 10:30am (retry 11:15am), 6pm (retry 6:45pm) | Closing 1H lines captured (for CLV)  | `lines_watch.yml`   |
 | Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |
 | Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
-| Monday                       | Weekly review together; adjust for next week            | `/weekly-review`    |
+| Monday                       | Weekly review together; adjust for next week            | `/results`    |
 
 ## Measuring, not promising
 

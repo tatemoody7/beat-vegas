@@ -20,14 +20,13 @@ because σ ≈ 12 is per-game outcome noise and a σ-based gate never fired.
 `score_slate` (`beatvegas/model/score.py`) sorts by `bv_gap` and stores the gap-ranked
 predictions; the old classifier `under_score` survives as a secondary lean on the card.
 
-**Validation gate** (`scripts/validate_engine.py`, proxy-graded, 2018+ OOS, top 20%):
-
-| Engine | Under% | ROI |
-|---|---|---|
-| gbm_v1 classifier (old) | 53.1% | +1.4% |
-| **gbm_v2 BV-gap (new)** | **54.0%** | **+3.0%** |
-
-Profitable in 6 of 8 OOS seasons.
+**Validation gate** (`scripts/validate_engine.py`, proxy-graded, top 20% by gap):
+the gap ranking passed the gate against the flat-0.52 proxy in use at the time
+(54.0% / +3.0% vs the classifier's 53.1% / +1.4%). That flat proxy was later
+shown to sit ~1 pt above a fair first-half line; against the fair step proxy
+(`data/multiplier.json`) the proxy-graded edge disappears (50.2% / -4.1% on
+2023-25). The gap band is kept as the RANKING rule; only real-line closing-line
+value can show an edge. See CLAUDE.md "Honest status of the edge".
 
 ## The factor framework
 

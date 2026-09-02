@@ -3,7 +3,6 @@
 // leaks into the UI as "betonlineag".
 export const BOOK_LABELS: Record<string, string> = {
   hardrockbet: "Hard Rock",
-  hardrockbet_fl: "Hard Rock (FL)",
   draftkings: "DraftKings",
   fanduel: "FanDuel",
   betmgm: "BetMGM",

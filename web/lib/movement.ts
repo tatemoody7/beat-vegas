@@ -2,14 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // Port of the "Line movement" tab in beatvegas/dashboard/app.py — per-game 1H
-// line history, one series per book over captured_at.
-
-export type MovementGame = {
-  id: number;
-  week: number;
-  matchup: string;
-  snaps: number;
-};
+// line history, one series per book over captured_at. Rendered inline on the
+// board cards (getMovements for a whole week); there is no standalone page.
 
 export type MovementPoint = { t: string } & Record<string, number | string>;
 
@@ -18,32 +12,6 @@ export type Movement = {
   points: MovementPoint[]; // pivoted: one row per captured_at, a column per book
   rows: { captured_at: string; book: string; line: number }[]; // ET-formatted, ordered
 };
-
-// Games with >1 snapshot for the season, labeled + sorted by week (app.py:180-186).
-export async function getMovementGames(
-  season: number,
-): Promise<MovementGame[]> {
-  const rows = await prisma.$queryRaw<
-    {
-      id: number | bigint;
-      week: number | bigint;
-      matchup: string;
-      snaps: number | bigint;
-    }[]
-  >`
-    SELECT g.id, g.week, g.away_team || ' @ ' || g.home_team AS matchup,
-           COUNT(*) AS snaps
-    FROM games g JOIN odds_snapshots o ON o.game_id = g.id
-    WHERE g.season = ${season} AND o.market = '1H_total'
-    GROUP BY g.id HAVING COUNT(*) > 1 ORDER BY g.week
-  `;
-  return rows.map((r) => ({
-    id: Number(r.id),
-    week: Number(r.week),
-    matchup: r.matchup,
-    snaps: Number(r.snaps),
-  }));
-}
 
 // "2025-10-13 12:00:00.000000" (stored naive UTC) -> "10-13 08:00" in ET.
 // Without the conversion every point on the movement chart reads 4-5h late
@@ -89,16 +57,6 @@ function pivot(snaps: MoveSnap[]): Movement {
     byTime.set(t, pt);
   }
   return { books: [...books], points: [...byTime.values()], rows };
-}
-
-export async function getMovement(gameId: number): Promise<Movement> {
-  const snaps = await prisma.$queryRaw<MoveSnap[]>`
-    SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line
-    FROM odds_snapshots
-    WHERE game_id = ${gameId} AND market = '1H_total'
-    ORDER BY captured_at
-  `;
-  return pivot(snaps);
 }
 
 // One query for a whole week's board: game id -> movement (only games with

@@ -21,7 +21,6 @@
 
   /* Outcome semantics — mirror web/lib/score.ts scoreColor (do not change) */
   --under-strong: #16a34a; /* green  */
-  --under-lean: #65a30d; /* lime   */
   --neutral: #ca8a04; /* amber  */
   --over-lean: #ea580c; /* orange */
   --over: #dc2626; /* red    */
@@ -31,22 +30,9 @@
     0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --shadow-card-hover:
     0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -16px rgba(2, 132, 199, 0.35);
-
-  /* Compat with any legacy refs */
-  --background: var(--bg);
-  --foreground: var(--text);
 }
 
 @theme inline {
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-bv-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-strong: var(--accent-strong);
-  --color-text-muted: var(--text-muted);
-  --color-text-dim: var(--text-dim);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-display);

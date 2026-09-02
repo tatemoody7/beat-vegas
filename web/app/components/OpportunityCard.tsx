@@ -201,7 +201,7 @@ export default function OpportunityCard({
                 className="inline-block rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-300"
                 title={
                   row.factors.qb_out_detail ??
-                  "Starting QB listed out (live ESPN, unofficial). Not a model input."
+                  "Starting QB listed out (live Rotowire, unofficial). Not a model input."
                 }
               >
                 ⚠ QB OUT

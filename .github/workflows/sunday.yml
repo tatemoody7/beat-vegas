@@ -48,6 +48,7 @@ jobs:
           echo "season=$SEASON" >> "$GITHUB_OUTPUT"
           echo "week=$WEEK" >> "$GITHUB_OUTPUT"
       - name: Capture full-game openers (multi-book incl. Hard Rock + no-vig exchanges)
+        if: steps.active.outputs.week != ''
         # us_ex adds Kalshi / Novig / ProphetX / BetOpenly (CFTC exchanges, ~0 vig):
         # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
         # only — they sharpen the market fair price Hard Rock is judged against.

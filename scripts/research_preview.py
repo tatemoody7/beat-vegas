@@ -22,6 +22,7 @@ import json
 import sys
 from datetime import datetime
 
+from beatvegas import ci
 from beatvegas.db.models import Game, GamePreview, Team
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.season import current_season
@@ -51,9 +52,9 @@ def main() -> None:
     report = rotowire.fetch_injury_report()  # one call for the whole slate
     espn_ok = teams_available()
     if not report:
-        print("[rotowire] WARNING: injury report empty/unreachable — injuries will be blank")
+        ci.warn("[rotowire] injury report empty/unreachable — injuries will be blank")
     if not espn_ok:
-        print("[espn] WARNING: team list empty (blocked or down) — news will be blank")
+        ci.warn("[espn] team list empty (blocked or down) — news will be blank")
     if not report and not espn_ok:
         print("[espn] FATAL: both sources empty — refusing to write a blank slate. Fix, re-run.")
         sys.exit(3)
@@ -123,7 +124,7 @@ def main() -> None:
         f"{len(inj_by_school)} teams matched), {qb_outs} with a QB out"
     )
     if n and not with_news:
-        print("[espn] WARNING: no news for any game — team list or news endpoint is failing")
+        ci.warn("[espn] no news for any game — team list or news endpoint is failing")
 
 
 if __name__ == "__main__":

@@ -8,8 +8,8 @@ import {
 } from "./verdict";
 import type { BoardFactor } from "./score";
 
-// Real 2025 shape: sigma ~11.7, so z is always tiny. Gates are in points, and
-// the gap that matters is Hard Rock's own number minus ours.
+// Real 2025 shape: sigma ~11.7, so a z-score would always be tiny. Gates are
+// in points, and the gap that matters is Hard Rock's own number minus ours.
 const base: VerdictInput = {
   away: "Ohio State",
   home: "Michigan",
@@ -19,7 +19,6 @@ const base: VerdictInput = {
   liveLine: 24.5,
   fallbackLine: 24.5,
   gap: 2.7,
-  z: 0.23,
   hrLine: 24.5,
   hrUnderPrice: -105,
   ev: 0.012,
@@ -184,7 +183,6 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
       ...base,
       liveLine: 19.8,
       gap: -2.0,
-      z: -0.17,
       hrLine: 19.8,
       evVerdict: "fair",
       ev: 0,
@@ -257,7 +255,6 @@ describe("verdictFor — no model (weeks 1–2 / derived lines)", () => {
     underScore: null,
     bvLine: null,
     gap: null,
-    z: null,
   };
 
   it("can only reach WATCH, and only on a positive Hard Rock price", () => {

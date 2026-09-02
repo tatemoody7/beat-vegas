@@ -73,15 +73,11 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
     );
   }
 
-  // Stake: flat 1 unit. Paper picks are 1 unit too (so their record reads in
-  // units); is_paper keeps them out of the bankroll. Never trust a client 0/NaN.
-  let stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
-  if (!isPaper && b.stake !== undefined) {
-    stake = Number(b.stake);
-    if (b.stake === null || !Number.isFinite(stake) || stake <= 0) {
-      return reject("stake must be a positive number");
-    }
-  }
+  // Stake: ALWAYS flat 1 unit (docs/BETTING_POLICY.md) — the client's `stake`
+  // is ignored so a stray 0/NaN/3 can never size a real bet. Paper picks are
+  // 1 unit too (so their record reads in units); is_paper keeps them out of
+  // the bankroll.
+  const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
 
   let price = DEFAULT_PRICE;
   if (b.price !== undefined) {
@@ -156,6 +152,14 @@ export function checkPolicy(
   if (ctx.kickedOff) return reject("game has already kicked off", 409);
   if (ctx.duplicate) {
     return reject(`a ${pick.market} pick already exists on this game`, 409);
+  }
+  // Real money follows the verdict: a WATCH/PASS logged as real is a policy
+  // breach, not a bet. A missing verdict is allowed (older clients / manual).
+  if (!pick.isPaper && pick.verdict !== undefined && pick.verdict !== "BET") {
+    return reject(
+      `${pick.verdict} is not a bet — policy allows real money on BET verdicts only. Log it as a paper pick.`,
+      409,
+    );
   }
   if (
     !pick.isPaper &&

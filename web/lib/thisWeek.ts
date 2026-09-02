@@ -101,7 +101,6 @@ export async function getThisWeek(
       liveLine: row.curLine,
       fallbackLine: row.factors.line ?? null,
       gap: row.liveGap,
-      z: row.liveGapZ,
       hrLine: check?.hrLine ?? null,
       hrUnderPrice: check?.hrUnderPrice ?? null,
       ev: check?.ev ?? null,

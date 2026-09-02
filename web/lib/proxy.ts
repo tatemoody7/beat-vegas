@@ -69,9 +69,6 @@ for (const [season, schools] of Object.entries(FBS)) {
   fbsSets.set(Number(season), new Set(schools));
 }
 
-/** Seasons the snapshot covers. */
-export const FBS_SEASONS = [...fbsSets.keys()].sort((a, b) => a - b);
-
 /** True when both teams were FBS in that season. Unknown season → false (never guess). */
 export function isFbsGame(
   season: number,

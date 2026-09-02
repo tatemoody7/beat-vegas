@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { proxyShareText } from "@/lib/proxy";
 
 // In-app glossary: the plain-English version of docs/GLOSSARY.md. Static TSX
 // (Vercel's root is web/, so we don't read ../docs at runtime) — keep the two
-// in step when a term changes.
+// in step when a term changes. The estimated-line share is read from the
+// fitted step (lib/proxy.ts) so this page can never drift from the model.
 
 const TERMS: { term: string; body: string }[] = [
   {
@@ -39,7 +41,7 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "Live line vs estimated line",
-    body: "A live line is a first-half total a sportsbook has actually posted. An estimated line is our reference number worked out from the full-game total (about half of it: 49.75% of the total, 53.75% when one side is a 21+ point favorite) used before books post. We never call BET on an estimate.",
+    body: `A live line is a first-half total a sportsbook has actually posted. An estimated line is our reference number worked out from the full-game total (about half of it: ${proxyShareText()}) used before books post. We never call BET on an estimate.`,
   },
   {
     term: "Price / fair price / +EV",
@@ -75,11 +77,11 @@ const TERMS: { term: string; body: string }[] = [
   },
   {
     term: "QB out flag",
-    body: "A starting quarterback listed out on ESPN’s unofficial injury feed. Shown as a warning because the model’s number does not know about it.",
+    body: "A starting quarterback listed out on Rotowire’s unofficial college injury report. Shown as a warning because the model’s number does not know about it.",
   },
   {
     term: "Proxy-graded backtest",
-    body: "Free data has no historical first-half lines, so past seasons were graded against an estimated line (a step share of the full-game total: 49.75%, or 53.75% at 21+ point spreads, FBS-only). Against that fair estimate the top-20% gap band shows no confirmed edge, so the backtest validates the ranking rule, not a profit. Real lines collected this season are the true test.",
+    body: `Free data has no historical first-half lines, so past seasons were graded against an estimated line (a step share: ${proxyShareText()}; FBS-only). Against that fair estimate the top-20% gap band shows no confirmed edge, so the backtest validates the ranking rule, not a profit. Real lines collected this season are the true test.`,
   },
 ];
 

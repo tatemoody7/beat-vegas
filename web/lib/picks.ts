@@ -3,7 +3,7 @@ import { getBoard } from "@/lib/board";
 import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import { PAPER_STAKE } from "@/lib/pickRules";
+import { DEFAULT_STAKE, PAPER_STAKE } from "@/lib/pickRules";
 
 // My Picks data layer: the current slate (for API validation), the user's
 // logged picks with the model + verdict snapshot frozen at log time, and the
@@ -229,8 +229,8 @@ export async function createPick(
 
   const isPaper = input.isPaper === true;
   // Flat 1 unit for real AND paper (paper record reads in units; is_paper keeps
-  // it out of the bankroll).
-  const stake = isPaper ? PAPER_STAKE : (input.stake ?? 1.0);
+  // it out of the bankroll). The client's stake is never trusted.
+  const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
   const price = input.price ?? -110;
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();

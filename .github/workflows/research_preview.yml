@@ -18,10 +18,13 @@ concurrency:
 jobs:
   preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # No ODDS_API_KEY on purpose: research_preview.py reads ESPN + the DB only.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -31,3 +34,10 @@ jobs:
         run: pip install -e .
       - name: Build week preview (slate + ESPN news/injuries)
         run: python scripts/research_preview.py
+      - name: Alert on failure (red run = Week Preview / injury data is stale)
+        if: failure()
+        run: |
+          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
+            -F "title=Beat Vegas — research_preview FAILED" \
+            -F "message=Run $GITHUB_RUN_ID failed. Week Preview news/injuries may be stale. Check Actions." \
+            https://api.pushover.net/1/messages.json || true

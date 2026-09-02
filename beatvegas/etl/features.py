@@ -424,10 +424,14 @@ def build_feature_frame(
     df["home_fh_pa"] = df["h_fh_pa_std"]
     df["away_fh_pf"] = df["a_fh_pf_std"]
     df["away_fh_pa"] = df["a_fh_pa_std"]
+    # Same convention as the fh_* block: <side>_full_pa is that team's OWN
+    # points allowed (the registry describes it that way). The two columns used
+    # to be crossed (home <- away's PA and vice versa) — a label fix only; the
+    # model saw both columns either way, so its information content is unchanged.
     df["home_full_pf"] = df["h_full_pf_std"]
-    df["home_full_pa"] = df["a_full_pa_std"]  # opponent allows
+    df["home_full_pa"] = df["h_full_pa_std"]
     df["away_full_pf"] = df["a_full_pf_std"]
-    df["away_full_pa"] = df["h_full_pa_std"]
+    df["away_full_pa"] = df["a_full_pa_std"]
 
     # Expected 1H points: blend each team's offense with opponent's defense.
     df["exp_1h_home"] = (df["h_fh_pf_std"] + df["a_fh_pa_std"]) / 2

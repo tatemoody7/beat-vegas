@@ -1,29 +1,29 @@
 import { prisma } from "@/lib/prisma";
 import { getBoard } from "@/lib/board";
-import { getLineCheck } from "@/lib/lineCheck";
-import type { Record3 } from "@/lib/ledger";
+import { recordFrom, type Record3 } from "@/lib/record";
+import { defaultWeek } from "@/lib/week";
+import type { PickReason, Verdict } from "@/lib/verdict";
+import { PAPER_STAKE } from "@/lib/pickRules";
 
-// Writable My Picks: the current scored slate to bet on, the user's logged picks
-// (with the model snapshot frozen at log time), and a running "You" record.
+// My Picks data layer: the current slate (for API validation), the user's
+// logged picks with the model + verdict snapshot frozen at log time, and the
+// running records. ONE picks query (loadPicks) feeds the ledger, the weekly
+// review and the bankroll strip so they can never disagree.
 
 export type SlateOption = {
   gameId: number;
   week: number;
   away: string;
   home: string;
-  underScore: number | null;
-  curLine: number | null; // consensus current 1H line; falls back to model line
-  fullGameLine: number | null; // posted full-game total (for full-game picks)
-  modelLine: number | null;
-  fairUnder: number | null; // market no-vig fair-under (1H) — feeds the Kelly hint
 };
 
 export type PickFull = {
   id: number;
+  gameId: number | null;
   week: number | null;
   away: string | null;
   home: string | null;
-  market: string; // '1H' | 'full'
+  market: "1H" | "full";
   line: number | null;
   stake: number | null;
   price: number | null;
@@ -34,39 +34,36 @@ export type PickFull = {
   units: number | null;
   clv: number | null;
   graded: boolean;
-  isPaper: boolean; // tracked with nothing at risk (stake 0)
+  isPaper: boolean; // tracked with nothing at risk
+  // Decision snapshot (null on picks logged before the tracking columns existed).
+  verdictAtPick: Verdict | null;
+  reason: PickReason | null;
+  gapAtPick: number | null;
+  evAtPick: number | null;
+  hrLineAtPick: number | null;
 };
 
-// Current week's scored games (max week present in the season's predictions).
+// Games on the current week (the week you are about to bet — see lib/week.ts).
 export async function getSlate(season: number): Promise<SlateOption[]> {
   const board = await getBoard(season);
-  if (board.length === 0) return [];
-  const maxWeek = Math.max(...board.map((b) => b.week));
-  // Market no-vig fair-under per game (same devig consensus /line-check uses).
-  const fairByGame = new Map<number, number | null>();
-  for (const r of await getLineCheck(season, "1h")) {
-    fairByGame.set(r.gameId, r.marketFairUnder);
-  }
+  const week = defaultWeek(board);
   return board
-    .filter((b) => b.week === maxWeek)
+    .filter((b) => b.week === week)
     .map((b) => ({
       gameId: b.gameId,
       week: b.week,
       away: b.away,
       home: b.home,
-      underScore: b.underScore,
-      curLine: b.curLine ?? b.factors.line ?? null,
-      fullGameLine: b.fullGameTotal ?? null,
-      modelLine: b.factors.line ?? null,
-      fairUnder: fairByGame.get(b.gameId) ?? null,
     }));
 }
 
-const signed = (n: number, dp = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
 const truthy = (v: unknown) => v === true || Number(v) === 1;
+const num = (v: number | bigint | null | undefined): number | null =>
+  v === null || v === undefined ? null : Number(v);
 
 type RawPick = {
   id: number | bigint;
+  game_id: number | bigint | null;
   week: number | bigint | null;
   away_team: string | null;
   home_team: string | null;
@@ -82,66 +79,100 @@ type RawPick = {
   clv: number | null;
   graded: number | boolean | null;
   is_paper: number | boolean | null;
+  verdict_at_pick?: string | null;
+  reason?: string | null;
+  gap_at_pick?: number | null;
+  ev_at_pick?: number | null;
+  hr_line_at_pick?: number | null;
 };
 
-// Running record over graded picks (mirrors ledger _record).
-export function recordFromPicks(
-  graded: Pick<PickFull, "result" | "units" | "clv">[],
-): Record3 | null {
-  if (graded.length === 0) return null;
-  const wins = graded.filter((p) => p.result === "under").length;
-  const pushes = graded.filter((p) => p.result === "push").length;
-  const decided = graded.length - pushes;
-  const unitsSum = graded.reduce((a, p) => a + (p.units ?? 0), 0);
-  const clvs = graded.filter((p) => p.clv !== null).map((p) => p.clv as number);
-  return {
-    record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
-    hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
-    units: signed(unitsSum),
-    clv: clvs.length
-      ? signed(clvs.reduce((a, b) => a + b, 0) / clvs.length)
-      : "—",
-  };
+const isMissingColumn = (e: unknown): boolean =>
+  /column .* does not exist|no such column/i.test(
+    String((e as Error)?.message ?? e),
+  );
+
+// The tracking columns arrive with the Python lane's migration; until it has
+// run on a database, fall back to the legacy column list (snapshot fields null)
+// and say so in the server log rather than 500 the whole Results page.
+async function selectPicks(season: number): Promise<RawPick[]> {
+  try {
+    return await prisma.$queryRaw<RawPick[]>`
+      SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
+             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             graded, is_paper, verdict_at_pick, reason, gap_at_pick, ev_at_pick,
+             hr_line_at_pick
+      FROM manual_picks WHERE season = ${season}
+    `;
+  } catch (e) {
+    if (!isMissingColumn(e)) throw e;
+    console.warn("manual_picks tracking columns missing — run the migration");
+    return prisma.$queryRaw<RawPick[]>`
+      SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
+             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             graded, is_paper
+      FROM manual_picks WHERE season = ${season}
+    `;
+  }
 }
 
-export async function getPicks(season: number): Promise<{
-  picks: PickFull[];
-  record: Record3 | null; // real-money picks only
-  paperRecord: Record3 | null; // paper picks, kept apart so they never flatter the real ledger
-}> {
-  const rows = await prisma.$queryRaw<RawPick[]>`
-    SELECT id, week, away_team, home_team, market, line, stake, price, note,
-           model_score_at_pick, model_line_at_pick, result, units, clv, graded,
-           is_paper
-    FROM manual_picks WHERE season = ${season}
-  `;
+const asVerdict = (v: string | null | undefined): Verdict | null =>
+  v === "BET" || v === "WATCH" || v === "PASS" ? v : null;
+const asReason = (v: string | null | undefined): PickReason | null =>
+  v === "model_gap" || v === "price_edge" || v === "manual" ? v : null;
 
+/** Every pick for the season, pending first then newest first. */
+export async function loadPicks(season: number): Promise<PickFull[]> {
+  const rows = await selectPicks(season);
   const picks: PickFull[] = rows.map((r) => ({
     id: Number(r.id),
-    week: r.week === null ? null : Number(r.week),
+    gameId: num(r.game_id),
+    week: num(r.week),
     away: r.away_team,
     home: r.home_team,
     market: r.market === "full" ? "full" : "1H", // null (legacy) -> 1H
     line: r.line,
     stake: r.stake,
-    price: r.price === null ? null : Number(r.price),
+    price: num(r.price),
     note: r.note,
-    modelScore:
-      r.model_score_at_pick === null ? null : Number(r.model_score_at_pick),
+    modelScore: num(r.model_score_at_pick),
     modelLine: r.model_line_at_pick,
     result: truthy(r.graded) ? r.result : "pending",
     units: r.units,
     clv: r.clv,
     graded: truthy(r.graded),
     isPaper: truthy(r.is_paper),
+    verdictAtPick: asVerdict(r.verdict_at_pick),
+    reason: asReason(r.reason),
+    gapAtPick: r.gap_at_pick ?? null,
+    evAtPick: r.ev_at_pick ?? null,
+    hrLineAtPick: r.hr_line_at_pick ?? null,
   }));
-  // pending first, then newest (highest id) first within each group
   picks.sort((a, b) => Number(a.graded) - Number(b.graded) || b.id - a.id);
+  return picks;
+}
 
+/** Real-money picks that count: first-half only (the only market we bet). */
+export const isRealFirstHalf = (p: PickFull): boolean =>
+  !p.isPaper && p.market === "1H";
+export const isPaperFirstHalf = (p: PickFull): boolean =>
+  p.isPaper && p.market === "1H";
+
+export type PickRecords = {
+  picks: PickFull[];
+  /** Real-money first-half picks only. */
+  record: Record3 | null;
+  /** Paper first-half picks, kept apart so they never flatter the real ledger. */
+  paperRecord: Record3 | null;
+};
+
+export async function getPicks(season: number): Promise<PickRecords> {
+  const picks = await loadPicks(season);
   const graded = picks.filter((p) => p.graded);
-  const record = recordFromPicks(graded.filter((p) => !p.isPaper));
-  const paperRecord = recordFromPicks(graded.filter((p) => p.isPaper));
-  return { picks, record, paperRecord };
+  return {
+    picks,
+    record: recordFrom(graded.filter(isRealFirstHalf)),
+    paperRecord: recordFrom(graded.filter(isPaperFirstHalf)),
+  };
 }
 
 export type CreatePickInput = {
@@ -151,11 +182,24 @@ export type CreatePickInput = {
   stake?: number;
   price?: number;
   note?: string;
-  isPaper?: boolean; // caller (the API route) forces stake 0 when true
+  isPaper?: boolean;
+  verdict?: Verdict;
+  reason?: PickReason;
+  gap?: number | null;
+  ev?: number | null;
+  hrLine?: number | null;
 };
 
-// Insert a ManualPick, freezing the model's current score+line onto it.
-export async function createPick(input: CreatePickInput): Promise<void> {
+export type CreatePickResult = {
+  /** False when the tracking columns are missing and the pick was stored without its snapshot. */
+  tracked: boolean;
+};
+
+// Insert a ManualPick, freezing the model's current score+line and the This
+// Week verdict onto it.
+export async function createPick(
+  input: CreatePickInput,
+): Promise<CreatePickResult> {
   const game = await prisma.games.findUnique({
     where: { id: input.gameId },
     select: { season: true, week: true, home_team: true, away_team: true },
@@ -165,7 +209,6 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   const market = input.market === "full" ? "full" : "1H";
 
   // The model (predictions) is 1H-only — only freeze its read onto a 1H pick.
-  // Full-game picks store NULL model fields (the model is a reference, not a pick).
   const pred =
     market === "1H"
       ? await prisma.$queryRaw<
@@ -185,24 +228,52 @@ export async function createPick(input: CreatePickInput): Promise<void> {
   const factorsAtPick = pred[0]?.factors_json ?? null;
 
   const isPaper = input.isPaper === true;
-  const stake = isPaper ? 0 : (input.stake ?? 1.0);
+  // Flat 1 unit for real AND paper (paper record reads in units; is_paper keeps
+  // it out of the bankroll).
+  const stake = isPaper ? PAPER_STAKE : (input.stake ?? 1.0);
   const price = input.price ?? -110;
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();
+  const verdict = input.verdict ?? null;
+  const reason = input.reason ?? null;
+  const gap = input.gap ?? null;
+  const ev = input.ev ?? null;
+  const hrLine = input.hrLine ?? null;
 
   // Postgres is strict: cast the ISO string to a timestamp and use real
   // booleans (SQLite tolerated a text date + integer 0; Neon/PG won't).
-  await prisma.$executeRaw`
-    INSERT INTO manual_picks
-      (game_id, season, week, home_team, away_team, side, market, line, price,
-       stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
-       factors_json_at_pick, graded)
-    VALUES
-      (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-       ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
-       ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
-       ${factorsAtPick}, false)
-  `;
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO manual_picks
+        (game_id, season, week, home_team, away_team, side, market, line, price,
+         stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
+         factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
+         ev_at_pick, hr_line_at_pick)
+      VALUES
+        (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
+         ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
+         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+         ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine})
+    `;
+    return { tracked: true };
+  } catch (e) {
+    if (!isMissingColumn(e)) throw e;
+    console.warn(
+      "manual_picks tracking columns missing — pick stored without snapshot",
+    );
+    await prisma.$executeRaw`
+      INSERT INTO manual_picks
+        (game_id, season, week, home_team, away_team, side, market, line, price,
+         stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
+         factors_json_at_pick, graded)
+      VALUES
+        (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
+         ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
+         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+         ${factorsAtPick}, false)
+    `;
+    return { tracked: false };
+  }
 }
 
 // Returns false if the pick is already graded (immutable) or missing.

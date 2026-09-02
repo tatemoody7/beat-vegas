@@ -78,6 +78,13 @@ model manual_picks {
   closing_line            Float?
   clv                     Float?
   clv_prob                Float?
+  // Decision snapshot at log time (shared contract with scripts/pick.py; the
+  // Python lane owns the SQL migration). reason: model_gap | price_edge | manual.
+  verdict_at_pick         String?   @db.VarChar
+  reason                  String?   @db.VarChar
+  gap_at_pick             Float?
+  ev_at_pick              Float?
+  hr_line_at_pick         Float?
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([season], map: "ix_manual_picks_season")

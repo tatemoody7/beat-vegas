@@ -27,7 +27,9 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 - After backfilling history, **pace + weather** lifted the top-20% classifier picks to
   ~53.7% / +2.45% ROI; the gbm_v2 **gap ranking** now grades **54.0% / +3.0% ROI**
   (2018–25 OOS, proxy-graded). Rest/travel/returning-production were flat.
-- The signal is **decaying** recently (≈57–59% in 2018–21 → ≈50% in 2023–25).
+- Against a fair step proxy (0.4975 of the total, 0.5375 at 21+ spreads, FBS-only)
+  the proxy-graded backtest shows **no confirmed edge**; earlier 54–59% reads were a
+  flat-0.52 proxy artefact.
 - Verdict: a genuinely useful *research* tool; **not** a proven money-maker. Real
   first-half lines collected this season are the only true test.
 - **Update — "soft market" thesis refuted:** deeper research found no evidence that
@@ -40,18 +42,21 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   `BETTING_POLICY.md`; the ranked research board lives at `/board`.
 
 ## Architecture (plain English)
-- A **local engine** on my Mac scrapes data, scores games, sends alerts, and runs
-  itself daily.
-- Data lives in a database (local SQLite now; moving to **Neon Postgres** in the cloud).
-- The dashboard is moving from a local Streamlit app to a **Next.js web app on
-  Vercel** (writable, password-protected, viewable from any device).
+- The **engine** (Python) runs in **GitHub Actions** on a weekly rhythm: Sunday
+  opener capture + pace/weather + scoring, Friday/Saturday first-half line sweeps
+  with phone push alerts, Monday grading, Tue/Fri news + injuries. Nothing runs on
+  the Mac on a schedule; the campus network cannot reach the database anyway.
+- Data lives in **Neon Postgres** (SQLite only for local dev/backtests).
+- The product is the **Next.js web app on Vercel** (writable, password-protected,
+  viewable from any device). Two Claude routines text Tate: the Friday bet card and
+  the Sunday ops/recap.
 
 ## Status & roadmap
-- **Done:** data pipeline, backtest, 0–100 scoring, line tracking + iMessage alerts,
-  Streamlit dashboard, weekly auto-run, free enrichments, historical pace/weather
-  backfill, private GitHub repo, DB layer made Postgres-ready.
-- **Done (Phase B–D):** Next.js app live on Vercel backed by Neon Postgres, password
-  gate, engine writes to Neon.
+- **Done:** data pipeline, backtest, 0–100 scoring, line tracking + Pushover push
+  alerts, free enrichments, historical pace/weather backfill, private GitHub repo,
+  Neon Postgres, GitHub Actions running the weekly engine.
+- **Done:** Next.js app live on Vercel backed by Neon Postgres, password gate
+  (the old Streamlit dashboard was removed).
 - **Done:** the **BV line** + gap vs Vegas + gap-vs-CLV tracker (live). Now
   **market-blind** (no Vegas number feeds it, by rule), with an **80% prediction
   band** so gaps are read in units of noise (the line's σ ≈ 12 pts — most single-game
@@ -64,7 +69,7 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 - Which *new free signals* might actually move the model (we've seen pace/weather
   help, situational/returning not). Ideas: specific coordinator/scheme changes,
   1Q-only splits, opponent-adjusted pace, garbage-time-free 1H efficiency.
-- How to present "confidence" honestly when the edge is marginal/decaying.
+- How to present "confidence" honestly when the edge is marginal or unconfirmed.
 - ~~Bankroll/staking views~~ — decided 2026-09-01: flat units, see `BETTING_POLICY.md`
   (Kelly stays an advisory chip only).
 - What "good" looks like for the live tracking after N weeks of real lines.

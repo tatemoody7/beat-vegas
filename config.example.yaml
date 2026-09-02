@@ -28,6 +28,9 @@ odds_api:
   base_url: "https://api.the-odds-api.com/v4"
   sport: "americanfootball_ncaaf"
   regions: "us,us2"           # us2 carries Hard Rock FL; needed to capture HR.
+                              # PRODUCTION RELIES ON THIS VALUE: the GitHub Actions
+                              # jobs have no config.yaml, so this example file IS the
+                              # prod regions config (keys come from GH secrets).
                               # NB: 1H (totals_h1) is per-event & costs markets x
                               # regions PER GAME, so us,us2 doubles 1H credit use.
                               # us_ex (Kalshi/Novig/ProphetX/BetOpenly, ~0-vig

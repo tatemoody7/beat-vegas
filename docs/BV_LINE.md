@@ -37,12 +37,13 @@ anywhere, we genuinely diverge with value.
 - **Isn't:** the old `proj_1h_total` "Hist proj" chip — a *naive* 1H-scoring-history
   formula. It stays as a separate, clearly-labeled context chip. Don't conflate them.
 - **Is (since Phase 3):** the **primary ranking.** `score_slate` sorts the board by
-  `bv_gap` (gate passed in `validate_engine.py`: top-20% by gap = 54.0% under /
-  +3.0% ROI OOS vs the classifier's 53.1% / +1.4%). The 0–100 Under Score still
-  comes only from the classifier and is a secondary lean on the card.
+  `bv_gap` (the top-20%-by-gap ranking rule validated in `validate_engine.py`; against
+  the fair step proxy the proxy-graded backtest shows no confirmed edge — only
+  real-line CLV can). The 0–100 Under Score still comes only from the classifier and
+  is a secondary lean on the card.
 
 ## Where it shows up
-- **Opportunities cards** (web + Streamlit): each card shows `BV (lo–hi) · Vegas ·
+- **Board cards** (Next.js on Vercel — the product): each card shows `BV (lo–hi) · Vegas ·
   gap (±Nσ)` — the band and the gap in σ, with sub-1σ gaps greyed and labeled
   "noise." A **⚠ QB OUT** banner appears when a starting QB is listed out (live
   ESPN, unofficial). The board **Sort** toggles: "Model rank" (default), "Biggest
@@ -99,9 +100,8 @@ python scripts/backfill_bv_line.py --start-season 2018
 # Log model_runs + BV calibration residual table (feeds the Research calibration table):
 python scripts/retrain.py --notes "..."
 
-# Keep the closing line fresh: poll games kicking off in the next ~2h (every ~30 min
-# via deploy/com.beatvegas.kickoff.plist; only runs while the Mac is awake):
-python scripts/poll_kickoff_lines.py
+# Closing 1H lines are captured by GitHub Actions (lines_watch.yml, Saturday
+# 10:30am + 6pm ET with retry slots) — no local poller.
 
 # Manual BV nudge for a game the model can't see (display-only, clearly labeled):
 python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"

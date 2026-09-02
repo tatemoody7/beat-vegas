@@ -25,9 +25,10 @@ the bet card follows. Change it here first, then in code.
 
 ## Which markets
 
-- **Real money: first-half (1H) unders only.** That is the only market with
-  any measured edge (backtest: top 20% of games by gap went under 54.0%,
-  +3.0% ROI out-of-sample, proxy-graded — small and unconfirmed vs real lines).
+- **Real money: first-half (1H) unders only.** That is the market the system is
+  built to measure. The ≥ 1.75-point gap band is the validated **top-20% ranking
+  rule**, not a proven edge: against a fair proxy line the backtest shows **no
+  confirmed edge**; only real-line CLV this season can show one.
 - Full-game is decision-support only. Its backtest on real lines found no
   edge; it stays on the board as context.
 - Bets are placed on Hard Rock Bet (the only Florida book). Always check the
@@ -58,9 +59,10 @@ A game is BET when all of these hold:
 
 1. The model has a read (both teams have played 2+ games; weeks 1–2 never
    qualify by design).
-2. The Vegas first-half total sits **≥ 1.75 points above our number** — the
-   top-20% gap band the backtest validated. (≥ 3.0 points = top-10%, "high"
-   confidence when the classifier agrees at 53+.)
+2. **Hard Rock's own** first-half number sits **≥ 1.75 points above our number**
+   (not the consensus line — the consensus can sit 1.75 above while Hard Rock
+   posts a lower number). This is the top-20% gap band. (≥ 3.0 points = top-10%,
+   "high" confidence when the classifier agrees at 53+.)
 3. A **live** first-half line has actually been captured — never an estimate.
 4. Hard Rock's under price is fair or better vs the market's no-vig fair
    price.
@@ -79,30 +81,36 @@ bet many small edges rather than one big one. It is not a gate.
 
 ## Weekly rhythm
 
-| When (ET)        | What                                                    | Where               |
-| ---------------- | ------------------------------------------------------- | ------------------- |
-| Sunday ~1–2pm    | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
-| Sun 10am–1:45pm  | Hard Rock opener push alerts (every 15 min)             | `lines_watch.yml`   |
-| Tue / Fri 9am    | ESPN news + injuries → Week Preview                     | `research_preview.yml` |
-| Friday 1pm       | First-half line sweep (18 events, ranked by bettability, credit-guarded); cron is unreliable, so the Friday card re-dispatches it | `lines_watch.yml` / card task |
-| Friday evening   | **Bet card**: This Week page reviewed, picks logged, text sent | Tate + Claude   |
-| Sat 10:30am, 6pm | Closing 1H lines captured (for CLV)                     | `lines_watch.yml`   |
-| Monday 8am       | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |
-| Monday           | Weekly review together; adjust for next week            | `/weekly-review`    |
+GitHub cron drops most single-slot runs, so every job has retry slots and the two
+Claude routines re-dispatch whatever is still missing before they need it.
+
+| When (ET)                    | What                                                    | Where               |
+| ---------------------------- | ------------------------------------------------------- | ------------------- |
+| Sun 10am–1:45pm, every 15 min | Hard Rock opener push alerts                            | `lines_watch.yml`   |
+| Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
+| Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
+| Tue / Fri 9am                | News + injuries / QB-out → Week Preview                 | `research_preview.yml` |
+| Fri 1pm (retry 2:30pm)       | First-half line sweep (18 events, ranked by bettability, credit-guarded) | `lines_watch.yml` |
+| Fri 6pm                      | **Bet card routine**: verify/kick sweep + preview (never double-dispatch), build the card, log paper picks, text | `cfb-friday-card` |
+| Sat 10:30am (retry 11:15am), 6pm (retry 6:45pm) | Closing 1H lines captured (for CLV)  | `lines_watch.yml`   |
+| Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |
+| Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
+| Monday                       | Weekly review together; adjust for next week            | `/weekly-review`    |
 
 ## Measuring, not promising
 
 - The truth metric this season is **closing-line value (CLV)** on real
   Hard Rock/consensus closes, plus the graded record. Win rate over a few
   weeks is noise; CLV shows up fast.
-- Paper picks (stake 0, `is_paper`) track what the model alone would bet
-  from week 3 on, kept apart from the real record, so "trust the model" is
-  an evidence-based call later in the season.
+- Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) track
+  what the card would bet, kept apart from the real record, so "trust the
+  model" is an evidence-based call later in the season.
 
 ## Pre-flight checklist (do once)
 
 - [ ] Install the Pushover app and register this phone on the user key —
-      the API currently answers "no active devices", so alerts reach nobody.
+      **still NOT done as of 2026-09-02** (API: "user is valid but has no active
+      devices"), so every push alert currently reaches nobody.
 - [ ] Vercel env: `BANKROLL_USD=100`, `UNIT_USD=10` (defaults match).
 - [ ] Hard Rock account funded ($100).
 - [ ] After the `is_paper` migration (`migrate.yml`) — done 2026-09-01.

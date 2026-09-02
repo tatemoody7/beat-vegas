@@ -62,8 +62,10 @@ signal), tracks line movement, sends iMessage alerts, and grades market vs model
 the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`).
 
 ## Architecture
-- **Local Mac engine** (`beatvegas/` + `scripts/`): scrape → score → grade →
-  alert, scheduled by launchd (`scripts/run_daily.sh`, `deploy/com.beatvegas.daily.plist`).
+- **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade → push,
+  run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
+  `grade.yml`, `research_preview.yml`; Pushover on failure). Nothing is scheduled on
+  the Mac; two Claude routines (Friday card, Sunday ops/recap) re-dispatch dropped crons.
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
@@ -76,8 +78,10 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 cp config.example.yaml config.yaml   # add CFBD + Odds API keys (gitignored)
-pytest -q                            # 226 tests (plus 32 vitest in web/)
+pytest -q                            # run `pytest -q` / `cd web && npx vitest run` for current counts
 ```
+Inside a **git worktree** run tests as `PYTHONPATH=. python -m pytest -q` — the venv's
+editable install points at the main checkout, so a bare `pytest` imports the wrong tree.
 Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
 (score), `poll_lines.py` (lines + alerts), `grade.py`, `pick.py`, `line_study.py`,
 `retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py`, `seed_demo.py`.
@@ -85,14 +89,13 @@ Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_upd
 `backfill_context.py` (venue/talent/roster), `rank_factors.py` (factor ranking →
 `factor_scores`), `validate_engine.py` (gbm_v2 gate + MAE ablation), `inspect_combo.py`
 + `explain_pbp.py` (factor deep-dives), `weekly_report.py` (markdown board), `deploy_neon.py`
-(additive Neon push). **Opener/cloud scripts**: `poll_full_game.py` (DK/CFBD full-game
-capture, `--source dk|cfbd|auto`), `derive_multiplier.py` (gated spread multiplier),
-`backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py` (additive
-games+spread push), `grade_lines.py` (terminal derived-1H report), `post_derived_lines.py`
-(writes display-only `derived_lines` predictions for the board), `notify_sunday.py` (local
-iMessage heads-up). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
+(additive Neon push). **Opener/cloud scripts**: `poll_full_game.py` (full-game capture,
+`--source dk|cfbd|auto|oddsapi`; prod uses `oddsapi`), `derive_multiplier.py` (gated spread
+multiplier), `backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py`
+(additive games+spread push), `post_derived_lines.py` (writes display-only `derived_lines`
+predictions for the board). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
 `~/.cache/beatvegas/pg_sim`) + `simulate_week.py` (replay a real week into it, rendered by
-the real Next.js app, Neon-isolated). 226 tests. **Lint/format**: `ruff check` + `ruff
+the real Next.js app, Neon-isolated). **Lint/format**: `ruff check` + `ruff
 format` for Python (`[tool.ruff]` in `pyproject.toml`, pragmatic F/E/I/B set — NOT pyupgrade,
 which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/`
 (ESLint flat config via Next 16's native arrays + Prettier).
@@ -120,11 +123,12 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 ## Web app (`web/`) — shipped + redesigned
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
 Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
-- **Views**: Opportunities (ranked under-score cards + chips), Line movement (per-game
-  chart), Line Study (under% by opening line vs 52.4% breakeven), Ledger (3-way
-  market/model/you), Research (model_runs/calibration), writable My Picks
-  (`POST /api/picks`). Score-color thresholds + chip logic live in `web/lib/score.ts`
-  (ported from `model/score.py`; keep the two in sync). API routes read the same SQL
+- **Views (5 tabs)**: This Week (`/`, BET / WATCH / PASS verdicts from `web/lib/verdict.ts`
+  + bankroll strip + writable picks, `POST /api/picks`), Board (`/board`, ranked research
+  board with model/derived numbers + factor chips), Results (market/model/you ledgers with
+  CLV), Research (calibration, gap-vs-CLV, model_runs), Glossary. Score-color thresholds +
+  chip logic live in `web/lib/score.ts` (ported from `model/score.py`; keep the two in sync);
+  the point gates are exported from `model/score.py` and parity-tested against `verdict.ts`. API routes read the same SQL
   the page loaders use; the app is locked by `middleware.ts` + `APP_PASSWORD` cookie.
 - **Design system**: plain-English copy + a modern sportsbook look in
   `web/app/globals.css` — deep-navy canvas, electric-cyan brand accent, Archivo display
@@ -155,14 +159,13 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   with header `Neon-Connection-String: $DATABASE_URL` and body `{"query": "..."}` returns
   rows as JSON from campus in <1s. Use it for ad-hoc reads/small writes when 5432 is blocked;
   the SQLAlchemy scripts still need GHA). So **Neon-writing scheduled jobs run in GitHub Actions**
-  (`.github/workflows/sunday.yml` cron + `bootstrap.yml` one-time), not local launchd.
-  **DK's API 403s GHA datacenter IPs** (confirmed), so the cloud job uses
-  `poll_full_game --source auto` → **CFBD /lines fallback** (`sources/cfbd_lines.py`,
-  reliable but less fresh than DK; DK only works from the Mac, which can't write Neon).
-  Local jobs degrade gracefully via `store.try_init_db` (logs "unreachable", exits 0).
-  The Sunday iMessage stays local + notify-only (`scripts/notify_sunday.py` +
-  `deploy/com.beatvegas.sunday-notify.plist`). Secrets `DATABASE_URL`/`CFBD_API_KEY`/
-  `ODDS_API_KEY` are set as GH secrets. Pushing `.github/workflows/` needs the gh
+  (`.github/workflows/sunday.yml` + `lines_watch.yml` + `grade.yml` + `research_preview.yml`).
+  **DK's API 403s GHA datacenter IPs** (confirmed), so prod captures full-game lines with
+  `poll_full_game --source oddsapi` (`auto` falls back to **CFBD /lines**, `sources/cfbd_lines.py`;
+  DK only works from the Mac, which can't write Neon). Local jobs degrade gracefully via
+  `store.try_init_db` (logs "unreachable", exits 0). The Sunday ops routine (`cfb-sunday-ops`)
+  reads `GET /api/health` over HTTPS to confirm capture. Secrets `DATABASE_URL`/`CFBD_API_KEY`/
+  `ODDS_API_KEY`/`PUSHOVER_TOKEN`/`PUSHOVER_USER` are set as GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
   scheduled runs; `research_preview` 10h late; no GitHub incident posted). Anything that must
@@ -194,7 +197,11 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   `postgresql://` → `postgresql+psycopg://` (config.py). NOT psycopg2.
 - **Deploy to Neon is ADDITIVE** (`deploy_neon.py`) — never `--wipe`/full-migrate to
   prod: `manual_picks`, `odds_snapshots`, `results` are live Neon-only data.
+- `db/store.py::upsert` **never overwrites a column with None** — a partial row (e.g. the
+  Monday finals backfill) must not null `spread`/`full_game_total` on upcoming games. Keep it so.
+- **The model scores UNPLAYED games**: target rows have no `first_half_total`. Never re-add a
+  `first_half_total` filter to the target slice (it silently empties the board).
 - **BV gap is now the PRIMARY ranking** (gate passed in `validate_engine.py`).
-  `score_slate` sorts by `bv_gap` desc; `is_opportunity` = `bv_gap_z >= 0.5`. Calibration
+  `score_slate` sorts by `bv_gap` desc; verdict gates are in POINTS (`model/score.py`). Calibration
   still uses a **global** intercept + `era_post2023` feature (per-era would double-count).
   The regressor is MARKET-BLIND (`BV_FEATURE_COLS = FEATURE_COLS − MARKET_COLS`) — keep it so.

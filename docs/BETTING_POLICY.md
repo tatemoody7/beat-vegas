@@ -86,7 +86,6 @@ Claude routines re-dispatch whatever is still missing before they need it.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
-| Sun 10am–1:45pm, every 15 min | Hard Rock opener push alerts                            | `lines_watch.yml`   |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
 | Tue / Fri 9am                | News + injuries / QB-out → Week Preview                 | `research_preview.yml` |
@@ -108,9 +107,9 @@ Claude routines re-dispatch whatever is still missing before they need it.
 
 ## Pre-flight checklist (do once)
 
-- [ ] Install the Pushover app and register this phone on the user key —
-      **still NOT done as of 2026-09-02** (API: "user is valid but has no active
-      devices"), so every push alert currently reaches nobody.
+- [ ] GitHub Actions email notifications on for failed runs (GitHub → Settings →
+      Notifications → Actions). That email plus the Claude routines are the only
+      failure alert; there is no push layer.
 - [ ] Vercel env: `BANKROLL_USD=100`, `UNIT_USD=10` (defaults match).
 - [ ] Hard Rock account funded ($100).
 - [ ] After the `is_paper` migration (`migrate.yml`) — done 2026-09-01.

@@ -5,17 +5,14 @@ name: Sunday opener capture + score
 # filtered). GHA runners reach Neon fine and run even when the Mac is asleep.
 # The Sunday 4:45pm ET Claude routine (cfb-sunday-ops) re-dispatches this
 # workflow if cron dropped it and texts the recap; no local launchd job remains.
+# A red run is reported by GitHub's failed-workflow email (no in-workflow notification).
 
 on:
   schedule:
     # GHA cron is UTC with no DST. 18:00 UTC ≈ 2pm EDT / 1pm EST; 19:00 covers
     # the other DST regime. Both fire in season; runs are idempotent (snapshots
-    # only written on change, predictions upserted).
-    #
-    # Deliberately AFTER lines_watch.yml's alert window (14:00-17:45 UTC): this
-    # job captures without --push, so if it ran inside the window it could write
-    # a Hard Rock snapshot first and consume the first-appearance state, eating
-    # the opener push that lines_watch exists to send.
+    # only written on change, predictions upserted). These three slots are the
+    # only Sunday opener capture (lines_watch.yml covers Fri/Sat 1H only).
     - cron: '0 18 * * 0'
     - cron: '0 19 * * 0'
     # Third slot: GitHub cron is best-effort (17 of 19 scheduled runs were
@@ -37,8 +34,6 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
-      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -56,8 +51,8 @@ jobs:
         # us_ex adds Kalshi / Novig / ProphetX / BetOpenly (CFTC exchanges, ~0 vig):
         # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
         # only — they sharpen the market fair price Hard Rock is judged against.
-        # +1 credit per run here only (2 runs/wk ≈ +9/mo); the 15-min alert
-        # window and the 1H sweeps stay us,us2 to fit the free tier.
+        # +1 credit per run here only (3 slots/wk ≈ +13/mo worst case); the 1H
+        # sweeps stay us,us2 to fit the free tier.
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
         id: pace
@@ -96,7 +91,7 @@ jobs:
       - name: Warn when the board scored WITHOUT pace/weather
         # The enrichment steps are continue-on-error so an unofficial-source
         # outage never blocks the board, but a silent miss means the week
-        # scored with pace/wx = NaN. Surface it (summary + Pushover WARNING,
+        # scored with pace/wx = NaN. Surface it (::warning:: + step summary,
         # not a failure) whenever either step did not succeed.
         if: steps.active.outputs.week != '' && (steps.pace.outcome != 'success' || steps.weather.outcome != 'success')
         env:
@@ -107,14 +102,3 @@ jobs:
           echo "::warning::$MSG"
           echo "## WARNING: $MSG" >> "$GITHUB_STEP_SUMMARY"
           echo "Board posted; pace/wx chips may read 'no data' for the active week. Re-run the failed enrichment or re-dispatch sunday.yml." >> "$GITHUB_STEP_SUMMARY"
-          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
-            -F "title=Beat Vegas — Sunday WARNING" \
-            -F "message=Run $GITHUB_RUN_ID $MSG. Board is posted but pace/weather inputs are missing." \
-            https://api.pushover.net/1/messages.json || true
-      - name: Alert on failure (red run = no capture/scoring happened)
-        if: failure()
-        run: |
-          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
-            -F "title=Beat Vegas — Sunday capture FAILED" \
-            -F "message=Run $GITHUB_RUN_ID failed. The board may be stale — do not bet off it. Check Actions." \
-            https://api.pushover.net/1/messages.json || true

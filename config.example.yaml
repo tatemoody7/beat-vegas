@@ -41,16 +41,3 @@ odds_api:
   odds_format: "american"
   # Optional whitelist of bookmaker keys (empty = all available).
   books: []
-
-alerts:
-  imessage_to: ""        # phone/email handle for iMessage alerts (Phase 3)
-  line_move_threshold: 1.0
-
-push:                    # cloud push for "Hard Rock lines dropped" (works from CI)
-  provider: pushover     # pushover (recommended) | ntfy
-  pushover:
-    token: ""            # Pushover app token (or env PUSHOVER_TOKEN)
-    user: ""             # Pushover user key (or env PUSHOVER_USER)
-  ntfy:
-    topic: ""            # ntfy topic, e.g. beatvegas-<random> (or env NTFY_TOPIC)
-    server: "https://ntfy.sh"

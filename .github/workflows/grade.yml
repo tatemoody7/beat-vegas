@@ -8,7 +8,8 @@ name: Weekly grading (results + ledger)
 # on the following Monday's run. Off-season every step is a green no-op.
 # Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
 # ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
-# (sunday.yml). A red run here means "the ledger or PBP factors are stale".
+# (sunday.yml). A red run here means "the ledger or PBP factors are stale";
+# GitHub emails it and the Monday coaching routine re-kicks the workflow.
 # No ODDS_API_KEY: grading reads snapshots already in Neon.
 
 on:
@@ -32,8 +33,6 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
-      PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
-      PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -60,10 +59,3 @@ jobs:
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)
         run: python scripts/grade_factor_ledger.py
-      - name: Alert on failure (red run = the ledger is stale)
-        if: failure()
-        run: |
-          curl -s --max-time 15 -F "token=$PUSHOVER_TOKEN" -F "user=$PUSHOVER_USER" \
-            -F "title=Beat Vegas — grading FAILED" \
-            -F "message=Run $GITHUB_RUN_ID failed. Results/ledger may be stale. Check Actions." \
-            https://api.pushover.net/1/messages.json || true

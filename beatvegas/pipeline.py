@@ -209,7 +209,7 @@ def _notify_print(season: int, week: int, n_model: int, n_derived: int, top: Lis
             f"COLD START: no model picks (wk{week} < min games). "
             f"{n_derived} DERIVED reference lines posted — no model pick."
         )
-    print("(real run would iMessage this; sim prints only)")
+    print("(the Sunday ops routine texts the recap; sim prints only)")
     print("=" * 60 + "\n")
 
 

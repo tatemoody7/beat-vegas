@@ -1,6 +1,7 @@
 """Odds API credit reserve: one helper on the client (it already tracks the
 x-requests-remaining header) shared by poll_lines and poll_full_game, so the
-Sunday opener budget can't be spent by a mid-week sweep or vice versa."""
+Sunday opener budget can't be spent by a mid-week sweep or vice versa. Hitting
+the floor is a `::warning::` + step-summary line (beatvegas/ci.py), not a failure."""
 
 from conftest import _load_script
 
@@ -47,7 +48,7 @@ def test_poll_full_game_oddsapi_skips_paid_call_at_the_floor(monkeypatch, capsys
     fg, h1, source, n = mod._fetch("oddsapi", 2026, credit_floor=60)
     assert (fg, h1, source, n) == ([], [], "oddsapi", 0)
     assert paid == []  # the paid bulk call never happened
-    assert "[credits]" in capsys.readouterr().out
+    assert "::warning::" in capsys.readouterr().out  # surfaced on the run page, not fatal
 
     # Above the floor (or floor disabled) the paid call goes through.
     fg, _, source, n = mod._fetch("oddsapi", 2026, credit_floor=30)
@@ -79,3 +80,19 @@ def test_poll_full_game_has_credit_floor_flag():
     finally:
         sys.argv = old
     assert captured["credit_floor"] == 75
+
+
+def test_ci_warn_writes_step_summary_when_set(monkeypatch, tmp_path, capsys):
+    from beatvegas.ci import warn
+
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    warn("credits low")
+    assert capsys.readouterr().out.strip() == "::warning::credits low"
+    assert summary.read_text() == "WARNING: credits low\n"
+
+    # Local shell (no summary file): stdout only, nothing written anywhere.
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY")
+    warn("again")
+    assert "::warning::again" in capsys.readouterr().out
+    assert summary.read_text() == "WARNING: credits low\n"

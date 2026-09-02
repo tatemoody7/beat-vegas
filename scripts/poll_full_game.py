@@ -205,12 +205,20 @@ def main() -> None:
             .distinct()
         }
 
+        # One snapshot per (game, book) per run: two feed events can resolve to
+        # the same game (seen live with us_ex: Idaho @ Utah listed twice), and a
+        # second row with the same captured_at violates uq_odds_snapshot.
+        seen_fg: set = set()
         for r in fg_rows:
             gid = _resolve_gid(r, games, ids)
             if gid is None:
                 unmatched += 1
                 unmatched_names.append(f"{r['away_team']} @ {r['home_team']}")
                 continue
+            if (gid, r["book"]) in seen_fg:
+                skipped += 1
+                continue
+            seen_fg.add((gid, r["book"]))
             matched += 1
             matched_gids.add(gid)
             if r["book"] in HR_BOOK_KEYS:
@@ -260,10 +268,12 @@ def main() -> None:
                 g.full_game_total_book = r["book"]
             games_updated += 1
 
+        seen_h1: set = set()
         for r in h1_rows:
             gid = _resolve_gid(r, games, ids)
-            if gid is None:
+            if gid is None or (gid, r["book"]) in seen_h1:
                 continue
+            seen_h1.add((gid, r["book"]))
             prev = _latest_snapshot(s, gid, r["book"], "1H_total")
             if _changed(prev, r["line"], None, r["over_price"], r["under_price"]):
                 s.add(

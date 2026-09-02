@@ -10,10 +10,14 @@ temp/wind/precip near kickoff.
 from __future__ import annotations
 
 import argparse
+import time
 
 from beatvegas.db.models import Game, Venue, Weather
 from beatvegas.db.store import init_db, session_scope, upsert
 from beatvegas.sources.weather import fetch_weather
+
+PER_CALL_TIMEOUT_S = 8
+MAX_CONSECUTIVE_FAILURES = 15
 
 
 def main() -> None:
@@ -32,6 +36,10 @@ def main() -> None:
         ]
         venues = {v.id: (v.dome, v.latitude, v.longitude) for v in s.query(Venue).all()}
     rows, fetched, domes, skipped = [], 0, 0, 0
+    # Open-Meteo rate-limits shared runners (GHA): a blocked call would otherwise
+    # sit out the full timeout, ~450 times. Short per-call timeout, and bail out
+    # after a run of failures — whatever was fetched still gets stored.
+    consecutive_failures = 0
     for gid, vid, start in games:
         v = venues.get(vid)
         if start is None or v is None:
@@ -50,10 +58,23 @@ def main() -> None:
             )
             domes += 1
             continue
-        w = fetch_weather(lat, lon, start.date().isoformat(), hour=start.hour or 19)
-        if w is None:
+        if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
             skipped += 1
             continue
+        w = fetch_weather(
+            lat, lon, start.date().isoformat(), hour=start.hour or 19, timeout=PER_CALL_TIMEOUT_S
+        )
+        time.sleep(0.15)  # be polite to the free API
+        if w is None:
+            skipped += 1
+            consecutive_failures += 1
+            if consecutive_failures == MAX_CONSECUTIVE_FAILURES:
+                print(
+                    f"[warn] {MAX_CONSECUTIVE_FAILURES} forecast calls failed in a row "
+                    "(rate limit / outage?) — skipping the rest of the slate"
+                )
+            continue
+        consecutive_failures = 0
         rows.append(
             {
                 "game_id": gid,

@@ -60,6 +60,7 @@ jobs:
         # read "no data").
         if: steps.active.outputs.week != ''
         continue-on-error: true
+        timeout-minutes: 5
         run: python scripts/enrich_tempo.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }} --date "$(date -u +%F)"
       - name: Refresh weather forecasts for the active week (Open-Meteo)
         # wx_* are model inputs joined on game_id; the forecast API covers the
@@ -67,6 +68,9 @@ jobs:
         # reason as pace.
         if: steps.active.outputs.week != ''
         continue-on-error: true
+        # Open-Meteo rate-limits the runner: the first live run sat 20+ min in
+        # this step. Cap it — scoring must not wait on forecasts.
+        timeout-minutes: 8
         run: python scripts/enrich_weather.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }}
       - name: Score + rank the board
         run: python scripts/weekly_update.py

@@ -22,6 +22,9 @@ the bet card follows. Change it here first, then in code.
   ceiling, not a target. Zero bets is a valid, normal week.
 - Only games whose verdict on the This Week page is **BET** are bettable.
   WATCH is not a bet. Passing costs nothing.
+- A bet placed anyway on a WATCH or PASS game is still logged as real money,
+  flagged **off-policy** on Results and broken out separately, so the record
+  is complete and the overrides can be judged against the system.
 
 ## Which markets
 

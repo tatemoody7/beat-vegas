@@ -5,6 +5,7 @@ import {
   isRealFirstHalf,
   loadPicks,
   type PickFull,
+  isOffPolicy,
 } from "@/lib/picks";
 import { recordFrom, type Record3 } from "@/lib/record";
 import type { PickReason } from "@/lib/verdict";
@@ -32,7 +33,7 @@ export type WeekRow = {
 };
 
 export type ReasonRow = {
-  reason: PickReason | "untagged";
+  reason: PickReason | "untagged" | "off_policy";
   real: Record3 | null;
   paper: Record3 | null;
   realBets: number;
@@ -56,6 +57,7 @@ export const REASON_LABEL: Record<ReasonRow["reason"], string> = {
   price_edge: "Price edge only (no model read)",
   manual: "Your own call",
   untagged: "Logged before tracking (no reason stored)",
+  off_policy: "Off-policy — real money where the site said WATCH/PASS",
 };
 
 const graded = (ps: PickFull[]) => ps.filter((p) => p.graded);
@@ -86,7 +88,7 @@ const REASON_ORDER: ReasonRow["reason"][] = [
 
 /** Pure: by-reason table; rows with no picks at all are omitted. */
 export function reasonRows(picks: PickFull[]): ReasonRow[] {
-  return REASON_ORDER.map((reason) => {
+  const rows: ReasonRow[] = REASON_ORDER.map((reason) => {
     const rs = picks.filter((p) => (p.reason ?? "untagged") === reason);
     return {
       reason,
@@ -96,6 +98,19 @@ export function reasonRows(picks: PickFull[]): ReasonRow[] {
       paperBets: rs.filter(isPaperFirstHalf).length,
     };
   }).filter((r) => r.realBets + r.paperBets > 0);
+  // Real money placed against the verdict is its own line, so the overrides
+  // can be judged against the system (docs/BETTING_POLICY.md).
+  const offs = picks.filter(isOffPolicy);
+  if (offs.length) {
+    rows.push({
+      reason: "off_policy",
+      real: recordFrom(graded(offs).filter(isRealFirstHalf)),
+      paper: null,
+      realBets: offs.filter(isRealFirstHalf).length,
+      paperBets: 0,
+    });
+  }
+  return rows;
 }
 
 export async function getWeeklyReview(

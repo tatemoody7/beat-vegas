@@ -156,6 +156,10 @@ export const isRealFirstHalf = (p: PickFull): boolean =>
   !p.isPaper && p.market === "1H";
 export const isPaperFirstHalf = (p: PickFull): boolean =>
   p.isPaper && p.market === "1H";
+/** Real money placed where the site graded WATCH/PASS (or a legacy pick with no
+ *  frozen verdict is NOT off-policy — we cannot know). Flagged on Results. */
+export const isOffPolicy = (p: PickFull): boolean =>
+  !p.isPaper && p.verdictAtPick !== null && p.verdictAtPick !== "BET";
 
 export type PickRecords = {
   picks: PickFull[];

@@ -108,23 +108,17 @@ describe("checkPolicy", () => {
       checkPolicy({ ...pick, isPaper: true }, { ...ctx, realWeekCount: 9 }),
     ).toEqual({ ok: true });
   });
-  it("real money only on a BET verdict; paper and verdict-less picks pass", () => {
-    const watchReal = checkPolicy({ ...pick, verdict: "WATCH" }, ctx);
-    expect(watchReal).toMatchObject({ ok: false, status: 409 });
-    if (!watchReal.ok) {
-      expect(watchReal.error).toBe(
-        "WATCH is not a bet — policy allows real money on BET verdicts only. Log it as a paper pick.",
-      );
-    }
-    expect(checkPolicy({ ...pick, verdict: "PASS" }, ctx)).toMatchObject({
-      ok: false,
-      status: 409,
+  it("real money is accepted on any verdict (WATCH/PASS = off-policy, still recorded)", () => {
+    expect(checkPolicy({ ...pick, verdict: "WATCH" }, ctx)).toEqual({
+      ok: true,
+    });
+    expect(checkPolicy({ ...pick, verdict: "PASS" }, ctx)).toEqual({
+      ok: true,
     });
     expect(
       checkPolicy({ ...pick, verdict: "WATCH", isPaper: true }, ctx),
     ).toEqual({ ok: true });
     expect(checkPolicy({ ...pick, verdict: "BET" }, ctx)).toEqual({ ok: true });
-    // Backwards compat: no verdict on the request → not gated.
     expect(checkPolicy({ ...pick, verdict: undefined }, ctx)).toEqual({
       ok: true,
     });

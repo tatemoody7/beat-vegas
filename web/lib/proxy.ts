@@ -1,11 +1,16 @@
-import multiplier from "../../data/multiplier.json";
-import fbsTeams from "../../data/fbs_teams.json";
+import multiplier from "../data/multiplier.json";
+import fbsTeams from "../data/fbs_teams.json";
 
 // Mirror of beatvegas/etl/proxy_line.py::fh_share + etl/fbs.py. The proxy
 // first-half line (used only where no real 1H line exists) is a STEP share of
 // the full-game total: a flat base below the blowout spread cut, a higher share
-// at or above it (favorites score relatively more early). Both artifacts are
-// git-tracked so the web reads the exact numbers the Python lane fitted.
+// at or above it (favorites score relatively more early).
+//
+// web/data/*.json are byte-for-byte MIRRORS of the repo's git-tracked
+// data/multiplier.json + data/fbs_teams.json: Turbopack (and Vercel, whose root
+// is web/) cannot import files above the project root. lib/dataMirror.test.ts
+// fails when the two drift — after derive_multiplier.py or
+// fetch_fbs_teams.py re-fit, copy the files into web/data/ as well.
 
 type StepCoeffs = {
   kind: string;

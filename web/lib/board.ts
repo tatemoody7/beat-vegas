@@ -144,6 +144,12 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
            g.week, g.start_date, g.away_team, g.home_team
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
+      -- The site's game universe: games Hard Rock has posted a full-game total
+      -- on (the only book Tate can bet). Everything else stays out of view.
+      AND EXISTS (
+        SELECT 1 FROM odds_snapshots hr
+        WHERE hr.game_id = g.id AND hr.market = 'full_game_total'
+          AND LOWER(hr.book) = 'hardrockbet')
       AND p.model_version = (
         SELECT p2.model_version FROM predictions p2
         JOIN games g2 ON g2.id = p2.game_id

@@ -21,7 +21,9 @@ import sys
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from beatvegas.db.models import Game, Prediction
+from sqlalchemy import func
+
+from beatvegas.db.models import Game, OddsSnapshot, Prediction
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import match_event
 from beatvegas.etl.proxy_line import fh_share, proxy_total
@@ -43,7 +45,10 @@ def fetch(source: str, season: int):
 
 
 def build_prediction_rows(
-    fetched: List[Dict], gmeta: Dict[int, Dict], week: Optional[int]
+    fetched: List[Dict],
+    gmeta: Dict[int, Dict],
+    week: Optional[int],
+    allowed: Optional[set] = None,
 ) -> List[Dict]:
     """Pure: map posted full-game rows -> derived-1H prediction-row dicts.
 
@@ -61,6 +66,8 @@ def build_prediction_rows(
             gid, _ = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
         if gid is None or gid not in gmeta:
             continue
+        if allowed is not None and gid not in allowed:
+            continue  # not a game Hard Rock prices -> not on the board
         if week is not None and gmeta[gid]["week"] != week:
             continue
         total, spread = r["line"], r.get("spread")
@@ -86,13 +93,13 @@ def build_prediction_rows(
     return out
 
 
-def write_derived_rows(session, fetched, gmeta, week, now) -> int:
+def write_derived_rows(session, fetched, gmeta, week, now, allowed=None) -> int:
     """Build derived-1H rows and persist them, replacing any prior derived_lines
     rows for the season's games (idempotent). Returns the number written.
 
     Refuses to delete when there is nothing to insert: an empty fetch (DK 403,
     CFBD not posted yet) must never blank the board's existing derived cards."""
-    rows = build_prediction_rows(fetched, gmeta, week)
+    rows = build_prediction_rows(fetched, gmeta, week, allowed)
     if not rows:
         return 0
 
@@ -135,7 +142,22 @@ def main() -> None:
             g.id: {"week": g.week, "home": g.home_team, "away": g.away_team}
             for g in s.query(Game).filter(Game.season == args.season).all()
         }
-        n = write_derived_rows(s, fetched, gmeta, args.week, now)
+        # The board's universe = games Hard Rock has posted a full-game total on
+        # (the only book Tate can bet). FCS/D2 games without a Hard Rock number
+        # never reach the site. Older derived rows for such games are deleted
+        # by write_derived_rows (it clears the whole season's derived set).
+        hr_ids = {
+            gid
+            for (gid,) in s.query(OddsSnapshot.game_id)
+            .filter(
+                OddsSnapshot.market == "full_game_total",
+                func.lower(OddsSnapshot.book) == "hardrockbet",
+                OddsSnapshot.game_id.in_(list(gmeta.keys())),
+            )
+            .distinct()
+        }
+        print(f"hard-rock-priced games this season: {len(hr_ids)}")
+        n = write_derived_rows(s, fetched, gmeta, args.week, now, allowed=hr_ids)
 
     print(
         f"source={source} season={args.season} "

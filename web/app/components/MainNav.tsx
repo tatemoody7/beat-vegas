@@ -18,7 +18,7 @@ export default function MainNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex min-w-0 flex-1 gap-6 overflow-x-auto">
+    <nav className="flex min-w-0 flex-1 items-end gap-6 overflow-x-clip">
       {LINKS.map((l) => {
         const active =
           l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);

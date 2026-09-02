@@ -326,7 +326,11 @@ body {
   /* Nav link + active state */
   .bv-nav-link {
     position: relative;
-    padding: 0.35rem 0.1rem;
+    /* Underline lives INSIDE the box (bottom: 0) so the nav never needs
+       vertical overflow — an overflow-x scroll container clips overflow-y too,
+       which is what cut the tab text off at the top in production. */
+    padding: 0.35rem 0.1rem 0.75rem;
+    margin-bottom: -0.75rem;
     font-size: 0.9rem;
     color: var(--text-muted);
     white-space: nowrap;
@@ -344,7 +348,7 @@ body {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -0.85rem;
+    bottom: 0;
     height: 2px;
     border-radius: 2px;
     background: var(--accent);

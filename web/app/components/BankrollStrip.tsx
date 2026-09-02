@@ -36,7 +36,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
         </div>
         <div
           className="bv-stat"
-          title="Profit or loss in units on settled real-money bets this season."
+          title="Profit or loss in units on settled real-money first-half bets this season. ROI = units won ÷ units staked."
         >
           <span className="bv-stat-label">Season</span>
           <span className="bv-stat-value text-xl" style={{ color: unitsColor }}>
@@ -44,7 +44,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
           </span>
           <span className="text-xs text-[var(--text-dim)]">
             {b.real
-              ? `${b.real.record} · ${b.real.hit} under`
+              ? `${b.real.record} · ${b.real.hit} under · ROI ${b.real.roi}`
               : "no settled bets yet"}
           </span>
         </div>
@@ -72,7 +72,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
             <span className="bv-stat-value text-xl text-[var(--text-muted)]">
               {b.paper.record}
             </span>
-            <span className="text-xs text-[var(--text-dim)]">{`${b.paper.hit} under · line value ${b.paper.clv}`}</span>
+            <span className="text-xs text-[var(--text-dim)]">{`${b.paper.hit} under · ${b.paper.units}u · line value ${b.paper.clv}`}</span>
           </div>
         )}
       </div>

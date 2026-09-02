@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..hardrock import normalize_book
+
 # Provider priority for picking a single full-game line per game.
 PROVIDER_PRIORITY = ["consensus", "DraftKings", "Bovada", "ESPN Bet", "William Hill (US)"]
 
@@ -144,7 +146,7 @@ def _full_game_rows_one_type(client, season: int, season_type: str) -> List[Dict
                 "commence_time": _get(g, "startDate", "start_date"),
                 "home_team": _get(g, "homeTeam", "home_team"),
                 "away_team": _get(g, "awayTeam", "away_team"),
-                "book": prov or "cfbd",
+                "book": normalize_book(prov or "cfbd"),  # "DraftKings" -> "draftkings"
                 "line": float(ou),
                 "line_open": opn,
                 "spread": sp,

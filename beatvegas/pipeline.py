@@ -1,27 +1,23 @@
-"""One pipeline, two targets.
+"""The week SIMULATION pipeline (scripts/simulate_week.py).
 
-`run_pipeline(...)` runs the ordered weekly steps — capture/replay openers ->
-lines -> score -> derive -> grade -> notify — parameterized by where it writes and
-whether it replays history or captures live. It exists so the WEEK SIMULATION and
-the REAL Sunday run share one code path instead of a tangle of scripts.
+`run_pipeline("sim", ...)` replays a real past week into the local Postgres
+sandbox (scripts/pg_sim.py) as a PRE-GAME slate — openers -> lines -> score ->
+derived board -> printed heads-up — and, with action="grade", reveals the
+outcomes. It writes ONLY to the sandbox and PRINTS the alert it would send; a
+hard guard (`_assert_sim_target`) refuses any target that isn't localhost, so
+it can never touch Neon.
 
-    SIM  = run_pipeline("sim",  2025, 8, mode="replay", notify="print")
-    REAL = run_pipeline("prod", 2026, W, mode="live",   notify="send")   # future wiring
+    run_pipeline("sim", 2025, 8, mode="replay", notify="print")
+    run_pipeline("sim", 2025, 8, mode="replay", action="grade")
 
-The sim writes ONLY to a local Postgres sandbox (scripts/pg_sim.py) and PRINTS the
-alert it would send. A hard guard (`_assert_sim_target`) refuses to run the sim
-against anything that isn't localhost — it can never touch Neon.
-
-NOTE: the prod/live path is implemented here but NOT yet wired into
-run_sunday.sh / .github/workflows — prod entry points are left untouched until the
-sim has proven these step functions.
+The real Sunday/Thursday runs are the individual scripts orchestrated by
+.github/workflows (poll_full_game, poll_lines, weekly_update, post_derived_lines,
+grade); there is no prod path here.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import sys
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -227,23 +223,24 @@ def run_pipeline(
     limit: Optional[int] = 12,
     action: str = "build",
 ) -> Dict:
-    """Run the weekly chain. Returns a summary dict.
+    """Run the sim chain. Returns a summary dict.
 
-    db_target: "sim" (local Postgres) | "prod" (Neon, env DATABASE_URL).
-    mode:      "replay" (historical, no network) | "live" (capture).
-    notify:    "print" | "send".
+    db_target: "sim" (local Postgres sandbox) — the only target.
+    mode:      "replay" (historical, no network) — the only mode.
+    notify:    "print" (anything else prints nothing; the sim never sends).
     action:    "build" (PRE-GAME slate — lines + picks, no results) |
                "grade" (reveal: grade market + your manual picks vs finals).
     """
-    if db_target == "sim":
-        if mode != "replay":
-            raise SystemExit("[sim] only mode='replay' is supported.")
-        if action == "grade":
-            return _grade_sim(season, week)
-        return _run_sim(season, week, notify=notify, min_games=min_games, limit=limit)
-    if db_target == "prod":
-        return _run_live(season, week, notify=notify, min_games=min_games)
-    raise SystemExit(f"unknown db_target: {db_target!r}")
+    if db_target != "sim":
+        raise SystemExit(
+            f"unknown db_target: {db_target!r} — only 'sim' exists; the real runs are "
+            "the scripts in .github/workflows."
+        )
+    if mode != "replay":
+        raise SystemExit("[sim] only mode='replay' is supported.")
+    if action == "grade":
+        return _grade_sim(season, week)
+    return _run_sim(season, week, notify=notify, min_games=min_games, limit=limit)
 
 
 def _run_sim(season: int, week: int, *, notify: str, min_games: int, limit: Optional[int]) -> Dict:
@@ -353,35 +350,6 @@ def _consensus_close(s, gid: int) -> float:
         .all()
     )
     return consensus_open_close(snaps)[1]
-
-
-def _run_live(season: int, week: int, *, notify: str, min_games: int) -> Dict:
-    """Prod path: orchestrate the existing CLIs in order (preserves their exact
-    behavior). NOT yet wired into run_sunday.sh / GHA — see module docstring."""
-    env = dict(os.environ)
-    steps = [
-        ["python", "scripts/poll_full_game.py", "--source", "auto"],
-        ["python", "scripts/poll_lines.py"],
-        [
-            "python",
-            "scripts/weekly_update.py",
-            "--season",
-            str(season),
-            "--week",
-            str(week),
-            "--min-games",
-            str(min_games),
-        ],
-        ["python", "scripts/post_derived_lines.py", "--season", str(season), "--week", str(week)],
-        ["python", "scripts/grade.py", "--season", str(season)],
-    ]
-    for cmd in steps:
-        subprocess.run(cmd, cwd=str(REPO_ROOT), env=env, check=True)
-    if notify == "send":
-        subprocess.run(
-            ["python", "scripts/notify_sunday.py"], cwd=str(REPO_ROOT), env=env, check=False
-        )
-    return {"mode": "live", "season": season, "week": week}
 
 
 def _base_for(season: int, week: int) -> datetime:

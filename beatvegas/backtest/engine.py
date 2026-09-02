@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
-from ..etl.features import FEATURE_COLS, build_feature_frame
+from ..etl.features import FEATURE_COLS, build_feature_frame, training_frame
 
 BREAKEVEN = 0.524  # win% needed to beat standard -110 juice
 WIN_PROFIT = 100 / 110  # units won on a winning -110 bet
@@ -58,6 +58,7 @@ def run_backtest(
 ) -> BacktestResult:
     if df is None:
         df = build_feature_frame(min_games=2)
+    df = training_frame(df)  # played games only — the frame also carries the unplayed slate
     seasons = sorted(df["season"].unique())
     test_seasons = [s for s in seasons if s >= first_test_season]
 

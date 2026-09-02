@@ -27,6 +27,7 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import match_event
+from beatvegas.hardrock import normalize_book
 from beatvegas.season import current_season
 from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
 
@@ -129,7 +130,7 @@ def main() -> None:
                 s.add(
                     OddsSnapshot(
                         game_id=g["id"],
-                        book=r["book"],
+                        book=normalize_book(r["book"]),
                         market="1H_total",
                         line=r["line"],
                         over_price=r["over_price"],

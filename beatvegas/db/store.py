@@ -39,12 +39,26 @@ _MIGRATIONS = {
         "market": "VARCHAR",
         "clv_prob": "FLOAT",
         "is_paper": "BOOLEAN",
+        "verdict_at_pick": "VARCHAR(8)",
+        "reason": "VARCHAR(16)",
+        "gap_at_pick": "FLOAT",
+        "ev_at_pick": "FLOAT",
+        "hr_line_at_pick": "FLOAT",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
     "games": {"spread": "FLOAT"},
     "odds_snapshots": {"spread": "FLOAT"},
 }
+
+# One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH
+# Postgres and SQLite (plain SQL-92 only). Run after the column migrations.
+_DATA_MIGRATIONS = [
+    # CFBD provider strings ("DraftKings") and Odds API keys ("draftkings") both
+    # landed in `book`, double-counting a book in medians. New writes go through
+    # hardrock.normalize_book; this folds the legacy rows onto lowercase.
+    ("odds_snapshots", "UPDATE odds_snapshots SET book = lower(book) WHERE book <> lower(book)"),
+]
 
 _engine = None
 _Session: Optional[sessionmaker] = None
@@ -162,6 +176,14 @@ def _apply_migrations(engine) -> None:
             for col, sqltype in cols.items():
                 if col not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
+    for table, sql in _DATA_MIGRATIONS:
+        if table not in existing:
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as e:  # noqa: BLE001 - never block startup on a data fix
+            print(f"[db] WARNING: data migration failed ({sql[:40]}...): {e}")
     # Dedup backstop on the movement history (models.py uq_odds_snapshot covers
     # fresh DBs; this covers existing ones). Fail-soft: if a legacy DB already
     # holds duplicates, warn and keep running — the backstop is best-effort.
@@ -194,8 +216,15 @@ def session_scope() -> Iterator[Session]:
         s.close()
 
 
-def upsert(session: Session, model, rows: Iterable[dict], pk_fields) -> int:
-    """Insert-or-update rows by primary-key fields. Returns count processed."""
+def upsert(
+    session: Session, model, rows: Iterable[dict], pk_fields, overwrite_none: bool = False
+) -> int:
+    """Insert-or-update rows by primary-key fields. Returns count processed.
+
+    On UPDATE, keys whose value is None are skipped unless `overwrite_none` —
+    a source that lacks a field (CFBD has no line yet for an upcoming game) must
+    not erase a value another job already stored (the Sunday opener's
+    Game.spread / full_game_total). Inserts set every key as given."""
     if isinstance(pk_fields, str):
         pk_fields = [pk_fields]
     n = 0
@@ -206,6 +235,8 @@ def upsert(session: Session, model, rows: Iterable[dict], pk_fields) -> int:
             session.add(model(**row))
         else:
             for k, v in row.items():
+                if v is None and not overwrite_none:
+                    continue
                 setattr(obj, k, v)
         n += 1
     return n

@@ -157,9 +157,10 @@ def test_oddsapi_normalize_full_game_multibook_incl_hardrock():
     ]
     rows = normalize_full_game(events)
     by_book = {r["book"]: r for r in rows}
-    assert set(by_book) == {"hardrockbet_fl", "draftkings"}  # spreads market ignored
-    assert by_book["hardrockbet_fl"]["line"] == 56.5
-    assert by_book["hardrockbet_fl"]["spread"] is None  # totals market has no spread
+    # spreads market ignored; hardrockbet_fl folds onto the canonical hardrockbet
+    assert set(by_book) == {"hardrockbet", "draftkings"}
+    assert by_book["hardrockbet"]["line"] == 56.5
+    assert by_book["hardrockbet"]["spread"] is None  # totals market has no spread
     assert all(r["event_id"] == "evt1" for r in rows)
 
 

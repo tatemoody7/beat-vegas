@@ -13,7 +13,7 @@ import argparse
 import time
 
 from beatvegas.db.models import Game, Venue, Weather
-from beatvegas.db.store import init_db, session_scope, upsert
+from beatvegas.db.store import session_scope, try_init_db, upsert
 from beatvegas.sources.weather import fetch_weather
 
 PER_CALL_TIMEOUT_S = 8
@@ -25,7 +25,8 @@ def main() -> None:
     ap.add_argument("--season", type=int, required=True)
     ap.add_argument("--week", type=int, required=True)
     args = ap.parse_args()
-    init_db()
+    if not try_init_db():
+        return
 
     # Read, then fetch OUTSIDE any session: hundreds of Open-Meteo calls inside
     # one transaction trip Neon's idle-in-transaction timeout and lose the batch.

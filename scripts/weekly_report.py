@@ -2,7 +2,7 @@
 """Generate a weekly 1H-under report from the predict-the-total engine.
 
 Ranks the slate by the gap between the book line and our predicted 1H total
-(gbm_v2), flags opportunities (gap >= 0.5 residual-sigma), and prints a readable
+(gbm_v2), marks games at the BET gate (gap >= BET_GAP_PTS points), and prints a readable
 report with the genuine-signal context (pace, weather, 1H efficiency). Honest by
 construction: notes the proxy caveat when no real line is supplied.
 
@@ -17,7 +17,7 @@ import argparse
 import pandas as pd
 
 from beatvegas.etl.features import build_feature_frame
-from beatvegas.model.score import _pace_str, _weather_str, score_slate
+from beatvegas.model.score import BET_GAP_PTS, _pace_str, _weather_str, score_slate
 
 
 def _reason(r: pd.Series) -> str:
@@ -52,19 +52,20 @@ def main() -> None:
     s = s.head(args.top)
 
     lines = [f"# 1H Under Board — {args.season} Week {args.week}", ""]
-    n_opp = int(s["is_opportunity"].sum())
+    n_bet = int((s["bv_gap"] >= BET_GAP_PTS).sum())
     lines.append(
-        f"_{len(s)} games shown, {n_opp} flagged opportunities "
-        f"(gap ≥ 0.5σ). Ranked by gap = line − our predicted 1H total. "
+        f"_{len(s)} games shown, {n_bet} at the BET gate "
+        f"(gap ≥ {BET_GAP_PTS:g} pts). Ranked by gap = line − our predicted 1H total. "
         f"Lines are the 0.52× proxy unless a real book line was supplied — "
         f"directional until graded vs real DraftKings lines._"
     )
     lines.append("")
-    lines.append("| # | Matchup | Line | Our 1H | Gap | σ-gap | Opp | Lean | Why |")
+    lines.append("| # | Matchup | Line | Our 1H | Gap | σ-gap | Bet | Lean | Why |")
     lines.append("|--:|---|--:|--:|--:|--:|:-:|--:|---|")
     for r in s.itertuples(index=False):
         rd = pd.Series(r._asdict())
-        opp = "✅" if rd.get("is_opportunity") else ""
+        gap = rd.get("bv_gap")
+        opp = "✅" if pd.notna(gap) and gap >= BET_GAP_PTS else ""
         z = rd.get("bv_gap_z")
         lines.append(
             f"| {int(rd['rank'])} | {rd['away_team']} @ {rd['home_team']} | "

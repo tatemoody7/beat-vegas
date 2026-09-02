@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import statistics
+from typing import Optional
 
 from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
 from beatvegas.db.store import session_scope, try_init_db
@@ -151,8 +152,14 @@ def grade_market(session, closings) -> int:
 
 
 def grade_model(session, season: int, closings) -> int:
-    """Grade the model's bets (under_score >= threshold) at the line it picked."""
-    preds = session.query(Prediction).filter(Prediction.model_version == MODEL_VERSION).all()
+    """Grade the model's bets (under_score >= threshold) at the line it picked.
+    Season-scoped through games.season (predictions carry no season column)."""
+    preds = (
+        session.query(Prediction)
+        .join(Game, Game.id == Prediction.game_id)
+        .filter(Prediction.model_version == MODEL_VERSION, Game.season == season)
+        .all()
+    )
     n = 0
     for p in preds:
         if not is_model_bet(p.under_score) or p.line_used is None:
@@ -192,8 +199,12 @@ def grade_model(session, season: int, closings) -> int:
     return n
 
 
-def _summary(session, model_version: str, label: str) -> None:
-    rows = session.query(Result).filter(Result.model_version == model_version).all()
+def _summary(session, model_version: str, label: str, season: Optional[int] = None) -> None:
+    """Print one ledger line; scoped to `season` via games.season when given."""
+    q = session.query(Result).filter(Result.model_version == model_version)
+    if season is not None:
+        q = q.join(Game, Game.id == Result.game_id).filter(Game.season == season)
+    rows = q.all()
     if not rows:
         print(f"{label}: no graded bets")
         return
@@ -231,9 +242,9 @@ def main() -> None:
         mfg = grade_market_fg(s, closings_fg)
     print(f"graded {m} market(1H) + {mdl} model(1H) + {mfg} market(FG) bets for {args.season}")
     with session_scope() as s:
-        _summary(s, MODEL_MARKET, "MARKET 1H")
-        _summary(s, MODEL_VERSION, "MODEL  1H")
-        _summary(s, MODEL_MARKET_FG, "MARKET FG")
+        _summary(s, MODEL_MARKET, "MARKET 1H", season=args.season)
+        _summary(s, MODEL_VERSION, "MODEL  1H", season=args.season)
+        _summary(s, MODEL_MARKET_FG, "MARKET FG", season=args.season)
 
 
 if __name__ == "__main__":

@@ -16,20 +16,40 @@ exactly the point: the card shows n loudly so you don't over-read a handful.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Dict
 
 from beatvegas.db.models import FactorLedger, Result
-from beatvegas.db.store import init_db, session_scope
+from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame
 from beatvegas.factors.ledger import grade_ledger
 
+LEDGER_MARKET = "1H"  # the market grade.py stamps on first-half Result rows
+
+
+def real_1h_outcomes(session) -> Dict[int, int]:
+    """{game_id: 1 if the 1H under cashed else 0} from REAL-line 1H results only.
+
+    results also holds the full-game ledger (model_version='market_fg',
+    market='full'); without the market filter its outcome overwrote the 1H one
+    for the same game. Rows with a NULL market predate the column and are 1H."""
+    real = (
+        session.query(Result)
+        .filter(
+            Result.line_kind == "real",
+            (Result.market == LEDGER_MARKET) | (Result.market.is_(None)),
+        )
+        .all()
+    )
+    return {int(r.game_id): (1 if r.under_hit else 0) for r in real}
+
 
 def main() -> None:
-    init_db()
+    if not try_init_db():
+        return
     df = build_feature_frame()
 
     with session_scope() as s:
-        real = s.query(Result).filter(Result.line_kind == "real").all()
-        outcomes = {int(r.game_id): (1 if r.under_hit else 0) for r in real}
+        outcomes = real_1h_outcomes(s)
 
         if not outcomes:
             print("[ledger] no real-line results yet — nothing to grade (see plan Phase 0).")

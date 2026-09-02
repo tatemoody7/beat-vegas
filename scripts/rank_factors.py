@@ -23,7 +23,7 @@ from datetime import datetime
 
 from beatvegas.db.models import FactorScore, ModelRun
 from beatvegas.db.store import init_db, session_scope
-from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.features import build_feature_frame, training_frame
 from beatvegas.factors import evaluable_factors, rank_factors
 
 
@@ -49,7 +49,7 @@ def main() -> None:
     ap.add_argument("--notes", default="")
     args = ap.parse_args()
 
-    df = build_feature_frame(min_games=args.min_games)
+    df = training_frame(build_feature_frame(min_games=args.min_games))  # played games only
     factors = evaluable_factors(df)
     result = rank_factors(
         df,

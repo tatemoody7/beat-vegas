@@ -241,8 +241,8 @@ class ManualPick(Base):
     line = Column(Float)  # the total you bet (1H or full-game per `market`)
     price = Column(Integer, default=-110)
     stake = Column(Float, default=1.0)
-    # Paper pick: tracked for record/CLV with nothing at risk (stake forced to
-    # 0 so units math self-protects even where a consumer forgets to filter).
+    # Paper pick: nothing at risk, staked ONE flat unit so it grades as +/-1u
+    # on its own record. Every ledger consumer must split on is_paper.
     is_paper = Column(Boolean, default=False)
     book = Column(String)
     placed_at = Column(DateTime)
@@ -265,6 +265,14 @@ class ManualPick(Base):
     # factor board at log time (forward-only); opening_line filled at grading.
     factors_json_at_pick = Column(String)
     opening_line = Column(Float)
+
+    # Decision tracking (shared contract with web/ — names are exact). What the
+    # board said at log time, so hit rate can be split by why the bet was made.
+    verdict_at_pick = Column(String(8))  # BET | WATCH | PASS
+    reason = Column(String(16))  # model_gap | price_edge | manual
+    gap_at_pick = Column(Float)  # bv_gap (points) shown at log time
+    ev_at_pick = Column(Float)  # no-vig EV of the under at log time
+    hr_line_at_pick = Column(Float)  # Hard Rock's line at log time
 
 
 class BvAdjustment(Base):

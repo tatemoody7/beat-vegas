@@ -35,7 +35,7 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
+from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, normalize_book, pick_hr_line
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
@@ -80,16 +80,43 @@ def _changed(prev, line, spread, over, under) -> bool:
     return prev.line != line or spread_moved or prev.over_price != over or prev.under_price != under
 
 
+def _normalize_books(rows: List[Dict]) -> List[Dict]:
+    """Canonical book key on every row before it can reach odds_snapshots
+    (one spelling per book, or medians double-count it)."""
+    for r in rows:
+        if "book" in r:
+            r["book"] = normalize_book(r["book"])
+    return rows
+
+
 def _fetch(
-    source: str, season: int, regions: str = "us,us2"
+    source: str, season: int, regions: str = "us,us2", credit_floor: int = 60
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     """Return (full_game_rows, first_half_rows, source_used, event_count)."""
+    fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor)
+    return _normalize_books(fg), _normalize_books(h1), used, n
+
+
+def _fetch_raw(
+    source: str, season: int, regions: str, credit_floor: int
+) -> Tuple[List[Dict], List[Dict], str, int]:
     dk_events = 0
     if source == "oddsapi":
         # Bulk /odds: multi-book full-game totals incl. Hard Rock (us2). The
         # rows carry team names + commence_time, so they match by name+time like
         # the DK path (no CFBD game id). 1H is captured separately (poll_lines).
-        events = OddsAPIClient().list_full_game_totals(regions=regions)
+        client = OddsAPIClient()
+        # list_events is FREE but returns the credit headers: learn the balance
+        # before the paid bulk call so a reserve floor can stop it.
+        client.list_events()
+        if client.credits_low(credit_floor):
+            print(
+                f"[credits] Odds API credits at reserve floor "
+                f"({client.last_credits.remaining} <= {credit_floor}) — skipping the "
+                "full-game pull. Pass --credit-floor 0 to override."
+            )
+            return [], [], "oddsapi", 0
+        events = client.list_full_game_totals(regions=regions)
         return oa_normalize_full_game(events), [], "oddsapi", len(events)
     h1: List[Dict] = []
     if source in ("dk", "auto"):
@@ -142,6 +169,13 @@ def main() -> None:
         "--days-ahead", type=int, default=8, help="only store odds for events within N days"
     )
     ap.add_argument(
+        "--credit-floor",
+        type=int,
+        default=60,
+        help="--source oddsapi only: skip the paid pull once remaining monthly "
+        "credits are at this floor (same reserve poll_lines honours); 0 disables",
+    )
+    ap.add_argument(
         "--notify",
         action="store_true",
         help="send a single 'DK fired' iMessage when done (no picks)",
@@ -170,7 +204,9 @@ def main() -> None:
     if not try_init_db():
         return
 
-    fg_rows, h1_rows, source, dk_events = _fetch(args.source, args.season, args.regions)
+    fg_rows, h1_rows, source, dk_events = _fetch(
+        args.source, args.season, args.regions, credit_floor=args.credit_floor
+    )
 
     now = datetime.utcnow()
     horizon = now + timedelta(days=args.days_ahead)

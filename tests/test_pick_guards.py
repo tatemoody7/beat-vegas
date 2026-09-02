@@ -37,6 +37,11 @@ def _args(**kw) -> Namespace:
         market="1h",
         force=False,
         paper=False,
+        reason="manual",
+        verdict=None,
+        gap=None,
+        ev=None,
+        hr_line=None,
     )
     base.update(kw)
     return Namespace(**base)
@@ -108,12 +113,12 @@ def test_force_accepts_best_guess():
     assert _n_picks(eng) == 1
 
 
-def test_paper_pick_forces_zero_stake():
-    """--paper tracks the pick with nothing at risk: stake 0 keeps the units
-    math clean even if a consumer forgets to filter is_paper."""
+def test_paper_pick_is_flagged_and_stakes_one_unit():
+    """--paper tracks the pick with nothing at risk on its own record: one
+    flat unit so it grades as +/-1u (see tests/test_pick_tracking.py)."""
     pick, eng = _pick_module_with_rematch()
     pick.cmd_add(_args(week=15, paper=True, stake=3.0))
     with Session(eng) as s:
         (row,) = s.query(ManualPick).all()
         assert row.is_paper is True
-        assert row.stake == 0.0
+        assert row.stake == 1.0

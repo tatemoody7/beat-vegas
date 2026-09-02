@@ -16,7 +16,10 @@ from ..config import REPO_ROOT
 from ..etl.match import name_score
 
 _UA = {"User-Agent": "Mozilla/5.0"}
-_SITE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
+# site.api.espn.com answers 403 (Akamai "Access Denied") from every network we run
+# on — the Mac, GitHub runners, Anthropic's fetcher — since at least July 2026.
+# site.web.api.espn.com serves the identical paths and works (verified 2026-09-02).
+_SITE = "https://site.web.api.espn.com/apis/site/v2/sports/football/college-football"
 _CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football"
 _CACHE = REPO_ROOT / "data" / "cache"
 
@@ -74,6 +77,9 @@ def team_news(espn_id: str, limit: int = 4) -> List[str]:
 
 
 def team_injuries(espn_id: str, limit: int = 6) -> List[str]:
+    """ESPN publishes NO college-football injuries here (count 0 for every FBS
+    team, verified 2026-09-02; the NFL endpoint works). Kept for shape/compat —
+    the preview uses beatvegas.sources.rotowire for injuries."""
     data = _get(f"{_CORE}/teams/{espn_id}/injuries", {"limit": limit})
     if not data or not data.get("items"):
         return []

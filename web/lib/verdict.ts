@@ -3,32 +3,39 @@
 // are unit-tested and easy to tune.
 //
 // Gates come from the VALIDATED selection rule, not from sigma. The backtest
-// (scripts/validate_engine.py → beatvegas/backtest/bv_engine.py) bets the top
-// 20% of each season's games by bv_gap and grades 54.0% under / +3.0% ROI
-// OOS. In Neon the season 80th-percentile gap is 1.2–1.8 pts and the 90th is
-// 2.2–3.0 pts (2023–25), so BET_GAP_PTS ≈ the top-20% cutoff and
-// STRONG_GAP_PTS ≈ the top-10%. bv_sigma (~11.9 pts) is the per-GAME outcome
-// noise — a gap can never clear it, so it is context ("any single game is
-// near a coin flip"), not a gate. MODEL_BET_THRESHOLD mirrors score.py.
+// (scripts/validate_engine.py → beatvegas/backtest/bv_engine.py) ranks each
+// season's games by bv_gap; the top 20% is the selection band. In Neon the
+// season 80th-percentile gap is 1.2–1.8 pts and the 90th is 2.2–3.0 pts
+// (2023–25), so BET_GAP_PTS ≈ the top-20% cutoff and STRONG_GAP_PTS ≈ the
+// top-10%. Against a FAIR estimated line (step share, FBS-only) that band shows
+// no confirmed edge — so the gap is a ranking rule, and only real-line
+// closing-line value this season can prove an edge. bv_sigma (~11.9 pts) is
+// the per-GAME outcome noise — a gap can never clear it, so it is context
+// ("any single game is near a coin flip"), not a gate.
+//
+// The gap that gates a BET is HARD ROCK'S number minus ours — Hard Rock is the
+// only book bettable from Florida, so a consensus gap that Hard Rock does not
+// match is not an edge you can take. MODEL_BET_THRESHOLD mirrors score.py.
 // Betting policy (docs/BETTING_POLICY.md): 1H unders only, ≤ WEEKLY_BET_CAP
 // bets a week, flat 1 unit each. Zero bets is a valid week.
 
 import type { BoardFactor } from "@/lib/score";
 import type { EvVerdict } from "@/lib/lineCheck";
+import { american, fmt, round2, signed } from "@/lib/format";
 
 export const BET_GAP_PTS = 1.75;
 export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
 export const MODEL_BET_THRESHOLD = 53;
 export const WEEKLY_BET_CAP = 5;
-// What the validated rule earned OOS — quoted, never promised.
-export const BACKTEST_UNDER_PCT = 54.0;
 // weekly_update.py --min-games: the model needs this many games played by both
 // teams, so weeks 1–2 have no model read at all.
 export const MIN_GAMES_FOR_MODEL = 2;
 
 export type Verdict = "BET" | "WATCH" | "PASS";
 export type Confidence = "high" | "medium" | "low" | "none";
+/** Why a pick was made — stored on manual_picks.reason (shared with pick.py). */
+export type PickReason = "model_gap" | "price_edge" | "manual";
 
 export type VerdictInput = {
   away: string;
@@ -41,6 +48,7 @@ export type VerdictInput = {
   liveLine: number | null;
   /** Fallback line baked in at scoring time (derived / proxy). */
   fallbackLine: number | null;
+  /** Consensus gap (liveLine − bvLine), or the gap stored at scoring time. */
   gap: number | null;
   z: number | null;
   /** Hard Rock price check (lib/lineCheck.ts). */
@@ -48,6 +56,8 @@ export type VerdictInput = {
   hrUnderPrice: number | null;
   ev: number | null;
   evVerdict: EvVerdict;
+  /** First-half share used for a derived reference line (factors.fh_share). */
+  fhShare: number | null;
   qbOut: boolean;
   qbOutDetail: string | null;
   bvAdjust: number | null;
@@ -66,13 +76,24 @@ export type VerdictResult = {
   flags: string[];
   /** True when the only edge is Hard Rock's price, with no model behind it. */
   priceEdgeOnly: boolean;
+  /** Hard Rock's line minus our number (the gap you can actually bet); null without both. */
+  hrGap: number | null;
+  /** Pick reason this verdict would log (model_gap / price_edge / manual). */
+  reason: PickReason;
   /** Sort key: higher = stronger case. */
   strength: number;
 };
 
-const fmt = (n: number, dp = 1) => n.toFixed(dp);
-const signed = (n: number, dp = 1) => `${n > 0 ? "+" : ""}${n.toFixed(dp)}`;
-const american = (p: number) => (p > 0 ? `+${p}` : `${p}`);
+/** model read + Hard Rock gap in the band → model_gap; price-only → price_edge; else manual. */
+export function deriveReason(
+  hasModel: boolean,
+  hrGap: number | null,
+  priceEdgeOnly: boolean,
+): PickReason {
+  if (hasModel && hrGap !== null && hrGap >= BET_GAP_PTS) return "model_gap";
+  if (priceEdgeOnly) return "price_edge";
+  return "manual";
+}
 
 function priceSentence(i: VerdictInput): string {
   if (i.hrLine === null) {
@@ -85,45 +106,73 @@ function priceSentence(i: VerdictInput): string {
   if (i.ev === null) {
     return `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
   }
-  const pct = fmt(Math.abs(i.ev) * 100);
+  const pctTxt = fmt(Math.abs(i.ev) * 100);
   switch (i.evVerdict) {
     case "pos":
-      return `Hard Rock’s ${at} pays about ${pct}% better than the market’s fair price (books plus no-vig exchanges) — a good price.`;
+      return `Hard Rock’s ${at} pays about ${pctTxt}% better than the market’s fair price (books plus no-vig exchanges) — a good price.`;
     case "neg":
-      return `Hard Rock’s ${at} pays about ${pct}% worse than the market’s fair price (books plus no-vig exchanges) — you’d be paying extra vig.`;
+      return `Hard Rock’s ${at} pays about ${pctTxt}% worse than the market’s fair price (books plus no-vig exchanges) — you’d be paying extra vig.`;
     default:
       return `Hard Rock’s ${at} is priced about the same as the rest of the market — a fair price, no extra edge.`;
   }
 }
 
-function gapSentence(i: VerdictInput): string {
+// What a gap of this size means. The band is a RANKING rule the backtest
+// validated; it is not a proven win rate.
+function sizeSentence(gap: number): string {
+  if (gap >= STRONG_GAP_PTS) {
+    return " Gaps this big are the top ~10% of a season — the strongest end of the band the backtest validated for ranking games. Against a fair estimated line the backtest found no confirmed edge, so only real-line closing-line value this season can prove one; still close to a coin flip on any single game.";
+  }
+  if (gap >= BET_GAP_PTS) {
+    return " That puts it in the top ~20% of gaps — the selection band the backtest validated for ranking games, not a proven win rate. Against a fair estimated line the backtest found no confirmed edge; only closing-line value against real lines this season can prove one, and any single game is still close to a coin flip.";
+  }
+  if (gap >= WATCH_GAP_PTS) {
+    return " That is a small lean — below the gap size that qualifies as bettable.";
+  }
+  return "";
+}
+
+function gapSentence(i: VerdictInput, hrGap: number | null): string {
   const line = i.liveLine ?? i.fallbackLine;
   if (i.derived || i.underScore === null || i.bvLine === null) {
+    const share =
+      i.fhShare !== null && Number.isFinite(i.fhShare)
+        ? `${fmt(i.fhShare * 100)}% of it`
+        : "about half of it";
     const ref =
       line !== null
-        ? `The ${fmt(line)} shown is a reference first-half number worked out from the full-game total (about 52% of it), not a prediction.`
+        ? `The ${fmt(line)} shown is a reference first-half number worked out from the full-game total (${share}; the share is higher when one side is a heavy favorite), not a prediction.`
         : "No first-half line has been posted yet.";
     return `No model read yet — the model needs both teams to have played ${MIN_GAMES_FOR_MODEL} games this season. ${ref}`;
+  }
+  // Prefer the number you can actually bet.
+  if (hrGap !== null && i.hrLine !== null) {
+    const dir =
+      hrGap > 0
+        ? "above our number, which leans under"
+        : hrGap < 0
+          ? "below our number, which leans over"
+          : "right on our number";
+    const market =
+      i.liveLine !== null && Math.abs(i.liveLine - i.hrLine) >= 0.05
+        ? ` (the market consensus is ${fmt(i.liveLine)}).`
+        : ".";
+    return `Hard Rock has the first half at ${fmt(i.hrLine)}; our number is ${fmt(i.bvLine)}${market} Hard Rock’s line is ${fmt(Math.abs(hrGap))} points ${dir}.${sizeSentence(hrGap)}`;
   }
   if (i.gap === null || line === null) {
     return `Our number for the first half is ${fmt(i.bvLine)}, but no Vegas line has been captured to compare it to.`;
   }
-  const src = i.liveLine !== null ? "Vegas has" : "The estimated line is";
+  const src =
+    i.liveLine !== null
+      ? "The market has (Hard Rock has not posted)"
+      : "The estimated line is";
   const dir =
     i.gap > 0
       ? "above our number, which leans under"
       : i.gap < 0
         ? "below our number, which leans over"
         : "right on our number";
-  const size =
-    i.gap >= STRONG_GAP_PTS
-      ? ` Gaps this big are the top ~10% of a season — historically the strongest under spots, about ${fmt(BACKTEST_UNDER_PCT)}% under; still close to a coin flip on any single game.`
-      : i.gap >= BET_GAP_PTS
-        ? ` That puts it in the top ~20% of gaps — the group that went under about ${fmt(BACKTEST_UNDER_PCT)}% of the time in the backtest. A small edge, so any single game is still close to a coin flip.`
-        : i.gap >= WATCH_GAP_PTS
-          ? " That is a small lean — below the gap size the backtest says is worth betting."
-          : "";
-  return `${src} the first half at ${fmt(line)}; our number is ${fmt(i.bvLine)}. The line is ${fmt(Math.abs(i.gap))} points ${dir}.${size}`;
+  return `${src} the first half at ${fmt(line)}; our number is ${fmt(i.bvLine)}. The line is ${fmt(Math.abs(i.gap))} points ${dir}.${sizeSentence(i.gap)}`;
 }
 
 // The 1–2 strongest real (non-hypothesis, tier 1–2) drivers on the factor
@@ -147,8 +196,11 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
 
 export function verdictFor(i: VerdictInput): VerdictResult {
   const hasModel = !i.derived && i.underScore !== null && i.bvLine !== null;
-  const gap = i.gap ?? 0;
-  const gapUnder = gap > 0;
+  const consensusGap = i.gap ?? 0;
+  const hrGap =
+    hasModel && i.hrLine !== null && i.bvLine !== null
+      ? round2(i.hrLine - i.bvLine)
+      : null;
   const pricePos = i.evVerdict === "pos";
   const priceNeg = i.evVerdict === "neg";
 
@@ -160,108 +212,122 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
   if (i.bvAdjust !== null && i.bvAdjust !== 0) {
     flags.push(
-      `Our number includes a manual ${signed(i.bvAdjust)} adjustment${i.bvAdjustReason ? ` (${i.bvAdjustReason})` : ""}.`,
+      `Our number includes a manual ${signed(i.bvAdjust, 1)} adjustment${i.bvAdjustReason ? ` (${i.bvAdjustReason})` : ""}.`,
     );
   }
 
   const why = [
-    gapSentence(i),
+    gapSentence(i, hrGap),
     priceSentence(i),
     ...driverSentences(i.factorBoard),
   ].slice(0, 4);
 
+  const out = (
+    verdict: Verdict,
+    confidence: Confidence,
+    headline: string,
+    priceEdgeOnly: boolean,
+    strength: number,
+  ): VerdictResult => ({
+    verdict,
+    confidence,
+    headline,
+    why,
+    flags,
+    priceEdgeOnly,
+    hrGap,
+    reason: deriveReason(hasModel, hrGap, priceEdgeOnly),
+    strength,
+  });
+
   // --- No model (weeks 1–2, or a derived reference row) ---------------------
   if (!hasModel) {
     if (pricePos) {
-      return {
-        verdict: "WATCH",
-        confidence: "low",
-        headline:
-          "Price edge only — Hard Rock is paying better than the market on this under, but there is no model read behind it.",
-        why,
-        flags,
-        priceEdgeOnly: true,
-        strength: 10 + (i.ev ?? 0) * 100,
-      };
+      return out(
+        "WATCH",
+        "low",
+        "Price edge only — Hard Rock is paying better than the market on this under, but there is no model read behind it.",
+        true,
+        10 + (i.ev ?? 0) * 100,
+      );
     }
-    return {
-      verdict: "PASS",
-      confidence: "none",
-      headline: "No model read and no price edge — nothing to act on.",
-      why,
-      flags,
-      priceEdgeOnly: false,
-      strength: 0,
-    };
+    return out(
+      "PASS",
+      "none",
+      "No model read and no price edge — nothing to act on.",
+      false,
+      0,
+    );
   }
 
   // --- Model rows -----------------------------------------------------------
-  const clear = gap >= BET_GAP_PTS && i.liveLine !== null;
-  if (clear && !priceNeg) {
+  // BET needs Hard Rock's own number in the band at a fair-or-better price.
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg) {
     const confidence: Confidence =
-      gap >= STRONG_GAP_PTS && i.underScore! >= MODEL_BET_THRESHOLD
+      hrGap >= STRONG_GAP_PTS && i.underScore! >= MODEL_BET_THRESHOLD
         ? "high"
         : "medium";
-    return {
-      verdict: "BET",
+    return out(
+      "BET",
       confidence,
-      headline: pricePos
-        ? "Model edge in the bettable range AND a good Hard Rock price — the strongest kind of spot."
-        : "Model edge in the bettable range at a fair price.",
-      why,
-      flags,
-      priceEdgeOnly: false,
-      strength: 100 + gap * 10 + (i.ev ?? 0) * 100,
-    };
+      pricePos
+        ? "Model edge in the bettable range at Hard Rock’s number AND a good Hard Rock price — the strongest kind of spot."
+        : "Model edge in the bettable range at Hard Rock’s number, at a fair price.",
+      false,
+      100 + hrGap * 10 + (i.ev ?? 0) * 100,
+    );
   }
-  if (clear && priceNeg) {
-    return {
-      verdict: "WATCH",
-      confidence: "medium",
-      headline:
-        "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
-      why,
-      flags,
-      priceEdgeOnly: false,
-      strength: 60 + gap * 10,
-    };
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && priceNeg) {
+    return out(
+      "WATCH",
+      "medium",
+      "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
+      false,
+      60 + hrGap * 10,
+    );
   }
-  if (gap >= BET_GAP_PTS && i.liveLine === null) {
-    return {
-      verdict: "WATCH",
-      confidence: "low",
-      headline:
-        "Model edge vs an ESTIMATED line — no book has posted a first-half total yet. Re-check once a real line is up.",
-      why,
-      flags,
-      priceEdgeOnly: false,
-      strength: 50 + gap * 10,
-    };
+  if (i.hrLine === null && consensusGap >= BET_GAP_PTS) {
+    return out(
+      "WATCH",
+      "low",
+      i.liveLine !== null
+        ? "Hard Rock has not posted a first-half line yet — the market’s number clears our bar, but you can only bet Hard Rock. Re-check once it posts."
+        : "Model edge vs an ESTIMATED line — Hard Rock has not posted a first-half line yet and no other book has either. Re-check once a real line is up.",
+      false,
+      50 + consensusGap * 10,
+    );
   }
-  if (gap >= WATCH_GAP_PTS || pricePos) {
-    return {
-      verdict: "WATCH",
-      confidence: "low",
-      headline: pricePos
+  if (hrGap !== null && i.liveLine !== null && consensusGap >= BET_GAP_PTS) {
+    const below = round2(i.liveLine - i.hrLine!);
+    return out(
+      "WATCH",
+      "low",
+      `The market’s number clears our bar but Hard Rock’s is ${fmt(below)} points lower — no edge at Hard Rock’s line.`,
+      false,
+      40 + hrGap * 10,
+    );
+  }
+  const effGap = hrGap ?? consensusGap;
+  if (effGap >= WATCH_GAP_PTS || pricePos) {
+    return out(
+      "WATCH",
+      "low",
+      pricePos
         ? "Small model lean plus a good Hard Rock price — worth a look, not a strong case."
-        : "Small model lean — below the gap size the backtest says is worth betting.",
-      why,
-      flags,
-      priceEdgeOnly: false,
-      strength: 30 + gap * 10 + (i.ev ?? 0) * 100,
-    };
+        : "Small model lean — below the gap size that qualifies as bettable.",
+      false,
+      30 + effGap * 10 + (i.ev ?? 0) * 100,
+    );
   }
-  return {
-    verdict: "PASS",
-    confidence: "none",
-    headline: gapUnder
+  return out(
+    "PASS",
+    "none",
+    effGap > 0
       ? "The line is near our number — no edge."
       : "The line sits below our number — this leans over, and we only bet unders.",
-    why,
-    flags,
-    priceEdgeOnly: false,
-    strength: gap,
-  };
+    false,
+    effGap,
+  );
 }
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {

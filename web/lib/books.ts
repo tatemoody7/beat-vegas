@@ -41,5 +41,21 @@ export const EXCHANGE_KEYS = new Set([
 export const isExchange = (b: string): boolean =>
   EXCHANGE_KEYS.has(b.toLowerCase());
 
+// CFBD's synthetic cross-book aggregate, stored as a "book" in odds_snapshots.
+// It is not a place you can bet and it double-counts the real books, so every
+// market read (best / median / fair price) drops it.
+export const SYNTHETIC_KEYS = new Set(["consensus"]);
+export const isSynthetic = (b: string): boolean =>
+  SYNTHETIC_KEYS.has(b.toLowerCase());
+
+// Unknown keys never leak raw: "betonlineag" → "Betonlineag", "some_book" →
+// "Some Book". Known keys use the friendly label.
+export const titleCase = (key: string): string =>
+  key
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+
 export const bookLabel = (b: string): string =>
-  BOOK_LABELS[b] ?? BOOK_LABELS[b.toLowerCase()] ?? b;
+  BOOK_LABELS[b] ?? BOOK_LABELS[b.toLowerCase()] ?? titleCase(b);

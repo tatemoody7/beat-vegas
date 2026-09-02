@@ -1,5 +1,6 @@
-import { isExchange } from "@/lib/books";
+import { isExchange, isSynthetic } from "@/lib/books";
 import { devigTwoWay, evUnder } from "@/lib/devig";
+import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
 // "Line Check" — is Hard Rock giving Tate a good number vs the rest of the market?
@@ -50,13 +51,6 @@ export type LineCheckRow = {
   books: BookLine[]; // deduped, sorted by line desc (best first)
 };
 
-function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
 function verdictFor(hr: number | null, best: number | null): Verdict {
   if (hr === null) return "no-hr";
   if (best === null) return "fair";
@@ -77,7 +71,9 @@ export async function getLineCheck(
   market: Market,
 ): Promise<LineCheckRow[]> {
   const dbMarket = MARKET_DB[market];
-  // Latest line per (game, exact book key) for the market.
+  // Latest line per (game, case-folded book key) for the market. The CFBD
+  // synthetic "consensus" aggregate is not a book anyone can bet and would
+  // double-count the real ones, so it never enters the market read.
   const rows = await prisma.$queryRaw<
     {
       game_id: number | bigint;
@@ -91,13 +87,14 @@ export async function getLineCheck(
       home_team: string;
     }[]
   >`
-    SELECT DISTINCT ON (o.game_id, o.book)
-      o.game_id, o.book, o.line, o.over_price, o.under_price,
+    SELECT DISTINCT ON (o.game_id, LOWER(o.book))
+      o.game_id, LOWER(o.book) AS book, o.line, o.over_price, o.under_price,
       CAST(o.captured_at AS TEXT) AS captured_at,
       g.week, g.away_team, g.home_team
     FROM odds_snapshots o JOIN games g ON g.id = o.game_id
     WHERE g.season = ${season} AND o.market = ${dbMarket}
-    ORDER BY o.game_id, o.book, o.captured_at DESC
+      AND LOWER(COALESCE(o.book, '')) <> 'consensus'
+    ORDER BY o.game_id, LOWER(o.book), o.captured_at DESC
   `;
 
   type BookObs = {
@@ -115,7 +112,7 @@ export async function getLineCheck(
   const games = new Map<number, Acc>();
 
   for (const r of rows) {
-    if (r.line === null || !r.book) continue;
+    if (r.line === null || !r.book || isSynthetic(r.book)) continue;
     const gid = Number(r.game_id);
     const g =
       games.get(gid) ??

@@ -11,8 +11,8 @@ Research only — it never places bets or automates gambling.
   `docs/BETTING_POLICY.md` ($100 roll, $10 flat units, ≤5 bets/wk, 1H unders only).
   **Gates are in POINTS from the validated top-20%-by-gap rule (≥1.75 pts) — never
   σ:** `bv_sigma` ≈ 12 pts is per-game outcome noise, so a 1σ gap never occurs.
-  Paper picks (`manual_picks.is_paper`, stake forced 0) sit apart from the real
-  ledger. Sunday job now refreshes pace/weather before scoring; Monday job refreshes
+  Paper picks (`manual_picks.is_paper`, stake forced to 1 flat unit so units/ROI are
+  comparable) sit apart from the real ledger. Sunday job now refreshes pace/weather before scoring; Monday job refreshes
   1H PBP and grades `game_records` + the factor ledger. The model cannot score
   weeks 1–2 (needs 2 games/team) — by design. **Florida platforms (verified
   2026-09-01):** Hard Rock Bet is still the only sportsbook; "FanDuel in Florida"
@@ -28,7 +28,7 @@ Research only — it never places bets or automates gambling.
   (S20), sunday.yml DST double-fire (N12), plaintext local keys (N14), no login
   rate limit (store-less); N13 is moot since the push-notification layer was removed 2026-09-02. Odds API totals rows carry no
   spread by design (spreads market would double credits).
-- **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: GH secrets set, `odds_api.regions: "us,us2"`. (The phone push-notification layer shipped here was removed 2026-09-02 — failure alerts are GitHub's failed-run email + the routines.)
+- **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`; the `hardrockbet_fl` key folds onto it at write time); web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: GH secrets set, `odds_api.regions: "us,us2"`. (The phone push-notification layer shipped here was removed 2026-09-02 — failure alerts are GitHub's failed-run email + the routines.)
 - **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
 - **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).
 - **2026-09-02 (FBS-only training):** the `games` table holds every CFBD game incl.

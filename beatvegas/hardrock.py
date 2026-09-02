@@ -1,9 +1,8 @@
 """Hard Rock Bet helpers shared across pollers and views.
 
 Tate is in Florida, so Hard Rock is the only bettable book. The Odds API returns
-the generic `hardrockbet` key (and a Florida-specific `hardrockbet_fl` when FL
-prices diverge), so prefer the FL price and fall back to the generic. See memory
-beat-vegas-hardrock-oddsapi.
+the generic `hardrockbet` key; the Florida-specific `hardrockbet_fl` seen in the
+docs folds onto it at write time (`normalize_book`), so one key is the truth.
 """
 
 from __future__ import annotations
@@ -11,8 +10,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-# Best first: Florida-specific price when present, else the generic key.
-HR_BOOK_KEYS = ("hardrockbet_fl", "hardrockbet")
+HR_BOOK_KEY = "hardrockbet"
+HR_BOOK_KEYS = (HR_BOOK_KEY,)  # kept as a tuple for callers that iterate
 
 # Odds API aliases that mean the same book: the FL-specific key collapses onto
 # the generic one so one Hard Rock line never counts twice in a median.
@@ -30,7 +29,3 @@ def normalize_book(key: Optional[str]) -> str:
     apply the Hard Rock alias. Idempotent; None/"" -> ""."""
     k = _NON_KEY_CHARS.sub("_", (key or "").strip().lower()).strip("_")
     return _BOOK_ALIASES.get(k, k)
-
-
-def is_hr_book(book: str) -> bool:
-    return book in HR_BOOK_KEYS

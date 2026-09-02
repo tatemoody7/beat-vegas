@@ -22,11 +22,10 @@ surface the best 1H-under opportunities each week — while I stay the decision-
 
 ## Honest findings so far (important — keep us grounded)
 - No free source has *historical* 1H betting lines, so the backtest grades against
-  a **proxy** (0.52 × full-game total). Directional, not proof.
+  a **proxy** (a step share of the full-game total, `data/multiplier.json`). Directional, not proof.
 - **Blanket** 1H unders ≈ breakeven (no edge). The edge, if any, is in **selection**.
 - After backfilling history, **pace + weather** lifted the top-20% classifier picks to
-  ~53.7% / +2.45% ROI; the gbm_v2 **gap ranking** now grades **54.0% / +3.0% ROI**
-  (2018–25 OOS, proxy-graded). Rest/travel/returning-production were flat.
+  ~53.7% / +2.45% ROI; the gbm_v2 **gap ranking** replaced it as the ranking rule. Rest/travel/returning-production were flat.
 - Against a fair step proxy (0.4975 of the total, 0.5375 at 21+ spreads, FBS-only)
   the proxy-graded backtest shows **no confirmed edge**; earlier 54–59% reads were a
   flat-0.52 proxy artefact.

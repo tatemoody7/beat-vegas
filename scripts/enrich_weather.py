@@ -10,8 +10,10 @@ temp/wind/precip near kickoff.
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 
+from beatvegas import ci
 from beatvegas.db.models import Game, Venue, Weather
 from beatvegas.db.store import session_scope, try_init_db, upsert
 from beatvegas.sources.weather import fetch_weather
@@ -70,8 +72,8 @@ def main() -> None:
             skipped += 1
             consecutive_failures += 1
             if consecutive_failures == MAX_CONSECUTIVE_FAILURES:
-                print(
-                    f"[warn] {MAX_CONSECUTIVE_FAILURES} forecast calls failed in a row "
+                ci.warn(
+                    f"{MAX_CONSECUTIVE_FAILURES} forecast calls failed in a row "
                     "(rate limit / outage?) — skipping the rest of the slate"
                 )
             continue
@@ -92,6 +94,11 @@ def main() -> None:
         f"weather: {n} games stored ({fetched} fetched, {domes} domes, "
         f"{skipped} skipped) for {args.season} wk{args.week}"
     )
+    if fetched == 0 and skipped > 0:
+        # Every outdoor game was skipped (outage/rate limit): flip the step's
+        # outcome so sunday.yml's "scored WITHOUT weather" warning fires.
+        ci.warn("enrich_weather fetched 0 forecasts — board will score without weather")
+        sys.exit(3)
 
 
 if __name__ == "__main__":

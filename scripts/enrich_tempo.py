@@ -11,8 +11,10 @@ backtests); omit it to pull the latest.
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime
 
+from beatvegas import ci
 from beatvegas.db.models import Team, TeamTempo
 from beatvegas.db.store import session_scope, try_init_db, upsert
 from beatvegas.sources.teamrankings import fetch_tempo, map_to_cfbd
@@ -61,6 +63,11 @@ def main() -> None:
     )
     if unmatched:
         print(f"unmatched TeamRankings names ({len(unmatched)}): {unmatched}")
+    if n == 0:
+        # A mapper collapse (TeamRankings renamed teams/columns) stores nothing
+        # and must flip this step's outcome so sunday.yml's warning fires.
+        ci.warn("enrich_tempo stored 0 teams — TeamRankings mapping produced no rows")
+        sys.exit(3)
 
 
 if __name__ == "__main__":

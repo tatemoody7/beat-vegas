@@ -9,6 +9,7 @@ data/*.log
 data/cache/
 data/pbp_cache/
 data/pg_sim/
+data/cards/          # Friday bet-card reasoning (local, per-week)
 # Node / Next.js (web/ app, added in later phases)
 node_modules/
 .next/

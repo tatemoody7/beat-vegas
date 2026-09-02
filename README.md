@@ -109,7 +109,7 @@ slots and the routines re-dispatch anything that is missing.
 Manual-only workflows: `post-lines.yml` (derived lines for the board),
 `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
 `enrich_tempo.yml` (re-backfill pace). Dispatch any workflow from the Mac with
-`gh workflow run <file> --ref main` (add `-f market=1h|1h_close|full_game` for
+`gh workflow run <file> --ref main` (add `-f market=1h|1h_close` for
 `lines_watch.yml`).
 
 ## Web app (Next.js → Vercel + Neon)

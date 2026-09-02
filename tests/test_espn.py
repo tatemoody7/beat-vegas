@@ -86,4 +86,4 @@ def test_research_preview_warns_but_continues_when_only_espn_is_empty(monkeypatc
     monkeypatch.setattr(sys, "argv", ["research_preview.py", "--season", "2026", "--week", "1"])
     rp.main()
     out = capsys.readouterr().out
-    assert "[espn] WARNING" in out and "FATAL" not in out
+    assert "::warning::[espn]" in out and "FATAL" not in out

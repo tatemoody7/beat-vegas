@@ -20,6 +20,8 @@ PARITY = {
     "WATCH_GAP_PTS": score.WATCH_GAP_PTS,
     "MODEL_BET_THRESHOLD": score.MODEL_BET_THRESHOLD,
     "WEEKLY_BET_CAP": score.WEEKLY_BET_CAP,
+    "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
+    "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
 }
 
 
@@ -40,3 +42,14 @@ def test_python_gate_matches_verdict_ts(name):
 def test_gates_are_ordered_points_not_sigmas():
     assert score.WATCH_GAP_PTS < score.BET_GAP_PTS < score.STRONG_GAP_PTS
     assert not hasattr(score, "OPPORTUNITY_Z")  # the sigma gate is gone for good
+
+
+def test_every_numeric_gate_in_verdict_ts_is_mirrored():
+    """A new `export const X_PTS = 0.5` in verdict.ts must land in PARITY (and in
+    model/score.py), or the Friday card routine and the site can disagree."""
+    if not _TS.exists():
+        pytest.skip(f"{_TS} not present in this checkout")
+    src = _TS.read_text()
+    exported = set(re.findall(r"export\s+const\s+([A-Z_]+)\s*=\s*[0-9.]+\s*;", src))
+    missing = exported - set(PARITY)
+    assert not missing, f"numeric gates in verdict.ts without a Python mirror: {sorted(missing)}"

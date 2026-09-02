@@ -85,24 +85,6 @@ def _query_games_frame(seasons: Optional[range] = None) -> pd.DataFrame:
     return df
 
 
-def calibrate(df: pd.DataFrame) -> Dict[str, float]:
-    """Summary stats for the realized 1H/full ratio + a fitted ratio."""
-    r = df["fh_ratio"].to_numpy()
-    return {
-        "n": int(len(df)),
-        "ratio_mean": float(np.mean(r)),
-        "ratio_median": float(np.median(r)),
-        "ratio_std": float(np.std(r)),
-        # OLS through fit: 1H_total ~ a + b * full_total
-        **_ols(df["full_game_total"].to_numpy(), df["first_half_total"].to_numpy()),
-    }
-
-
-def _ols(x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
-    b, a = np.polyfit(x, y, 1)
-    return {"ols_intercept": float(a), "ols_slope": float(b)}
-
-
 @lru_cache(maxsize=1)
 def _load_share_coeffs() -> Optional[Dict[str, float]]:
     """Fitted {'a','b'} for share = a + b*|spread|, or None if unfit (-> flat)."""

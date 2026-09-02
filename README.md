@@ -101,7 +101,7 @@ anything that is missing.
 | Sun 10:00am–1:45pm, every 15 min   | `lines_watch.yml`      | Hard Rock full-game opener capture; push the moment a line appears  |
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
 | Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
-| Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → Week Preview                              |
+| Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
 | Fri 1pm (retry 2:30pm)             | `lines_watch.yml`      | 1H sweep of the weekend slate (18 events, credit-guarded)            |
 | Fri 6pm                            | routine `cfb-friday-card` | Verify/kick the sweep + preview, build the bet card, log paper picks, text |
 | Sat 10:30am (retry 11:15), 6pm (retry 6:45) | `lines_watch.yml` | Closing 1H lines for CLV                                          |

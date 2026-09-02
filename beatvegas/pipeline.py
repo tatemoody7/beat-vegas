@@ -126,10 +126,14 @@ def _clone_inputs() -> Dict[str, int]:
         # weather.game_id, ...) stay valid — same semantics as seed_demo's
         # whole-file copy. Resync each id sequence afterward so the sim's own
         # fresh inserts (predictions/results/...) don't collide on the pkey.
+        # Clear the clone tables child-first (reverse dependency order) BEFORE
+        # re-inserting: deleting venues/teams while games still reference them
+        # trips games_venue_id_fkey on a re-run.
+        for table in reversed(_CLONE_TABLES):
+            ds.query(by_table[table]).delete()
+        ds.commit()
         for table in _CLONE_TABLES:
             model = by_table[table]
-            ds.query(model).delete()
-            ds.commit()
             rows = list(_maps(ss, model, drop_id=False))
             _chunked_insert(ds, model, rows)
             if table != "weather":  # weather PK is game_id (no serial)

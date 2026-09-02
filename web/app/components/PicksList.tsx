@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { PickFull } from "@/lib/picks";
+import { isOffPolicy } from "@/lib/picks";
 import type { PickReason } from "@/lib/verdict";
 
 const REASON_SHORT: Record<PickReason, string> = {
@@ -19,6 +20,7 @@ function loggedAs(p: PickFull): string {
   if (p.gapAtPick !== null) {
     parts.push(`HR gap ${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)}`);
   }
+  if (isOffPolicy(p)) parts.push("OFF-POLICY");
   return parts.filter(Boolean).join(" · ");
 }
 

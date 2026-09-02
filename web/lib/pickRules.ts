@@ -153,14 +153,10 @@ export function checkPolicy(
   if (ctx.duplicate) {
     return reject(`a ${pick.market} pick already exists on this game`, 409);
   }
-  // Real money follows the verdict: a WATCH/PASS logged as real is a policy
-  // breach, not a bet. A missing verdict is allowed (older clients / manual).
-  if (!pick.isPaper && pick.verdict !== undefined && pick.verdict !== "BET") {
-    return reject(
-      `${pick.verdict} is not a bet — policy allows real money on BET verdicts only. Log it as a paper pick.`,
-      409,
-    );
-  }
+  // Real money on a WATCH/PASS verdict is allowed but OFF-POLICY: the record
+  // must capture every bet actually placed, and Results flags these so the
+  // owner can see how overrides do (lib/picks.ts isOffPolicy). The cap and
+  // the flat unit still apply.
   if (
     !pick.isPaper &&
     pick.market === "1H" &&

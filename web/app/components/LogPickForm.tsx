@@ -157,6 +157,11 @@ export default function LogPickForm({
             <span className="bv-fac-badge bv-fac-badge-amber">PAPER</span>
           )}
         </label>
+        {!isPaper && prefill.verdict && prefill.verdict !== "BET" && (
+          <p className="text-xs text-amber-300 sm:col-span-3">
+            {`Off-policy: the site grades this game ${prefill.verdict}, not BET. It will be logged as real money and flagged on Results so you can see how your overrides do.`}
+          </p>
+        )}
 
         <label className={`${labelCls} sm:col-span-3`}>
           Note (why you took it — for the Monday review)

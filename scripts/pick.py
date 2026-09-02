@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from beatvegas.db.models import Game, ManualPick, OddsSnapshot
-from beatvegas.db.store import init_db, session_scope
+from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import resolve_game
 from beatvegas.grading import (
     clv_under,
@@ -239,7 +239,8 @@ def cmd_summary(args) -> None:
 
 
 def main() -> None:
-    init_db()
+    if not try_init_db():
+        return
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
 

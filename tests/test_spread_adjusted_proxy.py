@@ -1,6 +1,7 @@
 """Spread-adjusted 1H multiplier: flat fallback, spread sensitivity, clamps, fit."""
 
 import numpy as np
+import pytest
 
 from beatvegas.etl import proxy_line
 from beatvegas.etl.proxy_line import (
@@ -125,3 +126,16 @@ def test_load_games_frame_filters_to_fbs_by_default(monkeypatch):
     monkeypatch.setattr(proxy_line, "load_fbs_teams", lambda: {2024: {"Alabama", "Georgia"}})
     assert proxy_line.load_games_frame()["id"].tolist() == [1]
     assert proxy_line.load_games_frame(fbs_only=False)["id"].tolist() == [1, 2]
+
+
+@pytest.mark.real_multiplier
+def test_adopted_multiplier_on_disk_is_the_fbs_step_model():
+    """Documents the adopted state: data/multiplier.json is a step model fitted on
+    FBS-vs-FBS games whose base sits below the legacy flat 0.52."""
+    proxy_line._load_share_coeffs.cache_clear()
+    c = proxy_line._load_share_coeffs()
+    assert c is not None and c["kind"] == "step"
+    assert c["cut"] == 21.0
+    assert c["base"] < DEFAULT_SHARE < c["blowout"]
+    assert fh_share(None) == c["base"]
+    assert fh_share(-28.0) == c["blowout"]

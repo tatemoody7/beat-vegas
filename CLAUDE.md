@@ -40,7 +40,16 @@ Research only — it never places bets or automates gambling.
   seasons profitable (2018 the loser). Still proxy-graded: realized FBS 1H share is
   ~0.51, so the 0.52 proxy flatters unders; proxy re-fit is a separate open item.
   Details: `research/swarm/2026-09-01-1h-under-edges/FBS_FILTER_RESULTS.md`.
-- **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2: top-20% by gap = 55.7% under / +6.3% ROI OOS proxy on FBS-vs-FBS games; was 54.0% / +3.0% before the FBS filter); 117-factor framework in `beatvegas/factors/`.
+- **2026-09-02 (fair proxy):** `data/multiplier.json` is now a STEP share fitted
+  MAE-optimally on FBS-vs-FBS games with spreads (2023-25): **0.4975 of the total
+  below a 21-pt spread, 0.5375 at 21+** (walk-forward MAE 8.289 vs 8.347 flat,
+  cleared the 0.05 gate in `derive_multiplier.py`). The mean 1H ratio is ~0.52 but
+  the MEDIAN game lands near half the total, which is what books post. Against this
+  fair proxy the proxy-graded edge disappears: gbm_v2 top-20% = 50.2% / -4.1% on
+  2023-25 (was 58.5% / +11.6% at flat 0.52) and 52.7% / +0.6% on 2015-25. The old
+  54-56% reads were the flat-0.52 artefact. The model is a reference number; only
+  real-line CLV can show an edge. Details: `research/swarm/2026-09-01-1h-under-edges/PROXY_FIX_RESULTS.md`.
+- **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2). Proxy-graded selection stats are no longer quoted as an edge (see fair-proxy note above); 117-factor framework in `beatvegas/factors/`.
 - **History & details live in:** git log + PR descriptions, `docs/` (`PIVOT.md`, `BV_LINE.md`), `~/.claude/plans/`, and this project's memory dir (auto-loads). Read those instead of reconstructing from this file.
 
 ## What it does
@@ -89,10 +98,13 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 (ESLint flat config via Next 16's native arrays + Prettier).
 
 ## Honest status of the edge (don't oversell)
-- Backtest is **proxy-graded** (no free historical 1H lines; uses 0.52×full-game
-  total). Real DraftKings lines collected going forward are the true test.
-- **Predict-total engine (gbm_v2): top-20% by gap = 54.0% under / +3.0% ROI** OOS
-  (2018+), vs the old classifier's 53.1% / +1.4%. Profitable 6/8 seasons.
+- Backtest is **proxy-graded** (no free historical 1H lines). The proxy is the
+  step share in `data/multiplier.json` (~0.50 of the total, 0.54 in 21+ blowouts),
+  fitted on FBS-vs-FBS games. Real Hard Rock/DK lines collected forward are the true test.
+- **Predict-total engine (gbm_v2) shows NO proxy-graded edge against the fair proxy**
+  (top-20% by gap 50.2% / -4.1% on 2023-25; 52.7% / +0.6% on 2015-25). The earlier
+  54.0% / +3.0% and 55.7% / +6.3% figures were graded against a flat 0.52 line that
+  sits ~1 pt above fair and flattered every under selection.
 - **The proxy-under ROI is partly a PROXY ARTIFACT**: the flashy proxy-leaders
   (1H explosive/turnovers) actually correlate with *more* 1H scoring — they win the
   under via the flat-0.52 proxy over-pricing low-1H-share games, not real low scoring.

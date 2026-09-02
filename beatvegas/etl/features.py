@@ -26,6 +26,7 @@ from ..sources.season_stats import (
     sp_frame,
     talent_frame,
 )
+from .fbs import filter_fbs_games, load_fbs_teams
 from .fh_factors import FH_METRICS, fh_factor_frame
 from .proxy_line import proxy_total
 from .situational import situational_frame
@@ -143,7 +144,16 @@ BANNED_LINE_COLS = {
 }
 
 
-def _load_all_games() -> pd.DataFrame:
+def _load_all_games(fbs_only: bool = True) -> pd.DataFrame:
+    """Every game row the engine may see. `fbs_only` (default) drops any game
+    where either team was not FBS that season — see etl/fbs.py for why."""
+    df = _query_games()
+    if fbs_only:
+        df = filter_fbs_games(df, load_fbs_teams())
+    return df
+
+
+def _query_games() -> pd.DataFrame:
     with session_scope() as s:
         q = s.query(
             Game.id,
@@ -292,9 +302,12 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_feature_frame(
-    min_games: int = 2, seasons: Optional[range] = None, client: Optional[CFBDClient] = None
+    min_games: int = 2,
+    seasons: Optional[range] = None,
+    client: Optional[CFBDClient] = None,
+    fbs_only: bool = True,
 ) -> pd.DataFrame:
-    games = _load_all_games()
+    games = _load_all_games(fbs_only=fbs_only)
     std = _season_to_date(_team_long(games))
 
     # Merge season-to-date stats back, matching each side on its own team name.

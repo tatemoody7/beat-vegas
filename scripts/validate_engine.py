@@ -32,14 +32,24 @@ from beatvegas.etl.features import (
 from beatvegas.model.bv_line import BV_FEATURE_COLS
 
 
-def main() -> None:
+def parse_args(argv=None) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--first-test-season", type=int, default=2018)
     ap.add_argument("--top-frac", type=float, default=0.20)
     ap.add_argument("--no-store", action="store_true")
-    args = ap.parse_args()
+    ap.add_argument(
+        "--all-divisions",
+        dest="fbs_only",
+        action="store_false",
+        help="include FCS/D2/D3 games (pre-fix behaviour) for a like-for-like comparison",
+    )
+    return ap.parse_args(argv)
 
-    df = build_feature_frame(min_games=2)
+
+def main() -> None:
+    args = parse_args()
+
+    df = build_feature_frame(min_games=2, fbs_only=args.fbs_only)
 
     clf_res = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
     clf = clf_res.summary

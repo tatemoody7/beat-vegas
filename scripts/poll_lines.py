@@ -168,13 +168,7 @@ def main() -> None:
     )
 
     def _credits_low() -> bool:
-        c = client.last_credits
-        return (
-            args.credit_floor > 0
-            and c is not None
-            and c.remaining is not None
-            and c.remaining <= args.credit_floor
-        )
+        return client.credits_low(args.credit_floor)
 
     # list_events is free but still returns the credit headers — bail before
     # the paid loop if the month's budget is already at the reserve floor.

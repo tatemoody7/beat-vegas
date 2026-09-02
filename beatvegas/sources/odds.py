@@ -48,6 +48,14 @@ class OddsAPIClient:
         self.last_credits = c
         return c
 
+    def credits_low(self, floor: int) -> bool:
+        """True once the month's remaining credits (from the LAST response's
+        x-requests-remaining header) are at or below `floor`. Unknown (no call
+        yet / header missing) is NOT low; floor <= 0 disables the guard. Call a
+        free endpoint (list_events) first to learn the balance."""
+        c = self.last_credits
+        return floor > 0 and c is not None and c.remaining is not None and c.remaining <= floor
+
     def list_full_game_totals(self, regions: Optional[str] = None) -> List[Dict[str, Any]]:
         """Full-game `totals` for every book in `regions`, from the BULK /odds
         endpoint. `totals` is a FEATURED market, so this costs (1 x n_regions)

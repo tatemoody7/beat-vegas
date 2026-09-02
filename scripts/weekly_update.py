@@ -23,6 +23,7 @@ from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.lines import consensus_open_close
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
+from beatvegas.sources import rotowire
 
 
 def _full_game_opener(snaps: list) -> Tuple[Optional[float], Optional[float]]:
@@ -91,24 +92,36 @@ def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[
 
 
 def _enrich_qb_out(scored) -> None:
-    """Forward-only: tag the upcoming slate with live 'QB OUT' flags from ESPN.
+    """Forward-only: tag the upcoming slate with live 'QB OUT' flags from the
+    Rotowire injury report (ESPN publishes no college injuries).
 
-    Display only, unofficial, fail-silent — never a model feature, never
-    backfilled. Mutates `scored` in place, adding qb_out_home/away/detail which
-    store_predictions persists into factors_json."""
-    from beatvegas.sources.espn import qb_out_flags
+    ONE report call for the whole slate, matched to our school names the same
+    way scripts/research_preview.py does. Display only, unofficial, fail-silent
+    — never a model feature, never backfilled. Mutates `scored` in place, adding
+    qb_out_home/away/detail which store_predictions persists into factors_json."""
+    report = rotowire.fetch_injury_report()
+    if not report:
+        print("[rotowire] WARNING: injury report empty/unreachable — qb-out flags all False")
+    schools = sorted(set(scored["home_team"]) | set(scored["away_team"]))
+    inj_by_school = rotowire.by_school(report, schools) if report else {}
 
     homes, aways, details = [], [], []
     for _, r in scored.iterrows():
-        f = qb_out_flags(r["home_team"], r["away_team"])
-        homes.append(bool(f["home"]))
-        aways.append(bool(f["away"]))
-        details.append(f["detail"] or None)
+        parts = []
+        flags = {}
+        for side, school in (("home", r["home_team"]), ("away", r["away_team"])):
+            d = rotowire.qb_out_detail(inj_by_school.get(school, []))
+            flags[side] = d is not None
+            if d:
+                parts.append(f"{school}: {d}")
+        homes.append(flags["home"])
+        aways.append(flags["away"])
+        details.append(" · ".join(parts) or None)
     scored["qb_out_home"] = homes
     scored["qb_out_away"] = aways
     scored["qb_out_detail"] = details
     flagged = sum(1 for h, a in zip(homes, aways) if h or a)
-    print(f"qb-out flags: {flagged}/{len(scored)} games (live ESPN, unofficial)")
+    print(f"qb-out flags: {flagged}/{len(scored)} games (live Rotowire, unofficial)")
 
 
 def main() -> None:

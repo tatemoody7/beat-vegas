@@ -20,7 +20,26 @@ export const BOOK_LABELS: Record<string, string> = {
   mybookieag: "MyBookie",
   betanysports: "BetAnySports",
   consensus: "Consensus",
+  kalshi: "Kalshi (exchange)",
+  polymarket: "Polymarket (exchange)",
+  novig: "Novig (exchange)",
+  prophetx: "ProphetX (exchange)",
+  betopenly: "BetOpenly (exchange)",
 };
+
+// CFTC-regulated exchanges / prediction markets (Odds API region us_ex).
+// Legal in Florida, ~zero vig, but no first-half totals — a price-comparison
+// source that sharpens the market fair price; never a place we bet.
+export const EXCHANGE_KEYS = new Set([
+  "kalshi",
+  "polymarket",
+  "novig",
+  "prophetx",
+  "betopenly",
+]);
+
+export const isExchange = (b: string): boolean =>
+  EXCHANGE_KEYS.has(b.toLowerCase());
 
 export const bookLabel = (b: string): string =>
   BOOK_LABELS[b] ?? BOOK_LABELS[b.toLowerCase()] ?? b;

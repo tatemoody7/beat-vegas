@@ -88,9 +88,9 @@ function priceSentence(i: VerdictInput): string {
   const pct = fmt(Math.abs(i.ev) * 100);
   switch (i.evVerdict) {
     case "pos":
-      return `Hard Rock’s ${at} pays about ${pct}% better than the market’s fair price — a good price.`;
+      return `Hard Rock’s ${at} pays about ${pct}% better than the market’s fair price (books plus no-vig exchanges) — a good price.`;
     case "neg":
-      return `Hard Rock’s ${at} pays about ${pct}% worse than the market’s fair price — you’d be paying extra vig.`;
+      return `Hard Rock’s ${at} pays about ${pct}% worse than the market’s fair price (books plus no-vig exchanges) — you’d be paying extra vig.`;
     default:
       return `Hard Rock’s ${at} is priced about the same as the rest of the market — a fair price, no extra edge.`;
   }

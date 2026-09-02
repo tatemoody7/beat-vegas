@@ -45,8 +45,13 @@ jobs:
           read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
           echo "season=$SEASON" >> "$GITHUB_OUTPUT"
           echo "week=$WEEK" >> "$GITHUB_OUTPUT"
-      - name: Capture full-game openers (multi-book incl. Hard Rock)
-        run: python scripts/poll_full_game.py --source oddsapi
+      - name: Capture full-game openers (multi-book incl. Hard Rock + no-vig exchanges)
+        # us_ex adds Kalshi / Novig / ProphetX / BetOpenly (CFTC exchanges, ~0 vig):
+        # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
+        # only — they sharpen the market fair price Hard Rock is judged against.
+        # +1 credit per run here only (2 runs/wk ≈ +9/mo); the 15-min alert
+        # window and the 1H sweeps stay us,us2 to fit the free tier.
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
         # combined_sec_play / combined_plays are model inputs joined on exact
         # (season, week, team) — without this row the upcoming week scores with

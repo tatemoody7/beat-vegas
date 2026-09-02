@@ -30,6 +30,10 @@ odds_api:
   regions: "us,us2"           # us2 carries Hard Rock FL; needed to capture HR.
                               # NB: 1H (totals_h1) is per-event & costs markets x
                               # regions PER GAME, so us,us2 doubles 1H credit use.
+                              # us_ex (Kalshi/Novig/ProphetX/BetOpenly, ~0-vig
+                              # exchanges) is added ONLY on the Sunday full-game
+                              # capture via --regions (sunday.yml) — not here, so
+                              # the per-event 1H sweeps don't pay a third region.
   markets: "totals_h1"        # first-half totals
   odds_format: "american"
   # Optional whitelist of bookmaker keys (empty = all available).

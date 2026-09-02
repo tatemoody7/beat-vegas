@@ -191,6 +191,14 @@ export default function LineCheckCard({ row }: { row: LineCheckRow }) {
                     <td className="text-[var(--text)]">
                       {label(b.book)}
                       {b.isHR ? " ★" : ""}
+                      {b.isExchange && (
+                        <span
+                          className="bv-fac-badge ml-1"
+                          title="CFTC-regulated exchange: prices carry ~no vig, so they anchor the market fair price. Legal in Florida but no first-half totals — we never bet here."
+                        >
+                          no-vig
+                        </span>
+                      )}
                     </td>
                     <td className="font-mono text-[var(--text)]">{b.line}</td>
                     <td className="font-mono text-[var(--text-muted)]">

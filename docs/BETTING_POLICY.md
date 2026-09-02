@@ -34,6 +34,24 @@ the bet card follows. Change it here first, then in code.
   Line Check page first: a Hard Rock price worse than the market's fair price
   turns a BET into a WATCH.
 
+## Where you can legally bet in Florida (checked 2026-09-01)
+
+- **Hard Rock Bet** — the only licensed sportsbook in Florida (Seminole
+  compact, 21+). **Every real bet goes here.** FanDuel Sportsbook, DraftKings
+  Sportsbook, BetMGM etc. remain illegal in FL.
+- **Prediction markets (CFTC-regulated, 18+)** — legal for Floridians:
+  **FanDuel Predicts** (launched 2026-01-15 via CME Group; this is what people
+  mean when they say "FanDuel is in Florida"), **Kalshi**, **Polymarket**,
+  **ProphetX**, **Novig**, **DraftKings Predictions**, Crypto.com, Underdog
+  Predict. They sell game-winner / spread / futures contracts priced with no
+  vig — and, as far as we can tell, **no first-half totals**, so they cannot
+  carry our real-money market. **Use: price comparison only.** Kalshi,
+  Polymarket, Novig and ProphetX flow into the Sunday full-game capture via
+  The Odds API region `us_ex` and sharpen the "market fair price" Hard Rock
+  is judged against on Line Check. FanDuel Predicts is not in any feed we use.
+- **Sweepstakes / DFS** — Fliff (sweepstakes book; its lines are in our feed),
+  PrizePicks, Underdog, DraftKings Pick6. Not used.
+
 ## What BET means (lib/verdict.ts)
 
 A game is BET when all of these hold:

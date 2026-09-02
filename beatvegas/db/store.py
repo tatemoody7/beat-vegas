@@ -194,8 +194,15 @@ def session_scope() -> Iterator[Session]:
         s.close()
 
 
-def upsert(session: Session, model, rows: Iterable[dict], pk_fields) -> int:
-    """Insert-or-update rows by primary-key fields. Returns count processed."""
+def upsert(
+    session: Session, model, rows: Iterable[dict], pk_fields, overwrite_none: bool = False
+) -> int:
+    """Insert-or-update rows by primary-key fields. Returns count processed.
+
+    On UPDATE, keys whose value is None are skipped unless `overwrite_none` —
+    a source that lacks a field (CFBD has no line yet for an upcoming game) must
+    not erase a value another job already stored (the Sunday opener's
+    Game.spread / full_game_total). Inserts set every key as given."""
     if isinstance(pk_fields, str):
         pk_fields = [pk_fields]
     n = 0
@@ -206,6 +213,8 @@ def upsert(session: Session, model, rows: Iterable[dict], pk_fields) -> int:
             session.add(model(**row))
         else:
             for k, v in row.items():
+                if v is None and not overwrite_none:
+                    continue
                 setattr(obj, k, v)
         n += 1
     return n

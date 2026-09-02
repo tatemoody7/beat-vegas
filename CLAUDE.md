@@ -31,7 +31,16 @@ Research only — it never places bets or automates gambling.
 - **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`, FL-specific `hardrockbet_fl`); Pushover push alerts; web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: set Pushover config + GH secrets, `odds_api.regions: "us,us2"`.
 - **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
 - **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).
-- **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2: top-20% by gap = 54.0% under / +3.0% ROI OOS proxy); 117-factor framework in `beatvegas/factors/`.
+- **2026-09-02 (FBS-only training):** the `games` table holds every CFBD game incl.
+  FCS/D2/D3, and from 2022 CFBD carried lines for FCS games, so ~40% of trainable
+  rows in 2022-25 had no FBS team. `etl/fbs.py` + git-tracked `data/fbs_teams.json`
+  (per-season CFBD `/teams/fbs`, refresh each August via `scripts/fetch_fbs_teams.py`)
+  now filter training/backtest/scoring to FBS-vs-FBS. Like-for-like on demo.db
+  (2015-25, flat-0.52 proxy): gbm_v2 top-20% 53.9%/+2.9% → **55.7%/+6.3%**, 7 of 8
+  seasons profitable (2018 the loser). Still proxy-graded: realized FBS 1H share is
+  ~0.51, so the 0.52 proxy flatters unders; proxy re-fit is a separate open item.
+  Details: `research/swarm/2026-09-01-1h-under-edges/FBS_FILTER_RESULTS.md`.
+- **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2: top-20% by gap = 55.7% under / +6.3% ROI OOS proxy on FBS-vs-FBS games; was 54.0% / +3.0% before the FBS filter); 117-factor framework in `beatvegas/factors/`.
 - **History & details live in:** git log + PR descriptions, `docs/` (`PIVOT.md`, `BV_LINE.md`), `~/.claude/plans/`, and this project's memory dir (auto-loads). Read those instead of reconstructing from this file.
 
 ## What it does

@@ -4,6 +4,10 @@
 # log a bet (resolves the game by name within the season):
 python scripts/pick.py add --home "Ohio State" --away "Michigan" --line 24.5
 python scripts/pick.py add --home Bama --away LSU --line 27 --price -105 --stake 2 --book dk
+# record WHY (board verdict + numbers at log time) so hit rate splits by reason:
+python scripts/pick.py add --home LSU --away Clemson --line 24.5 --reason model_gap \
+    --verdict BET --gap 2.25 --ev 0.03 --hr-line 24.5
+python scripts/pick.py add ... --paper           # paper: one flat unit, own record
 
 python scripts/pick.py list                 # show logged picks
 python scripts/pick.py grade --season 2026  # grade completed picks (vs result + CLV)
@@ -92,9 +96,9 @@ def cmd_add(args) -> None:
                 )
                 return
 
-        # Paper pick: stake forced to 0 so units math stays clean; CLV/result
-        # still grade normally.
-        stake = 0.0 if args.paper else args.stake
+        # Paper pick: one flat unit so it grades as +/-1u on its own record
+        # (is_paper keeps it out of the real ledger); CLV/result grade normally.
+        stake = 1.0 if args.paper else args.stake
         pick = ManualPick(
             game_id=gid,
             season=season,
@@ -111,13 +115,19 @@ def cmd_add(args) -> None:
             placed_at=datetime.utcnow(),
             note=args.note,
             graded=False,
+            reason=args.reason or "manual",
+            verdict_at_pick=args.verdict,
+            gap_at_pick=args.gap,
+            ev_at_pick=args.ev,
+            hr_line_at_pick=args.hr_line,
         )
         s.add(pick)
         s.flush()
+        why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
         print(
             f"logged {'PAPER ' if args.paper else ''}pick #{pick.id}: {market} UNDER "
             f"{args.line} ({args.price}) {pick.away_team} @ {pick.home_team} "
-            f"[{season} wk{pick.week}] stake={stake}u"
+            f"[{season} wk{pick.week}] stake={stake}u reason={why}"
             + (f" (game {gid})" if gid else " (UNMATCHED)")
         )
 
@@ -134,9 +144,10 @@ def cmd_list(args) -> None:
         for p in rows:
             status = f"{p.result} ({p.units:+.2f}u, CLV {p.clv:+.1f})" if p.graded else "pending"
             tag = "[PAPER] " if p.is_paper else ""
+            why = (p.reason or "manual") + (f"/{p.verdict_at_pick}" if p.verdict_at_pick else "")
             print(
                 f"#{p.id} {tag}[{p.season} wk{p.week}] UNDER {p.line} {p.price} "
-                f"{p.away_team} @ {p.home_team} stake={p.stake}u -> {status}"
+                f"{p.away_team} @ {p.home_team} stake={p.stake}u {why} -> {status}"
             )
 
 
@@ -213,8 +224,8 @@ def cmd_summary(args) -> None:
         if not rows:
             print("no graded picks yet")
             return
-        # Real and paper picks are separate records: paper has no stake, so its
-        # ROI is meaningless and its wins must not flatter the real ledger.
+        # Real and paper picks are separate records: paper stakes one flat unit
+        # with nothing at risk, so its wins must never flatter the real ledger.
         for label, subset in (
             ("YOUR RECORD", [p for p in rows if not p.is_paper]),
             ("PAPER RECORD", [p for p in rows if p.is_paper]),
@@ -263,8 +274,23 @@ def main() -> None:
     a.add_argument(
         "--paper",
         action="store_true",
-        help="paper pick: tracked for record + CLV with nothing at risk (stake forced to 0)",
+        help="paper pick: nothing at risk, staked one flat unit so it grades +/-1u "
+        "on its own PAPER record",
     )
+    a.add_argument(
+        "--reason",
+        choices=("model_gap", "price_edge", "manual"),
+        default="manual",
+        help="why the bet: the model gap, a Hard Rock price edge, or your own read",
+    )
+    a.add_argument(
+        "--verdict",
+        choices=("BET", "WATCH", "PASS"),
+        help="the board's verdict at log time (frozen for later review)",
+    )
+    a.add_argument("--gap", type=float, help="bv_gap in points shown at log time")
+    a.add_argument("--ev", type=float, help="no-vig EV of the under at log time")
+    a.add_argument("--hr-line", type=float, dest="hr_line", help="Hard Rock's line at log time")
     a.add_argument(
         "--force",
         action="store_true",

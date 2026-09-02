@@ -1,0 +1,172 @@
+"""ManualPick decision-tracking columns (shared contract with the web lane —
+names are exact): verdict_at_pick, reason, gap_at_pick, ev_at_pick,
+hr_line_at_pick. pick.py add takes them as flags; --paper now stakes one flat
+unit so paper picks grade as +/-1 (is_paper keeps them out of the real ledger)."""
+
+from argparse import Namespace
+from contextlib import contextmanager
+from datetime import datetime, timedelta
+
+from conftest import _load_script
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import Session
+
+from beatvegas.db.models import Base, Game, ManualPick
+from beatvegas.db.store import _MIGRATIONS, _apply_migrations
+
+TRACKING_COLS = {
+    "verdict_at_pick": "VARCHAR(8)",
+    "reason": "VARCHAR(16)",
+    "gap_at_pick": "FLOAT",
+    "ev_at_pick": "FLOAT",
+    "hr_line_at_pick": "FLOAT",
+}
+
+
+def test_model_and_migration_carry_the_tracking_columns():
+    cols = ManualPick.__table__.columns
+    for name in TRACKING_COLS:
+        assert name in cols, name
+    assert cols["verdict_at_pick"].type.length == 8
+    assert cols["reason"].type.length == 16
+    for name, sqltype in TRACKING_COLS.items():
+        assert _MIGRATIONS["manual_picks"][name] == sqltype
+
+
+def test_migration_adds_columns_to_a_legacy_table():
+    eng = create_engine("sqlite:///:memory:")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE manual_picks (id INTEGER PRIMARY KEY, line FLOAT)"))
+    _apply_migrations(eng)
+    have = {col["name"] for col in inspect(eng).get_columns("manual_picks")}
+    assert set(TRACKING_COLS) <= have
+
+
+def _args(**kw) -> Namespace:
+    base = dict(
+        home="Michigan",
+        away="Ohio State",
+        line=24.5,
+        price=-110,
+        stake=1.0,
+        book=None,
+        season=2026,
+        week=None,
+        note=None,
+        market="1h",
+        force=False,
+        paper=False,
+        reason="manual",
+        verdict=None,
+        gap=None,
+        ev=None,
+        hr_line=None,
+    )
+    base.update(kw)
+    return Namespace(**base)
+
+
+def _pick_module():
+    pick = _load_script("pick")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(
+            Game(
+                id=1,
+                season=2026,
+                week=13,
+                home_team="Michigan",
+                away_team="Ohio State",
+                start_date=datetime.utcnow() + timedelta(days=30),
+            )
+        )
+        s.commit()
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    pick.session_scope = scope
+    return pick, eng
+
+
+def test_add_stores_the_decision_snapshot():
+    pick, eng = _pick_module()
+    pick.cmd_add(
+        _args(reason="model_gap", verdict="BET", gap=2.25, ev=0.031, hr_line=24.5, stake=2.0)
+    )
+    with Session(eng) as s:
+        (row,) = s.query(ManualPick).all()
+    assert row.reason == "model_gap"
+    assert row.verdict_at_pick == "BET"
+    assert row.gap_at_pick == 2.25
+    assert row.ev_at_pick == 0.031
+    assert row.hr_line_at_pick == 24.5
+    assert row.stake == 2.0 and row.is_paper is False
+
+
+def test_add_defaults_to_manual_reason_and_null_snapshot():
+    pick, eng = _pick_module()
+    pick.cmd_add(_args())
+    with Session(eng) as s:
+        (row,) = s.query(ManualPick).all()
+    assert row.reason == "manual"
+    assert row.verdict_at_pick is None and row.gap_at_pick is None
+    assert row.ev_at_pick is None and row.hr_line_at_pick is None
+
+
+def test_paper_pick_stakes_one_flat_unit():
+    pick, eng = _pick_module()
+    pick.cmd_add(_args(paper=True, stake=3.0))
+    with Session(eng) as s:
+        (row,) = s.query(ManualPick).all()
+    assert row.is_paper is True
+    assert row.stake == 1.0  # grades as +/-1u; is_paper keeps it off the real ledger
+
+
+def test_paper_pick_grades_to_plus_minus_one_unit():
+    fields = _load_script("pick").graded_pick_fields(20, 24.5, -110, 1.0, 25.0, 24.0)
+    assert fields["result"] == "under" and round(fields["units"], 3) == 0.909
+    fields = _load_script("pick").graded_pick_fields(30, 24.5, -110, 1.0, 25.0, 24.0)
+    assert fields["result"] == "over" and fields["units"] == -1.0
+
+
+def test_cli_parses_the_new_flags(monkeypatch):
+    import sys
+
+    pick = _load_script("pick")
+    seen = {}
+    monkeypatch.setattr(pick, "try_init_db", lambda: True)
+    monkeypatch.setattr(pick, "cmd_add", lambda a: seen.update(vars(a)))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pick.py",
+            "add",
+            "--home",
+            "Michigan",
+            "--away",
+            "Ohio State",
+            "--line",
+            "24.5",
+            "--reason",
+            "price_edge",
+            "--verdict",
+            "WATCH",
+            "--gap",
+            "1.5",
+            "--ev",
+            "0.02",
+            "--hr-line",
+            "25",
+            "--paper",
+        ],
+    )
+    pick.main()
+    assert seen["reason"] == "price_edge" and seen["verdict"] == "WATCH"
+    assert seen["gap"] == 1.5 and seen["ev"] == 0.02 and seen["hr_line"] == 25.0
+    assert seen["paper"] is True

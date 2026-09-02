@@ -61,10 +61,17 @@ def _assert_market_blind(cols) -> None:
         raise AssertionError(f"BV line must be market-blind; leaked columns: {leaked}")
 
 
+def _played(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows with a realized 1H total — the frame also carries the unplayed
+    upcoming slate (NaN target), which must never reach a fit or a residual."""
+    return df[pd.to_numeric(df[TARGET], errors="coerce").notna()]
+
+
 def fit_bv_regressor(train_df: pd.DataFrame) -> HistGradientBoostingRegressor:
     _assert_market_blind(BV_FEATURE_COLS)
+    train_df = _played(train_df)
     model = _new_regressor()
-    model.fit(train_df[BV_FEATURE_COLS], train_df[TARGET])
+    model.fit(train_df[BV_FEATURE_COLS], train_df[TARGET].astype(float))
     return model
 
 
@@ -76,6 +83,7 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500) -> pd.DataFrame:
     `bv_raw` prediction and `residual` column for the seasons that could be
     scored (early seasons with too little prior data are dropped).
     """
+    df = _played(df)
     seasons = sorted(df["season"].unique())
     out = []
     for ts in seasons:

@@ -28,6 +28,7 @@ from beatvegas.etl.features import (
     FH_FACTOR_COLS,
     MATCHUP_COLS,
     build_feature_frame,
+    training_frame,
 )
 from beatvegas.model.bv_line import BV_FEATURE_COLS
 
@@ -49,7 +50,8 @@ def parse_args(argv=None) -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    df = build_feature_frame(min_games=2, fbs_only=args.fbs_only)
+    # Played games only: the frame also carries the unplayed upcoming slate.
+    df = training_frame(build_feature_frame(min_games=2, fbs_only=args.fbs_only))
 
     clf_res = run_backtest(df, first_test_season=args.first_test_season, top_frac=args.top_frac)
     clf = clf_res.summary

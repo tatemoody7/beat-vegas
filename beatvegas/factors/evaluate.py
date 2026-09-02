@@ -64,6 +64,7 @@ def _walk_forward(
     rows; single-factor scans drop NaN to get a clean coverage/correlation read.
     """
     sub = df.dropna(subset=cols) if dropna else df
+    sub = sub[sub["under"].notna()]  # played games only (the frame carries the unplayed slate)
     seasons = sorted(sub["season"].unique())
     preds = []
     for ts in [s for s in seasons if s >= first_test_season]:
@@ -148,6 +149,7 @@ def permutation_importances(
 ) -> Dict[str, float]:
     """Permutation importance (mean AUC drop) of each col in the full GBM,
     measured on the most recent season held out from training."""
+    df = df[df["under"].notna()]  # played games only
     seasons = sorted(df["season"].unique())
     if len(seasons) < 2:
         return {}
@@ -217,6 +219,7 @@ def rank_factors(
     by OOS top-fraction ROI, then scan combinations of the strongest. Returns
     {"univariate": [...ranked...], "combos": [...], "baseline": {...}}.
     """
+    df = df[df["under"].notna()]  # played games only (baseline n / under% must not see NaN)
     rows = [
         r for f in factors if (r := evaluate_factor(df, f, top_frac, first_test_season)) is not None
     ]

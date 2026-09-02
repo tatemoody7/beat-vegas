@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import argparse
 import statistics
+import sys
 from typing import Dict, Optional, Tuple
 
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.lines import consensus_open_close
 from beatvegas.model.score import score_slate, store_predictions
@@ -127,17 +128,39 @@ def main() -> None:
         )
         return
 
-    df = build_feature_frame(min_games=args.min_games)
+    # Build WITHOUT the min_games cut so we can tell "nothing eligible yet" from
+    # "scoring broke": the frame keeps every game with a full-game total
+    # (including the unplayed target week), and the cut is applied here.
+    frame = build_feature_frame(min_games=0)
+    in_week = (frame["season"] == args.season) & (frame["week"] == week)
+    n_with_total = int(in_week.sum())
+    df = apply_min_games(frame, args.min_games)
+    n_eligible = int(((df["season"] == args.season) & (df["week"] == week)).sum())
+
     lines, kinds = opening_line_lookup(args.season, week)
     scored = score_slate(
         args.season, target_week=week, line_lookup=lines, line_kind_lookup=kinds, df=df
     )
     if scored.empty:
+        if n_with_total == 0:
+            print(
+                f"{args.season} wk{week}: no games with a full-game total yet — "
+                "nothing to score (the opener capture fills Game.full_game_total)."
+            )
+            return
+        if n_eligible == 0:
+            print(
+                f"No scorable games for {args.season} wk{week}: {n_with_total} have a total "
+                f"but none clear the cut (need >= {args.min_games} games played by both teams)."
+            )
+            return
+        # Eligible rows existed and still nothing came back — that is a bug or
+        # missing training data, not an empty week. Fail so the workflow shows red.
         print(
-            f"No scorable games for {args.season} wk{week} "
-            f"(need >= {args.min_games} games played by both teams)."
+            f"ERROR: {n_eligible} eligible games for {args.season} wk{week} "
+            "but score_slate returned no rows (no prior-season training data?)."
         )
-        return
+        sys.exit(1)
     _enrich_qb_out(scored)
     n = store_predictions(scored)
     obs = sum(1 for k in kinds.values() if k == "observed_1h")

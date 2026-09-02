@@ -21,7 +21,7 @@ import pandas as pd
 from ..backtest.engine import BREAKEVEN, _new_model
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
-from ..etl.features import FEATURE_COLS, build_feature_frame
+from ..etl.features import FEATURE_COLS, build_feature_frame, training_frame
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
 from ..factors.board import build_factor_board, factor_references
@@ -160,7 +160,11 @@ def score_slate(
 ) -> pd.DataFrame:
     if df is None:
         df = build_feature_frame(min_games=2)
-    train = df[df["season"] < target_season]
+    # Train on PLAYED prior-season games only: the frame keeps unplayed rows
+    # (NaN `under`) so the upcoming slate can be scored, and a NaN target must
+    # never reach a fit. Target rows keep their NaN `under` — they have no
+    # outcome yet; that is the point.
+    train = training_frame(df[df["season"] < target_season])
     target = df[df["season"] == target_season].copy()
     if target_week is not None:
         target = target[target["week"] == target_week]

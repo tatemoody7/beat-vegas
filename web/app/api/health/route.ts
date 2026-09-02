@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/health — capture-freshness metadata for local notifiers
-// (scripts/notify_sunday.py can reach Vercel over HTTPS but not Neon:5432).
+// GET /api/health — capture-freshness metadata for the Sunday ops routine
+// (cfb-sunday-ops checks lastFullGameCapture over HTTPS; Neon:5432 is blocked on campus).
 // Exposes only aggregate timestamps/counts — no lines, picks, or edges — so
 // it is exempt from the password gate in middleware.ts.
 export async function GET() {

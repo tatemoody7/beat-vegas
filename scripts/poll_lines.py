@@ -30,22 +30,26 @@ from beatvegas.alerts.detect import (
 from beatvegas.alerts.imessage import send_imessage
 from beatvegas.alerts.push import push_configured, send_push
 from beatvegas.config import load_config
-from beatvegas.db.models import Game, OddsSnapshot, Prediction
+from beatvegas.db.models import Game, OddsSnapshot, Prediction, TeamTempo, Weather
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
 from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
 from beatvegas.lines import consensus_open_close
 from beatvegas.season import current_season
 from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
+from beatvegas.sweep import CLOSE_SPREAD, build_context, latest_pace_by_team, rank_events
 
 
 def _candidate_games(session, season: int) -> List[Dict]:
     rows = (
-        session.query(Game.id, Game.home_team, Game.away_team, Game.start_date)
+        session.query(Game.id, Game.home_team, Game.away_team, Game.start_date, Game.spread)
         .filter(Game.season == season)
         .all()
     )
-    return [{"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3]} for r in rows]
+    return [
+        {"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3], "spread": r[4]}
+        for r in rows
+    ]
 
 
 def _latest_snapshot(session, game_id: int, book: str):
@@ -134,7 +138,34 @@ def main() -> None:
         dt = _parse_dt(ev.get("commence_time"))
         if dt is None or now - timedelta(hours=args.hours_back) <= dt <= horizon:
             in_window.append(ev)
-    in_window = in_window[: args.max_events]
+    # Rank the window by bettability BEFORE spending credits. A plain [:max]
+    # took the earliest kickoffs (Friday night + the Saturday noon wave), so the
+    # evening games the card wants were never swept on the free-tier cap.
+    with session_scope() as s:
+        slate = _candidate_games(s, args.season)
+        dome_by_game = dict(
+            s.query(Weather.game_id, Weather.dome)
+            .join(Game, Game.id == Weather.game_id)
+            .filter(Game.season == args.season)
+            .all()
+        )
+        pace_by_team = latest_pace_by_team(
+            s.query(
+                TeamTempo.season, TeamTempo.week, TeamTempo.team, TeamTempo.seconds_per_play
+            ).all()
+        )
+    ctx = build_context(in_window, slate, dome_by_game, pace_by_team)
+    n_window = len(in_window)
+    in_window = rank_events(in_window, ctx, args.max_events)
+    n_close = sum(
+        1
+        for e in in_window
+        if (c := ctx.get(e["id"])) and c["spread"] is not None and abs(c["spread"]) <= CLOSE_SPREAD
+    )
+    print(
+        f"[sweep] {n_window} events in window -> sweeping {len(in_window)} "
+        f"({n_close} with |spread|<={CLOSE_SPREAD:g}, {len(ctx)} matched to games)"
+    )
 
     def _credits_low() -> bool:
         c = client.last_credits

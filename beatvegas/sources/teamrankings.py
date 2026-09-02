@@ -5,7 +5,12 @@ supports an `?date=YYYY-MM-DD` param that returns season-to-date values *as of*
 that date — which keeps historical features leak-free.
 
 Team names use abbreviations ("S Florida", "Ohio St", "Miami (FL)"), so we expand
-common patterns then fuzzy-match to the CFBD school list.
+common patterns, then take an EXACT match against the CFBD school list, and only
+fall back to fuzzy matching when there is none. Fuzzy-first was the 2025 bug:
+`name_score` treats a school that is a prefix of the source name as a perfect
+match (built for "Kansas Jayhawks"), so "Kansas St" scored 1.0 for BOTH Kansas
+and Kansas State and the first one scanned won — 136 TeamRankings rows became
+110 stored teams, and Mississippi State carried Ole Miss's numbers.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import requests
 
-from ..etl.match import name_score
+from ..etl.match import _norm, name_score
 
 _UA = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -35,16 +40,26 @@ _PREFIX = {
     "St ": "State ",
 }
 
-# Exact aliases for names fuzzy matching can't resolve.
+# Exact aliases (TeamRankings name -> CFBD school) for names that expansion
+# alone can't resolve. Values must be the CFBD spelling in the `teams` table.
 _ALIASES = {
     "UMass": "Massachusetts",
-    "Southern Miss": "Southern Mississippi",
-    "App State": "Appalachian State",
+    "Southern Miss": "Southern Miss",
+    "App State": "App State",
     "Hawaii": "Hawai'i",
     "Miami (FL)": "Miami",
+    "Miami FL": "Miami",
     "Miami (OH)": "Miami (OH)",
+    "Miami OH": "Miami (OH)",
+    "Mississippi": "Ole Miss",  # TeamRankings' name for Ole Miss
     "Florida Intl": "Florida International",
+    "Middle Tenn": "Middle Tennessee",
     "Middle Tennessee": "Middle Tennessee",
+    "Georgia So": "Georgia Southern",
+    "Coastal Car": "Coastal Carolina",
+    "J Madison": "James Madison",
+    "N Illinois": "Northern Illinois",
+    "San Jose St": "San José State",
 }
 
 
@@ -91,14 +106,26 @@ def _expand(name: str) -> str:
 def map_to_cfbd(
     tr_names: List[str], cfbd_teams: List[str], min_score: float = 0.78
 ) -> Dict[str, Optional[str]]:
-    """Best CFBD school for each TeamRankings name (None if no confident match)."""
+    """Best CFBD school for each TeamRankings name (None if no confident match).
+
+    Exact match on the expanded name first (normalised: case/punctuation-blind),
+    then fuzzy. Fuzzy ties go to the LONGER school name, so a prefix school
+    ("Kansas") never beats the full one ("Kansas State")."""
+    by_key: Dict[str, str] = {}
+    for school in cfbd_teams:
+        by_key.setdefault(_norm(school), school)
+
     mapping: Dict[str, Optional[str]] = {}
     for tr in tr_names:
         expanded = _expand(tr)
+        exact = by_key.get(_norm(expanded)) or by_key.get(_norm(tr))
+        if exact:
+            mapping[tr] = exact
+            continue
         best, best_s = None, 0.0
         for school in cfbd_teams:
             s = max(name_score(school, expanded), name_score(school, tr))
-            if s > best_s:
+            if s > best_s or (s == best_s and best is not None and len(school) > len(best)):
                 best, best_s = school, s
         mapping[tr] = best if best_s >= min_score else None
     return mapping

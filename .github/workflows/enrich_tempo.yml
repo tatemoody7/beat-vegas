@@ -1,0 +1,89 @@
+name: Re-backfill pace (TeamRankings -> team_tempo)
+
+# Re-pulls season-to-date pace for a season range and upserts team_tempo, from
+# the cloud because the Mac's campus network can't reach Neon:5432. Run it after
+# any change to the TeamRankings -> CFBD name mapper (a new alias, a renamed
+# school): the 2023-25 rows were first written with a mapper that collapsed
+# 26 FBS teams/season onto prefix schools. Idempotent (upserts); resyncs the
+# id sequence first (SQLite-seeded rows left it behind, so inserts collided).
+# prune_stale deletes rows in the range that the re-run did NOT touch — those
+# are the old mapper's wrong names ("San Diego", "Jacksonville"); rows with a
+# correct key are overwritten by the upsert, not deleted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: 'first season'
+        default: '2023'
+      end:
+        description: 'last season'
+        default: '2025'
+      prune_stale:
+        description: 'delete rows in the range the re-run did not touch (old mapper names)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: enrich-tempo
+  cancel-in-progress: false
+
+jobs:
+  tempo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      SEASON_START: ${{ inputs.start }}
+      SEASON_END: ${{ inputs.end }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Resync team_tempo id sequence + coverage before
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import text
+          from beatvegas.db.store import session_scope
+          a, b = int(os.environ["SEASON_START"]), int(os.environ["SEASON_END"])
+          with session_scope() as s:
+              s.execute(text("select setval(pg_get_serial_sequence('team_tempo','id'), (select max(id) from team_tempo))"))
+              print("seq ->", s.execute(text("select last_value from team_tempo_id_seq")).scalar())
+              for r in s.execute(text("select season, count(distinct team) from team_tempo where season between :a and :b group by season order by season"), {"a": a, "b": b}):
+                  print("before", r)
+          PY
+      - name: Re-backfill pace
+        run: python scripts/backfill_enrichment.py --tempo --start "$SEASON_START" --end "$SEASON_END"
+      - name: Prune rows the re-run did not touch (old mapper names)
+        if: ${{ inputs.prune_stale }}
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import text
+          from beatvegas.db.store import session_scope
+          a, b = int(os.environ["SEASON_START"]), int(os.environ["SEASON_END"])
+          where = "season between :a and :b and captured_at < now() - interval '2 hours'"
+          with session_scope() as s:
+              stale = s.execute(text(f"select team, count(*) from team_tempo where {where} group by team order by team"), {"a": a, "b": b}).all()
+              print("stale rows by team:", stale)
+              n = s.execute(text(f"delete from team_tempo where {where}"), {"a": a, "b": b}).rowcount
+              print("deleted", n)
+          PY
+      - name: Coverage after + spot checks
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import text
+          from beatvegas.db.store import session_scope
+          a, b = int(os.environ["SEASON_START"]), int(os.environ["SEASON_END"])
+          with session_scope() as s:
+              for r in s.execute(text("select season, count(distinct team) from team_tempo where season between :a and :b group by season order by season"), {"a": a, "b": b}):
+                  print("after", r)
+              for r in s.execute(text("select team, seconds_per_play, plays_per_game from team_tempo where season=2025 and week=16 and team in ('Ole Miss','Mississippi State','Kansas State','Texas Tech','San Diego State','Virginia Tech') order by team")):
+                  print("check", r)
+          PY

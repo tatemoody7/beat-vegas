@@ -50,6 +50,25 @@ const factor = (over: Partial<BoardFactor>): BoardFactor => ({
 });
 
 describe("verdictFor — model rows, gated on Hard Rock's number", () => {
+  it("WATCH, never BET, when Hard Rock's total sits more than half a point below the market", () => {
+    // Our 21.8 vs HR 24.0 clears 1.75, but the market is at 26.0: HR is 2 pts
+    // off-market — giving up points, and a void risk under HR house rules.
+    const v = verdictFor({
+      ...base,
+      liveLine: 26.0,
+      gap: 4.2,
+      hrLine: 24.0,
+      ev: null,
+      evVerdict: "na",
+    });
+    expect(v.verdict).toBe("WATCH");
+    expect(v.headline).toContain("2.0 points below the market");
+    expect(v.hrGap).toBe(2.2);
+  });
+  it("BET still allowed when Hard Rock is within half a point of the market", () => {
+    const v = verdictFor({ ...base, liveLine: 25.0, gap: 3.2, hrLine: 24.5 });
+    expect(v.verdict).toBe("BET");
+  });
   it("BET when Hard Rock's gap is in the validated top-20% band at a fair-or-better price", () => {
     const v = verdictFor(base);
     expect(v.verdict).toBe("BET");

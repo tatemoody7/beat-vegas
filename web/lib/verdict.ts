@@ -28,6 +28,9 @@ export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
 export const MODEL_BET_THRESHOLD = 53;
 export const WEEKLY_BET_CAP = 5;
+// Hard Rock more than this far BELOW the market total = off-market number
+// (mirrors lib/lineCheck.ts "poor"): never a BET.
+export const HR_OFF_MARKET_PTS = 0.5;
 // weekly_update.py --min-games: the model needs this many games played by both
 // teams, so weeks 1–2 have no model read at all.
 export const MIN_GAMES_FOR_MODEL = 2;
@@ -270,6 +273,26 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
 
   // --- Model rows -----------------------------------------------------------
+  // Hard Rock posting a number well BELOW the market is not a gift: an under
+  // at a lower total is a worse bet than the same under at the market's number
+  // (lib/lineCheck.ts calls this "poor"), and Hard Rock's house rules can void
+  // bets on lines that differ materially from the general market. Never BET
+  // into it — WATCH until Hard Rock's number is back within half a point.
+  if (
+    hrGap !== null &&
+    hrGap >= BET_GAP_PTS &&
+    i.liveLine !== null &&
+    i.liveLine - i.hrLine! > HR_OFF_MARKET_PTS
+  ) {
+    const below = round2(i.liveLine - i.hrLine!);
+    return out(
+      "WATCH",
+      "medium",
+      `Our number clears the bar, but Hard Rock’s total is ${fmt(below)} points below the market’s — you’d be giving up points, and an off-market number risks a void. Wait for Hard Rock to move toward ${fmt(i.liveLine)}.`,
+      false,
+      55 + hrGap * 10,
+    );
+  }
   // BET needs Hard Rock's own number in the band at a fair-or-better price.
   if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg) {
     const confidence: Confidence =

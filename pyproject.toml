@@ -18,6 +18,7 @@ include = ["beatvegas*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "real_multiplier: use the on-disk data/multiplier.json instead of the hermetic flat proxy",
     "integration: tests that run against the local Postgres sandbox (scripts/pg_sim.py)",
 ]
 

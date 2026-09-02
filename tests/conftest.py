@@ -64,3 +64,15 @@ def db(pg_sandbox):
 @pytest.fixture
 def load_script():
     return _load_script
+
+
+@pytest.fixture(autouse=True)
+def _flat_proxy_unless_opted_in(request, monkeypatch):
+    """Tests run as if no multiplier had been adopted (flat 0.52), so they do not
+    depend on whatever data/multiplier.json says today. A test that wants the
+    real on-disk multiplier marks itself with @pytest.mark.real_multiplier."""
+    if "real_multiplier" in request.keywords:
+        return
+    from beatvegas.etl import proxy_line
+
+    monkeypatch.setattr(proxy_line, "_load_share_coeffs", lambda: None)

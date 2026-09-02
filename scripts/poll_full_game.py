@@ -35,7 +35,7 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, pick_hr_line
+from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, normalize_book, pick_hr_line
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
@@ -80,10 +80,24 @@ def _changed(prev, line, spread, over, under) -> bool:
     return prev.line != line or spread_moved or prev.over_price != over or prev.under_price != under
 
 
+def _normalize_books(rows: List[Dict]) -> List[Dict]:
+    """Canonical book key on every row before it can reach odds_snapshots
+    (one spelling per book, or medians double-count it)."""
+    for r in rows:
+        if "book" in r:
+            r["book"] = normalize_book(r["book"])
+    return rows
+
+
 def _fetch(
     source: str, season: int, regions: str = "us,us2"
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     """Return (full_game_rows, first_half_rows, source_used, event_count)."""
+    fg, h1, used, n = _fetch_raw(source, season, regions)
+    return _normalize_books(fg), _normalize_books(h1), used, n
+
+
+def _fetch_raw(source: str, season: int, regions: str) -> Tuple[List[Dict], List[Dict], str, int]:
     dk_events = 0
     if source == "oddsapi":
         # Bulk /odds: multi-book full-game totals incl. Hard Rock (us2). The

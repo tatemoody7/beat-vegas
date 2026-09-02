@@ -46,6 +46,15 @@ _MIGRATIONS = {
     "odds_snapshots": {"spread": "FLOAT"},
 }
 
+# One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH
+# Postgres and SQLite (plain SQL-92 only). Run after the column migrations.
+_DATA_MIGRATIONS = [
+    # CFBD provider strings ("DraftKings") and Odds API keys ("draftkings") both
+    # landed in `book`, double-counting a book in medians. New writes go through
+    # hardrock.normalize_book; this folds the legacy rows onto lowercase.
+    ("odds_snapshots", "UPDATE odds_snapshots SET book = lower(book) WHERE book <> lower(book)"),
+]
+
 _engine = None
 _Session: Optional[sessionmaker] = None
 
@@ -162,6 +171,14 @@ def _apply_migrations(engine) -> None:
             for col, sqltype in cols.items():
                 if col not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
+    for table, sql in _DATA_MIGRATIONS:
+        if table not in existing:
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as e:  # noqa: BLE001 - never block startup on a data fix
+            print(f"[db] WARNING: data migration failed ({sql[:40]}...): {e}")
     # Dedup backstop on the movement history (models.py uq_odds_snapshot covers
     # fresh DBs; this covers existing ones). Fail-soft: if a legacy DB already
     # holds duplicates, warn and keep running — the backstop is best-effort.

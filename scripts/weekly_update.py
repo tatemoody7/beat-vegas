@@ -16,6 +16,8 @@ import statistics
 import sys
 from typing import Dict, Optional, Tuple
 
+import pandas as pd
+
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import apply_min_games, build_feature_frame
@@ -119,7 +121,9 @@ def _enrich_qb_out(scored) -> None:
         details.append(" · ".join(parts) or None)
     scored["qb_out_home"] = homes
     scored["qb_out_away"] = aways
-    scored["qb_out_detail"] = details
+    # object dtype keeps None as None across pandas versions (newer pandas
+    # coerces a list with None into NaN, which is not a str for factors_json).
+    scored["qb_out_detail"] = pd.Series(details, index=scored.index, dtype="object")
     flagged = sum(1 for h, a in zip(homes, aways) if h or a)
     print(f"qb-out flags: {flagged}/{len(scored)} games (live Rotowire, unofficial)")
 

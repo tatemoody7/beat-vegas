@@ -83,18 +83,36 @@ jobs:
         env:
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_MARKET: ${{ inputs.market }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          retry_since=""
           case "$SCHEDULE" in
-            '*/15 14-17 * * 0')                market=full_game ;;
-            '0 17 * * 5'|'30 18 * * 5')        market=1h ;;
-            '30 14 * * 6'|'15 15 * * 6'|'0 22 * * 6'|'45 22 * * 6') market=1h_close ;;
-            '')                                market="$INPUT_MARKET" ;;   # workflow_dispatch
-            *) echo "::error::unmapped cron '$SCHEDULE' — add it to the resolve step"; exit 1 ;;
+            '*/15 14-17 * * 0')  market=full_game ;;
+            '0 17 * * 5')        market=1h ;;
+            '30 18 * * 5')       market=1h;       retry_since="$(date -u +%F)T16:30:00Z" ;;
+            '30 14 * * 6')       market=1h_close ;;
+            '15 15 * * 6')       market=1h_close; retry_since="$(date -u +%F)T14:00:00Z" ;;
+            '0 22 * * 6')        market=1h_close ;;
+            '45 22 * * 6')       market=1h_close; retry_since="$(date -u +%F)T21:30:00Z" ;;
+            '')                  market="$INPUT_MARKET" ;;   # workflow_dispatch
+            *) echo "::error::unmapped cron '$SCHEDULE' - add it to the resolve step"; exit 1 ;;
           esac
           case "$market" in
             full_game|1h|1h_close) ;;
             *) echo "::error::unknown market '$market'"; exit 1 ;;
           esac
+          # A retry slot only spends credits when the primary slot did not land:
+          # skip if a SCHEDULED run of this workflow already succeeded since the
+          # primary slot's window opened (Odds API free tier, see header budget).
+          if [ -n "$retry_since" ]; then
+            done_already=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" \
+              --event schedule --status success --json createdAt \
+              --jq "[.[] | select(.createdAt >= \"$retry_since\")] | length" 2>/dev/null || echo 0)
+            if [ "${done_already:-0}" -gt 0 ]; then
+              echo "primary slot already succeeded since $retry_since; retry slot skipping"
+              market=skip
+            fi
+          fi
           echo "market=$market" >> "$GITHUB_OUTPUT"
           echo "resolved market=$market (schedule='$SCHEDULE')"
       - uses: actions/checkout@v5

@@ -357,7 +357,10 @@ export default function VerdictCard({ g }: { g: ThisWeekGame }) {
           <InjuriesBlock p={g.preview} />
           <AllBooks g={g} />
 
-          {v.verdict !== "PASS" && (
+          {/* Every un-kicked game can be logged: BET as real money, anything
+              else as a paper pick (weeks 1-2 have no BETs at all, and the
+              record should still capture what you would have bet). */}
+          {
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <LogPickButton
                 prefill={{
@@ -377,7 +380,7 @@ export default function VerdictCard({ g }: { g: ThisWeekGame }) {
                 kickedOff={g.kickedOff}
               />
             </div>
-          )}
+          }
         </div>
       </div>
     </div>

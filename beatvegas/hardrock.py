@@ -9,11 +9,10 @@ beat-vegas-hardrock-oddsapi.
 from __future__ import annotations
 
 import re
-from typing import Dict, Optional
+from typing import Optional
 
 # Best first: Florida-specific price when present, else the generic key.
 HR_BOOK_KEYS = ("hardrockbet_fl", "hardrockbet")
-BOARD_URL = "https://beat-vegas.vercel.app"
 
 # Odds API aliases that mean the same book: the FL-specific key collapses onto
 # the generic one so one Hard Rock line never counts twice in a median.
@@ -35,11 +34,3 @@ def normalize_book(key: Optional[str]) -> str:
 
 def is_hr_book(book: str) -> bool:
     return book in HR_BOOK_KEYS
-
-
-def pick_hr_line(book_lines: Dict[str, float]) -> Optional[float]:
-    """Pick the Hard Rock line from a {book_key: line} map, preferring FL."""
-    for k in HR_BOOK_KEYS:
-        if k in book_lines:
-            return book_lines[k]
-    return None

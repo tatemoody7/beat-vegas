@@ -5,7 +5,9 @@ Each run captures the current totals_h1 line per (game, book). New snapshots are
 written only when the line/prices changed vs the last observation, so the table
 becomes a compact movement history; the earliest row per game = posting time.
 
-Run this once or twice a day during the season (later: schedule it).
+The window is ranked by bettability (beatvegas/sweep.py) before any paid call,
+and the sweep stops at --credit-floor so the Sunday opener capture (sunday.yml)
+keeps its budget. Runs from GitHub Actions (lines_watch.yml) Friday + Saturday.
 
     python scripts/poll_lines.py
     python scripts/poll_lines.py --season 2025
@@ -14,27 +16,18 @@ Run this once or twice a day during the season (later: schedule it).
 from __future__ import annotations
 
 import argparse
-import statistics
 import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 import requests
 
-from beatvegas.alerts.detect import (
-    detect_first_half_posted,
-    detect_line_alerts,
-    format_alert,
-    format_posted_summary,
-)
-from beatvegas.alerts.imessage import send_imessage
-from beatvegas.alerts.push import push_configured, send_push
+from beatvegas.ci import warn
 from beatvegas.config import load_config
-from beatvegas.db.models import Game, OddsSnapshot, Prediction, TeamTempo, Weather
+from beatvegas.db.models import Game, OddsSnapshot, TeamTempo, Weather
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, normalize_book, pick_hr_line
-from beatvegas.lines import consensus_open_close
+from beatvegas.hardrock import normalize_book
 from beatvegas.season import current_season
 from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
 from beatvegas.sweep import CLOSE_SPREAD, build_context, latest_pace_by_team, rank_events
@@ -96,33 +89,13 @@ def main() -> None:
         "event cap on in-play games)",
     )
     ap.add_argument(
-        "--dry-run-alerts", action="store_true", help="print alerts instead of sending iMessages"
-    )
-    ap.add_argument("--no-alerts", action="store_true", help="disable alerts")
-    ap.add_argument(
-        "--push",
-        action="store_true",
-        help="send a cloud push when Hard Rock POSTS new 1H lines (the mid-week trigger)",
-    )
-    ap.add_argument(
         "--credit-floor",
         type=int,
         default=60,
         help="stop per-event odds calls once remaining monthly credits hit this "
-        "floor (reserves budget for the Sunday opener window); 0 disables",
+        "floor (reserves budget for the Sunday opener capture); 0 disables",
     )
     args = ap.parse_args()
-
-    # Preflight BEFORE spending API credits or writing snapshots: a --push run
-    # with no working push config would consume the first-appearance alert
-    # state and then silently fail to notify.
-    if args.push and not args.dry_run_alerts and not push_configured():
-        print(
-            "[push] FATAL: --push requested but push is not configured "
-            "(set PUSHOVER_TOKEN/PUSHOVER_USER or config.yaml push:). "
-            "Refusing to capture, so the alert can still fire once configured."
-        )
-        sys.exit(2)
 
     if not try_init_db():
         return
@@ -173,14 +146,11 @@ def main() -> None:
     # list_events is free but still returns the credit headers — bail before
     # the paid loop if the month's budget is already at the reserve floor.
     if _credits_low():
-        msg = (
+        warn(
             f"Odds API credits at reserve floor ({client.last_credits.remaining} "
             f"<= {args.credit_floor}) — skipping the 1H sweep to protect the "
             "Sunday opener budget."
         )
-        print(f"[credits] {msg}")
-        if args.push and not args.dry_run_alerts:
-            send_push("Beat Vegas — credits low", msg)
         return
 
     # 2) Paid (markets x regions credits/event): fetch totals_h1 per event.
@@ -209,41 +179,17 @@ def main() -> None:
                 row["book"] = normalize_book(row["book"])  # one spelling per book
                 rows.append(row)
         if _credits_low():
-            print(
-                f"[credits] hit reserve floor ({client.last_credits.remaining} "
-                f"<= {args.credit_floor}) after "
-                f"{i + 1}/{len(in_window)} events — stopping "
-                "the sweep; processing what was fetched."
+            warn(
+                f"1H sweep stopped at the {args.credit_floor}-credit reserve floor "
+                f"({client.last_credits.remaining} left this month) after "
+                f"{i + 1}/{len(in_window)} events — processing what was fetched."
             )
-            if args.push and not args.dry_run_alerts:
-                send_push(
-                    "Beat Vegas — credits low",
-                    f"1H sweep stopped at the {args.credit_floor}-credit reserve "
-                    f"floor ({client.last_credits.remaining} left this month).",
-                )
             break
     written = matched = unmatched = skipped = 0
     unmatched_names = []
-    this_poll_lines: Dict[int, List[float]] = {}
-    prev_consensus: Dict[int, Optional[float]] = {}
-    hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: 1H line}
-    matchups: Dict[int, str] = {}
-    scores: Dict[int, int] = {}
-    alert_msgs: List[str] = []
 
     with session_scope() as s:
         games = _candidate_games(s, args.season)
-        meta = {g["id"]: g for g in games}
-        # Games that ALREADY had a Hard Rock 1H line (first-appearance detection).
-        hr_prev_ids = {
-            gid
-            for (gid,) in s.query(OddsSnapshot.game_id)
-            .filter(
-                OddsSnapshot.market == "1H_total",
-                OddsSnapshot.book.in_(HR_BOOK_KEYS),
-            )
-            .distinct()
-        }
         for r in rows:
             gid, _score = match_event(r["home_team"], r["away_team"], r["commence_time"], games)
             if gid is None:
@@ -251,28 +197,6 @@ def main() -> None:
                 unmatched_names.append(f"{r['away_team']} @ {r['home_team']}")
                 continue
             matched += 1
-            # consensus-before-this-poll (latest per book), computed once per game
-            if gid not in prev_consensus:
-                existing = (
-                    s.query(OddsSnapshot)
-                    .filter(OddsSnapshot.game_id == gid, OddsSnapshot.market == "1H_total")
-                    .all()
-                )
-                prev_consensus[gid] = consensus_open_close(existing)[1]
-                g = meta.get(gid, {})
-                matchups[gid] = f"{g.get('away_team')} @ {g.get('home_team')}"
-                pred = (
-                    s.query(Prediction.under_score)
-                    .filter(Prediction.game_id == gid)
-                    .order_by(Prediction.created_at.desc())
-                    .first()
-                )
-                if pred and pred[0] is not None:
-                    scores[gid] = int(pred[0])
-            this_poll_lines.setdefault(gid, []).append(r["line"])
-            if r["book"] in HR_BOOK_KEYS:
-                hr_rows.setdefault(gid, {})[r["book"]] = r["line"]
-
             prev = _latest_snapshot(s, gid, r["book"])
             if not _changed(prev, r["line"], r["over_price"], r["under_price"]):
                 skipped += 1
@@ -290,49 +214,11 @@ def main() -> None:
             )
             written += 1
 
-    # --- alerts: newly-posted + significant consensus moves ---
-    new_consensus = {gid: statistics.median(ls) for gid, ls in this_poll_lines.items() if ls}
-    acfg = load_config().get("alerts", {}) or {}
-    threshold = float(acfg.get("line_move_threshold", 1.0))
-    recipient = acfg.get("imessage_to", "")
-    if not args.no_alerts:
-        alerts = detect_line_alerts(
-            prev_consensus, new_consensus, matchups, threshold=threshold, scores=scores
-        )
-        for a in alerts:
-            msg = format_alert(a)
-            alert_msgs.append(msg)
-            if args.dry_run_alerts or not recipient:
-                print(f"[alert] {msg}" + ("" if recipient else "  (no recipient set)"))
-            else:
-                ok, detail = send_imessage(recipient, msg)
-                print(f"[alert {'sent' if ok else 'FAILED: ' + detail}] {msg}")
-
-    # --- cloud push: Hard Rock 1H lines newly posted (the mid-week trigger) ---
-    if args.push:
-        hr_new = {
-            gid: line for gid, bl in hr_rows.items() if (line := pick_hr_line(bl)) is not None
-        }
-        posted = detect_first_half_posted(hr_prev_ids, hr_new, matchups)
-        pmsg = format_posted_summary(posted)
-        if not pmsg:
-            print(f"[push] no newly-posted Hard Rock 1H lines ({len(hr_new)} HR lines seen)")
-        elif args.dry_run_alerts:
-            print(f"[push] {pmsg}")
-        else:
-            ok, detail = send_push("Beat Vegas", pmsg, url=BOARD_URL)
-            print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {pmsg}")
-            if not ok:
-                # Snapshots are already committed (capture must not be lost),
-                # so these games won't re-alert — fail the run loudly instead
-                # of letting the workflow show green with the alert dropped.
-                sys.exit(1)
-
     c = client.last_credits
     print(
         f"events_total={len(all_events)} in_window={len(in_window)} "
         f"odds_rows={len(rows)} matched={matched} unmatched={unmatched} "
-        f"new_snapshots={written} unchanged={skipped} alerts={len(alert_msgs)}"
+        f"new_snapshots={written} unchanged={skipped}"
     )
     if c:
         print(f"credits: remaining={c.remaining} used={c.used} last_cost={c.last_cost}")

@@ -10,13 +10,12 @@ Sources (`--source`):
   dk      — DraftKings hidden API (free, fresh; may 403 datacenter IPs)
   cfbd    — CFBD /lines (key-based, reachable from anywhere incl. GitHub Actions)
   oddsapi — The Odds API bulk /odds (MULTI-BOOK incl. Hard Rock; cloud-safe; the
-            source for the HR-vs-market comparison + the HR-line-drop alert)
+            source for the HR-vs-market comparison; prod runs this from sunday.yml)
   auto    — try DK, fall back to CFBD if DK returns nothing (default)
 
     python scripts/poll_full_game.py                      # auto, local
     python scripts/poll_full_game.py --source cfbd        # cloud-safe, one book
     python scripts/poll_full_game.py --source oddsapi     # multi-book incl. Hard Rock
-    python scripts/poll_full_game.py --season 2026 --notify
 
 Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + close.
 """
@@ -24,18 +23,14 @@ Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + clo
 from __future__ import annotations
 
 import argparse
-import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from beatvegas.alerts.detect import detect_full_game_posted, format_posted_summary
-from beatvegas.alerts.imessage import send_imessage
-from beatvegas.alerts.push import push_configured, send_push
-from beatvegas.config import load_config
+from beatvegas.ci import warn
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import BOARD_URL, HR_BOOK_KEYS, normalize_book, pick_hr_line
+from beatvegas.hardrock import normalize_book
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
@@ -110,8 +105,8 @@ def _fetch_raw(
         # before the paid bulk call so a reserve floor can stop it.
         client.list_events()
         if client.credits_low(credit_floor):
-            print(
-                f"[credits] Odds API credits at reserve floor "
+            warn(
+                f"Odds API credits at reserve floor "
                 f"({client.last_credits.remaining} <= {credit_floor}) — skipping the "
                 "full-game pull. Pass --credit-floor 0 to override."
             )
@@ -175,31 +170,7 @@ def main() -> None:
         help="--source oddsapi only: skip the paid pull once remaining monthly "
         "credits are at this floor (same reserve poll_lines honours); 0 disables",
     )
-    ap.add_argument(
-        "--notify",
-        action="store_true",
-        help="send a single 'DK fired' iMessage when done (no picks)",
-    )
-    ap.add_argument(
-        "--push",
-        action="store_true",
-        help="send a cloud push when Hard Rock POSTS new full-game lines (the opener trigger)",
-    )
-    ap.add_argument(
-        "--dry-run-alerts", action="store_true", help="print the notification instead of sending it"
-    )
     args = ap.parse_args()
-
-    # Preflight BEFORE spending API credits or writing snapshots: a --push run
-    # with no working push config would consume the first-appearance alert
-    # state and then silently fail to notify — the worst possible outcome.
-    if args.push and not args.dry_run_alerts and not push_configured():
-        print(
-            "[push] FATAL: --push requested but push is not configured "
-            "(set PUSHOVER_TOKEN/PUSHOVER_USER or config.yaml push:). "
-            "Refusing to capture, so the alert can still fire once configured."
-        )
-        sys.exit(2)
 
     if not try_init_db():
         return
@@ -220,26 +191,11 @@ def main() -> None:
 
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
     unmatched_names: List[str] = []
-    matched_gids = set()
-    hr_rows: Dict[int, Dict[str, float]] = {}  # gid -> {hr_book: line}
-    matchups: Dict[int, str] = {}
     best_row: Dict[int, Dict] = {}  # gid -> highest-priority book's row this run
 
     with session_scope() as s:
         games = _candidate_games(s, args.season)
         ids = {g["id"] for g in games}
-
-        # Games that ALREADY had a Hard Rock full-game line (for first-appearance
-        # detection) — captured before we insert this run's rows.
-        hr_prev_ids = {
-            gid
-            for (gid,) in s.query(OddsSnapshot.game_id)
-            .filter(
-                OddsSnapshot.market == "full_game_total",
-                OddsSnapshot.book.in_(HR_BOOK_KEYS),
-            )
-            .distinct()
-        }
 
         # One snapshot per (game, book) per run: two feed events can resolve to
         # the same game (seen live with us_ex: Idaho @ Utah listed twice), and a
@@ -256,10 +212,6 @@ def main() -> None:
                 continue
             seen_fg.add((gid, r["book"]))
             matched += 1
-            matched_gids.add(gid)
-            if r["book"] in HR_BOOK_KEYS:
-                hr_rows.setdefault(gid, {})[r["book"]] = r["line"]
-                matchups[gid] = f"{r['away_team']} @ {r['home_team']}"
             prev = _latest_snapshot(s, gid, r["book"], "full_game_total")
             # A game's FIRST snapshot is its opener: prefer the source's true
             # opening number when it carries one (CFBD `overUnderOpen`) so the
@@ -334,38 +286,6 @@ def main() -> None:
     if unmatched_names:
         uniq = sorted(set(unmatched_names))
         print(f"unmatched events ({len(uniq)}): {uniq[:10]}" + (" ..." if len(uniq) > 10 else ""))
-
-    if args.push:
-        hr_new = {
-            gid: line for gid, bl in hr_rows.items() if (line := pick_hr_line(bl)) is not None
-        }
-        alerts = detect_full_game_posted(hr_prev_ids, hr_new, matchups)
-        msg = format_posted_summary(alerts)
-        if not msg:
-            print(f"[push] no newly-posted Hard Rock full-game lines ({len(hr_new)} HR lines seen)")
-        elif args.dry_run_alerts:
-            print(f"[push] {msg}")
-        else:
-            ok, detail = send_push("Beat Vegas", msg, url=BOARD_URL)
-            print(f"[push {'sent' if ok else 'FAILED: ' + detail}] {msg}")
-            if not ok:
-                # Snapshots are already committed (capture must not be lost),
-                # so this game won't re-alert — fail the run loudly instead of
-                # letting the workflow show green with the alert dropped.
-                sys.exit(1)
-
-    if args.notify:
-        acfg = load_config().get("alerts", {}) or {}
-        recipient = acfg.get("imessage_to", "")
-        msg = (
-            f"DK poll done — {len(matched_gids)} games captured "
-            f"({written_fg} new full-game lines). Board updated."
-        )
-        if args.dry_run_alerts or not recipient:
-            print(f"[notify] {msg}" + ("" if recipient else "  (no recipient set)"))
-        elif fg_rows:  # don't text on empty offseason pulls
-            ok, detail = send_imessage(recipient, msg)
-            print(f"[notify {'sent' if ok else 'FAILED: ' + detail}] {msg}")
 
 
 if __name__ == "__main__":

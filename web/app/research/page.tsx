@@ -1,66 +1,112 @@
 import Link from "next/link";
 
 import {
+  BREAKEVEN_PCT,
+  DEFAULT_MIN_GAMES,
+  getLineStudy,
+} from "@/lib/lineStudy";
+import { proxyShareText } from "@/lib/proxy";
+import { getRecordSeasons } from "@/lib/records";
+import {
   getBvCalibration,
   getEdgeStats,
   getGapClvBuckets,
   getModelRuns,
 } from "@/lib/research";
+import { resolveSeason } from "@/lib/season";
+import { getTrends } from "@/lib/trends";
+import LineStudyView from "@/app/components/LineStudyView";
+import MinGamesSelect from "@/app/components/MinGamesSelect";
+import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
+import SeasonSelect from "@/app/components/SeasonSelect";
 
 export const dynamic = "force-dynamic";
 
-export default async function ResearchPage() {
-  const [edge, runs, gaps, calib] = await Promise.all([
-    getEdgeStats(),
+// Research: is there really an edge? Season-scoped (with an all-seasons view):
+// the realized first-half share, gap vs closing-line value, the line study
+// (which opening lines go under), calibration, model runs, candidate trends,
+// and the link to the exportable per-game records.
+export default async function ResearchPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string; minGames?: string }>;
+}) {
+  const seasons = await getRecordSeasons();
+  const sp = await searchParams;
+  const allSeasons = sp.season === "all";
+  const { season, fallbackFrom } = resolveSeason(
+    seasons,
+    allSeasons ? undefined : sp.season,
+  );
+  const scope = allSeasons ? undefined : season;
+  const minGamesReq = Number(sp.minGames);
+  const minGames =
+    Number.isFinite(minGamesReq) && minGamesReq > 0
+      ? minGamesReq
+      : DEFAULT_MIN_GAMES;
+
+  const [edge, runs, gaps, calib, study, trends] = await Promise.all([
+    getEdgeStats(scope),
     getModelRuns(),
-    getGapClvBuckets(),
+    getGapClvBuckets(scope),
     getBvCalibration(),
+    getLineStudy(season, minGames),
+    getTrends(),
   ]);
   const gapGraded = gaps.reduce((a, b) => a + b.n, 0);
+  const scopeLabel = allSeasons ? "all seasons" : `${season}`;
 
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="bv-page-title">Research</h1>
-      <p className="bv-page-sub mb-3">Is there really an edge?</p>
-      <p className="mb-5">
-        <Link href="/research/records" className="bv-btn">
-          Our records — every game, exportable →
-        </Link>
-      </p>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="bv-page-title">Research</h1>
+          <p className="bv-page-sub mt-1">
+            {`Is there really an edge? Showing ${scopeLabel}.`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {seasons.length > 0 && (
+            <SeasonSelect
+              seasons={seasons}
+              current={allSeasons ? "all" : season}
+              allowAll
+            />
+          )}
+          <Link href="/research/records" className="bv-btn">
+            Our records — every game, exportable →
+          </Link>
+        </div>
+      </div>
+
+      {!allSeasons && (
+        <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+      )}
 
       {edge ? (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Stat label="Games analyzed" value={edge.games.toLocaleString()} />
+            <Stat
+              label="Games analyzed (FBS vs FBS)"
+              value={edge.games.toLocaleString()}
+            />
             <Stat
               label="1st-half share of full game (avg)"
-              value={edge.mean.toFixed(3)}
+              value={`${(100 * edge.mean).toFixed(1)}%`}
             />
-            <Stat label="Median" value={edge.median.toFixed(3)} />
+            <Stat label="Median" value={`${(100 * edge.median).toFixed(1)}%`} />
           </div>
           <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
-            First halves end up worth{" "}
-            <b className="text-[var(--text)]">~52% of the full-game total</b>
-            {/* Template literal — Next 16 dev can also collapse the space
-                after an element when the text that follows carries an HTML
-                entity ("total— right"). */}
-            {` — right where sportsbooks set the first-half line. Betting every first-half under, or only the model's picks, did `}
-            <b className="text-gray-200">not</b> reliably beat the −110
-            break-even (you need to win 52.4%) against an estimated line, and
-            the apparent edge sits inside the ±1.5-point margin of that
-            estimate.
+            {`First halves end up worth about ${(100 * edge.mean).toFixed(1)}% of the full-game total in this sample — about half, and right where sportsbooks set the first-half line. Our estimated line uses a step share fitted on 2023–25 FBS games: ${proxyShareText()}. Graded against that fair estimate, neither betting every first-half under nor only the model’s top-20% picks reliably beat the −110 break-even (you need to win ${BREAKEVEN_PCT}%).`}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            <b className="text-[var(--text)]">Bottom line:</b> we can’t{" "}
-            <i>confirm</i> an edge on free past data — there are no past
-            first-half lines to check against. The real test is the live record,
-            built from real first-half lines captured this season.
+            <b className="text-[var(--text)]">Bottom line:</b>
+            {` the backtest validates the gap band as a way to rank games, not as a profit. We cannot confirm an edge on free past data — there are no past first-half lines to check against. The real test is the live record below and on Results, built from real first-half lines captured this season.`}
           </p>
         </>
       ) : (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          No game history loaded yet — this fills in once past seasons are in
-          the database.
+          {`No played games loaded for ${scopeLabel} yet — this fills in once first-half results are in the database.`}
         </p>
       )}
 
@@ -71,20 +117,12 @@ export default async function ResearchPage() {
         way?
       </h2>
       <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
-        Edge = Vegas line − our number (toward the under). If our number really
-        finds value, the line on our biggest-edge picks should drift{" "}
-        <i>toward</i>
-        {/* Template literal — Next 16 dev can also collapse the space after an
-            element when the text that follows carries an HTML entity
-            ("towardus"). */}
-        {` us before kickoff — i.e. average line value rises with the size of the edge. If it's flat or negative, the big edges are blind spots, not real value. Positive line value = the under closed at a more favorable number than we bet.`}
+        {`Edge = Vegas line − our number (toward the under). If our number really finds value, the line on our biggest-edge games should drift toward us before kickoff — average line value rises with the size of the edge. If it is flat or negative, the big edges are blind spots, not value. Positive line value = the under closed at a more favorable number than the open.`}
       </p>
 
       {gapGraded === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No settled games with our number and a real closing line yet. This
-          fills in through the season as first-half lines are captured before
-          kickoff and the games are graded on Mondays.
+          {`No settled games with our number and a real closing line for ${scopeLabel} yet. This fills in through the season as first-half lines are captured before kickoff and the games are graded on Mondays.`}
         </p>
       ) : (
         <div className="bv-table-wrap">
@@ -97,7 +135,7 @@ export default async function ResearchPage() {
                 <th title="Average line value (CLV): positive = the line moved our way.">
                   Avg line value
                 </th>
-                <th title="Average profit in units. 1 unit = one standard bet.">
+                <th title="Average profit in units at the closing line. 1 unit = one standard bet.">
                   Avg units
                 </th>
                 <th>Under %</th>
@@ -116,10 +154,10 @@ export default async function ResearchPage() {
                     style={{
                       color:
                         b.meanClv === null
-                          ? "#6b7280"
+                          ? "var(--text-dim)"
                           : b.meanClv > 0
-                            ? "#16a34a"
-                            : "#dc2626",
+                            ? "var(--under-strong)"
+                            : "var(--over)",
                     }}
                   >
                     {b.meanClv ?? "—"}
@@ -137,15 +175,35 @@ export default async function ResearchPage() {
         </div>
       )}
 
+      <hr className="my-6 border-[var(--border-soft)]" />
+
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--text)]">
+            {`Line study — which opening first-half lines hit the under most often (${season})`}
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
+            {`Grouped by ${study.anyReal ? "real pre-kickoff opening lines" : `estimated lines (${proxyShareText()})`}${study.fbsFiltered ? ", FBS vs FBS only" : " — no FBS list for this season, so every game is included"}. You need to win ${BREAKEVEN_PCT}% to break even at −110.${study.anyReal ? "" : " On estimated lines this ranking partly reflects how high-scoring the games are, not a signal you can bet — treat it as a hint until real lines build up."}`}
+          </p>
+        </div>
+        <MinGamesSelect current={minGames} />
+      </div>
+      {study.buckets.length === 0 ? (
+        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
+          {`No line buckets hold ${minGames}+ games for ${season} yet — early in a season there isn’t enough graded history to bucket. Lower the min-games filter or check back after a few weeks.`}
+        </p>
+      ) : (
+        <LineStudyView buckets={study.buckets} breakeven={BREAKEVEN_PCT} />
+      )}
+
       {calib && (
         <>
-          <h2 className="mb-1 mt-6 text-sm font-semibold text-[var(--text)]">
-            How accurate is our number? (on unseen games)
+          <hr className="my-6 border-[var(--border-soft)]" />
+          <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+            How accurate is our number? (on unseen games, all seasons)
           </h2>
           <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
-            {/* One template literal — Next 16 dev can collapse the space after
-                a JSX expression ("1,234games"). */}
-            {`Average miss = actual first-half points − our number, per segment (${calib.n.toLocaleString()} games). Near 0 = on target. A steady positive miss means our number runs low (it would wrongly scream "under"); the first post-2023 season can't be corrected from data that doesn't exist yet — so it's shown here, not hidden.`}
+            {`Average miss = actual first-half points − our number, per segment (${calib.n.toLocaleString()} games). Near 0 = on target. A steady positive miss means our number runs low (it would wrongly lean "under"); the first post-2023 season can't be corrected from data that doesn't exist yet — so it's shown here, not hidden.`}
           </p>
           <div className="bv-table-wrap">
             <table className="bv-table">
@@ -175,10 +233,10 @@ export default async function ResearchPage() {
                       style={{
                         color:
                           s.meanResidual === null
-                            ? "#6b7280"
+                            ? "var(--text-dim)"
                             : Math.abs(s.meanResidual) <= 0.5
-                              ? "#16a34a"
-                              : "#ca8a04",
+                              ? "var(--text)"
+                              : "var(--neutral)",
                       }}
                     >
                       {s.meanResidual ?? "—"}
@@ -194,11 +252,10 @@ export default async function ResearchPage() {
       <hr className="my-6 border-[var(--border-soft)]" />
 
       <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-        Model runs over time
+        Model runs over time (all seasons)
       </h2>
       <p className="mb-3 text-xs text-[var(--text-dim)]">
-        Does it get sharper as seasons are added? (under % for all picks vs the
-        top picks, plus return)
+        {`Does it get sharper as seasons are added? Under % for all picks vs the top picks, plus return — proxy-graded, so directional only.`}
       </p>
 
       {runs.length === 0 ? (
@@ -242,9 +299,10 @@ export default async function ResearchPage() {
                     className="font-mono font-semibold"
                     style={{
                       color:
-                        r.top_under_pct !== null && r.top_under_pct >= 52.4
-                          ? "#16a34a"
-                          : "#dc2626",
+                        r.top_under_pct !== null &&
+                        r.top_under_pct >= BREAKEVEN_PCT
+                          ? "var(--under-strong)"
+                          : "var(--over)",
                     }}
                   >
                     {r.top_under_pct ?? "—"}
@@ -254,14 +312,70 @@ export default async function ResearchPage() {
                     style={{
                       color:
                         r.top_roi !== null && r.top_roi >= 0
-                          ? "#16a34a"
-                          : "#dc2626",
+                          ? "var(--under-strong)"
+                          : "var(--over)",
                     }}
                   >
                     {r.top_roi !== null ? r.top_roi.toFixed(4) : "—"}
                   </td>
                   <td className="max-w-xs text-[var(--text-dim)]">
                     {r.notes ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <hr className="my-6 border-[var(--border-soft)]" />
+
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+        Candidate trends
+        <span className="ml-2 text-[var(--neutral)]">(unconfirmed)</span>
+      </h2>
+      <p className="mb-3 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]">
+        {`Top factors from the latest ranking run — hypotheses, not edges. A season is only ~14 weeks, so anything here is a multiple-testing candidate: pre-register it and confirm out-of-sample (and opponent-adjust — low scoring is often a blowout, i.e. the spread, already priced) before betting it.`}
+      </p>
+      {trends.length === 0 ? (
+        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
+          No factor ranking has been run yet — this table fills in once one is.
+        </p>
+      ) : (
+        <div className="bv-table-wrap">
+          <table className="bv-table">
+            <thead>
+              <tr>
+                <th>Factor</th>
+                <th>Family</th>
+                <th title="Under % in the top-fraction selection (out of sample, proxy-graded).">
+                  Under %
+                </th>
+                <th title="ROI on that selection at −110 (out of sample, proxy-graded).">
+                  ROI
+                </th>
+                <th title="Correlation between the factor and the under, out of sample.">
+                  Corr
+                </th>
+                <th>n</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trends.map((t, i) => (
+                <tr key={i}>
+                  <td className="text-[var(--text)]">{t.factor}</td>
+                  <td className="text-[var(--text-dim)]">{t.family ?? "—"}</td>
+                  <td className="font-mono text-[var(--text-muted)]">
+                    {t.underPct === null ? "—" : `${t.underPct.toFixed(1)}%`}
+                  </td>
+                  <td className="font-mono text-[var(--text-muted)]">
+                    {t.roi === null ? "—" : `${(t.roi * 100).toFixed(1)}%`}
+                  </td>
+                  <td className="font-mono text-[var(--text-muted)]">
+                    {t.corr === null ? "—" : t.corr.toFixed(3)}
+                  </td>
+                  <td className="font-mono text-[var(--text-dim)]">
+                    {t.n ?? "—"}
                   </td>
                 </tr>
               ))}

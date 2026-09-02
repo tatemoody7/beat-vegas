@@ -3,17 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Five tabs (owner-approved consolidation). The retired routes (/preview,
+// /line-check, /line-study, /movement, /ledger, /weekly-review, /picks)
+// redirect into these.
 const LINKS = [
   { href: "/", label: "This Week" },
-  { href: "/board", label: "Opportunities" },
-  { href: "/preview", label: "Week Preview" },
-  { href: "/line-check", label: "Line Check" },
-  { href: "/line-study", label: "Line Study" },
-  { href: "/movement", label: "Movement" },
-  { href: "/ledger", label: "Ledger" },
-  { href: "/weekly-review", label: "Weekly Review" },
+  { href: "/board", label: "Board" },
+  { href: "/results", label: "Results" },
   { href: "/research", label: "Research" },
-  { href: "/picks", label: "My Picks" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 export default function MainNav() {

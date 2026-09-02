@@ -26,17 +26,23 @@ skill's logic here.**
 ## 1. Discover routes (re-discover every run — never hardcode)
 
 - Browser pages: list `web/app/**/page.tsx`; map dir → URL path
-  (`web/app/picks/page.tsx` → `/picks`, `web/app/page.tsx` → `/`). Current set:
-  `/`, `/ledger`, `/line-check`, `/line-study`, `/login`, `/movement`, `/picks`,
-  `/preview`, `/research`, `/weekly-review`. If you cap the list, say so.
-- Note `web/app/api/**/route.ts` for context (board, ledger, line-study,
-  movement, picks, records, research, login, logout). API routes are checked
-  indirectly via the pages that call them + the network panel.
+  (`web/app/results/page.tsx` → `/results`, `web/app/page.tsx` → `/`). Current
+  set (5 tabs + records + login): `/` (This Week), `/board`, `/results`,
+  `/research`, `/research/records`, `/glossary`, `/login`. The retired pages
+  `/preview`, `/line-check`, `/line-study`, `/movement`, `/ledger`,
+  `/weekly-review`, `/picks` are `redirect()` stubs — check each returns a 307
+  to its new home (`/`, `/`, `/research`, `/board`, `/results`, `/results`,
+  `/results`) and nothing else. If you cap the list, say so.
+- `web/app/api/**/route.ts` for context: `POST /api/picks`,
+  `DELETE /api/picks/[id]`, `GET /api/records?season=` (CSV), `GET /api/health`
+  (public), `POST /api/login`, `POST /api/logout`. There are no GET data APIs
+  any more — pages read the `lib/*` loaders directly, so data is checked via the
+  pages plus the network panel.
 
 ## 2. Auth
 
 `web/middleware.ts` locks the app when `APP_PASSWORD` is set: pages redirect to
-`/login`, APIs return 401. Exempt: `/login`, `/api/login`, static assets.
+`/login`, APIs return 401. Exempt: `/login`, `/api/login`, `/api/health`, static assets.
 
 - Detect: load `/` on the live URL. If redirected to `/login`, the gate is **on**.
 - Log in: read `APP_PASSWORD` from local `web/.env`. With the `Claude_in_Chrome`
@@ -65,17 +71,22 @@ shows. Each data page renders what its API returns; each API wraps a Prisma lib.
 At run time, read the lib to get the exact query, then verify the displayed
 number against Neon via the **`postgres`** MCP (HTTPS — per memory). Map:
 
-| Page                         | API / lib                        | Cross-check against Neon                                                    |
-| ---------------------------- | -------------------------------- | --------------------------------------------------------------------------- |
-| `/` (board)                  | `lib/board.ts` (`/api/board`)    | board row count + active season match `games`/`predictions` for that season |
-| `/picks`                     | `lib/picks.ts` (`/api/picks`)    | pick count + running W-L-P record match `manual_picks` joined to `results`  |
-| `/ledger`                    | `lib/ledger.ts` (`/api/ledger`)  | running balance/units match sum over `manual_picks`/`bv_adjustments`        |
-| `/research`, `/movement`     | `/api/research`, `/api/movement` | row counts match `odds_snapshots`/`predictions` for the season              |
-| `/line-study`, `/line-check` | `lib/*`                          | spot-check a displayed line/edge vs `odds_snapshots`/`predictions`          |
+| Page                | lib                                                                               | Cross-check against Neon                                                                                                                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/` (This Week)     | `lib/thisWeek.ts` → `board.ts`, `lineCheck.ts`, `preview.ts`, `picks.ts`          | card count = `predictions` rows for the default week (latest week with a game still to kick off); Hard Rock line/price per card matches the latest `odds_snapshots` row for `hardrockbet*` + `1H_total`; bankroll strip = `manual_picks` where `is_paper=false` and `market='1H'` |
+| `/board`            | `lib/board.ts`, `lib/movement.ts`                                                 | row count for the selected week matches `predictions` × `games`; a card's movement row matches that game's `odds_snapshots` (`1H_total`) history                                                                                                                                  |
+| `/results`          | `lib/ledger.ts`, `lib/weeklyReview.ts`, `lib/decision-quality.ts`, `lib/picks.ts` | Market/Model cards = `results` rows by `model_version` ('market', 'market_fg', `lib/model.ts::MODEL_VERSION`); You = graded `manual_picks` (real 1H vs paper); week-by-week + by-reason totals sum to the pick count                                                              |
+| `/research`         | `lib/research.ts`, `lib/lineStudy.ts`, `lib/trends.ts`                            | games analyzed = FBS-vs-FBS `games` with `first_half_total` for the season; gap-vs-CLV n = `results` ('market') joined to `predictions` with CLV                                                                                                                                  |
+| `/research/records` | `lib/records.ts` (`GET /api/records` CSV)                                         | row count = `games` for the season; CSV downloads and row count matches the grid                                                                                                                                                                                                  |
+| `/glossary`         | static                                                                            | renders; copy carries no "54%" / "+3.0% ROI" / "52% of the total" claims                                                                                                                                                                                                          |
 
 Tables (from `web/prisma/schema.prisma`): `games`, `predictions`, `results`,
-`manual_picks`, `bv_adjustments`, `odds_snapshots`, `model_runs`, `teams`,
-`team_tempo`, `team_week_features`, `venues`, `weather`.
+`manual_picks` (incl. the tracking columns `verdict_at_pick`, `reason`,
+`gap_at_pick`, `ev_at_pick`, `hr_line_at_pick` — the pages degrade to
+"untagged" if the migration has not run), `bv_adjustments`, `odds_snapshots`,
+`model_runs`, `teams`, `team_tempo`, `team_week_features`, `venues`, `weather`.
+Not in the schema but read defensively: `game_previews`, `factor_scores`,
+`factor_ledger` (absent table → empty state, never a 500).
 
 Flag mismatches, empty-when-should-have-data, stale (last `model_runs` timestamp
 far behind today), and wrong-season data.

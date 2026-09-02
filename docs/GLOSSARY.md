@@ -50,9 +50,10 @@
   segment. Measured OOF residual ≈ −0.18, all segments within ±0.5.
 - **2023 era flag** — feature marking the post-2023 running-clock regime (~8 fewer
   plays/game); pre-2023 is a different scoring distribution.
-- **QB-out flag** — a forward-only, unofficial "starting QB listed out" banner from
-  live ESPN injuries. Display only — never a model feature (no historical injury data
-  exists to train on).
+- **QB-out flag** — a forward-only, unofficial "QB listed Out/Doubtful" banner from
+  Rotowire's college injury report (which aggregates the SEC/ACC/Big Ten
+  availability reports). Display only — never a model feature (no historical injury
+  data exists to train on). ESPN publishes no college injuries, so ESPN is news-only.
 - **Closing-line freshness** — CLV is only trustworthy if the closing line was
   captured near kickoff. A near-kickoff poll keeps it fresh; grading stores when the
   closing snapshot landed.
@@ -63,7 +64,11 @@
 - **TeamRankings** — tempo (seconds/play, plays/game), as-of-date historical.
 - **Open-Meteo** — weather (temp/wind/precip) by venue, archive + forecast.
 - **The Odds API** — live first-half totals (`totals_h1`), free tier (500/mo).
-- **ESPN hidden API** — news/injuries for card context (display only, unofficial).
+- **ESPN hidden API** — team news for card context (display only, unofficial; use the
+  `site.web.api.espn.com` host — `site.api.espn.com` is Akamai-blocked).
+- **Rotowire injury report** — the college injury/availability table behind
+  rotowire.com's injury-report page (unofficial JSON). The only free source that
+  actually carries CFB injuries. Display only.
 
 ## What moved the model (and what didn't)
 - **Helped:** pace (tempo) + weather — lifted top-20% classifier picks to

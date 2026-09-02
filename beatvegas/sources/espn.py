@@ -3,11 +3,6 @@
 DISPLAY CONTEXT ONLY — never a model feature. The API is unofficial (can change
 without notice) and CFB injury reporting is unreliable, so every call fails silent
 (returns empty) rather than raising. Results are cached by the dashboard.
-
-Request headers: send NONE. ESPN's Akamai edge returns 403 "Access Denied" for a
-bare spoofed browser UA ("Mozilla/5.0" — and for a full Chrome UA without the
-matching client-hint headers), while requests' default UA is served normally.
-The spoof silently blanked every week-1 preview (0 of 455 games had news).
 """
 
 from __future__ import annotations
@@ -20,7 +15,11 @@ import requests
 from ..config import REPO_ROOT
 from ..etl.match import _norm, name_score
 
-_SITE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
+_UA = {"User-Agent": "Mozilla/5.0"}
+# site.api.espn.com answers 403 (Akamai "Access Denied") from every network we run
+# on — the Mac, GitHub runners, Anthropic's fetcher — since at least July 2026.
+# site.web.api.espn.com serves the identical paths and works (verified 2026-09-02).
+_SITE = "https://site.web.api.espn.com/apis/site/v2/sports/football/college-football"
 _CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football"
 _CACHE = REPO_ROOT / "data" / "cache"
 
@@ -32,7 +31,7 @@ _TEAM_MEMO: Optional[List[dict]] = None
 
 def _get(url: str, params: Optional[dict] = None, timeout: int = 12):
     try:
-        r = requests.get(url, params=params or {}, timeout=timeout)
+        r = requests.get(url, params=params or {}, headers=_UA, timeout=timeout)
         if r.status_code == 200:
             return r.json()
     except requests.RequestException:
@@ -78,7 +77,7 @@ def _teams() -> List[dict]:
 
 def teams_available() -> bool:
     """False when the ESPN team list is empty (blocked or down) — callers that
-    write per-game rows should refuse rather than persist blanks."""
+    write per-game rows should say so loudly rather than persist blanks."""
     return bool(_teams())
 
 
@@ -111,6 +110,9 @@ def team_news(espn_id: str, limit: int = 4) -> List[str]:
 
 
 def team_injuries(espn_id: str, limit: int = 6) -> List[str]:
+    """ESPN publishes NO college-football injuries here (count 0 for every FBS
+    team, verified 2026-09-02; the NFL endpoint works). Kept for shape/compat —
+    the preview uses beatvegas.sources.rotowire for injuries."""
     data = _get(f"{_CORE}/teams/{espn_id}/injuries", {"limit": limit})
     if not data or not data.get("items"):
         return []

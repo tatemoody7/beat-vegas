@@ -74,8 +74,16 @@ export default async function PreviewPage({
           <h1 className="bv-page-title">Week Preview</h1>
           <p className="bv-page-sub">
             This week’s games with the latest news and injuries — the research
-            read before lines drop. Display only (unofficial ESPN).
+            read before lines drop. Display only: injuries from Rotowire’s
+            college report (conference availability reports plus beat
+            reporting), news from ESPN. Both unofficial; check starters before
+            any real bet.
           </p>
+          {preview.games[0]?.updatedAt && (
+            <p className="mt-1 text-xs text-[var(--text-dim)]">
+              {`Last pulled ${new Date(preview.games[0].updatedAt.replace(" ", "T") + "Z").toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })} ET — refreshes Tuesday and Friday mornings.`}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {preview.weeks.length > 0 && preview.week !== null && (

@@ -56,15 +56,34 @@ def test_teams_available_false_when_list_empty(monkeypatch):
     assert espn.teams_available() is True
 
 
-def test_research_preview_exits_loudly_when_espn_team_list_is_empty(monkeypatch, capsys):
+def test_research_preview_exits_loudly_when_both_sources_are_empty(monkeypatch, capsys):
     import sys
 
     from conftest import _load_script
 
     rp = _load_script("research_preview")
     monkeypatch.setattr(rp, "teams_available", lambda: False)
+    monkeypatch.setattr(rp.rotowire, "fetch_injury_report", lambda timeout=15: [])
     monkeypatch.setattr(sys, "argv", ["research_preview.py", "--season", "2026", "--week", "1"])
     with pytest.raises(SystemExit) as e:
         rp.main()
     assert e.value.code == 3
     assert "[espn] FATAL" in capsys.readouterr().out
+
+
+def test_research_preview_warns_but_continues_when_only_espn_is_empty(monkeypatch, capsys):
+    """Rotowire carries the injuries now; a dead ESPN must not block writing them."""
+    import sys
+
+    from conftest import _load_script
+
+    rp = _load_script("research_preview")
+    monkeypatch.setattr(rp, "teams_available", lambda: False)
+    monkeypatch.setattr(
+        rp.rotowire, "fetch_injury_report", lambda timeout=15: [{"player": "x", "team": "LSU"}]
+    )
+    monkeypatch.setattr(rp, "try_init_db", lambda: False)  # stop before any DB work
+    monkeypatch.setattr(sys, "argv", ["research_preview.py", "--season", "2026", "--week", "1"])
+    rp.main()
+    out = capsys.readouterr().out
+    assert "[espn] WARNING" in out and "FATAL" not in out

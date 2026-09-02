@@ -62,3 +62,66 @@ def test_fit_share_recovers_coefficients():
     out = fit_share(full, rng, fh)
     assert abs(out["a"] - 0.50) < 1e-6
     assert abs(out["b"] - 0.002) < 1e-6
+
+
+# --- step-shaped share (FBS-only finding: flat ~0.51 below a blowout cut, higher above) ---
+
+STEP = {"kind": "step", "base": 0.51, "blowout": 0.54, "cut": 21.0}
+
+
+def test_step_share_is_base_below_cut_and_blowout_at_or_above_cut():
+    assert fh_share(0.0, coeffs=STEP) == 0.51
+    assert fh_share(20.5, coeffs=STEP) == 0.51
+    assert fh_share(21.0, coeffs=STEP) == 0.54
+    assert fh_share(-35.0, coeffs=STEP) == 0.54  # uses |spread|
+
+
+def test_step_share_without_a_spread_uses_the_base_not_the_legacy_flat():
+    # A fitted base is the best no-spread guess; the legacy linear kind keeps flat.
+    assert fh_share(None, coeffs=STEP) == 0.51
+    assert fh_share(None, coeffs={"a": 0.50, "b": 0.003}) == DEFAULT_SHARE
+
+
+def test_step_share_clamps_hold():
+    assert (
+        fh_share(30.0, coeffs={"kind": "step", "base": 0.40, "blowout": 0.70, "cut": 21})
+        == (SHARE_CLAMP[1])
+    )
+
+
+def test_fit_share_step_recovers_mae_optimal_bucket_shares():
+    from beatvegas.etl.proxy_line import fit_share_step
+
+    spread = np.array([3.0, 7.0, 10.0, 14.0, 24.0, 28.0, 35.0, 42.0])
+    full = np.full_like(spread, 50.0)
+    # below the cut the half lands at exactly 0.51*50, above at 0.54*50
+    fh = np.where(np.abs(spread) >= 21, 27.0, 25.5)
+    out = fit_share_step(full, spread, fh, cut=21.0)
+    assert out["kind"] == "step"
+    assert out["cut"] == 21.0
+    assert abs(out["base"] - 0.51) < 0.0026  # grid resolution 0.0025
+    assert abs(out["blowout"] - 0.54) < 0.0026
+
+
+def test_load_games_frame_filters_to_fbs_by_default(monkeypatch):
+    import pandas as pd
+
+    raw = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "season": [2024, 2024],
+            "week": [3, 3],
+            "home_team": ["Alabama", "Alabama"],
+            "away_team": ["Georgia", "Furman"],
+            "first_half_total": [24.0, 30.0],
+            "full_game_total": [50.0, 55.0],
+            "home_points": [27, 40],
+            "away_points": [20, 10],
+            "neutral_site": [0, 0],
+            "spread": [-3.0, -30.0],
+        }
+    )
+    monkeypatch.setattr(proxy_line, "_query_games_frame", lambda seasons=None: raw)
+    monkeypatch.setattr(proxy_line, "load_fbs_teams", lambda: {2024: {"Alabama", "Georgia"}})
+    assert proxy_line.load_games_frame()["id"].tolist() == [1]
+    assert proxy_line.load_games_frame(fbs_only=False)["id"].tolist() == [1, 2]

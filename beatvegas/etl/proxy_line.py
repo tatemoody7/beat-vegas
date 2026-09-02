@@ -19,6 +19,7 @@ import pandas as pd
 from ..config import REPO_ROOT
 from ..db.models import Game
 from ..db.store import session_scope
+from .fbs import filter_fbs_games, load_fbs_teams
 
 # Central estimate when we have no spread / no fitted curve. The research band for
 # the CFB 1H share is ~0.50-0.53 (clamp wider to absorb extreme favorites).
@@ -32,8 +33,17 @@ SHARE_CLAMP = (0.48, 0.56)
 _COEFFS_PATH = REPO_ROOT / "data" / "multiplier.json"
 
 
-def load_games_frame(seasons: Optional[range] = None) -> pd.DataFrame:
-    """Games that have BOTH a realized 1H total and a full-game total."""
+def load_games_frame(seasons: Optional[range] = None, fbs_only: bool = True) -> pd.DataFrame:
+    """Games that have BOTH a realized 1H total and a full-game total. `fbs_only`
+    (default) keeps FBS-vs-FBS games only — lower-division games run a higher 1H
+    share and would bias the fitted proxy (see etl/fbs.py)."""
+    df = _query_games_frame(seasons)
+    if fbs_only:
+        df = filter_fbs_games(df, load_fbs_teams())
+    return df
+
+
+def _query_games_frame(seasons: Optional[range] = None) -> pd.DataFrame:
     with session_scope() as s:
         q = s.query(
             Game.id,
@@ -98,6 +108,13 @@ def _load_share_coeffs() -> Optional[Dict[str, float]]:
     """Fitted {'a','b'} for share = a + b*|spread|, or None if unfit (-> flat)."""
     try:
         d = json.loads(_COEFFS_PATH.read_text())
+        if d.get("kind") == "step":
+            return {
+                "kind": "step",
+                "base": float(d["base"]),
+                "blowout": float(d["blowout"]),
+                "cut": float(d["cut"]),
+            }
         if "a" in d and "b" in d:
             return {"a": float(d["a"]), "b": float(d["b"])}
     except (OSError, ValueError, TypeError):
@@ -111,7 +128,18 @@ def fh_share(spread: Optional[float] = None, coeffs: Optional[Dict[str, float]] 
     flat DEFAULT_SHARE when no spread or no fitted curve is available."""
     if coeffs is None:
         coeffs = _load_share_coeffs()
-    if spread is None or pd.isna(spread) or coeffs is None:
+    if coeffs is None:
+        return DEFAULT_SHARE
+    no_spread = spread is None or pd.isna(spread)
+    if coeffs.get("kind") == "step":
+        # Piecewise share: a flat base below the blowout cut, a higher share at or
+        # above it (FBS-only 2023-25: ~0.51 below 21, ~0.54 at 21+). With no
+        # spread the fitted base is the best guess, not the legacy flat.
+        share = coeffs["base"]
+        if not no_spread and abs(float(spread)) >= coeffs["cut"]:
+            share = coeffs["blowout"]
+        return min(max(share, SHARE_CLAMP[0]), SHARE_CLAMP[1])
+    if no_spread:
         return DEFAULT_SHARE
     share = coeffs["a"] + coeffs["b"] * abs(float(spread))
     return min(max(share, SHARE_CLAMP[0]), SHARE_CLAMP[1])
@@ -140,3 +168,36 @@ def fit_share(
     x = np.abs(np.asarray(spread, float))
     b, a = np.polyfit(x, share, 1)
     return {"a": float(a), "b": float(b)}
+
+
+SHARE_GRID = np.round(np.arange(SHARE_CLAMP[0], SHARE_CLAMP[1] + 1e-9, 0.0025), 4)
+
+
+def _mae_optimal_share(full_total: np.ndarray, first_half_total: np.ndarray) -> float:
+    """The constant share whose proxy line (share x total, unrounded) minimises
+    MAE vs realized 1H points — i.e. the median-type fair line a book would post,
+    not the mean ratio, which right-skew (blowouts) pulls upward. Rounding to the
+    half-point happens at prediction time; optimising the rounded line would tie
+    across neighbouring shares."""
+    best, best_mae = DEFAULT_SHARE, np.inf
+    for sh in SHARE_GRID:
+        line = full_total * sh
+        mae = float(np.mean(np.abs(line - first_half_total)))
+        if mae < best_mae - 1e-12:
+            best, best_mae = float(sh), mae
+    return best
+
+
+def fit_share_step(
+    full_total: np.ndarray,
+    spread: np.ndarray,
+    first_half_total: np.ndarray,
+    cut: float = 21.0,
+) -> Dict[str, float]:
+    """Piecewise share: MAE-optimal constant below `cut` (|spread|) and at/above it."""
+    full = np.asarray(full_total, float)
+    fh = np.asarray(first_half_total, float)
+    big = np.abs(np.asarray(spread, float)) >= cut
+    base = _mae_optimal_share(full[~big], fh[~big]) if (~big).any() else DEFAULT_SHARE
+    blow = _mae_optimal_share(full[big], fh[big]) if big.any() else base
+    return {"kind": "step", "base": base, "blowout": blow, "cut": float(cut)}

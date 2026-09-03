@@ -30,7 +30,12 @@ from beatvegas.db.models import Game, Prediction
 from beatvegas.db.models import ManualPick as _ManualPick
 from beatvegas.db.models import OddsSnapshot as _OddsSnapshot
 from beatvegas.db.models import Result as _Result
+from beatvegas.etl.context import context_for_games
+from beatvegas.etl.form import form_for_games
 from beatvegas.etl.proxy_line import fh_share, proxy_total
+from beatvegas.factors.board import historical_references
+from beatvegas.factors.ledger import load_ledger
+from beatvegas.model.score import derived_factors
 
 # Input tables cloned from the real SQLite DB into the sim Postgres (read-only
 # context for scoring + the board). Generated tables (odds_snapshots, results,
@@ -153,6 +158,23 @@ def _derive_lines_replay(s, season: int, week: int, now: datetime) -> int:
         .filter(Game.season == season, Game.week == week, Game.full_game_total.isnot(None))
         .all()
     )
+    ids = [g.id for g in games]
+    # Same card drivers the real script merges (etl/context.py + etl/form.py), so
+    # the sim board renders the identical payload. Fail-soft: a missing source
+    # leaves those keys out rather than breaking the rehearsal. Prior-season PPA
+    # needs a CFBD call, so the sim skips it (efficiency=None).
+    try:
+        context = context_for_games(s, season, week, ids)
+    except Exception as e:  # noqa: BLE001 - display-only enrichment
+        print(f"[sim] context unavailable ({e!r})")
+        context = {}
+    try:
+        form = form_for_games(s, season, week, ids)
+    except Exception as e:  # noqa: BLE001
+        print(f"[sim] form unavailable ({e!r})")
+        form = {}
+    ledger = load_ledger(s)
+    refs = historical_references()  # built ONCE, not per row
     rows: List[Dict] = []
     for g in games:
         total, spread = g.full_game_total, getattr(g, "spread", None)
@@ -162,13 +184,16 @@ def _derive_lines_replay(s, season: int, week: int, now: datetime) -> int:
                 "game_id": g.id,
                 "line_used": derived,
                 "factors_json": json.dumps(
-                    {
-                        "line": derived,
-                        "line_kind": "derived_fg",
-                        "full_game_total": total,
-                        "spread": spread,
-                        "fh_share": round(fh_share(spread), 3),
-                    }
+                    derived_factors(
+                        derived,
+                        total,
+                        spread,
+                        round(fh_share(spread), 3),
+                        context=context.get(g.id),
+                        form=form.get(g.id),
+                        refs=refs,
+                        ledger=ledger,
+                    )
                 ),
             }
         )

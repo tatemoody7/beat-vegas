@@ -44,6 +44,10 @@ BOARD_FACTOR_NAMES: List[str] = [
     # unverified hypotheses (amber until the real ledger speaks)
     "mm_explosive_edge",
     "mm_havoc",
+    # situational thesis (travel / early kickoff) — amber; available for every
+    # game incl. weeks 1-2 and FBS-vs-FCS via etl/context.py
+    "away_travel_dist",
+    "kickoff_local_hour",
 ]
 
 _NEUTRAL_EPS = 0.15  # |lean| at/below this reads as neutral
@@ -199,3 +203,20 @@ def build_factor_board(
             }
         )
     return board
+
+
+def historical_references(min_games: int = 0) -> Dict[str, Tuple[float, float]]:
+    """`factor_references` over the whole historical feature frame, fail-soft.
+
+    The tint compares a game against HISTORY, so both writers of a board card
+    (model rows in model/score.py, derived rows in scripts/post_derived_lines.py
+    and the week sim) need the same anchors. CFBD calls behind the frame are
+    disk-cached. Any problem -> {} : the card still posts, its continuous
+    factors just untinted."""
+    try:
+        from ..etl.features import build_feature_frame
+
+        return factor_references(build_feature_frame(min_games=min_games))
+    except Exception as e:  # noqa: BLE001 - the tint is cosmetic, never fatal
+        print(f"[board] factor references unavailable ({e!r}) — cards untinted")
+        return {}

@@ -56,6 +56,32 @@ the bet card follows. Change it here first, then in code.
 - **Sweepstakes / DFS** — Fliff (sweepstakes book; its lines are in our feed),
   PrizePicks, Underdog, DraftKings Pick6. Not used.
 
+## The board (web/lib/homeBoard.ts + edge.ts)
+
+The site is one page: every game on the week in a single ranked list.
+
+- **Universe** — games Hard Rock has priced a full-game total on. If Hard Rock
+  will not take the game, it is not a decision we have to make.
+- **Score (0-100)** — one number per game, and the only thing the list sorts on.
+  With a model read it starts at 50 and moves 10 points per point of gap between
+  the line you can bet and our number, then adjusts for Hard Rock's price (up to
+  8 points either way), minus 10 for an off-market Hard Rock number and minus 5
+  for a starting QB listed out. With no model read (weeks 1-2, derived rows) it
+  is a context-only score: 40 plus/minus pace, wind, dome, spread and last
+  season's first halves, capped at 49 — 55 when Hard Rock's price alone beats the
+  market. The score RANKS; it never overrides the BET rules below.
+- **Tiers** — BET is exactly the verdict rule below, every gate passed. EDGE is
+  score 60+ (or a price-only edge with no model) with one gate still failing, and
+  the card names which one: no Hard Rock line, off-market number, price worse
+  than fair, QB out, or a gap short of 1.75. Everything else is PASS, kept in the
+  same list, dimmer.
+- **Action line** — one sentence per card saying what to do now: bet it at this
+  number and price, wait for a specific number, or pass and why.
+- **Kill number** — where the edge is gone: our number plus 1.75 rounded up to
+  the next half point, and the worst price still clearing the market's fair under
+  by more than the unavoidable 2% of vig. Clearing one and not the other is not a
+  bet.
+
 ## What BET means (lib/verdict.ts)
 
 A game is BET when all of these hold:

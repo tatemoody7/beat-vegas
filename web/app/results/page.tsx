@@ -1,9 +1,12 @@
 import { getSeasons } from "@/lib/board";
 import { getDecisionQuality } from "@/lib/decision-quality";
+import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
 import { getLedger } from "@/lib/ledger";
+import { loadPicks } from "@/lib/picks";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
 import { getWeeklyReview, REASON_LABEL } from "@/lib/weeklyReview";
+import BankrollCurve from "@/app/components/BankrollCurve";
 import PicksList from "@/app/components/PicksList";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
@@ -154,13 +157,16 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq] = await Promise.all([
+  const [ledger, review, dq, allPicks] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
     getDecisionQuality(season),
+    loadPicks(season),
   ]);
   const settled = review.lines.filter((l) => l.rec);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
+  const { startUsd, unitUsd } = bankrollEnv();
+  const curve = bankrollCurve(allPicks, startUsd, unitUsd);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -207,7 +213,7 @@ export default async function ResultsPage({
         <RecordCard
           title="You — real money (first half)"
           rec={ledger.you}
-          emptyHint="No settled real-money bets yet. Log bets from This Week."
+          emptyHint="No settled real-money bets yet. Log bets from the board."
           hint="Real-money first-half picks only — the record the bankroll follows."
         />
         <RecordCard
@@ -223,6 +229,23 @@ export default async function ResultsPage({
           hint="Context only: the full-game under at the closing line. We do not bet full game."
         />
       </div>
+
+      {/* Bankroll curve */}
+      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
+        Bankroll, week by week
+      </h2>
+      {curve.length < 2 ? (
+        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
+          {`No settled real-money bets yet — the curve starts once a week grades. Starting bankroll is $${startUsd}, one unit is $${unitUsd}.`}
+        </p>
+      ) : (
+        <>
+          <BankrollCurve points={curve} startUsd={startUsd} />
+          <p className="mt-1 text-xs text-[var(--text-dim)]">
+            {`Settled real-money first-half bets only, at $${unitUsd} a unit. The dashed line is the $${startUsd} starting bankroll; pending bets do not move it.`}
+          </p>
+        </>
+      )}
 
       {/* One week's scorecard */}
       {review.week !== null && (
@@ -271,7 +294,7 @@ export default async function ResultsPage({
       </h2>
       {review.byWeek.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          {`No picks logged for ${season} yet. Log bets from This Week; this table fills in as weeks settle.`}
+          {`No picks logged for ${season} yet. Log bets from the board; this table fills in as weeks settle.`}
         </p>
       ) : (
         <div className="bv-table-wrap">

@@ -51,39 +51,48 @@ def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
     return r * 2 * math.asin(math.sqrt(a))
 
 
-def _load() -> tuple:
-    with session_scope() as s:
-        games = pd.DataFrame(
-            s.query(
-                Game.id,
-                Game.season,
-                Game.week,
-                Game.start_date,
-                Game.venue_id,
-                Game.home_team,
-                Game.away_team,
-                Game.home_points,
-                Game.away_points,
-            ).all(),
-            columns=[
-                "id",
-                "season",
-                "week",
-                "start_date",
-                "venue_id",
-                "home_team",
-                "away_team",
-                "home_points",
-                "away_points",
-            ],
-        )
-        venues = pd.DataFrame(
-            s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
-            columns=["venue_id", "lat", "lon"],
-        )
-        teams = pd.DataFrame(
-            s.query(Team.school, Team.conference).all(), columns=["team", "conference"]
-        )
+def _load(session=None, season: Optional[int] = None) -> tuple:
+    """games/venues/teams frames. `session` reuses a caller's session (else opens
+    one); `season` restricts the games to one season (enough for rest/travel/
+    kickoff — the cross-season revenge/rivalry flags then only see that season)."""
+    if session is None:
+        with session_scope() as s:
+            return _load(s, season)
+    s = session
+    q = s.query(
+        Game.id,
+        Game.season,
+        Game.week,
+        Game.start_date,
+        Game.venue_id,
+        Game.home_team,
+        Game.away_team,
+        Game.home_points,
+        Game.away_points,
+    )
+    if season is not None:
+        q = q.filter(Game.season == season)
+    games = pd.DataFrame(
+        q.all(),
+        columns=[
+            "id",
+            "season",
+            "week",
+            "start_date",
+            "venue_id",
+            "home_team",
+            "away_team",
+            "home_points",
+            "away_points",
+        ],
+    )
+    venues = pd.DataFrame(
+        s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
+        columns=["venue_id", "lat", "lon"],
+    )
+    teams = pd.DataFrame(
+        s.query(Team.school, Team.conference).all(), columns=["team", "conference"]
+    )
     return games, venues, teams
 
 
@@ -167,9 +176,15 @@ def _rest_days(games: pd.DataFrame) -> pd.DataFrame:
     return long[["id", "team", "rest_days"]]
 
 
-def situational_frame() -> pd.DataFrame:
-    """One row per game id with the situational columns."""
-    games, venues, teams = _load()
+def situational_frame(session=None, season: Optional[int] = None) -> pd.DataFrame:
+    """One row per game id with the situational columns.
+
+    Default: every game in the DB via its own session (the feature frame).
+    `session` + `season` let a caller (etl/context.py) compute the rest/travel/
+    kickoff numbers for one season inside an open session."""
+    games, venues, teams = _load(session, season)
+    if games.empty:
+        return pd.DataFrame(columns=["id"] + SITUATIONAL_COLS)
     games["start_date"] = pd.to_datetime(games["start_date"])
     vcoord = venues.set_index("venue_id")
     conf = teams.dropna(subset=["conference"]).set_index("team")["conference"].to_dict()

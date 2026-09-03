@@ -303,6 +303,18 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def quality_prior_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
+    """SP+ + advanced efficiency per (season, team), with `join_season` =
+    season + 1: a season's full-year stats are only ever joined to the FOLLOWING
+    season's games (a stable preseason prior, zero same-season leak). Shared by
+    build_feature_frame and etl/context.py so the two can never drift."""
+    sp = sp_frame(client, seasons)
+    adv = advanced_frame(client, seasons)
+    quality = sp.merge(adv, on=["season", "team"], how="outer")
+    quality["join_season"] = quality["season"] + 1  # use as next season's prior
+    return quality
+
+
 def apply_min_games(df: pd.DataFrame, min_games: int) -> pd.DataFrame:
     """Keep games where BOTH teams have played >= min_games this season."""
     return df[(df["h_games_played"] >= min_games) & (df["a_games_played"] >= min_games)]
@@ -381,10 +393,7 @@ def build_feature_frame(
         client = CFBDClient()
     yrs = sorted(games["season"].unique().tolist())
     prior_yrs = [y - 1 for y in yrs]
-    sp = sp_frame(client, sorted(set(yrs + prior_yrs)))
-    adv = advanced_frame(client, sorted(set(yrs + prior_yrs)))
-    quality = sp.merge(adv, on=["season", "team"], how="outer")
-    quality["join_season"] = quality["season"] + 1  # use as next season's prior
+    quality = quality_prior_frame(client, sorted(set(yrs + prior_yrs)))
 
     for side in ["home", "away"]:
         q = quality.add_prefix(f"{side}_q_")

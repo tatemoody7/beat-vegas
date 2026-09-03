@@ -1,4 +1,4 @@
-import type { Bankroll } from "@/lib/thisWeek";
+import type { Bankroll } from "@/lib/homeBoard";
 
 // Bankroll + discipline strip for the This Week page. Cyan is the brand accent;
 // green/red appear only on the signed units figure (an outcome).
@@ -81,7 +81,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
           "First-half unders only",
           `At most ${b.cap} bets a week`,
           "Flat 1 unit per bet",
-          "Only BET verdicts with a live line",
+          "Only BET cards with a live line",
           "Check injuries before every bet",
         ].map((rule) => (
           <span key={rule} className="bv-pill">

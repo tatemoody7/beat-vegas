@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Five tabs (owner-approved consolidation). The retired routes (/preview,
+// Four tabs. The board is the home page; the retired routes (/board, /preview,
 // /line-check, /line-study, /movement, /ledger, /weekly-review, /picks)
 // redirect into these.
 const LINKS = [
-  { href: "/", label: "This Week" },
-  { href: "/board", label: "Board" },
+  { href: "/", label: "Board" },
   { href: "/results", label: "Results" },
   { href: "/research", label: "Research" },
   { href: "/glossary", label: "Glossary" },

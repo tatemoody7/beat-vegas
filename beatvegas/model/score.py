@@ -21,7 +21,9 @@ import pandas as pd
 from ..backtest.engine import BREAKEVEN, _new_model
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
+from ..etl.context import SITUATIONAL_KEYS, context_for_games, json_safe
 from ..etl.features import FEATURE_COLS, build_feature_frame, training_frame
+from ..etl.form import form_for_games
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
 from ..factors.board import build_factor_board, factor_references
@@ -112,11 +114,73 @@ def _returning_str(row: pd.Series) -> Optional[str]:
     return f"{_p(h)}/{_p(a)}"
 
 
+# Raw numeric factor inputs copied into factors_json under their feature-frame
+# names, so the card can render drivers (not just the pre-formatted chips). The
+# same keys come from the feature frame (model rows) or etl/context.py (derived
+# rows / gaps in the frame).
+CONTEXT_NUMERIC_KEYS = (
+    "combined_sec_play",
+    "combined_plays",
+    "wx_temp",
+    "wx_wind",
+    "wx_precip",
+    "wx_dome",
+    "home_off_ppa",
+    "away_off_ppa",
+    "home_def_ppa",
+    "away_def_ppa",
+    "combined_off_ppa",
+    "combined_def_ppa",
+    "combined_fh_offense",
+    "combined_fh_defense",
+) + SITUATIONAL_KEYS
+FORM_KEYS = ("form_home", "form_away", "split_home", "split_away")
+
+
+def _missing(v) -> bool:
+    if v is None:
+        return True
+    if isinstance(v, (str, bool, list, dict)):
+        return False
+    try:
+        return bool(pd.isna(v))
+    except (TypeError, ValueError):
+        return False
+
+
+def _merge_context(row: pd.Series, context: Optional[Dict]) -> pd.Series:
+    """Fill the row's missing/NaN factor inputs from a context dict (the row's
+    own values win). Returns an object-dtype Series so strings and floats mix."""
+    if not context:
+        return row
+    merged = {k: row[k] for k in row.index}
+    for k, v in context.items():
+        if k not in merged or _missing(merged[k]):
+            merged[k] = v
+    return pd.Series(merged, dtype=object)
+
+
+def _fh_prior_source(row: pd.Series) -> Optional[str]:
+    src = row.get("fh_prior_source")
+    if isinstance(src, str):
+        return src
+    # Feature-frame rows: the fh_* columns are the season-to-date expanding means.
+    return "season_to_date" if not _missing(row.get("home_fh_pf")) else None
+
+
 def _factors(
-    row: pd.Series, line: float, refs: Optional[Dict] = None, ledger: Optional[Dict] = None
+    row: pd.Series,
+    line: float,
+    refs: Optional[Dict] = None,
+    ledger: Optional[Dict] = None,
+    context: Optional[Dict] = None,
+    form: Optional[Dict] = None,
 ) -> Dict:
+    """The per-game factors_json payload. `context` (etl/context.py) fills any
+    input the row lacks; `form` (etl/form.py) adds form_*/split_* blocks."""
+    row = _merge_context(row, context)
     proj = row.get("proj_1h_total")
-    return {
+    out = {
         # Green/red factor board (pure explainer; never affects rank). Empty
         # until references are available; the ledger fills each factor's `live`.
         "factor_board": build_factor_board(row, refs, ledger=ledger) if refs else [],
@@ -154,6 +218,75 @@ def _factors(
         "fh_off_success_home": _f(row.get("home_fh_off_success")),
         "fh_off_success_away": _f(row.get("away_fh_off_success")),
     }
+    # Raw driver numbers under their feature names (+ dome as a bool), the
+    # provenance of the 1H scoring priors, and the form/split blocks.
+    out.update({k: _f(row.get(k)) for k in CONTEXT_NUMERIC_KEYS})
+    dome = row.get("wx_dome")
+    out["dome"] = None if _missing(dome) else bool(dome)
+    out["fh_prior_source"] = _fh_prior_source(row)
+    out["fh_source_home"] = (
+        row.get("fh_source_home")
+        if isinstance(row.get("fh_source_home"), str)
+        else out["fh_prior_source"]
+    )
+    out["fh_source_away"] = (
+        row.get("fh_source_away")
+        if isinstance(row.get("fh_source_away"), str)
+        else out["fh_prior_source"]
+    )
+    for k in FORM_KEYS:
+        out[k] = (form or {}).get(k)
+    return json_safe(out)
+
+
+def derived_factors(
+    line: float,
+    full_game_total: Optional[float],
+    spread: Optional[float],
+    fh_share_used: Optional[float],
+    context: Optional[Dict] = None,
+    form: Optional[Dict] = None,
+    refs: Optional[Dict] = None,
+    ledger: Optional[Dict] = None,
+) -> Dict:
+    """factors_json for a `derived_lines` board row (no model fields): the same
+    driver keys + factor board as a model row, built from context alone, plus the
+    derived-line provenance (`full_game_total`, `spread`, `fh_share`)."""
+    row = pd.Series(dict(context or {}), dtype=object)
+    out = _factors(row, line, refs=refs, ledger=ledger, form=form)
+    out.update(
+        {
+            "line": _f(line),
+            "line_kind": "derived_fg",
+            "full_game_total": _f(full_game_total),
+            "spread": _f(spread),
+            "fh_share": _f(fh_share_used),
+            "rank_basis": "derived_line",
+        }
+    )
+    return json_safe(out)
+
+
+def slate_context(session, scored: pd.DataFrame) -> tuple:
+    """(context, form) maps keyed by game id for every (season, week) in the
+    scored slate. Fail-soft per group: a DB hiccup logs and leaves that week's
+    cards without the extra keys rather than failing the scoring run. The
+    prior-season PPA keys are skipped here — model rows already carry them."""
+    ctx: Dict[int, Dict] = {}
+    form: Dict[int, Dict] = {}
+    if scored.empty or "season" not in scored.columns or "week" not in scored.columns:
+        return ctx, form
+    for (season, week), grp in scored.groupby(["season", "week"]):
+        ids = [int(x) for x in grp["id"].tolist()]
+        try:
+            ctx.update(context_for_games(session, int(season), int(week), ids))
+        except Exception as e:  # noqa: BLE001 - display-only enrichment
+            print(f"[context] {int(season)} wk{int(week)}: context unavailable ({e!r})")
+        try:
+            form.update(form_for_games(session, int(season), int(week), ids))
+        except Exception as e:  # noqa: BLE001
+            print(f"[context] {int(season)} wk{int(week)}: form unavailable ({e!r})")
+    return ctx, form
 
 
 def _f(v):
@@ -237,6 +370,7 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
     n = 0
     with session_scope() as s:
         ledger = load_ledger(s)  # real-line track record → each card's `live` badge
+        ctx, form = slate_context(s, scored)  # drivers + form for the card
         ids = [int(x) for x in scored["id"].tolist()]
         if ids:
             (
@@ -260,7 +394,16 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
                     bv_sigma=_f(r.get("bv_sigma")),
                     line_used=_f(line),
                     rank=int(r["rank"]),
-                    factors_json=json.dumps(_factors(r, line, refs=refs, ledger=ledger)),
+                    factors_json=json.dumps(
+                        _factors(
+                            r,
+                            line,
+                            refs=refs,
+                            ledger=ledger,
+                            context=ctx.get(int(r["id"])),
+                            form=form.get(int(r["id"])),
+                        )
+                    ),
                     created_at=now,
                 )
             )

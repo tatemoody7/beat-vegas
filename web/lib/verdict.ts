@@ -97,7 +97,7 @@ export function deriveReason(
   return "manual";
 }
 
-function priceSentence(i: VerdictInput): string {
+export function priceSentence(i: VerdictInput): string {
   if (i.hrLine === null) {
     return "Hard Rock hasn’t posted a first-half line for this game yet.";
   }

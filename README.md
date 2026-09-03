@@ -116,12 +116,14 @@ Manual-only workflows: `post-lines.yml` (derived lines for the board),
 
 The product is the Next.js app in `web/` (App Router + TypeScript + Tailwind +
 Prisma + Recharts), deployed on **Vercel**, reading/writing **Neon Postgres**,
-behind a simple password gate, at **https://beat-vegas.vercel.app**. Five tabs:
-**This Week** (BET / WATCH / PASS verdicts + bankroll strip), **Board** (ranked
-research board with model/derived numbers and factor chips), **Results** (market /
-model / your-picks ledgers with CLV), **Research** (calibration, gap-vs-CLV,
-model runs), **Glossary**. Plain-English, modern-sportsbook design system (deep navy +
-electric-cyan accent; `.bv-*` classes in `web/app/globals.css`).
+behind a simple password gate, at **https://beat-vegas.vercel.app**. Four tabs:
+**Board** (the home page — every game with a Hard Rock total in one ranked list, an
+edge score 0-100, a BET / EDGE / PASS tier, one line saying what to do, and cards that
+expand into the lines, the model, the reasons and the news), **Results** (market /
+model / your-picks ledgers with CLV plus the bankroll curve), **Research**
+(calibration, gap-vs-CLV, model runs), **Glossary**. Plain-English,
+modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` classes
+in `web/app/globals.css`).
 
 **Architecture:** Neon Postgres is the single source of truth. GitHub Actions writes
 it; the Vercel app reads it and writes manual picks. `web/lib/*.ts` hold the

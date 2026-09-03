@@ -40,10 +40,13 @@ class Factor:
 # (market flag is applied from MARKET_COLS below so the two never drift.)
 _FACTORS: List[Factor] = [
     # --- 1H / full-game scoring history (season-to-date, leak-free) ----------
-    Factor("home_fh_pf", "scoring", "Home season-to-date 1H points for"),
-    Factor("home_fh_pa", "scoring", "Home season-to-date 1H points allowed"),
-    Factor("away_fh_pf", "scoring", "Away season-to-date 1H points for"),
-    Factor("away_fh_pa", "scoring", "Away season-to-date 1H points allowed"),
+    # Per-side 1H scoring levels. On the card these come with a provenance tag
+    # (factors_json.fh_prior_source: season-to-date from week 3, else the prior
+    # season's per-game means — see etl/context.py).
+    Factor("home_fh_pf", "scoring", "Home 1H points for (per game)"),
+    Factor("home_fh_pa", "scoring", "Home 1H points allowed (per game)"),
+    Factor("away_fh_pf", "scoring", "Away 1H points for (per game)"),
+    Factor("away_fh_pa", "scoring", "Away 1H points allowed (per game)"),
     Factor(
         "combined_fh_offense",
         "scoring",
@@ -95,15 +98,51 @@ _FACTORS: List[Factor] = [
     Factor("home_returning_ppa", "personnel", "Home returning production (PPA share)"),
     Factor("away_returning_ppa", "personnel", "Away returning production (PPA share)"),
     # --- situational (schedule-derived, leak-free) --------------------------
-    Factor("home_rest_days", "situational", "Home days of rest"),
-    Factor("away_rest_days", "situational", "Away days of rest"),
+    # Rest / travel / kickoff carry the slow-start THESIS (early kickoffs + long
+    # trips dampen first halves) but no validated real-line record: hypothesis
+    # + tier 3, rendered amber until the ledger speaks. Directions are the
+    # thesis sign only (travel +, earlier kickoff -); rest and tz stay 0.
+    Factor(
+        "home_rest_days",
+        "situational",
+        "Home days of rest",
+        hypothesis=True,
+        sentence="Home on {value:.0f} days' rest — {dir} the under.",
+    ),
+    Factor(
+        "away_rest_days",
+        "situational",
+        "Away days of rest",
+        hypothesis=True,
+        sentence="Away on {value:.0f} days' rest — {dir} the under.",
+    ),
     Factor("home_short_week", "situational", "Home on a short week (<6 days)", tier=2, binary=True),
     Factor("away_short_week", "situational", "Away on a short week (<6 days)", tier=2, binary=True),
     Factor("home_off_bye", "situational", "Home off a bye (>9 days)"),
     Factor("away_off_bye", "situational", "Away off a bye (>9 days)"),
-    Factor("away_travel_dist", "situational", "Away travel distance (miles)"),
-    Factor("away_tz_shift", "situational", "Away time-zone shift (hours)"),
-    Factor("kickoff_local_hour", "situational", "Local kickoff hour"),
+    Factor(
+        "away_travel_dist",
+        "situational",
+        "Away travel distance (miles)",
+        direction=1,
+        hypothesis=True,
+        sentence="Visitors travel ~{value:.0f} miles — {dir} the under.",
+    ),
+    Factor(
+        "away_tz_shift",
+        "situational",
+        "Away time-zone shift (hours)",
+        hypothesis=True,
+        sentence="Visitors cross {value:+.1f} time zones — {dir} the under.",
+    ),
+    Factor(
+        "kickoff_local_hour",
+        "situational",
+        "Local kickoff hour",
+        direction=-1,
+        hypothesis=True,
+        sentence="~{value:.0f}:00 local kickoff — {dir} the under.",
+    ),
     Factor("early_kickoff", "situational", "Early kickoff (<=1pm local)"),
     Factor("week", "situational", "Week of season"),
     Factor("neutral_site", "situational", "Neutral-site game"),

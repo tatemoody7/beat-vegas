@@ -32,8 +32,24 @@ const TERMS: { term: string; body: string }[] = [
     body: "How much any single first half can miss our number by. It is the noise of one game, not a test for an edge — which is why every card says a single game is still close to a coin flip.",
   },
   {
-    term: "BET / WATCH / PASS",
-    body: "The This Week verdict. BET = a model read, Hard Rock’s own posted first-half line 1.75+ points above our number, and a Hard Rock price no worse than the market. WATCH = a smaller lean, a good price on its own, the market clearing the bar while Hard Rock does not, or Hard Rock not yet posted. PASS = nothing to act on.",
+    term: "BET / EDGE / PASS",
+    body: "The tier badge on each board card. BET = every rule passes: a model read, Hard Rock’s own posted first-half line 1.75+ points above our number, a live line, and a Hard Rock price no worse than the market. EDGE = something is there but a rule fails. PASS = nothing to act on.",
+  },
+  {
+    term: "Edge score (0–100)",
+    body: "The one number the board sorts on. With a model read it starts at 50 and moves 10 points for every point of gap between the line you can bet and our number, then adjusts for Hard Rock’s price (up to 8 points either way), takes 10 off an off-market Hard Rock number and 5 off a starting QB being out. With no model read it is a context-only score — it starts at 40, moves on pace, wind, dome, spread and last season’s first halves, and cannot pass 49 (55 when Hard Rock’s price alone beats the market). It ranks the board; it never overrides the BET rules.",
+  },
+  {
+    term: "EDGE (tier)",
+    body: "Not a bet, but worth watching: the card scores 60 or better and still fails one rule — or, in weeks 1–2, Hard Rock’s price beats the market with no model behind it. The card names the rule that is blocking it: no Hard Rock line, an off-market Hard Rock number, a price worse than fair, a starting QB out, or a gap short of 1.75 points.",
+  },
+  {
+    term: "Action line",
+    body: "The plain sentence at the bottom of every collapsed card saying what to do right now — bet it at this number and price, wait for a specific number, or pass and why. It is written from the same rules that set the tier, so the two can never disagree.",
+  },
+  {
+    term: "Kill number",
+    body: "Where the edge is gone. The line half of it is our number plus the 1.75-point bar, rounded up to the next half point — below that total the bet is no longer in the band. The price half is the worst payout that still clears the market’s fair under price by more than the unavoidable 2% of vig. A card that clears one and not the other is not a bet.",
   },
   {
     term: "Under score (0–100)",
@@ -104,9 +120,9 @@ export default function GlossaryPage() {
         ))}
       </dl>
       <p className="mt-6 text-xs text-[var(--text-dim)]">
-        {`The betting rules themselves live in `}
+        {`The betting rules themselves live on the `}
         <Link href="/" className="bv-nav-link">
-          This Week
+          board
         </Link>
         {` — bankroll strip at the top.`}
       </p>

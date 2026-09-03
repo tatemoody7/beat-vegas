@@ -1,51 +1,63 @@
-import Link from "next/link";
 import { getSeasons } from "@/lib/board";
+import {
+  getHomeBoard,
+  matchesFilters,
+  parseFilters,
+  tierCounts,
+} from "@/lib/homeBoard";
 import { resolveSeason } from "@/lib/season";
-import { getThisWeek } from "@/lib/thisWeek";
-import { MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
+import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
+import BoardFilters from "@/app/components/BoardFilters";
+import GameCard from "@/app/components/GameCard";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
-import VerdictCard from "@/app/components/VerdictCard";
 import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
-// Landing page: one plain-English verdict per game (BET / WATCH / PASS), how
-// sure we are, why, injuries/news, every book's number, and a "log this bet"
-// button that freezes the verdict onto the pick. The full research board lives
-// at /board; settled results at /results.
-export default async function ThisWeekPage({
+// The board IS the home page: every game on the week in one ranked list, best
+// spot first, each with an edge score 0–100, a tier, and one line saying what
+// to do. Open a card for the lines, the model, the reasons and the news.
+export default async function BoardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; week?: string }>;
+  searchParams: Promise<{
+    season?: string;
+    week?: string;
+    days?: string;
+    mine?: string;
+    hr?: string;
+  }>;
 }) {
   const seasons = await getSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const reqWeek = Number(sp.week);
-  const tw = await getThisWeek(
+  const board = await getHomeBoard(
     season,
     Number.isFinite(reqWeek) ? reqWeek : undefined,
   );
 
-  const actionable = tw.games.filter((g) => g.verdict.verdict !== "PASS");
-  const passes = tw.games.filter((g) => g.verdict.verdict === "PASS");
+  const filters = parseFilters(sp);
+  const games = board.games.filter((g) => matchesFilters(g, filters));
+  const counts = tierCounts(games);
+  const filtered = games.length !== board.games.length;
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="bv-page-title">
-            {tw.week !== null ? `This Week · Week ${tw.week}` : "This Week"}
+            {board.week !== null ? `Board · Week ${board.week}` : "Board"}
           </h1>
           <p className="bv-page-sub mt-1">
-            {`One verdict per game. BET = Hard Rock’s own first-half number sits 1.75+ points above ours at a fair-or-better price. WATCH = something is there but not enough. PASS = nothing to act on.`}
+            {`Every game with a Hard Rock total, best spot first. The score is 0–100 — it ranks the board and nothing else. BET only appears when every rule passes: a model read, Hard Rock’s own first-half number ${BET_GAP_PTS}+ points above ours, a live line, and a price no worse than the market.`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {tw.weeks.length > 0 && tw.week !== null && (
-            <WeekSelect weeks={tw.weeks} current={tw.week} />
+          {board.weeks.length > 0 && board.week !== null && (
+            <WeekSelect weeks={board.weeks} current={board.week} />
           )}
           {seasons.length > 0 && (
             <SeasonSelect seasons={seasons} current={season} />
@@ -55,107 +67,73 @@ export default async function ThisWeekPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <BankrollStrip b={tw.bankroll} />
+      <BankrollStrip b={board.bankroll} />
 
-      {tw.noModel && (
-        <div className="bv-card mb-5 border-l-2 border-[#e0a44a] p-4 text-sm text-[var(--text-muted)]">
+      <div className="mb-4">
+        <BoardFilters current={filters} />
+      </div>
+
+      {board.noModel && (
+        <div className="bv-card mb-4 border-l-2 border-[#e0a44a] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
-            No model picks yet this week.
+            No model read this week.
           </p>
           <p className="mt-1">
-            {`The model needs both teams to have played ${MIN_GAMES_FOR_MODEL} games this season before it will rate a game, so it sits out weeks 1–2 by design. Until then the only thing worth acting on is a Hard Rock price that beats the rest of the market — those show as WATCH with "price edge only". Anything you bet this week is a price bet, not a model bet.`}
+            {`The model needs both teams to have played ${MIN_GAMES_FOR_MODEL} games this season, so it sits out weeks 1–2 by design. Until then the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
           </p>
         </div>
       )}
 
-      {tw.games.length === 0 ? (
+      {board.noHrLine && board.games.length > 0 && (
+        <div className="bv-card mb-4 border-l-2 border-[var(--accent)] p-4 text-sm text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--text)]">
+            Hard Rock has not posted first-half lines yet.
+          </p>
+          <p className="mt-1">
+            {`First-half totals usually post later in the week. Each card says the number and price that would make it a bet, so you know what to watch for.`}
+          </p>
+        </div>
+      )}
+
+      {board.games.length === 0 ? (
         <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          {`Nothing on the board for ${season} yet. Lines and verdicts land automatically on Sunday afternoon once the week’s openers post.`}
+          {`Nothing on the board for ${season} yet. It fills in automatically on Sunday afternoon once the week’s opening lines post.`}
         </p>
       ) : (
         <>
           <p className="mb-3 text-sm text-[var(--text-dim)]">
             <span className="font-mono font-semibold text-[var(--accent)]">
-              {tw.counts.bet}
+              {counts.bet}
             </span>
-            {` to bet · `}
-            <span className="font-mono font-semibold text-[#e0a44a]">
-              {tw.counts.watch}
+            {` bet · `}
+            <span className="font-mono font-semibold text-[var(--text)]">
+              {counts.edge}
             </span>
-            {` to watch · `}
+            {` edge · `}
             <span className="font-mono font-semibold text-[var(--text-muted)]">
-              {tw.counts.pass}
+              {counts.pass}
             </span>
-            {` pass · `}
-            <Link href="/board" className="bv-nav-link">
-              full research board →
-            </Link>
-            {` · `}
-            <Link href="/results" className="bv-nav-link">
-              results →
-            </Link>
+            {` pass`}
+            {filtered ? ` · ${board.games.length} games before filters` : ""}
           </p>
 
-          {actionable.length === 0 ? (
-            <p className="bv-card mb-5 p-5 text-sm text-[var(--text-muted)]">
-              {`Nothing clears the bar this week. That is a result, not a failure — passing costs nothing, and the cap is a ceiling, not a target.`}
+          {games.length === 0 ? (
+            <p className="bv-card p-5 text-sm text-[var(--text-muted)]">
+              {`No games match those filters. Clear a filter to see the rest of the week.`}
             </p>
           ) : (
-            <div className="mb-6 flex flex-col gap-3.5">
-              {actionable.map((g) => (
-                <VerdictCard key={g.row.gameId} g={g} />
-              ))}
-            </div>
-          )}
-
-          {passes.length > 0 && (
-            <details className="bv-card p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">
-                {`${passes.length} games we pass on`}
-                <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                  click to see why, one line each
-                </span>
-              </summary>
-              <div className="bv-table-wrap mt-3">
-                <table className="bv-table">
-                  <thead>
-                    <tr>
-                      <th>Matchup</th>
-                      <th title="The market’s first-half total, or our reference number when none is posted.">
-                        1H line
-                      </th>
-                      <th title="Hard Rock’s first-half total and under price.">
-                        Hard Rock
-                      </th>
-                      <th>Why pass</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {passes.map((g) => {
-                      const line = g.row.curLine ?? g.row.factors.line ?? null;
-                      return (
-                        <tr key={g.row.gameId}>
-                          <td className="text-[var(--text)]">
-                            {`${g.row.away} @ ${g.row.home}`}
-                          </td>
-                          <td className="font-mono text-[var(--text-muted)]">
-                            {line !== null ? line.toFixed(1) : "—"}
-                          </td>
-                          <td className="font-mono text-[var(--text-muted)]">
-                            {g.check?.hrLine != null
-                              ? `u${g.check.hrLine.toFixed(1)}${g.check.hrUnderPrice != null ? ` ${g.check.hrUnderPrice > 0 ? "+" : ""}${g.check.hrUnderPrice}` : ""}`
-                              : "—"}
-                          </td>
-                          <td className="text-[var(--text-dim)]">
-                            {g.verdict.headline}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            <>
+              {counts.bet === 0 && counts.edge === 0 && (
+                <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
+                  {`Nothing clears the bar this week — no bets, no edges worth watching. That is a result, not a failure: passing costs nothing, and the weekly cap is a ceiling, not a target.`}
+                </p>
+              )}
+              <div className="flex flex-col gap-3">
+                {games.map((g) => (
+                  <GameCard key={g.row.gameId} g={g} />
+                ))}
               </div>
-            </details>
+            </>
           )}
         </>
       )}

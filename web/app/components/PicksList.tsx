@@ -41,7 +41,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
   if (picks.length === 0) {
     return (
       <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-        No picks logged for this selection. Log bets from the This Week cards.
+        No picks logged for this selection. Log bets from the board cards.
       </p>
     );
   }
@@ -61,7 +61,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
             <th title="The under score and our number at the time you logged the pick.">
               Model @ pick
             </th>
-            <th title="The This Week verdict, the reason, and Hard Rock’s gap vs our number when you logged it.">
+            <th title="The board verdict, the reason, and Hard Rock’s gap vs our number when you logged it.">
               Logged as
             </th>
             <th>Result</th>

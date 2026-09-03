@@ -67,6 +67,54 @@ export type Factors = {
   fh_off_epa_away?: number | null;
   fh_off_success_home?: number | null;
   fh_off_success_away?: number | null;
+  // --- Board context (beatvegas/etl/context.py + form). ALL OPTIONAL: written
+  // for every card (derived rows included) once the context job runs; read
+  // defensively — any key may be absent on older rows.
+  combined_sec_play?: number | null;
+  combined_plays?: number | null;
+  wx_temp?: number | null;
+  wx_wind?: number | null;
+  wx_precip?: number | null;
+  wx_dome?: number | null;
+  dome?: boolean | null;
+  /** Raw 1H priors by feature-frame name (context.py); the model row's
+   *  `fh_home_pf` etc. above are the same numbers under the scoring names. */
+  home_fh_pf?: number | null;
+  home_fh_pa?: number | null;
+  away_fh_pf?: number | null;
+  away_fh_pa?: number | null;
+  fh_prior_source?: string | null;
+  combined_off_ppa?: number | null;
+  combined_def_ppa?: number | null;
+  home_rest_days?: number | null;
+  away_rest_days?: number | null;
+  away_travel_dist?: number | null;
+  away_tz_shift?: number | null;
+  kickoff_local_hour?: number | null;
+  form_home?: TeamForm | null;
+  form_away?: TeamForm | null;
+  split_home?: TeamSplit | null;
+  split_away?: TeamSplit | null;
+};
+
+/** Last-n first-half points for / against, oldest → newest. */
+export type TeamForm = {
+  pf: number[];
+  pa: number[];
+  n: number;
+  source?: "season_to_date" | "prior_season" | string | null;
+};
+
+export type SplitLeg = { pf: number; pa: number; n: number } | null;
+
+/** Home / away first-half splits. context.py writes `at_home` / `on_road`;
+ *  `home` / `away` are accepted as aliases. */
+export type TeamSplit = {
+  at_home?: SplitLeg;
+  on_road?: SplitLeg;
+  home?: SplitLeg;
+  away?: SplitLeg;
+  source?: "season_to_date" | "prior_season" | string | null;
 };
 
 export function parseFactors(raw: string | null | undefined): Factors {

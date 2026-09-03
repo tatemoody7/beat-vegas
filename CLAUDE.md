@@ -125,10 +125,13 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 ## Web app (`web/`) — shipped + redesigned
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
 Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
-- **Views (5 tabs)**: This Week (`/`, BET / WATCH / PASS verdicts from `web/lib/verdict.ts`
-  + bankroll strip + writable picks, `POST /api/picks`), Board (`/board`, ranked research
-  board with model/derived numbers + factor chips), Results (market/model/you ledgers with
-  CLV), Research (calibration, gap-vs-CLV, model_runs), Glossary. Score-color thresholds +
+- **Views (4 tabs)**: Board (`/`, THE home page — one ranked list of every game with a
+  Hard Rock total, edge score 0-100 + BET/EDGE/PASS tier + action line from
+  `web/lib/edge.ts`, composed by `web/lib/homeBoard.ts`; bankroll strip, day/my-teams/
+  Hard-Rock filters, expandable cards with Lines / Model / Why / News and writable picks,
+  `POST /api/picks`), Results (market/model/you ledgers with CLV + bankroll curve),
+  Research (calibration, gap-vs-CLV, model_runs), Glossary. `/board` redirects to `/`.
+  Score-color thresholds +
   chip logic live in `web/lib/score.ts` (ported from `model/score.py`; keep the two in sync);
   the point gates are exported from `model/score.py` and parity-tested against `verdict.ts`. API routes read the same SQL
   the page loaders use; the app is locked by `middleware.ts` + `APP_PASSWORD` cookie.

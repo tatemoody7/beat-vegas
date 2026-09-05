@@ -274,14 +274,17 @@ export type HomeBoard = {
   bankroll: Bankroll;
 };
 
-/** Pure: score desc, then the earliest kickoff, then the away team. */
+/** Pure: upcoming before kicked-off, then score desc, earliest kickoff, away team. */
 export function sortGames(games: HomeGame[]): HomeGame[] {
   const ms = (g: HomeGame): number => {
     const t = asDate(g.row.startDate);
     return t === null ? Number.POSITIVE_INFINITY : t.getTime();
   };
+  // Games that have kicked off are no longer actionable: they sink below every
+  // upcoming game regardless of score.
   return [...games].sort(
     (a, b) =>
+      Number(a.kickedOff) - Number(b.kickedOff) ||
       b.edge.score - a.edge.score ||
       ms(a) - ms(b) ||
       a.row.away.localeCompare(b.row.away),

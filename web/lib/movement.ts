@@ -165,10 +165,13 @@ export async function getMovements(
   const snaps = await prisma.$queryRaw<MoveSnap[]>`
     SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line,
            spread, market
-    FROM odds_snapshots
-    WHERE game_id IN (${Prisma.join(gameIds)})
-      AND market IN ('1H_total', 'full_game_total')
-    ORDER BY game_id, captured_at
+    FROM odds_snapshots o
+    WHERE o.game_id IN (${Prisma.join(gameIds)})
+      AND o.market IN ('1H_total', 'full_game_total')
+      -- pre-kickoff only: in-game captures are not line movement
+      AND o.captured_at <= COALESCE(
+        (SELECT g.start_date FROM games g WHERE g.id = o.game_id), o.captured_at)
+    ORDER BY o.game_id, o.captured_at
   `;
   const byGame = new Map<number, { fh: MoveSnap[]; fg: MoveSnap[] }>();
   for (const s of snaps) {

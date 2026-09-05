@@ -131,7 +131,9 @@ jobs:
           cat "$GITHUB_OUTPUT"
       - name: 1H sweep (only when today's capture is missing)
         if: steps.inputs.outputs.need_sweep == 'true'
-        run: python scripts/poll_lines.py --days-ahead 3 --max-events 18
+        # --hours-back 0: upcoming games only; a Saturday refresh must not spend
+        # credits on in-game lines for games that already kicked off.
+        run: python scripts/poll_lines.py --days-ahead 3 --hours-back 0 --max-events 18
       - name: Research preview (only when today's refresh is missing)
         if: steps.inputs.outputs.need_preview == 'true'
         # Unofficial sources (ESPN / Rotowire) may be down; the card still builds

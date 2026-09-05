@@ -515,7 +515,8 @@ export default function GameCard({ g }: { g: HomeGame }) {
 
   return (
     <div
-      className={`bv-card overflow-hidden ${edge.tier === "PASS" ? "opacity-70" : ""}`}
+      id={`game-${row.gameId}`}
+      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "PASS" ? "opacity-70" : ""}`}
     >
       <button
         type="button"

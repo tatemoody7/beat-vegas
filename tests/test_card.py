@@ -1,0 +1,341 @@
+"""beatvegas/card.py — the pure card rules, mirroring web/lib/edge.ts.
+
+Every scenario builds plain rows (no DB) and checks the tier, the blocker, the
+action wording, the kill numbers and the payload contract the Board renders."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from beatvegas.card import (
+    FAIR_PRICE_EXCLUDED,
+    break_even_price,
+    build_card,
+    hold_note,
+    kill_line,
+    market_read,
+    round_half_up,
+)
+from beatvegas.model.score import BET_GAP_PTS, EV_FLOOR
+
+NOW = datetime(2026, 9, 18, 22, 5)  # Friday 6:05pm ET, in UTC
+KICK = NOW + timedelta(days=1)
+
+
+def game(gid=1, away="Kansas", home="Missouri", kick=KICK):
+    return {"game_id": gid, "away": away, "home": home, "kick": kick}
+
+
+def snap(gid, book, line, over=-110, under=-110, hours_ago=1.0):
+    return {
+        "game_id": gid,
+        "book": book,
+        "line": line,
+        "over_price": over,
+        "under_price": under,
+        "captured_at": NOW - timedelta(hours=hours_ago),
+    }
+
+
+def market(gid, line, books=("draftkings", "fanduel", "betmgm"), over=100, under=-120):
+    """The other books, shaded toward the under (fair under 0.5217) so Hard
+    Rock's plain -110 reads as a fair price (ev -0.4%). At a flat -110/-110
+    market the fair under is 0.5 and even -105 is outside the -2% floor."""
+    return [snap(gid, b, line, over, under) for b in books]
+
+
+FAIR_UNDER = 12 / 23  # devig of +100/-120
+
+
+def model(gid, bv_line, line_used=None):
+    return {"game_id": gid, "model_version": "gbm_v1", "bv_line": bv_line, "line_used": line_used}
+
+
+def card(games, snaps, preds=(), previews=(), **kw):
+    kw.setdefault("season", 2026)
+    kw.setdefault("week", 3)
+    kw.setdefault("now", NOW)
+    return build_card(games, snaps, list(preds), list(previews), **kw)
+
+
+def only(c):
+    assert len(c["items"]) == 1, c["items"]
+    return c["items"][0]
+
+
+# --- tiers ---------------------------------------------------------------------
+
+
+def test_bet_path_logs_hard_rocks_number_and_price():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    c = card([game()], snaps, [model(1, 22.4)])
+    it = only(c)
+    assert it["tier"] == "BET" and it["blocker"] is None
+    assert it["hr_line"] == 24.5 and it["hr_price"] == -110
+    assert it["market_line"] == 24.5 and it["gap"] == 2.1 and it["bv_line"] == 22.4
+    assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4)
+    assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -2% floor
+    assert it["kill_line"] == 24.5 and it["kill_price"] == -110
+    assert it["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
+    assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0}
+    assert c["model_read"] is True and c["notes"] == []
+    assert it["paper_logged"] is False
+
+
+def test_edge_no_hr_line_uses_the_market_median_as_basis():
+    c = card([game()], market(1, 25.0), [model(1, 22.4)])
+    it = only(c)
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
+    assert it["hr_line"] is None and it["market_line"] == 25.0 and it["gap"] == 2.6
+    assert it["kill_line"] == 24.5
+    assert it["action"] == "No Hard Rock line yet. A bet at under 24.5 or higher, -110 or better."
+    assert "Hard Rock hasn’t posted a first-half line for this game yet." in it["why"]
+
+
+def test_edge_off_market_when_hard_rock_sits_below_the_market():
+    snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
+    it = only(card([game()], snaps, [model(1, 21.5)]))
+    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
+    assert it["market_line"] == 25.0 and it["gap"] == 2.5  # gap is vs Hard Rock's own number
+    assert it["fair_under"] is None  # no other book at 24.0 -> no fair price
+    assert it["action"] == (
+        "Wait: Hard Rock’s 24.0 is 1.0 below the market’s 25.0 — giving up points and a void "
+        "risk. Bet if it moves to 24.5 or higher."
+    )
+
+
+def test_edge_price_when_hard_rock_is_worse_than_fair():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -125)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["tier"] == "EDGE" and it["blocker"] == "price"
+    assert it["ev"] < EV_FLOOR
+    assert it["kill_price"] == -110  # worst price still inside the floor vs the market's fair
+    assert it["action"] == "Wait: Hard Rock is -125; needs -110 or better."
+    assert any("worse than the market’s fair price" in w for w in it["why"])
+
+
+def test_edge_qb_out_blocks_the_bet_and_flags_it():
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "Missouri QB Smith (knee) out"}]
+    it = only(card([game()], snaps, [model(1, 22.4)], prev))
+    assert it["tier"] == "EDGE" and it["blocker"] == "qb_out"
+    assert it["action"] == (
+        "Wait: a starting QB is listed out — re-check the number after the news settles."
+    )
+    assert any(w.startswith("QB OUT") and "Smith" in w for w in it["why"])
+
+
+def test_edge_gap_blocker_when_the_score_clears_60_short_of_the_bar():
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 23.2)]))  # gap 1.3 -> score 63
+    assert it["tier"] == "EDGE" and it["blocker"] == "gap"
+    assert it["gap"] == 1.3 and it["kill_line"] == 25.0
+    assert it["action"] == "Pass: the line is only 1.3 above our number; needs 25.0 or higher."
+
+
+def test_no_model_price_only_edge():
+    snaps = [snap(1, "hardrockbet", 24.5, -115, 105)] + market(1, 24.5)
+    c = card([game()], snaps)
+    it = only(c)
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_model"
+    assert it["bv_line"] is None and it["gap"] is None and it["kill_line"] is None
+    assert it["ev"] == pytest.approx(0.0696, abs=1e-3)
+    assert it["action"] == (
+        "Price only: Hard Rock pays 7.0% better than the market on this under. No model behind it."
+    )
+    assert c["model_read"] is False
+    assert c["notes"][0].startswith("No model read this week (weeks 1-2)")
+
+
+def test_no_model_pass_and_reference_line_in_why():
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    it = only(card([game()], snaps))
+    assert it["tier"] == "PASS" and it["blocker"] is None
+    assert it["action"] == "Pass: no model read this week and no price edge at Hard Rock."
+    assert it["why"][0].startswith("No model read yet")
+
+
+def test_model_pass_leans_over_wording():
+    snaps = [snap(1, "hardrockbet", 22.0)] + market(1, 22.0)
+    it = only(card([game()], snaps, [model(1, 24.0)]))
+    assert it["tier"] == "PASS"
+    assert it["gap"] == -2.0 and it["kill_line"] == 26.0
+    assert it["action"] == (
+        "Pass: the line is 2.0 below our number (leans over); needs 26.0 or higher."
+    )
+
+
+def test_hard_rock_gap_gates_the_bet_not_the_consensus_gap():
+    # Market clears the bar, Hard Rock's own number is lower but within 0.5.
+    snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["tier"] != "BET" and it["gap"] == 1.6  # gap is vs Hard Rock's line
+
+
+def test_derived_reference_is_the_basis_when_no_book_has_posted():
+    preds = [
+        model(1, 22.0, line_used=23.0),
+        {"game_id": 1, "model_version": "derived_lines", "bv_line": None, "line_used": 24.0},
+    ]
+    it = only(card([game()], [], preds))
+    assert it["market_line"] is None and it["gap"] == 2.0  # derived_lines row wins
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
+    assert it["action"] == "No Hard Rock line yet. A bet at under 24.0 or higher, -110 or better."
+
+
+def test_no_line_at_all_wording():
+    it = only(card([game()], [], [model(1, 22.0)]))
+    assert it["gap"] is None and it["tier"] == "PASS" and it["blocker"] is None
+    assert it["action"] == "No line captured yet. A bet at under 24.0 or higher, -110 or better."
+    assert it["why"][0].startswith("Our number for the first half is 22.0, but no Vegas line")
+
+
+# --- market read ------------------------------------------------------------------
+
+
+def test_fair_price_excludes_hard_rock_fliff_consensus_and_exchanges():
+    assert {"hardrockbet", "fliff", "consensus", "kalshi", "novig", "prophetx", "betopenly"} <= set(
+        FAIR_PRICE_EXCLUDED
+    )
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -105),
+        snap(1, "draftkings", 24.5, -110, -110),
+        snap(1, "fliff", 24.5, 100, 100),  # would drag fair to 0.5 exactly; excluded
+        snap(1, "kalshi", 24.5, 100, 100),
+        snap(1, "consensus", 30.0, -110, -110),  # synthetic: not in the market line either
+        snap(1, "betmgm", 25.5, -105, -115),  # a full point away: outside the 0.5 window
+    ]
+    m = market_read(snaps)
+    assert m["fair_under"] == pytest.approx(0.5)
+    assert m["market_line"] == 24.5  # median of HR, DK, fliff, kalshi, MGM (24.5 x4, 25.5)
+    assert m["hr_line"] == 24.5 and m["hr_price"] == -105
+
+
+def test_latest_snapshot_per_book_and_hard_rock_open():
+    snaps = [
+        snap(1, "hardrockbet", 23.5, hours_ago=30),
+        snap(1, "hardrockbet_fl", 24.5, hours_ago=1),  # alias folds onto hardrockbet
+        snap(1, "draftkings", 23.0, hours_ago=20),
+        snap(1, "draftkings", 24.5, hours_ago=2),
+    ]
+    m = market_read(snaps)
+    assert m["hr_line"] == 24.5 and m["hr_open"] == 23.5 and m["market_line"] == 24.5
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert "Hard Rock opened at 23.5 and has moved up to 24.5." in it["why"]
+
+
+# --- kill numbers -----------------------------------------------------------------
+
+
+def test_round_half_up_and_kill_line():
+    assert round_half_up(23.55) == 24.0
+    assert round_half_up(23.1) == 23.5
+    assert round_half_up(23.5) == 23.5
+    assert kill_line(22.4) == round_half_up(22.4 + BET_GAP_PTS) == 24.5
+    assert kill_line(23.2) == 25.0
+
+
+def test_break_even_price_is_the_worst_price_inside_the_floor():
+    assert break_even_price(0.5) == 100  # -105 is -2.4%: outside; +100 is 0
+    assert break_even_price(0.55) == -125
+    assert break_even_price(0.52) == -110  # -110 is -0.7%, -115 is -2.8%
+    assert break_even_price(FAIR_UNDER) == -110
+    assert break_even_price(0.0) is None
+
+
+# --- ordering, filtering, notes -------------------------------------------------
+
+
+def test_items_sort_bet_then_edge_by_ev_then_pass_by_ev():
+    k = [KICK + timedelta(hours=i) for i in range(5)]
+    games = [game(i + 1, away=f"A{i}", home=f"H{i}", kick=k[i]) for i in range(5)]
+    snaps = []
+    # 1: PASS, fair price (ev 0)
+    snaps += [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    # 2: EDGE price, ev strongly negative
+    snaps += [snap(2, "hardrockbet", 24.5, -110, -130)] + market(2, 24.5)
+    # 3: BET (Hard Rock a nickel better than -110)
+    snaps += [snap(3, "hardrockbet", 24.5, -115, -105)] + market(3, 24.5)
+    # 4: EDGE no_hr_line (ev None -> after any priced EDGE)
+    snaps += market(4, 25.0)
+    # 5: PASS with a positive price (ev > 0) -> ahead of PASS #1
+    snaps += [snap(5, "hardrockbet", 24.5, -120, 100)] + market(5, 24.5)
+    preds = [model(1, 24.0), model(2, 22.4), model(3, 22.4), model(4, 22.4), model(5, 24.0)]
+    c = card(games, snaps, preds)
+    order = [(it["game_id"], it["tier"]) for it in c["items"]]
+    assert order == [(3, "BET"), (2, "EDGE"), (4, "EDGE"), (5, "PASS"), (1, "PASS")]
+    assert c["counts"] == {"bet": 1, "edge": 2, "pass": 2}
+
+
+def test_only_games_still_to_kick_off_are_on_the_card():
+    games = [game(1, kick=NOW - timedelta(hours=1)), game(2, kick=NOW + timedelta(hours=1))]
+    c = card(games, market(1, 24.5) + market(2, 24.5), [model(1, 22.0), model(2, 22.0)])
+    assert [it["game_id"] for it in c["items"]] == [2]
+
+
+def test_timezone_aware_inputs_are_normalized_to_utc():
+    aware_now = NOW.replace(tzinfo=timezone.utc)
+    aware_kick = KICK.replace(tzinfo=timezone.utc)
+    c = card([game(kick=aware_kick)], market(1, 24.5), [model(1, 22.0)], now=aware_now)
+    assert c["built_at"] == "2026-09-18T22:05:00Z"
+    assert only(c)["kick"] == "2026-09-19T22:05:00Z"
+
+
+def test_hold_note_when_hard_rock_charges_three_cents_more():
+    snaps = [snap(1, "hardrockbet", 24.5, -120, -120)] + market(1, 24.5)  # 9.1% vs 4.5%
+    c = card([game()], snaps, [model(1, 22.4)])
+    assert any(
+        n.startswith("Hard Rock’s average hold on this slate is 9.1% vs 4.5%") for n in c["notes"]
+    )
+    # a fair-priced Hard Rock produces no note
+    c2 = card([game()], [snap(1, "hardrockbet", 24.5)] + market(1, 24.5), [model(1, 22.4)])
+    assert not any(n.startswith("Hard Rock’s average hold") for n in c2["notes"])
+    assert hold_note([]) is None
+
+
+def test_no_hard_rock_line_anywhere_note():
+    c = card([game()], market(1, 24.5), [model(1, 24.0)])
+    assert "Hard Rock has not posted a first-half line on any game yet." in c["notes"]
+
+
+# --- contract ---------------------------------------------------------------------
+
+ITEM_KEYS = {
+    "game_id",
+    "away",
+    "home",
+    "kick",
+    "tier",
+    "blocker",
+    "hr_line",
+    "hr_price",
+    "hr_open",
+    "market_line",
+    "fair_under",
+    "ev",
+    "bv_line",
+    "gap",
+    "kill_line",
+    "kill_price",
+    "action",
+    "why",
+    "paper_logged",
+}
+
+
+def test_payload_contract_and_strict_json_round_trip():
+    nan = float("nan")
+    snaps = [snap(1, "hardrockbet", 24.5, nan, nan)] + market(1, 24.5)
+    preds = [model(1, nan), {"game_id": 1, "model_version": "derived_lines", "line_used": 24.5}]
+    c = card([game()], snaps, preds)
+    assert set(c) == {"season", "week", "built_at", "model_read", "counts", "items", "notes"}
+    it = only(c)
+    assert set(it) == ITEM_KEYS
+    assert it["hr_price"] is None and it["bv_line"] is None  # NaN read as missing
+    text = json.dumps(c, allow_nan=False)  # raises on any NaN/inf
+    back = json.loads(text)
+    assert back == c
+    assert back["items"][0]["tier"] in {"BET", "EDGE", "PASS"}

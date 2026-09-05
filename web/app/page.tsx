@@ -1,4 +1,5 @@
 import { getSeasons } from "@/lib/board";
+import { getLatestCard } from "@/lib/card";
 import {
   getHomeBoard,
   matchesFilters,
@@ -9,6 +10,7 @@ import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BoardFilters from "@/app/components/BoardFilters";
+import CardPanel from "@/app/components/CardPanel";
 import GameCard from "@/app/components/GameCard";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
@@ -34,10 +36,16 @@ export default async function BoardPage({
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
   const reqWeek = Number(sp.week);
-  const board = await getHomeBoard(
-    season,
-    Number.isFinite(reqWeek) ? reqWeek : undefined,
-  );
+  const weekArg = Number.isFinite(reqWeek) ? reqWeek : undefined;
+  // The card read runs alongside the board read. With no ?week= it fetches the
+  // season's latest card and keeps it only if it is for the week the board
+  // settled on, so a stale card never sits above a different week's games.
+  const [board, latestCard] = await Promise.all([
+    getHomeBoard(season, weekArg),
+    getLatestCard(season, weekArg),
+  ]);
+  const card =
+    latestCard !== null && latestCard.week === board.week ? latestCard : null;
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -68,6 +76,8 @@ export default async function BoardPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       <BankrollStrip b={board.bankroll} />
+
+      <CardPanel card={card} />
 
       <div className="mb-4">
         <BoardFilters current={filters} />

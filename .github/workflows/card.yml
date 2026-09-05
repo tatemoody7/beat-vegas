@@ -1,0 +1,149 @@
+name: Bet card (cloud)
+
+# Builds the weekend first-half-under bet card and publishes it to the Board
+# (`cards` table, read by the site). Replaces the Mac routine `cfb-friday-card`,
+# which slept through the card when the Mac was asleep. No text: the card lives
+# on the site; a red run is reported by GitHub's failed-workflow email.
+#
+# Slots (GHA cron is UTC, best-effort and often late; each has a retry or a
+# refresh): Friday 22:05Z (~6:05pm ET) after the 1H sweep + preview, retry 23:00Z
+# only if no scheduled run succeeded since the primary slot; Saturday 15:00Z
+# (11am ET) refresh after the 10:30am closing capture (lines_watch.yml), so
+# the numbers on the card are the ones Tate can still bet.
+#
+# INPUTS: before building, the job checks that today's inputs exist and runs
+# only what is missing — (a) a 1H_total snapshot captured today for the week
+# (else the Friday sweep, <=36 Odds API credits, spent only when lines_watch's
+# cron dropped), (b) a game_previews refresh today (else research_preview.py,
+# free). The card never double-spends the sweep.
+
+on:
+  schedule:
+    - cron: '5 22 * * 5'   # Fri ~6:05pm ET — the card
+    - cron: '0 23 * * 5'   # Fri ~7pm ET — retry, skips when the 22:05 slot landed
+    - cron: '0 15 * * 6'   # Sat 11am ET — refresh after the closing capture
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'season (default: current)'
+        required: false
+        default: ''
+      week:
+        description: 'week (default: the active week)'
+        required: false
+        default: ''
+
+concurrency:
+  group: card
+  cancel-in-progress: false
+
+jobs:
+  card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - name: Resolve slot from schedule / input
+        id: slot
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          retry_since=""
+          case "$SCHEDULE" in
+            '5 22 * * 5')  slot=friday ;;
+            '0 23 * * 5')  slot=friday; retry_since="$(date -u +%F)T21:45:00Z" ;;
+            '0 15 * * 6')  slot=saturday ;;
+            '')            slot=manual ;;   # workflow_dispatch
+            *) echo "::error::unmapped cron '$SCHEDULE' - add it to the resolve step"; exit 1 ;;
+          esac
+          # The retry slot only runs when the primary slot did not land: skip if
+          # a SCHEDULED run of this workflow already succeeded since the primary
+          # slot's window opened (pattern shared with lines_watch.yml).
+          if [ -n "$retry_since" ]; then
+            done_already=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" \
+              --event schedule --status success --json createdAt \
+              --jq "[.[] | select(.createdAt >= \"$retry_since\")] | length" 2>/dev/null || echo 0)
+            if [ "${done_already:-0}" -gt 0 ]; then
+              echo "primary slot already succeeded since $retry_since; retry slot skipping"
+              slot=skip
+            fi
+          fi
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "resolved slot=$slot (schedule='$SCHEDULE')"
+      - uses: actions/checkout@v5
+        if: steps.slot.outputs.slot != 'skip'
+      - uses: actions/setup-python@v6
+        if: steps.slot.outputs.slot != 'skip'
+        with:
+          python-version: '3.11'
+      - name: Install
+        if: steps.slot.outputs.slot != 'skip'
+        run: pip install -e .
+      - name: Resolve season / week
+        id: active
+        if: steps.slot.outputs.slot != 'skip'
+        env:
+          INPUT_SEASON: ${{ inputs.season }}
+          INPUT_WEEK: ${{ inputs.week }}
+        run: |
+          read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
+          SEASON="${INPUT_SEASON:-$SEASON}"
+          WEEK="${INPUT_WEEK:-$WEEK}"
+          echo "season=$SEASON" >> "$GITHUB_OUTPUT"
+          echo "week=$WEEK" >> "$GITHUB_OUTPUT"
+          echo "season=$SEASON week=${WEEK:-none}"
+      - name: Check today's inputs (1H sweep + preview)
+        id: inputs
+        if: steps.slot.outputs.slot != 'skip' && steps.active.outputs.week != ''
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from datetime import datetime
+          from beatvegas.db.models import Game, GamePreview, OddsSnapshot
+          from beatvegas.db.store import init_db, session_scope
+          init_db()
+          season, week = int(os.environ["SEASON"]), int(os.environ["WEEK"])
+          today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+          with session_scope() as s:
+              snaps = (
+                  s.query(OddsSnapshot.id)
+                  .join(Game, Game.id == OddsSnapshot.game_id)
+                  .filter(Game.season == season, Game.week == week,
+                          OddsSnapshot.market == "1H_total", OddsSnapshot.captured_at >= today)
+                  .count()
+              )
+              previews = (
+                  s.query(GamePreview.id)
+                  .filter(GamePreview.season == season, GamePreview.week == week,
+                          GamePreview.updated_at >= today)
+                  .count()
+              )
+          print(f"need_sweep={'true' if snaps == 0 else 'false'}")
+          print(f"need_preview={'true' if previews == 0 else 'false'}")
+          PY
+          cat "$GITHUB_OUTPUT"
+      - name: 1H sweep (only when today's capture is missing)
+        if: steps.inputs.outputs.need_sweep == 'true'
+        run: python scripts/poll_lines.py --days-ahead 3 --max-events 18
+      - name: Research preview (only when today's refresh is missing)
+        if: steps.inputs.outputs.need_preview == 'true'
+        # Unofficial sources (ESPN / Rotowire) may be down; the card still builds
+        # with the QB-out gate reading whatever preview is on file.
+        continue-on-error: true
+        run: python scripts/research_preview.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
+      - name: Build + publish the card
+        if: steps.slot.outputs.slot != 'skip'
+        run: |
+          if [ -z "${{ steps.active.outputs.week }}" ]; then
+            echo "no active week — nothing to build"
+            echo "No active week — no card built." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"

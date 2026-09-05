@@ -91,9 +91,9 @@ never eaten. The schedule below is sized to stay under 500/month worst case.
 Nothing runs on the Mac on a schedule. The engine runs in **GitHub Actions**
 (`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY`)
 because the campus network cannot reach Neon:5432. Failures: GitHub emails every
-failed run, and the Claude routines below check each workflow before they need it.
+failed run, and the Sunday routine checks the Sunday workflow before it needs it.
 GitHub cron is best-effort (it drops most single-slot runs), so each job has retry
-slots and the routines re-dispatch anything that is missing.
+slots and the card job runs any missing input itself before it builds.
 
 | When (ET)                          | Workflow / routine     | What                                                                 |
 | ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
@@ -101,8 +101,9 @@ slots and the routines re-dispatch anything that is missing.
 | Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
 | Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
 | Fri 1pm (retry 2:30pm)             | `lines_watch.yml`      | 1H sweep of the weekend slate (18 events, credit-guarded)            |
-| Fri 6pm                            | routine `cfb-friday-card` | Verify/kick the sweep + preview, build the bet card, log paper picks, text |
+| Fri 6:05pm (retry 7pm)             | `card.yml`             | Bet card built + published on the Board (`cards` table); BETs logged as paper picks; runs the sweep/preview first only if today's is missing |
 | Sat 10:30am (retry 11:15), 6pm (retry 6:45) | `lines_watch.yml` | Closing 1H lines for CLV                                          |
+| Sat 11am                           | `card.yml`             | Bet card refreshed against the closing numbers                       |
 | Mon 8am / 10am / 1pm               | `grade.yml`            | Finals + 1H play-by-play → grade market / model / picks / records    |
 | Mon 9am                            | routine `monday-coaching` | Includes a one-line grading check (kicks `grade.yml` if cron dropped it) |
 

@@ -52,6 +52,10 @@ const TERMS: { term: string; body: string }[] = [
     body: "Where the edge is gone. The line half of it is our number plus the 1.75-point bar, rounded up to the next half point — below that total the bet is no longer in the band. The price half is the worst payout that still clears the market’s fair under price by more than the unavoidable 2% of vig. A card that clears one and not the other is not a bet.",
   },
   {
+    term: "The card",
+    body: "The week’s bet list, built in the cloud every Friday at 6pm ET (retried at 7pm) and refreshed Saturday at 11am ET, shown at the top of the board. It runs the same rules as the board — a BET on the card is a BET on the board below it, never something extra — and on a no-bet week it says why and names the games that came closest. Every BET on the card is logged automatically as a paper pick. Real money is never placed for you: you log those yourself from the card.",
+  },
+  {
     term: "Under score (0–100)",
     body: "A second, older model’s lean. 50 = coin flip after the vig; higher = stronger under. It is context on the card, not the ranking.",
   },

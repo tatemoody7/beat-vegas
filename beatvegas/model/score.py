@@ -47,6 +47,10 @@ HR_OFF_MARKET_PTS = 0.5
 # weekly_update --min-games: both teams need this many games for a model read,
 # so weeks 1-2 have no model by design.
 MIN_GAMES_FOR_MODEL = 2
+# Worst per-$1 EV of Hard Rock's under (vs the market's no-vig fair under) still
+# treated as a fair price: the unavoidable ~2 cents of vig. Below it the price
+# gate fails (web/lib/edge.ts FAIR_EV_FLOOR / lineCheck.ts "neg").
+EV_FLOOR = -0.02
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:

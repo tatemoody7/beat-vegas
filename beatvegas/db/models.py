@@ -8,8 +8,10 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base
@@ -395,3 +397,19 @@ class GamePreview(Base):
     news_json = Column(String)  # {"home": [...], "away": [...]}
     injuries_json = Column(String)  # {"home": [...], "away": [...]}
     updated_at = Column(DateTime)
+
+
+class Card(Base):
+    """One built bet card (scripts/build_card.py, `.github/workflows/card.yml`):
+    the week's ranked BET / EDGE / PASS items as JSON, exactly what the Board's
+    card view renders. Every build appends a row (history); the newest
+    (season, week) row is the live card. Schema: beatvegas/card.py::build_card."""
+
+    __tablename__ = "cards"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    season = Column(Integer, nullable=False)
+    week = Column(Integer, nullable=False)
+    built_at = Column(DateTime, nullable=False)
+    payload = Column(Text, nullable=False)  # JSON, the build_card contract
+
+    __table_args__ = (Index("ix_cards_season_week_built", "season", "week", "built_at"),)

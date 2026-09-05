@@ -31,6 +31,7 @@ from beatvegas.grading import (
     units_won,
 )
 from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
+from beatvegas.picks import add_pick, existing_pick
 
 
 def _season_games(s, season: int) -> List[dict]:
@@ -83,12 +84,7 @@ def cmd_add(args) -> None:
                     "Pass --force if you genuinely placed it pre-game."
                 )
                 return
-            dup = (
-                s.query(ManualPick)
-                .filter(ManualPick.game_id == gid, ManualPick.side == "under")
-                .filter((ManualPick.market == market) | (ManualPick.market.is_(None)))
-                .first()
-            )
+            dup = existing_pick(s, gid, market)
             if dup is not None:
                 print(
                     f"REFUSED: pick #{dup.id} already logged on this game/market "
@@ -98,36 +94,32 @@ def cmd_add(args) -> None:
 
         # Paper pick: one flat unit so it grades as +/-1u on its own record
         # (is_paper keeps it out of the real ledger); CLV/result grade normally.
-        stake = 1.0 if args.paper else args.stake
-        pick = ManualPick(
+        # The insert itself is beatvegas.picks.add_pick, shared with the cloud card.
+        pick = add_pick(
+            s,
             game_id=gid,
             season=season,
             week=(g or {}).get("week") if g else args.week,
             home_team=(g or {}).get("home_team", args.home) if g else args.home,
             away_team=(g or {}).get("away_team", args.away) if g else args.away,
-            side="under",
             market=market,
             line=args.line,
             price=args.price,
-            stake=stake,
+            stake=args.stake,
             is_paper=bool(args.paper),
             book=args.book,
-            placed_at=datetime.utcnow(),
             note=args.note,
-            graded=False,
             reason=args.reason or "manual",
-            verdict_at_pick=args.verdict,
-            gap_at_pick=args.gap,
-            ev_at_pick=args.ev,
-            hr_line_at_pick=args.hr_line,
+            verdict=args.verdict,
+            gap=args.gap,
+            ev=args.ev,
+            hr_line=args.hr_line,
         )
-        s.add(pick)
-        s.flush()
         why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
         print(
             f"logged {'PAPER ' if args.paper else ''}pick #{pick.id}: {market} UNDER "
             f"{args.line} ({args.price}) {pick.away_team} @ {pick.home_team} "
-            f"[{season} wk{pick.week}] stake={stake}u reason={why}"
+            f"[{season} wk{pick.week}] stake={pick.stake}u reason={why}"
             + (f" (game {gid})" if gid else " (UNMATCHED)")
         )
 

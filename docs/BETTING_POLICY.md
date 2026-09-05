@@ -114,8 +114,9 @@ bet many small edges rather than one big one. It is not a gate.
 
 ## Weekly rhythm
 
-GitHub cron drops most single-slot runs, so every job has retry slots and the two
-Claude routines re-dispatch whatever is still missing before they need it.
+GitHub cron drops most single-slot runs, so every job has retry slots, the card
+job runs whatever input is still missing before it builds, and the one remaining
+Claude routine (Sunday ops) re-dispatches the Sunday capture.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
@@ -123,8 +124,9 @@ Claude routines re-dispatch whatever is still missing before they need it.
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
 | Tue / Fri 9am                | News + injuries / QB-out → This Week cards                 | `research_preview.yml` |
 | Fri 1pm (retry 2:30pm)       | First-half line sweep (18 events, ranked by bettability, credit-guarded) | `lines_watch.yml` |
-| Fri 6pm                      | **Bet card routine**: verify/kick sweep + preview (never double-dispatch), build the card, log paper picks, text | `cfb-friday-card` |
+| Fri 6:05pm (retry 7pm)       | **Bet card** built in the cloud and published on the Board (BET / EDGE / PASS, action line, kill numbers); BETs logged as paper picks; runs the sweep / preview first only if today's is missing. No text. | `card.yml` |
 | Sat 10:30am (retry 11:15am), 6pm (retry 6:45pm) | Closing 1H lines captured (for CLV)  | `lines_watch.yml`   |
+| Sat 11am                     | Bet card refreshed against the closing numbers (same rules; no new paper pick on a game already logged) | `card.yml` |
 | Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |
 | Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
@@ -136,7 +138,9 @@ Claude routines re-dispatch whatever is still missing before they need it.
   weeks is noise; CLV shows up fast.
 - Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) track
   what the card would bet, kept apart from the real record, so "trust the
-  model" is an evidence-based call later in the season.
+  model" is an evidence-based call later in the season. The cloud card
+  (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
+  per BET through the same insert as `pick.py add`, never twice for one game.
 
 ## Pre-flight checklist (do once)
 

@@ -64,10 +64,12 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 ## Architecture
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade,
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
-  `grade.yml`, `research_preview.yml`). No notification code: GitHub emails failed
-  runs; the routines re-dispatch and text. Nothing is scheduled on the Mac; three
-  Claude routines (Friday card, Sunday ops/recap, Monday coaching) check each workflow
-  and re-dispatch dropped crons.
+  `card.yml`, `grade.yml`, `research_preview.yml`). No notification code: GitHub emails
+  failed runs. Nothing is scheduled on the Mac; the only Mac routine left is
+  `cfb-sunday-ops` (verify/kick `sunday.yml`, text the recap). **The Friday bet card is
+  cloud-built** (`card.yml` → `scripts/build_card.py` → `beatvegas/card.py`, pure rules
+  mirroring `web/lib/edge.ts`) and published to the Board via the `cards` table — the Mac
+  routine `cfb-friday-card` is deleted (it slept through the card).
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
@@ -95,7 +97,8 @@ Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_upd
 `--source dk|cfbd|auto|oddsapi`; prod uses `oddsapi`), `derive_multiplier.py` (gated spread
 multiplier), `backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py`
 (additive games+spread push), `post_derived_lines.py` (writes display-only `derived_lines`
-predictions for the board). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
+predictions for the board), `build_card.py` (the weekly bet card → `cards` row + paper picks
+via `beatvegas/picks.py::add_pick`, the same insert `pick.py add` uses). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
 `~/.cache/beatvegas/pg_sim`) + `simulate_week.py` (replay a real week into it, rendered by
 the real Next.js app, Neon-isolated). **Lint/format**: `ruff check` + `ruff
 format` for Python (`[tool.ruff]` in `pyproject.toml`, pragmatic F/E/I/B set — NOT pyupgrade,
@@ -164,7 +167,7 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   with header `Neon-Connection-String: $DATABASE_URL` and body `{"query": "..."}` returns
   rows as JSON from campus in <1s. Use it for ad-hoc reads/small writes when 5432 is blocked;
   the SQLAlchemy scripts still need GHA). So **Neon-writing scheduled jobs run in GitHub Actions**
-  (`.github/workflows/sunday.yml` + `lines_watch.yml` + `grade.yml` + `research_preview.yml`).
+  (`.github/workflows/sunday.yml` + `lines_watch.yml` + `card.yml` + `grade.yml` + `research_preview.yml`).
   **DK's API 403s GHA datacenter IPs** (confirmed), so prod captures full-game lines with
   `poll_full_game --source oddsapi` (`auto` falls back to **CFBD /lines**, `sources/cfbd_lines.py`;
   DK only works from the Mac, which can't write Neon). Local jobs degrade gracefully via
@@ -175,7 +178,8 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
   scheduled runs; `research_preview` 10h late; no GitHub incident posted). Anything that must
   happen at a time is DISPATCHED from the Mac (`gh workflow run <wf> -f market=1h`, then poll
-  `gh run list --limit 1`) — the Friday card task does this itself. Cron stays as a backup.
+  `gh run list --limit 1`) or checks its own inputs: `card.yml` runs the 1H sweep / preview
+  itself when today's is missing before it builds. Cron stays as a backup.
 - **Friday 1H sweep is RANKED before the credit cap** (`beatvegas/sweep.py`): close spread
   (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
   first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never

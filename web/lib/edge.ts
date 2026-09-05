@@ -16,6 +16,7 @@ import {
   verdictFor,
   type VerdictInput,
   type VerdictResult,
+  EV_FLOOR,
 } from "@/lib/verdict";
 
 /** Context leans used when the model has no read (from factors_json). */
@@ -62,7 +63,7 @@ export type EdgeResult = {
 };
 
 /** Worst EV (per $1) still treated as a fair price — mirrors lineCheck "neg". */
-export const FAIR_EV_FLOOR = -0.02;
+export const FAIR_EV_FLOOR = EV_FLOOR; // single source: verdict.ts
 export const EDGE_SCORE_MIN = 60;
 export const CONTEXT_BASE = 40;
 export const CONTEXT_CAP = 49;

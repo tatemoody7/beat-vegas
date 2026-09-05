@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { americanToDecimal, evUnder } from "./devig";
+import { americanToDecimal, devigTwoWay, evUnder } from "./devig";
 import {
+  FAIR_EV_FLOOR,
   breakEvenPrice,
   contextScore,
   edgeScore,
   roundHalfUp,
   type EdgeInput,
 } from "./edge";
+import { evVerdictFor } from "./lineCheck";
 
 // Same real-2025 shape as verdict.test.ts: our 21.8 vs Hard Rock 24.5 is a
 // 2.7-point gap at a slightly-better-than-fair price.
@@ -68,14 +70,22 @@ describe("roundHalfUp", () => {
 });
 
 describe("breakEvenPrice", () => {
-  it("is the worst 5-cent American price that keeps EV >= -0.02", () => {
+  it("is the worst 5-cent American price that keeps EV >= FAIR_EV_FLOOR (-0.05)", () => {
+    expect(FAIR_EV_FLOOR).toBe(-0.05);
     const p = breakEvenPrice(0.52);
-    expect(p).toBe(-110);
-    expect(evUnder(0.52, p!)).toBeGreaterThanOrEqual(-0.02);
-    expect(evUnder(0.52, p! - 5)).toBeLessThan(-0.02);
+    expect(p).toBe(-120); // -120 is -4.7%; -125 is -6.4%
+    expect(evUnder(0.52, p!)).toBeGreaterThanOrEqual(FAIR_EV_FLOOR);
+    expect(evUnder(0.52, p! - 5)).toBeLessThan(FAIR_EV_FLOOR);
+    // A balanced market tolerates standard juice and nothing more.
+    expect(breakEvenPrice(0.5)).toBe(-110); // -110 is -4.5%; -115 is -6.5%
+    expect(breakEvenPrice(0.55)).toBe(-135); // -135 is -4.3%; -140 is -5.7%
   });
   it("never returns -100 (that is +100)", () => {
-    expect(breakEvenPrice(0.5)).toBe(100);
+    // fair 0.48: +100 is -4.0% (inside), -105 is -6.3% (outside) — the step
+    // between them must be +100, not the non-price -100.
+    expect(breakEvenPrice(0.48)).toBe(100);
+    expect(evUnder(0.48, 100)).toBeGreaterThanOrEqual(FAIR_EV_FLOOR);
+    expect(evUnder(0.48, -105)).toBeLessThan(FAIR_EV_FLOOR);
   });
   it("is monotonic: a likelier under tolerates a worse price", () => {
     const pay = (f: number) => americanToDecimal(breakEvenPrice(f)!);
@@ -97,8 +107,8 @@ describe("edgeScore — model rows", () => {
     expect(e.action).toBe("Bet now: 1H under 24.5 at -105 on Hard Rock.");
     expect(e.verdict.verdict).toBe("BET");
     expect(e.kill.line).toBe(24);
-    expect(e.kill.price).toBe(-110);
-    expect(e.kill.text).toBe("Not worth it below u24.0 or worse than -110.");
+    expect(e.kill.price).toBe(-120); // fair 0.52: -120 is -4.7%, -125 is -6.4%
+    expect(e.kill.text).toBe("Not worth it below u24.0 or worse than -120.");
   });
   it("no Hard Rock line + big market gap → EDGE / no_hr_line, action names the line to take", () => {
     const e = edgeScore({
@@ -162,24 +172,26 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(78);
   });
   it("price too high → EDGE / price with a computed break-even", () => {
-    const ev = evUnder(0.52, -125); // ≈ -0.064
+    const ev = evUnder(0.52, -125); // ≈ -0.064, below the -0.05 floor
+    expect(ev).toBeLessThan(FAIR_EV_FLOOR);
     const e = edgeScore({
       ...base,
       hrUnderPrice: -125,
       ev,
-      evVerdict: "neg",
+      evVerdict: evVerdictFor(ev),
     });
     expect(e.score).toBe(71); // 77 + clamp(round(-6.4)) = 77 - 6
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("price");
-    expect(e.action).toBe("Wait: Hard Rock is -125; needs -110 or better.");
-    expect(e.kill.price).toBe(-110);
+    expect(e.verdict.verdict).toBe("WATCH");
+    expect(e.action).toBe("Wait: Hard Rock is -125; needs -120 or better.");
+    expect(e.kill.price).toBe(-120);
   });
   it("price too high with no market fair price asks for a fair price", () => {
     const e = edgeScore({
       ...base,
       hrUnderPrice: -125,
-      ev: -0.05,
+      ev: -0.064,
       evVerdict: "neg",
       marketFairUnder: null,
     });
@@ -215,11 +227,67 @@ describe("edgeScore — model rows", () => {
       "Wait: a starting QB is listed out — re-check the number after the news settles.",
     );
   });
-  it("QB out on a BET keeps the BET tier (verdict rules) but costs 5 points", () => {
-    const e = edgeScore({ ...base, qbOut: true });
-    expect(e.tier).toBe("BET");
-    expect(e.score).toBe(73);
+  it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH) and costs 5 points", () => {
+    // Everything else clears: in-band Hard Rock gap, on-market number, good
+    // price. The QB news alone turns the BET into a WATCH the site renders as
+    // EDGE with the qb_out blocker (gate order: no_hr_line → off_market →
+    // price → qb_out → gap; the first three pass here).
+    const e = edgeScore({
+      ...base,
+      qbOut: true,
+      qbOutDetail: "QB1 (knee) out",
+    });
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("qb_out");
+    expect(e.score).toBe(73); // 78 - 5
+    expect(e.verdict.verdict).toBe("WATCH");
+    expect(e.verdict.headline).toBe(
+      "Our number clears the bar, but a starting quarterback is listed out and the model does not know it — re-check the number after the news settles.",
+    );
+    expect(e.verdict.strength).toBe(58 + 2.7 * 10);
+    expect(e.action).toBe(
+      "Wait: a starting QB is listed out — re-check the number after the news settles.",
+    );
     expect(e.verdict.flags[0]).toMatch(/QB OUT/);
+    expect(e.verdict.flags[0]).toContain("QB1 (knee) out");
+    // Without the QB news the same row is a BET.
+    expect(edgeScore(base).tier).toBe("BET");
+  });
+  it("-110 at a balanced market passes the price gate; -115 does not", () => {
+    // Other books -110/-110 → fair under 0.5. Standard juice is -4.5% (inside
+    // the -0.05 floor); a nickel more is -6.5% (outside).
+    const fair = devigTwoWay(-110, -110).fairUnder;
+    expect(fair).toBeCloseTo(0.5);
+    const ev110 = evUnder(fair, -110);
+    expect(ev110).toBeCloseTo(-0.0455, 3);
+    expect(evVerdictFor(ev110)).toBe("fair");
+    const at110 = edgeScore({
+      ...base,
+      hrUnderPrice: -110,
+      ev: ev110,
+      evVerdict: evVerdictFor(ev110),
+      marketFairUnder: fair,
+    });
+    expect(at110.tier).toBe("BET");
+    expect(at110.blocker).toBeNull();
+    expect(at110.kill.price).toBe(-110);
+    expect(at110.action).toBe("Bet now: 1H under 24.5 at -110 on Hard Rock.");
+
+    const ev115 = evUnder(fair, -115);
+    expect(ev115).toBeCloseTo(-0.0652, 3);
+    expect(evVerdictFor(ev115)).toBe("neg");
+    const at115 = edgeScore({
+      ...base,
+      hrUnderPrice: -115,
+      ev: ev115,
+      evVerdict: evVerdictFor(ev115),
+      marketFairUnder: fair,
+    });
+    expect(at115.tier).toBe("EDGE");
+    expect(at115.blocker).toBe("price");
+    expect(at115.verdict.verdict).toBe("WATCH");
+    expect(at115.kill.price).toBe(-110);
+    expect(at115.action).toBe("Wait: Hard Rock is -115; needs -110 or better.");
   });
   it("gap just short of the bar at a good price → EDGE / gap", () => {
     const e = edgeScore({
@@ -431,8 +499,8 @@ describe("edgeScore — no model read", () => {
       "Price only: Hard Rock pays 3.0% better than the market on this under. No model behind it.",
     );
     expect(e.kill.line).toBeNull();
-    expect(e.kill.price).toBe(100);
-    expect(e.kill.text).toBe("Not worth it worse than +100.");
+    expect(e.kill.price).toBe(-110); // fair 0.5: standard juice is the floor
+    expect(e.kill.text).toBe("Not worth it worse than -110.");
   });
   it("price edge on top of a strong context caps at 55", () => {
     const e = edgeScore({

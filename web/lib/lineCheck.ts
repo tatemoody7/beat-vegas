@@ -94,6 +94,9 @@ export async function getLineCheck(
     FROM odds_snapshots o JOIN games g ON g.id = o.game_id
     WHERE g.season = ${season} AND o.market = ${dbMarket}
       AND LOWER(COALESCE(o.book, '')) <> 'consensus'
+      -- pre-kickoff only: a poll that ran after kickoff captures an in-game
+      -- number (e.g. u31.5 -275 at halftime) that must never read as the line
+      AND (g.start_date IS NULL OR o.captured_at <= g.start_date)
     ORDER BY o.game_id, LOWER(o.book), o.captured_at DESC
   `;
 

@@ -146,6 +146,12 @@ describe("sortGames", () => {
     expect(sortGames(games).map((g) => g.edge.score)).toEqual([90, 65, 40]);
   });
 
+  it("sinks games that have kicked off below every upcoming game", () => {
+    const done = game({ edge: edge(95, "EDGE"), kickedOff: true });
+    const live = game({ edge: edge(41, "PASS"), kickedOff: false });
+    expect(sortGames([done, live]).map((g) => g.edge.score)).toEqual([41, 95]);
+  });
+
   it("breaks a tie on the earlier kickoff, then the away team", () => {
     const late = game({
       row: row({ gameId: 2, startDate: new Date("2025-10-11T23:30:00Z") }),

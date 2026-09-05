@@ -116,7 +116,8 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
   });
 
   it("WATCH when Hard Rock's gap clears the bar but its price is worse than the market", () => {
-    const v = verdictFor({ ...base, evVerdict: "neg", ev: -0.03 });
+    // -0.065 ≈ -115 into a balanced market: below the -0.05 floor.
+    const v = verdictFor({ ...base, evVerdict: "neg", ev: -0.065 });
     expect(v.verdict).toBe("WATCH");
     expect(v.headline).toContain("price is worse");
   });
@@ -245,6 +246,53 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     });
     expect(v.flags).toHaveLength(2);
     expect(v.flags[0]).toContain("does not know this");
+    expect(v.flags[0]).toContain("QB J. Smith — Out");
+    expect(v.flags[1]).toContain("-1.5");
+  });
+
+  it("WATCH, never BET, when a starting QB is listed out — even with the gap and price clearing", () => {
+    // base is a BET (gap 2.7 at a good price); the QB news alone blocks it.
+    expect(verdictFor(base).verdict).toBe("BET");
+    const v = verdictFor({
+      ...base,
+      qbOut: true,
+      qbOutDetail: "QB1 (knee) out",
+    });
+    expect(v.verdict).toBe("WATCH");
+    expect(v.confidence).toBe("medium");
+    expect(v.headline).toBe(
+      "Our number clears the bar, but a starting quarterback is listed out and the model does not know it — re-check the number after the news settles.",
+    );
+    expect(v.hrGap).toBe(2.7);
+    expect(v.strength).toBe(58 + 2.7 * 10);
+    expect(v.priceEdgeOnly).toBe(false);
+    expect(v.flags[0]).toMatch(/^QB OUT/);
+    // The gate sits after the off-market check: an off-market number still
+    // reads as off-market first.
+    const off = verdictFor({
+      ...base,
+      qbOut: true,
+      liveLine: 26.0,
+      gap: 4.2,
+      hrLine: 24.0,
+      ev: null,
+      evVerdict: "na",
+    });
+    expect(off.verdict).toBe("WATCH");
+    expect(off.headline).toContain("below the market");
+    // Below the bar (Hard Rock and the market both at 23.0: gap 1.2) the QB
+    // flag is just a flag; the verdict is the usual small lean.
+    const short = verdictFor({
+      ...base,
+      qbOut: true,
+      hrLine: 23.0,
+      liveLine: 23.0,
+      gap: 1.2,
+      ev: 0,
+      evVerdict: "fair",
+    });
+    expect(short.verdict).toBe("WATCH");
+    expect(short.headline).toContain("Small model lean");
   });
 });
 

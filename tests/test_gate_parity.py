@@ -22,11 +22,12 @@ PARITY = {
     "WEEKLY_BET_CAP": score.WEEKLY_BET_CAP,
     "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
     "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
+    "EV_FLOOR": score.EV_FLOOR,
 }
 
 
 def _ts_const(src: str, name: str) -> float:
-    m = re.search(rf"export\s+const\s+{name}\s*=\s*([0-9.]+)\s*;", src)
+    m = re.search(rf"export\s+const\s+{name}\s*=\s*(-?[0-9.]+)\s*;", src)
     assert m, f"{name} not exported from {_TS}"
     return float(m.group(1))
 
@@ -50,6 +51,6 @@ def test_every_numeric_gate_in_verdict_ts_is_mirrored():
     if not _TS.exists():
         pytest.skip(f"{_TS} not present in this checkout")
     src = _TS.read_text()
-    exported = set(re.findall(r"export\s+const\s+([A-Z_]+)\s*=\s*[0-9.]+\s*;", src))
+    exported = set(re.findall(r"export\s+const\s+([A-Z_]+)\s*=\s*-?[0-9.]+\s*;", src))
     missing = exported - set(PARITY)
     assert not missing, f"numeric gates in verdict.ts without a Python mirror: {sorted(missing)}"

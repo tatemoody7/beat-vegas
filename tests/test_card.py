@@ -19,6 +19,7 @@ from beatvegas.card import (
     market_read,
     round_half_up,
 )
+from beatvegas.devig import ev_under
 from beatvegas.model.score import BET_GAP_PTS, EV_FLOOR
 
 NOW = datetime(2026, 9, 18, 22, 5)  # Friday 6:05pm ET, in UTC
@@ -43,7 +44,8 @@ def snap(gid, book, line, over=-110, under=-110, hours_ago=1.0):
 def market(gid, line, books=("draftkings", "fanduel", "betmgm"), over=100, under=-120):
     """The other books, shaded toward the under (fair under 0.5217) so Hard
     Rock's plain -110 reads as a fair price (ev -0.4%). At a flat -110/-110
-    market the fair under is 0.5 and even -105 is outside the -2% floor."""
+    market the fair under is 0.5: -110 (ev -4.5%) is inside the -5% floor,
+    -115 (ev -6.5%) is not."""
     return [snap(gid, b, line, over, under) for b in books]
 
 
@@ -77,8 +79,9 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     assert it["hr_line"] == 24.5 and it["hr_price"] == -110
     assert it["market_line"] == 24.5 and it["gap"] == 2.1 and it["bv_line"] == 22.4
     assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4)
-    assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -2% floor
-    assert it["kill_line"] == 24.5 and it["kill_price"] == -110
+    assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -5% floor
+    # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
+    assert it["kill_line"] == 24.5 and it["kill_price"] == -120
     assert it["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
     assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0}
     assert c["model_read"] is True and c["notes"] == []
@@ -111,9 +114,9 @@ def test_edge_price_when_hard_rock_is_worse_than_fair():
     snaps = [snap(1, "hardrockbet", 24.5, -110, -125)] + market(1, 24.5)
     it = only(card([game()], snaps, [model(1, 22.4)]))
     assert it["tier"] == "EDGE" and it["blocker"] == "price"
-    assert it["ev"] < EV_FLOOR
-    assert it["kill_price"] == -110  # worst price still inside the floor vs the market's fair
-    assert it["action"] == "Wait: Hard Rock is -125; needs -110 or better."
+    assert it["ev"] == pytest.approx(-0.0609, abs=1e-3) and it["ev"] < EV_FLOOR
+    assert it["kill_price"] == -120  # worst price still inside the floor vs the market's fair
+    assert it["action"] == "Wait: Hard Rock is -125; needs -120 or better."
     assert any("worse than the market’s fair price" in w for w in it["why"])
 
 
@@ -239,11 +242,39 @@ def test_round_half_up_and_kill_line():
 
 
 def test_break_even_price_is_the_worst_price_inside_the_floor():
-    assert break_even_price(0.5) == 100  # -105 is -2.4%: outside; +100 is 0
-    assert break_even_price(0.55) == -125
-    assert break_even_price(0.52) == -110  # -110 is -0.7%, -115 is -2.8%
-    assert break_even_price(FAIR_UNDER) == -110
+    assert EV_FLOOR == -0.05
+    assert break_even_price(0.5) == -110  # -110 is -4.5%: inside; -115 is -6.5%
+    assert break_even_price(0.55) == -135  # -135 is -4.3%; -140 is -5.7%
+    assert break_even_price(0.52) == -120  # -120 is -4.7%; -125 is -6.4%
+    assert break_even_price(FAIR_UNDER) == -120
+    assert break_even_price(0.48) == 100  # +100 is -4.0%; -105 is -6.3%; never -100
     assert break_even_price(0.0) is None
+    for fair in (0.48, 0.5, 0.52, FAIR_UNDER, 0.55):
+        p = break_even_price(fair)
+        assert ev_under(fair, p) >= EV_FLOOR
+        assert ev_under(fair, p - 5 if p != 100 else -105) < EV_FLOOR
+
+
+def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
+    """Headline of the -0.05 floor: at a balanced -110/-110 market (fair under
+    0.5) Hard Rock's own -110 is a BET; -115 is EDGE / price."""
+    balanced = market(1, 24.5, over=-110, under=-110)
+    at_110 = only(
+        card([game()], [snap(1, "hardrockbet", 24.5, -110, -110)] + balanced, [model(1, 22.4)])
+    )
+    assert at_110["fair_under"] == pytest.approx(0.5)
+    assert at_110["ev"] == pytest.approx(-0.0455, abs=1e-3) and at_110["ev"] >= EV_FLOOR
+    assert at_110["tier"] == "BET" and at_110["blocker"] is None
+    assert at_110["kill_price"] == -110
+    assert at_110["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
+
+    at_115 = only(
+        card([game()], [snap(1, "hardrockbet", 24.5, -110, -115)] + balanced, [model(1, 22.4)])
+    )
+    assert at_115["ev"] == pytest.approx(-0.0652, abs=1e-3) and at_115["ev"] < EV_FLOOR
+    assert at_115["tier"] == "EDGE" and at_115["blocker"] == "price"
+    assert at_115["kill_price"] == -110
+    assert at_115["action"] == "Wait: Hard Rock is -115; needs -110 or better."
 
 
 # --- ordering, filtering, notes -------------------------------------------------

@@ -31,6 +31,10 @@ export const WEEKLY_BET_CAP = 5;
 // Hard Rock more than this far BELOW the market total = off-market number
 // (mirrors lib/lineCheck.ts "poor"): never a BET.
 export const HR_OFF_MARKET_PTS = 0.5;
+// Price gate: Hard Rock's under may be at most this much worse (per $1) than the
+// market's no-vig fair price. -0.05 lets standard -110 juice on a balanced market
+// through and rejects -115 or worse unless the market itself leans under.
+export const EV_FLOOR = -0.05;
 // weekly_update.py --min-games: the model needs this many games played by both
 // teams, so weeks 1–2 have no model read at all.
 export const MIN_GAMES_FOR_MODEL = 2;
@@ -292,7 +296,19 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       55 + hrGap * 10,
     );
   }
-  // BET needs Hard Rock's own number in the band at a fair-or-better price.
+  // A starting QB listed out: the number does not know it. Never BET into it;
+  // WATCH until the news settles and the line has had a chance to react.
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.qbOut) {
+    return out(
+      "WATCH",
+      "medium",
+      "Our number clears the bar, but a starting quarterback is listed out and the model does not know it — re-check the number after the news settles.",
+      false,
+      58 + hrGap * 10,
+    );
+  }
+  // BET needs Hard Rock's own number in the band at a price no worse than
+  // EV_FLOOR against the market's fair price (standard juice passes).
   if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg) {
     const confidence: Confidence =
       hrGap >= STRONG_GAP_PTS && i.underScore! >= MODEL_BET_THRESHOLD

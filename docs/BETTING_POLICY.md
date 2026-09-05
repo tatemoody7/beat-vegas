@@ -93,8 +93,10 @@ A game is BET when all of these hold:
    posts a lower number). This is the top-20% gap band. (≥ 3.0 points = top-10%,
    "high" confidence when the classifier agrees at 53+.)
 3. A **live** first-half line has actually been captured — never an estimate.
-4. Hard Rock's under price is fair or better vs the market's no-vig fair
-   price.
+4. Hard Rock's under price is no more than 5 cents (per $1) worse than the
+   market's no-vig fair price. Standard -110 juice on a balanced market
+   passes; -115 or worse fails unless the market itself leans under. (Decided
+   2026-09-05: the earlier 2-cent version could almost never fire.)
 5. Hard Rock's first-half total is **not more than 0.5 points below the
    market's** — a lower number is a worse under, and Hard Rock's house rules
    can void bets on lines that differ materially from the general market.

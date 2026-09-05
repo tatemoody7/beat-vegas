@@ -50,7 +50,7 @@ MIN_GAMES_FOR_MODEL = 2
 # Worst per-$1 EV of Hard Rock's under (vs the market's no-vig fair under) still
 # treated as a fair price: the unavoidable ~2 cents of vig. Below it the price
 # gate fails (web/lib/edge.ts FAIR_EV_FLOOR / lineCheck.ts "neg").
-EV_FLOOR = -0.02
+EV_FLOOR = -0.05  # standard -110 juice on a balanced market passes; -115+ fails
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:

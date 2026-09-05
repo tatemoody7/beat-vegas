@@ -1,3 +1,4 @@
+import { EV_FLOOR } from "@/lib/verdict";
 import { isExchange, isSynthetic } from "@/lib/books";
 import { devigTwoWay, evUnder } from "@/lib/devig";
 import { median } from "@/lib/format";
@@ -61,7 +62,7 @@ function verdictFor(hr: number | null, best: number | null): Verdict {
 export function evVerdictFor(ev: number | null): EvVerdict {
   if (ev === null) return "na";
   if (ev > 0.005) return "pos"; // HR's under clears the market's fair price
-  if (ev < -0.02) return "neg"; // worse than fair beyond the unavoidable vig
+  if (ev < EV_FLOOR) return "neg"; // worse than standard juice vs the fair price
   return "fair";
 }
 

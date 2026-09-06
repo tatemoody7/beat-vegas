@@ -59,3 +59,8 @@ jobs:
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)
         run: python scripts/grade_factor_ledger.py
+      - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
+        # Regrades the stored 2023-25 ratings under the flat and fair proxies and
+        # the season's cards at Hard Rock's numbers; delete-then-rewrite per scope,
+        # no API calls. Feeds the Results page panel and docs/POST_MORTEM.md.
+        run: python scripts/post_mortem.py --write --md ""

@@ -53,3 +53,29 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
     roiNum,
   };
 }
+
+/**
+ * The same record shape from aggregate counts (the post-mortem buckets store
+ * W-L-P and units, not rows). Pushes count as staked; no CLV at bucket level.
+ */
+export function recordFromCounts(
+  unders: number,
+  overs: number,
+  pushes: number,
+  units: number,
+): Record3 | null {
+  const n = unders + overs + pushes;
+  if (n === 0) return null;
+  const decided = unders + overs;
+  const roiNum = (100 * units) / n;
+  return {
+    n,
+    record: `${unders}-${overs}${pushes ? `-${pushes}P` : ""}`,
+    hit: decided ? `${((100 * unders) / decided).toFixed(1)}%` : "—",
+    units: signed(units),
+    roi: `${signed(roiNum, 1)}%`,
+    clv: "—",
+    unitsNum: units,
+    roiNum,
+  };
+}

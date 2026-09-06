@@ -259,7 +259,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--live-season", type=int, default=None)
     ap.add_argument("--model-version", default=MODEL_VERSION)
     ap.add_argument("--cap", type=int, default=pm.WEEKLY_CAP)
-    ap.add_argument("--md", type=Path, default=DEFAULT_MD, help="markdown report path ('' to skip)")
+    ap.add_argument(
+        "--md",
+        type=str,
+        default=str(DEFAULT_MD),
+        help="markdown report path; pass '' to skip the report",
+    )
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--write", action="store_true", help="write the postmortem_* tables")
     g.add_argument("--dry-run", action="store_true", help="compute + markdown only (default)")
@@ -325,10 +330,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         [b for o in outs for b in o["buckets"]],
         [c for o in outs for c in o["contrasts"]],
     )
-    if str(args.md):
-        args.md.parent.mkdir(parents=True, exist_ok=True)
-        args.md.write_text(md)
-        print(f"[md] wrote {args.md} ({len(md.splitlines())} lines)")
+    if args.md.strip():
+        md_path = Path(args.md)
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(md)
+        print(f"[md] wrote {md_path} ({len(md.splitlines())} lines)")
+    else:
+        print("[md] skipped (--md '')")
 
     for o in outs:
         if o["scope"] == pm.HIST_SCOPE:

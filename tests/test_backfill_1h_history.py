@@ -124,3 +124,65 @@ def test_match_game_to_event_no_match():
         },
     ]
     assert bf._match_game_to_event(game, events) == (None, 0.0)
+
+
+def test_events_snapshot_ts_buckets_by_utc_day():
+    bf = _load("backfill_1h_history")
+    # one events-list call per UTC day covers every game that kicks off later that day
+    assert bf.events_snapshot_ts(datetime(2024, 10, 19, 18, 30)) == datetime(2024, 10, 19, 0, 0)
+    assert bf.events_snapshot_ts(datetime(2024, 10, 20, 0, 0)) == datetime(2024, 10, 20, 0, 0)
+
+
+def test_games_needing_can_filter_fbs_and_rated_only():
+    from beatvegas.db.models import Prediction
+
+    bf = _load("backfill_1h_history")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add_all(
+            [
+                Game(
+                    id=1,
+                    season=2024,
+                    week=8,
+                    home_team="Auburn",
+                    away_team="Missouri",
+                    start_date=datetime(2024, 10, 19, 19, 0),
+                ),
+                Game(
+                    id=2,
+                    season=2024,
+                    week=8,
+                    home_team="Iowa",
+                    away_team="Penn State",
+                    start_date=datetime(2024, 10, 19, 16, 0),
+                ),
+                Game(
+                    id=3,
+                    season=2024,
+                    week=8,
+                    home_team="Brown",
+                    away_team="Princeton",
+                    start_date=datetime(2024, 10, 19, 12, 0),
+                ),
+            ]
+        )
+        s.add(Prediction(game_id=2, model_version="gbm_v1", under_score=55, bv_line=24.0))
+        s.add(Prediction(game_id=3, model_version="gbm_v1", under_score=50, bv_line=22.0))
+        s.commit()
+        fbs = {2024: {"Auburn", "Missouri", "Iowa", "Penn State"}}
+        assert [g["id"] for g in bf.games_needing_backfill(s, 2024, week=8, limit=0, fbs=fbs)] == [
+            2,
+            1,
+        ]
+        assert [
+            g["id"]
+            for g in bf.games_needing_backfill(s, 2024, week=8, limit=0, rated_only="gbm_v1")
+        ] == [3, 2]
+        assert [
+            g["id"]
+            for g in bf.games_needing_backfill(
+                s, 2024, week=8, limit=0, fbs=fbs, rated_only="gbm_v1"
+            )
+        ] == [2]

@@ -33,6 +33,7 @@ from beatvegas.config import REPO_ROOT
 from beatvegas.db.models import (
     Card,
     Game,
+    OddsSnapshot,
     PostMortemBucket,
     PostMortemGame,
     PostMortemRun,
@@ -44,6 +45,7 @@ from beatvegas.db.models import (
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.proxy_line import _load_share_coeffs
+from beatvegas.lines import closing_before_kickoff
 from beatvegas.model.score import MODEL_VERSION
 from beatvegas.season import current_season
 
@@ -86,8 +88,12 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
         .filter(Prediction.model_version == model_version, Game.season.in_(list(seasons)))
     )
     tempo = _tempo_lookup(session, seasons)
+    rows = q.all()
+    closes = _real_closes(
+        session, [g.id for _, g, _ in rows], {g.id: g.start_date for _, g, _ in rows}
+    )
     out: List[Dict] = []
-    for p, g, w in q.all():
+    for p, g, w in rows:
         spp_vals = [
             tempo.get((g.season, g.week, t))
             for t in (g.home_team, g.away_team)
@@ -116,8 +122,33 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
                 "wx_wind": w.wind_mph if w else None,
                 "wx_dome": (1.0 if w.dome else 0.0) if (w and w.dome is not None) else None,
                 "tempo_spp": (sum(spp_vals) / len(spp_vals)) if spp_vals else None,
+                "close_line": closes.get(g.id),
             }
         )
+    return out
+
+
+def _real_closes(
+    session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]
+) -> Dict[int, float]:
+    """game_id -> pre-kickoff consensus 1H close from captured snapshots (the
+    historical backfill writes these); games without one are simply absent."""
+    if not game_ids:
+        return {}
+    by_game: Dict[int, List] = {}
+    ids = list(game_ids)
+    for i in range(0, len(ids), 1000):
+        for snap in (
+            session.query(OddsSnapshot)
+            .filter(OddsSnapshot.market == "1H_total", OddsSnapshot.game_id.in_(ids[i : i + 1000]))
+            .all()
+        ):
+            by_game.setdefault(snap.game_id, []).append(snap)
+    out: Dict[int, float] = {}
+    for gid, snaps in by_game.items():
+        _open, close, _at = closing_before_kickoff(snaps, kickoffs.get(gid))
+        if close is not None:
+            out[gid] = float(close)
     return out
 
 
@@ -340,8 +371,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     for o in outs:
         if o["scope"] == pm.HIST_SCOPE:
+            kinds = (
+                ("real", "step", "flat")
+                if o["notes"].get("real_lines", {}).get("n")
+                else ("step", "flat")
+            )
             for sel in ("cap5", "gap175", "all"):
-                for prx in ("step", "flat"):
+                for prx in kinds:
                     print("  " + _headline(o, sel, "fbs_only", prx))
         else:
             for sel in ("bet", "price_read", "all_hr"):

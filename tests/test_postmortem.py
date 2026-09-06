@@ -556,3 +556,42 @@ def test_postmortem_models_exist():
         "p_beat",
         "q_value",
     } <= cols
+
+
+# ---------------------------------------------------------------- real closing lines
+
+
+def test_build_hist_frame_grades_at_real_close_when_present():
+    preds = [
+        _pred(1, 2025, 5, gap=2.0, score=55, fh=20),
+        _pred(2, 2025, 5, gap=0.5, score=48, fh=31),
+    ]
+    preds[0]["close_line"] = 26.5  # a real consensus 1H close captured pre-kickoff
+    df = pm.build_hist_frame(preds, STEP, FBS).set_index("game_id")
+    r1 = df.loc[1]
+    assert r1["line_real"] == 26.5 and r1["gap_real"] == 1.5  # 26.5 - 25.0
+    assert r1["outcome_real"] == "under"
+    assert pd.isna(df.loc[2, "line_real"]) and pd.isna(df.loc[2, "outcome_real"])
+
+
+def test_compute_hist_adds_real_column_only_when_real_closes_exist():
+    df_none = _hist_fixture()
+    out = pm.compute_hist(df_none, run_id="r", computed_at="t", cap=5)
+    assert "real" not in {b["proxy_kind"] for b in out["buckets"]}
+    rows = [_pred(i, 2025, 5, gap=2.0 + i * 0.1, score=55, fh=20 + i) for i in range(40)]
+    for r in rows[:30]:
+        r["close_line"] = 26.0
+    df = pm.build_hist_frame(rows, STEP, FBS)
+    out = pm.compute_hist(df, run_id="r", computed_at="t", cap=5)
+    kinds = {b["proxy_kind"] for b in out["buckets"]}
+    assert kinds == {"flat", "step", "real"}
+    head = next(
+        b
+        for b in out["buckets"]
+        if b["proxy_kind"] == "real"
+        and b["dimension"] == "all"
+        and b["selection"] == "all"
+        and b["segment"] == "fbs_only"
+    )
+    assert head["n"] == 30  # only games with a real close are graded in the real column
+    assert out["notes"]["real_lines"]["n"] == 30

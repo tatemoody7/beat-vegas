@@ -31,6 +31,13 @@ _MIGRATIONS = {
         "market": "VARCHAR",
         "clv_prob": "FLOAT",
     },
+    # post-mortem: the real-close grading column (2026-09-06, after the tables existed)
+    "postmortem_games": {
+        "line_real": "FLOAT",
+        "gap_real": "FLOAT",
+        "outcome_real": "VARCHAR",
+        "units_real": "FLOAT",
+    },
     "manual_picks": {
         "model_score_at_pick": "INTEGER",
         "model_line_at_pick": "FLOAT",

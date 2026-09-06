@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+from sqlalchemy import text
 
 from beatvegas import postmortem as pm
 from beatvegas.config import REPO_ROOT
@@ -241,11 +242,28 @@ def _chunked_insert(session, model, rows: List[Dict], chunk: int = CHUNK) -> Non
         session.commit()
 
 
+def _resync_sequence(session, model) -> None:
+    """Point the id sequence past MAX(id). Neon tables seeded or partially written
+    by earlier runs can leave the sequence behind the data (CLAUDE.md gotcha), and
+    a bulk insert then collides on the primary key."""
+    table = model.__tablename__
+    session.execute(
+        text(
+            f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+            f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
+        )
+    )
+
+
 def write_run(session, out: Dict[str, Any], computed_at: datetime, params: Dict[str, Any]) -> None:
     scope = out["scope"]
     for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
         session.query(model).filter(model.scope == scope).delete(synchronize_session=False)
     session.commit()
+    if session.bind.dialect.name == "postgresql":
+        for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
+            _resync_sequence(session, model)
+        session.commit()
     buckets = _model_rows(PostMortemBucket, out["buckets"] + out["contrasts"], computed_at)
     games = _model_rows(PostMortemGame, out["games"], computed_at)
     session.add(

@@ -136,7 +136,9 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.hrGap).toBe(2.2);
   });
 
-  it("high confidence needs a top-10% Hard Rock gap AND the classifier agreeing", () => {
+  it("high confidence needs only a top-10% Hard Rock gap; the classifier score does not gate it", () => {
+    // 2026-09-06 post-mortem: under_score bands hit the same rate (48.6–49.0%)
+    // against a fair line, so the score is a display chip, not a confidence input.
     const v = verdictFor({
       ...base,
       hrLine: 21.8 + STRONG_GAP_PTS + 0.5,
@@ -145,12 +147,18 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.verdict).toBe("BET");
     expect(v.confidence).toBe("high");
     expect(v.why[0]).toContain("top ~10%");
-    const weak = verdictFor({
+    const lowScore = verdictFor({
       ...base,
       hrLine: 21.8 + STRONG_GAP_PTS + 0.5,
-      underScore: 50,
+      underScore: 40,
     });
-    expect(weak.confidence).toBe("medium");
+    expect(lowScore.confidence).toBe("high");
+    const smallerGap = verdictFor({
+      ...base,
+      hrLine: 21.8 + STRONG_GAP_PTS - 0.5,
+      underScore: 90,
+    });
+    expect(smallerGap.confidence).toBe("medium");
   });
 
   it("never BETs a Hard Rock gap below the validated cutoff", () => {

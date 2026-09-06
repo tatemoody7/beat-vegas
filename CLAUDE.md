@@ -21,6 +21,11 @@ Research only — it never places bets or automates gambling.
   full-game poll only as a no-vig PRICE-COMPARISON source (`web/lib/books.ts`
   `EXCHANGE_KEYS`) — never bet there (no 1H totals). See `docs/BETTING_POLICY.md`.
 - **What ships today:** decision-support for **full-game + 1H unders on Hard Rock Bet** (the only FL book). The model number is a reference chip, not a pick gate; the edge is *measured* via CLV, not promised (full-game backtest found no edge on the thin 2023-25 regime).
+- **2026-09-06 (post-mortem):** `scripts/post_mortem.py` (pure math in `beatvegas/postmortem.py`)
+  regrades every rated game vs its outcome — the 2023-25 walk-forward ratings at the flat 0.52 AND
+  the fair step proxy (FBS-only + all), plus the season's cards at Hard Rock's numbers — into
+  `postmortem_runs/buckets/games` (last step of `grade.yml`) and `docs/POST_MORTEM.md`; the Results
+  page renders the headline records, rating bands and change flags (`web/lib/postmortem.ts`).
 - **2026-07-17 (review closed):** the pre-season readiness review is fully worked
   off — blockers (PR #16), 13 should-fixes (PR #17), and the remainder (S8 strict
   pick matching, S15 postseason capture, S16 multiplier margin gate — fitted curve

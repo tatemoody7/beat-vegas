@@ -413,3 +413,132 @@ class Card(Base):
     payload = Column(Text, nullable=False)  # JSON, the build_card contract
 
     __table_args__ = (Index("ix_cards_season_week_built", "season", "week", "built_at"),)
+
+
+class PostMortemRun(Base):
+    """One post-mortem computation per scope (scripts/post_mortem.py, Monday
+    grade.yml). Delete-then-insert per scope, so each scope has exactly one live
+    run and the web never has to pick a "latest". notes_json carries the change
+    flags, caveats, the overfitting control and the live-scope diagnostics."""
+
+    __tablename__ = "postmortem_runs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, index=True)
+    computed_at = Column(DateTime, nullable=False)
+    scope = Column(String, index=True, nullable=False)  # 'hist_2023_25' | 'live_<season>'
+    params_json = Column(Text)
+    notes_json = Column(Text)
+    dropped_json = Column(Text)
+    n_games = Column(Integer)
+    n_buckets = Column(Integer)
+
+
+class PostMortemBucket(Base):
+    """Tidy outcomes-by-bucket rows: for each scope x segment (fbs_only | all |
+    live) x grading line (flat | step | hr | market | market_close) x selection
+    rule x dimension x bucket: n, W-L-P, hit rate with a Wilson interval and the
+    ledger's Beta posterior, units and ROI. dimension 'all' is the headline
+    record; 'wl_contrast' rows hold the wins-vs-losses statistics instead."""
+
+    __tablename__ = "postmortem_buckets"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, index=True)
+    computed_at = Column(DateTime)
+    scope = Column(String, nullable=False)
+    segment = Column(String, nullable=False)
+    proxy_kind = Column(String, nullable=False)
+    selection = Column(String, nullable=False)
+    dimension = Column(String, nullable=False)
+    bucket = Column(String, nullable=False)
+    bucket_order = Column(Integer)
+    n = Column(Integer)
+    unders = Column(Integer)
+    overs = Column(Integer)
+    pushes = Column(Integer)
+    under_pct = Column(Float)
+    units = Column(Float)
+    roi = Column(Float)
+    ci_lo = Column(Float)
+    ci_hi = Column(Float)
+    post_mean = Column(Float)
+    p_beat = Column(Float)
+    stat_win = Column(Float)
+    stat_loss = Column(Float)
+    med_win = Column(Float)
+    med_loss = Column(Float)
+    effect = Column(Float)
+    p_value = Column(Float)
+    q_value = Column(Float)
+    delta = Column(Float)
+
+    __table_args__ = (
+        Index("ix_pm_bucket_lookup", "scope", "segment", "proxy_kind", "selection", "dimension"),
+    )
+
+
+class PostMortemGame(Base):
+    """Per-game detail behind the buckets: both proxy lines, both gradings and
+    the covariates (historical scope); Hard Rock / consensus / close gradings
+    (live scope). followed_system marks the cap-5 fair-proxy pick (hist) or the
+    card BET tier (live). rules_json = {rule_proxy: bool}."""
+
+    __tablename__ = "postmortem_games"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String, index=True)
+    scope = Column(String, index=True, nullable=False)
+    game_id = Column(Integer, index=True, nullable=False)
+    season = Column(Integer)
+    week = Column(Integer)
+    home_team = Column(String)
+    away_team = Column(String)
+    division = Column(String)
+    fh = Column(Float)
+    bv_line = Column(Float)
+    under_score = Column(Float)
+    spread = Column(Float)
+    spread_abs = Column(Float)
+    full_game_total = Column(Float)
+    neutral_site = Column(Boolean)
+    pace_spp = Column(Float)
+    pace_plays = Column(Float)
+    wx_temp = Column(Float)
+    wx_wind = Column(Float)
+    wx_precip = Column(Float)
+    dome = Column(Float)
+    off_ppa = Column(Float)
+    def_ppa = Column(Float)
+    fh_pf_sum = Column(Float)
+    fh_pa_sum = Column(Float)
+    fh_off_epa_mean = Column(Float)
+    fh_off_success_mean = Column(Float)
+    returning_pct = Column(Float)
+    kick_hour_et = Column(Float)
+    line_flat = Column(Float)
+    line_step = Column(Float)
+    gap_flat = Column(Float)
+    gap_step = Column(Float)
+    outcome_flat = Column(String)
+    outcome_step = Column(String)
+    units_flat = Column(Float)
+    units_step = Column(Float)
+    resid = Column(Float)
+    kick = Column(String)
+    tier = Column(String)
+    blocker = Column(String)
+    ev = Column(Float)
+    gap = Column(Float)
+    hr_line = Column(Float)
+    hr_price = Column(Integer)
+    market_line = Column(Float)
+    close_line = Column(Float)
+    derived_line = Column(Float)
+    fh_share = Column(Float)
+    outcome_hr = Column(String)
+    outcome_market = Column(String)
+    outcome_close = Column(String)
+    units_hr = Column(Float)
+    units_market = Column(Float)
+    units_close = Column(Float)
+    hr_vs_market = Column(String)
+    followed_system = Column(Boolean)
+    rules_json = Column(Text)

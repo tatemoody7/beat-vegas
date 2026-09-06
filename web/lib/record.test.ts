@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordFrom } from "./record";
+import { recordFrom, recordFromCounts } from "./record";
 
 describe("recordFrom", () => {
   it("returns null with nothing graded", () => {
@@ -42,5 +42,24 @@ describe("recordFrom", () => {
       roi: "—",
       clv: "+1.00",
     });
+  });
+});
+
+describe("recordFromCounts", () => {
+  it("builds the same shape from aggregate counts (pushes staked, no CLV)", () => {
+    const rec = recordFromCounts(89, 72, 5, 8.9);
+    expect(rec).toMatchObject({
+      n: 166,
+      record: "89-72-5P",
+      hit: "55.3%",
+      units: "+8.90",
+      roi: "+5.4%",
+      clv: "—",
+    });
+    expect(rec?.roiNum).toBeCloseTo(5.36, 1);
+  });
+
+  it("is null with nothing graded", () => {
+    expect(recordFromCounts(0, 0, 0, 0)).toBeNull();
   });
 });

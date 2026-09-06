@@ -3,11 +3,13 @@ import { getDecisionQuality } from "@/lib/decision-quality";
 import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
+import { loadPostMortem } from "@/lib/postmortem";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
 import { getWeeklyReview, REASON_LABEL } from "@/lib/weeklyReview";
 import BankrollCurve from "@/app/components/BankrollCurve";
 import PicksList from "@/app/components/PicksList";
+import PostMortemPanel from "@/app/components/PostMortemPanel";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
@@ -157,11 +159,12 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq, allPicks] = await Promise.all([
+  const [ledger, review, dq, allPicks, pm] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
     getDecisionQuality(season),
     loadPicks(season),
+    loadPostMortem(),
   ]);
   const settled = review.lines.filter((l) => l.rec);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
@@ -541,6 +544,9 @@ export default async function ResultsPage({
           )}
         </>
       )}
+
+      {/* Post-mortem */}
+      <PostMortemPanel pm={pm} />
 
       {/* Pick history */}
       <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">

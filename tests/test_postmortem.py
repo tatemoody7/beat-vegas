@@ -382,8 +382,8 @@ def test_build_live_frame_grades_hr_market_close_and_labels_off_consensus():
     assert abs(df.loc[1, "units_hr"] - 100 / 160) < 1e-9
     assert df.loc[2, "hr_vs_market"] == "HR lower" and df.loc[2, "outcome_hr"] == "over"
     assert df.loc[2, "outcome_market"] == "under"
-    assert df.loc[3, "hr_vs_market"] == "within 0.5" and df.loc[3, "outcome_hr"] is None
-    assert df.loc[4, "hr_vs_market"] is None and df.loc[4, "outcome_market"] == "under"
+    assert df.loc[3, "hr_vs_market"] == "within 0.5" and pd.isna(df.loc[3, "outcome_hr"])
+    assert pd.isna(df.loc[4, "hr_vs_market"]) and df.loc[4, "outcome_market"] == "under"
     masks = pm.live_rule_masks(df.reset_index())
     assert list(masks["price_read"]) == [False, True, False, False]
     assert list(masks["bet"]) == [False] * 4

@@ -26,7 +26,7 @@ import { american, fmt, round2, signed } from "@/lib/format";
 export const BET_GAP_PTS = 1.75;
 export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
-export const MODEL_BET_THRESHOLD = 53;
+export const MODEL_BET_THRESHOLD = 53; // model ledger only; not a verdict input since 2026-09-06
 export const WEEKLY_BET_CAP = 5;
 // Hard Rock more than this far BELOW the market total = off-market number
 // (mirrors lib/lineCheck.ts "poor"): never a BET.
@@ -310,10 +310,11 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // BET needs Hard Rock's own number in the band at a price no worse than
   // EV_FLOOR against the market's fair price (standard juice passes).
   if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg) {
-    const confidence: Confidence =
-      hrGap >= STRONG_GAP_PTS && i.underScore! >= MODEL_BET_THRESHOLD
-        ? "high"
-        : "medium";
+    // Confidence is the gap alone. The classifier's under_score used to gate
+    // "high" (needed >= MODEL_BET_THRESHOLD); the 2026-09-06 post-mortem found
+    // every score band hits the same rate against a fair line, so it no longer
+    // enters the label. It stays a display chip.
+    const confidence: Confidence = hrGap >= STRONG_GAP_PTS ? "high" : "medium";
     return out(
       "BET",
       confidence,

@@ -91,7 +91,9 @@ A game is BET when all of these hold:
 2. **Hard Rock's own** first-half number sits **≥ 1.75 points above our number**
    (not the consensus line — the consensus can sit 1.75 above while Hard Rock
    posts a lower number). This is the top-20% gap band. (≥ 3.0 points = top-10%,
-   "high" confidence when the classifier agrees at 53+.)
+   "high" confidence. The classifier's under_score no longer gates the label: the
+   2026-09-06 post-mortem found it carries no information about the outcome, so
+   it stays a display chip only.)
 3. A **live** first-half line has actually been captured — never an estimate.
 4. Hard Rock's under price is no more than 5 cents (per $1) worse than the
    market's no-vig fair price. Standard -110 juice on a balanced market

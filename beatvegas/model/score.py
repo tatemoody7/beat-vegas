@@ -38,7 +38,7 @@ MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
 # per-GAME outcome noise, so a 1-sigma gap never occurs. Mirrored by
 # web/lib/verdict.ts; tests/test_gate_parity.py keeps the two in lock-step.
 BET_GAP_PTS = 1.75  # ~ the season's top-20% gap cutoff -> BET
-STRONG_GAP_PTS = 3.0  # ~ top-10% -> high confidence
+STRONG_GAP_PTS = 3.0  # ~ top-10% -> "high" confidence (gap alone; under_score no longer gates it)
 WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
 WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
 # Hard Rock's 1H total more than this far BELOW the market's = off-market

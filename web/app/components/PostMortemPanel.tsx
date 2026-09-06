@@ -300,6 +300,12 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <PmCard
+          title="Followed the system, 2023–25 · real closing line"
+          rec={headline(buckets, HIST_SCOPE, "fbs_only", "real", "cap5")}
+          emptyHint="No real first-half closes captured for 2023–25 yet. Fills in once the historical backfill runs."
+          hint="Same selection graded at the captured pre-kickoff consensus first-half close from The Odds API history — the only column that is not an estimate. Only games with a captured close count."
+        />
+        <PmCard
           title="Followed the system, 2023–25 · fair line"
           rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "cap5")}
           emptyHint="No historical ratings graded."

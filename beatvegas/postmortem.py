@@ -345,6 +345,8 @@ def build_hist_frame(
             line_flat = flat_proxy
         o_flat, u_flat = regrade(fh, line_flat)
         o_step, u_step = regrade(fh, step_line)
+        line_real = _num(p.get("close_line"))  # real pre-kickoff consensus 1H close, if captured
+        o_real, u_real = regrade(fh, line_real)
         season = int(p["season"])
         rows.append(
             {
@@ -387,6 +389,10 @@ def build_hist_frame(
                 "outcome_step": o_step,
                 "units_flat": u_flat,
                 "units_step": u_step,
+                "line_real": line_real,
+                "gap_real": round(line_real - bv, 2) if line_real is not None else None,
+                "outcome_real": o_real,
+                "units_real": u_real,
                 "resid": float(fh) - bv,
             }
         )
@@ -1458,7 +1464,12 @@ def compute_hist(
     proxies: Sequence[str] = ("flat", "step"),
     segments: Sequence[str] = ("fbs_only", "all"),
 ) -> Dict[str, Any]:
-    """Everything the historical scope writes: buckets, contrasts, notes, games."""
+    """Everything the historical scope writes: buckets, contrasts, notes, games.
+    A 'real' grading column (captured pre-kickoff 1H closes) is added whenever
+    any row carries one; only those rows are graded in it."""
+    n_real = int(df["line_real"].notna().sum()) if "line_real" in df else 0
+    if n_real and "real" not in proxies:
+        proxies = tuple(proxies) + ("real",)
     buckets: List[Dict] = []
     contrasts: List[Dict] = []
     returns_by_config: Dict[str, List[float]] = {}
@@ -1517,6 +1528,7 @@ def compute_hist(
         "flags": flags,
         "dropped": dict(df.attrs.get("dropped", {}) or {}),
         "n_tests": n_tests,
+        "real_lines": {"n": n_real, "share": (n_real / len(df)) if len(df) else None},
         "logit": logit,
         "overfit": overfit_summary(returns_by_config, headline="cap5/step/fbs_only"),
         "caveats": [
@@ -1526,7 +1538,15 @@ def compute_hist(
             "No Hard Rock prices existed historically, so the price, off-market and QB gates cannot be applied; "
             "'followed the system' is the gap gate plus the weekly cap of 5.",
             "About 2,300 bets separate a 55% bettor from breakeven at 80% power; this data cannot confirm a realistic edge.",
-        ],
+        ]
+        + (
+            [
+                f"'real' grades at the captured pre-kickoff consensus first-half close (The Odds API history); "
+                f"{n_real} of {len(df)} rated games have one. Only those games appear in the real column."
+            ]
+            if n_real
+            else []
+        ),
     }
     games = _game_rows(df, run_id=run_id, scope=scope, followed=followed, rules=all_rules)
     return {

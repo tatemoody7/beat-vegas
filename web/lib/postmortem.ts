@@ -86,6 +86,7 @@ export const RULE_LABEL: Record<string, string> = {
 };
 
 export const PROXY_LABEL: Record<string, string> = {
+  real: "real closing line",
   step: "fair line",
   flat: "old 0.52 line",
   hr: "Hard Rock's number",

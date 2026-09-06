@@ -487,7 +487,7 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
       <Flags flags={flags} />
 
       <p className="mt-2 text-xs text-[var(--text-dim)]">
-        {`Computed ${hist?.computed_at ?? live?.computed_at ?? ""}. Historical ratings are graded against proxy lines (no real first-half lines existed); ${hist?.notes?.caveats?.[3] ?? "about 2,300 bets separate a 55% bettor from breakeven, so this cannot confirm a realistic edge."} Full tables in docs/POST_MORTEM.md.`}
+        {`Computed ${(hist?.computed_at ?? live?.computed_at ?? "").slice(0, 16).replace("T", " ")} UTC. Historical ratings are graded against proxy lines (no real first-half lines existed). About 2,300 bets separate a 55% bettor from breakeven, so this cannot confirm a realistic edge. Full tables in docs/POST_MORTEM.md.`}
       </p>
     </>
   );

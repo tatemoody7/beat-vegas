@@ -147,18 +147,22 @@ function BandTable({
                 return (
                   <tr key={r.bucket}>
                     <td
-                      className={
+                      className={`whitespace-nowrap ${
                         dim ? "text-[var(--text-dim)]" : "text-[var(--text)]"
-                      }
+                      }`}
                     >
                       {r.bucket}
                     </td>
                     <td className={`font-mono ${cls}`}>{r.n}</td>
-                    <td className={`font-mono ${cls}`}>{r.record}</td>
+                    <td className={`font-mono whitespace-nowrap ${cls}`}>
+                      {r.record}
+                    </td>
                     <td className={`font-mono ${cls}`}>
                       {dim ? "n<30" : r.hit}
                     </td>
-                    <td className={`font-mono ${cls}`}>{dim ? "—" : r.ci}</td>
+                    <td className={`font-mono whitespace-nowrap ${cls}`}>
+                      {dim ? "—" : r.ci}
+                    </td>
                     <td className={`font-mono ${cls}`}>
                       {dim ? "—" : r.pBeat}
                     </td>

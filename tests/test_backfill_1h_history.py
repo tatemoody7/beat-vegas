@@ -186,3 +186,68 @@ def test_games_needing_can_filter_fbs_and_rated_only():
                 s, 2024, week=8, limit=0, fbs=fbs, rated_only="gbm_v1"
             )
         ] == [2]
+
+
+def test_games_needing_opener_pass_skips_only_games_with_an_early_snapshot():
+    """The opener pass (lead 48h) must not be blocked by the closing snapshot the
+    close pass wrote 30 minutes before kickoff: a game counts as done only when it
+    already has a 1H snapshot captured at least `existing_before_hours` before kickoff."""
+    bf = _load("backfill_1h_history")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add_all(
+            [
+                Game(
+                    id=1,
+                    season=2024,
+                    week=8,
+                    home_team="Auburn",
+                    away_team="Missouri",
+                    start_date=datetime(2024, 10, 19, 19, 0),
+                ),
+                Game(
+                    id=2,
+                    season=2024,
+                    week=8,
+                    home_team="Iowa",
+                    away_team="Penn State",
+                    start_date=datetime(2024, 10, 19, 16, 0),
+                ),
+            ]
+        )
+        # game 1: close-pass snapshot (30 min before) only -> still needs an opener
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="fanduel",
+                market="1H_total",
+                line=24.5,
+                captured_at=datetime(2024, 10, 19, 18, 30),
+            )
+        )
+        # game 2: has both a close and an opener (48h before) -> done
+        s.add(
+            OddsSnapshot(
+                game_id=2,
+                book="fanduel",
+                market="1H_total",
+                line=27.5,
+                captured_at=datetime(2024, 10, 19, 15, 30),
+            )
+        )
+        s.add(
+            OddsSnapshot(
+                game_id=2,
+                book="fanduel",
+                market="1H_total",
+                line=28.0,
+                captured_at=datetime(2024, 10, 17, 16, 0),
+            )
+        )
+        s.commit()
+        # default (close pass): both already have a snapshot -> nothing to do
+        assert bf.games_needing_backfill(s, 2024, week=8, limit=0) == []
+        # opener pass: only game 1 still needs one
+        got = bf.games_needing_backfill(s, 2024, week=8, limit=0, existing_before_hours=24)
+        assert [g["id"] for g in got] == [1]

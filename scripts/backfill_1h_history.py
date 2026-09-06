@@ -11,6 +11,9 @@ gated hard — you pick the season + week(s) + a game cap, and it is idempotent
 
     python scripts/backfill_1h_history.py --season 2024 --week 8 --dry-run
     python scripts/backfill_1h_history.py --season 2024 --week 8 --limit 20
+    # opener pass (48h before kickoff) after the close pass:
+    python scripts/backfill_1h_history.py --season 2024 --fbs-only --rated-only gbm_v1 \
+        --limit 0 --lead-min 2880 --existing-before-hours 24
 
 For each in-scope game it pulls ONE near-kickoff snapshot (kickoff - lead minutes)
 and stores it as the closing 1H line per book. closing_before_kickoff then treats
@@ -56,11 +59,15 @@ def games_needing_backfill(
     limit: int,
     fbs: Optional[FbsMap] = None,
     rated_only: Optional[str] = None,
+    existing_before_hours: Optional[float] = None,
 ) -> List[Dict]:
     """In-scope games with NO 1H_total snapshot yet (idempotent), with a kickoff.
     `fbs` keeps only games where both teams were FBS that season; `rated_only`
     keeps only games that carry a prediction of that model_version (the games a
-    real-line regrade can actually use)."""
+    real-line regrade can actually use). `existing_before_hours` changes what
+    "already captured" means: a game is done only if it has a 1H snapshot taken
+    at least that many hours before kickoff (the OPENER pass, run after the close
+    pass wrote a snapshot 30 minutes before kickoff)."""
     rated = None
     if rated_only:
         rated = {
@@ -69,12 +76,25 @@ def games_needing_backfill(
             .filter(Prediction.model_version == rated_only)
             .distinct()
         }
-    have = {
-        gid
-        for (gid,) in session.query(OddsSnapshot.game_id)
-        .filter(OddsSnapshot.market == "1H_total")
-        .distinct()
-    }
+    if existing_before_hours is None:
+        have = {
+            gid
+            for (gid,) in session.query(OddsSnapshot.game_id)
+            .filter(OddsSnapshot.market == "1H_total")
+            .distinct()
+        }
+    else:
+        cutoff = timedelta(hours=existing_before_hours)
+        have = {
+            gid
+            for gid, captured, start in session.query(
+                OddsSnapshot.game_id, OddsSnapshot.captured_at, Game.start_date
+            )
+            .join(Game, Game.id == OddsSnapshot.game_id)
+            .filter(OddsSnapshot.market == "1H_total")
+            .all()
+            if captured is not None and start is not None and captured <= start - cutoff
+        }
     q = session.query(Game.id, Game.home_team, Game.away_team, Game.start_date, Game.week).filter(
         Game.season == season, Game.start_date.isnot(None)
     )
@@ -120,6 +140,13 @@ def main() -> None:
         help="only games carrying a prediction of this model_version (e.g. gbm_v1)",
     )
     ap.add_argument(
+        "--existing-before-hours",
+        type=float,
+        default=None,
+        help="OPENER pass: treat a game as done only if it already has a 1H snapshot at "
+        "least this many hours before kickoff (pair with --lead-min 2880 for a 48h opener)",
+    )
+    ap.add_argument(
         "--regions",
         default="us",
         help="Odds API regions for the historical pull (cost is 10 credits per region "
@@ -147,7 +174,13 @@ def main() -> None:
 
     with session_scope() as s:
         scope = games_needing_backfill(
-            s, args.season, args.week, args.limit, fbs=fbs, rated_only=args.rated_only
+            s,
+            args.season,
+            args.week,
+            args.limit,
+            fbs=fbs,
+            rated_only=args.rated_only,
+            existing_before_hours=args.existing_before_hours,
         )
 
     print(

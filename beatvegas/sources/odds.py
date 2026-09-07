@@ -3,10 +3,14 @@
 Paid tier = 100K credits/month (2026-09; free tier was 500). totals_h1 costs credits
 per region, so we surface the credit headers on every call. The normalizer turns
 the nested events->bookmakers->markets->outcomes JSON into flat snapshot rows.
+
+Every HTTP error is re-raised with the `apiKey=` query value redacted
+(`redact_key`) so a 401/429 traceback never echoes the key into CI logs.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +25,25 @@ class Credits:
     remaining: Optional[int]
     used: Optional[int]
     last_cost: Optional[int]
+
+
+_API_KEY_RE = re.compile(r"(apiKey=)[^&\s'\"]+")
+
+
+def redact_key(text: str) -> str:
+    """Mask the `apiKey=` query value anywhere in `text` (URLs in error
+    messages, printed request lines). Idempotent."""
+    return _API_KEY_RE.sub(r"\1***", text)
+
+
+def _raise_for_status(resp: requests.Response) -> None:
+    """`resp.raise_for_status()` whose HTTPError message has the key redacted:
+    requests puts the full request URL (apiKey included) in the message, and
+    that string ends up in GitHub Actions logs on a 401/429."""
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as e:
+        raise requests.HTTPError(redact_key(str(e)), response=resp) from None
 
 
 class OddsAPIClient:
@@ -75,7 +98,7 @@ class OddsAPIClient:
         }
         resp = requests.get(url, params=params, timeout=self.timeout)
         self._credits(resp)
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     def list_events(self) -> List[Dict[str, Any]]:
@@ -86,7 +109,7 @@ class OddsAPIClient:
             url, params={"apiKey": self.api_key, "dateFormat": "iso"}, timeout=self.timeout
         )
         self._credits(resp)
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     def event_first_half_totals(self, event_id: str) -> Dict[str, Any]:
@@ -106,7 +129,7 @@ class OddsAPIClient:
         self._credits(resp)
         if resp.status_code == 404:
             return {}  # event has no odds posted yet
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     # --- historical (paid backfill / coverage gate, plan Phase 0) -------------
@@ -120,7 +143,7 @@ class OddsAPIClient:
             timeout=self.timeout,
         )
         self._credits(resp)
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or []
 
     def historical_bulk_totals(
@@ -142,7 +165,7 @@ class OddsAPIClient:
         }
         resp = requests.get(url, params=params, timeout=self.timeout)
         self._credits(resp)
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or []
 
     def historical_event_first_half_totals(self, event_id: str, date_iso: str) -> Dict[str, Any]:
@@ -161,7 +184,7 @@ class OddsAPIClient:
         self._credits(resp)
         if resp.status_code == 404:
             return {}
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or {}
 
 

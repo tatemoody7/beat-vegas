@@ -131,7 +131,8 @@ def cmd_list(args) -> None:
             return
         for p in rows:
             units = "unpriced" if p.units is None else f"{p.units:+.2f}u"
-            status = f"{p.result} ({units}, CLV {p.clv:+.1f})" if p.graded else "pending"
+            clv = "n/a" if p.clv is None else f"{p.clv:+.1f}"  # no closing captured
+            status = f"{p.result} ({units}, CLV {clv})" if p.graded else "pending"
             tag = "[PAPER] " if p.is_paper else ""
             why = (p.reason or "manual") + (f"/{p.verdict_at_pick}" if p.verdict_at_pick else "")
             print(

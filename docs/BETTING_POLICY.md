@@ -137,14 +137,24 @@ Claude routine (Sunday ops) re-dispatches the Sunday capture.
 
 ## Measuring, not promising
 
-- The truth metric this season is **closing-line value (CLV)** on real
-  Hard Rock/consensus closes, plus the graded record. Win rate over a few
-  weeks is noise; CLV shows up fast.
-- Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) track
-  what the card would bet, kept apart from the real record, so "trust the
-  model" is an evidence-based call later in the season. The cloud card
+- The truth metric this season is the **graded record over every qualifying
+  game**, plus closing-line value (CLV) on Hard Rock's own opener and pre-kick
+  close (captured per game) and the consensus close. The real-close backtest
+  (docs/POST_MORTEM.md) found the 1H market barely moves between open and
+  close (mean |move| 0.42 pts, 45% unchanged), so CLV alone cannot resolve the
+  edge in one season — volume of graded gated games can.
+- Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
+  **every game whose Hard Rock first-half line sits ≥ 1.75 above our number**,
+  tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
+  BET, `price`, `off_market`, `qb_out`, `cap` = the 6th+ by gap that week).
+  That measures each gate, not just the survivors. The cloud card
   (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
-  per BET through the same insert as `pick.py add`, never twice for one game.
+  per qualifying game at its decision build — the Thursday/Friday evening
+  card for weeknight games, the Saturday-morning card for the Saturday slate
+  (`--paper-log-window-hours`) — never twice for one game. A paper pick never
+  blocks your real ticket on the same game, and vice versa (the duplicate
+  guard is per ledger). The card ranks BETs by gap (the cap-5 rule the
+  backtest measured), so the text order is the cap order.
 
 ## Pre-flight checklist (do once)
 

@@ -23,14 +23,14 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Set
 
 from beatvegas.card import REFERENCE_MODEL_VERSION, build_card
-from beatvegas.db.models import Card, Game, GamePreview, OddsSnapshot, Prediction
+from beatvegas.db.models import Card, Game, GamePreview, ManualPick, OddsSnapshot, Prediction
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
-from beatvegas.model.score import BET_GAP_PTS, MODEL_VERSION
+from beatvegas.model.score import MODEL_VERSION
 from beatvegas.picks import add_pick, existing_pick
 
 
@@ -41,9 +41,35 @@ def hr_universe(session, season: int, week: int) -> List[Dict]:
         return []
     rows = session.query(Game).filter(Game.id.in_(ids)).order_by(Game.start_date, Game.id).all()
     return [
-        {"game_id": g.id, "away": g.away_team, "home": g.home_team, "kick": g.start_date}
+        {
+            "game_id": g.id,
+            "away": g.away_team,
+            "home": g.home_team,
+            "kick": g.start_date,
+            "total": g.full_game_total,
+            "spread": g.spread,
+        }
         for g in rows
     ]
+
+
+def bet_slots_this_week(session, season: int, week: int) -> Set[int]:
+    """Game ids with a BET-verdict 1H pick already logged this week (paper or
+    real; over-cap paper picks excluded). They hold their cap slot."""
+    rows = (
+        session.query(ManualPick.game_id)
+        .filter(
+            ManualPick.season == season,
+            ManualPick.week == week,
+            (ManualPick.market == "1H") | (ManualPick.market.is_(None)),
+            ManualPick.verdict_at_pick == "BET",
+            (ManualPick.blocker.is_(None)) | (ManualPick.blocker == "none"),
+            ManualPick.game_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return {r[0] for r in rows}
 
 
 def load_inputs(session, game_ids: List[int]) -> tuple:
@@ -85,19 +111,38 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
     return snaps, preds, previews
 
 
-def log_paper_picks(session, card: Dict, now: datetime) -> int:
-    """Insert one PAPER pick per BET item that has no pick on the game yet
-    (any 1H pick — paper or real — counts as logged). Marks `paper_logged` on
-    the items. Returns the number inserted."""
+PAPER_VERDICT = {"BET": "BET", "EDGE": "WATCH", "PASS": "PASS"}
+
+
+def log_paper_picks(
+    session, card: Dict, now: datetime, window_hours: Optional[float] = None
+) -> int:
+    """Insert one PAPER pick per QUALIFYING item (Hard Rock's 1H line >=
+    BET_GAP_PTS above ours — any tier) that has no paper pick yet, tagged with
+    the gate that blocked a real bet (`blocker`: none = BET, price, off_market,
+    qb_out, cap). Tate's real ticket on the same game never blocks it and is
+    never blocked by it (per-ledger guard). `window_hours` restricts logging to
+    games kicking off within that many hours (the DECISION build for that game:
+    Thursday/Friday evening for weeknight games, Saturday morning for the
+    Saturday slate). Marks `paper_logged`. Returns the number inserted."""
     inserted = 0
     for it in card["items"]:
-        if it["tier"] != "BET":
+        if not it.get("qualifies"):
             continue
+        if window_hours is not None and it.get("kick"):
+            kick = datetime.fromisoformat(it["kick"].replace("Z", "+00:00")).replace(tzinfo=None)
+            if kick - now > timedelta(hours=window_hours):
+                continue
         gid = it["game_id"]
-        if existing_pick(session, gid, "1H") is not None:
+        if existing_pick(session, gid, "1H", is_paper=True) is not None:
             it["paper_logged"] = True
             continue
-        reason = "model_gap" if it["gap"] is not None and it["gap"] >= BET_GAP_PTS else "price_edge"
+        blocker = "cap" if it.get("over_cap") else (it.get("paper_blocker") or "none")
+        chips = {
+            k: it.get(k)
+            for k in ("total_band", "hook_side", "key_dist", "full_game_total", "spread")
+        }
+        chips.update({"tier": it["tier"], "cap_rank": it.get("cap_rank")})
         add_pick(
             session,
             game_id=gid,
@@ -110,37 +155,65 @@ def log_paper_picks(session, card: Dict, now: datetime) -> int:
             price=it["hr_price"] if it["hr_price"] is not None else -110,
             is_paper=True,
             book=HR_BOOK_KEY,
-            note=f"card {now:%Y-%m-%d}: {it['action']}",
-            reason=reason,
-            verdict="BET",
+            note=f"card {now:%Y-%m-%d} [{blocker}]: {it['action']}",
+            reason="model_gap",
+            verdict=PAPER_VERDICT[it["tier"]],
             gap=it["gap"],
             ev=it["ev"],
             hr_line=it["hr_line"],
             placed_at=now,
+            blocker=blocker,
+            factors_json=json.dumps(chips, ensure_ascii=False, allow_nan=False),
         )
         it["paper_logged"] = True
         inserted += 1
     return inserted
 
 
+def _kill_text(it: Dict) -> str:
+    parts = []
+    if it.get("kill_line") is not None:
+        parts.append(f"below u{it['kill_line']}")
+    if it.get("kill_price") is not None:
+        parts.append(f"worse than {it['kill_price']:+d}")
+    return f" | kill: {' or '.join(parts)}" if parts else ""
+
+
 def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
     c = card["counts"]
+    paper = card.get("paper", {})
     out = [
         f"Card {card['season']} wk{card['week']} built {card['built_at']}: "
         f"{c['bet']} BET / {c['edge']} EDGE / {c['pass']} PASS "
         f"({len(card['items'])} of {universe} Hard Rock games still to kick off; "
-        f"model read: {'yes' if card['model_read'] else 'no'}; paper picks added: {picks_added})"
+        f"model read: {'yes' if card['model_read'] else 'no'}; "
+        f"qualifying: {paper.get('qualifying', 0)}; paper picks added: {picks_added})"
     ]
     for it in card["items"]:
-        if it["tier"] == "BET":
+        if it["tier"] == "BET" and not it.get("over_cap"):
             price = f" {it['hr_price']:+d}" if it["hr_price"] is not None else ""
             out.append(
-                f"  BET  {it['away']} @ {it['home']}: 1H under {it['hr_line']}{price} "
+                f"  BET #{it.get('cap_rank')}  {it['away']} @ {it['home']}: 1H under {it['hr_line']}{price} "
                 f"(gap {it['gap']:+.2f}, ev {it['ev'] if it['ev'] is not None else 'n/a'})"
+                f"{_kill_text(it)}"
+            )
+    for it in card["items"]:
+        if it.get("over_cap"):
+            out.append(
+                f"  OVER CAP #{it.get('cap_rank')} {it['away']} @ {it['home']}: 1H under "
+                f"{it['hr_line']} (gap {it['gap']:+.2f}) — paper only"
             )
     for it in card["items"]:
         if it["tier"] == "EDGE":
             out.append(f"  EDGE {it['away']} @ {it['home']} [{it['blocker']}]: {it['action']}")
+    logged = [it for it in card["items"] if it.get("paper_logged")]
+    if logged:
+        out.append("  PAPER (qualifying games logged, by blocker):")
+        for it in logged:
+            b = "cap" if it.get("over_cap") else (it.get("paper_blocker") or "none")
+            out.append(
+                f"    [{b}] {it['away']} @ {it['home']} u{it['hr_line']} gap {it['gap']:+.2f}"
+            )
     for n in card["notes"]:
         out.append(f"  note: {n}")
     return out
@@ -155,16 +228,27 @@ def write_step_summary(card: Dict, lines: List[str]) -> None:
         fh.write(f"## Bet card {card['season']} wk{card['week']}\n\n")
         fh.write(f"**{c['bet']} BET · {c['edge']} EDGE · {c['pass']} PASS**\n\n")
         for it in card["items"]:
-            if it["tier"] == "BET":
-                fh.write(f"- {it['action']} ({it['away']} @ {it['home']})\n")
+            if it["tier"] == "BET" and not it.get("over_cap"):
+                fh.write(f"- {it['action']} ({it['away']} @ {it['home']}){_kill_text(it)}\n")
         if c["bet"] == 0:
             fh.write("- No bets this week.\n")
+        over = [it for it in card["items"] if it.get("over_cap")]
+        if over:
+            fh.write("\nOver the weekly cap (paper only): ")
+            fh.write(", ".join(f"{it['away']} @ {it['home']} u{it['hr_line']}" for it in over))
+            fh.write("\n")
         for n in card["notes"]:
             fh.write(f"\n_{n}_\n")
 
 
 def run(
-    season: Optional[int], week: Optional[int], dry_run: bool, now: Optional[datetime] = None
+    season: Optional[int],
+    week: Optional[int],
+    dry_run: bool,
+    now: Optional[datetime] = None,
+    *,
+    paper_window_hours: Optional[float] = None,
+    no_paper: bool = False,
 ) -> int:
     """Build + persist; returns the process exit code."""
     now = now or datetime.utcnow()
@@ -181,10 +265,22 @@ def run(
     with session_scope() as s:
         games = hr_universe(s, season, week)
         snaps, preds, previews = load_inputs(s, [g["game_id"] for g in games])
-        card = build_card(games, snaps, preds, previews, season=season, week=week, now=now)
+        held = bet_slots_this_week(s, season, week)
+        card = build_card(
+            games,
+            snaps,
+            preds,
+            previews,
+            season=season,
+            week=week,
+            now=now,
+            held_game_ids=held,
+            prior_bet_game_ids=held,
+        )
         picks_added = 0
         if not dry_run and card["items"]:
-            picks_added = log_paper_picks(s, card, now)
+            if not no_paper:
+                picks_added = log_paper_picks(s, card, now, window_hours=paper_window_hours)
             s.add(
                 Card(
                     season=season,
@@ -213,10 +309,32 @@ def main() -> None:
     ap.add_argument("--season", type=int, help="default: the current season")
     ap.add_argument("--week", type=int, help="default: beatvegas.season.active()")
     ap.add_argument("--dry-run", action="store_true", help="print the payload; write nothing")
+    ap.add_argument(
+        "--paper-log-window-hours",
+        type=float,
+        default=None,
+        dest="paper_window_hours",
+        help="paper-log only qualifying games kicking off within N hours (the decision "
+        "build for those games); default: every upcoming qualifying game",
+    )
+    ap.add_argument(
+        "--no-paper",
+        action="store_true",
+        dest="no_paper",
+        help="publish the card without logging paper picks (preview builds)",
+    )
     args = ap.parse_args()
     if not try_init_db():
         return
-    sys.exit(run(args.season, args.week, args.dry_run))
+    sys.exit(
+        run(
+            args.season,
+            args.week,
+            args.dry_run,
+            paper_window_hours=args.paper_window_hours,
+            no_paper=args.no_paper,
+        )
+    )
 
 
 if __name__ == "__main__":

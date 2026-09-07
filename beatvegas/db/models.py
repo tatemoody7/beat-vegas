@@ -279,6 +279,11 @@ class ManualPick(Base):
     gap_at_pick = Column(Float)  # bv_gap (points) shown at log time
     ev_at_pick = Column(Float)  # no-vig EV of the under at log time
     hr_line_at_pick = Column(Float)  # Hard Rock's line at log time
+    # Paper ledger only: which gate blocked a real bet on this qualifying game
+    # (Hard Rock's 1H line >= BET_GAP_PTS above ours). none = it was a BET;
+    # price | off_market | qb_out | cap (6th+ by gap that week). NULL on real
+    # picks and legacy rows. The post-mortem groups the paper record by it.
+    blocker = Column(String(16))
 
 
 class BvAdjustment(Base):

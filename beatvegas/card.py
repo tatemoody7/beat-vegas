@@ -25,11 +25,11 @@ from __future__ import annotations
 import math
 import statistics
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from .devig import devig_two_way, ev_under
 from .hardrock import HR_BOOK_KEY, normalize_book
-from .model.score import BET_GAP_PTS, EV_FLOOR, HR_OFF_MARKET_PTS, MODEL_VERSION
+from .model.score import BET_GAP_PTS, EV_FLOOR, HR_OFF_MARKET_PTS, MODEL_VERSION, WEEKLY_BET_CAP
 
 # lineCheck.ts evVerdictFor: "pos" above this, "neg" below EV_FLOOR, else fair.
 PRICE_EDGE_EV = 0.005
@@ -54,6 +54,46 @@ SYNTHETIC_BOOKS = frozenset({"consensus"})
 
 TIER_ORDER = {"BET": 0, "EDGE": 1, "PASS": 2}
 REFERENCE_MODEL_VERSION = "derived_lines"
+
+# Display chips (NOT gates — decided 2026-09-07: the post-mortem judges them at
+# season end). Same bands/keys as beatvegas/postmortem.py so the live ledger
+# and the historical tables read alike.
+KEY_NUMBERS_1H = (24.0, 28.0, 31.0)
+TOTAL_BANDS = ((45.0, "<45"), (52.0, "45–52"), (60.0, "52–60"), (math.inf, "60+"))
+# Paper-ledger blockers, in the order the gates are checked.
+PAPER_BLOCKERS = ("off_market", "price", "qb_out")
+
+
+def total_band(total: Optional[float]) -> Optional[str]:
+    """Full-game total band chip (<45 / 45–52 / 52–60 / 60+)."""
+    t = _num(total)
+    if t is None:
+        return None
+    for hi, label in TOTAL_BANDS:
+        if t < hi:
+            return label
+    return None
+
+
+def hook_side(line: Optional[float]) -> Optional[str]:
+    """'key+0.5' when the line sits half a point above 24/28/31 (an under at
+    24.5 wins on a landing AT the key number), 'key−0.5' half a point below,
+    else 'other'."""
+    v = _num(line)
+    if v is None:
+        return None
+    for k in KEY_NUMBERS_1H:
+        if abs((v - k) - 0.5) < 1e-9:
+            return "key+0.5"
+        if abs((k - v) - 0.5) < 1e-9:
+            return "key−0.5"
+    return "other"
+
+
+def key_dist(line: Optional[float]) -> Optional[float]:
+    """Distance from the line to the nearest 1H key number."""
+    v = _num(line)
+    return None if v is None else min(abs(v - k) for k in KEY_NUMBERS_1H)
 
 
 # --- small helpers (mirroring web/lib/format.ts + edge.ts) --------------------
@@ -388,6 +428,18 @@ def build_item(
         and not price_neg
         and not qb_out
     )
+    # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
+    # >= BET_GAP_PTS above our number is logged, tagged with the gate that
+    # blocked a real bet (None = it was a BET). The weekly cap adds "cap" later.
+    qualifies = has_model and hr_gap is not None and hr_gap >= BET_GAP_PTS
+    paper_blocker: Optional[str] = None
+    if qualifies:
+        if off_market:
+            paper_blocker = "off_market"
+        elif price_neg:
+            paper_blocker = "price"
+        elif qb_out:
+            paper_blocker = "qb_out"
     blocker: Optional[str] = None
     if is_bet:
         tier = "BET"
@@ -483,6 +535,17 @@ def build_item(
         "action": action,
         "why": why,
         "paper_logged": False,
+        # paper ledger + weekly cap (apply_weekly_cap fills cap_rank / over_cap)
+        "qualifies": qualifies,
+        "paper_blocker": paper_blocker,
+        "cap_rank": None,
+        "over_cap": False,
+        # display chips (not gates)
+        "full_game_total": _num(game.get("total")),
+        "spread": _num(game.get("spread")),
+        "total_band": total_band(game.get("total")),
+        "hook_side": hook_side(hr_line),
+        "key_dist": key_dist(hr_line),
         # not part of the web contract; stripped by build_card, kept for the note.
         "_hr_hold": m["hr_hold"],
         "_market_hold": m["market_hold"],
@@ -494,9 +557,48 @@ def build_item(
 
 
 def _sort_key(item: Dict) -> tuple:
+    """BET, EDGE, PASS; within a tier by gap desc (the cap-5 rule the real-close
+    backtest measured ranks by gap), then price, then kickoff."""
     ev = item["ev"] if item["ev"] is not None else -math.inf
     gap = item["gap"] if item["gap"] is not None else -math.inf
-    return (TIER_ORDER[item["tier"]], -ev, -gap, item["kick"] or "", item["away"])
+    return (TIER_ORDER[item["tier"]], -gap, -ev, item["kick"] or "", item["away"])
+
+
+def apply_weekly_cap(
+    items: List[Dict],
+    held_game_ids: Optional[Set[int]] = None,
+    prior_bet_game_ids: Optional[Set[int]] = None,
+    cap: int = WEEKLY_BET_CAP,
+) -> List[Dict]:
+    """Rank the BET items for the week's real-money cap (docs/BETTING_POLICY.md:
+    at most `cap` bets, ranked by gap). Items keep tier BET (every gate passed);
+    the 6th+ get blocker "cap", over_cap True and a paper-only action.
+
+    held_game_ids: BETs already logged this week (paper or real) keep their slot
+    ahead of new arrivals — a decision made Thursday is not undone Saturday.
+    prior_bet_game_ids: BET picks this week on games NOT on this card (e.g. a
+    Thursday game already played) — they consume slots too. Mutates + returns."""
+    held = set(held_game_ids or ())
+    bets = [it for it in items if it["tier"] == "BET"]
+    on_card = {it["game_id"] for it in bets}
+    used = len({g for g in (prior_bet_game_ids or ()) if g not in on_card})
+
+    def key(it: Dict) -> tuple:
+        ev = it["ev"] if it["ev"] is not None else -math.inf
+        gap = it["gap"] if it["gap"] is not None else -math.inf
+        return (0 if it["game_id"] in held else 1, -gap, -ev, it["kick"] or "", it["away"])
+
+    for i, it in enumerate(sorted(bets, key=key)):
+        rank = used + i + 1
+        it["cap_rank"] = rank
+        if rank > cap:
+            it["over_cap"] = True
+            it["blocker"] = "cap"
+            it["action"] = (
+                f"Over the weekly cap (#{rank} by gap): paper only — the card carries "
+                f"{cap} real bets."
+            )
+    return items
 
 
 def hold_note(items: Sequence[Dict]) -> Optional[str]:
@@ -529,10 +631,12 @@ def build_card(
     season: int,
     week: int,
     now: datetime,
+    held_game_ids: Optional[Set[int]] = None,
+    prior_bet_game_ids: Optional[Set[int]] = None,
 ) -> Dict[str, Any]:
     """The card payload for one week.
 
-    games:       {game_id, away, home, kick: datetime (UTC)}
+    games:       {game_id, away, home, kick: datetime (UTC), total?, spread?}
     snapshots:   every 1H_total odds row for those games:
                  {game_id, book, line, over_price, under_price, captured_at}
     predictions: {game_id, model_version, bv_line, line_used} — the gbm_v1 row
@@ -574,6 +678,7 @@ def build_card(
             )
         )
     items.sort(key=_sort_key)
+    apply_weekly_cap(items, held_game_ids, prior_bet_game_ids)
 
     model_read = any(it["_has_model"] for it in items)
     notes: List[str] = []
@@ -593,6 +698,11 @@ def build_card(
         "edge": sum(1 for it in public if it["tier"] == "EDGE"),
         "pass": sum(1 for it in public if it["tier"] == "PASS"),
     }
+    paper = {
+        "qualifying": sum(1 for it in public if it["qualifies"]),
+        "over_cap": sum(1 for it in public if it["over_cap"]),
+        "cap": WEEKLY_BET_CAP,
+    }
     return json_clean(
         {
             "season": int(season),
@@ -600,6 +710,7 @@ def build_card(
             "built_at": _iso(now),
             "model_read": model_read,
             "counts": counts,
+            "paper": paper,
             "items": public,
             "notes": notes,
         }

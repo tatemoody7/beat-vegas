@@ -12,6 +12,11 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# 1H engines score_slate can run. "bv_line" is the incumbent market-blind
+# regressor; "residual" conditions on the pre-kick line (model/residual.py).
+ENGINES = ("bv_line", "residual")
+DEFAULT_ENGINE = "bv_line"
+
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(base)
@@ -62,6 +67,20 @@ def odds_api_key() -> str:
             "set it in config.yaml (odds_api.api_key) or export ODDS_API_KEY."
         )
     return key
+
+
+def engine_name() -> str:
+    """Which 1H engine to run: env BV_ENGINE if set, else config model.engine,
+    else "bv_line". An unknown value is a configuration error, never a silent
+    fallback — the wrong engine on a card day must fail loudly."""
+    name = os.environ.get("BV_ENGINE")
+    if not name:
+        name = (load_config().get("model", {}) or {}).get("engine")
+        if name is None:  # key absent / null -> default; "" is a typo, not unset
+            name = DEFAULT_ENGINE
+    if name not in ENGINES:
+        raise ValueError(f"unknown model.engine {name!r}; expected one of {ENGINES}")
+    return name
 
 
 def db_path() -> Path:

@@ -17,6 +17,17 @@ backfill:
   # 'regular' or 'both' (regular + postseason)
   season_type: "both" # regular + postseason (bowls/playoff); "regular" to exclude bowls
 
+model:
+  # Which 1H engine score_slate runs (scripts/weekly_update.py). PRODUCTION
+  # CONFIG: GHA has no config.yaml, so this value IS the prod engine (see the
+  # odds_api.regions note). Override per run with BV_ENGINE=<name>.
+  #   bv_line  — incumbent market-blind regressor; bv_line = our own 1H number
+  #   residual — market-residual engine (model/residual.py): conditions on the
+  #              pre-kick 1H line and predicts actual − line; bv_line = line + r̂.
+  #              Needs >= RESIDUAL_MIN_TRAIN training games with a REAL 1H close
+  #              or score_slate falls back to bv_line (attrs["engine_fallback"]).
+  engine: "bv_line"   # bv_line | residual
+
 proxy_line:
   # Fallback ratio used before empirical calibration runs.
   # 1H total ~= ratio * full-game total. Calibrated by etl/proxy_line.py.

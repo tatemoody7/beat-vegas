@@ -206,3 +206,23 @@ def test_existing_keys_lets_a_rerun_skip_rows_a_crashed_pass_already_wrote():
         assert bf.existing_keys(s, [1, 3], wave) == {(1, "draftkings")}
         assert bf.existing_keys(s, [1], wave + timedelta(hours=1)) == set()
         assert bf.existing_keys(s, [], wave) == set()
+
+
+def test_two_events_matching_one_game_keep_only_the_best_scoring_event():
+    bf = _load_script("backfill_fg_history")
+    eng, k = _db()
+    with Session(eng) as s:
+        scope = bf.games_needing_fg_close(s, 2024, rated_only="gbm_v1")
+    iso = k.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        {
+            "id": "exact",
+            "home_team": "Auburn Tigers",
+            "away_team": "Missouri Tigers",
+            "commence_time": iso,
+        },
+        {"id": "fuzzy", "home_team": "Auburn", "away_team": "Missouri St", "commence_time": iso},
+    ]
+    out = bf.match_events_to_games(events, scope)
+    assert list(out.values()).count(1) == 1  # one event per game
+    assert out.get("exact") == 1

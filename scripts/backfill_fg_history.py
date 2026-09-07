@@ -167,15 +167,22 @@ def group_by_wave(games: List[Dict], lead_min: int = LEAD_MIN) -> Dict[datetime,
 
 
 def match_events_to_games(events: List[Dict], games: List[Dict]) -> Dict[str, int]:
-    """event id -> game id for the events that match one of `games`."""
-    out: Dict[str, int] = {}
+    """event id -> game id for the events that match one of `games`. ONE event
+    per game: when two listed events fuzzy-match the same game (Washington vs
+    Oregon and Washington State vs Oregon State kick off the same day), only
+    the best-scoring event is kept — two would write the same
+    (game, book, captured_at) key twice."""
+    best: Dict[int, tuple] = {}  # game id -> (score, event id)
     for ev in events:
-        gid, _score = match_event(
+        gid, score = match_event(
             ev.get("home_team"), ev.get("away_team"), ev.get("commence_time"), games
         )
-        if gid is not None:
-            out[ev["id"]] = gid
-    return out
+        if gid is None:
+            continue
+        cur = best.get(gid)
+        if cur is None or score > cur[0]:
+            best[gid] = (score, ev["id"])
+    return {ev_id: gid for gid, (_score, ev_id) in best.items()}
 
 
 def main() -> None:
@@ -253,8 +260,10 @@ def main() -> None:
             existing = existing_keys(s, list(hit), ts)
             for r in rows:
                 gid = ev_to_game.get(r["event_id"])
-                if gid is None or (gid, normalize_book(r["book"])) in existing:
+                key = (gid, normalize_book(r["book"]))
+                if gid is None or key in existing:
                     continue
+                existing.add(key)  # never two rows on one key within the wave either
                 s.add(
                     OddsSnapshot(
                         game_id=gid,

@@ -89,3 +89,15 @@ def fair_under_before_kickoff(
 ) -> Tuple[Optional[float], Optional[float]]:
     """(open_fair_under, close_fair_under) using only PRE-kickoff snapshots."""
     return consensus_fair_under_open_close(_pre_kickoff(snaps, kickoff), method)
+
+
+def book_closing_before_kickoff(
+    snaps: Sequence, kickoff, book: str
+) -> Tuple[Optional[float], Optional[float], Optional[object]]:
+    """(opening, closing, closing_at) for ONE book's pre-kickoff snapshots — the
+    number you actually bet at Hard Rock, not the consensus. Same rules as
+    closing_before_kickoff; (None, None, None) when the book has no snapshot."""
+    mine = [s for s in snaps if getattr(s, "book", None) == book]
+    if not mine:
+        return None, None, None
+    return closing_before_kickoff(mine, kickoff)

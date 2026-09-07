@@ -45,7 +45,8 @@ from beatvegas.db.models import (
 from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.proxy_line import _load_share_coeffs
-from beatvegas.lines import closing_before_kickoff
+from beatvegas.hardrock import HR_BOOK_KEY
+from beatvegas.lines import book_closing_before_kickoff, closing_before_kickoff
 from beatvegas.model.score import MODEL_VERSION
 from beatvegas.season import current_season
 
@@ -152,10 +153,38 @@ def _real_closes(
     return out
 
 
-def load_live(session, season: int) -> Tuple[List[Dict], Dict[int, Dict], Dict[int, float]]:
+def _hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) -> Dict[int, float]:
+    """game_id -> Hard Rock's OWN pre-kickoff 1H close (the per-game close polls,
+    lines_watch.yml); games without one are simply absent."""
+    if not game_ids:
+        return {}
+    by_game: Dict[int, List] = {}
+    ids = list(game_ids)
+    for i in range(0, len(ids), 1000):
+        for snap in (
+            session.query(OddsSnapshot)
+            .filter(
+                OddsSnapshot.market == "1H_total",
+                OddsSnapshot.book == HR_BOOK_KEY,
+                OddsSnapshot.game_id.in_(ids[i : i + 1000]),
+            )
+            .all()
+        ):
+            by_game.setdefault(snap.game_id, []).append(snap)
+    out: Dict[int, float] = {}
+    for gid, snaps in by_game.items():
+        _open, close, _at = book_closing_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
+        if close is not None:
+            out[gid] = float(close)
+    return out
+
+
+def load_live(
+    session, season: int
+) -> Tuple[List[Dict], Dict[int, Dict], Dict[int, float], Dict[int, float]]:
     """Every rated game across the season's cards (newest card wins per game,
     so a game only the morning build carried still counts); games for those
-    ids; consensus closes."""
+    ids; consensus closes; Hard Rock's own pre-kick closes."""
     cards = session.query(Card).filter(Card.season == season).order_by(Card.built_at.desc()).all()
     items: List[Dict] = []
     seen_games = set()
@@ -172,6 +201,7 @@ def load_live(session, season: int) -> Tuple[List[Dict], Dict[int, Dict], Dict[i
             items.append(it)
     ids = sorted({int(it["game_id"]) for it in items if it.get("game_id") is not None})
     games: Dict[int, Dict] = {}
+    kickoffs: Dict[int, datetime] = {}
     if ids:
         derived = {
             pr.game_id: pr.line_used
@@ -180,6 +210,8 @@ def load_live(session, season: int) -> Tuple[List[Dict], Dict[int, Dict], Dict[i
             .all()
         }
         for g in session.query(Game).filter(Game.id.in_(ids)).all():
+            if g.start_date is not None:
+                kickoffs[g.id] = g.start_date
             games[g.id] = {
                 "season": g.season,
                 "week": g.week,
@@ -201,7 +233,8 @@ def load_live(session, season: int) -> Tuple[List[Dict], Dict[int, Dict], Dict[i
             line = r.closing_line if r.closing_line is not None else r.line_used
             if line is not None:
                 closes[r.game_id] = float(line)
-    return items, games, closes
+    hr_closes = _hr_closes(session, ids, kickoffs) if ids else {}
+    return items, games, closes, hr_closes
 
 
 # ---------------------------------------------------------------- writer
@@ -333,8 +366,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 out["run_id"] = run_id
                 outs.append(out)
         if args.scope in ("live", "both"):
-            items, games, closes = load_live(session, live_season)
-            ldf = pm.build_live_frame(items, games, closes)
+            items, games, closes, hr_closes = load_live(session, live_season)
+            ldf = pm.build_live_frame(items, games, closes, hr_closes)
             print(
                 f"[live] season {live_season}: {len(items)} card items, {len(games)} games, {len(closes)} closes"
             )

@@ -30,7 +30,12 @@ from beatvegas.grading import (
     under_result,
     units_won,
 )
-from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
+from beatvegas.hardrock import HR_BOOK_KEY, normalize_book
+from beatvegas.lines import (
+    book_closing_before_kickoff,
+    closing_before_kickoff,
+    fair_under_before_kickoff,
+)
 from beatvegas.picks import add_pick, existing_pick
 
 
@@ -198,6 +203,13 @@ def cmd_grade(args) -> None:
             # Pre-kickoff snapshots only (mirrors grade.py): a poll that ran
             # after the game started must not pollute your closing line / CLV.
             opening, closing, _closing_at = closing_before_kickoff(snaps, g.start_date)
+            # A Hard Rock ticket grades against Hard Rock's OWN pre-kick close
+            # when the per-game close polls captured one (the number you could
+            # have bet), else the consensus close as before.
+            if normalize_book(p.book) == HR_BOOK_KEY:
+                hr_open, hr_close, _ = book_closing_before_kickoff(snaps, g.start_date, HR_BOOK_KEY)
+                if hr_close is not None:
+                    opening, closing = hr_open, hr_close
             fair_open, fair_close = fair_under_before_kickoff(snaps, g.start_date)
             for k, v in graded_pick_fields(
                 actual, p.line, p.price, p.stake, opening, closing, fair_open, fair_close

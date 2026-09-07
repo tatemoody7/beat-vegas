@@ -83,6 +83,7 @@ export const RULE_LABEL: Record<string, string> = {
   bet: "Card BET tier",
   price_read: "Price read (Hard Rock pays at least fair)",
   all_hr: "Every Hard Rock number (blanket under)",
+  qualifying: "Qualifying (Hard Rock gap ≥ 1.75, any gate — the paper ledger)",
 };
 
 export const PROXY_LABEL: Record<string, string> = {
@@ -90,6 +91,7 @@ export const PROXY_LABEL: Record<string, string> = {
   step: "fair line",
   flat: "old 0.52 line",
   hr: "Hard Rock's number",
+  hr_close: "Hard Rock's pre-kick close",
   market: "consensus at build",
   market_close: "consensus close",
 };

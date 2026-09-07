@@ -32,6 +32,13 @@ name: Hard Rock 1H line capture
 #   run today first and only dispatches when none exists.
 #   For more cadence or wider caps, buy a paid Odds API tier.
 #
+# CONCURRENCY: every Neon-writing workflow shares the `neon-writers` group
+# (tests/test_workflows.py enforces it) so two writers never run at once — a
+# concurrent init_db() used to lower an id sequence under an in-flight insert
+# (beatvegas/db/store.py::resync_table_sequence). GitHub keeps one running run +
+# ONE pending run per group and cancels the older pending run when a third
+# arrives; a dropped close slot is re-covered by the next one, so that is fine.
+#
 # GHA cron routinely fires 5-20+ min late (accepted, not fixable); the retry
 # slots and the routines absorb the drift.
 #
@@ -61,7 +68,7 @@ on:
         default: 1h
 
 concurrency:
-  group: lines-watch
+  group: neon-writers
   cancel-in-progress: false
 
 jobs:

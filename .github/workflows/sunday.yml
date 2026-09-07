@@ -23,7 +23,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: sunday
+  group: neon-writers
   cancel-in-progress: false
 
 jobs:

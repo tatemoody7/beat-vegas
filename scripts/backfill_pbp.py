@@ -18,10 +18,9 @@ from __future__ import annotations
 import argparse
 
 import pandas as pd
-from sqlalchemy import text
 
 from beatvegas.db.models import FhTeamGame, Game
-from beatvegas.db.store import get_engine, init_db, session_scope, upsert
+from beatvegas.db.store import get_engine, init_db, resync_table_sequence, session_scope, upsert
 from beatvegas.etl.fh_factors import aggregate_fh
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbpbp import PARQUET_MAX_YEAR, load_plays
@@ -38,17 +37,12 @@ def _games_meta(season: int) -> pd.DataFrame:
 
 
 def _resync_sequence() -> None:
-    """Neon/Postgres: advance the pkey sequence past seeded ids before insert."""
+    """Neon/Postgres: bring the pkey sequence up to MAX(id) (never down) before insert."""
     engine = get_engine()
     if engine.dialect.name != "postgresql":
         return
     with engine.begin() as conn:
-        conn.execute(
-            text(
-                "SELECT setval(pg_get_serial_sequence('fh_team_game','id'), "
-                "COALESCE((SELECT MAX(id) FROM fh_team_game), 1))"
-            )
-        )
+        resync_table_sequence(conn, "fh_team_game")
 
 
 def backfill_season(season: int, client: CFBDClient) -> int:

@@ -148,3 +148,18 @@ def real_closes(
         if close is not None:
             out[gid] = float(close)
     return out
+
+
+def book_closing_price_before_kickoff(snaps: Sequence, kickoff, book: str) -> Optional[int]:
+    """ONE book's closing UNDER price: the `under_price` of its latest pre-kickoff
+    snapshot that carries one (an unpriced row is skipped, not read as -110).
+    None when the book has no priced pre-kick snapshot. Fills a pick logged
+    with a NULL price (an unpriced Hard Rock line) at grade time."""
+    mine = [s for s in snaps if getattr(s, "book", None) == book]
+    if not mine:
+        return None
+    priced = [s for s in _pre_kickoff(mine, kickoff) if getattr(s, "under_price", None) is not None]
+    if not priced:
+        return None
+    last = sorted(priced, key=lambda s: s.captured_at or datetime.min)[-1]
+    return int(last.under_price)

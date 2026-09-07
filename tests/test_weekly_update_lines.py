@@ -50,7 +50,7 @@ def wu(monkeypatch):
 
     mod.session_scope = scope
     with Session(eng) as s:
-        for gid in (1, 2, 3, 4):
+        for gid in (1, 2, 3, 4, 5):
             s.add(
                 Game(
                     id=gid,
@@ -66,6 +66,9 @@ def wu(monkeypatch):
                 id=9, season=SEASON, week=WEEK + 1, home_team="H9", away_team="A9", start_date=KICK
             )
         )
+        # game 6: NULL start_date — the pre-kick filter must not apply (no kickoff
+        # to filter against), so current behaviour (latest-by-captured_at) holds.
+        s.add(Game(id=6, season=SEASON, week=WEEK, home_team="H6", away_team="A6", start_date=None))
         s.add_all(
             [
                 # game 1: Hard Rock + DraftKings 1H, plus a full-game opener
@@ -84,6 +87,14 @@ def wu(monkeypatch):
                 _snap(3, "draftkings", "full_game_total", 52.0, 2, spread=-7.0),
                 # game 4: nothing. game 9: another week (must be ignored)
                 _snap(9, "hardrockbet", "1H_total", 30.5, 3),
+                # game 5: Hard Rock's pre-kick line, then an IN-PLAY snapshot from
+                # a midweek re-run (poll_lines --hours-back 24 catches games that
+                # already kicked) — the post-kick one must never win "current".
+                _snap(5, "hardrockbet", "1H_total", 24.5, 1),  # 1h before kickoff
+                _snap(5, "hardrockbet", "1H_total", 17.5, -1),  # 1h AFTER kickoff
+                # game 6: same shape, but the game has no known start_date.
+                _snap(6, "hardrockbet", "1H_total", 20.0, 1),
+                _snap(6, "hardrockbet", "1H_total", 15.0, -1),
             ]
         )
         s.commit()
@@ -105,6 +116,26 @@ def test_current_basis_prefers_hard_rock_then_consensus_latest_then_derived(wu):
     assert lines[2] == 24.0 and kinds[2] == "observed_1h"  # median(23.5, 24.5) latest per book
     assert lines[3] == proxy_total(50.0, spread=-7.0) and kinds[3] == "derived_fg"  # opener
     assert 4 not in lines and 9 not in lines
+
+
+def test_current_basis_ignores_in_play_snapshots_after_kickoff(wu):
+    """A midweek re-run must not condition the residual model on an in-play
+    line: game 5's Hard Rock snapshot posted 1h AFTER kickoff (17.5) is later
+    than its pre-kick snapshot (24.5) by captured_at, but must be filtered out."""
+    lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="current")
+    assert lines[5] == 24.5 and kinds[5] == "hr_1h"
+
+
+def test_opener_basis_unaffected_by_pre_kickoff_filter(wu):
+    lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="opener")
+    assert lines[5] == 24.5 and kinds[5] == "observed_1h"  # unchanged: first-seen already pre-kick
+
+
+def test_current_basis_null_start_date_keeps_no_filter(wu):
+    """Game 6 has no known start_date — _pre_kickoff can't filter without a
+    kickoff, so current behaviour (plain latest-by-captured_at) still applies."""
+    lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="current")
+    assert lines[6] == 15.0 and kinds[6] == "hr_1h"
 
 
 def test_unknown_basis_raises(wu):
@@ -213,6 +244,39 @@ def test_main_bv_line_does_not_touch_closes(monkeypatch, wu, capsys):
     assert got["score"]["engine"] == "bv_line"
     assert got["score"]["real_closes"] is None
     assert "engine=bv_line basis=opener train_rows_with_close=0" in capsys.readouterr().out
+
+
+def test_main_prints_actual_train_rows_not_all_fetched_closes(monkeypatch, wu, capsys):
+    """training_real_closes fetches closes off the PRE-apply_min_games frame,
+    but score_slate's residual branch trains on the post-filter frame — so the
+    rows it actually fit on can be fewer than len(closes). The summary line
+    must report what score_slate says it trained on (its fingerprint's
+    n_rows), not the wider close count, when that's available."""
+    _wire(monkeypatch, wu, "residual")
+
+    def fake_score_fewer_rows(
+        season, target_week=None, line_lookup=None, line_kind_lookup=None, df=None, **kw
+    ):
+        out = pd.DataFrame(
+            {
+                "id": [1],
+                "rank": [1],
+                "under_score": [55],
+                "away_team": ["A1"],
+                "home_team": ["H1"],
+                "line": [25.0],
+            }
+        )
+        # real_closes handed 3 rows (100, 101, 102); the residual branch's
+        # min-games/training cut only kept 2 of them.
+        out.attrs["engine_artifact"] = {"fingerprint": {"n_rows": 2}}
+        return out
+
+    monkeypatch.setattr(wu, "score_slate", fake_score_fewer_rows)
+    wu.main()
+    out = capsys.readouterr().out
+    assert "train_rows_with_close=2" in out
+    assert "train_rows_with_close=3" not in out
 
 
 def test_main_line_basis_flag_overrides_auto(monkeypatch, wu):

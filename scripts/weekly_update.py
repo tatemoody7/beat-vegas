@@ -31,7 +31,12 @@ from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.hardrock import HR_BOOK_KEY
-from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, consensus_open_close, real_closes
+from beatvegas.lines import (
+    REAL_1H_CLOSE_WINDOW_H,
+    _pre_kickoff,
+    consensus_open_close,
+    real_closes,
+)
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
@@ -95,6 +100,7 @@ def ranking_line_lookup(
                 OddsSnapshot.spread,
                 OddsSnapshot.market,
                 OddsSnapshot.captured_at,
+                Game.start_date,
             )
             .join(Game, Game.id == OddsSnapshot.game_id)
             .filter(
@@ -106,12 +112,18 @@ def ranking_line_lookup(
         )
     h1: Dict[int, list] = {}
     fg: Dict[int, list] = {}
-    for gid, book, line, spread, market, cap in rows:
+    kickoffs: Dict[int, object] = {}
+    for gid, book, line, spread, market, cap, start_date in rows:
         snap = type("S", (), {"book": book, "line": line, "spread": spread, "captured_at": cap})
         (h1 if market == "1H_total" else fg).setdefault(gid, []).append(snap)
+        kickoffs[gid] = start_date
 
     for gid, snaps in h1.items():
         if basis == "current":
+            # A midweek re-run can catch in-play snapshots (poll_lines defaults
+            # to --hours-back 24, well past kickoff for games already underway).
+            # Never condition the residual model on a live line.
+            snaps = _pre_kickoff(snaps, kickoffs.get(gid))
             hr = [sn for sn in snaps if sn.book == HR_BOOK_KEY and sn.line is not None]
             if hr:
                 lines[gid], kinds[gid] = float(_latest(hr).line), "hr_1h"
@@ -264,10 +276,17 @@ def main() -> None:
     obs = sum(1 for k in kinds.values() if k == "observed_1h")
     der = sum(1 for k in kinds.values() if k == "derived_fg")
     fallback = scored.attrs.get("engine_fallback")
+    # Prefer the ROWS THE MODEL ACTUALLY TRAINED ON (score_slate's residual
+    # branch, via the fingerprint it stamps into engine_artifact) over
+    # len(closes): closes is computed off the pre-apply_min_games frame, so it
+    # can count games score_slate's min-games/training cut later drops.
+    fingerprint = (scored.attrs.get("engine_artifact") or {}).get("fingerprint") or {}
+    n_train = fingerprint.get("n_rows")
+    train_rows = n_train if n_train is not None else len(closes or {})
     print(
         f"scored {n} games for {args.season} wk{week} "
         f"({hr} Hard Rock 1H, {obs} observed 1H, {der} derived-from-full-game, rest proxy) "
-        f"engine={engine} basis={basis} train_rows_with_close={len(closes or {})}"
+        f"engine={engine} basis={basis} train_rows_with_close={train_rows}"
         + (f" FALLBACK={fallback}" if fallback else "")
     )
     top = scored.head(5)

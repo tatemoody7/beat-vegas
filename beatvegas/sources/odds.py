@@ -1,6 +1,6 @@
 """The Odds API v4 client for college-football first-half totals (totals_h1).
 
-Free tier = 500 requests/month. Additional markets like totals_h1 cost credits
+Paid tier = 100K credits/month (2026-09; free tier was 500). totals_h1 costs credits
 per region, so we surface the credit headers on every call. The normalizer turns
 the nested events->bookmakers->markets->outcomes JSON into flat snapshot rows.
 """

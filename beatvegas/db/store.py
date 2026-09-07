@@ -55,7 +55,7 @@ _MIGRATIONS = {
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
     "games": {"spread": "FLOAT"},
-    "odds_snapshots": {"spread": "FLOAT"},
+    "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
 }
 
 # One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH

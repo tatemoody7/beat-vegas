@@ -103,3 +103,22 @@ def test_fair_under_before_kickoff_ignores_post_kickoff():
     fo, fc = fair_under_before_kickoff(snaps, kickoff)
     assert fo > fc
     assert abs(fc - 0.5) < 1e-6  # the balanced close, not the post-kickoff snap
+
+
+def test_closing_at_uses_last_seen_when_the_line_was_confirmed_later():
+    """A pre-kick poll that finds the number unchanged writes no row; it stamps
+    last_seen_at on the existing one. The close timestamp must reflect that."""
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    s = snap("dk", 24.5, 1)
+    s.last_seen_at = datetime(2024, 11, 5, 11, 30)  # confirmed 30 min before kick
+    opening, closing, closing_at = closing_before_kickoff([s], kickoff)
+    assert (opening, closing) == (24.5, 24.5)
+    assert closing_at == datetime(2024, 11, 5, 11, 30)
+
+
+def test_closing_at_ignores_a_post_kickoff_last_seen():
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    s = snap("dk", 24.5, 1)
+    s.last_seen_at = datetime(2024, 11, 5, 13, 0)  # stray in-game poll
+    _, _, closing_at = closing_before_kickoff([s], kickoff)
+    assert closing_at == datetime(2024, 11, 1, 12, 0)

@@ -64,8 +64,17 @@ def closing_before_kickoff(
     """
     pre = _pre_kickoff(snaps, kickoff)
     opening, closing = consensus_open_close(pre)
-    caps = [s.captured_at for s in pre if s.captured_at is not None]
-    closing_at = max(caps) if caps and closing is not None else None
+    stamps = []
+    for s in pre:
+        stamp = s.captured_at
+        # A poll that found the number unchanged wrote no row but stamped
+        # last_seen_at; that later PRE-kick confirmation is the real close time.
+        seen = getattr(s, "last_seen_at", None)
+        if seen is not None and (kickoff is None or seen <= kickoff):
+            stamp = seen if stamp is None else max(stamp, seen)
+        if stamp is not None:
+            stamps.append(stamp)
+    closing_at = max(stamps) if stamps and closing is not None else None
     return opening, closing, closing_at
 
 

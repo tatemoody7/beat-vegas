@@ -264,3 +264,92 @@ def test_second_paper_pick_is_refused(capsys):
     pick.cmd_add(_args(paper=True))
     pick.cmd_add(_args(paper=True))
     assert "REFUSED: paper pick" in capsys.readouterr().out
+
+
+def test_grade_uses_hard_rocks_own_close_for_a_hard_rock_ticket():
+    """The per-game close polls capture Hard Rock's pre-kick number; a Hard
+    Rock ticket's CLV is against THAT, not the consensus close."""
+    from datetime import datetime, timedelta
+
+    from beatvegas.db.models import Game, OddsSnapshot
+
+    pick, eng = _pick_module()
+    kick = datetime(2026, 9, 19, 19, 30)
+    with Session(eng) as s:
+        s.add(
+            Game(
+                id=2,
+                season=2026,
+                week=3,
+                home_team="Missouri",
+                away_team="Kansas",
+                start_date=kick,
+                home_points=30,
+                away_points=10,
+                first_half_total=20,
+                first_half_source="pbp",
+            )
+        )
+        for book, line, hrs in (
+            ("draftkings", 24.5, 30),
+            ("draftkings", 26.5, 1),
+            ("hardrockbet", 24.5, 30),
+            ("hardrockbet", 23.5, 1),
+            ("hardrockbet", 30.0, -1),
+        ):  # last one is in-game
+            s.add(
+                OddsSnapshot(
+                    game_id=2,
+                    book=book,
+                    market="1H_total",
+                    line=line,
+                    over_price=-110,
+                    under_price=-110,
+                    captured_at=kick - timedelta(hours=hrs),
+                )
+            )
+        s.add(
+            ManualPick(
+                game_id=2,
+                season=2026,
+                week=3,
+                home_team="Missouri",
+                away_team="Kansas",
+                side="under",
+                market="1H",
+                line=24.5,
+                price=-110,
+                stake=1.0,
+                is_paper=False,
+                book="hardrockbet",
+                graded=False,
+                placed_at=kick,
+            )
+        )
+        s.add(
+            ManualPick(
+                game_id=2,
+                season=2026,
+                week=3,
+                home_team="Missouri",
+                away_team="Kansas",
+                side="under",
+                market="1H",
+                line=24.5,
+                price=-110,
+                stake=1.0,
+                is_paper=True,
+                book=None,
+                graded=False,
+                placed_at=kick,
+            )
+        )
+        s.commit()
+    pick.cmd_grade(_args(season=2026))
+    with Session(eng) as s:
+        hr, other = (
+            s.query(ManualPick).filter(ManualPick.game_id == 2).order_by(ManualPick.id).all()
+        )
+    assert hr.graded and hr.result == "under"
+    assert hr.closing_line == 23.5 and hr.clv == -1.0  # Hard Rock's own pre-kick close
+    assert other.closing_line == 25.0 and other.clv == 0.5  # consensus close (median of 26.5, 23.5)

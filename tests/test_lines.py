@@ -122,3 +122,19 @@ def test_closing_at_ignores_a_post_kickoff_last_seen():
     s.last_seen_at = datetime(2024, 11, 5, 13, 0)  # stray in-game poll
     _, _, closing_at = closing_before_kickoff([s], kickoff)
     assert closing_at == datetime(2024, 11, 1, 12, 0)
+
+
+def test_book_closing_uses_one_books_pre_kick_snapshots_only():
+    from beatvegas.lines import book_closing_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("dk", 24.5, 1),
+        snap("hardrockbet", 25.5, 2),
+        snap("hardrockbet", 23.5, 4),
+        snap("hardrockbet", 30.0, 6),
+    ]  # last one is post-kick
+    opening, closing, closing_at = book_closing_before_kickoff(snaps, kickoff, "hardrockbet")
+    assert (opening, closing) == (25.5, 23.5)
+    assert closing_at == datetime(2024, 11, 4, 12, 0)
+    assert book_closing_before_kickoff(snaps, kickoff, "fanduel") == (None, None, None)

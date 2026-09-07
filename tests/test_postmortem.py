@@ -524,7 +524,7 @@ def test_compute_live_grades_at_hr_and_close():
     out = pm.compute_live(df, season=2026, run_id="r2", computed_at="t")
     assert out["scope"] == "live_2026"
     kinds = {b["proxy_kind"] for b in out["buckets"]}
-    assert kinds == {"hr", "market", "market_close"}
+    assert kinds == {"hr", "hr_close", "market", "market_close"}
     head_hr = next(
         b
         for b in out["buckets"]
@@ -595,3 +595,176 @@ def test_compute_hist_adds_real_column_only_when_real_closes_exist():
     )
     assert head["n"] == 30  # only games with a real close are graded in the real column
     assert out["notes"]["real_lines"]["n"] == 30
+
+
+# --- paper ledger + Hard Rock close in the live scope (2026-09-07) ----------------
+
+
+def _paper_item(
+    gid,
+    tier,
+    *,
+    qualifies,
+    paper_blocker=None,
+    over_cap=False,
+    cap_rank=None,
+    blocker=None,
+    gap=2.1,
+    bv_line=22.4,
+    hr_open=None,
+    **kw,
+):
+    it = _item(gid, tier=tier, **kw)
+    it.update(
+        {
+            "blocker": blocker,
+            "gap": gap,
+            "bv_line": bv_line,
+            "qualifies": qualifies,
+            "paper_blocker": paper_blocker,
+            "over_cap": over_cap,
+            "cap_rank": cap_rank,
+            "hr_open": hr_open if hr_open is not None else it["hr_open"],
+        }
+    )
+    return it
+
+
+def test_live_blocker_reads_the_paper_gate_then_the_card_blocker():
+    assert pm.live_blocker(_paper_item(1, "BET", qualifies=True, cap_rank=1)) == "none"
+    assert (
+        pm.live_blocker(
+            _paper_item(2, "EDGE", qualifies=True, paper_blocker="price", blocker="price")
+        )
+        == "price"
+    )
+    assert (
+        pm.live_blocker(
+            _paper_item(3, "BET", qualifies=True, over_cap=True, blocker="cap", cap_rank=6)
+        )
+        == "cap"
+    )
+    assert (
+        pm.live_blocker(_paper_item(4, "EDGE", qualifies=False, blocker="no_hr_line", gap=2.6))
+        == "no_hr_line"
+    )
+    assert pm.live_blocker(_paper_item(5, "PASS", qualifies=False, gap=0.5)) == "gap"
+    assert pm.live_blocker(_item(6)) == "no_model"  # derived card, no model read
+
+
+def test_build_live_frame_grades_hard_rocks_own_close_and_carries_the_ledger():
+    items = [
+        _paper_item(
+            1, "BET", qualifies=True, cap_rank=1, hr_line=24.5, hr_open=25.5, market_line=24.5
+        ),
+        _paper_item(
+            2,
+            "EDGE",
+            qualifies=True,
+            paper_blocker="price",
+            blocker="price",
+            hr_line=24.5,
+            hr_price=-125,
+            market_line=24.5,
+        ),
+        _paper_item(
+            3, "BET", qualifies=True, over_cap=True, cap_rank=6, blocker="cap", hr_line=27.5
+        ),
+    ]
+    games = {
+        gid: {
+            "season": 2026,
+            "week": 3,
+            "first_half_total": fh,
+            "first_half_source": "pbp",
+            "home_points": 30,
+            "away_points": 10,
+            "spread": -7.0,
+            "full_game_total": 55.5,
+        }
+        for gid, fh in ((1, 23), (2, 24), (3, 28))
+    }
+    df = pm.build_live_frame(items, games, {1: 24.5}, hr_closes={1: 23.5, 3: 27.5}).set_index(
+        "game_id"
+    )
+    # game 1: Hard Rock opened 25.5, built at 24.5, closed 23.5: under at build, PUSH... no: 23 < 23.5 -> under
+    assert (
+        df.loc[1, "hr_open"] == 25.5
+        and df.loc[1, "hr_close"] == 23.5
+        and df.loc[1, "hr_move"] == -2.0
+    )
+    assert df.loc[1, "outcome_hr"] == "under" and df.loc[1, "outcome_hr_close"] == "under"
+    assert (
+        df.loc[1, "blocker_dim"] == "none"
+        and bool(df.loc[1, "qualifies"])
+        and df.loc[1, "cap_rank"] == 1
+    )
+    assert df.loc[2, "blocker_dim"] == "price" and pd.isna(df.loc[2, "hr_close"])
+    assert pd.isna(df.loc[2, "outcome_hr_close"])  # no HR close captured -> not graded there
+    assert df.loc[3, "blocker_dim"] == "cap" and bool(df.loc[3, "over_cap"])
+    assert df.loc[3, "outcome_hr_close"] == "over"  # 28 > 27.5
+    masks = pm.live_rule_masks(df.reset_index())
+    assert list(masks["qualifying"]) == [True, True, True]
+    assert list(masks["bet"]) == [True, False, True]
+
+
+def test_compute_live_adds_hr_close_grading_and_the_blocker_dimension():
+    items = [
+        _paper_item(1, "BET", qualifies=True, cap_rank=1, hr_line=24.5, market_line=24.5),
+        _paper_item(
+            2,
+            "EDGE",
+            qualifies=True,
+            paper_blocker="price",
+            blocker="price",
+            hr_line=24.5,
+            hr_price=-125,
+            market_line=24.5,
+        ),
+        _paper_item(3, "PASS", qualifies=False, gap=0.5, hr_line=24.5),
+    ]
+    games = {
+        gid: {
+            "season": 2026,
+            "week": 3,
+            "first_half_total": fh,
+            "first_half_source": "pbp",
+            "home_points": 30,
+            "away_points": 10,
+            "spread": -7.0,
+            "full_game_total": 55.5,
+            "derived_line": 27.5,
+        }
+        for gid, fh in ((1, 23), (2, 27), (3, 20))
+    }
+    df = pm.build_live_frame(
+        items, games, {1: 24.5, 2: 24.5, 3: 24.5}, hr_closes={1: 24.0, 2: 24.5}
+    )
+    out = pm.compute_live(df, season=2026, run_id="r3", computed_at="t")
+    kinds = {b["proxy_kind"] for b in out["buckets"]}
+    assert kinds == {"hr", "hr_close", "market", "market_close"}
+    by_blocker = {
+        b["bucket"]: b
+        for b in out["buckets"]
+        if b["proxy_kind"] == "hr"
+        and b["dimension"] == "blocker"
+        and b["selection"] == "qualifying"
+    }
+    assert set(by_blocker) == {"none", "price"}
+    assert by_blocker["none"]["n"] == 1 and by_blocker["none"]["unders"] == 1
+    assert by_blocker["price"]["n"] == 1 and by_blocker["price"]["overs"] == 1
+    hr_close_all = next(
+        b
+        for b in out["buckets"]
+        if b["proxy_kind"] == "hr_close"
+        and b["dimension"] == "all"
+        and b["selection"] == "qualifying"
+    )
+    assert hr_close_all["n"] == 2  # game 3 has no Hard Rock close captured
+    assert out["notes"]["n_qualifying"] == 2 and out["notes"]["n_bets"] == 1
+    assert not any("zero model bets" in c for c in out["notes"]["caveats"])
+    g1 = next(g for g in out["games"] if g["game_id"] == 1)
+    assert (
+        g1["blocker_dim"] == "none" and g1["hr_close"] == 24.0 and g1["outcome_hr_close"] == "under"
+    )
+    assert any("hook_side" == b["dimension"] for b in out["buckets"])

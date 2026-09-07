@@ -42,7 +42,7 @@ WEEKLY_CAP = 5
 
 HIST_SCOPE = "hist_2023_25"
 RULES = ("all", "gap175", "gap300", "score53", "both", "cap5", "top20")
-LIVE_RULES = ("all_hr", "bet", "price_read", "gap175")
+LIVE_RULES = ("all_hr", "bet", "price_read", "gap175", "qualifying")
 KEY_NUMBERS = (24.0, 28.0, 31.0)
 SIGMA_1H = 11.9  # per-game 1H-total noise, pts (validate_engine)
 
@@ -100,6 +100,8 @@ _ORDER: Dict[str, List[str]] = {
     "hr_vs_market": ["HR lower", "within 0.5", "HR higher"],
     "ev_band": [b[2] for b in EV_BANDS],
     "tier": ["BET", "EDGE", "PASS"],
+    # paper-ledger gate (live): what blocked a real bet on each rated game
+    "blocker": ["none", "price", "off_market", "qb_out", "cap", "gap", "no_hr_line", "no_model"],
 }
 
 HIST_DIMENSIONS = (
@@ -122,7 +124,16 @@ HIST_DIMENSIONS = (
     "def_ppa_q",
     "fh_pf_q",
 )
-LIVE_DIMENSIONS = ("hr_vs_market", "tier", "ev_band", "week_band", "spread_band")
+LIVE_DIMENSIONS = (
+    "hr_vs_market",
+    "tier",
+    "blocker",
+    "ev_band",
+    "week_band",
+    "spread_band",
+    "total_band",
+    "hook_side",
+)
 
 CONTRAST_FEATURES = (
     "spread_abs",
@@ -401,11 +412,31 @@ def build_hist_frame(
     return df
 
 
+def live_blocker(it: Dict) -> str:
+    """The paper-ledger gate for a card item: 'cap' beyond the weekly cap; the
+    gate that blocked a qualifying game ('none' = it was a BET); otherwise the
+    card's own blocker ('no_hr_line', 'gap', 'no_model', ...)."""
+    if it.get("over_cap"):
+        return "cap"
+    if it.get("qualifies"):
+        return it.get("paper_blocker") or "none"
+    b = it.get("blocker")
+    if b:
+        return str(b)
+    return "no_model" if _num(it.get("bv_line")) is None else "gap"
+
+
 def build_live_frame(
-    items: Iterable[Dict], games: Dict[int, Dict], closes: Dict[int, float]
+    items: Iterable[Dict],
+    games: Dict[int, Dict],
+    closes: Dict[int, float],
+    hr_closes: Optional[Dict[int, float]] = None,
 ) -> pd.DataFrame:
     """Card items (the live ratings) graded at Hard Rock's number, the consensus
-    number and the consensus close. Ungraded games keep fh=None."""
+    number, the consensus close and (when captured) Hard Rock's own pre-kick
+    close. Ungraded games keep fh=None. `hr_closes`: game_id -> Hard Rock's
+    pre-kickoff 1H close from the per-game close polls."""
+    hr_closes = hr_closes or {}
     rows: List[Dict] = []
     for it in items:
         gid = int(it["game_id"])
@@ -420,9 +451,12 @@ def build_live_frame(
         hr_price = it.get("hr_price")
         price = int(hr_price) if hr_price is not None else -110
         close = _num(closes.get(gid))
+        hr_close = _num(hr_closes.get(gid))
+        hr_open = _num(it.get("hr_open"))
         o_hr, u_hr = regrade(fh, hr_line, price)
         o_mk, u_mk = regrade(fh, market_line)
         o_cl, u_cl = regrade(fh, close)
+        o_hc, u_hc = regrade(fh, hr_close, price)
         spread = _num(g.get("spread"))
         full = _num(g.get("full_game_total"))
         rows.append(
@@ -455,6 +489,19 @@ def build_live_frame(
                 "outcome_close": o_cl,
                 "units_close": u_cl,
                 "hr_vs_market": hr_vs_market(hr_line, market_line),
+                # Hard Rock's own opener -> pre-kick close (the number you bet)
+                "hr_open": hr_open,
+                "hr_close": hr_close,
+                "hr_move": (hr_close - hr_open)
+                if hr_close is not None and hr_open is not None
+                else None,
+                "outcome_hr_close": o_hc,
+                "units_hr_close": u_hc,
+                # paper ledger
+                "qualifies": bool(it.get("qualifies")),
+                "over_cap": bool(it.get("over_cap")),
+                "cap_rank": _num(it.get("cap_rank")),
+                "blocker_dim": live_blocker(it),
             }
         )
     return pd.DataFrame(rows)
@@ -521,11 +568,18 @@ def live_rule_masks(df: pd.DataFrame) -> Dict[str, pd.Series]:
         if "gap" in df
         else pd.Series(np.nan, index=df.index)
     )
+    hr = df["hr_line"].notna() if "hr_line" in df else pd.Series(False, index=df.index)
+    if "qualifies" in df:
+        qualifying = df["qualifies"].fillna(False).astype(bool)
+    else:
+        qualifying = hr & gap.notna() & (gap >= BET_GAP_PTS)
     return {
-        "all_hr": df["hr_line"].notna(),
+        "all_hr": hr,
         "bet": tier == "BET",
         "price_read": tier.isin(["BET", "EDGE"]) | (ev.notna() & (ev >= PRICE_EDGE_EV)),
         "gap175": gap.notna() & (gap >= BET_GAP_PTS),
+        # the paper ledger's population: Hard Rock's 1H line >= 1.75 above ours, any gate
+        "qualifying": qualifying,
     }
 
 
@@ -642,6 +696,11 @@ def assign_dimensions(df: pd.DataFrame, proxy: str) -> pd.DataFrame:
             out[dim] = out[col].map(lambda v, b=bands: band_label(v, b)) if bands else None
     if "ev" in out:
         out["ev_band"] = out["ev"].map(lambda v: band_label(v, EV_BANDS))
+    if "blocker_dim" in out:
+        out["blocker"] = out["blocker_dim"]
+    if proxy == "hr" and "hr_line" in out and "hook_side" not in out:
+        out["key_dist"] = out["hr_line"].map(_key_dist)
+        out["hook_side"] = out["hr_line"].map(_hook_side)
     return out
 
 
@@ -1238,6 +1297,7 @@ RULE_LABEL = {
     "bet": "Card BET tier",
     "price_read": "Price read (Hard Rock pays ≥ fair)",
     "all_hr": "Every Hard Rock number (blanket under)",
+    "qualifying": "Qualifying (Hard Rock gap ≥ 1.75, any gate — the paper ledger)",
 }
 
 
@@ -1314,6 +1374,7 @@ def render_markdown(
             ("fh_pf_q", "Prior-season 1H points for, both teams (quartiles)"),
             ("hr_vs_market", "Hard Rock vs consensus"),
             ("tier", "Card tier"),
+            ("blocker", "Gate that blocked a real bet (paper ledger)"),
             ("ev_band", "Price read"),
             ("line_stress", "Line stress test (shift the grading line)"),
             ("resid_by_gap", "Model residual (actual − our line) by gap band"),
@@ -1572,6 +1633,7 @@ def compute_live(df: pd.DataFrame, *, season: int, run_id: str, computed_at: str
     buckets: List[Dict] = []
     for kind, ocol, ucol in (
         ("hr", "outcome_hr", "units_hr"),
+        ("hr_close", "outcome_hr_close", "units_hr_close"),
         ("market", "outcome_market", "units_market"),
         ("market_close", "outcome_close", "units_close"),
     ):
@@ -1630,10 +1692,20 @@ def compute_live(df: pd.DataFrame, *, season: int, run_id: str, computed_at: str
         "derived_line": derived_note,
         "price_read_counts": price_counts,
         "landing": sorted(int(v) for v in fh.dropna().tolist()) if len(fh) else [],
-        "caveats": [
-            f"The {season} system has placed zero model bets by design (no model read in weeks 1-2); there is no {season} record to grade.",
-            "Every card item is a Hard Rock price read. 'hr' grades the under at Hard Rock's own number and price, "
-            "'market' at the consensus number when the card was built, 'market_close' at the consensus close.",
+        "n_qualifying": int(masks["qualifying"].sum()),
+        "caveats": (
+            [
+                f"The {season} system has placed zero model bets so far (no model read in weeks 1-2 by design)."
+            ]
+            if int(masks["bet"].sum()) == 0
+            else []
+        )
+        + [
+            "'hr' grades the under at Hard Rock's own number and price when the card was built, "
+            "'hr_close' at Hard Rock's own pre-kick close, 'market' at the consensus number at "
+            "build time, 'market_close' at the consensus close.",
+            "'Qualifying' is the paper ledger: every game whose Hard Rock 1H line sat >= 1.75 "
+            "above ours, tagged by the gate that blocked a real bet (the 'blocker' dimension).",
             "Counts, not rates, until a bucket has 30 graded games.",
         ],
     }

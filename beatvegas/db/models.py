@@ -534,6 +534,17 @@ class PostMortemGame(Base):
     gap_real = Column(Float)
     outcome_real = Column(String)
     units_real = Column(Float)
+    # live scope (2026-09-07): Hard Rock's own opener, pre-kick close and move,
+    # graded at that close; plus the paper-ledger blocker dimension.
+    hr_open = Column(Float)
+    hr_close = Column(Float)
+    hr_move = Column(Float)
+    outcome_hr_close = Column(String)
+    units_hr_close = Column(Float)
+    blocker_dim = Column(String)
+    qualifies = Column(Boolean)
+    over_cap = Column(Boolean)
+    cap_rank = Column(Float)
     resid = Column(Float)
     kick = Column(String)
     tier = Column(String)

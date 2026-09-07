@@ -319,21 +319,12 @@ def _run_sim(season: int, week: int, *, notify: str, min_games: int, limit: Opti
 
 def _grade_manual_picks(s, season: int) -> int:
     """Grade the user's own ungraded manual picks for `season` against the
-    real final 1H scores (mirrors scripts/pick.py cmd_grade): a Hard Rock
-    ticket grades against Hard Rock's own pre-kick close when the per-game
-    close polls captured one, and a pick logged with a NULL price (an
-    unpriced Hard Rock line) has its price filled from Hard Rock's own priced
-    pre-kick close when one was captured — else it grades for the record
-    only (units stay None) rather than raising."""
-    from beatvegas.hardrock import HR_BOOK_KEY, normalize_book
-    from beatvegas.lines import (
-        book_closing_before_kickoff,
-        book_closing_price_before_kickoff,
-        consensus_open_close,
-    )
-
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    from pick import graded_pick_fields  # type: ignore
+    real final scores through the SAME `beatvegas.picks.grade_pick` the
+    production `scripts/pick.py grade` uses (trusted 1H total, pre-kickoff
+    close, Hard Rock's own close for a Hard Rock ticket, NULL-price fill from
+    HR's priced pre-kick close else units None), so the sim reveal matches
+    production grading exactly."""
+    from beatvegas.picks import grade_pick
 
     picks = (
         s.query(_ManualPick)
@@ -347,26 +338,8 @@ def _grade_manual_picks(s, season: int) -> int:
     graded = 0
     for p in picks:
         g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
-        if g is None or g.first_half_total is None:
-            continue
-        snaps = (
-            s.query(_OddsSnapshot)
-            .filter(_OddsSnapshot.game_id == p.game_id, _OddsSnapshot.market == "1H_total")
-            .all()
-        )
-        opening, closing = consensus_open_close(snaps)
-        if normalize_book(p.book) == HR_BOOK_KEY:
-            hr_open, hr_close, _ = book_closing_before_kickoff(snaps, g.start_date, HR_BOOK_KEY)
-            if hr_close is not None:
-                opening, closing = hr_open, hr_close
-            if p.price is None:
-                p.price = book_closing_price_before_kickoff(snaps, g.start_date, HR_BOOK_KEY)
-        for k, v in graded_pick_fields(
-            g.first_half_total, p.line, p.price, p.stake, opening, closing
-        ).items():
-            setattr(p, k, v)
-        p.graded = True
-        graded += 1
+        if g is not None and grade_pick(s, p, g):
+            graded += 1
     return graded
 
 

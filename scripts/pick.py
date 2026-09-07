@@ -20,24 +20,12 @@ import argparse
 from datetime import datetime
 from typing import List, Optional
 
-from beatvegas.db.models import Game, ManualPick, OddsSnapshot
+from beatvegas.db.models import Game, ManualPick
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import resolve_game
-from beatvegas.grading import (
-    clv_under,
-    price_clv_under,
-    trusted_first_half_total,
-    under_result,
-    units_won,
-)
-from beatvegas.hardrock import HR_BOOK_KEY, normalize_book
-from beatvegas.lines import (
-    book_closing_before_kickoff,
-    book_closing_price_before_kickoff,
-    closing_before_kickoff,
-    fair_under_before_kickoff,
-)
-from beatvegas.picks import add_pick, existing_pick
+from beatvegas.picks import add_pick, existing_pick, grade_pick, graded_pick_fields
+
+__all__ = ["graded_pick_fields"]  # re-exported from beatvegas.picks for existing importers
 
 
 def _season_games(s, season: int) -> List[dict]:
@@ -152,22 +140,6 @@ def cmd_list(args) -> None:
             )
 
 
-def graded_pick_fields(
-    actual_first_half, line, price, stake, opening, closing, fair_open=None, fair_close=None
-) -> dict:
-    """Pure: the graded ManualPick fields for one pick + its line snapshots.
-    `price` None (an unpriced line) grades the result and CLV but no units."""
-    return {
-        "actual_first_half_total": actual_first_half,
-        "result": under_result(actual_first_half, line),
-        "units": None if price is None else stake * units_won(actual_first_half, line, price),
-        "opening_line": opening,
-        "closing_line": closing,
-        "clv": clv_under(line, closing) if closing is not None else None,
-        "clv_prob": price_clv_under(fair_open, fair_close),
-    }
-
-
 def cmd_grade(args) -> None:
     season = args.season or _default_season()
     graded = 0
@@ -185,46 +157,10 @@ def cmd_grade(args) -> None:
             g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
             if g is None:
                 continue
-            is_full = (p.market or "1H") == "full"
-            if is_full:
-                if g.home_points is None or g.away_points is None:
-                    continue  # game not finished
-                actual = g.home_points + g.away_points
-                snap_market = "full_game_total"
-            else:
-                actual = trusted_first_half_total(
-                    g.first_half_total, g.home_points, g.away_points, g.first_half_source
-                )
-                if actual is None:
-                    continue  # not finished, or a known-false 0 — never grade it
-                snap_market = "1H_total"
-            snaps = (
-                s.query(OddsSnapshot)
-                .filter(OddsSnapshot.game_id == p.game_id, OddsSnapshot.market == snap_market)
-                .all()
-            )
-            # Pre-kickoff snapshots only (mirrors grade.py): a poll that ran
-            # after the game started must not pollute your closing line / CLV.
-            opening, closing, _closing_at = closing_before_kickoff(snaps, g.start_date)
-            # A Hard Rock ticket grades against Hard Rock's OWN pre-kick close
-            # when the per-game close polls captured one (the number you could
-            # have bet), else the consensus close as before.
-            if normalize_book(p.book) == HR_BOOK_KEY:
-                hr_open, hr_close, _ = book_closing_before_kickoff(snaps, g.start_date, HR_BOOK_KEY)
-                if hr_close is not None:
-                    opening, closing = hr_open, hr_close
-            # A pick logged on an unpriced Hard Rock line (price NULL) takes HR's
-            # own pre-kick closing price when the close polls captured one; if
-            # they never did, it grades for the record only (units stay None).
-            if p.price is None and normalize_book(p.book) == HR_BOOK_KEY:
-                p.price = book_closing_price_before_kickoff(snaps, g.start_date, HR_BOOK_KEY)
-            fair_open, fair_close = fair_under_before_kickoff(snaps, g.start_date)
-            for k, v in graded_pick_fields(
-                actual, p.line, p.price, p.stake, opening, closing, fair_open, fair_close
-            ).items():
-                setattr(p, k, v)
-            p.graded = True
-            graded += 1
+            # per-pick rules (trusted 1H, pre-kick close, Hard Rock's own close,
+            # NULL-price fill) live in beatvegas.picks.grade_pick
+            if grade_pick(s, p, g):
+                graded += 1
     print(f"graded {graded} pick(s) for {season}")
     cmd_summary(args)
 

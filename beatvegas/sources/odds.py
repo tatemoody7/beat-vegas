@@ -123,6 +123,28 @@ class OddsAPIClient:
         resp.raise_for_status()
         return _unwrap_historical(resp.json()) or []
 
+    def historical_bulk_totals(
+        self, date_iso: str, regions: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Full-game `totals` for EVERY upcoming event as of a past timestamp, from
+        the historical BULK /odds endpoint (one call covers the whole slate that
+        commences after `date_iso`). Costs 10 credits x regions x markets — so
+        10 with `us` — regardless of how many events come back. Used by
+        scripts/backfill_fg_history.py to grade the same picks on the full game."""
+        url = f"{self.base_url}/historical/sports/{self.sport}/odds"
+        params = {
+            "apiKey": self.api_key,
+            "regions": regions or self.regions,
+            "markets": "totals",
+            "oddsFormat": self.odds_format,
+            "dateFormat": "iso",
+            "date": date_iso,
+        }
+        resp = requests.get(url, params=params, timeout=self.timeout)
+        self._credits(resp)
+        resp.raise_for_status()
+        return _unwrap_historical(resp.json()) or []
+
     def historical_event_first_half_totals(self, event_id: str, date_iso: str) -> Dict[str, Any]:
         """totals_h1 odds for one event as of a past timestamp. Historical
         snapshots cost more per market than live calls — probe sparingly."""

@@ -141,7 +141,7 @@ def log_paper_picks(
     """Insert one PAPER pick per QUALIFYING item (Hard Rock's 1H line >=
     BET_GAP_PTS above ours — any tier) that has no paper pick yet, tagged with
     the gate that blocked a real bet (`blocker`: none = BET, price, off_market,
-    qb_out, cap). Tate's real ticket on the same game never blocks it and is
+    no_fair_price, qb_out, cap). Tate's real ticket on the same game never blocks it and is
     never blocked by it (per-ledger guard). `window_hours` restricts logging to
     games kicking off within that many hours (the DECISION build for that game:
     Thursday/Friday evening for weeknight games, Saturday morning for the
@@ -159,9 +159,21 @@ def log_paper_picks(
             it["paper_logged"] = True
             continue
         blocker = "cap" if it.get("over_cap") else (it.get("paper_blocker") or "none")
+        # Display chips + the market read frozen at the pick, so the post-mortem
+        # can slice by them even after the lines move (never gates).
         chips = {
             k: it.get(k)
-            for k in ("total_band", "hook_side", "key_dist", "full_game_total", "spread")
+            for k in (
+                "total_band",
+                "hook_side",
+                "key_dist",
+                "full_game_total",
+                "spread",
+                "hr_vs_market",
+                "fair_source",
+                "fair_under",
+                "market_line",
+            )
         }
         chips.update({"tier": it["tier"], "cap_rank": it.get("cap_rank")})
         add_pick(

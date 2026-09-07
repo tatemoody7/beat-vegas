@@ -137,6 +137,9 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     chips = json.loads(p.factors_json_at_pick)
     assert chips["total_band"] == "45–52" and chips["hook_side"] == "key+0.5"
     assert chips["tier"] == "BET" and chips["cap_rank"] == 1
+    # market-read chips frozen at the pick (post-mortem dimensions)
+    assert chips["hr_vs_market"] == 0.0 and chips["fair_source"] == "books"
+    assert chips["fair_under"] == pytest.approx(12 / 23, abs=1e-4) and chips["market_line"] == 24.5
 
     assert q.game_id == 5 and q.is_paper is True and q.blocker == "price"
     assert q.verdict_at_pick == "WATCH" and q.price == -125 and q.gap_at_pick == 2.0
@@ -370,6 +373,47 @@ def test_unpriced_hard_rock_line_logs_a_null_paper_price(env):
     (it,) = json.loads(row.payload)["items"]
     assert it["qualifies"] and it["hr_price"] is None
     assert pick.game_id == 21 and pick.is_paper is True and pick.price is None
+
+
+def test_no_comparable_price_logs_a_paper_pick_with_blocker_no_fair_price(env):
+    """Hard Rock alone at 24.5 -110 (no book or exchange at that number): the
+    gap qualifies, the price cannot be judged -> paper pick tagged
+    no_fair_price, verdict WATCH, never a real BET."""
+    mod, eng = env
+    kick = NOW + timedelta(days=1)
+    with Session(eng) as s:
+        s.add(_game(31, "Rice", "Tulsa", kick))
+        s.add(_snap(31, "hardrockbet", "full_game_total", 50.5, hours_ago=100))
+        s.add(_snap(31, "hardrockbet", "1H_total", 24.5, -110, -110))
+        s.add(
+            Prediction(
+                game_id=31,
+                model_version="gbm_v1",
+                bv_line=22.4,
+                under_score=55,
+                line_used=24.0,
+                created_at=NOW,
+            )
+        )
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW) == 0
+    with Session(eng) as s:
+        (pick,) = s.query(ManualPick).all()
+        (row,) = s.query(Card).all()
+    payload = json.loads(row.payload)
+    (it,) = payload["items"]
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price" and it["fair_source"] is None
+    assert payload["counts"]["bet"] == 0 and payload["paper"]["qualifying"] == 1
+    assert pick.game_id == 31 and pick.is_paper is True
+    assert pick.blocker == "no_fair_price" and pick.verdict_at_pick == "WATCH"
+    assert pick.ev_at_pick is None and pick.price == -110
+    assert pick.note.startswith(
+        "card 2026-09-18 [no_fair_price]: Wait: Hard Rock’s -110 can’t be judged"
+    )
+    chips = json.loads(pick.factors_json_at_pick)
+    assert chips["fair_source"] is None and chips["fair_under"] is None
+    assert chips["hr_vs_market"] is None and chips["market_line"] == 24.5
 
 
 def test_dry_run_writes_nothing(env, capsys):

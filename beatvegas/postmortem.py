@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .card import KEY_NUMBERS_1H, hook_side
 from .etl.fbs import FbsMap
 from .etl.proxy_line import DEFAULT_SHARE, proxy_total
 from .factors.ledger import BREAKEVEN, beta_posterior
@@ -43,7 +44,7 @@ WEEKLY_CAP = 5
 HIST_SCOPE = "hist_2023_25"
 RULES = ("all", "gap175", "gap300", "score53", "both", "cap5", "top20")
 LIVE_RULES = ("all_hr", "bet", "price_read", "gap175", "qualifying")
-KEY_NUMBERS = (24.0, 28.0, 31.0)
+KEY_NUMBERS = KEY_NUMBERS_1H  # one tuple with card.py so both ledgers read alike
 SIGMA_1H = 11.9  # per-game 1H-total noise, pts (validate_engine)
 
 _INF = float("inf")
@@ -642,18 +643,7 @@ def _key_dist(line: Any) -> Optional[str]:
     return band_label(min(abs(v - k) for k in KEY_NUMBERS), KEY_DIST_BANDS)
 
 
-def _hook_side(line: Any) -> Optional[str]:
-    v = _num(line)
-    if v is None:
-        return None
-    for k in KEY_NUMBERS:
-        if abs(v - k) < 1e-9:
-            return "on_key"
-        if abs((v - k) - 0.5) < 1e-9:
-            return "key+0.5"
-        if abs((k - v) - 0.5) < 1e-9:
-            return "key−0.5"
-    return "other"
+_hook_side = hook_side  # same chip as the live card (beatvegas/card.py)
 
 
 def assign_dimensions(df: pd.DataFrame, proxy: str) -> pd.DataFrame:

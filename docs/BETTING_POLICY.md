@@ -151,7 +151,11 @@ week expected (`lines_watch.yml` header).
 - Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
   **every game whose Hard Rock first-half line sits ≥ 1.75 above our number**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
-  BET, `price`, `off_market`, `qb_out`, `cap` = the 6th+ by gap that week).
+  BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
+  Hard Rock's number so the price could not be judged, `qb_out`, `cap` = the
+  6th+ by gap that week). The fair price is exchange-first: the mean of the
+  exchanges quoting Hard Rock's exact line (the Friday/Saturday sweeps add the
+  `us_ex` region), else the median of the books within half a point.
   That measures each gate, not just the survivors. The cloud card
   (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
   per qualifying game at its decision build — the Thursday/Friday evening

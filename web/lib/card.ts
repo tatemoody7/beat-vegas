@@ -16,8 +16,8 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 //    counts:{bet,edge,pass,over_cap,degraded},
 //    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
-//            hr_open, market_line, fair_under, ev, bv_line, gap, kill_line,
-//            kill_price, action, why:[...], paper_logged,
+//            hr_open, market_line, fair_under, fair_source, hr_vs_market, ev,
+//            bv_line, gap, kill_line, kill_price, action, why:[...], paper_logged,
 //            qualifies, paper_blocker, cap_rank, over_cap,
 //            full_game_total, spread, total_band, hook_side, key_dist,
 //            hr_vs_market, fair_source, degraded_inputs, reason}],
@@ -36,6 +36,7 @@ export type CardBlocker =
   | "no_hr_line"
   | "off_market"
   | "price"
+  | "no_fair_price"
   | "qb_out"
   | "gap"
   | "no_model"
@@ -70,6 +71,10 @@ export type CardItem = {
   hrOpen: number | null;
   marketLine: number | null;
   fairUnder: number | null;
+  /** Where the fair price came from: exchanges at Hard Rock's exact line, else the book median; null = none (no_fair_price). */
+  fairSource: "exchange" | "books" | null;
+  /** Hard Rock's line minus the other books' median; null without both. */
+  hrVsMarket: number | null;
   ev: number | null;
   bvLine: number | null;
   gap: number | null;
@@ -128,6 +133,7 @@ const BLOCKERS: readonly CardBlocker[] = [
   "no_hr_line",
   "off_market",
   "price",
+  "no_fair_price",
   "qb_out",
   "gap",
   "no_model",
@@ -188,6 +194,11 @@ function parseItem(raw: unknown): CardItem | null {
     hrOpen: num(raw.hr_open),
     marketLine: num(raw.market_line),
     fairUnder: num(raw.fair_under),
+    fairSource:
+      raw.fair_source === "exchange" || raw.fair_source === "books"
+        ? raw.fair_source
+        : null,
+    hrVsMarket: num(raw.hr_vs_market),
     ev: num(raw.ev),
     bvLine: num(raw.bv_line),
     gap: num(raw.gap),

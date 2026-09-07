@@ -26,6 +26,8 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   hrOpen: null,
   marketLine: 24.5,
   fairUnder: 0.52,
+  fairSource: "books",
+  hrVsMarket: 0,
   ev: -0.004,
   bvLine: 22.4,
   gap: 2.1,

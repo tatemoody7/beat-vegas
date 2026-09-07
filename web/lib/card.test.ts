@@ -99,6 +99,8 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   hrOpen: null,
   marketLine: null,
   fairUnder: null,
+  fairSource: null,
+  hrVsMarket: null,
   ev: null,
   bvLine: null,
   gap: null,
@@ -544,6 +546,46 @@ describe("parseCard: paper ledger fields", () => {
       overCap: 1,
       degraded: 0,
     });
+  });
+
+  it("reads fair_source / hr_vs_market and the no_fair_price blocker (PR-6)", () => {
+    const c = parseCard(
+      rawCard({
+        items: [
+          rawItem({ fair_source: "exchange", hr_vs_market: 0.5 }),
+          rawItem({
+            game_id: 402,
+            tier: "EDGE",
+            blocker: "no_fair_price",
+            paper_blocker: "no_fair_price",
+            qualifies: true,
+            fair_under: null,
+            fair_source: null,
+            hr_vs_market: null,
+            ev: null,
+          }),
+          rawItem({ game_id: 403, fair_source: "books", hr_vs_market: "-0.5" }),
+          rawItem({ game_id: 404, fair_source: "guess", hr_vs_market: "x" }),
+        ],
+      }),
+    )!;
+    expect(c.items[0]).toMatchObject({
+      fairSource: "exchange",
+      hrVsMarket: 0.5,
+    });
+    expect(c.items[1]).toMatchObject({
+      blocker: "no_fair_price",
+      paperBlocker: "no_fair_price",
+      fairSource: null,
+      hrVsMarket: null,
+      ev: null,
+    });
+    expect(c.items[2]).toMatchObject({ fairSource: "books", hrVsMarket: -0.5 });
+    // unknown source / garbage number read as null, never leak through
+    expect(c.items[3]).toMatchObject({ fairSource: null, hrVsMarket: null });
+    // a payload from before the fields existed
+    const old = parseCard(rawCard())!;
+    expect(old.items[0]).toMatchObject({ fairSource: null, hrVsMarket: null });
   });
 
   it("derives the paper tallies and defaults when the payload predates them", () => {

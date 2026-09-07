@@ -51,6 +51,65 @@ export type LineCheckRow = {
   books: BookLine[]; // deduped, sorted by line desc (best first)
 };
 
+// Books that never enter the BOOK median fair price (mirrors
+// beatvegas/card.py FAIR_PRICE_EXCLUDED): Hard Rock (the book being judged),
+// the sweepstakes book, the synthetic aggregate and the exchanges (they enter
+// through the exchange-first path instead).
+const FAIR_PRICE_EXCLUDED = new Set(["fliff"]);
+// A book is "comparable" to Hard Rock's number within this many points
+// (card.py FAIR_PRICE_LINE_WINDOW).
+const FAIR_PRICE_LINE_WINDOW = 0.5;
+
+export type FairSource = "exchange" | "books";
+export type FairObs = {
+  line: number;
+  overPrice: number | null;
+  underPrice: number | null;
+};
+
+const fairUnderOf = (o: FairObs): number | null =>
+  o.overPrice === null || o.underPrice === null
+    ? null
+    : devigTwoWay(o.overPrice, o.underPrice).fairUnder;
+
+/**
+ * The market's no-vig fair P(under) at Hard Rock's number — EXCHANGE-FIRST
+ * (mirrors beatvegas/card.py market_read): the mean of the ~0-hold exchanges
+ * quoting Hard Rock's EXACT line, else the median over comparable books
+ * (within half a point; Hard Rock, fliff, the synthetic aggregate and the
+ * exchanges excluded), else null — the price cannot be judged.
+ */
+export function marketFairUnderAt(
+  hrLine: number | null,
+  byBook: Map<string, FairObs>,
+): { fairUnder: number | null; source: FairSource | null } {
+  if (hrLine === null) return { fairUnder: null, source: null };
+  const exchange: number[] = [];
+  const books: number[] = [];
+  for (const [key, o] of byBook) {
+    const k = key.toLowerCase();
+    if (HR_KEYS.includes(k) || isSynthetic(k) || FAIR_PRICE_EXCLUDED.has(k)) {
+      continue;
+    }
+    const f = fairUnderOf(o);
+    if (f === null) continue;
+    if (isExchange(k)) {
+      // Same market only: exact line equality (a half point off is another total).
+      if (Math.abs(o.line - hrLine) < 1e-9) exchange.push(f);
+    } else if (Math.abs(o.line - hrLine) <= FAIR_PRICE_LINE_WINDOW) {
+      books.push(f);
+    }
+  }
+  if (exchange.length > 0) {
+    return {
+      fairUnder: exchange.reduce((a, b) => a + b, 0) / exchange.length,
+      source: "exchange",
+    };
+  }
+  const med = median(books);
+  return { fairUnder: med, source: med === null ? null : "books" };
+}
+
 function verdictFor(hr: number | null, best: number | null): Verdict {
   if (hr === null) return "no-hr";
   if (best === null) return "fair";
@@ -142,11 +201,6 @@ export async function getLineCheck(
 
   const out: LineCheckRow[] = [];
   for (const [gameId, g] of games) {
-    const fairUnderOf = (o: BookObs): number | null =>
-      o.overPrice === null || o.underPrice === null
-        ? null
-        : devigTwoWay(o.overPrice, o.underPrice).fairUnder;
-
     const books: BookLine[] = [...g.byBook.entries()].map(([book, v]) => ({
       book,
       line: v.line,
@@ -167,19 +221,11 @@ export async function getLineCheck(
     const hrLine = hrObs?.line ?? null;
 
     // Devig / EV layer. Compare HR's under price to the market's no-vig fair
-    // under at a COMPARABLE number (other books within half a point of HR's
-    // line) — keeps it apples-to-apples rather than mixing different totals.
+    // under at Hard Rock's number: exchanges at the exact line first, else the
+    // comparable books (within half a point) — the same read as the card
+    // (beatvegas/card.py), so the site and the card never disagree on EV.
     const hrUnderPrice = hrObs?.underPrice ?? null;
-    const comparable =
-      hrLine === null
-        ? []
-        : [...g.byBook.entries()]
-            .filter(([k]) => !HR_KEYS.includes(k))
-            .map(([, o]) => o)
-            .filter((o) => Math.abs(o.line - hrLine) <= 0.5)
-            .map(fairUnderOf)
-            .filter((f): f is number => f !== null);
-    const marketFairUnder = median(comparable);
+    const marketFairUnder = marketFairUnderAt(hrLine, g.byBook).fairUnder;
     const ev =
       marketFairUnder !== null && hrUnderPrice !== null
         ? evUnder(marketFairUnder, hrUnderPrice)

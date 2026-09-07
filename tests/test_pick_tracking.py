@@ -202,6 +202,29 @@ def _paper(s, gid=1, blocker="price"):
     )
 
 
+def test_null_price_persists_as_null():
+    """An unpriced Hard Rock line logs price NULL — the ORM must not fall back
+    to a -110 column default on INSERT (grade fills it from HR's close)."""
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        row = add_pick(
+            s,
+            game_id=1,
+            season=2026,
+            week=3,
+            home_team="H",
+            away_team="A",
+            line=24.5,
+            price=None,
+            is_paper=True,
+        )
+        s.commit()
+        rid = row.id
+    with Session(eng) as s:
+        assert s.get(ManualPick, rid).price is None
+
+
 def test_add_pick_stores_blocker_and_chips():
     pick, eng = _pick_module()
     with Session(eng) as s:

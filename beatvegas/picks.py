@@ -51,7 +51,7 @@ def add_pick(
     home_team: str,
     away_team: str,
     line: float,
-    price: int = -110,
+    price: Optional[int] = -110,
     stake: float = 1.0,
     is_paper: bool = False,
     market: str = "1H",

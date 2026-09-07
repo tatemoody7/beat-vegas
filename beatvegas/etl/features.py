@@ -193,7 +193,8 @@ def _query_games() -> pd.DataFrame:
                 "full_game_total",
                 "spread",
                 "venue_id",
-                "first_half_source",  # 'pbp' | 'linescores' — for trusted-FH filtering
+                "first_half_source",  # 'pbp' | 'linescores' — selected for the residual-model
+                # training frame added in the next PR (unused here so far)
             ],
         )
         venues = pd.DataFrame(

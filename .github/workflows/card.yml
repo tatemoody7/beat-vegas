@@ -34,7 +34,7 @@ on:
         default: ''
 
 concurrency:
-  group: card
+  group: neon-writers
   cancel-in-progress: false
 
 jobs:

@@ -147,29 +147,49 @@ def try_init_db(path: Optional[Path] = None) -> bool:
         return False
 
 
-def _resync_sequences(engine) -> None:
-    """Postgres only: bump each table's id sequence to MAX(id).
+_RESYNC_LOCK_KEY = "beatvegas_resync_sequences"
+
+
+def resync_table_sequence(executor, table: str) -> bool:
+    """Postgres only: raise `table`'s id sequence to MAX(id) when it has fallen
+    behind the data, and NEVER lower it. Returns True when it moved.
 
     Rows deployed from SQLite carry explicit ids that never advance the serial
     sequence, so the next ORM insert would collide on the pkey (the Neon
-    id-sequence gotcha). Running this on every init makes any writer safe to
-    start after an explicit-id deploy."""
+    id-sequence gotcha). But a concurrent writer may already hold ids past the
+    MAX(id) visible here (uncommitted rows), so lowering the sequence to MAX(id)
+    hands out ids that writer owns — that collision crashed the 2023 opener
+    pull. Callers must hold a transaction; `executor` is a Connection or Session.
+    Concurrent resyncs are serialized by a transaction-scoped advisory lock."""
+    executor.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": _RESYNC_LOCK_KEY})
+    seq = executor.execute(text("SELECT pg_get_serial_sequence(:t, 'id')"), {"t": table}).scalar()
+    if not seq:
+        return False
+    max_id = executor.execute(text(f'SELECT MAX(id) FROM "{table}"')).scalar()
+    if max_id is None:
+        return False
+    row = executor.execute(text(f"SELECT last_value, is_called FROM {seq}")).one()
+    current = int(row.last_value) if row.is_called else 0
+    if max_id <= current:
+        return False
+    executor.execute(text("SELECT setval(:s, :n)"), {"s": seq, "n": int(max_id)})
+    return True
+
+
+def _resync_sequences(engine) -> None:
+    """Postgres only: bring every table's id sequence up to MAX(id) (never down).
+    Running this on every init makes any writer safe to start after an
+    explicit-id deploy; see resync_table_sequence for the concurrency rule."""
     if engine.url.get_backend_name().startswith("sqlite"):
         return
     with engine.begin() as conn:
         seqs = conn.execute(
             text("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'")
         ).scalars()
-        for seq in seqs:
+        for seq in list(seqs):
             if not seq.endswith("_id_seq"):
                 continue
-            table = seq[: -len("_id_seq")]
-            max_id = conn.execute(text(f'SELECT MAX(id) FROM "{table}"')).scalar()
-            if max_id is not None:
-                conn.execute(
-                    text("SELECT setval(pg_get_serial_sequence(:t, 'id'), :n)"),
-                    {"t": table, "n": max_id},
-                )
+            resync_table_sequence(conn, seq[: -len("_id_seq")])
 
 
 def _apply_migrations(engine) -> None:

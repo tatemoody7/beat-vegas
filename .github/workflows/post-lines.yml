@@ -25,7 +25,7 @@ on:
 # Shares sunday.yml's concurrency group: both write derived_lines with a
 # delete-then-insert, so they must never overlap.
 concurrency:
-  group: sunday
+  group: neon-writers
   cancel-in-progress: false
 
 jobs:

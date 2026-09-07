@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from sqlalchemy import text
 
 from beatvegas import postmortem as pm
 from beatvegas.config import REPO_ROOT
@@ -43,7 +42,7 @@ from beatvegas.db.models import (
     TeamTempo,
     Weather,
 )
-from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.proxy_line import _load_share_coeffs
 from beatvegas.lines import closing_before_kickoff
@@ -243,16 +242,10 @@ def _chunked_insert(session, model, rows: List[Dict], chunk: int = CHUNK) -> Non
 
 
 def _resync_sequence(session, model) -> None:
-    """Point the id sequence past MAX(id). Neon tables seeded or partially written
-    by earlier runs can leave the sequence behind the data (CLAUDE.md gotcha), and
-    a bulk insert then collides on the primary key."""
-    table = model.__tablename__
-    session.execute(
-        text(
-            f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-            f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
-        )
-    )
+    """Bring the id sequence up to MAX(id) — never down — via the shared store
+    rule (Neon tables seeded or partially written by earlier runs can leave the
+    sequence behind the data; a concurrent writer may be ahead of it)."""
+    resync_table_sequence(session, model.__tablename__)
 
 
 def write_run(session, out: Dict[str, Any], computed_at: datetime, params: Dict[str, Any]) -> None:

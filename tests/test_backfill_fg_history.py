@@ -149,3 +149,39 @@ def test_historical_bulk_totals_hits_the_bulk_endpoint_and_unwraps(monkeypatch):
     assert seen["params"]["markets"] == "totals" and seen["params"]["regions"] == "us"
     assert seen["params"]["date"] == "2024-10-19T19:00:00Z"
     assert c.last_credits.last_cost == 10
+
+
+def test_fetch_with_retry_retries_transient_errors_then_gives_up_quietly():
+    import requests
+
+    bf = _load_script("backfill_fg_history")
+    calls = {"n": 0}
+    slept = []
+
+    def _resp(code):
+        r = requests.Response()
+        r.status_code = code
+        return r
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise requests.HTTPError("502", response=_resp(502))
+        return [{"id": "e1"}]
+
+    out = bf.fetch_with_retry(flaky, backoff=(1, 2, 3), sleep=slept.append)
+    assert out == [{"id": "e1"}] and calls["n"] == 3 and slept == [1, 2]
+
+    def always_502():
+        raise requests.HTTPError("502", response=_resp(502))
+
+    slept.clear()
+    assert bf.fetch_with_retry(always_502, backoff=(1, 2, 3), sleep=slept.append) is None
+    assert slept == [1, 2, 3]  # every retry spent, then the wave is skipped
+
+    def unauthorized():
+        raise requests.HTTPError("401", response=_resp(401))
+
+    slept.clear()
+    assert bf.fetch_with_retry(unauthorized, backoff=(1, 2, 3), sleep=slept.append) is None
+    assert slept == []  # a 4xx is not transient: no retries

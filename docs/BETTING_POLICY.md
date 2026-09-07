@@ -159,7 +159,19 @@ week expected (`lines_watch.yml` header).
   (`--paper-log-window-hours`) — never twice for one game. A paper pick never
   blocks your real ticket on the same game, and vice versa (the duplicate
   guard is per ledger). The card ranks BETs by gap (the cap-5 rule the
-  backtest measured), so the text order is the cap order.
+  backtest measured), so the text order is the cap order. A real ticket this
+  week on a game that is not on the card (a Thursday game already played)
+  still consumes one of the five slots.
+- **Unpriced lines.** When Hard Rock has posted the first-half number but no
+  price yet, the paper pick is logged with `price` NULL — never a made-up
+  -110. The Monday grader fills it from Hard Rock's own pre-kick close when
+  the close polls captured one and grades units normally; if no priced Hard
+  Rock snapshot exists, the pick still grades for the record and hit rate
+  but carries no units (the summary reports `(k unpriced)`).
+- **Hook chip.** Each paper pick carries a `hook_side` chip: `key+0.5`
+  (half a point above 24/28/31 — the under wins on a landing at the key),
+  `key−0.5`, `on_key` (the line is a key number — a landing there pushes),
+  or `other`. Chips describe, they never gate.
 
 ## Pre-flight checklist (do once)
 

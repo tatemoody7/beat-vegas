@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { BetSlip as Slip, BetSlipRow } from "@/lib/betSlip";
-import { american } from "@/lib/format";
+import {
+  loggedLabel,
+  type BetSlip as Slip,
+  type BetSlipRow,
+} from "@/lib/betSlip";
 
 // The Saturday-morning bet slip: this week's BETs from the latest card, ranked
 // by gap, each with Hard Rock's line + price and the kill numbers, and ONE tap
@@ -95,9 +98,7 @@ function SlipRow({ r, disabled }: { r: BetSlipRow; disabled: boolean }) {
         <span className="ml-auto flex items-center gap-2">
           {status === "logged" && (
             <span className="rounded-md border border-[var(--accent-strong)] px-1.5 text-xs text-[var(--accent)]">
-              {r.loggedLine !== null
-                ? `logged u${r.loggedLine}${r.loggedPrice !== null ? ` ${american(r.loggedPrice)}` : ""}`
-                : "logged"}
+              {loggedLabel(r.loggedLine, r.loggedPrice)}
             </span>
           )}
           {status === "over_cap" && (

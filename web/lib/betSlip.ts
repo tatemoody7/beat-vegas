@@ -1,4 +1,5 @@
 import { killLabel, lineLabel, type Card } from "@/lib/card";
+import { american } from "@/lib/format";
 import { kickoffET } from "@/lib/homeBoard";
 import type { WeekPick } from "@/lib/picks";
 
@@ -51,6 +52,15 @@ export type BetSlip = {
 };
 
 const pickKey = (away: string | null, home: string | null) => `${away}@${home}`;
+
+/**
+ * The "logged" chip text: "logged u24.5 -115"; "logged u24.5" when the pick
+ * was logged before Hard Rock priced it (price NULL); "logged" with no line.
+ */
+export function loggedLabel(line: number | null, price: number | null): string {
+  if (line === null) return "logged";
+  return `logged u${line}${price !== null ? ` ${american(price)}` : ""}`;
+}
 
 /** Pure: the slip from the latest card and this week's real 1H picks. */
 export function buildBetSlip(

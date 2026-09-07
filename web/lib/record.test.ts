@@ -30,6 +30,22 @@ describe("recordFrom", () => {
     expect(rec?.roi).toBe("+91.0%");
   });
 
+  it("unpriced rows (units null) count in W-L and hit rate but not in units or staked", () => {
+    const rec = recordFrom([
+      { result: "under", units: 0.91, clv: 1.0, stake: 1 },
+      { result: "under", units: null, clv: 0.5, stake: 1 }, // no Hard Rock close captured
+      { result: "over", units: -1, clv: null, stake: 1 },
+    ]);
+    expect(rec).toMatchObject({
+      n: 3,
+      record: "2-1",
+      hit: "66.7%",
+      units: "-0.09",
+      roi: "-4.5%", // -0.09 over the 2 units actually staked
+      clv: "+0.75",
+    });
+  });
+
   it("legacy paper picks (stake 0) show no ROI but still count wins and CLV", () => {
     const rec = recordFrom([
       { result: "under", units: 0, clv: 1.5, stake: 0 },

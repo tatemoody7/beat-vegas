@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBetSlip } from "./betSlip";
+import { buildBetSlip, loggedLabel } from "./betSlip";
 import type { Card, CardItem } from "./card";
 
 const NOW = new Date("2026-09-19T12:50:00Z"); // Sat 8:50am ET
@@ -39,9 +39,10 @@ const card = (items: CardItem[]): Card => ({
   builtAt: "2026-09-19T12:45:00Z",
   modelRead: true,
   counts: {
-    bet: items.filter((i) => i.tier === "BET").length,
+    bet: items.filter((i) => i.tier === "BET" && !i.overCap).length,
     edge: 0,
     pass: 0,
+    overCap: items.filter((i) => i.overCap).length,
   },
   paper: { qualifying: 0, overCap: 0, cap: 5 },
   items,
@@ -112,6 +113,32 @@ describe("buildBetSlip", () => {
     expect(s.builtAt).toBe("2026-09-19T12:45:00Z");
   });
 
+  it("carries a NULL logged price through (pick logged before Hard Rock priced it)", () => {
+    const c = card([item({ gameId: 1 })]);
+    const s = buildBetSlip(
+      c,
+      [
+        {
+          gameId: 1,
+          away: "Kansas",
+          home: "Missouri",
+          line: 24.5,
+          price: null,
+        },
+      ],
+      5,
+      NOW,
+    );
+    expect(s.rows[0]).toMatchObject({
+      status: "logged",
+      loggedLine: 24.5,
+      loggedPrice: null,
+    });
+    expect(loggedLabel(s.rows[0].loggedLine, s.rows[0].loggedPrice)).toBe(
+      "logged u24.5",
+    );
+  });
+
   it("matches a logged pick by team names when the game id is missing", () => {
     const c = card([item({ gameId: 1 })]);
     const s = buildBetSlip(
@@ -129,5 +156,14 @@ describe("buildBetSlip", () => {
       NOW,
     );
     expect(s.rows[0].status).toBe("logged");
+  });
+});
+
+describe("loggedLabel", () => {
+  it("shows the line and price, the line alone when unpriced, or just 'logged'", () => {
+    expect(loggedLabel(24, -115)).toBe("logged u24 -115");
+    expect(loggedLabel(24.5, 100)).toBe("logged u24.5 +100");
+    expect(loggedLabel(24.5, null)).toBe("logged u24.5");
+    expect(loggedLabel(null, -110)).toBe("logged");
   });
 });

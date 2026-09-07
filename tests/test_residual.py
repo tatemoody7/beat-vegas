@@ -131,8 +131,14 @@ def test_residual_feature_cols_pass_guard():
         "closing_line",
         "proxy_line",
         "under",
-        "first_half_total",
         R.TARGET,
+        # the OUTCOME columns build_feature_frame carries next to the features
+        "home_points",
+        "away_points",
+        "first_half_total",
+        "first_half_source",
+        "home_fh",
+        "away_fh",
     ],
 )
 def test_guard_trips_on_banned_column(bad):
@@ -243,11 +249,37 @@ def test_residual_1h_for_slate_empty_safe():
 
 
 def test_residual_1h_for_slate_tolerates_missing_frame_columns():
-    """A frame that predates a feature (e.g. wx_wind_band) must score with NaN,
-    not KeyError — the same contract features.py gives FEATURE_COLS."""
+    """A frame that predates a LONG-TAIL feature (wx_wind_band) still scores with
+    NaN, not KeyError — the same contract features.py gives FEATURE_COLS. But a
+    missing REQUIRED feature (spread) is not a silent NaN fill: it warns and is
+    named in the fingerprint, because the residual has little signal to spare."""
     df, closes = _frame(per_season=40)
     df = df.drop(columns=["wx_wind_band", "spread"])
     train_r = R.residual_training_frame(df[df["season"] < 2025], closes)
     target = df[df["season"] == 2025].copy()
-    pred, _, _ = R.residual_1h_for_slate(train_r, target, target["id"].map(closes).astype(float))
+    with pytest.warns(RuntimeWarning, match="spread"):
+        pred, _, fp = R.residual_1h_for_slate(
+            train_r, target, target["id"].map(closes).astype(float)
+        )
     assert len(pred) == len(target)
+    assert fp["missing_features"] == ["spread"]  # wx_wind_band is long tail, not required
+
+
+def test_residual_1h_for_slate_does_not_warn_on_a_complete_frame(recwarn):
+    df, closes = _frame(per_season=40)
+    train_r = R.residual_training_frame(df[df["season"] < 2025], closes)
+    target = df[df["season"] == 2025].copy()
+    _, _, fp = R.residual_1h_for_slate(train_r, target, target["id"].map(closes).astype(float))
+    assert fp["missing_features"] == []
+    assert [w for w in recwarn.list if issubclass(w.category, RuntimeWarning)] == []
+
+
+def test_required_features_all_nan_column_counts_as_missing():
+    """A column that is present but entirely NaN is as useless as an absent one."""
+    df, closes = _frame(per_season=40)
+    df["full_game_total"] = np.nan
+    train_r = R.residual_training_frame(df[df["season"] < 2025], closes)
+    target = df[df["season"] == 2025].copy()
+    with pytest.warns(RuntimeWarning, match="full_game_total"):
+        _, _, fp = R.residual_1h_for_slate(train_r, target, target["id"].map(closes).astype(float))
+    assert fp["missing_features"] == ["full_game_total"]

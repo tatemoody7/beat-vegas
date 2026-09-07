@@ -21,6 +21,7 @@ columns may ever leak into bv_line.BV_FEATURE_COLS.
 from __future__ import annotations
 
 import hashlib
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -69,7 +70,10 @@ RESIDUAL_FEATURE_COLS: List[str] = [
     "neutral_site",
 ]
 
-# Names that would make the residual circular or leak the outcome.
+# Names that would make the residual circular or leak the outcome. The second
+# block is every OUTCOME column build_feature_frame carries alongside the
+# features (final score, the 1H truth and its provenance, and the per-team 1H
+# points `home_fh`/`away_fh` those are summed from) — none may ever be a feature.
 _FORBIDDEN = {
     "bv_line",
     "bv_gap",
@@ -77,11 +81,23 @@ _FORBIDDEN = {
     "closing_line",
     "proxy_line",
     "under",
-    "first_half_total",
     TARGET,
+    "home_points",
+    "away_points",
+    "first_half_total",
+    "first_half_source",
+    "home_fh",
+    "away_fh",
 }
 # This engine's line-derived columns: the incumbent must never see them.
 _LINE_DERIVED = {LINE_COL, "implied_1h_share", "wx_wind_band"}
+
+# The features the residual genuinely needs: the line it conditions on and the
+# two market numbers that shape 1H share. The long tail (weather, PBP factors,
+# rest) may legitimately be absent on an old frame and is NaN-filled silently;
+# these three are not — a residual has little signal to spare, so their absence
+# is a loud warning plus fingerprint["missing_features"], not a quiet NaN column.
+REQUIRED_FEATURES: Tuple[str, ...] = (LINE_COL, "full_game_total", "spread")
 
 
 def assert_residual_features(cols) -> None:
@@ -117,6 +133,20 @@ def _ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = np.nan
         df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
     return df
+
+
+def missing_required(df: pd.DataFrame) -> List[str]:
+    """REQUIRED_FEATURES that `df` cannot supply — absent, or present but wholly
+    NaN (an all-NaN column is as useless to the fit as a missing one)."""
+    out: List[str] = []
+    for c in REQUIRED_FEATURES:
+        if c not in df.columns:
+            out.append(c)
+            continue
+        col = pd.to_numeric(df[c], errors="coerce")
+        if len(col) == 0 or bool(col.isna().all()):
+            out.append(c)
+    return out
 
 
 def residual_training_frame(df: pd.DataFrame, closes: Dict[int, float]) -> pd.DataFrame:
@@ -263,10 +293,24 @@ def residual_1h_for_slate(
 ) -> Tuple[np.ndarray, object, Dict]:
     """Fit on the residual training frame, predict the slate given its ranking
     line: (predicted 1H total, fitted model, fingerprint). Empty train or slate
-    -> (empty array, None, {}), like bv_line_for_slate."""
+    -> (empty array, None, {}), like bv_line_for_slate.
+
+    A REQUIRED_FEATURES column missing from either frame warns (RuntimeWarning)
+    and lands in fingerprint["missing_features"]; the long tail stays a silent
+    NaN fill."""
     if train_resid is None or train_resid.empty or target.empty:
         return np.array([], dtype=float), None, {}
     model = fit_residual(train_resid)
     slate = attach_line_features(target, line)
     pred = predict_1h_total(model, slate)
-    return pred, model, fingerprint(train_resid, RESIDUAL_FEATURE_COLS)
+    fp = fingerprint(train_resid, RESIDUAL_FEATURE_COLS)
+    missing = sorted(set(missing_required(train_resid)) | set(missing_required(slate)))
+    if missing:
+        warnings.warn(
+            f"residual engine: required feature(s) {missing} absent or all-NaN — "
+            "the model is conditioning on a NaN column",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    fp["missing_features"] = missing
+    return pred, model, fp

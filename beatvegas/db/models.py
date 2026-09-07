@@ -354,7 +354,7 @@ class GameRecord(Base):
     model_version = Column(String)  # model that produced the as-of bv_line
     features_json = Column(String)  # leak-free feature vector, as-of kickoff
     line = Column(Float)  # 1H line at snapshot
-    line_kind = Column(String)  # 'observed_1h' | 'derived_fg' | 'proxy'
+    line_kind = Column(String)  # 'hr_1h' | 'observed_1h' | 'derived_fg' | 'proxy'
     bv_line = Column(Float)
     bv_gap = Column(Float)
     bv_gap_z = Column(Float)

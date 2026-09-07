@@ -11,7 +11,7 @@ import { WEEKLY_BET_CAP } from "@/lib/verdict";
 // instead of a 500.
 //
 // Payload contract (exact, from the Python side):
-//   {season, week, built_at, model_read, counts:{bet,edge,pass},
+//   {season, week, built_at, model_read, counts:{bet,edge,pass,over_cap},
 //    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
 //            hr_open, market_line, fair_under, ev, bv_line, gap, kill_line,
@@ -23,6 +23,7 @@ import { WEEKLY_BET_CAP } from "@/lib/verdict";
 // (the cap-5 rule the real-close backtest measured ranks by gap). The 6th+
 // BET by gap keeps tier BET but carries blocker "cap" and over_cap: every
 // gate passed, the weekly cap (docs/BETTING_POLICY.md) makes it paper only.
+// counts.bet is the bettable BETs (inside the cap); counts.over_cap the rest.
 
 export type CardTier = "BET" | "EDGE" | "PASS";
 export type CardBlocker =
@@ -74,7 +75,8 @@ export type Card = {
   /** When the card was built, UTC ISO; null when the payload did not say. */
   builtAt: string | null;
   modelRead: boolean;
-  counts: { bet: number; edge: number; pass: number };
+  /** bet = BETs inside the weekly cap (bettable); overCap = BETs beyond it (paper only). */
+  counts: { bet: number; edge: number; pass: number; overCap: number };
   /** Paper ledger tallies: qualifying games, BETs over the cap, the cap. */
   paper: { qualifying: number; overCap: number; cap: number };
   items: CardItem[];
@@ -181,15 +183,17 @@ export function parseCard(raw: unknown): Card | null {
     ? obj.items.map(parseItem).filter((i): i is CardItem => i !== null)
     : [];
   const derived = {
-    bet: items.filter((i) => i.tier === "BET").length,
+    bet: items.filter((i) => i.tier === "BET" && !i.overCap).length,
     edge: items.filter((i) => i.tier === "EDGE").length,
     pass: items.filter((i) => i.tier === "PASS").length,
+    overCap: items.filter((i) => i.overCap).length,
   };
   const c = isObj(obj.counts) ? obj.counts : {};
   const counts = {
     bet: int(c.bet) ?? derived.bet,
     edge: int(c.edge) ?? derived.edge,
     pass: int(c.pass) ?? derived.pass,
+    overCap: int(c.over_cap) ?? derived.overCap,
   };
   const pp = isObj(obj.paper) ? obj.paper : {};
   const paper = {

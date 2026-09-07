@@ -138,3 +138,30 @@ def test_book_closing_uses_one_books_pre_kick_snapshots_only():
     assert (opening, closing) == (25.5, 23.5)
     assert closing_at == datetime(2024, 11, 4, 12, 0)
     assert book_closing_before_kickoff(snaps, kickoff, "fanduel") == (None, None, None)
+
+
+def test_book_closing_price_is_the_books_latest_pre_kick_under_price():
+    from beatvegas.lines import book_closing_price_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("dk", 24.5, 1, under=-115),
+        snap("hardrockbet", 25.5, 2, under=-112),
+        snap("hardrockbet", 23.5, 4, under=-108),
+        snap("hardrockbet", 30.0, 6, under=-130),  # in-game: ignored
+    ]
+    assert book_closing_price_before_kickoff(snaps, kickoff, "hardrockbet") == -108
+    assert book_closing_price_before_kickoff(snaps, kickoff, "fanduel") is None
+
+
+def test_book_closing_price_skips_unpriced_rows_and_is_none_when_all_unpriced():
+    from beatvegas.lines import book_closing_price_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("hardrockbet", 24.5, 2, under=-105),
+        snap("hardrockbet", 24.0, 4, under=None),  # newest pre-kick row carries no price
+    ]
+    assert book_closing_price_before_kickoff(snaps, kickoff, "hardrockbet") == -105
+    assert book_closing_price_before_kickoff([snaps[1]], kickoff, "hardrockbet") is None
+    assert book_closing_price_before_kickoff([], kickoff, "hardrockbet") is None

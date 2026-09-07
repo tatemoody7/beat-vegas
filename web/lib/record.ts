@@ -20,6 +20,8 @@ export type Record3 = {
 export type Gradable = {
   /** under / over / push (anything else = not decided). */
   result: string | null;
+  /** Null on an unpriced pick (no Hard Rock close captured): counts in W-L and
+   *  hit rate, but neither its units nor its stake enter units/ROI. */
   units: number | null;
   clv: number | null;
   /** Units risked; null/0 for paper and for results-ledger rows (flat 1u). */
@@ -32,9 +34,12 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
   const wins = rows.filter((r) => r.result === "under").length;
   const pushes = rows.filter((r) => r.result === "push").length;
   const decided = rows.length - pushes;
-  const unitsSum = rows.reduce((a, r) => a + (r.units ?? 0), 0);
+  // Unpriced rows (units null) are excluded from BOTH sums so ROI stays
+  // units won over units actually priced and staked.
+  const priced = rows.filter((r) => r.units !== null);
+  const unitsSum = priced.reduce((a, r) => a + (r.units as number), 0);
   // Results-ledger rows carry no stake: they are flat 1-unit bets by construction.
-  const staked = rows.reduce(
+  const staked = priced.reduce(
     (a, r) => a + (r.stake === undefined ? 1 : (r.stake ?? 0)),
     0,
   );

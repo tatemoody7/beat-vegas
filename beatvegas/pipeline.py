@@ -317,12 +317,36 @@ def _run_sim(season: int, week: int, *, notify: str, min_games: int, limit: Opti
     }
 
 
+def _grade_manual_picks(s, season: int) -> int:
+    """Grade the user's own ungraded manual picks for `season` against the
+    real final scores through the SAME `beatvegas.picks.grade_pick` the
+    production `scripts/pick.py grade` uses (trusted 1H total, pre-kickoff
+    close, Hard Rock's own close for a Hard Rock ticket, NULL-price fill from
+    HR's priced pre-kick close else units None), so the sim reveal matches
+    production grading exactly."""
+    from beatvegas.picks import grade_pick
+
+    picks = (
+        s.query(_ManualPick)
+        .filter(
+            _ManualPick.season == season,
+            _ManualPick.graded == False,  # noqa: E712
+            _ManualPick.game_id.isnot(None),
+        )
+        .all()
+    )
+    graded = 0
+    for p in picks:
+        g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
+        if g is not None and grade_pick(s, p, g):
+            graded += 1
+    return graded
+
+
 def _grade_sim(season: int, week: int) -> Dict:
     """REVEAL: grade the market + your own manual picks against the real final
     1H scores. Does NOT re-clone or re-score — preserves the picks you placed."""
     from beatvegas.db.store import session_scope
-    from beatvegas.grading import clv_under, under_result, units_won
-    from beatvegas.lines import consensus_open_close
 
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     from grade import _closings, grade_market, grade_model  # type: ignore
@@ -335,34 +359,8 @@ def _grade_sim(season: int, week: int) -> Dict:
         n_model = grade_model(s, season, closings)
 
     # grade the user's own manual picks (mirrors scripts/pick.py cmd_grade)
-    graded = 0
     with session_scope() as s:
-        picks = (
-            s.query(_ManualPick)
-            .filter(
-                _ManualPick.season == season,
-                _ManualPick.graded == False,  # noqa: E712
-                _ManualPick.game_id.isnot(None),
-            )
-            .all()
-        )
-        for p in picks:
-            g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
-            if g is None or g.first_half_total is None:
-                continue
-            snaps = (
-                s.query(_OddsSnapshot)
-                .filter(_OddsSnapshot.game_id == p.game_id, _OddsSnapshot.market == "1H_total")
-                .all()
-            )
-            _open, closing = consensus_open_close(snaps)
-            p.actual_first_half_total = g.first_half_total
-            p.result = under_result(g.first_half_total, p.line)
-            p.units = p.stake * units_won(g.first_half_total, p.line, p.price)
-            p.closing_line = closing
-            p.clv = clv_under(p.line, closing) if closing is not None else None
-            p.graded = True
-            graded += 1
+        graded = _grade_manual_picks(s, season)
     print(
         f"[reveal] graded {n_market} market + {n_model} model + {graded} "
         f"of your picks for {season} wk{week}"

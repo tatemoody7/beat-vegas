@@ -202,6 +202,29 @@ def _paper(s, gid=1, blocker="price"):
     )
 
 
+def test_null_price_persists_as_null():
+    """An unpriced Hard Rock line logs price NULL — the ORM must not fall back
+    to a -110 column default on INSERT (grade fills it from HR's close)."""
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        row = add_pick(
+            s,
+            game_id=1,
+            season=2026,
+            week=3,
+            home_team="H",
+            away_team="A",
+            line=24.5,
+            price=None,
+            is_paper=True,
+        )
+        s.commit()
+        rid = row.id
+    with Session(eng) as s:
+        assert s.get(ManualPick, rid).price is None
+
+
 def test_add_pick_stores_blocker_and_chips():
     pick, eng = _pick_module()
     with Session(eng) as s:
@@ -353,3 +376,89 @@ def test_grade_uses_hard_rocks_own_close_for_a_hard_rock_ticket():
     assert hr.graded and hr.result == "under"
     assert hr.closing_line == 23.5 and hr.clv == -1.0  # Hard Rock's own pre-kick close
     assert other.closing_line == 25.0 and other.clv == 0.5  # consensus close (median of 26.5, 23.5)
+
+
+def test_graded_pick_fields_leave_units_none_when_unpriced():
+    fields = _load_script("pick").graded_pick_fields(20, 24.5, None, 1.0, 25.0, 24.0)
+    assert fields["result"] == "under" and fields["units"] is None
+    assert fields["clv"] == -0.5  # line CLV still grades without a price (closing - line)
+
+
+def test_grade_fills_null_price_from_hard_rocks_close_else_units_none(capsys):
+    """A pick logged with price NULL (unpriced Hard Rock line): the grader fills
+    the price from Hard Rock's priced pre-kick close when one was captured and
+    grades units; with no priced HR snapshot the result still lands but units
+    stay None, and the summary counts it for hit rate only."""
+    from datetime import datetime, timedelta
+
+    from beatvegas.db.models import Game, OddsSnapshot
+
+    pick, eng = _pick_module()
+    kick = datetime(2026, 9, 19, 19, 30)
+
+    def _game(gid):
+        return Game(
+            id=gid,
+            season=2026,
+            week=3,
+            home_team=f"H{gid}",
+            away_team=f"A{gid}",
+            start_date=kick,
+            home_points=30,
+            away_points=10,
+            first_half_total=20,
+            first_half_source="pbp",
+        )
+
+    def _snap(gid, line, under, hrs):
+        return OddsSnapshot(
+            game_id=gid,
+            book="hardrockbet",
+            market="1H_total",
+            line=line,
+            over_price=-110,
+            under_price=under,
+            captured_at=kick - timedelta(hours=hrs),
+        )
+
+    def _pick(gid):
+        return ManualPick(
+            game_id=gid,
+            season=2026,
+            week=3,
+            home_team=f"H{gid}",
+            away_team=f"A{gid}",
+            side="under",
+            market="1H",
+            line=24.5,
+            price=None,
+            stake=1.0,
+            is_paper=True,
+            book="hardrockbet",
+            graded=False,
+            placed_at=kick - timedelta(days=1),
+        )
+
+    with Session(eng) as s:
+        s.add_all([_game(2), _game(3)])
+        # game 2: HR opened unpriced, then priced -108 pre-kick; -130 is in-game
+        s.add_all([_snap(2, 24.5, None, 30), _snap(2, 24.5, -108, 1), _snap(2, 24.5, -130, -1)])
+        # game 3: HR never priced the under before kickoff
+        s.add_all([_snap(3, 24.5, None, 30), _snap(3, 24.0, None, 1)])
+        s.add_all([_pick(2), _pick(3)])
+        s.commit()
+    pick.cmd_grade(_args(season=2026))
+    out = capsys.readouterr().out
+    with Session(eng) as s:
+        priced = s.query(ManualPick).filter(ManualPick.game_id == 2).one()
+        unpriced = s.query(ManualPick).filter(ManualPick.game_id == 3).one()
+    assert priced.graded and priced.price == -108 and priced.result == "under"
+    assert round(priced.units, 3) == round(100 / 108, 3)
+    assert unpriced.graded and unpriced.price is None and unpriced.result == "under"
+    assert unpriced.units is None
+    # summary: both count for the record / hit rate; units/ROI over the priced one only
+    assert "PAPER RECORD: 2-0" in out and "hit=100.0%" in out
+    assert f"units={100 / 108:+.2f}" in out and "(1 unpriced)" in out
+    # list must not choke on the unpriced graded row
+    pick.cmd_list(_args(season=2026))
+    assert "under (unpriced," in capsys.readouterr().out

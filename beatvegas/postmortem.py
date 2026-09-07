@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .card import KEY_NUMBERS_1H, hook_side
 from .etl.fbs import FbsMap
 from .etl.proxy_line import DEFAULT_SHARE, proxy_total
 from .factors.ledger import BREAKEVEN, beta_posterior
@@ -43,7 +44,7 @@ WEEKLY_CAP = 5
 HIST_SCOPE = "hist_2023_25"
 RULES = ("all", "gap175", "gap300", "score53", "both", "cap5", "top20")
 LIVE_RULES = ("all_hr", "bet", "price_read", "gap175", "qualifying")
-KEY_NUMBERS = (24.0, 28.0, 31.0)
+KEY_NUMBERS = KEY_NUMBERS_1H  # one tuple with card.py so both ledgers read alike
 SIGMA_1H = 11.9  # per-game 1H-total noise, pts (validate_engine)
 
 _INF = float("inf")
@@ -92,7 +93,7 @@ _ORDER: Dict[str, List[str]] = {
     "temp_band": [b[2] for b in TEMP_BANDS],
     "week_band": [b[2] for b in WEEK_BANDS],
     "key_dist": [b[2] for b in KEY_DIST_BANDS],
-    "hook_side": ["key+0.5", "key−0.5", "other"],
+    "hook_side": ["key+0.5", "key−0.5", "on_key", "other"],
     "line_frac": ["whole", "half"],
     "division": ["fbs", "fbs_v_fcs", "non_fbs"],
     "neutral": ["home", "neutral"],
@@ -526,15 +527,15 @@ def weekly_cap(
     df: pd.DataFrame, gap_col: str, cap: int = WEEKLY_CAP, min_gap: float = BET_GAP_PTS
 ) -> pd.Series:
     """Per (season, week): the top `cap` games by gap among gap >= min_gap.
-    Ties: higher under_score, then lower game_id. Deterministic."""
+    Ties: lower game_id. Deterministic. Hist rows have no ev; mirrors
+    card.apply_weekly_cap minus ev (under_score is never a tie-break)."""
     mask = pd.Series(False, index=df.index)
     if df.empty or gap_col not in df:
         return mask
-    elig = df[df[gap_col].notna() & (df[gap_col] >= min_gap)].copy()
+    elig = df[df[gap_col].notna() & (df[gap_col] >= min_gap)]
     if elig.empty:
         return mask
-    elig["_score"] = elig["under_score"].fillna(-1) if "under_score" in elig else -1
-    elig = elig.sort_values([gap_col, "_score", "game_id"], ascending=[False, False, True])
+    elig = elig.sort_values([gap_col, "game_id"], ascending=[False, True])
     keep = elig.groupby(["season", "week"], sort=False, dropna=False).head(cap)
     mask.loc[keep.index] = True
     return mask
@@ -642,16 +643,7 @@ def _key_dist(line: Any) -> Optional[str]:
     return band_label(min(abs(v - k) for k in KEY_NUMBERS), KEY_DIST_BANDS)
 
 
-def _hook_side(line: Any) -> Optional[str]:
-    v = _num(line)
-    if v is None:
-        return None
-    for k in KEY_NUMBERS:
-        if abs((v - k) - 0.5) < 1e-9:
-            return "key+0.5"
-        if abs((k - v) - 0.5) < 1e-9:
-            return "key−0.5"
-    return "other"
+_hook_side = hook_side  # same chip as the live card (beatvegas/card.py)
 
 
 def assign_dimensions(df: pd.DataFrame, proxy: str) -> pd.DataFrame:

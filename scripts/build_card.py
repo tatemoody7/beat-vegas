@@ -73,6 +73,26 @@ def bet_slots_this_week(session, season: int, week: int) -> Set[int]:
     return {r[0] for r in rows}
 
 
+def real_bets_this_week(session, season: int, week: int) -> Set[int]:
+    """Game ids with a REAL (is_paper False, or legacy NULL) 1H pick this week.
+    Passed to build_card as prior_bet_game_ids: a real ticket on a game NOT on
+    this card (a Thursday game already played) consumes a weekly-cap slot;
+    apply_weekly_cap ignores ids that are on the card (they rank via `held`)."""
+    rows = (
+        session.query(ManualPick.game_id)
+        .filter(
+            ManualPick.season == season,
+            ManualPick.week == week,
+            (ManualPick.is_paper.is_(False)) | (ManualPick.is_paper.is_(None)),
+            (ManualPick.market == "1H") | (ManualPick.market.is_(None)),
+            ManualPick.game_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return {r[0] for r in rows}
+
+
 def load_inputs(session, game_ids: List[int]) -> tuple:
     """(snapshots, predictions, previews) as the plain dicts build_card takes."""
     if not game_ids:
@@ -153,7 +173,7 @@ def log_paper_picks(
             away_team=it["away"],
             market="1H",
             line=it["hr_line"],
-            price=it["hr_price"] if it["hr_price"] is not None else -110,
+            price=it["hr_price"],  # None when Hard Rock has not priced the line yet
             is_paper=True,
             book=HR_BOOK_KEY,
             note=f"card {now:%Y-%m-%d} [{blocker}]: {it['action']}",
@@ -267,6 +287,7 @@ def run(
         games = hr_universe(s, season, week)
         snaps, preds, previews = load_inputs(s, [g["game_id"] for g in games])
         held = bet_slots_this_week(s, season, week)
+        real = real_bets_this_week(s, season, week)
         card = build_card(
             games,
             snaps,
@@ -276,7 +297,7 @@ def run(
             week=week,
             now=now,
             held_game_ids=held,
-            prior_bet_game_ids=held,
+            prior_bet_game_ids=real,
         )
         picks_added = 0
         if not dry_run and card["items"]:

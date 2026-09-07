@@ -43,7 +43,7 @@ const rawCard = (o: Record<string, unknown> = {}): Record<string, unknown> => ({
   week: 3,
   built_at: "2026-09-11T22:07:12Z", // Fri 6:07pm ET
   model_read: true,
-  counts: { bet: 1, edge: 2, pass: 1 },
+  counts: { bet: 1, edge: 2, pass: 1, over_cap: 0 },
   items: [
     rawItem(),
     rawItem({
@@ -119,7 +119,7 @@ const card = (o: Partial<Card> = {}): Card => ({
   week: 3,
   builtAt: "2026-09-11T22:07:12Z",
   modelRead: true,
-  counts: { bet: 0, edge: 0, pass: 0 },
+  counts: { bet: 0, edge: 0, pass: 0, overCap: 0 },
   paper: { qualifying: 0, overCap: 0, cap: 5 },
   items: [],
   notes: [],
@@ -136,7 +136,7 @@ describe("parseCard", () => {
     expect(c!.week).toBe(3);
     expect(c!.builtAt).toBe("2026-09-11T22:07:12.000Z");
     expect(c!.modelRead).toBe(true);
-    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1 });
+    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 });
     expect(c!.notes).toEqual([
       "Hard Rock is holding 6% on first halves this week.",
     ]);
@@ -189,16 +189,16 @@ describe("parseCard", () => {
       week: 3,
       builtAt: null,
       modelRead: false,
-      counts: { bet: 0, edge: 0, pass: 0 },
+      counts: { bet: 0, edge: 0, pass: 0, overCap: 0 },
       paper: { qualifying: 0, overCap: 0, cap: 5 },
       items: [],
       notes: [],
     });
     const d = parseCard(rawCard({ counts: "nope", notes: null }));
-    expect(d!.counts).toEqual({ bet: 1, edge: 2, pass: 1 });
+    expect(d!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 });
     expect(d!.notes).toEqual([]);
     const e = parseCard(rawCard({ counts: { bet: 4 } }));
-    expect(e!.counts).toEqual({ bet: 4, edge: 2, pass: 1 });
+    expect(e!.counts).toEqual({ bet: 4, edge: 2, pass: 1, overCap: 0 });
   });
 
   it("drops items with no game id or team and defaults odd fields", () => {
@@ -237,7 +237,7 @@ describe("parseCard", () => {
       why: ["ok"],
       paperLogged: true,
     });
-    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1 }); // payload's own
+    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 }); // payload's own
   });
 
   it("normalises a naive Postgres timestamp as UTC", () => {
@@ -473,6 +473,23 @@ describe("parseCard: paper ledger fields", () => {
       qualifies: true,
       capRank: null,
     });
+  });
+
+  it("reads counts.over_cap, and derives bet (inside the cap) and over_cap from the items when absent", () => {
+    const items = [
+      rawItem({ cap_rank: 1, over_cap: false }),
+      rawItem({ game_id: 402, blocker: "cap", cap_rank: 6, over_cap: true }),
+      rawItem({ game_id: 403, tier: "EDGE", blocker: "price" }),
+    ];
+    const own = parseCard(
+      rawCard({ counts: { bet: 1, edge: 1, pass: 0, over_cap: 1 }, items }),
+    )!;
+    expect(own.counts).toEqual({ bet: 1, edge: 1, pass: 0, overCap: 1 });
+    // A payload from before counts.over_cap existed: derive both from the items.
+    const derived = parseCard(rawCard({ counts: undefined, items }))!;
+    expect(derived.counts).toEqual({ bet: 1, edge: 1, pass: 0, overCap: 1 });
+    const partial = parseCard(rawCard({ counts: { bet: 2 }, items }))!;
+    expect(partial.counts).toEqual({ bet: 2, edge: 1, pass: 0, overCap: 1 });
   });
 
   it("derives the paper tallies and defaults when the payload predates them", () => {

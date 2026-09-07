@@ -251,7 +251,9 @@ class ManualPick(Base):
     side = Column(String, default="under")  # under (this project's market)
     market = Column(String, default="1H")  # '1H' | 'full' (first-half vs full-game)
     line = Column(Float)  # the total you bet (1H or full-game per `market`)
-    price = Column(Integer, default=-110)
+    # No column default: an unpriced Hard Rock line is logged as NULL and the
+    # Monday grader fills it from HR's pre-kick close (callers pass -110 themselves).
+    price = Column(Integer)
     stake = Column(Float, default=1.0)
     # Paper pick: nothing at risk, staked ONE flat unit so it grades as +/-1u
     # on its own record. Every ledger consumer must split on is_paper.

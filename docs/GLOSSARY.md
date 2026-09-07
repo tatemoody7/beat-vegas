@@ -85,9 +85,10 @@
 - DB: SQLite locally, **Neon Postgres** in the cloud (`DATABASE_URL`).
 - Product: the **Next.js app on Vercel** (Neon-backed, password-gated).
 - Engine: the Python scripts run in **GitHub Actions** (`.github/workflows/`) — Sunday
-  capture + score, Friday/Saturday 1H sweeps, Monday grading, Tue/Fri research
-  preview. GitHub emails failed runs; the Claude routines (Friday card, Sunday
-  ops/recap, Monday coaching) check each workflow and text Tate.
+  capture + score, Wed–Fri opener sweeps + per-game 1H closes, weeknight/Friday/
+  Saturday-final cards, Monday grading, Tue/Fri research preview. GitHub emails
+  failed runs; the Claude routines (Saturday card, Sunday ops/recap, Monday coaching)
+  check each workflow and text Tate.
 - Repo (private): https://github.com/tatemoody7/beat-vegas
 - The real test of the edge = **real first-half lines collected this season**,
   graded vs the model and my own picks.

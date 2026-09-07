@@ -20,7 +20,7 @@ the bet card follows. Change it here first, then in code.
 
 - **Edge-driven, capped at 5 real-money bets per week.** The cap is a
   ceiling, not a target. Zero bets is a valid, normal week.
-- Only games whose verdict on the This Week page is **BET** are bettable.
+- Only games whose verdict on the This Week page is **BET** are bettable. Real bets are placed in one sitting Saturday morning (~9am ET) off the final card's Bet Slip; a weeknight (Tue–Fri) game may be bet off that evening's card and counts toward the same weekly cap. BETs are ranked by gap — the 6th+ by gap is paper only (`blocker: cap`).
   WATCH is not a bet. Passing costs nothing.
 - A bet placed anyway on a WATCH or PASS game is still logged as real money,
   flagged **off-policy** on Results and broken out separately, so the record
@@ -118,20 +118,25 @@ bet many small edges rather than one big one. It is not a gate.
 
 ## Weekly rhythm
 
-GitHub cron drops most single-slot runs, so every job has retry slots, the card
-job runs whatever input is still missing before it builds, and the one remaining
-Claude routine (Sunday ops) re-dispatches the Sunday capture.
+GitHub cron drops some single-slot runs, so every job has retry slots, the card
+job re-sweeps before it builds, and two Claude routines re-dispatch what cron
+dropped (`cfb-saturday-card` for the final card, `cfb-sunday-ops` for the Sunday
+capture). Odds API: paid 100K-credit plan (since 2026-09-06), ~800 credits a
+week expected (`lines_watch.yml` header).
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
 | Tue / Fri 9am                | News + injuries / QB-out → This Week cards                 | `research_preview.yml` |
-| Fri 1pm (retry 2:30pm)       | First-half line sweep (18 events, ranked by bettability, credit-guarded) | `lines_watch.yml` |
-| Fri 6:05pm (retry 7pm)       | **Bet card** built in the cloud and published on the Board (BET / EDGE / PASS, action line, kill numbers); BETs logged as paper picks; runs the sweep / preview first only if today's is missing. No text. | `card.yml` |
-| Sat 10:30am (retry 11:15am), 6pm (retry 6:45pm) | Closing 1H lines captured (for CLV)  | `lines_watch.yml`   |
-| Sat 11am                     | Bet card refreshed against the closing numbers (same rules; no new paper pick on a game already logged) | `card.yml` |
-| Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded  | `grade.yml`         |
+| Wed 2pm; Thu 10am, 4pm; Fri 8am, noon, 4pm | **Opener sweeps**: every Hard Rock-priced game without a Hard Rock 1H line yet (a game stops being polled once its opener is in) | `lines_watch.yml` |
+| Tue–Thu ~4:05pm              | Weeknight card: sweep tonight's games, build, paper-log games kicking off within 10 h | `card.yml` |
+| Fri ~6:05pm (retry 7pm)      | **Preview card** after a full sweep of the weekend slate; paper-logs Friday-night games only | `card.yml` |
+| Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
+| Sat ~8:05–8:45am             | **FINAL card**: forced fresh sweep + injury refresh, then build; paper-logs every qualifying Saturday game with its blocker. Gated on the Eastern clock so DST needs no edit | `card.yml` |
+| Sat 8:50am                   | **Card routine**: verify/kick the final, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
+| Sat ~9am                     | **Tate places every real bet in one sitting** off the Bet Slip on the Board (one tap logs the ticket) | you |
+| Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed | `grade.yml`         |
 | Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 

@@ -94,7 +94,8 @@ per-game closes poll only games kicking off within 75 minutes
 Nothing runs on the Mac on a schedule. The engine runs in **GitHub Actions**
 (`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY`)
 because the campus network cannot reach Neon:5432. Failures: GitHub emails every
-failed run, and the Sunday routine checks the Sunday workflow before it needs it.
+failed run; the Saturday card routine checks the final card and the Sunday routine
+checks the Sunday capture before each is needed.
 GitHub cron is best-effort (it drops most single-slot runs), so each job has retry
 slots and the card job runs any missing input itself before it builds.
 
@@ -103,11 +104,13 @@ slots and the card job runs any missing input itself before it builds.
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
 | Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
 | Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
-| Fri 1pm (retry 2:30pm)             | `lines_watch.yml`      | 1H sweep of the weekend slate (18 events, credit-guarded)            |
-| Fri 6:05pm (retry 7pm)             | `card.yml`             | Bet card built + published on the Board (`cards` table); BETs logged as paper picks; runs the sweep/preview first only if today's is missing |
-| Sat 10:30am (retry 11:15), 6pm (retry 6:45) | `lines_watch.yml` | Closing 1H lines for CLV                                          |
-| Sat 11am                           | `card.yml`             | Bet card refreshed against the closing numbers                       |
-| Mon 8am / 10am / 1pm               | `grade.yml`            | Finals + 1H play-by-play → grade market / model / picks / records    |
+| Wed 2pm; Thu 10am/4pm; Fri 8am/noon/4pm | `lines_watch.yml` | Opener sweeps: every Hard Rock-priced game without a Hard Rock 1H line yet |
+| Tue–Thu ~4:05pm                    | `card.yml`             | Weeknight card (tonight's games), paper-logs qualifying games kicking off within 10 h |
+| Fri ~6:05pm (retry 7pm)            | `card.yml`             | Preview card after a full sweep of the weekend slate                   |
+| Every 30 min, evenings + all Saturday | `lines_watch.yml`   | Per-game Hard Rock 1H closes ~30–75 min before each kickoff             |
+| Sat ~8:05–8:45am (ET-gated)        | `card.yml`             | FINAL card: forced sweep + injury refresh → build → paper-log every qualifying game with its blocker |
+| Sat 8:50am                         | routine `cfb-saturday-card` | Verify/kick the final, text the BET list with line, price, kill numbers |
+| Mon 8am / 10am / 1pm               | `grade.yml`            | Finals + 1H play-by-play → grade market / model / picks / records → post-mortem |
 | Mon 9am                            | routine `monday-coaching` | Includes a one-line grading check (kicks `grade.yml` if cron dropped it) |
 
 Manual-only workflows: `post-lines.yml` (derived lines for the board),

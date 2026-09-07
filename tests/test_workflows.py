@@ -76,3 +76,13 @@ def test_every_cron_is_mapped_in_its_resolve_step():
             )
             checked += 1
     assert checked > 0
+
+
+def test_card_yml_crons_match_ci_slots_exactly():
+    """card.yml resolves its schedule through beatvegas.ci.CRON_SLOTS (no shell
+    case block): the two must name exactly the same cron strings."""
+    from beatvegas.ci import CRON_SLOTS
+
+    data = _load(WF_DIR / "card.yml")
+    assert any("beatvegas.ci" in r for r in _run_blocks(data))
+    assert set(_cron_strings(data)) == set(CRON_SLOTS), "card.yml and CRON_SLOTS drifted"

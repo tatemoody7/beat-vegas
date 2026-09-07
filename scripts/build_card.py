@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 """Build the week's bet card and publish it to the Board (`cards` table).
 
-Runs in GitHub Actions (`.github/workflows/card.yml`, Friday 6pm ET + Saturday
-11am ET refresh) — the Mac routine it replaces slept through the card. Pure
-rules live in beatvegas/card.py; this script only loads the inputs, writes one
-`cards` row per build (history; the newest row is the live card) and logs every
-BET as a PAPER pick through the same code path as `pick.py add`
-(beatvegas.picks.add_pick), never twice for one game.
+Runs in GitHub Actions (`.github/workflows/card.yml`: weeknight + Friday preview
+builds, then the Saturday-morning FINAL ~8:05-8:45am ET; slots in
+beatvegas/ci.py). Pure rules live in beatvegas/card.py; this script only loads
+the inputs, writes one `cards` row per build (history; the newest row is the
+live card) and logs every QUALIFYING game (Hard Rock's 1H line >= BET_GAP_PTS
+above ours, any tier) as a PAPER pick tagged with its blocker, through the same
+code path as `pick.py add` (beatvegas.picks.add_pick), never twice for one game.
 
     python scripts/build_card.py                      # active season/week
     python scripts/build_card.py --season 2026 --week 3

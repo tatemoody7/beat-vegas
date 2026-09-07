@@ -78,11 +78,14 @@ def total_band(total: Optional[float]) -> Optional[str]:
 def hook_side(line: Optional[float]) -> Optional[str]:
     """'key+0.5' when the line sits half a point above 24/28/31 (an under at
     24.5 wins on a landing AT the key number), 'key−0.5' half a point below,
-    else 'other'."""
+    'on_key' when the line IS a key number (a landing there pushes), else
+    'other'."""
     v = _num(line)
     if v is None:
         return None
     for k in KEY_NUMBERS_1H:
+        if abs(v - k) < 1e-9:
+            return "on_key"
         if abs((v - k) - 0.5) < 1e-9:
             return "key+0.5"
         if abs((k - v) - 0.5) < 1e-9:
@@ -576,8 +579,12 @@ def apply_weekly_cap(
 
     held_game_ids: BETs already logged this week (paper or real) keep their slot
     ahead of new arrivals — a decision made Thursday is not undone Saturday.
-    prior_bet_game_ids: BET picks this week on games NOT on this card (e.g. a
-    Thursday game already played) — they consume slots too. Mutates + returns."""
+    prior_bet_game_ids: real bets this week on games NOT on this card (e.g. a
+    Thursday game already played) — they consume slots too; ids that are on the
+    card are ignored here (they rank through `held`). Mutates + returns.
+
+    Rank key: (held-first, gap desc, ev desc, kickoff asc, away). Mirrored by
+    postmortem.weekly_cap minus ev (historical rows carry none)."""
     held = set(held_game_ids or ())
     bets = [it for it in items if it["tier"] == "BET"]
     on_card = {it["game_id"] for it in bets}
@@ -693,10 +700,13 @@ def build_card(
         notes.append(note)
 
     public = [{k: v for k, v in it.items() if not k.startswith("_")} for it in items]
+    # counts.bet = bettable BETs (inside the weekly cap): what the site and the
+    # Saturday text read. Over-cap BETs keep tier BET but are tallied apart.
     counts = {
-        "bet": sum(1 for it in public if it["tier"] == "BET"),
+        "bet": sum(1 for it in public if it["tier"] == "BET" and not it["over_cap"]),
         "edge": sum(1 for it in public if it["tier"] == "EDGE"),
         "pass": sum(1 for it in public if it["tier"] == "PASS"),
+        "over_cap": sum(1 for it in public if it["over_cap"]),
     }
     paper = {
         "qualifying": sum(1 for it in public if it["qualifies"]),

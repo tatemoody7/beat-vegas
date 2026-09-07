@@ -112,7 +112,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert (row.season, row.week, row.built_at) == (SEASON, WEEK, NOW)
     payload = json.loads(row.payload)
     assert payload["season"] == SEASON and payload["week"] == WEEK
-    assert payload["counts"] == {"bet": 1, "edge": 2, "pass": 1}
+    assert payload["counts"] == {"bet": 1, "edge": 2, "pass": 1, "over_cap": 0}
     assert payload["paper"] == {"qualifying": 2, "over_cap": 0, "cap": 5}
     ids = [it["game_id"] for it in payload["items"]]
     # BET; EDGE by gap (3: 2.6 no_hr_line, 5: 2.0 price); PASS. Outside-universe 4 dropped.
@@ -234,7 +234,8 @@ def test_sixth_bet_by_gap_is_paper_only_with_blocker_cap(env):
         picks = {p.game_id: p for p in s.query(ManualPick).all()}
         (row,) = s.query(Card).all()
     payload = json.loads(row.payload)
-    assert payload["counts"]["bet"] == 6 and payload["paper"]["over_cap"] == 1
+    assert payload["counts"]["bet"] == 5 and payload["counts"]["over_cap"] == 1
+    assert payload["paper"]["over_cap"] == 1
     assert picks[16].blocker == "cap" and picks[16].verdict_at_pick == "BET"
     assert all(picks[g].blocker == "none" for g in range(11, 16))
     over = [it for it in payload["items"] if it["over_cap"]]

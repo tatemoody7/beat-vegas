@@ -21,10 +21,13 @@ within 3 hours before kickoff (idempotent; re-runs skip it).
 from __future__ import annotations
 
 import argparse
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set
+from functools import partial
+from typing import Callable, Dict, List, Optional, Set
 
+import requests
 from sqlalchemy import and_
 
 from beatvegas.config import load_config
@@ -38,6 +41,34 @@ from beatvegas.sources.odds import OddsAPIClient, normalize_full_game
 
 LEAD_MIN = 30
 DONE_WITHIN_HOURS = 3.0  # a full-game snapshot this close to kickoff counts as the close
+RETRY_BACKOFF_S = (5.0, 15.0, 45.0)  # transient HTTP errors: retry in-run, never crash the pull
+
+
+def fetch_with_retry(
+    call: Callable[[], List[Dict]],
+    backoff: tuple = RETRY_BACKOFF_S,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Optional[List[Dict]]:
+    """Run `call`; on a transient failure (5xx, 429, timeout, connection reset)
+    retry with backoff; None once every retry is spent so the caller skips the
+    wave and the rest of the pull continues. 4xx other than 429 is not retried.
+    Never echoes the request URL (it carries the API key)."""
+    attempts = len(backoff) + 1
+    for i in range(attempts):
+        try:
+            return call()
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            transient = status is None or status == 429 or status >= 500
+            print(f"[fg-backfill] HTTP {status} on attempt {i + 1}/{attempts}")
+            if not transient or i == attempts - 1:
+                return None
+        except (requests.ConnectionError, requests.Timeout) as e:
+            print(f"[fg-backfill] {type(e).__name__} on attempt {i + 1}/{attempts}")
+            if i == attempts - 1:
+                return None
+        sleep(backoff[i])
+    return None
 
 
 def wave_ts(start_date: datetime, lead_min: int = LEAD_MIN) -> datetime:
@@ -171,7 +202,7 @@ def main() -> None:
         return
 
     client = OddsAPIClient()
-    written = matched = missing = spent = 0
+    written = matched = missing = spent = failed_waves = 0
     stopped = None
     for i, (ts, gs) in enumerate(waves.items(), 1):
         if args.max_credits and spent >= args.max_credits:
@@ -180,10 +211,20 @@ def main() -> None:
         if client.credits_low(args.credit_floor):
             stopped = f"account floor of {args.credit_floor} credits reached"
             break
-        events = client.historical_bulk_totals(_iso_z(ts), regions=args.regions)
+        ts_iso = _iso_z(ts)
+        events = fetch_with_retry(
+            partial(client.historical_bulk_totals, ts_iso, regions=args.regions)
+        )
         c = client.last_credits
         if c is not None and c.last_cost is not None:
             spent += c.last_cost
+        if events is None:
+            print(
+                f"[fg-backfill] wave {ts_iso} skipped after retries ({len(gs)} games) — rerun later"
+            )
+            missing += len(gs)
+            failed_waves += 1
+            continue
         ev_to_game = match_events_to_games(events, gs)
         hit = set(ev_to_game.values())
         missing += len(gs) - len(hit)
@@ -217,7 +258,7 @@ def main() -> None:
         print(f"[fg-backfill] stopped early: {stopped}")
     print(
         f"[fg-backfill] waves={len(waves)} games={len(scope)} matched={matched} missing={missing} "
-        f"snapshots_written={written} credits_spent={spent}"
+        f"failed_waves={failed_waves} snapshots_written={written} credits_spent={spent}"
     )
     if c:
         print(

@@ -200,7 +200,10 @@ def _closes_for(df: pd.DataFrame, seasons_below: int, n: int = None) -> dict:
 
 
 # Pinned from the incumbent code path (default args) before the engine switch
-# landed: the bv_line engine must keep producing exactly these numbers.
+# landed: the bv_line engine must keep producing these numbers. Compared with a
+# tolerance, not ==: CI runs ubuntu/py3.11, where a different BLAS can sum the
+# tree ensemble in another order and shift the .round(2) value.
+_PIN_TOL = 0.006
 _BV_LINE_PIN = {
     723: 24.33,
     733: 19.47,
@@ -213,11 +216,18 @@ _BV_LINE_PIN = {
 }
 
 
+def _assert_matches_pin(got: dict) -> None:
+    assert set(got) == set(_BV_LINE_PIN)
+    for gid, want in _BV_LINE_PIN.items():
+        assert got[gid] == pytest.approx(want, abs=_PIN_TOL), gid
+
+
 def test_bv_line_engine_output_unchanged_by_engine_switch(monkeypatch):
     monkeypatch.delenv("BV_ENGINE", raising=False)
-    out = score_mod.score_slate(2025, target_week=5, df=_frame())
+    # explicit engine: a local config.yaml must not be able to flip this test
+    out = score_mod.score_slate(2025, target_week=5, df=_frame(), engine="bv_line")
     got = {int(r.id): float(r.bv_line) for r in out.itertuples()}
-    assert got == _BV_LINE_PIN
+    _assert_matches_pin(got)
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
     assert "engine_fallback" not in out.attrs and "engine_artifact" not in out.attrs
@@ -278,7 +288,7 @@ def test_residual_engine_falls_back_when_closes_are_scarce(monkeypatch):
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
     got = {int(r.id): float(r.bv_line) for r in out.itertuples()}
-    assert got == _BV_LINE_PIN  # the incumbent's numbers, untouched
+    _assert_matches_pin(got)  # the incumbent's numbers, untouched
 
 
 def test_residual_engine_without_closes_falls_back():

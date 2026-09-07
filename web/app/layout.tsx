@@ -32,7 +32,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-[var(--bg)]/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl items-center gap-8 px-6 py-3">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
             <Link
               href="/"
               className="shrink-0 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight"

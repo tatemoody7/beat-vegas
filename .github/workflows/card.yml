@@ -1,29 +1,47 @@
 name: Bet card (cloud)
 
-# Builds the weekend first-half-under bet card and publishes it to the Board
-# (`cards` table, read by the site). Replaces the Mac routine `cfb-friday-card`,
-# which slept through the card when the Mac was asleep. No text: the card lives
-# on the site; a red run is reported by GitHub's failed-workflow email.
+# Builds the week's first-half-under bet card and publishes it to the Board
+# (`cards` table, read by the site), logging EVERY qualifying game (Hard Rock's
+# 1H line >= 1.75 above ours) as a paper pick tagged with the gate that blocked a
+# real bet. No text from here: the Saturday-morning routine `cfb-saturday-card`
+# (Mac, 8:50am ET) reads the newest card and texts the BET list; a red run is
+# reported by GitHub's failed-workflow email and that routine re-dispatches
+# the final when GitHub cron dropped it.
 #
-# Slots (GHA cron is UTC, best-effort and often late; each has a retry or a
-# refresh): Friday 22:05Z (~6:05pm ET) after the 1H sweep + preview, retry 23:00Z
-# only if no scheduled run succeeded since the primary slot; Saturday 15:00Z
-# (11am ET) refresh after the 10:30am closing capture (lines_watch.yml), so
-# the numbers on the card are the ones Tate can still bet.
+# SLOTS — one source of truth: beatvegas/ci.py::resolve_slot (tests/test_ci_slots.py
+# + tests/test_workflows.py keep this schedule and that table in lock-step):
+#   weeknight  Tue/Wed/Thu 20:05Z (~4:05pm ET; retry 20:50Z) — sweep tonight's
+#              games, build, paper-log games kicking off within 10 h.
+#   friday     22:05Z (~6:05pm ET; retry 23:00Z) — PREVIEW: full sweep of the
+#              weekend slate, build, paper-log Friday-night games only (6 h).
+#   saturday   12:05Z / 12:35Z / 13:05Z / 13:35Z — FINAL: gated on the Eastern
+#              clock (runs only 7:45-9:15am ET, and only once per Saturday),
+#              so it lands 8:05-8:45am ET in EDT and EST alike. Forced fresh
+#              sweep + research preview, then build; paper-logs the Saturday
+#              slate (20 h). Tate bets in one sitting off this card ~9am ET.
+#   manual     workflow_dispatch (input `slot` may name one of the above).
+# The preview and the final ALWAYS re-sweep (an evening close poll would
+# otherwise satisfy "a 1H snapshot exists today" and the final would build on
+# Friday's numbers); weeknight builds sweep only what is missing.
 #
-# INPUTS: before building, the job checks that today's inputs exist and runs
-# only what is missing — (a) a 1H_total snapshot captured today for the week
-# (else the Friday sweep, <=36 Odds API credits, spent only when lines_watch's
-# cron dropped), (b) a game_previews refresh today (else research_preview.py,
-# free). The card never double-spends the sweep.
+# CONCURRENCY: shared `neon-writers` group (see lines_watch.yml header).
 
 on:
   schedule:
-    - cron: '5 22 * * 5'   # Fri ~6:05pm ET — the card
-    - cron: '0 23 * * 5'   # Fri ~7pm ET — retry, skips when the 22:05 slot landed
-    - cron: '0 15 * * 6'   # Sat 11am ET — refresh after the closing capture
+    - cron: '5 20 * * 2,3,4'   # weeknight
+    - cron: '50 20 * * 2,3,4'  # weeknight retry
+    - cron: '5 22 * * 5'       # friday preview
+    - cron: '0 23 * * 5'       # friday retry
+    - cron: '5 12 * * 6'       # saturday final (EDT primary)
+    - cron: '35 12 * * 6'      # saturday final (EDT retry)
+    - cron: '5 13 * * 6'       # saturday final (EST primary / EDT last retry)
+    - cron: '35 13 * * 6'      # saturday final (EST retry)
   workflow_dispatch:
     inputs:
+      slot:
+        description: 'weeknight | friday | saturday | manual (default: manual full refresh)'
+        required: false
+        default: ''
       season:
         description: 'season (default: current)'
         required: false
@@ -46,40 +64,35 @@ jobs:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
-      - name: Resolve slot from schedule / input
+      - uses: actions/checkout@v5
+      - name: Resolve slot (beatvegas/ci.py; ET-gated Saturday final)
         id: slot
         env:
           SCHEDULE: ${{ github.event.schedule }}
+          INPUT_SLOT: ${{ inputs.slot }}
           GH_TOKEN: ${{ github.token }}
+        # System python only (no pip yet): beatvegas.ci imports nothing else.
         run: |
-          retry_since=""
-          case "$SCHEDULE" in
-            '5 22 * * 5')  slot=friday ;;
-            '0 23 * * 5')  slot=friday; retry_since="$(date -u +%F)T21:45:00Z" ;;
-            '0 15 * * 6')  slot=saturday ;;
-            '')            slot=manual ;;   # workflow_dispatch
-            *) echo "::error::unmapped cron '$SCHEDULE' - add it to the resolve step"; exit 1 ;;
-          esac
-          # The retry slot only runs when the primary slot did not land: skip if
-          # a SCHEDULED run of this workflow already succeeded since the primary
-          # slot's window opened (pattern shared with lines_watch.yml).
-          if [ -n "$retry_since" ]; then
+          PYTHONPATH=. python3 -m beatvegas.ci
+          slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+          retry_since=$(grep '^retry_since=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
+          # A retry slot only runs when no SCHEDULED run of this workflow
+          # succeeded since the primary slot's window opened.
+          if [ -n "$retry_since" ] && [ "$slot" != "skip" ]; then
             done_already=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" \
               --event schedule --status success --json createdAt \
               --jq "[.[] | select(.createdAt >= \"$retry_since\")] | length" 2>/dev/null || echo 0)
             if [ "${done_already:-0}" -gt 0 ]; then
-              echo "primary slot already succeeded since $retry_since; retry slot skipping"
-              slot=skip
+              echo "a scheduled run already succeeded since $retry_since; skipping"
+              echo "slot=skip" >> "$GITHUB_OUTPUT"
             fi
           fi
-          echo "slot=$slot" >> "$GITHUB_OUTPUT"
-          echo "resolved slot=$slot (schedule='$SCHEDULE')"
-      - uses: actions/checkout@v5
-        if: steps.slot.outputs.slot != 'skip'
+          echo "resolved slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2) (schedule='$SCHEDULE')"
       - uses: actions/setup-python@v6
         if: steps.slot.outputs.slot != 'skip'
         with:
           python-version: '3.11'
+          cache: pip
       - name: Install
         if: steps.slot.outputs.slot != 'skip'
         run: pip install -e .
@@ -102,6 +115,8 @@ jobs:
         env:
           SEASON: ${{ steps.active.outputs.season }}
           WEEK: ${{ steps.active.outputs.week }}
+          FORCE_SWEEP: ${{ steps.slot.outputs.force_sweep }}
+          FORCE_PREVIEW: ${{ steps.slot.outputs.force_preview }}
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
@@ -125,27 +140,31 @@ jobs:
                           GamePreview.updated_at >= today)
                   .count()
               )
-          print(f"need_sweep={'true' if snaps == 0 else 'false'}")
-          print(f"need_preview={'true' if previews == 0 else 'false'}")
+          force_sweep = os.environ.get("FORCE_SWEEP") == "true"
+          force_preview = os.environ.get("FORCE_PREVIEW") == "true"
+          print(f"need_sweep={'true' if (force_sweep or snaps == 0) else 'false'}")
+          print(f"need_preview={'true' if (force_preview or previews == 0) else 'false'}")
           PY
           cat "$GITHUB_OUTPUT"
-      - name: 1H sweep (only when today's capture is missing)
+      - name: 1H sweep (forced for the preview / final; else only when today's is missing)
         if: steps.inputs.outputs.need_sweep == 'true'
-        # --hours-back 0: upcoming games only; a Saturday refresh must not spend
-        # credits on in-game lines for games that already kicked off.
-        run: python scripts/poll_lines.py --hr-universe --days-ahead 3 --hours-back 0
-      - name: Research preview (only when today's refresh is missing)
+        run: python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }}
+      - name: Research preview (forced on the final; else only when today's is missing)
         if: steps.inputs.outputs.need_preview == 'true'
         # Unofficial sources (ESPN / Rotowire) may be down; the card still builds
         # with the QB-out gate reading whatever preview is on file.
         continue-on-error: true
         run: python scripts/research_preview.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
-      - name: Build + publish the card
+      - name: Build + publish the card (+ paper-log qualifying games in the slot's window)
         if: steps.slot.outputs.slot != 'skip'
+        env:
+          PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
         run: |
           if [ -z "${{ steps.active.outputs.week }}" ]; then
             echo "no active week — nothing to build"
             echo "No active week — no card built." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
+          extra=""
+          if [ -n "$PAPER_WINDOW" ]; then extra="--paper-log-window-hours $PAPER_WINDOW"; fi
+          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" $extra

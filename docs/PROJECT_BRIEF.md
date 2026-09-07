@@ -48,8 +48,8 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   GitHub's email and re-checked by the Claude routines.
 - Data lives in **Neon Postgres** (SQLite only for local dev/backtests).
 - The product is the **Next.js web app on Vercel** (writable, password-protected,
-  viewable from any device). Two Claude routines text Tate: the Friday bet card and
-  the Sunday ops/recap.
+  viewable from any device). Two Claude routines text Tate: the Saturday-morning bet card
+  (8:50am ET, BETs with line/price/kill numbers) and the Sunday ops/recap.
 
 ## Status & roadmap
 - **Done:** data pipeline, backtest, 0–100 scoring, line tracking, free

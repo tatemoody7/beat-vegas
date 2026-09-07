@@ -70,11 +70,11 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade,
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
   `card.yml`, `grade.yml`, `research_preview.yml`). No notification code: GitHub emails
-  failed runs. Nothing is scheduled on the Mac; the only Mac routine left is
-  `cfb-sunday-ops` (verify/kick `sunday.yml`, text the recap). **The Friday bet card is
-  cloud-built** (`card.yml` → `scripts/build_card.py` → `beatvegas/card.py`, pure rules
-  mirroring `web/lib/edge.ts`) and published to the Board via the `cards` table — the Mac
-  routine `cfb-friday-card` is deleted (it slept through the card).
+  failed runs. Nothing runs the engine on the Mac; two Mac routines text Tate:
+  `cfb-saturday-card` (Sat 8:50am ET: verify/kick the FINAL card, text the BET list
+  with line, price and kill numbers) and `cfb-sunday-ops` (verify/kick `sunday.yml`,
+  text the recap). The bet card itself is built in the cloud (`card.yml`; slots in
+  `beatvegas/ci.py::resolve_slot`, Saturday final ET-gated ~8:05–8:45am).
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
@@ -185,7 +185,7 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   happen at a time is DISPATCHED from the Mac (`gh workflow run <wf> -f market=1h`, then poll
   `gh run list --limit 1`) or checks its own inputs: `card.yml` runs the 1H sweep / preview
   itself when today's is missing before it builds. Cron stays as a backup.
-- **Friday 1H sweep is RANKED before the credit cap** (`beatvegas/sweep.py`): close spread
+- **1H sweeps are RANKED before any cap** (`beatvegas/sweep.py`; the paid tier has no event cap, `--max-credits-per-run` is the runaway guard): close spread
   (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
   first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never
   reached the evening games the card wants.

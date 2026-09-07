@@ -792,6 +792,33 @@ describe("cardHealth", () => {
     expect(STALE_CARD_HOURS).toBe(6);
   });
 
+  it("is ok for a Saturday final built 8:45am ET and read 3pm ET the same day (not stale)", () => {
+    const h = cardHealth(
+      card({
+        slot: "saturday",
+        status: "final",
+        builtAt: "2026-09-19T12:45:00Z", // 8:45am ET
+      }),
+      new Date("2026-09-19T19:00:00Z"), // 3:00pm ET
+    );
+    expect(h.level).toBe("ok");
+  });
+
+  it("still warns a Friday preview read at 3pm ET Saturday (preview rule, not the stale rule)", () => {
+    const h = cardHealth(
+      card({
+        slot: "friday",
+        status: "preview",
+        builtAt: "2026-09-18T22:07:00Z",
+      }),
+      new Date("2026-09-19T19:00:00Z"), // 3:00pm ET Saturday
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe(
+      "Preview card (friday) — the Saturday final builds 8:05–8:45am ET",
+    );
+  });
+
   it("lists every degraded input on a degraded card", () => {
     const h = cardHealth(
       card({

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blockReason,
   buildBetSlip,
   killBlocks,
   liveLinesFrom,
@@ -215,6 +216,33 @@ describe("killBlocks", () => {
     expect(killBlocks(24, null, 24.5, -120)).toBe("kill_line");
     expect(killBlocks(null, null, 24.5, -120)).toBeNull();
     expect(killBlocks(20, -150, null, null)).toBeNull();
+  });
+});
+
+describe("blockReason", () => {
+  it("names Hard Rock's live number when the block is live-sourced", () => {
+    expect(blockReason("kill_line", true)).toBe(
+      "Hard Rock’s live line is below the kill line",
+    );
+    expect(blockReason("kill_price", true)).toBe(
+      "Hard Rock’s live price is worse than the kill price",
+    );
+  });
+
+  it("keeps the plain wording when the block is from the entered values", () => {
+    expect(blockReason("kill_line", false)).toBe("below kill line");
+    expect(blockReason("kill_price", false)).toBe("worse than kill price");
+  });
+
+  it("leaves degraded/cap wording the same regardless of source", () => {
+    expect(blockReason("degraded", true)).toBe(
+      "card inputs degraded — paper only",
+    );
+    expect(blockReason("degraded", false)).toBe(
+      "card inputs degraded — paper only",
+    );
+    expect(blockReason("cap", true)).toBe("over the weekly cap");
+    expect(blockReason("cap", false)).toBe("over the weekly cap");
   });
 });
 

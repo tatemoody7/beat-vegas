@@ -143,6 +143,29 @@ export function killBlocks(
   return null;
 }
 
+const BLOCK_REASON: Record<SlipBlock, string> = {
+  degraded: "card inputs degraded — paper only",
+  kill_line: "below kill line",
+  kill_price: "worse than kill price",
+  cap: "over the weekly cap",
+};
+
+/** Only kill_line/kill_price change wording when the block is live-sourced. */
+const LIVE_BLOCK_REASON: Partial<Record<SlipBlock, string>> = {
+  kill_line: "Hard Rock’s live line is below the kill line",
+  kill_price: "Hard Rock’s live price is worse than the kill price",
+};
+
+/**
+ * The disabled-reason text for a slip block. `live` is true when the block
+ * came from Hard Rock's live number (row.blockedBy), false when it came from
+ * the line/price the user typed in.
+ */
+export function blockReason(block: SlipBlock, live: boolean): string {
+  if (live) return LIVE_BLOCK_REASON[block] ?? BLOCK_REASON[block];
+  return BLOCK_REASON[block];
+}
+
 /** Whole minutes from now to kickoff (0 once kicked off); null without a usable kickoff. */
 function minutesToKick(kickIso: string | null, now: Date): number | null {
   if (kickIso === null) return null;

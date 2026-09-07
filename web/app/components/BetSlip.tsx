@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  blockReason,
   HARD_ROCK_URL,
   killBlocks,
   type BetSlip as Slip,
@@ -24,13 +25,6 @@ import { american, fmt } from "@/lib/format";
 const ARM_MS = 8_000;
 /** Kickoff this close turns the clock amber. */
 const SOON_MINUTES = 60;
-
-const BLOCK_REASON: Record<SlipBlock, string> = {
-  degraded: "card inputs degraded — paper only",
-  kill_line: "below kill line",
-  kill_price: "worse than kill price",
-  cap: "over the weekly cap",
-};
 
 const FAIR_TITLE = {
   exchange:
@@ -81,6 +75,7 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
   // typed in, re-checked on every edit.
   const block: SlipBlock | null =
     r.blockedBy ?? killBlocks(lineNum, priceNum, r.killLine, r.killPrice);
+  const blockIsLive = r.blockedBy !== null;
   const disabled = busy || block !== null;
 
   const status = done ? "logged" : r.status;
@@ -272,7 +267,7 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
               className="bv-btn min-h-11 text-sm"
               title={
                 block !== null
-                  ? BLOCK_REASON[block]
+                  ? blockReason(block, blockIsLive)
                   : armed
                     ? "Tap again to log this as a real-money first-half under at the number entered."
                     : "First tap arms; the second logs the bet."
@@ -287,7 +282,9 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
         )}
       </div>
       {open && block !== null && (
-        <p className="mt-1 text-xs text-[var(--warn)]">{BLOCK_REASON[block]}</p>
+        <p className="mt-1 text-xs text-[var(--warn)]">
+          {blockReason(block, blockIsLive)}
+        </p>
       )}
       {err !== null && <p className="mt-1 text-xs text-[var(--warn)]">{err}</p>}
       {warning !== null && (

@@ -408,7 +408,8 @@ export function cardHealth(card: Card, now: Date): CardHealth {
       details: [],
     };
   }
-  if (saturday && card.builtAt !== null) {
+  const isSaturdayFinal = card.slot === "saturday" && card.status === "final";
+  if (saturday && !isSaturdayFinal && card.builtAt !== null) {
     const built = new Date(card.builtAt);
     const ageMs = now.getTime() - built.getTime();
     if (ageMs > STALE_CARD_HOURS * 3_600_000) {

@@ -93,6 +93,8 @@ describe("checkPolicy", () => {
     duplicate: false,
     realWeekCount: 0,
     week: 3,
+    killLine: null,
+    killPrice: null,
   };
   it("passes a clean pick", () => {
     expect(checkPolicy(pick, ctx)).toEqual({ ok: true });
@@ -121,6 +123,70 @@ describe("checkPolicy", () => {
     expect(checkPolicy({ ...pick, verdict: "BET" }, ctx)).toEqual({ ok: true });
     expect(checkPolicy({ ...pick, verdict: undefined }, ctx)).toEqual({
       ok: true,
+    });
+  });
+  describe("kill numbers (the card's line/price floor on a real BET)", () => {
+    const bet: PickRequest = {
+      ...pick,
+      verdict: "BET",
+      line: 24.5,
+      price: -110,
+    };
+    const kills = { ...ctx, killLine: 24.5, killPrice: -120 };
+    it("rejects a real 1H BET below the kill line with a 409 that names the kill", () => {
+      const r = checkPolicy({ ...bet, line: 24 }, kills);
+      expect(r).toMatchObject({ ok: false, status: 409 });
+      if (!r.ok) {
+        expect(r.error).toMatch(/kill line/i);
+        expect(r.error).toMatch(/u24\.5/);
+        expect(r.error).toMatch(/u24\b/);
+        expect(r.error).toMatch(/reason manual/);
+      }
+    });
+    it("accepts a line exactly at the kill line", () => {
+      expect(checkPolicy({ ...bet, line: 24.5 }, kills)).toEqual({ ok: true });
+      expect(checkPolicy({ ...bet, line: 25 }, kills)).toEqual({ ok: true });
+    });
+    it("rejects a price worse than the kill price (American odds, lower = worse)", () => {
+      const r = checkPolicy({ ...bet, price: -125 }, kills);
+      expect(r).toMatchObject({ ok: false, status: 409 });
+      if (!r.ok) expect(r.error).toMatch(/-120/);
+      expect(checkPolicy({ ...bet, price: 105 }, kills)).toEqual({ ok: true });
+    });
+    it("accepts a price exactly at the kill price", () => {
+      expect(checkPolicy({ ...bet, price: -120 }, kills)).toEqual({ ok: true });
+    });
+    it("exempts paper picks", () => {
+      expect(
+        checkPolicy({ ...bet, line: 23, price: -130, isPaper: true }, kills),
+      ).toEqual({ ok: true });
+    });
+    it("exempts WATCH/PASS (an owner override is off-policy, not the card's bet)", () => {
+      expect(
+        checkPolicy({ ...bet, line: 23, verdict: "WATCH" }, kills),
+      ).toEqual({ ok: true });
+      expect(checkPolicy({ ...bet, line: 23, verdict: "PASS" }, kills)).toEqual(
+        { ok: true },
+      );
+      expect(
+        checkPolicy({ ...bet, line: 23, verdict: undefined }, kills),
+      ).toEqual({ ok: true });
+    });
+    it("is a no-op when the card has no kill numbers", () => {
+      expect(checkPolicy({ ...bet, line: 20, price: -140 }, ctx)).toEqual({
+        ok: true,
+      });
+      expect(
+        checkPolicy({ ...bet, line: 20 }, { ...ctx, killPrice: -120 }),
+      ).toEqual({ ok: true });
+    });
+    it("runs after the duplicate check and before the cap", () => {
+      expect(
+        checkPolicy({ ...bet, line: 24 }, { ...kills, duplicate: true }),
+      ).toMatchObject({ status: 409, error: expect.stringMatching(/already/) });
+      expect(
+        checkPolicy({ ...bet, line: 24 }, { ...kills, realWeekCount: 5 }),
+      ).toMatchObject({ error: expect.stringMatching(/kill line/i) });
     });
   });
   it("rejects off-slate, post-kickoff and duplicate picks", () => {

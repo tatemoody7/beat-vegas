@@ -1,3 +1,4 @@
+import { american, fmt } from "@/lib/format";
 import {
   REASONS,
   WEEKLY_BET_CAP,
@@ -145,6 +146,9 @@ export type PolicyContext = {
   /** Real-money 1H picks already logged for this season + week. */
   realWeekCount: number;
   week: number | null;
+  /** The card's kill numbers for this game (lib/card.ts CardItem); null = no card item. */
+  killLine: number | null;
+  killPrice: number | null;
 };
 
 /** Betting-policy checks that need DB facts (passed in). */
@@ -156,6 +160,24 @@ export function checkPolicy(
   if (ctx.kickedOff) return reject("game has already kicked off", 409);
   if (ctx.duplicate) {
     return reject(`a ${pick.market} pick already exists on this game`, 409);
+  }
+  // A real BET below the card's kill line, or at a worse price, is not the
+  // bet the card rated: the edge is gone. Paper and WATCH/PASS (an owner
+  // override, already off-policy) are exempt.
+  if (!pick.isPaper && pick.market === "1H" && pick.verdict === "BET") {
+    if (ctx.killLine !== null && pick.line < ctx.killLine) {
+      return reject(
+        `Below the kill line: the card rated this bet at u${fmt(ctx.killLine)} or higher; u${fmt(pick.line)} is not the same bet. Log it as your own call (reason manual) or pass.`,
+        409,
+      );
+    }
+    // American odds: the larger signed value pays better (-105 beats -120).
+    if (ctx.killPrice !== null && pick.price < ctx.killPrice) {
+      return reject(
+        `Worse than the kill price: the card rated this bet at ${american(ctx.killPrice)} or better; ${american(pick.price)} is not the same bet. Log it as your own call (reason manual) or pass.`,
+        409,
+      );
+    }
   }
   // Real money on a WATCH/PASS verdict is allowed but OFF-POLICY: the record
   // must capture every bet actually placed, and Results flags these so the

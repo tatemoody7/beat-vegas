@@ -259,6 +259,18 @@ def _season_to_date(long: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# Wind-speed bands (mph): [0,10) -> 0, [10,15) -> 1, [15,20) -> 2, 20+ -> 3.
+WIND_BAND_EDGES = (10.0, 15.0, 20.0)
+
+
+def wind_band(w) -> np.ndarray:
+    """Band index for each wind speed (float array; NaN stays NaN)."""
+    vals = pd.to_numeric(pd.Series(w), errors="coerce").astype(float).to_numpy()
+    out = np.digitize(np.nan_to_num(vals, nan=-1.0), WIND_BAND_EDGES).astype(float)
+    out[np.isnan(vals)] = np.nan
+    return out
+
+
 def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
     """Exact (season, week, team) join for pace + (game_id) join for weather."""
     with session_scope() as s:
@@ -302,6 +314,12 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = pd.NA
     # dome -> numeric for the model (True/False/NA -> 1.0/0.0/NaN)
     df["wx_dome"] = df["wx_dome"].map({True: 1.0, False: 0.0})
+    # A dome has no weather: null whatever the row stores (legacy rows carried a
+    # 72F / 0 mph placeholder) so the model never learns "72 and calm = dome".
+    dome = df["wx_dome"] == 1.0
+    df.loc[dome, ["wx_temp", "wx_wind", "wx_precip"]] = np.nan
+    # Extra (non-FEATURE_COLS) column: coarse wind band for display / analysis.
+    df["wx_wind_band"] = wind_band(df["wx_wind"])
     return df
 
 

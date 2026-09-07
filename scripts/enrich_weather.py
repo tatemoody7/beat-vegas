@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Populate the weather table for a week's games via Open-Meteo + venue coords.
 
-Dome venues are recorded as dome (no wind/precip effect). Outdoor venues get
-temp/wind/precip near kickoff.
+Dome venues are recorded as dome with NULL temp/wind/precip (there is no
+weather to model; a fake 72F/0mph placeholder would teach the model that "72
+and calm" means dome). Outdoor venues get temp/wind/precip near kickoff.
 
     python scripts/enrich_weather.py --season 2025 --week 8
 """
@@ -53,9 +54,9 @@ def main() -> None:
             rows.append(
                 {
                     "game_id": gid,
-                    "temperature_f": 72.0,
-                    "wind_mph": 0.0,
-                    "precipitation": 0.0,
+                    "temperature_f": None,
+                    "wind_mph": None,
+                    "precipitation": None,
                     "dome": True,
                 }
             )

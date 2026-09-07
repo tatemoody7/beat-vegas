@@ -84,6 +84,13 @@ _DATA_MIGRATIONS = [
     # landed in `book`, double-counting a book in medians. New writes go through
     # hardrock.normalize_book; this folds the legacy rows onto lowercase.
     ("odds_snapshots", "UPDATE odds_snapshots SET book = lower(book) WHERE book <> lower(book)"),
+    # enrich_weather used to store a 72F / 0 mph / 0 in placeholder for domes;
+    # domes carry no weather (NULL), see etl/features._merge_tempo_weather.
+    (
+        "weather",
+        "UPDATE weather SET temperature_f = NULL, wind_mph = NULL, precipitation = NULL "
+        "WHERE dome AND temperature_f = 72 AND wind_mph = 0",
+    ),
 ]
 
 _engine = None

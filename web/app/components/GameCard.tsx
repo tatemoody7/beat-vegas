@@ -16,6 +16,7 @@ import {
 } from "@/lib/score";
 import {
   BET_GAP_PTS,
+  WEEKLY_BET_CAP,
   CONFIDENCE_LABEL,
   STRONG_GAP_PTS,
   WATCH_GAP_PTS,
@@ -548,6 +549,14 @@ export default function GameCard({ g }: { g: HomeGame }) {
             {g.picked && (
               <span className="rounded-md border border-[var(--accent-strong)] px-1.5 text-xs text-[var(--accent)]">
                 logged
+              </span>
+            )}
+            {g.overCap && (
+              <span
+                className="rounded-md border border-[var(--border)] px-1.5 text-xs text-[var(--text-dim)]"
+                title={`BET #${g.capRank} by gap this week — beyond the ${WEEKLY_BET_CAP}-bet cap, so paper only. Every gate passed.`}
+              >
+                over cap · paper only
               </span>
             )}
           </span>

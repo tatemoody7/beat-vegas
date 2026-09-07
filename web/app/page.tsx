@@ -1,4 +1,5 @@
 import { getSeasons } from "@/lib/board";
+import { buildBetSlip } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
 import {
   getHomeBoard,
@@ -9,6 +10,7 @@ import {
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
+import BetSlip from "@/app/components/BetSlip";
 import BoardFilters from "@/app/components/BoardFilters";
 import CardPanel from "@/app/components/CardPanel";
 import GameCard from "@/app/components/GameCard";
@@ -46,6 +48,7 @@ export default async function BoardPage({
   ]);
   const card =
     latestCard !== null && latestCard.week === board.week ? latestCard : null;
+  const slip = buildBetSlip(card, board.weekPicks, board.bankroll.cap);
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -76,6 +79,8 @@ export default async function BoardPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       <BankrollStrip b={board.bankroll} />
+
+      {card !== null && <BetSlip slip={slip} week={board.week} />}
 
       <CardPanel card={card} />
 

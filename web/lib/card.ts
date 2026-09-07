@@ -1,19 +1,28 @@
 import { american, fmt } from "@/lib/format";
 import { kickoffET } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
 
-// The Friday bet card. scripts/build_card.py (GitHub Actions: Fri 6:05pm ET,
-// retry 7pm, refresh Sat 11am) writes one row per build to `cards`
-// (season, week, built_at, payload JSON). The home board shows the latest row
-// for the week. The table is NOT in the Prisma schema and may not exist yet on
-// a fresh database — every read degrades to "no card" instead of a 500.
+// The bet card. scripts/build_card.py (GitHub Actions: weeknight and Friday
+// preview builds, then the Saturday-morning FINAL ~8:45am ET) writes one row
+// per build to `cards` (season, week, built_at, payload JSON). The home board
+// shows the latest row for the week. The table is NOT in the Prisma schema and
+// may not exist yet on a fresh database — every read degrades to "no card"
+// instead of a 500.
 //
 // Payload contract (exact, from the Python side):
 //   {season, week, built_at, model_read, counts:{bet,edge,pass},
+//    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
 //            hr_open, market_line, fair_under, ev, bv_line, gap, kill_line,
-//            kill_price, action, why:[...], paper_logged}], notes:[...]}
-// Items arrive pre-sorted: BET, then EDGE by ev desc, then PASS.
+//            kill_price, action, why:[...], paper_logged,
+//            qualifies, paper_blocker, cap_rank, over_cap,
+//            full_game_total, spread, total_band, hook_side, key_dist}],
+//    notes:[...]}
+// Items arrive pre-sorted: BET, then EDGE, then PASS — each tier by gap desc
+// (the cap-5 rule the real-close backtest measured ranks by gap). The 6th+
+// BET by gap keeps tier BET but carries blocker "cap" and over_cap: every
+// gate passed, the weekly cap (docs/BETTING_POLICY.md) makes it paper only.
 
 export type CardTier = "BET" | "EDGE" | "PASS";
 export type CardBlocker =
@@ -22,7 +31,8 @@ export type CardBlocker =
   | "price"
   | "qb_out"
   | "gap"
-  | "no_model";
+  | "no_model"
+  | "cap";
 
 export type CardItem = {
   gameId: number;
@@ -45,6 +55,17 @@ export type CardItem = {
   action: string;
   why: string[];
   paperLogged: boolean;
+  /** Hard Rock's 1H line sits BET_GAP_PTS+ above ours (any tier): on the paper ledger. */
+  qualifies: boolean;
+  /** The gate that blocked a real bet on a qualifying game (null = it was a BET). */
+  paperBlocker: string | null;
+  /** 1-based rank among the week's BETs by gap; null on non-BETs. */
+  capRank: number | null;
+  /** BET beyond the weekly cap: every gate passed, paper only. */
+  overCap: boolean;
+  /** Display chips (never gates): full-game total band and hook position. */
+  totalBand: string | null;
+  hookSide: string | null;
 };
 
 export type Card = {
@@ -54,6 +75,8 @@ export type Card = {
   builtAt: string | null;
   modelRead: boolean;
   counts: { bet: number; edge: number; pass: number };
+  /** Paper ledger tallies: qualifying games, BETs over the cap, the cap. */
+  paper: { qualifying: number; overCap: number; cap: number };
   items: CardItem[];
   notes: string[];
 };
@@ -68,6 +91,7 @@ const BLOCKERS: readonly CardBlocker[] = [
   "qb_out",
   "gap",
   "no_model",
+  "cap",
 ];
 
 const num = (v: unknown): number | null => {
@@ -122,6 +146,12 @@ function parseItem(raw: unknown): CardItem | null {
     action: str(raw.action) ?? "",
     why: strList(raw.why),
     paperLogged: raw.paper_logged === true || raw.paper_logged === 1,
+    qualifies: raw.qualifies === true || raw.qualifies === 1,
+    paperBlocker: str(raw.paper_blocker),
+    capRank: int(raw.cap_rank),
+    overCap: raw.over_cap === true || raw.over_cap === 1,
+    totalBand: str(raw.total_band),
+    hookSide: str(raw.hook_side),
   };
 }
 
@@ -161,6 +191,12 @@ export function parseCard(raw: unknown): Card | null {
     edge: int(c.edge) ?? derived.edge,
     pass: int(c.pass) ?? derived.pass,
   };
+  const pp = isObj(obj.paper) ? obj.paper : {};
+  const paper = {
+    qualifying: int(pp.qualifying) ?? items.filter((i) => i.qualifies).length,
+    overCap: int(pp.over_cap) ?? items.filter((i) => i.overCap).length,
+    cap: int(pp.cap) ?? WEEKLY_BET_CAP,
+  };
 
   return {
     season,
@@ -168,6 +204,7 @@ export function parseCard(raw: unknown): Card | null {
     builtAt: asIso(obj.built_at),
     modelRead: obj.model_read === true || obj.model_read === 1,
     counts,
+    paper,
     items,
     notes: strList(obj.notes),
   };
@@ -251,14 +288,23 @@ export type CardRow = {
   line: string;
   action: string;
   paperLogged: boolean;
+  /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
+  capRank: number | null;
+  overCap: boolean;
+  /** Which gate blocked a real bet on a qualifying game (null = none). */
+  paperBlocker: string | null;
+  /** "below u24.5 or worse than -120" — the numbers that kill the bet; "" when unknown. */
+  kill: string;
 };
 
 export type CardSummary = {
   /** "No bets this week." / "1 bet this week." / "3 bets this week." */
   headline: string;
   hasBets: boolean;
-  /** One row per BET, in card order (never more than MAX_CARD_ROWS). */
+  /** One row per bettable BET (inside the weekly cap), in card order (never more than MAX_CARD_ROWS). */
   bets: CardRow[];
+  /** BETs beyond the weekly cap: every gate passed, paper only. */
+  overCap: CardRow[];
   /** On a no-bet week: up to CLOSEST_ROWS EDGE items, best ev first. */
   closest: CardRow[];
   /** On a no-bet week: the first note, shown right under the headline. */
@@ -273,6 +319,17 @@ export function lineLabel(item: Pick<CardItem, "hrLine" | "hrPrice">): string {
   return `u${fmt(item.hrLine)}${item.hrPrice === null ? "" : ` ${american(item.hrPrice)}`}`;
 }
 
+/** "below u24.5 or worse than -120" — what would kill the bet; "" when unknown. */
+export function killLabel(
+  item: Pick<CardItem, "killLine" | "killPrice">,
+): string {
+  const parts: string[] = [];
+  if (item.killLine !== null) parts.push(`below u${fmt(item.killLine)}`);
+  if (item.killPrice !== null)
+    parts.push(`worse than ${american(item.killPrice)}`);
+  return parts.join(" or ");
+}
+
 function toRow(item: CardItem): CardRow {
   return {
     gameId: item.gameId,
@@ -282,14 +339,21 @@ function toRow(item: CardItem): CardRow {
     line: lineLabel(item),
     action: item.action,
     paperLogged: item.paperLogged,
+    capRank: item.capRank,
+    overCap: item.overCap,
+    paperBlocker: item.overCap ? "cap" : item.paperBlocker,
+    kill: killLabel(item),
   };
 }
 
 /** Pure: everything the card panel draws, worked out once from the card. */
 export function summarizeCard(card: Card): CardSummary {
   const bets = card.items
-    .filter((i) => i.tier === "BET")
+    .filter((i) => i.tier === "BET" && !i.overCap)
     .slice(0, MAX_CARD_ROWS)
+    .map(toRow);
+  const overCap = card.items
+    .filter((i) => i.tier === "BET" && i.overCap)
     .map(toRow);
   const hasBets = bets.length > 0;
   const closest = hasBets
@@ -310,6 +374,7 @@ export function summarizeCard(card: Card): CardSummary {
       : "No bets this week.",
     hasBets,
     bets,
+    overCap,
     closest,
     reason,
     notes: reason === null ? card.notes : card.notes.slice(1),

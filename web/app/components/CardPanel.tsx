@@ -28,6 +28,14 @@ function Row({ r }: { r: CardRow }) {
         >
           {r.tier}
         </span>
+        {r.capRank !== null && (
+          <span
+            className="font-mono text-xs text-[var(--text-dim)]"
+            title="Rank among this week's BETs by gap — the order the weekly cap fills."
+          >
+            {`#${r.capRank}`}
+          </span>
+        )}
         <span className="font-semibold text-[var(--text)]">{r.matchup}</span>
         <span className="text-xs text-[var(--text-dim)]">
           {r.kick ?? "kickoff TBD"}
@@ -38,7 +46,11 @@ function Row({ r }: { r: CardRow }) {
         {r.paperLogged && (
           <span
             className="rounded-md border border-[var(--accent-strong)] px-1.5 text-xs text-[var(--accent)]"
-            title="Logged automatically as a paper pick — one notional unit, kept apart from the real record."
+            title={
+              r.paperBlocker
+                ? `Logged automatically as a paper pick (gate: ${r.paperBlocker}) — one notional unit, kept apart from the real record.`
+                : "Logged automatically as a paper pick — one notional unit, kept apart from the real record."
+            }
           >
             paper logged
           </span>
@@ -53,6 +65,11 @@ function Row({ r }: { r: CardRow }) {
       </div>
       {r.action !== "" && (
         <p className="mt-1 text-[var(--text-muted)]">{r.action}</p>
+      )}
+      {r.tier === "BET" && !r.overCap && r.kill !== "" && (
+        <p className="mt-0.5 font-mono text-xs text-[var(--text-dim)]">
+          {`kill: ${r.kill}`}
+        </p>
       )}
     </li>
   );
@@ -72,7 +89,7 @@ export default function CardPanel({
           {`This week’s card`}
         </h2>
         <p className="mt-1 text-sm text-[var(--text-dim)]">
-          {`The card builds Friday at 6pm ET and refreshes Saturday at 11am ET.`}
+          {`A preview builds Friday evening; the final card lands Saturday around 8:45am ET off a fresh sweep of Hard Rock’s first-half lines.`}
         </p>
       </div>
     );
@@ -101,11 +118,28 @@ export default function CardPanel({
       </p>
 
       {s.hasBets ? (
-        <ul className="mt-2">
-          {s.bets.map((r) => (
-            <Row key={r.gameId} r={r} />
-          ))}
-        </ul>
+        <>
+          <ul className="mt-2">
+            {s.bets.map((r) => (
+              <Row key={r.gameId} r={r} />
+            ))}
+          </ul>
+          {s.overCap.length > 0 && (
+            <>
+              <p
+                className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]"
+                title="Every gate passed on these too; the weekly cap makes them paper only."
+              >
+                Over the weekly cap · paper only
+              </p>
+              <ul className="mt-1">
+                {s.overCap.map((r) => (
+                  <Row key={r.gameId} r={r} />
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       ) : (
         s.closest.length > 0 && (
           <>

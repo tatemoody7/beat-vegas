@@ -8,7 +8,12 @@ import {
 import { round2 } from "@/lib/format";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
 import { getMovements, type Movement } from "@/lib/movement";
-import { getPicks, isRealFirstHalf, type PickFull } from "@/lib/picks";
+import {
+  getPicks,
+  isRealFirstHalf,
+  type PickFull,
+  type WeekPick,
+} from "@/lib/picks";
 import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
 import type { Record3 } from "@/lib/record";
 import type { BoardFactor, Factors } from "@/lib/score";
@@ -258,6 +263,10 @@ export type HomeGame = {
   gapBasis: GapBasis | null;
   /** One sentence on Hard Rock's price vs the market's no-vig fair price. */
   priceLine: string;
+  /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
+  capRank: number | null;
+  /** BET beyond the weekly cap: every gate passed, paper only (docs/BETTING_POLICY.md). */
+  overCap: boolean;
 };
 
 export type HomeBoard = {
@@ -272,6 +281,8 @@ export type HomeBoard = {
   games: HomeGame[];
   counts: { bet: number; edge: number; pass: number };
   bankroll: Bankroll;
+  /** Real-money 1H picks logged on this week (the bet slip's "logged" state). */
+  weekPicks: WeekPick[];
 };
 
 /** Pure: upcoming before kicked-off, then score desc, earliest kickoff, away team. */
@@ -289,6 +300,40 @@ export function sortGames(games: HomeGame[]): HomeGame[] {
       ms(a) - ms(b) ||
       a.row.away.localeCompare(b.row.away),
   );
+}
+
+/**
+ * Pure: rank this week's BETs for the real-money cap, by gap (the cap-5 rule
+ * the real-close backtest measured — beatvegas/card.py apply_weekly_cap).
+ * Games already bet (`held`) keep their slot ahead of new arrivals; the rest
+ * follow by gap desc, then Hard Rock's price, then kickoff. Rank > cap marks
+ * overCap: every gate passed, paper only. Non-BETs get capRank null.
+ */
+export function assignCapRanks(
+  games: HomeGame[],
+  held: Set<number>,
+  cap: number = WEEKLY_BET_CAP,
+): HomeGame[] {
+  const bets = games.filter((g) => g.edge.tier === "BET" && !g.kickedOff);
+  const ms = (g: HomeGame): number => {
+    const t = asDate(g.row.startDate);
+    return t === null ? Number.POSITIVE_INFINITY : t.getTime();
+  };
+  const ranked = [...bets].sort(
+    (a, b) =>
+      Number(!held.has(a.row.gameId)) - Number(!held.has(b.row.gameId)) ||
+      (b.gap ?? Number.NEGATIVE_INFINITY) -
+        (a.gap ?? Number.NEGATIVE_INFINITY) ||
+      (b.check?.ev ?? Number.NEGATIVE_INFINITY) -
+        (a.check?.ev ?? Number.NEGATIVE_INFINITY) ||
+      ms(a) - ms(b) ||
+      a.row.away.localeCompare(b.row.away),
+  );
+  const rank = new Map(ranked.map((g, i) => [g.row.gameId, i + 1]));
+  return games.map((g) => {
+    const r = rank.get(g.row.gameId) ?? null;
+    return { ...g, capRank: r, overCap: r !== null && r > cap };
+  });
 }
 
 /** Pure: how many games sit in each tier. */
@@ -403,10 +448,24 @@ export async function getHomeBoard(
           : null,
       gapBasis: hasModel ? gapBasis : null,
       priceLine: priceSentence(input),
+      capRank: null,
+      overCap: false,
     };
   });
 
-  const sorted = sortGames(games);
+  const heldIds = new Set(
+    [...pickedGames].filter((g): g is number => g !== null),
+  );
+  const sorted = assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP);
+  const weekPicks: WeekPick[] = real1H
+    .filter((p) => p.week === week)
+    .map((p) => ({
+      gameId: p.gameId,
+      away: p.away,
+      home: p.home,
+      line: p.line,
+      price: p.price,
+    }));
   const { startUsd, unitUsd } = bankrollEnv();
   const realUnits = round2(
     real1H.filter((p) => p.graded).reduce((a, p) => a + (p.units ?? 0), 0),
@@ -430,5 +489,6 @@ export async function getHomeBoard(
       real: record,
       paper: paperRecord,
     },
+    weekPicks,
   };
 }

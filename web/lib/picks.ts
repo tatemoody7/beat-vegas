@@ -41,6 +41,17 @@ export type PickFull = {
   gapAtPick: number | null;
   evAtPick: number | null;
   hrLineAtPick: number | null;
+  /** Paper ledger: the gate that blocked a real bet (none | price | off_market | qb_out | cap); null on real picks. */
+  blocker: string | null;
+};
+
+/** A real-money 1H pick on the week, as the bet slip needs it. */
+export type WeekPick = {
+  gameId: number | null;
+  away: string | null;
+  home: string | null;
+  line: number | null;
+  price: number | null;
 };
 
 // Games on the current week (the week you are about to bet — see lib/week.ts).
@@ -84,6 +95,7 @@ type RawPick = {
   gap_at_pick?: number | null;
   ev_at_pick?: number | null;
   hr_line_at_pick?: number | null;
+  blocker?: string | null;
 };
 
 const isMissingColumn = (e: unknown): boolean =>
@@ -95,6 +107,19 @@ const isMissingColumn = (e: unknown): boolean =>
 // run on a database, fall back to the legacy column list (snapshot fields null)
 // and say so in the server log rather than 500 the whole Results page.
 async function selectPicks(season: number): Promise<RawPick[]> {
+  try {
+    return await prisma.$queryRaw<RawPick[]>`
+      SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
+             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             graded, is_paper, verdict_at_pick, reason, gap_at_pick, ev_at_pick,
+             hr_line_at_pick, blocker
+      FROM manual_picks WHERE season = ${season}
+    `;
+  } catch (e) {
+    if (!isMissingColumn(e)) throw e;
+  }
+  // `blocker` (2026-09-07) arrives with the Python lane's migration; keep the
+  // rest of the snapshot when only it is missing.
   try {
     return await prisma.$queryRaw<RawPick[]>`
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
@@ -146,6 +171,7 @@ export async function loadPicks(season: number): Promise<PickFull[]> {
     gapAtPick: r.gap_at_pick ?? null,
     evAtPick: r.ev_at_pick ?? null,
     hrLineAtPick: r.hr_line_at_pick ?? null,
+    blocker: r.blocker ?? null,
   }));
   picks.sort((a, b) => Number(a.graded) - Number(b.graded) || b.id - a.id);
   return picks;

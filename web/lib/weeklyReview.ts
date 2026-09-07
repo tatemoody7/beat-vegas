@@ -40,6 +40,30 @@ export type ReasonRow = {
   paperBets: number;
 };
 
+/** Paper ledger by the gate that blocked a real bet (docs/BETTING_POLICY.md). */
+export type BlockerKey =
+  | "none"
+  | "price"
+  | "off_market"
+  | "qb_out"
+  | "cap"
+  | "untagged";
+
+export type BlockerRow = {
+  blocker: BlockerKey;
+  paper: Record3 | null;
+  paperBets: number;
+};
+
+export const BLOCKER_LABEL: Record<BlockerKey, string> = {
+  none: "BET — every gate passed",
+  price: "Blocked by price (Hard Rock worse than fair)",
+  off_market: "Blocked: Hard Rock's number below the market",
+  qb_out: "Blocked: starting QB listed out",
+  cap: "Over the weekly cap (6th+ by gap)",
+  untagged: "Paper pick logged before gate tagging",
+};
+
 export type WeeklyReview = {
   /** The week shown in the scorecard; null when nothing is graded yet. */
   week: number | null;
@@ -48,6 +72,8 @@ export type WeeklyReview = {
   lines: ReviewLine[];
   byWeek: WeekRow[];
   byReason: ReasonRow[];
+  /** Paper first-half picks by the gate that blocked a real bet. */
+  byBlocker: BlockerRow[];
   /** Picks for the selected week (or all, when week is "all"). */
   picks: PickFull[];
 };
@@ -111,6 +137,38 @@ export function reasonRows(picks: PickFull[]): ReasonRow[] {
     });
   }
   return rows;
+}
+
+const BLOCKER_ORDER: BlockerKey[] = [
+  "none",
+  "price",
+  "off_market",
+  "qb_out",
+  "cap",
+  "untagged",
+];
+
+const asBlocker = (v: string | null): BlockerKey =>
+  v === "none" ||
+  v === "price" ||
+  v === "off_market" ||
+  v === "qb_out" ||
+  v === "cap"
+    ? v
+    : "untagged";
+
+/** Pure: the paper ledger by gate — what each gate would have done. Rows with
+ *  no picks are omitted. Real picks never enter (they are not tagged). */
+export function blockerRows(picks: PickFull[]): BlockerRow[] {
+  const paper = picks.filter(isPaperFirstHalf);
+  return BLOCKER_ORDER.map((blocker) => {
+    const rs = paper.filter((p) => asBlocker(p.blocker) === blocker);
+    return {
+      blocker,
+      paper: recordFrom(graded(rs)),
+      paperBets: rs.length,
+    };
+  }).filter((r) => r.paperBets > 0);
 }
 
 export async function getWeeklyReview(
@@ -186,6 +244,7 @@ export async function getWeeklyReview(
     lines,
     byWeek: weekRows(picks),
     byReason: reasonRows(picks),
+    byBlocker: blockerRows(picks),
     picks: mine,
   };
 }

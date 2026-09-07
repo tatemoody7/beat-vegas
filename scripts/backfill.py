@@ -25,6 +25,7 @@ from beatvegas.etl.first_half import (
     first_half_from_plays,
     line_scores_trustworthy,
 )
+from beatvegas.line_sources import strip_protected_line_fields
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import pick_total_spread as _pick_total
@@ -124,14 +125,26 @@ def backfill_season(
             if tid is not None and tid not in team_rows:
                 team_rows[tid] = {"id": tid, "school": name, "conference": conf}
 
+    cfbd_with_total = sum(1 for r in game_rows if r["full_game_total"] is not None)
     with session_scope() as s:
+        # The Sunday/card-day capture (Odds API / DK) owns the total + spread it
+        # wrote; CFBD's consensus number must not overwrite it every Monday.
+        sources = {
+            gid: (fg_src, sp_src)
+            for gid, fg_src, sp_src in s.query(
+                Game.id, Game.full_game_total_source, Game.spread_source
+            ).filter(Game.season == season)
+        }
+        game_rows = [
+            strip_protected_line_fields(r, *sources.get(r["id"], (None, None))) for r in game_rows
+        ]
         upsert(s, Game, game_rows, "id")
         upsert(s, Team, list(team_rows.values()), "id")
 
     return {
         "games": len(game_rows),
         "with_1h": n_with_1h,
-        "with_total": sum(1 for r in game_rows if r["full_game_total"] is not None),
+        "cfbd_with_total": cfbd_with_total,
     }
 
 
@@ -181,7 +194,7 @@ def main() -> None:
             stats = backfill_season(client, season, st, args.use_pbp)
             print(
                 f"{season} {st}: {stats['games']} games, {stats['with_1h']} with 1H, "
-                f"{stats['with_total']} with full-game total"
+                f"{stats['cfbd_with_total']} with a CFBD-supplied full-game total"
             )
 
 

@@ -46,7 +46,12 @@ from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.proxy_line import _load_share_coeffs
 from beatvegas.hardrock import HR_BOOK_KEY
-from beatvegas.lines import book_closing_before_kickoff, closing_before_kickoff
+from beatvegas.lines import (
+    REAL_1H_CLOSE_WINDOW_H,
+    REAL_FG_CLOSE_WINDOW_H,
+    book_closing_before_kickoff,
+    real_closes,
+)
 from beatvegas.model.score import MODEL_VERSION
 from beatvegas.season import current_season
 
@@ -92,8 +97,10 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
     rows = q.all()
     ids = [g.id for _, g, _ in rows]
     kicks = {g.id: g.start_date for _, g, _ in rows}
-    closes = _real_closes(session, ids, kicks)
-    fg_closes = _real_closes(session, ids, kicks, market="full_game_total", within_hours=3.0)
+    closes = real_closes(session, ids, kicks, within_hours=REAL_1H_CLOSE_WINDOW_H)
+    fg_closes = real_closes(
+        session, ids, kicks, market="full_game_total", within_hours=REAL_FG_CLOSE_WINDOW_H
+    )
     out: List[Dict] = []
     for p, g, w in rows:
         spp_vals = [
@@ -128,45 +135,6 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
                 "fg_close": fg_closes.get(g.id),
             }
         )
-    return out
-
-
-def _real_closes(
-    session,
-    game_ids: Sequence[int],
-    kickoffs: Dict[int, datetime],
-    market: str = "1H_total",
-    within_hours: Optional[float] = None,
-) -> Dict[int, float]:
-    """game_id -> pre-kickoff consensus close for `market` from captured
-    snapshots (the historical backfills write these); games without one are
-    simply absent. `within_hours` keeps only snapshots at most that many hours
-    before kickoff — the full-game column must not grade against a Sunday
-    opener when no real close was captured."""
-    if not game_ids:
-        return {}
-    by_game: Dict[int, List] = {}
-    ids = list(game_ids)
-    for i in range(0, len(ids), 1000):
-        for snap in (
-            session.query(OddsSnapshot)
-            .filter(OddsSnapshot.market == market, OddsSnapshot.game_id.in_(ids[i : i + 1000]))
-            .all()
-        ):
-            k = kickoffs.get(snap.game_id)
-            if (
-                within_hours is not None
-                and k is not None
-                and snap.captured_at is not None
-                and not (0 <= (k - snap.captured_at).total_seconds() <= within_hours * 3600)
-            ):
-                continue
-            by_game.setdefault(snap.game_id, []).append(snap)
-    out: Dict[int, float] = {}
-    for gid, snaps in by_game.items():
-        _open, close, _at = closing_before_kickoff(snaps, kickoffs.get(gid))
-        if close is not None:
-            out[gid] = float(close)
     return out
 
 

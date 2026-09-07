@@ -157,10 +157,11 @@ def test_oddsapi_normalize_full_game_multibook_incl_hardrock():
     ]
     rows = normalize_full_game(events)
     by_book = {r["book"]: r for r in rows}
-    # spreads market ignored; hardrockbet_fl folds onto the canonical hardrockbet
+    # fanduel has no totals market (no row); hardrockbet_fl folds onto hardrockbet
     assert set(by_book) == {"hardrockbet", "draftkings"}
     assert by_book["hardrockbet"]["line"] == 56.5
-    assert by_book["hardrockbet"]["spread"] is None  # totals market has no spread
+    # no spreads market in this fixture for hardrock -> spread unknown, not 0
+    assert by_book["hardrockbet"]["spread"] is None
     assert all(r["event_id"] == "evt1" for r in rows)
 
 
@@ -220,3 +221,93 @@ def test_full_game_opener_consensus_with_spread():
     total, spread = _full_game_opener(snaps)
     assert total == 57.0  # median(56.0, 58.0)
     assert spread == -7.5  # median(-7.0, -8.0)
+
+
+def test_consensus_spread_is_the_median_of_known_spreads():
+    _consensus_spread = _load("poll_full_game")._consensus_spread
+    rows = [{"spread": -7.0}, {"spread": None}, {"spread": -8.0}, {"spread": -6.5}]
+    assert _consensus_spread(rows) == -7.0
+    assert _consensus_spread([{"spread": -7.0}, {"spread": -8.0}]) == -7.5
+    assert _consensus_spread([{"spread": None}, {}]) is None
+    assert _consensus_spread([]) is None
+
+
+def _row(gid, book, line, spread, over=-110, under=-110):
+    return {
+        "game_id": gid,
+        "book": book,
+        "line": line,
+        "spread": spread,
+        "over_price": over,
+        "under_price": under,
+        "commence_time": None,
+    }
+
+
+def _run_poll(mod, monkeypatch, eng, fg_rows, now, source="oddsapi"):
+    import sys
+    from contextlib import contextmanager
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    class _Now(datetime):
+        @classmethod
+        def utcnow(cls):
+            return now
+
+    monkeypatch.setattr(mod, "session_scope", scope)
+    monkeypatch.setattr(mod, "try_init_db", lambda: True)
+    monkeypatch.setattr(mod, "datetime", _Now)
+    monkeypatch.setattr(
+        mod, "_fetch", lambda src, season, regions, credit_floor=60: (fg_rows, [], source, 1)
+    )
+    monkeypatch.setattr(sys, "argv", ["poll_full_game.py", "--season", "2026", "--source", source])
+    mod.main()
+
+
+def test_two_runs_move_spread_but_fill_total_only_when_null(monkeypatch):
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=3, home_team="LSU", away_team="Clemson"))
+        s.commit()
+
+    run1 = [_row(1, "draftkings", 55.5, -7.0), _row(1, "fanduel", 56.0, -8.0)]
+    _run_poll(mod, monkeypatch, eng, run1, datetime(2026, 9, 6, 12, 0))
+    with Session(eng) as s:
+        g = s.get(Game, 1)
+        assert g.spread == -7.5  # median across the run's books
+        assert g.spread_source == "oddsapi"
+        assert g.full_game_total == 55.5  # DK outranks FanDuel for the opener
+        assert g.full_game_total_book == "draftkings"
+        assert g.full_game_total_source == "oddsapi"
+
+    run2 = [_row(1, "draftkings", 57.0, -8.0), _row(1, "fanduel", 58.0, -9.0)]
+    _run_poll(mod, monkeypatch, eng, run2, datetime(2026, 9, 7, 12, 0))
+    with Session(eng) as s:
+        g = s.get(Game, 1)
+        assert g.spread == -8.5  # spread tracks the market
+        assert g.full_game_total == 55.5  # opener total is NOT overwritten
+        assert g.full_game_total_source == "oddsapi"
+        snaps = s.query(OddsSnapshot).filter_by(market="full_game_total").all()
+        assert len(snaps) == 4  # both books moved both runs
+        assert {sn.spread for sn in snaps if sn.book == "draftkings"} == {-7.0, -8.0}
+
+
+def test_spread_none_for_every_book_leaves_game_spread_alone(monkeypatch):
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=3, home_team="LSU", away_team="Clemson", spread=-3.0))
+        s.commit()
+    _run_poll(mod, monkeypatch, eng, [_row(1, "consensus", 50.0, None)], datetime(2026, 9, 6))
+    with Session(eng) as s:
+        g = s.get(Game, 1)
+        assert g.spread == -3.0 and g.spread_source is None
+        assert g.full_game_total == 50.0 and g.full_game_total_source == "oddsapi"

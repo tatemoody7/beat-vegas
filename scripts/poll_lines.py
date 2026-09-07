@@ -39,7 +39,7 @@ from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import match_event
 from beatvegas.hardrock import games_with_hr_first_half, hr_universe_game_ids, normalize_book
 from beatvegas.season import current_season
-from beatvegas.sources.odds import OddsAPIClient, normalize_first_half
+from beatvegas.sources.odds import OddsAPIClient, normalize_first_half, redact_key
 from beatvegas.sweep import (
     CLOSE_SPREAD,
     build_context,
@@ -237,7 +237,7 @@ def main() -> None:
         try:
             data = client.event_first_half_totals(ev["id"])
         except requests.RequestException as e:
-            fetch_error = f"{type(e).__name__}: {e}"
+            fetch_error = redact_key(f"{type(e).__name__}: {e}")
             print(
                 f"[fetch] FAILED at event {i + 1}/{len(in_window)} ({fetch_error}) — "
                 "processing what was already fetched."

@@ -65,12 +65,18 @@ class Game(Base):
     first_half_total = Column(Integer)
     first_half_source = Column(String)  # 'pbp' | 'linescores'
 
-    # Full-game closing total from CFBD /lines (consensus/best available).
+    # Full-game total: the Sunday/card-day opener capture (Odds API / DK) or
+    # CFBD /lines (consensus/best available) when nothing live was captured.
     full_game_total = Column(Float)
     full_game_total_book = Column(String)
     # Point spread, home-relative signed (negative = home favored). Drives the
     # spread-adjusted 1H multiplier (favorites score relatively more early).
     spread = Column(Float)
+    # Who last wrote the total / spread: 'cfbd' | 'oddsapi' | 'dk'. A live
+    # source (oddsapi/dk) is protected from Monday's CFBD upsert — see
+    # beatvegas/line_sources.py.
+    full_game_total_source = Column(String)
+    spread_source = Column(String)
 
     __table_args__ = (UniqueConstraint("id", name="uq_game_id"),)
 

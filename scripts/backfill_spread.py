@@ -5,9 +5,14 @@ Surgical by design: it UPDATEs existing games' `spread` and nothing else, so it
 never touches the PBP-derived first-half ground truth (re-running the full
 backfill.py without --use-pbp would null those — see etl/first_half). Idempotent.
 
+Games whose spread came from a live capture (Game.spread_source in
+line_sources.LIVE_LINE_SOURCES: oddsapi / dk) are skipped unless --force, so
+this never overwrites the Sunday opener's number with CFBD's consensus.
+
     python scripts/backfill_spread.py                 # config range
     python scripts/backfill_spread.py --start 2015 --end 2025
     python scripts/backfill_spread.py --season 2026
+    python scripts/backfill_spread.py --season 2026 --force   # CFBD wins everywhere
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ import argparse
 from beatvegas.config import load_config
 from beatvegas.db.models import Game
 from beatvegas.db.store import init_db, session_scope
+from beatvegas.line_sources import CFBD_SOURCE, LIVE_LINE_SOURCES
 from beatvegas.season import current_season
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import DEFAULT_SEASON_TYPE, _season_types
@@ -46,7 +52,9 @@ def _pick_spread(lines):
     return next(iter(by_provider.values())) if by_provider else None
 
 
-def backfill_season(client: CFBDClient, season: int, season_type: str) -> int:
+def backfill_season(client: CFBDClient, season: int, season_type: str, force: bool = False) -> int:
+    """UPDATE Game.spread from CFBD for `season`; returns games updated. Games
+    tagged with a live spread source are left alone unless `force`."""
     spread_by_game = {}
     for st in _season_types(season_type):
         for g in client.lines(year=season, season_type=st):
@@ -58,9 +66,13 @@ def backfill_season(client: CFBDClient, season: int, season_type: str) -> int:
     with session_scope() as s:
         for gid, sp in spread_by_game.items():
             g = s.query(Game).filter(Game.id == gid).one_or_none()
-            if g is not None:
-                g.spread = sp
-                updated += 1
+            if g is None:
+                continue
+            if not force and g.spread_source in LIVE_LINE_SOURCES:
+                continue
+            g.spread = sp
+            g.spread_source = CFBD_SOURCE
+            updated += 1
     return updated
 
 
@@ -71,13 +83,18 @@ def main() -> None:
     ap.add_argument("--start", type=int, default=cfg.get("start_season", 2015))
     ap.add_argument("--end", type=int, default=cfg.get("end_season") or current_season())
     ap.add_argument("--season-type", default=cfg.get("season_type", DEFAULT_SEASON_TYPE))
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="also overwrite spreads a live capture (Odds API / DK) wrote",
+    )
     args = ap.parse_args()
 
     init_db()
     client = CFBDClient()
     seasons = [args.season] if args.season else range(args.start, args.end + 1)
     for season in seasons:
-        n = backfill_season(client, season, args.season_type)
+        n = backfill_season(client, season, args.season_type, force=args.force)
         print(f"{season}: {n} games updated with spread")
 
 

@@ -146,6 +146,15 @@ jobs:
           print(f"need_preview={'true' if (force_preview or previews == 0) else 'false'}")
           PY
           cat "$GITHUB_OUTPUT"
+      - name: Full-game refresh (preview / final only; totals+spreads, 4 credits)
+        # Sunday's opener capture is the only other writer of Game.spread /
+        # full_game_total; by Friday the market has moved. One bulk call
+        # (us,us2 x totals,spreads) keeps the spread current for the 1H share
+        # and the HR-vs-market read. Optional: the card still builds on
+        # Sunday's numbers if the Odds API is down.
+        if: steps.slot.outputs.force_sweep == 'true' && steps.active.outputs.week != ''
+        continue-on-error: true
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --days-ahead 3
       - name: 1H sweep (forced for the preview / final; else only when today's is missing)
         if: steps.inputs.outputs.need_sweep == 'true'
         run: python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }}

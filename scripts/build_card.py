@@ -24,33 +24,19 @@ import json
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from beatvegas.card import REFERENCE_MODEL_VERSION, build_card
 from beatvegas.db.models import Card, Game, GamePreview, OddsSnapshot, Prediction
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.hardrock import HR_BOOK_KEY
+from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
 from beatvegas.model.score import BET_GAP_PTS, MODEL_VERSION
 from beatvegas.picks import add_pick, existing_pick
 
 
 def hr_universe(session, season: int, week: int) -> List[Dict]:
     """The week's games Hard Rock has priced a full-game total on, as card rows."""
-    ids: Set[int] = {
-        r[0]
-        for r in (
-            session.query(OddsSnapshot.game_id)
-            .join(Game, Game.id == OddsSnapshot.game_id)
-            .filter(
-                Game.season == season,
-                Game.week == week,
-                OddsSnapshot.market == "full_game_total",
-                OddsSnapshot.book == HR_BOOK_KEY,
-            )
-            .distinct()
-            .all()
-        )
-    }
+    ids = hr_universe_game_ids(session, season, week)
     if not ids:
         return []
     rows = session.query(Game).filter(Game.id.in_(ids)).order_by(Game.start_date, Game.id).all()

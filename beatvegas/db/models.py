@@ -188,6 +188,10 @@ class OddsSnapshot(Base):
     over_price = Column(Integer)
     under_price = Column(Integer)
     captured_at = Column(DateTime, index=True)
+    # Snapshots are written on CHANGE only, so a pre-kick poll that finds the
+    # number unchanged leaves no row; it stamps the moment it re-confirmed this
+    # one instead. lines.closing_before_kickoff reads it as the close time.
+    last_seen_at = Column(DateTime)
 
 
 class Prediction(Base):

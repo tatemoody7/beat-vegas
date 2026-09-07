@@ -118,3 +118,58 @@ def test_latest_pace_by_team_skips_null_current_week_and_uses_last_real_value():
         (2026, 1, "Clemson", None),
     ]
     assert latest_pace_by_team(rows) == {"LSU": 27.7, "Clemson": 27.6}
+
+
+# --- paid-tier window + universe filters (2026-09: capture EVERY Hard Rock 1H line) ---
+
+from datetime import datetime  # noqa: E402
+
+from beatvegas.sweep import filter_hr_universe, filter_missing_hr, select_window  # noqa: E402
+
+NOW = datetime(2026, 9, 19, 15, 0)  # Sat 11am ET
+
+
+def test_select_window_days_ahead_and_hours_back():
+    events = [
+        ev("yesterday", "2026-09-18T15:00:00Z"),
+        ev("two-hours-ago", "2026-09-19T13:00:00Z"),
+        ev("tonight", "2026-09-19T23:30:00Z"),
+        ev("next-week", "2026-09-26T16:00:00Z"),
+        ev("no-time", None),
+    ]
+    got = [e["id"] for e in select_window(events, NOW, days_ahead=3, hours_back=0)]
+    assert got == ["tonight", "no-time"]  # unparseable kickoff is kept (matched later)
+    got = [e["id"] for e in select_window(events, NOW, days_ahead=3, hours_back=24)]
+    assert got == ["yesterday", "two-hours-ago", "tonight", "no-time"]
+
+
+def test_select_window_kickoff_within_minutes_is_the_close_mode():
+    events = [
+        ev("kicked-5m-ago", "2026-09-19T14:55:00Z"),
+        ev("in-40m", "2026-09-19T15:40:00Z"),
+        ev("in-75m", "2026-09-19T16:15:00Z"),
+        ev("in-3h", "2026-09-19T18:00:00Z"),
+    ]
+    got = select_window(events, NOW, days_ahead=6, hours_back=0, kickoff_within_min=75)
+    assert [e["id"] for e in got] == ["in-40m", "in-75m"]
+
+
+def test_filter_missing_hr_drops_games_hard_rock_already_priced():
+    events = [ev("a", "t"), ev("b", "t"), ev("c-unmatched", "t")]
+    ctx = {"a": {"game_id": 1}, "b": {"game_id": 2}}
+    got = filter_missing_hr(events, ctx, games_with_hr_1h={1})
+    assert [e["id"] for e in got] == ["b", "c-unmatched"]
+
+
+def test_filter_hr_universe_keeps_only_hard_rock_priced_games():
+    events = [ev("a", "t"), ev("b", "t"), ev("c-unmatched", "t")]
+    ctx = {"a": {"game_id": 1}, "b": {"game_id": 2}}
+    got, fallback = filter_hr_universe(events, ctx, hr_universe={2})
+    assert [e["id"] for e in got] == ["b"] and fallback is False
+
+
+def test_filter_hr_universe_falls_back_to_everything_when_universe_is_empty():
+    """sunday.yml dropped -> no HR full-game rows: sweep everything and warn."""
+    events = [ev("a", "t"), ev("c-unmatched", "t")]
+    got, fallback = filter_hr_universe(events, {"a": {"game_id": 1}}, hr_universe=set())
+    assert [e["id"] for e in got] == ["a", "c-unmatched"] and fallback is True

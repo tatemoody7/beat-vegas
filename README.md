@@ -79,12 +79,15 @@ lines where captured, else proxy):
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
-**Credit budget (Odds API free tier = 500/month):** `totals_h1` is served only
-per-event, so a 1H sweep costs `markets × regions` credits **per game** with a posted
-1H line (2 with `us,us2`); listing events is free; full-game totals are one bulk
-call. `poll_lines.py` caps events (`--max-events`, ranked by bettability in
-`beatvegas/sweep.py`) and stops at `--credit-floor` so the Sunday opener reserve is
-never eaten. The schedule below is sized to stay under 500/month worst case.
+**Credit budget (Odds API paid tier, 100K/month since 2026-09-06):** `totals_h1` is
+served only per-event, so a 1H poll costs `markets × regions` credits **per game**
+(2 with `us,us2`); listing events is free; full-game totals are one bulk call.
+`poll_lines.py` captures EVERY Hard Rock-priced game (`--hr-universe`): opener
+sweeps stop paying for a game once its Hard Rock 1H line is in (`--missing-hr-only`),
+per-game closes poll only games kicking off within 75 minutes
+(`--kickoff-within-min`), `--max-credits-per-run` is the runaway guard and
+`--credit-floor` the month-end reserve. Expected ~800 credits/week, worst ~1,350
+(budget comment in `.github/workflows/lines_watch.yml`).
 
 ## How it runs
 

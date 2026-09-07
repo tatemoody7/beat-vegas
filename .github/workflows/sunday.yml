@@ -53,7 +53,7 @@ jobs:
         # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
         # only — they sharpen the market fair price Hard Rock is judged against.
         # +1 credit per run here only (3 slots/wk ≈ +13/mo worst case); the 1H
-        # sweeps stay us,us2 to fit the free tier.
+        # sweeps stay us,us2 (Hard Rock is in us2; no exchange 1H lines).
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
         id: pace

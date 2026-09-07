@@ -90,9 +90,10 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
     )
     tempo = _tempo_lookup(session, seasons)
     rows = q.all()
-    closes = _real_closes(
-        session, [g.id for _, g, _ in rows], {g.id: g.start_date for _, g, _ in rows}
-    )
+    ids = [g.id for _, g, _ in rows]
+    kicks = {g.id: g.start_date for _, g, _ in rows}
+    closes = _real_closes(session, ids, kicks)
+    fg_closes = _real_closes(session, ids, kicks, market="full_game_total", within_hours=3.0)
     out: List[Dict] = []
     for p, g, w in rows:
         spp_vals = [
@@ -124,16 +125,24 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
                 "wx_dome": (1.0 if w.dome else 0.0) if (w and w.dome is not None) else None,
                 "tempo_spp": (sum(spp_vals) / len(spp_vals)) if spp_vals else None,
                 "close_line": closes.get(g.id),
+                "fg_close": fg_closes.get(g.id),
             }
         )
     return out
 
 
 def _real_closes(
-    session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    market: str = "1H_total",
+    within_hours: Optional[float] = None,
 ) -> Dict[int, float]:
-    """game_id -> pre-kickoff consensus 1H close from captured snapshots (the
-    historical backfill writes these); games without one are simply absent."""
+    """game_id -> pre-kickoff consensus close for `market` from captured
+    snapshots (the historical backfills write these); games without one are
+    simply absent. `within_hours` keeps only snapshots at most that many hours
+    before kickoff — the full-game column must not grade against a Sunday
+    opener when no real close was captured."""
     if not game_ids:
         return {}
     by_game: Dict[int, List] = {}
@@ -141,9 +150,17 @@ def _real_closes(
     for i in range(0, len(ids), 1000):
         for snap in (
             session.query(OddsSnapshot)
-            .filter(OddsSnapshot.market == "1H_total", OddsSnapshot.game_id.in_(ids[i : i + 1000]))
+            .filter(OddsSnapshot.market == market, OddsSnapshot.game_id.in_(ids[i : i + 1000]))
             .all()
         ):
+            k = kickoffs.get(snap.game_id)
+            if (
+                within_hours is not None
+                and k is not None
+                and snap.captured_at is not None
+                and not (0 <= (k - snap.captured_at).total_seconds() <= within_hours * 3600)
+            ):
+                continue
             by_game.setdefault(snap.game_id, []).append(snap)
     out: Dict[int, float] = {}
     for gid, snaps in by_game.items():

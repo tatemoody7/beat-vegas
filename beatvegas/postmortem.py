@@ -358,6 +358,11 @@ def build_hist_frame(
         o_step, u_step = regrade(fh, step_line)
         line_real = _num(p.get("close_line"))  # real pre-kickoff consensus 1H close, if captured
         o_real, u_real = regrade(fh, line_real)
+        # Same pick, FULL-GAME under at the real pre-kick full-game close (2026-09-07):
+        # selection stays the 1H gap (gap_fg = gap_real); the outcome is the whole game.
+        pts = _sum2(p.get("home_points"), p.get("away_points"))
+        line_fg = _num(p.get("fg_close"))
+        o_fg, u_fg = regrade(pts, line_fg) if line_real is not None else (None, None)
         season = int(p["season"])
         rows.append(
             {
@@ -404,6 +409,13 @@ def build_hist_frame(
                 "gap_real": round(line_real - bv, 2) if line_real is not None else None,
                 "outcome_real": o_real,
                 "units_real": u_real,
+                "pts": pts,
+                "line_fg": line_fg,
+                "gap_fg": round(line_real - bv, 2)
+                if (line_real is not None and line_fg is not None)
+                else None,
+                "outcome_fg": o_fg,
+                "units_fg": u_fg,
                 "resid": float(fh) - bv,
             }
         )
@@ -813,15 +825,17 @@ def stress_rows(
     mask: pd.Series,
     line_col: str,
     deltas: Sequence[float] = (-1.0, -0.5, 0.0, 0.5, 1.0),
+    actual_col: str = "fh",
     **ids: Any,
 ) -> List[Dict]:
-    """Hold the selection, shift the grading line by each delta, regrade."""
+    """Hold the selection, shift the grading line by each delta, regrade
+    `actual_col` (the 1H total, or `pts` for the full-game column)."""
     sub = df[mask.reindex(df.index, fill_value=False).astype(bool)]
     out: List[Dict] = []
     for d in deltas:
         graded = [
             regrade(fh, (ln + d) if _num(ln) is not None else None)
-            for fh, ln in zip(sub["fh"], sub[line_col])
+            for fh, ln in zip(sub[actual_col], sub[line_col])
         ]
         t = tally(
             pd.Series([g[0] for g in graded], dtype=object),
@@ -1531,6 +1545,9 @@ def compute_hist(
     n_real = int(df["line_real"].notna().sum()) if "line_real" in df else 0
     if n_real and "real" not in proxies:
         proxies = tuple(proxies) + ("real",)
+    n_fg = int(df["outcome_fg"].notna().sum()) if "outcome_fg" in df else 0
+    if n_fg and "fg" not in proxies:
+        proxies = tuple(proxies) + ("fg",)
     buckets: List[Dict] = []
     contrasts: List[Dict] = []
     returns_by_config: Dict[str, List[float]] = {}
@@ -1567,10 +1584,14 @@ def compute_hist(
                 scope=scope,
                 segment=seg,
             )
+            actual_col = "pts" if prx == "fg" else "fh"
             for sel in ("cap5", "gap175"):
-                buckets += stress_rows(d, masks[sel], lcol, selection=sel, **ids)
+                buckets += stress_rows(
+                    d, masks[sel], lcol, actual_col=actual_col, selection=sel, **ids
+                )
                 contrasts += contrast_rows(d, masks[sel], ocol, selection=sel, **ids)
-            buckets += residual_by_band(d, prx, selection="all", **ids)
+            if prx != "fg":  # the residual check is a 1H-model check; the fg column shares it
+                buckets += residual_by_band(d, prx, selection="all", **ids)
             for sel, m in masks.items():
                 if sel == "all":
                     continue
@@ -1590,6 +1611,7 @@ def compute_hist(
         "dropped": dict(df.attrs.get("dropped", {}) or {}),
         "n_tests": n_tests,
         "real_lines": {"n": n_real, "share": (n_real / len(df)) if len(df) else None},
+        "fg_lines": {"n": n_fg, "share": (n_fg / len(df)) if len(df) else None},
         "logit": logit,
         "overfit": overfit_summary(returns_by_config, headline="cap5/step/fbs_only"),
         "caveats": [
@@ -1606,6 +1628,14 @@ def compute_hist(
                 f"{n_real} of {len(df)} rated games have one. Only those games appear in the real column."
             ]
             if n_real
+            else []
+        )
+        + (
+            [
+                f"'fg' grades the SAME picks (selected on the real 1H gap) as FULL-GAME unders at the captured "
+                f"pre-kick full-game consensus close; {n_fg} of {len(df)} rated games have one."
+            ]
+            if n_fg
             else []
         ),
     }

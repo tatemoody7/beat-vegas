@@ -768,3 +768,60 @@ def test_compute_live_adds_hr_close_grading_and_the_blocker_dimension():
         g1["blocker_dim"] == "none" and g1["hr_close"] == 24.0 and g1["outcome_hr_close"] == "under"
     )
     assert any("hook_side" == b["dimension"] for b in out["buckets"])
+
+
+# --- full-game under on the same picks at the real full-game close (2026-09-07) --
+
+
+def test_build_hist_frame_grades_the_full_game_at_the_captured_fg_close():
+    preds = [
+        _pred(1, 2025, 5, gap=2.0, score=55, fh=20, hp=24, ap=20),  # 44 pts
+        _pred(2, 2025, 5, gap=3.0, score=58, fh=22, hp=35, ap=31),  # 66 pts
+        _pred(3, 2025, 5, gap=2.5, score=57, fh=19, hp=20, ap=17),  # no fg close
+    ]
+    preds[0]["close_line"], preds[0]["fg_close"] = 24.5, 51.5
+    preds[1]["close_line"], preds[1]["fg_close"] = 26.5, 55.5
+    preds[2]["close_line"] = 25.5  # 1H close but no full-game close captured
+    df = pm.build_hist_frame(preds, STEP, FBS).set_index("game_id")
+    assert df.loc[1, "pts"] == 44 and df.loc[1, "line_fg"] == 51.5
+    assert df.loc[1, "outcome_fg"] == "under" and df.loc[1, "outcome_real"] == "under"
+    assert df.loc[1, "gap_fg"] == df.loc[1, "gap_real"]  # selection stays the 1H gap
+    assert df.loc[2, "outcome_fg"] == "over" and df.loc[2, "outcome_real"] == "under"
+    assert pd.isna(df.loc[3, "line_fg"]) and pd.isna(df.loc[3, "outcome_fg"])
+
+
+def test_compute_hist_adds_the_fg_column_graded_on_full_points():
+    preds = []
+    for i in range(1, 7):
+        p = _pred(i, 2025, 5, gap=2.0 + 0.1 * i, score=55, fh=20 + i, hp=20 + i, ap=20)
+        p["close_line"], p["fg_close"] = 27.0, 45.5  # gap_real = gap; pts 41..46 -> 5 under, 1 over
+        preds.append(p)
+    df = pm.build_hist_frame(preds, STEP, FBS)
+    out = pm.compute_hist(df, run_id="r", computed_at="t", proxies=("step",))
+    kinds = {b["proxy_kind"] for b in out["buckets"]}
+    assert {"step", "real", "fg"} <= kinds
+    fg_all = next(
+        b
+        for b in out["buckets"]
+        if b["proxy_kind"] == "fg"
+        and b["dimension"] == "all"
+        and b["selection"] == "gap175"
+        and b["segment"] == "all"
+    )
+    assert fg_all["n"] == 6 and fg_all["unders"] == 5 and fg_all["overs"] == 1
+    stress = [
+        b
+        for b in out["buckets"]
+        if b["proxy_kind"] == "fg"
+        and b["dimension"] == "line_stress"
+        and b["selection"] == "gap175"
+        and b["segment"] == "all"
+    ]
+    # shifting the FULL-GAME line by -1 (44.5) flips the 45-point game to over
+    minus1 = next(b for b in stress if b["bucket"] == "-1.0")
+    assert minus1["unders"] == 4 and minus1["overs"] == 2
+    assert not any(
+        b["proxy_kind"] == "fg" and b["dimension"] == "resid_by_gap" for b in out["buckets"]
+    )
+    assert out["notes"]["fg_lines"]["n"] == 6
+    assert any("'fg' grades the SAME picks" in c for c in out["notes"]["caveats"])

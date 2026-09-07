@@ -89,7 +89,7 @@ export default function CardPanel({
           {`This week’s card`}
         </h2>
         <p className="mt-1 text-sm text-[var(--text-dim)]">
-          {`A preview builds Friday evening; the final card lands Saturday around 8:45am ET off a fresh sweep of Hard Rock’s first-half lines.`}
+          {`A preview builds Friday evening; the final card lands Saturday between 8:05 and 8:45am ET off a fresh sweep of Hard Rock’s first-half lines.`}
         </p>
       </div>
     );

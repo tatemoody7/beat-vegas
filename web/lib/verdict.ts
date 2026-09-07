@@ -43,6 +43,11 @@ export type Verdict = "BET" | "WATCH" | "PASS";
 export type Confidence = "high" | "medium" | "low" | "none";
 /** Why a pick was made — stored on manual_picks.reason (shared with pick.py). */
 export type PickReason = "model_gap" | "price_edge" | "manual";
+export const REASONS: readonly PickReason[] = [
+  "model_gap",
+  "price_edge",
+  "manual",
+];
 
 export type VerdictInput = {
   away: string;

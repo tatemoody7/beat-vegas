@@ -1,4 +1,9 @@
-import { WEEKLY_BET_CAP, type PickReason, type Verdict } from "@/lib/verdict";
+import {
+  REASONS,
+  WEEKLY_BET_CAP,
+  type PickReason,
+  type Verdict,
+} from "@/lib/verdict";
 
 // Pure request validation + betting-policy checks for POST /api/picks, kept
 // out of the route so the rules are unit-tested. docs/BETTING_POLICY.md:
@@ -29,7 +34,6 @@ export type PickRequest = {
 export type Rejection = { ok: false; error: string; status: number };
 export type Parsed = { ok: true; pick: PickRequest };
 
-const REASONS: readonly PickReason[] = ["model_gap", "price_edge", "manual"];
 const VERDICTS: readonly Verdict[] = ["BET", "WATCH", "PASS"];
 
 const reject = (error: string, status = 400): Rejection => ({

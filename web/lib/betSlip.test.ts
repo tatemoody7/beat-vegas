@@ -30,6 +30,10 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   overCap: false,
   totalBand: "52–60",
   hookSide: "key+0.5",
+  hrVsMarket: null,
+  fairSource: null,
+  reason: null,
+  degradedInputs: [],
   ...o,
 });
 
@@ -38,11 +42,15 @@ const card = (items: CardItem[]): Card => ({
   week: 3,
   builtAt: "2026-09-19T12:45:00Z",
   modelRead: true,
+  slot: "saturday",
+  status: "final",
+  degraded: [],
   counts: {
     bet: items.filter((i) => i.tier === "BET" && !i.overCap).length,
     edge: 0,
     pass: 0,
     overCap: items.filter((i) => i.overCap).length,
+    degraded: 0,
   },
   paper: { qualifying: 0, overCap: 0, cap: 5 },
   items,

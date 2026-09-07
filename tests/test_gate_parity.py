@@ -54,3 +54,17 @@ def test_every_numeric_gate_in_verdict_ts_is_mirrored():
     exported = set(re.findall(r"export\s+const\s+([A-Z_]+)\s*=\s*-?[0-9.]+\s*;", src))
     missing = exported - set(PARITY)
     assert not missing, f"numeric gates in verdict.ts without a Python mirror: {sorted(missing)}"
+
+
+def test_exchange_books_match_books_ts():
+    """card.EXCHANGE_BOOKS (exchange-first fair price) mirrors web/lib/books.ts
+    EXCHANGE_KEYS — the site's Line Check must pick the same exchanges."""
+    from beatvegas import card
+
+    ts = _TS.parent / "books.ts"
+    if not ts.exists():
+        pytest.skip(f"{ts} not present in this checkout")
+    m = re.search(r"EXCHANGE_KEYS = new Set\(\[(.*?)\]\)", ts.read_text(), re.S)
+    assert m, "EXCHANGE_KEYS not found in books.ts"
+    keys = set(re.findall(r'"([a-z_]+)"', m.group(1)))
+    assert keys == set(card.EXCHANGE_BOOKS)

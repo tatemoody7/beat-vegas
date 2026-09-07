@@ -290,6 +290,88 @@ def test_a_bet_logged_earlier_in_the_week_holds_its_cap_slot(env):
     assert by_id[15]["cap_rank"] == 6 and by_id[15]["over_cap"] is True and p15.blocker == "cap"
 
 
+def test_real_bet_on_a_game_not_on_the_card_consumes_a_cap_slot(env):
+    """A real ticket (is_paper False) this week on a game NOT on the card (say a
+    Thursday game already played) uses one of the five slots: the card's first
+    BET ranks #2. Paper picks on off-card games do not."""
+    mod, eng = env
+    seed_week(eng)
+    kick = NOW + timedelta(days=1)
+    with Session(eng) as s:
+        s.add(_game(99, "Thu", "Night", NOW - timedelta(days=1)))  # already played
+        s.add(
+            ManualPick(
+                game_id=99,
+                season=SEASON,
+                week=WEEK,
+                side="under",
+                market="1H",
+                line=24.5,
+                price=-110,
+                stake=1.0,
+                is_paper=False,
+                book="hardrockbet",
+                placed_at=NOW - timedelta(days=2),
+            )
+        )
+        s.add(_game(98, "Paper", "Only", kick))
+        s.add(
+            ManualPick(
+                game_id=98,
+                season=SEASON,
+                week=WEEK,
+                side="under",
+                market="1H",
+                line=24.5,
+                price=-110,
+                stake=1.0,
+                is_paper=True,
+                verdict_at_pick="WATCH",
+                blocker="price",
+                placed_at=NOW - timedelta(days=2),
+            )
+        )
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW) == 0
+    with Session(eng) as s:
+        (row,) = s.query(Card).all()
+    by_id = {it["game_id"]: it for it in json.loads(row.payload)["items"]}
+    assert by_id[1]["tier"] == "BET" and by_id[1]["cap_rank"] == 2
+    assert by_id[1]["over_cap"] is False
+
+
+def test_unpriced_hard_rock_line_logs_a_null_paper_price(env):
+    """Hard Rock posted the 1H number but no price yet: the paper pick keeps
+    price NULL (never a made-up -110); the Monday grader fills it from HR's
+    pre-kick close when captured."""
+    mod, eng = env
+    kick = NOW + timedelta(days=1)
+    with Session(eng) as s:
+        s.add(_game(21, "Rice", "Tulsa", kick))
+        s.add(_snap(21, "hardrockbet", "full_game_total", 50.5, hours_ago=100))
+        s.add(_snap(21, "hardrockbet", "1H_total", 24.5, None, None))
+        s.add(_snap(21, "draftkings", "1H_total", 24.5, 100, -120))
+        s.add(_snap(21, "fanduel", "1H_total", 24.5, 100, -120))
+        s.add(
+            Prediction(
+                game_id=21,
+                model_version="gbm_v1",
+                bv_line=22.4,
+                under_score=55,
+                line_used=24.0,
+                created_at=NOW,
+            )
+        )
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW) == 0
+    with Session(eng) as s:
+        (pick,) = s.query(ManualPick).all()
+        (row,) = s.query(Card).all()
+    (it,) = json.loads(row.payload)["items"]
+    assert it["qualifies"] and it["hr_price"] is None
+    assert pick.game_id == 21 and pick.is_paper is True and pick.price is None
+
+
 def test_dry_run_writes_nothing(env, capsys):
     mod, eng = env
     seed_week(eng)

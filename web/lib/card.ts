@@ -402,6 +402,15 @@ export function cardHealth(card: Card, now: Date): CardHealth {
     (card.status === "preview" ||
       (card.slot !== null && card.slot !== "saturday"))
   ) {
+    if (card.slot === "manual") {
+      const when =
+        card.builtAt === null ? "" : ` built ${builtET(new Date(card.builtAt))} ET`;
+      return {
+        level: "warn",
+        title: `Manual card${when} — re-run with slot=saturday for a final`,
+        details: [],
+      };
+    }
     return {
       level: "warn",
       title: `Preview card (${card.slot ?? "preview"}) — the Saturday final builds 8:05–8:45am ET`,

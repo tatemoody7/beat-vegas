@@ -819,6 +819,32 @@ describe("cardHealth", () => {
     );
   });
 
+  it("warns with manual-specific copy for a manual-slot preview read on Saturday", () => {
+    const h = cardHealth(
+      card({
+        slot: "manual",
+        status: "preview",
+        builtAt: "2026-09-19T12:07:00Z", // Sat 8:07am ET
+      }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toContain("Manual card");
+    expect(h.title).toContain("slot=saturday");
+    expect(h.title).toBe(
+      "Manual card built Sat 8:07am ET — re-run with slot=saturday for a final",
+    );
+  });
+
+  it("omits the time when a manual card has no builtAt", () => {
+    const h = cardHealth(
+      card({ slot: "manual", status: "preview", builtAt: null }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe("Manual card — re-run with slot=saturday for a final");
+  });
+
   it("lists every degraded input on a degraded card", () => {
     const h = cardHealth(
       card({

@@ -140,7 +140,8 @@ describe("checkPolicy", () => {
         expect(r.error).toMatch(/kill line/i);
         expect(r.error).toMatch(/u24\.5/);
         expect(r.error).toMatch(/u24\b/);
-        expect(r.error).toMatch(/reason manual/);
+        expect(r.error).toMatch(/is not the same bet the card rated/i);
+        expect(r.error).toMatch(/pass on it/i);
       }
     });
     it("accepts a line exactly at the kill line", () => {
@@ -150,7 +151,11 @@ describe("checkPolicy", () => {
     it("rejects a price worse than the kill price (American odds, lower = worse)", () => {
       const r = checkPolicy({ ...bet, price: -125 }, kills);
       expect(r).toMatchObject({ ok: false, status: 409 });
-      if (!r.ok) expect(r.error).toMatch(/-120/);
+      if (!r.ok) {
+        expect(r.error).toMatch(/-120/);
+        expect(r.error).toMatch(/is not the same bet the card rated/i);
+        expect(r.error).toMatch(/pass on it/i);
+      }
       expect(checkPolicy({ ...bet, price: 105 }, kills)).toEqual({ ok: true });
     });
     it("accepts a price exactly at the kill price", () => {

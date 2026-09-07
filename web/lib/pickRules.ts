@@ -167,14 +167,14 @@ export function checkPolicy(
   if (!pick.isPaper && pick.market === "1H" && pick.verdict === "BET") {
     if (ctx.killLine !== null && pick.line < ctx.killLine) {
       return reject(
-        `Below the kill line: the card rated this bet at u${fmt(ctx.killLine)} or higher; u${fmt(pick.line)} is not the same bet. Log it as your own call (reason manual) or pass.`,
+        `Below the kill line: the card rated this bet at u${fmt(ctx.killLine)} or higher; u${fmt(pick.line)} is not the same bet the card rated. Pass on it.`,
         409,
       );
     }
     // American odds: the larger signed value pays better (-105 beats -120).
     if (ctx.killPrice !== null && pick.price < ctx.killPrice) {
       return reject(
-        `Worse than the kill price: the card rated this bet at ${american(ctx.killPrice)} or better; ${american(pick.price)} is not the same bet. Log it as your own call (reason manual) or pass.`,
+        `Worse than the kill price: the card rated this bet at ${american(ctx.killPrice)} or better; ${american(pick.price)} is not the same bet the card rated. Pass on it.`,
         409,
       );
     }

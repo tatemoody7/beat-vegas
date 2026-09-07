@@ -141,6 +141,23 @@ def games_needing_fg_close(
     return games[:limit] if limit else games
 
 
+def existing_keys(session, game_ids: List[int], captured_at: datetime) -> Set[tuple]:
+    """(game_id, book) pairs that already hold a full_game_total snapshot at
+    exactly `captured_at` — the uq_odds_snapshot key a partial earlier pass left."""
+    if not game_ids:
+        return set()
+    rows = (
+        session.query(OddsSnapshot.game_id, OddsSnapshot.book)
+        .filter(
+            OddsSnapshot.market == "full_game_total",
+            OddsSnapshot.captured_at == captured_at,
+            OddsSnapshot.game_id.in_(game_ids),
+        )
+        .all()
+    )
+    return {(gid, book) for gid, book in rows}
+
+
 def group_by_wave(games: List[Dict], lead_min: int = LEAD_MIN) -> Dict[datetime, List[Dict]]:
     """wave timestamp -> games in that wave (sorted by wave)."""
     waves: Dict[datetime, List[Dict]] = defaultdict(list)
@@ -231,9 +248,12 @@ def main() -> None:
         matched += len(hit)
         rows = normalize_full_game([ev for ev in events if ev.get("id") in ev_to_game], books=books)
         with session_scope() as s:
+            # A crashed earlier pass may have written part of this wave: skip rows
+            # whose (game, book, market, captured_at) already exist (uq_odds_snapshot).
+            existing = existing_keys(s, list(hit), ts)
             for r in rows:
                 gid = ev_to_game.get(r["event_id"])
-                if gid is None:
+                if gid is None or (gid, normalize_book(r["book"])) in existing:
                     continue
                 s.add(
                     OddsSnapshot(

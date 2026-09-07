@@ -185,3 +185,24 @@ def test_fetch_with_retry_retries_transient_errors_then_gives_up_quietly():
     slept.clear()
     assert bf.fetch_with_retry(unauthorized, backoff=(1, 2, 3), sleep=slept.append) is None
     assert slept == []  # a 4xx is not transient: no retries
+
+
+def test_existing_keys_lets_a_rerun_skip_rows_a_crashed_pass_already_wrote():
+    bf = _load_script("backfill_fg_history")
+    eng, k = _db()
+    wave = bf.wave_ts(k)
+    with Session(eng) as s:
+        s.add(
+            OddsSnapshot(
+                game_id=1, book="draftkings", market="full_game_total", line=50.5, captured_at=wave
+            )
+        )
+        s.add(
+            OddsSnapshot(
+                game_id=1, book="draftkings", market="1H_total", line=24.5, captured_at=wave
+            )
+        )  # other market: not a key clash
+        s.commit()
+        assert bf.existing_keys(s, [1, 3], wave) == {(1, "draftkings")}
+        assert bf.existing_keys(s, [1], wave + timedelta(hours=1)) == set()
+        assert bf.existing_keys(s, [], wave) == set()

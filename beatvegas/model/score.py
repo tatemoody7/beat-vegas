@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from ..backtest.engine import BREAKEVEN, _new_model
-from ..config import engine_name
+from ..config import ENGINES, engine_name
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.context import SITUATIONAL_KEYS, context_for_games, json_safe
@@ -345,7 +345,7 @@ def score_slate(
     Either way bv_gap = line - bv_line and the board sorts by it.
     """
     engine = engine or engine_name()
-    if engine not in ("bv_line", "residual"):
+    if engine not in ENGINES:
         raise ValueError(f"unknown engine {engine!r}")
     if df is None:
         df = build_feature_frame(min_games=2)

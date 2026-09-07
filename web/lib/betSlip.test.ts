@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockReason,
   buildBetSlip,
+  effectiveBlock,
   killBlocks,
   liveLinesFrom,
   loggedLabel,
@@ -243,6 +244,55 @@ describe("blockReason", () => {
     );
     expect(blockReason("cap", true)).toBe("over the weekly cap");
     expect(blockReason("cap", false)).toBe("over the weekly cap");
+  });
+});
+
+describe("effectiveBlock", () => {
+  const row = {
+    blockedBy: "kill_line" as const,
+    killLine: 24.5,
+    killPrice: -120,
+    liveLine: 24,
+    livePrice: -110,
+  };
+
+  it("re-checks a kill block against the ENTERED values, not the stale live snapshot", () => {
+    // Live line (24) sits below the kill line (24.5) — row.blockedBy says so —
+    // but the user has typed in the kill line itself: not blocked.
+    expect(effectiveBlock(row, 24.5, -110)).toEqual({
+      block: null,
+      isLive: false,
+    });
+  });
+
+  it("blocks with live wording when the entered values still match the live number", () => {
+    expect(effectiveBlock(row, 24, -110)).toEqual({
+      block: "kill_line",
+      isLive: true,
+    });
+  });
+
+  it("degraded is a hard block regardless of what's entered", () => {
+    const degraded = { ...row, blockedBy: "degraded" as const };
+    expect(effectiveBlock(degraded, 30, -110).block).toBe("degraded");
+    expect(effectiveBlock(degraded, 24.5, -110).block).toBe("degraded");
+  });
+
+  it("cap is a hard block regardless of what's entered", () => {
+    const capped = { ...row, blockedBy: "cap" as const };
+    expect(effectiveBlock(capped, 30, -110).block).toBe("cap");
+  });
+
+  it("blocks on the entered values even without a live-sourced blockedBy", () => {
+    const clean = { ...row, blockedBy: null };
+    expect(effectiveBlock(clean, 20, -110)).toEqual({
+      block: "kill_line",
+      isLive: false,
+    });
+    expect(effectiveBlock(clean, 24.5, -110)).toEqual({
+      block: null,
+      isLive: false,
+    });
   });
 });
 

@@ -166,6 +166,39 @@ export function blockReason(block: SlipBlock, live: boolean): string {
   return BLOCK_REASON[block];
 }
 
+export type EffectiveBlock = { block: SlipBlock | null; isLive: boolean };
+
+/**
+ * What actually stops the tap right now, given what's entered in the two
+ * inputs. `degraded`/`cap` are hard blocks off the card/cap and hold no
+ * matter what's typed in. A kill block is instead RE-EVALUATED against the
+ * entered line/price — never trusted from row.blockedBy, which was computed
+ * against Hard Rock's live snapshot at render time and can go stale the
+ * moment the user edits a field. This mirrors the server's own check
+ * (lib/pickRules.ts checkPolicy), which judges the SUBMITTED line/price, so
+ * the slip is never stricter than the rule it fronts: raise the entered line
+ * to the kill line (or better the price) and the block clears. `isLive` is
+ * true only when the block still applies to what's currently on the live
+ * board, so the UI can say "Hard Rock's live …" instead of a generic warning.
+ */
+export function effectiveBlock(
+  row: Pick<
+    BetSlipRow,
+    "blockedBy" | "killLine" | "killPrice" | "liveLine" | "livePrice"
+  >,
+  line: number | null,
+  price: number | null,
+): EffectiveBlock {
+  const hard =
+    row.blockedBy === "degraded" || row.blockedBy === "cap"
+      ? row.blockedBy
+      : null;
+  const block = hard ?? killBlocks(line, price, row.killLine, row.killPrice);
+  const isLive =
+    block !== null && line === row.liveLine && price === row.livePrice;
+  return { block, isLive };
+}
+
 /** Whole minutes from now to kickoff (0 once kicked off); null without a usable kickoff. */
 function minutesToKick(kickIso: string | null, now: Date): number | null {
   if (kickIso === null) return null;

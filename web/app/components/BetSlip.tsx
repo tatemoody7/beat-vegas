@@ -4,11 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   blockReason,
+  effectiveBlock,
   HARD_ROCK_URL,
-  killBlocks,
   type BetSlip as Slip,
   type BetSlipRow,
-  type SlipBlock,
 } from "@/lib/betSlip";
 import { lineLabel } from "@/lib/card";
 import { american, fmt } from "@/lib/format";
@@ -71,11 +70,12 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
 
   const lineNum = numOrNull(line);
   const priceNum = numOrNull(price);
-  // The card's block (live number, cap, degraded input) wins; then the number
-  // typed in, re-checked on every edit.
-  const block: SlipBlock | null =
-    r.blockedBy ?? killBlocks(lineNum, priceNum, r.killLine, r.killPrice);
-  const blockIsLive = r.blockedBy !== null;
+  // degraded/cap are hard blocks off the card; a kill block is re-checked
+  // against what's actually entered (defaults to the live number) so raising
+  // the entered line/price above the kill numbers clears it, matching what
+  // the server (lib/pickRules.ts) judges on submit — the slip must never be
+  // stricter than the rule it fronts.
+  const { block, isLive: blockIsLive } = effectiveBlock(r, lineNum, priceNum);
   const disabled = busy || block !== null;
 
   const status = done ? "logged" : r.status;

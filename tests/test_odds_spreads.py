@@ -75,6 +75,16 @@ def test_home_spreads_ignores_books_without_a_spreads_market():
     assert _home_spreads([ev]) == {}
 
 
+def test_home_spreads_skips_a_malformed_point_but_keeps_the_rest():
+    ev = _event(
+        [
+            {"key": "draftkings", "markets": [_spreads_mkt("LSU", "Clemson", "bad", "bad")]},
+            {"key": "fanduel", "markets": [_spreads_mkt("LSU", "Clemson", -3.5, 3.5)]},
+        ]
+    )
+    assert _home_spreads([ev]) == {("evt1", "fanduel"): -3.5}
+
+
 def test_normalize_full_game_carries_spread_per_book():
     ev = _event(
         [

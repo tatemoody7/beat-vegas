@@ -70,6 +70,24 @@ def test_client_calls_raise_redacted_errors(monkeypatch):
         assert "SECRET" not in str(ei.value), call
 
 
+def test_client_redacts_transport_errors_too(monkeypatch):
+    """requests.get itself can raise (ConnectionError, ReadTimeout, ...) before
+    there's ever a Response to call _raise_for_status on. That path used to
+    bypass redaction entirely and leak the raw apiKey in the exception."""
+    monkeypatch.setattr(odds, "load_config", lambda: {})
+
+    def _boom(*a, **k):
+        raise requests.ConnectionError(f"Max retries exceeded with url: {URL}")
+
+    monkeypatch.setattr(odds.requests, "get", _boom)
+    client = OddsAPIClient(api_key="SECRET")
+    for call in (client.list_events, client.list_full_game_odds):
+        with pytest.raises(requests.ConnectionError) as ei:
+            call()
+        assert "SECRET" not in str(ei.value), call
+        assert "***" in str(ei.value), call
+
+
 def test_poll_lines_fetch_failure_print_lacks_the_key(monkeypatch, capsys):
     mod = _load_script("poll_lines")
     eng = create_engine("sqlite:///:memory:")

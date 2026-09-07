@@ -9,8 +9,10 @@ The bulk full-game pull asks for BOTH featured markets, `totals,spreads`, so eac
 (`spread` is None only when the book posted no spreads market). Featured markets
 cost (markets x regions) credits per call, so the whole slate is 4-6 credits.
 
-Every HTTP error is re-raised with the `apiKey=` query value redacted
-(`redact_key`) so a 401/429 traceback never echoes the key into CI logs.
+Every HTTP status error and transport error is re-raised with the `apiKey=`
+query value redacted (`redact_key`) so a 401/429 traceback, or a connection
+failure/timeout raised by `requests.get` itself, never echoes the key into
+CI logs.
 """
 
 from __future__ import annotations
@@ -48,7 +50,7 @@ def _raise_for_status(resp: requests.Response) -> None:
     try:
         resp.raise_for_status()
     except requests.HTTPError as e:
-        raise requests.HTTPError(redact_key(str(e)), response=resp) from None
+        raise requests.HTTPError(redact_key(str(e)), response=resp, request=resp.request) from None
 
 
 class OddsAPIClient:
@@ -62,6 +64,20 @@ class OddsAPIClient:
         self.odds_format = cfg.get("odds_format", "american")
         self.timeout = timeout
         self.last_credits: Optional[Credits] = None
+
+    def _get(self, url: str, params: Dict[str, Any]) -> requests.Response:
+        """`requests.get` with the key redacted no matter how it fails: a
+        transport error (ConnectionError, ReadTimeout, ...) raised by `get`
+        itself never reaches `_raise_for_status` (there's no Response yet),
+        but requests still stuffs the full request URL — apiKey included —
+        into the exception message. Re-raise the same exception type with
+        that message redacted."""
+        try:
+            resp = requests.get(url, params=params, timeout=self.timeout)
+        except requests.RequestException as e:
+            raise type(e)(redact_key(str(e))) from None
+        self._credits(resp)
+        return resp
 
     def _credits(self, resp: requests.Response) -> Credits:
         def _int(h):
@@ -106,8 +122,7 @@ class OddsAPIClient:
             "oddsFormat": self.odds_format,
             "dateFormat": "iso",
         }
-        resp = requests.get(url, params=params, timeout=self.timeout)
-        self._credits(resp)
+        resp = self._get(url, params)
         _raise_for_status(resp)
         return resp.json()
 
@@ -120,10 +135,7 @@ class OddsAPIClient:
         """Upcoming events for the sport. FREE (0 credits). Each has id,
         commence_time, home_team, away_team — but no odds."""
         url = f"{self.base_url}/sports/{self.sport}/events"
-        resp = requests.get(
-            url, params={"apiKey": self.api_key, "dateFormat": "iso"}, timeout=self.timeout
-        )
-        self._credits(resp)
+        resp = self._get(url, {"apiKey": self.api_key, "dateFormat": "iso"})
         _raise_for_status(resp)
         return resp.json()
 
@@ -140,8 +152,7 @@ class OddsAPIClient:
             "oddsFormat": self.odds_format,
             "dateFormat": "iso",
         }
-        resp = requests.get(url, params=params, timeout=self.timeout)
-        self._credits(resp)
+        resp = self._get(url, params)
         if resp.status_code == 404:
             return {}  # event has no odds posted yet
         _raise_for_status(resp)
@@ -152,12 +163,7 @@ class OddsAPIClient:
         """Events as of a past timestamp. The historical envelope wraps the list
         in `data`. Cheap (no odds)."""
         url = f"{self.base_url}/historical/sports/{self.sport}/events"
-        resp = requests.get(
-            url,
-            params={"apiKey": self.api_key, "date": date_iso, "dateFormat": "iso"},
-            timeout=self.timeout,
-        )
-        self._credits(resp)
+        resp = self._get(url, {"apiKey": self.api_key, "date": date_iso, "dateFormat": "iso"})
         _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or []
 
@@ -178,8 +184,7 @@ class OddsAPIClient:
             "dateFormat": "iso",
             "date": date_iso,
         }
-        resp = requests.get(url, params=params, timeout=self.timeout)
-        self._credits(resp)
+        resp = self._get(url, params)
         _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or []
 
@@ -195,8 +200,7 @@ class OddsAPIClient:
             "dateFormat": "iso",
             "date": date_iso,
         }
-        resp = requests.get(url, params=params, timeout=self.timeout)
-        self._credits(resp)
+        resp = self._get(url, params)
         if resp.status_code == 404:
             return {}
         _raise_for_status(resp)
@@ -285,14 +289,20 @@ def _home_spreads(
                     continue
                 home_pt = away_pt = None
                 for oc in mkt.get("outcomes", []):
+                    try:
+                        point = float(oc.get("point"))
+                    except (TypeError, ValueError):
+                        # One book's malformed outcome (bad/missing point)
+                        # shouldn't abort the whole Sunday capture.
+                        continue
                     if oc.get("name") == home:
-                        home_pt = oc.get("point")
+                        home_pt = point
                     elif oc.get("name") == away:
-                        away_pt = oc.get("point")
+                        away_pt = point
                 if home_pt is not None:
-                    spread = float(home_pt)
+                    spread = home_pt
                 elif away_pt is not None:
-                    spread = -float(away_pt)
+                    spread = -away_pt
                 else:
                     continue
                 key = (ev.get("id"), normalize_book(bm.get("key")))

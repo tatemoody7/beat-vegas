@@ -69,7 +69,11 @@ _MIGRATIONS = {
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
-    "games": {"spread": "FLOAT"},
+    "games": {
+        "spread": "FLOAT",
+        "full_game_total_source": "VARCHAR",
+        "spread_source": "VARCHAR",
+    },
     "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
 }
 

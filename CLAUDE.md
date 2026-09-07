@@ -31,8 +31,10 @@ Research only — it never places bets or automates gambling.
   pick matching, S15 postseason capture, S16 multiplier margin gate — fitted curve
   REVERTED to flat 0.52, S17-S19, S21-S22, nits). Accepted as-is: GHA cron lag
   (S20), sunday.yml DST double-fire (N12), plaintext local keys (N14), no login
-  rate limit (store-less); N13 is moot since the push-notification layer was removed 2026-09-02. Odds API totals rows carry no
-  spread by design (spreads market would double credits).
+  rate limit (store-less); N13 is moot since the push-notification layer was removed 2026-09-02. Since PR-1 data plumbing
+  (2026-09) the Odds API bulk pull requests `totals,spreads` together (4-6 credits per slate), so each
+  book's row carries its home spread; `Game.spread` is the run's cross-book median and Monday's CFBD
+  upsert no longer clobbers Odds-API-sourced totals/spreads (`*_source` columns + `line_sources.py`).
 - **2026-07 (Hard Rock pivot, PRs #7-#9):** multi-book capture incl. Hard Rock via The Odds API (`hardrockbet`; the `hardrockbet_fl` key folds onto it at write time); web views `/preview`, `/line-check`, `/weekly-review`; both markets logged + graded (`manual_picks.market`, `market_fg` ledger). Before season: GH secrets set, `odds_api.regions: "us,us2"`. (The phone push-notification layer shipped here was removed 2026-09-02 — failure alerts are GitHub's failed-run email + the routines.)
 - **2026-06 (cloud + board):** Neon-writing jobs run in GitHub Actions, not launchd (campus network can't reach Neon:5432; DK 403s GHA IPs → CFBD `/lines` fallback). Derived-1H lines post to the board as "DERIVED · no model pick"; board query is season-scoped.
 - **2026-05 (opener capture):** Sunday DK full-game opener via free hidden API + gated spread-adjusted 1H multiplier (`data/multiplier.json`; absent = flat 0.52). Next.js on Vercel is the product (Streamlit removed).

@@ -40,7 +40,7 @@ def test_poll_full_game_oddsapi_skips_paid_call_at_the_floor(monkeypatch, capsys
         def credits_low(self, floor):
             return OddsAPIClient.credits_low(self, floor)
 
-        def list_full_game_totals(self, regions=None):
+        def list_full_game_odds(self, regions=None, markets="totals,spreads"):
             paid.append(regions)
             return [{"id": "e1", "bookmakers": []}]
 

@@ -1,8 +1,13 @@
-"""The Odds API v4 client for college-football first-half totals (totals_h1).
+"""The Odds API v4 client for college-football totals (totals_h1 + full-game).
 
 Paid tier = 100K credits/month (2026-09; free tier was 500). totals_h1 costs credits
-per region, so we surface the credit headers on every call. The normalizer turns
+per region, so we surface the credit headers on every call. The normalizers turn
 the nested events->bookmakers->markets->outcomes JSON into flat snapshot rows.
+
+The bulk full-game pull asks for BOTH featured markets, `totals,spreads`, so each
+(event, book) row carries that book's home-relative spread next to its total
+(`spread` is None only when the book posted no spreads market). Featured markets
+cost (markets x regions) credits per call, so the whole slate is 4-6 credits.
 
 Every HTTP error is re-raised with the `apiKey=` query value redacted
 (`redact_key`) so a 401/429 traceback never echoes the key into CI logs.
@@ -12,7 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -79,10 +84,15 @@ class OddsAPIClient:
         c = self.last_credits
         return floor > 0 and c is not None and c.remaining is not None and c.remaining <= floor
 
-    def list_full_game_totals(self, regions: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Full-game `totals` for every book in `regions`, from the BULK /odds
-        endpoint. `totals` is a FEATURED market, so this costs (1 x n_regions)
-        credits TOTAL for the whole slate — cheap vs the per-event 1H calls.
+    def list_full_game_odds(
+        self, regions: Optional[str] = None, markets: str = "totals,spreads"
+    ) -> List[Dict[str, Any]]:
+        """Full-game featured markets for every book in `regions`, from the BULK
+        /odds endpoint. Featured markets cost (n_markets x n_regions) credits
+        TOTAL for the whole slate: the Sunday opener (`us,us2,us_ex`, two
+        markets) is 6 credits, a card-day refresh (`us,us2`) is 4 — cheap vs
+        the per-event 1H calls. Default `totals,spreads` gives each book's
+        total AND its home-relative spread in one call.
 
         Hard Rock's LIVE book key is `hardrockbet` (the docs' FL-specific
         `hardrockbet_fl` has not appeared in responses; hardrock.py accepts
@@ -92,7 +102,7 @@ class OddsAPIClient:
         params = {
             "apiKey": self.api_key,
             "regions": regions or self.regions,
-            "markets": "totals",
+            "markets": markets,
             "oddsFormat": self.odds_format,
             "dateFormat": "iso",
         }
@@ -100,6 +110,11 @@ class OddsAPIClient:
         self._credits(resp)
         _raise_for_status(resp)
         return resp.json()
+
+    def list_full_game_totals(self, regions: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Full-game `totals` only (1 x n_regions credits). Thin alias kept for
+        callers that never need the spread; see list_full_game_odds."""
+        return self.list_full_game_odds(regions=regions, markets="totals")
 
     def list_events(self) -> List[Dict[str, Any]]:
         """Upcoming events for the sport. FREE (0 credits). Each has id,
@@ -249,13 +264,55 @@ def normalize_first_half(
     return _rows_for_market(events, "totals_h1", books)
 
 
+def _home_spreads(
+    events: List[Dict[str, Any]], books: Optional[List[str]] = None
+) -> Dict[Tuple[str, str], float]:
+    """(event_id, book) -> home-relative spread (negative = home favored) from
+    each book's `spreads` market. The outcome named after `home_team` carries
+    the home point; when only the away outcome is present its point is negated.
+    Same freshest-`last_update`-wins rule and canonical book key as
+    _rows_for_market, so the two dicts line up key for key."""
+    book_filter = set(books) if books else None
+    by_key: Dict[Tuple[str, str], Tuple[str, float]] = {}
+    for ev in events:
+        home = ev.get("home_team")
+        away = ev.get("away_team")
+        for bm in ev.get("bookmakers", []):
+            if book_filter and bm.get("key") not in book_filter:
+                continue
+            for mkt in bm.get("markets", []):
+                if mkt.get("key") != "spreads":
+                    continue
+                home_pt = away_pt = None
+                for oc in mkt.get("outcomes", []):
+                    if oc.get("name") == home:
+                        home_pt = oc.get("point")
+                    elif oc.get("name") == away:
+                        away_pt = oc.get("point")
+                if home_pt is not None:
+                    spread = float(home_pt)
+                elif away_pt is not None:
+                    spread = -float(away_pt)
+                else:
+                    continue
+                key = (ev.get("id"), normalize_book(bm.get("key")))
+                stamp = mkt.get("last_update") or bm.get("last_update") or ""
+                prev = by_key.get(key)
+                if prev is None or stamp >= prev[0]:
+                    by_key[key] = (stamp, spread)
+    return {k: v[1] for k, v in by_key.items()}
+
+
 def normalize_full_game(
     events: List[Dict[str, Any]], books: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """One row per (event, book) for the full-game `totals` market. Same shape as
-    sources.draftkings.normalize_full_game (spread is None — the totals market
-    carries no spread), so scripts/poll_full_game.py consumes either source."""
+    """One row per (event, book) for the full-game `totals` market, with that
+    book's home-relative `spread` from its `spreads` market (None when the book
+    posted no spread — poll_full_game._changed treats None as "unknown", not
+    "moved"). Same shape as sources.draftkings.normalize_full_game, so
+    scripts/poll_full_game.py consumes either source."""
     rows = _rows_for_market(events, "totals", books)
+    spreads = _home_spreads(events, books)
     for r in rows:
-        r["spread"] = None
+        r["spread"] = spreads.get((r["event_id"], r["book"]))
     return rows

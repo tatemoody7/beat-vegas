@@ -3,14 +3,17 @@
 
 Full-game totals open Sunday; retail 1H totals post later. We capture the
 full-game opener (earliest snapshot per game/book/market = a genuine opener) and
-keep Game.spread/full_game_total current so the slate can be scored + ranked
-before the retail 1H market exists.
+keep Game.spread (cross-book median) current and fill Game.full_game_total once,
+tagging both with the source so Monday's CFBD upsert leaves them alone
+(beatvegas/line_sources.py). The slate is scorable before the retail 1H market
+exists.
 
 Sources (`--source`):
   dk      — DraftKings hidden API (free, fresh; may 403 datacenter IPs)
   cfbd    — CFBD /lines (key-based, reachable from anywhere incl. GitHub Actions)
-  oddsapi — The Odds API bulk /odds (MULTI-BOOK incl. Hard Rock; cloud-safe; the
-            source for the HR-vs-market comparison; prod runs this from sunday.yml)
+  oddsapi — The Odds API bulk /odds, `totals,spreads` (MULTI-BOOK incl. Hard Rock;
+            cloud-safe; the source for the HR-vs-market comparison; prod runs this
+            from sunday.yml and the card-day refresh in card.yml)
   auto    — try DK, fall back to CFBD if DK returns nothing (default)
 
     python scripts/poll_full_game.py                      # auto, local
@@ -23,6 +26,7 @@ Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + clo
 from __future__ import annotations
 
 import argparse
+import statistics
 import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -112,7 +116,7 @@ def _fetch_raw(
                 "full-game pull. Pass --credit-floor 0 to override."
             )
             return [], [], "oddsapi", 0
-        events = client.list_full_game_totals(regions=regions)
+        events = client.list_full_game_odds(regions=regions)
         return oa_normalize_full_game(events), [], "oddsapi", len(events)
     h1: List[Dict] = []
     if source in ("dk", "auto"):
@@ -137,6 +141,13 @@ _BOOK_PRIORITY = {"draftkings": 0, "consensus": 1}
 
 def _book_rank(book: Optional[str]) -> int:
     return _BOOK_PRIORITY.get((book or "").lower(), len(_BOOK_PRIORITY))
+
+
+def _consensus_spread(rows: List[Dict]) -> Optional[float]:
+    """Median home-relative spread across this run's books for one game; None
+    when no book carried one (single-book sources still work: median of one)."""
+    vals = [float(r["spread"]) for r in rows if r.get("spread") is not None]
+    return statistics.median(vals) if vals else None
 
 
 def _resolve_gid(r: Dict, games: List[Dict], ids: set) -> Optional[int]:
@@ -193,6 +204,7 @@ def main() -> None:
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
     unmatched_names: List[str] = []
     best_row: Dict[int, Dict] = {}  # gid -> highest-priority book's row this run
+    rows_by_gid: Dict[int, List[Dict]] = {}  # gid -> every matched book row this run
 
     with session_scope() as s:
         games = _candidate_games(s, args.season)
@@ -242,19 +254,25 @@ def main() -> None:
             cur = best_row.get(gid)
             if cur is None or _book_rank(r["book"]) < _book_rank(cur["book"]):
                 best_row[gid] = {**r, "line": line}
+            rows_by_gid.setdefault(gid, []).append(r)
 
-        # Keep each game's spread current and fill total only if missing, so an
-        # upcoming slate is scorable before CFBD posts its closing number — from
-        # the highest-priority book this run, not the last row iterated.
+        # Keep each game's spread current (cross-book median this run) and fill
+        # the total only if missing, so an upcoming slate is scorable before
+        # CFBD posts its closing number — the total comes from the
+        # highest-priority book this run, not the last row iterated. Both are
+        # tagged with `source` so Monday's CFBD upsert leaves them alone.
         for gid, r in best_row.items():
             g = s.query(Game).filter(Game.id == gid).one_or_none()
             if g is None:
                 continue
-            if r.get("spread") is not None:
-                g.spread = r["spread"]
+            sp = _consensus_spread(rows_by_gid.get(gid, []))
+            if sp is not None:
+                g.spread = sp
+                g.spread_source = source
             if g.full_game_total is None:
                 g.full_game_total = r["line"]
                 g.full_game_total_book = r["book"]
+                g.full_game_total_source = source
             games_updated += 1
 
         seen_h1: set = set()

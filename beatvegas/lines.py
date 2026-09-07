@@ -70,7 +70,7 @@ def closing_before_kickoff(
     snapshots with captured_at <= kickoff (all of them if kickoff/captured_at is
     unknown), and report the freshest used timestamp as the trust signal.
     """
-    pre = _pre_kickoff(snaps, kickoff)
+    pre = pre_kickoff(snaps, kickoff)
     opening, closing = consensus_open_close(pre)
     stamps = []
     for s in pre:
@@ -86,8 +86,15 @@ def closing_before_kickoff(
     return opening, closing, closing_at
 
 
-def _pre_kickoff(snaps: Sequence, kickoff) -> list:
-    """Snapshots captured at or before kickoff (all of them if unknown)."""
+def pre_kickoff(snaps: Sequence, kickoff) -> list:
+    """Snapshots captured at or before kickoff.
+
+    Falls back to ALL of them when none qualifies, so a caller with no usable
+    kickoff still gets a consensus rather than nothing. That fallback means a
+    non-empty result is NOT proof the snapshots are pre-kick: a caller that must
+    never see a live number (the residual engine's ranking line) has to check
+    for itself — see scripts/weekly_update.ranking_line_lookup.
+    """
     pre = [s for s in snaps if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
     return pre or list(snaps)
 
@@ -96,7 +103,7 @@ def fair_under_before_kickoff(
     snaps: Sequence, kickoff, method: str = "multiplicative"
 ) -> Tuple[Optional[float], Optional[float]]:
     """(open_fair_under, close_fair_under) using only PRE-kickoff snapshots."""
-    return consensus_fair_under_open_close(_pre_kickoff(snaps, kickoff), method)
+    return consensus_fair_under_open_close(pre_kickoff(snaps, kickoff), method)
 
 
 def book_closing_before_kickoff(
@@ -158,7 +165,7 @@ def book_closing_price_before_kickoff(snaps: Sequence, kickoff, book: str) -> Op
     mine = [s for s in snaps if getattr(s, "book", None) == book]
     if not mine:
         return None
-    priced = [s for s in _pre_kickoff(mine, kickoff) if getattr(s, "under_price", None) is not None]
+    priced = [s for s in pre_kickoff(mine, kickoff) if getattr(s, "under_price", None) is not None]
     if not priced:
         return None
     last = sorted(priced, key=lambda s: s.captured_at or datetime.min)[-1]

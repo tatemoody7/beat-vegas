@@ -33,8 +33,8 @@ from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.lines import (
     REAL_1H_CLOSE_WINDOW_H,
-    _pre_kickoff,
     consensus_open_close,
+    pre_kickoff,
     real_closes,
 )
 from beatvegas.model.score import score_slate, store_predictions
@@ -84,8 +84,10 @@ def ranking_line_lookup(
     snapshot; kind 'observed_1h'); else a 1H number DERIVED from the captured
     full-game opener via the spread-adjusted multiplier (kind 'derived_fg') —
     which on Sunday is every game, before the retail 1H market posts.
-    basis="current": Hard Rock's LATEST 1H line (kind 'hr_1h'); else the median
-    of each book's latest 1H line ('observed_1h'); else 'derived_fg' as above.
+    basis="current": Hard Rock's LATEST PRE-KICKOFF 1H line (kind 'hr_1h'); else
+    the median of each book's latest pre-kick 1H line ('observed_1h'); else
+    'derived_fg' as above. A game whose only 1H captures are in-play has no
+    bettable 1H number and falls through to derived_fg too.
     Games with none are left to score_slate's internal proxy."""
     if basis not in LINE_BASES:
         raise ValueError(f"unknown line basis {basis!r}; expected one of {LINE_BASES}")
@@ -123,7 +125,16 @@ def ranking_line_lookup(
             # A midweek re-run can catch in-play snapshots (poll_lines defaults
             # to --hours-back 24, well past kickoff for games already underway).
             # Never condition the residual model on a live line.
-            snaps = _pre_kickoff(snaps, kickoffs.get(gid))
+            kick = kickoffs.get(gid)
+            snaps = pre_kickoff(snaps, kick)
+            # lines.pre_kickoff hands back EVERY snapshot when none is pre-kick,
+            # so for a game we only ever caught in-play the filter is a no-op and
+            # the "latest" line would be a LIVE number. Skip its 1H market
+            # outright: the loop below derives a 1H line from the full-game opener.
+            if kick is not None and not any(
+                sn.captured_at is None or sn.captured_at <= kick for sn in snaps
+            ):
+                continue
             hr = [sn for sn in snaps if sn.book == HR_BOOK_KEY and sn.line is not None]
             if hr:
                 lines[gid], kinds[gid] = float(_latest(hr).line), "hr_1h"

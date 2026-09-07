@@ -50,7 +50,7 @@ def wu(monkeypatch):
 
     mod.session_scope = scope
     with Session(eng) as s:
-        for gid in (1, 2, 3, 4, 5):
+        for gid in (1, 2, 3, 4, 5, 7, 8):
             s.add(
                 Game(
                     id=gid,
@@ -95,6 +95,15 @@ def wu(monkeypatch):
                 # game 6: same shape, but the game has no known start_date.
                 _snap(6, "hardrockbet", "1H_total", 20.0, 1),
                 _snap(6, "hardrockbet", "1H_total", 15.0, -1),
+                # game 7: ONLY in-play 1H captures (the game kicked before we ever
+                # polled its 1H market) + a full-game opener. There is no pre-kick
+                # 1H line to bet, so "current" must fall through to derived_fg.
+                _snap(7, "hardrockbet", "1H_total", 13.5, -1),
+                _snap(7, "draftkings", "1H_total", 12.5, -2),
+                _snap(7, "draftkings", "full_game_total", 54.0, 48, spread=-10.0),
+                # game 8: only in-play 1H captures and no full-game opener either
+                # — no line at all, left to score_slate's internal proxy.
+                _snap(8, "hardrockbet", "1H_total", 11.0, -1),
             ]
         )
         s.commit()
@@ -132,10 +141,28 @@ def test_opener_basis_unaffected_by_pre_kickoff_filter(wu):
 
 
 def test_current_basis_null_start_date_keeps_no_filter(wu):
-    """Game 6 has no known start_date — _pre_kickoff can't filter without a
+    """Game 6 has no known start_date — pre_kickoff can't filter without a
     kickoff, so current behaviour (plain latest-by-captured_at) still applies."""
     lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="current")
     assert lines[6] == 15.0 and kinds[6] == "hr_1h"
+
+
+def test_current_basis_skips_a_game_whose_only_1h_snaps_are_in_play(wu):
+    """lines.pre_kickoff returns EVERY snapshot when none is pre-kick (so callers
+    with no kickoff still get a consensus). For a game we only ever caught
+    in-play that would hand the residual model a LIVE 1H line. With a known
+    kickoff and an empty pre-kick subset the 1H market is skipped entirely:
+    game 7 falls through to its full-game opener, game 8 has no line at all."""
+    lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="current")
+    assert lines[7] == proxy_total(54.0, spread=-10.0) and kinds[7] == "derived_fg"
+    assert 8 not in lines and 8 not in kinds
+
+
+def test_opener_basis_unaffected_by_the_in_play_skip(wu):
+    """The opener basis never filtered on kickoff and must not start: it reads
+    each book's FIRST snapshot, and an opener is pre-kick by construction."""
+    lines, kinds = wu.ranking_line_lookup(SEASON, WEEK, basis="opener")
+    assert lines[7] == 13.0 and kinds[7] == "observed_1h"  # median(13.5, 12.5)
 
 
 def test_unknown_basis_raises(wu):

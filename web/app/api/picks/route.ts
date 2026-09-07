@@ -29,11 +29,14 @@ export async function POST(req: NextRequest) {
   const slate = game ? await getSlate(game.season) : [];
   const inSlate = !!game && slate.some((g) => g.gameId === pick.gameId);
 
-  // One pick per game/market: a double-click must not double the record.
+  // One pick per game/market PER LEDGER: a double-click must not double the
+  // record, but the card's paper pick on a game (the paper ledger now logs
+  // every qualifying game) must never block Tate's real ticket on it.
   const dup = game
     ? await prisma.$queryRaw<{ id: number }[]>`
         SELECT id FROM manual_picks
         WHERE game_id = ${pick.gameId} AND COALESCE(market, '1H') = ${pick.market}
+          AND COALESCE(is_paper, false) = ${pick.isPaper}
         LIMIT 1
       `
     : [];

@@ -85,6 +85,7 @@ model manual_picks {
   gap_at_pick             Float?
   ev_at_pick              Float?
   hr_line_at_pick         Float?
+  blocker                 String?   @db.VarChar
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([season], map: "ix_manual_picks_season")

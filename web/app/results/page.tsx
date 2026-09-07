@@ -6,7 +6,11 @@ import { loadPicks } from "@/lib/picks";
 import { loadPostMortem } from "@/lib/postmortem";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
-import { getWeeklyReview, REASON_LABEL } from "@/lib/weeklyReview";
+import {
+  BLOCKER_LABEL,
+  getWeeklyReview,
+  REASON_LABEL,
+} from "@/lib/weeklyReview";
 import BankrollCurve from "@/app/components/BankrollCurve";
 import PicksList from "@/app/components/PicksList";
 import PostMortemPanel from "@/app/components/PostMortemPanel";
@@ -376,6 +380,46 @@ export default async function ResultsPage({
                     {r.realBets}
                   </td>
                   <RecCells rec={r.real} />
+                  <td className="font-mono text-[var(--text-muted)]">
+                    {r.paperBets}
+                  </td>
+                  <RecCells rec={r.paper} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Paper ledger by gate */}
+      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
+        Paper record by gate — what each rule would have done
+      </h2>
+      <p className="mb-2 text-xs text-[var(--text-dim)]">
+        Every game whose Hard Rock first-half line sat 1.75+ above our number is
+        logged as a paper pick and tagged with the gate that blocked a real bet.
+        Counts, not conclusions, until a row has 30 graded picks.
+      </p>
+      {review.byBlocker.length === 0 ? (
+        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
+          No qualifying games logged yet.
+        </p>
+      ) : (
+        <div className="bv-table-wrap">
+          <table className="bv-table">
+            <thead>
+              <tr>
+                <th>Gate</th>
+                <th>Picks</th>
+                <RecHead />
+              </tr>
+            </thead>
+            <tbody>
+              {review.byBlocker.map((r) => (
+                <tr key={r.blocker}>
+                  <td className="text-[var(--text)]">
+                    {BLOCKER_LABEL[r.blocker]}
+                  </td>
                   <td className="font-mono text-[var(--text-muted)]">
                     {r.paperBets}
                   </td>

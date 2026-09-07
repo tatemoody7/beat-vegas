@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BoardRow } from "./board";
 import type { EdgeResult, EdgeTier } from "./edge";
 import {
+  assignCapRanks,
   bankrollCurve,
   dayKey,
   edgeContext,
@@ -63,6 +64,8 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     gap: 2.5,
     gapBasis: "market",
     priceLine: "",
+    capRank: null,
+    overCap: false,
     ...o,
   }) as HomeGame;
 
@@ -90,6 +93,7 @@ const pick = (o: Partial<PickFull>): PickFull =>
     gapAtPick: null,
     evAtPick: null,
     hrLineAtPick: null,
+    blocker: null,
     ...o,
   }) as PickFull;
 
@@ -367,5 +371,60 @@ describe("bankrollCurve", () => {
     expect(bankrollCurve([], 250, 25)).toEqual([
       { week: 0, units: 0, usd: 250 },
     ]);
+  });
+});
+
+// --- the weekly cap on the board (2026-09-07) ------------------------------------
+
+describe("assignCapRanks", () => {
+  const bet = (gameId: number, gap: number, o: Partial<HomeGame> = {}) =>
+    game({
+      row: row({ gameId, away: `A${gameId}`, home: `H${gameId}` }),
+      edge: edge(70 + gap, "BET"),
+      gap,
+      ...o,
+    });
+
+  it("ranks BETs by gap, marks the 6th+ over the cap, leaves non-BETs null", () => {
+    const games = [
+      bet(1, 2.0),
+      bet(2, 3.1),
+      bet(3, 2.5),
+      bet(4, 1.9),
+      bet(5, 2.2),
+      bet(6, 2.1),
+      game({ row: row({ gameId: 7 }), edge: edge(64, "EDGE"), gap: 1.4 }),
+    ];
+    const out = assignCapRanks(games, new Set(), 5);
+    const ranks = Object.fromEntries(out.map((g) => [g.row.gameId, g.capRank]));
+    expect(ranks).toEqual({ 1: 5, 2: 1, 3: 2, 4: 6, 5: 3, 6: 4, 7: null });
+    expect(out.filter((g) => g.overCap).map((g) => g.row.gameId)).toEqual([4]);
+    expect(out.map((g) => g.row.gameId)).toEqual([1, 2, 3, 4, 5, 6, 7]); // order kept
+  });
+
+  it("a game already bet keeps its slot ahead of a bigger new gap", () => {
+    const games = [
+      bet(1, 3.0),
+      bet(2, 2.9),
+      bet(3, 2.8),
+      bet(4, 2.7),
+      bet(5, 2.6),
+      bet(6, 1.8),
+    ];
+    const out = assignCapRanks(games, new Set([6]), 5);
+    const by = Object.fromEntries(out.map((g) => [g.row.gameId, g]));
+    expect(by[6].capRank).toBe(1);
+    expect(by[6].overCap).toBe(false);
+    expect(by[5].capRank).toBe(6);
+    expect(by[5].overCap).toBe(true);
+  });
+
+  it("kicked-off games are out of the ranking", () => {
+    const out = assignCapRanks(
+      [bet(1, 3.0, { kickedOff: true }), bet(2, 2.0)],
+      new Set(),
+      5,
+    );
+    expect(out.map((g) => g.capRank)).toEqual([null, 1]);
   });
 });

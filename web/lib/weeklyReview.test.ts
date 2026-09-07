@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PickFull } from "./picks";
-import { reasonRows, weekRows } from "./weeklyReview";
+import { blockerRows, reasonRows, weekRows } from "./weeklyReview";
 
 const pick = (o: Partial<PickFull>): PickFull => ({
   id: 1,
@@ -25,6 +25,7 @@ const pick = (o: Partial<PickFull>): PickFull => ({
   gapAtPick: 2.1,
   evAtPick: 0.01,
   hrLineAtPick: 24.5,
+  blocker: null,
   ...o,
 });
 
@@ -75,5 +76,63 @@ describe("reasonRows", () => {
     // untagged: one 1H paper pick counts; the full-game paper pick is context only
     expect(rows[2]).toMatchObject({ realBets: 0, paperBets: 1, real: null });
     expect(rows[2].paper).toMatchObject({ record: "1-0" });
+  });
+});
+
+// --- paper ledger by gate (2026-09-07) ---------------------------------------
+
+const paperPick = (o: Partial<PickFull>): PickFull => ({
+  id: 1,
+  gameId: 1,
+  week: 3,
+  away: "A",
+  home: "B",
+  market: "1H",
+  line: 24.5,
+  stake: 1,
+  price: -110,
+  note: null,
+  modelScore: null,
+  modelLine: null,
+  result: "under",
+  units: 0.91,
+  clv: null,
+  graded: true,
+  isPaper: true,
+  verdictAtPick: "BET",
+  reason: "model_gap",
+  gapAtPick: 2.1,
+  evAtPick: null,
+  hrLineAtPick: 24.5,
+  blocker: "none",
+  ...o,
+});
+
+describe("blockerRows", () => {
+  it("groups the PAPER 1H ledger by gate, in gate order, omitting empty gates", () => {
+    const picks = [
+      paperPick({ id: 1, blocker: "none" }),
+      paperPick({ id: 2, blocker: "none", result: "over", units: -1 }),
+      paperPick({ id: 3, blocker: "price", verdictAtPick: "WATCH" }),
+      paperPick({
+        id: 4,
+        blocker: "cap",
+        graded: false,
+        result: "pending",
+        units: null,
+      }),
+      paperPick({ id: 5, blocker: null }), // logged before tagging
+      paperPick({ id: 6, isPaper: false, blocker: null }), // real: never in this table
+      paperPick({ id: 7, market: "full", blocker: "none" }), // full game: out
+    ];
+    const rows = blockerRows(picks);
+    expect(rows.map((r) => [r.blocker, r.paperBets])).toEqual([
+      ["none", 2],
+      ["price", 1],
+      ["cap", 1],
+      ["untagged", 1],
+    ]);
+    expect(rows[0].paper).toMatchObject({ record: "1-1" });
+    expect(rows[2].paper).toBeNull(); // pending only: no graded record
   });
 });

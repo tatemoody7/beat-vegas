@@ -21,6 +21,8 @@ function loggedAs(p: PickFull): string {
     parts.push(`HR gap ${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)}`);
   }
   if (isOffPolicy(p)) parts.push("OFF-POLICY");
+  if (p.isPaper && p.blocker && p.blocker !== "none")
+    parts.push(`gate: ${p.blocker}`);
   return parts.filter(Boolean).join(" · ");
 }
 

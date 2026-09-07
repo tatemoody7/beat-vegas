@@ -3,6 +3,7 @@ import {
   asIso,
   cardAge,
   CLOSEST_ROWS,
+  killLabel,
   lineLabel,
   MAX_CARD_ROWS,
   parseCard,
@@ -104,6 +105,12 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   action: "",
   why: [],
   paperLogged: false,
+  qualifies: false,
+  paperBlocker: null,
+  capRank: null,
+  overCap: false,
+  totalBand: null,
+  hookSide: null,
   ...o,
 });
 
@@ -113,6 +120,7 @@ const card = (o: Partial<Card> = {}): Card => ({
   builtAt: "2026-09-11T22:07:12Z",
   modelRead: true,
   counts: { bet: 0, edge: 0, pass: 0 },
+  paper: { qualifying: 0, overCap: 0, cap: 5 },
   items: [],
   notes: [],
   ...o,
@@ -182,6 +190,7 @@ describe("parseCard", () => {
       builtAt: null,
       modelRead: false,
       counts: { bet: 0, edge: 0, pass: 0 },
+      paper: { qualifying: 0, overCap: 0, cap: 5 },
       items: [],
       notes: [],
     });
@@ -335,6 +344,10 @@ describe("summarizeCard", () => {
         line: "u24.5 -110",
         action: "Bet the first-half under 24.5 at -110.",
         paperLogged: true,
+        capRank: null,
+        overCap: false,
+        paperBlocker: null,
+        kill: "below u24.0 or worse than -118",
       },
     ]);
   });
@@ -404,5 +417,118 @@ describe("summarizeCard", () => {
     expect(s.bets).toHaveLength(MAX_CARD_ROWS);
     expect(s.bets[0].kick).toBeNull();
     expect(s.bets[0].line).toBe("no Hard Rock line");
+  });
+});
+
+// --- paper ledger + weekly cap (2026-09-07) ---------------------------------------
+
+describe("parseCard: paper ledger fields", () => {
+  it("reads qualifies / paper_blocker / cap_rank / over_cap / chips and the cap blocker", () => {
+    const c = parseCard(
+      rawCard({
+        paper: { qualifying: 3, over_cap: 1, cap: 5 },
+        items: [
+          rawItem({
+            qualifies: true,
+            paper_blocker: null,
+            cap_rank: 1,
+            over_cap: false,
+            total_band: "52–60",
+            hook_side: "key+0.5",
+          }),
+          rawItem({
+            game_id: 402,
+            blocker: "cap",
+            cap_rank: 6,
+            over_cap: true,
+            qualifies: true,
+          }),
+          rawItem({
+            game_id: 403,
+            tier: "EDGE",
+            blocker: "price",
+            paper_blocker: "price",
+            qualifies: true,
+          }),
+        ],
+      }),
+    )!;
+    expect(c.paper).toEqual({ qualifying: 3, overCap: 1, cap: 5 });
+    expect(c.items[0]).toMatchObject({
+      qualifies: true,
+      paperBlocker: null,
+      capRank: 1,
+      overCap: false,
+      totalBand: "52–60",
+      hookSide: "key+0.5",
+    });
+    expect(c.items[1]).toMatchObject({
+      blocker: "cap",
+      capRank: 6,
+      overCap: true,
+      tier: "BET",
+    });
+    expect(c.items[2]).toMatchObject({
+      paperBlocker: "price",
+      qualifies: true,
+      capRank: null,
+    });
+  });
+
+  it("derives the paper tallies and defaults when the payload predates them", () => {
+    const c = parseCard(rawCard())!; // no paper block, no new item fields
+    expect(c.paper).toEqual({ qualifying: 0, overCap: 0, cap: 5 });
+    expect(c.items[0]).toMatchObject({
+      qualifies: false,
+      paperBlocker: null,
+      capRank: null,
+      overCap: false,
+    });
+  });
+});
+
+describe("killLabel", () => {
+  it("reads like the text: below u24 or worse than -118", () => {
+    expect(killLabel({ killLine: 24, killPrice: -118 })).toBe(
+      "below u24.0 or worse than -118",
+    );
+    expect(killLabel({ killLine: 24.5, killPrice: null })).toBe("below u24.5");
+    expect(killLabel({ killLine: null, killPrice: null })).toBe("");
+  });
+});
+
+describe("summarizeCard: the weekly cap", () => {
+  it("keeps over-cap BETs out of the bet rows and lists them apart, with kill numbers on the bets", () => {
+    const c = card({
+      items: [
+        item({
+          gameId: 1,
+          tier: "BET",
+          capRank: 1,
+          gap: 3,
+          killLine: 24,
+          killPrice: -118,
+        }),
+        item({ gameId: 2, tier: "BET", capRank: 2, gap: 2 }),
+        item({
+          gameId: 3,
+          tier: "BET",
+          capRank: 6,
+          gap: 1.8,
+          overCap: true,
+          blocker: "cap",
+          paperLogged: true,
+        }),
+      ],
+    });
+    const s = summarizeCard(c);
+    expect(s.headline).toBe("2 bets this week.");
+    expect(s.bets.map((r) => [r.gameId, r.capRank, r.kill])).toEqual([
+      [1, 1, "below u24.0 or worse than -118"],
+      [2, 2, ""],
+    ]);
+    expect(
+      s.overCap.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
+    ).toEqual([[3, "cap", true]]);
   });
 });

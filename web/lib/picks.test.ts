@@ -25,6 +25,7 @@ const pick = (o: Partial<PickFull>): PickFull => ({
   gapAtPick: null,
   evAtPick: null,
   hrLineAtPick: null,
+  blocker: null,
   ...o,
 });
 

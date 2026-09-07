@@ -128,7 +128,8 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.hrGap).toBe(2.7);
     expect(v.reason).toBe("model_gap"); // it still qualifies for the paper ledger
     expect(v.why[1]).toContain("not enough other books at that number");
-    // Hard Rock posted the number but no price yet: same branch.
+    // Hard Rock posted the number but no price yet: same gate, different
+    // wording (the old text falsely implied no other book/exchange is priced).
     const unpriced = verdictFor({
       ...base,
       hrUnderPrice: null,
@@ -136,7 +137,9 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
       evVerdict: "na",
     });
     expect(unpriced.verdict).toBe("WATCH");
-    expect(unpriced.headline).toContain("can’t be judged");
+    expect(unpriced.headline).toBe(
+      "Model edge in range, but Hard Rock hasn’t priced its under yet — the price can’t be judged. Paper only.",
+    );
     // A judgeable fair-or-better price is what makes it a BET.
     expect(verdictFor({ ...base, ev: 0, evVerdict: "fair" }).verdict).toBe(
       "BET",

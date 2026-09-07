@@ -345,7 +345,9 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     return out(
       "WATCH",
       "medium",
-      "Model edge in range, but no other book or exchange is priced at Hard Rock’s number — the price can’t be judged. Paper only.",
+      i.hrUnderPrice === null
+        ? "Model edge in range, but Hard Rock hasn’t priced its under yet — the price can’t be judged. Paper only."
+        : "Model edge in range, but no other book or exchange is priced at Hard Rock’s number — the price can’t be judged. Paper only.",
       false,
       59 + hrGap * 10,
     );

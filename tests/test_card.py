@@ -504,7 +504,7 @@ def test_unpriced_hard_rock_line_is_blocked_as_no_fair_price():
     assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4) and it["fair_source"] == "books"
     assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
     assert it["paper_blocker"] == "no_fair_price"
-    assert it["action"].startswith("Wait: Hard Rock’s unpriced can’t be judged")
+    assert it["action"].startswith("Wait: Hard Rock hasn’t priced its 24.5 under yet")
 
 
 def test_blocker_order_off_market_then_price_then_no_fair_price_then_qb_out():

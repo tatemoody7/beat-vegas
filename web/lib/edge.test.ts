@@ -223,7 +223,8 @@ describe("edgeScore — model rows", () => {
       "Wait: Hard Rock’s -105 can’t be judged — no other book or exchange is priced at 24.5. Paper only until a comparable price appears.",
     );
     expect(e.kill.price).toBeNull();
-    // unpriced Hard Rock line: same gate, "unpriced" in the action
+    // unpriced Hard Rock line: same gate, "hasn't priced" wording (not a false
+    // "no other book is priced" claim)
     const u = edgeScore({
       ...base,
       hrUnderPrice: null,
@@ -232,7 +233,9 @@ describe("edgeScore — model rows", () => {
       marketFairUnder: null,
     });
     expect(u.blocker).toBe("no_fair_price");
-    expect(u.action).toContain("Hard Rock’s unpriced can’t be judged");
+    expect(u.action).toContain(
+      "Hard Rock hasn’t priced its 24.5 under yet — nothing to judge",
+    );
     // Gate order: no_fair_price is named before qb_out (transient news) ...
     const both = edgeScore({
       ...base,

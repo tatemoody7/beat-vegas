@@ -228,8 +228,12 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     const hr = i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "unpriced";
     action = `Wait: Hard Rock is ${hr}; needs ${needs}.`;
   } else if (blocker === "no_fair_price") {
-    const hr = i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "unpriced";
-    action = `Wait: Hard Rock’s ${hr} can’t be judged — no other book or exchange is priced at ${fmt(i.hrLine)}. Paper only until a comparable price appears.`;
+    if (i.hrUnderPrice === null) {
+      action = `Wait: Hard Rock hasn’t priced its ${fmt(i.hrLine)} under yet — nothing to judge. Paper only until Hard Rock posts a price.`;
+    } else {
+      const hr = american(i.hrUnderPrice);
+      action = `Wait: Hard Rock’s ${hr} can’t be judged — no other book or exchange is priced at ${fmt(i.hrLine)}. Paper only until a comparable price appears.`;
+    }
   } else if (blocker === "qb_out") {
     action =
       "Wait: a starting QB is listed out — re-check the number after the news settles.";

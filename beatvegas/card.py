@@ -547,11 +547,17 @@ def build_item(
         hr = american(hr_price) if hr_price is not None else "unpriced"
         action = f"Wait: Hard Rock is {hr}; needs {needs}."
     elif blocker == "no_fair_price":
-        hr = american(hr_price) if hr_price is not None else "unpriced"
-        action = (
-            f"Wait: Hard Rock’s {hr} can’t be judged — no other book or exchange is priced at "
-            f"{fmt(hr_line)}. Paper only until a comparable price appears."
-        )
+        if hr_price is None:
+            action = (
+                f"Wait: Hard Rock hasn’t priced its {fmt(hr_line)} under yet — nothing to judge. "
+                "Paper only until Hard Rock posts a price."
+            )
+        else:
+            hr = american(hr_price)
+            action = (
+                f"Wait: Hard Rock’s {hr} can’t be judged — no other book or exchange is priced at "
+                f"{fmt(hr_line)}. Paper only until a comparable price appears."
+            )
     elif blocker == "qb_out":
         action = "Wait: a starting QB is listed out — re-check the number after the news settles."
     else:

@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import statistics
-from typing import List, Optional, Sequence, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Sequence, Tuple
 
+from .db.models import OddsSnapshot
 from .devig import devig_two_way
+
+# A "real" close is a snapshot captured this close to kickoff. The 48-hour
+# Sunday opener alone must never grade as a close: the 1H market posts on game
+# week and the close polls run inside 2 h; full-game polls are sparser (3 h).
+REAL_1H_CLOSE_WINDOW_H = 2.0
+REAL_FG_CLOSE_WINDOW_H = 3.0
 
 
 def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[float]]:
@@ -101,3 +109,42 @@ def book_closing_before_kickoff(
     if not mine:
         return None, None, None
     return closing_before_kickoff(mine, kickoff)
+
+
+def real_closes(
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    market: str = "1H_total",
+    within_hours: Optional[float] = None,
+) -> Dict[int, float]:
+    """game_id -> pre-kickoff consensus close for `market` from captured
+    snapshots; games without one are simply absent. `within_hours` keeps only
+    snapshots at most that many hours before kickoff (REAL_1H_CLOSE_WINDOW_H /
+    REAL_FG_CLOSE_WINDOW_H) so an opener-only game never grades as a real close;
+    None keeps every pre-kickoff snapshot."""
+    if not game_ids:
+        return {}
+    by_game: Dict[int, List] = {}
+    ids = list(game_ids)
+    for i in range(0, len(ids), 1000):
+        for snap in (
+            session.query(OddsSnapshot)
+            .filter(OddsSnapshot.market == market, OddsSnapshot.game_id.in_(ids[i : i + 1000]))
+            .all()
+        ):
+            k = kickoffs.get(snap.game_id)
+            if (
+                within_hours is not None
+                and k is not None
+                and snap.captured_at is not None
+                and not (0 <= (k - snap.captured_at).total_seconds() <= within_hours * 3600)
+            ):
+                continue
+            by_game.setdefault(snap.game_id, []).append(snap)
+    out: Dict[int, float] = {}
+    for gid, snaps in by_game.items():
+        _open, close, _at = closing_before_kickoff(snaps, kickoffs.get(gid))
+        if close is not None:
+            out[gid] = float(close)
+    return out

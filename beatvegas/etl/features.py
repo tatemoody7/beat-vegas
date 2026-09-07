@@ -173,6 +173,7 @@ def _query_games() -> pd.DataFrame:
             Game.full_game_total,
             Game.spread,
             Game.venue_id,
+            Game.first_half_source,
         )
         df = pd.DataFrame(
             q.all(),
@@ -192,6 +193,7 @@ def _query_games() -> pd.DataFrame:
                 "full_game_total",
                 "spread",
                 "venue_id",
+                "first_half_source",  # 'pbp' | 'linescores' — for trusted-FH filtering
             ],
         )
         venues = pd.DataFrame(

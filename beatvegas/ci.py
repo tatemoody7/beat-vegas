@@ -25,14 +25,18 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 
 # Sweep arguments per slot (scripts/poll_lines.py). Every slot sweeps only the
-# Hard Rock universe and only upcoming games.
+# Hard Rock universe and only upcoming games. The Friday preview and the
+# Saturday final add the exchange region (us_ex: Kalshi, Novig, ...) so the
+# card's exchange-first fair price (beatvegas/card.py) has a quote at Hard
+# Rock's number — decided 2026-09-07: ~1 extra credit per event on those two
+# sweeps only; weeknight and manual stay on the config regions (us,us2).
 SWEEP_ARGS: Dict[str, str] = {
     # Tue/Wed/Thu ~4:05pm ET: tonight's games (kicking off within 10 hours)
     "weeknight": "--hr-universe --kickoff-within-min 600 --hours-back 0",
     # Fri ~6:05pm ET preview: the whole weekend slate
-    "friday": "--hr-universe --hours-back 0 --days-ahead 3",
+    "friday": "--hr-universe --hours-back 0 --days-ahead 3 --regions us,us2,us_ex",
     # Sat ~8:15am ET FINAL: the Saturday slate (+ Sunday/Monday stragglers)
-    "saturday": "--hr-universe --hours-back 0 --days-ahead 2",
+    "saturday": "--hr-universe --hours-back 0 --days-ahead 2 --regions us,us2,us_ex",
     # workflow_dispatch with no slot: a full refresh of the week
     "manual": "--hr-universe --hours-back 0 --days-ahead 6",
 }

@@ -73,3 +73,19 @@ def test_every_cron_slot_has_sweep_args_and_a_paper_window():
 
     for slot, _ in CRON_SLOTS.values():
         assert slot in SWEEP_ARGS and slot in PAPER_WINDOW_HOURS
+
+
+def test_friday_and_saturday_sweeps_add_the_exchange_region():
+    """The exchange-first fair price (beatvegas/card.py) needs a us_ex quote at
+    Hard Rock's number on the decision builds; ~1 extra credit per event on
+    those two sweeps only. Weeknight and manual sweeps stay on us,us2."""
+    from beatvegas.ci import SWEEP_ARGS
+
+    for slot in ("friday", "saturday"):
+        assert "--regions us,us2,us_ex" in SWEEP_ARGS[slot], slot
+    for slot in ("weeknight", "manual"):
+        assert "--regions" not in SWEEP_ARGS[slot], slot
+    r = resolve_slot("5 22 * * 5", utc(2026, 9, 25, 22, 9))
+    assert "--regions us,us2,us_ex" in r["sweep_args"]
+    r = resolve_slot("5 12 * * 6", utc(2026, 9, 19, 12, 9))
+    assert "--regions us,us2,us_ex" in r["sweep_args"]

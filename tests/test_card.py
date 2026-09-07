@@ -280,7 +280,7 @@ def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
 # --- ordering, filtering, notes -------------------------------------------------
 
 
-def test_items_sort_bet_then_edge_by_ev_then_pass_by_ev():
+def test_items_sort_bet_then_edge_by_gap_then_pass_by_gap_then_ev():
     k = [KICK + timedelta(hours=i) for i in range(5)]
     games = [game(i + 1, away=f"A{i}", home=f"H{i}", kick=k[i]) for i in range(5)]
     snaps = []
@@ -297,7 +297,8 @@ def test_items_sort_bet_then_edge_by_ev_then_pass_by_ev():
     preds = [model(1, 24.0), model(2, 22.4), model(3, 22.4), model(4, 22.4), model(5, 24.0)]
     c = card(games, snaps, preds)
     order = [(it["game_id"], it["tier"]) for it in c["items"]]
-    assert order == [(3, "BET"), (2, "EDGE"), (4, "EDGE"), (5, "PASS"), (1, "PASS")]
+    # gap first (4: 2.6 beats 2: 2.1); equal gaps (5 and 1, both 0.5) fall back to ev
+    assert order == [(3, "BET"), (4, "EDGE"), (2, "EDGE"), (5, "PASS"), (1, "PASS")]
     assert c["counts"] == {"bet": 1, "edge": 2, "pass": 2}
 
 
@@ -354,6 +355,17 @@ ITEM_KEYS = {
     "action",
     "why",
     "paper_logged",
+    # paper ledger + weekly cap
+    "qualifies",
+    "paper_blocker",
+    "cap_rank",
+    "over_cap",
+    # display chips
+    "full_game_total",
+    "spread",
+    "total_band",
+    "hook_side",
+    "key_dist",
 }
 
 
@@ -362,7 +374,16 @@ def test_payload_contract_and_strict_json_round_trip():
     snaps = [snap(1, "hardrockbet", 24.5, nan, nan)] + market(1, 24.5)
     preds = [model(1, nan), {"game_id": 1, "model_version": "derived_lines", "line_used": 24.5}]
     c = card([game()], snaps, preds)
-    assert set(c) == {"season", "week", "built_at", "model_read", "counts", "items", "notes"}
+    assert set(c) == {
+        "season",
+        "week",
+        "built_at",
+        "model_read",
+        "counts",
+        "paper",
+        "items",
+        "notes",
+    }
     it = only(c)
     assert set(it) == ITEM_KEYS
     assert it["hr_price"] is None and it["bv_line"] is None  # NaN read as missing
@@ -370,3 +391,136 @@ def test_payload_contract_and_strict_json_round_trip():
     back = json.loads(text)
     assert back == c
     assert back["items"][0]["tier"] in {"BET", "EDGE", "PASS"}
+
+
+# --- paper ledger: qualifying games, blockers, chips, the weekly cap (2026-09-07) --
+
+from beatvegas.card import apply_weekly_cap, hook_side, key_dist, total_band  # noqa: E402
+from beatvegas.model.score import WEEKLY_BET_CAP  # noqa: E402
+
+
+def test_bet_item_qualifies_with_no_paper_blocker():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["qualifies"] is True and it["paper_blocker"] is None
+    assert it["cap_rank"] == 1 and it["over_cap"] is False
+
+
+def test_price_blocked_edge_qualifies_with_blocker_price():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -125)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["tier"] == "EDGE" and it["qualifies"] is True and it["paper_blocker"] == "price"
+
+
+def test_off_market_pass_still_qualifies_with_blocker_off_market():
+    """gap 2.0 at Hard Rock but 1.0 under the market: score 70-10 = 60 -> EDGE;
+    with a QB out too the score drops to 55 -> PASS. Either way it qualifies and
+    the paper ledger tags off_market first (gate order)."""
+    snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
+    prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
+    it = only(card([game()], snaps, [model(1, 22.0)], prev))
+    assert it["tier"] == "PASS" and it["blocker"] is None
+    assert it["qualifies"] is True and it["paper_blocker"] == "off_market"
+
+
+def test_small_gap_does_not_qualify():
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 23.2)]))  # gap 1.3
+    assert it["qualifies"] is False and it["paper_blocker"] is None
+
+
+def test_no_hr_line_never_qualifies_even_with_a_consensus_gap():
+    it = only(card([game()], market(1, 25.0), [model(1, 22.4)]))  # consensus gap 2.6
+    assert it["blocker"] == "no_hr_line" and it["qualifies"] is False
+
+
+def test_chips_total_band_hook_and_key_distance():
+    assert total_band(44.9) == "<45" and total_band(45) == "45–52"
+    assert total_band(59.5) == "52–60" and total_band(60) == "60+" and total_band(None) is None
+    assert hook_side(24.5) == "key+0.5" and hook_side(27.5) == "key−0.5"
+    assert hook_side(30.5) == "key−0.5" and hook_side(26.0) == "other" and hook_side(None) is None
+    assert key_dist(26.0) == 2.0 and key_dist(31.5) == 0.5
+    g = {**game(), "total": 55.5, "spread": -7.5}
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    it = only(card([g], snaps, [model(1, 22.4)]))
+    assert it["total_band"] == "52–60" and it["full_game_total"] == 55.5 and it["spread"] == -7.5
+    assert it["hook_side"] == "key+0.5" and it["key_dist"] == 0.5
+
+
+def _bets(n, start_gap=3.0):
+    """n BET games with gaps start_gap, start_gap-0.1, ... (all >= 1.75)."""
+    games, snaps, preds = [], [], []
+    for i in range(n):
+        gid = i + 1
+        games.append(game(gid, away=f"A{gid}", home=f"H{gid}", kick=KICK + timedelta(minutes=i)))
+        snaps += [snap(gid, "hardrockbet", 24.5)] + market(gid, 24.5)
+        preds.append(model(gid, round(24.5 - (start_gap - 0.1 * i), 2)))
+    return games, snaps, preds
+
+
+def test_weekly_cap_ranks_bets_by_gap_and_papers_the_sixth():
+    games, snaps, preds = _bets(6)
+    c = card(games, snaps, preds)
+    bets = [it for it in c["items"] if it["tier"] == "BET"]
+    assert [it["cap_rank"] for it in bets] == [1, 2, 3, 4, 5, 6]
+    assert [it["gap"] for it in bets] == sorted((it["gap"] for it in bets), reverse=True)
+    assert [it["over_cap"] for it in bets] == [False] * 5 + [True]
+    sixth = bets[-1]
+    assert sixth["tier"] == "BET" and sixth["blocker"] == "cap"
+    assert sixth["action"].startswith("Over the weekly cap (#6 by gap): paper only")
+    assert c["counts"] == {"bet": 6, "edge": 0, "pass": 0}
+    assert c["paper"] == {"qualifying": 6, "over_cap": 1, "cap": WEEKLY_BET_CAP}
+
+
+def test_weekly_cap_counts_prior_bets_on_games_not_on_the_card():
+    games, snaps, preds = _bets(3)
+    c = card(games, snaps, preds, prior_bet_game_ids={901, 902, 903, 904})
+    bets = [it for it in c["items"] if it["tier"] == "BET"]
+    assert [it["cap_rank"] for it in bets] == [5, 6, 7]
+    assert [it["over_cap"] for it in bets] == [False, True, True]
+
+
+def test_weekly_cap_does_not_double_count_a_prior_bet_that_is_on_the_card():
+    games, snaps, preds = _bets(2)
+    c = card(games, snaps, preds, prior_bet_game_ids={1}, held_game_ids={1})
+    bets = [it for it in c["items"] if it["tier"] == "BET"]
+    assert [it["cap_rank"] for it in bets] == [1, 2]
+
+
+def test_held_bet_keeps_its_slot_ahead_of_a_bigger_new_gap():
+    """A BET logged Thursday (game 6, smallest gap) is not bumped Saturday."""
+    games, snaps, preds = _bets(6)
+    c = card(games, snaps, preds, held_game_ids={6})
+    bets = [it for it in c["items"] if it["tier"] == "BET"]
+    by_id = {it["game_id"]: it for it in bets}
+    assert by_id[6]["cap_rank"] == 1 and by_id[6]["over_cap"] is False
+    assert by_id[5]["cap_rank"] == 6 and by_id[5]["over_cap"] is True
+
+
+def test_apply_weekly_cap_uses_the_policy_cap_constant():
+    items = [
+        {
+            "game_id": i,
+            "tier": "BET",
+            "gap": 2.0,
+            "ev": 0.0,
+            "kick": "",
+            "away": str(i),
+            "action": "",
+            "blocker": None,
+            "cap_rank": None,
+            "over_cap": False,
+        }
+        for i in range(WEEKLY_BET_CAP + 2)
+    ]
+    apply_weekly_cap(items)
+    assert sum(1 for it in items if it["over_cap"]) == 2
+
+
+def test_edge_items_sort_by_gap_before_price():
+    """EDGE order is gap-first now (was price-first): the cap-5 rule is by gap."""
+    g1, g2 = game(1, "A", "B"), game(2, "C", "D", kick=KICK + timedelta(hours=1))
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -125), snap(2, "hardrockbet", 24.5, -110, -130)]
+    snaps += market(1, 24.5) + market(2, 24.5)
+    c = card([g1, g2], snaps, [model(1, 22.4), model(2, 21.9)])  # gaps 2.1, 2.6
+    assert [it["game_id"] for it in c["items"]] == [2, 1]

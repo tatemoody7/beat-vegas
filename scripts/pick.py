@@ -84,11 +84,13 @@ def cmd_add(args) -> None:
                     "Pass --force if you genuinely placed it pre-game."
                 )
                 return
-            dup = existing_pick(s, gid, market)
+            # Per ledger: the card's PAPER pick on a game never blocks a real
+            # ticket on it (the paper ledger now logs every qualifying game).
+            dup = existing_pick(s, gid, market, is_paper=bool(args.paper))
             if dup is not None:
                 print(
-                    f"REFUSED: pick #{dup.id} already logged on this game/market "
-                    f"(UNDER {dup.line}). Pass --force to log a second bet on it."
+                    f"REFUSED: {'paper ' if args.paper else ''}pick #{dup.id} already logged "
+                    f"on this game/market (UNDER {dup.line}). Pass --force to log a second bet on it."
                 )
                 return
 

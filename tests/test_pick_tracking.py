@@ -170,3 +170,97 @@ def test_cli_parses_the_new_flags(monkeypatch):
     assert seen["reason"] == "price_edge" and seen["verdict"] == "WATCH"
     assert seen["gap"] == 1.5 and seen["ev"] == 0.02 and seen["hr_line"] == 25.0
     assert seen["paper"] is True
+
+
+# --- paper ledger vs real ledger (2026-09-07) ----------------------------------
+
+from beatvegas.picks import add_pick, existing_pick  # noqa: E402
+
+
+def test_blocker_column_and_migration():
+    cols = ManualPick.__table__.columns
+    assert "blocker" in cols and cols["blocker"].type.length == 16
+    assert _MIGRATIONS["manual_picks"]["blocker"] == "VARCHAR(16)"
+
+
+def _paper(s, gid=1, blocker="price"):
+    return add_pick(
+        s,
+        game_id=gid,
+        season=2026,
+        week=13,
+        home_team="Michigan",
+        away_team="Ohio State",
+        line=24.5,
+        price=-125,
+        is_paper=True,
+        reason="model_gap",
+        verdict="WATCH",
+        gap=2.0,
+        blocker=blocker,
+        factors_json='{"total_band": "52–60"}',
+    )
+
+
+def test_add_pick_stores_blocker_and_chips():
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        _paper(s)
+        s.commit()
+        (row,) = s.query(ManualPick).all()
+    assert row.blocker == "price" and row.factors_json_at_pick == '{"total_band": "52–60"}'
+
+
+def test_existing_pick_is_scoped_per_ledger():
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        _paper(s)
+        s.commit()
+        assert existing_pick(s, 1, "1H") is not None  # any ledger (legacy)
+        assert existing_pick(s, 1, "1H", is_paper=True) is not None
+        assert existing_pick(s, 1, "1H", is_paper=False) is None  # real ledger is clear
+        # a legacy row with NULL is_paper counts as real
+        s.add(
+            ManualPick(
+                game_id=1,
+                season=2026,
+                week=13,
+                side="under",
+                market="1H",
+                line=24.5,
+                price=-110,
+                stake=1.0,
+                is_paper=None,
+            )
+        )
+        s.commit()
+        assert existing_pick(s, 1, "1H", is_paper=False) is not None
+
+
+def test_real_ticket_is_not_refused_by_the_cards_paper_pick(capsys):
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        _paper(s)
+        s.commit()
+    pick.cmd_add(_args(price=-110))  # Tate's real bet on the same game
+    out = capsys.readouterr().out
+    assert "REFUSED" not in out
+    with Session(eng) as s:
+        rows = s.query(ManualPick).order_by(ManualPick.id).all()
+    assert [r.is_paper for r in rows] == [True, False]
+
+
+def test_second_real_ticket_is_still_refused(capsys):
+    pick, eng = _pick_module()
+    pick.cmd_add(_args())
+    pick.cmd_add(_args(price=-105))
+    assert "REFUSED" in capsys.readouterr().out
+    with Session(eng) as s:
+        assert s.query(ManualPick).count() == 1
+
+
+def test_second_paper_pick_is_refused(capsys):
+    pick, eng = _pick_module()
+    pick.cmd_add(_args(paper=True))
+    pick.cmd_add(_args(paper=True))
+    assert "REFUSED: paper pick" in capsys.readouterr().out

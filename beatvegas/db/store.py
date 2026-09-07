@@ -51,6 +51,7 @@ _MIGRATIONS = {
         "gap_at_pick": "FLOAT",
         "ev_at_pick": "FLOAT",
         "hr_line_at_pick": "FLOAT",
+        "blocker": "VARCHAR(16)",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},

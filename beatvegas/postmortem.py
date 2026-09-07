@@ -92,7 +92,7 @@ _ORDER: Dict[str, List[str]] = {
     "temp_band": [b[2] for b in TEMP_BANDS],
     "week_band": [b[2] for b in WEEK_BANDS],
     "key_dist": [b[2] for b in KEY_DIST_BANDS],
-    "hook_side": ["key+0.5", "key−0.5", "other"],
+    "hook_side": ["key+0.5", "key−0.5", "on_key", "other"],
     "line_frac": ["whole", "half"],
     "division": ["fbs", "fbs_v_fcs", "non_fbs"],
     "neutral": ["home", "neutral"],
@@ -526,15 +526,15 @@ def weekly_cap(
     df: pd.DataFrame, gap_col: str, cap: int = WEEKLY_CAP, min_gap: float = BET_GAP_PTS
 ) -> pd.Series:
     """Per (season, week): the top `cap` games by gap among gap >= min_gap.
-    Ties: higher under_score, then lower game_id. Deterministic."""
+    Ties: lower game_id. Deterministic. Hist rows have no ev; mirrors
+    card.apply_weekly_cap minus ev (under_score is never a tie-break)."""
     mask = pd.Series(False, index=df.index)
     if df.empty or gap_col not in df:
         return mask
-    elig = df[df[gap_col].notna() & (df[gap_col] >= min_gap)].copy()
+    elig = df[df[gap_col].notna() & (df[gap_col] >= min_gap)]
     if elig.empty:
         return mask
-    elig["_score"] = elig["under_score"].fillna(-1) if "under_score" in elig else -1
-    elig = elig.sort_values([gap_col, "_score", "game_id"], ascending=[False, False, True])
+    elig = elig.sort_values([gap_col, "game_id"], ascending=[False, True])
     keep = elig.groupby(["season", "week"], sort=False, dropna=False).head(cap)
     mask.loc[keep.index] = True
     return mask
@@ -647,6 +647,8 @@ def _hook_side(line: Any) -> Optional[str]:
     if v is None:
         return None
     for k in KEY_NUMBERS:
+        if abs(v - k) < 1e-9:
+            return "on_key"
         if abs((v - k) - 0.5) < 1e-9:
             return "key+0.5"
         if abs((k - v) - 0.5) < 1e-9:

@@ -136,12 +136,21 @@ def test_weekly_cap_keeps_top_five_by_gap_per_week():
 
 
 def test_weekly_cap_tiebreak_is_deterministic():
+    """Equal gaps: the five lowest game_ids are kept — under_score is NOT a
+    tie-break (mirrors card.apply_weekly_cap, which never reads it)."""
     rows = [
         _pred(i, 2025, 5, gap=2.0, score=s, fh=20) for i, s in enumerate([50, 60, 55, 52, 58, 57])
     ]
     df = pm.build_hist_frame(rows, STEP, FBS)
     mask = pm.weekly_cap(df, "gap_flat", cap=5, min_gap=1.75)
-    assert set(df.loc[mask, "game_id"]) == {1, 2, 3, 4, 5}  # lowest score (id 0) drops
+    assert set(df.loc[mask, "game_id"]) == {0, 1, 2, 3, 4}  # highest id (5) drops
+
+
+def test_hook_side_reads_on_key_and_the_half_point_hooks():
+    assert pm._hook_side(28.0) == "on_key" and pm._hook_side(24.0) == "on_key"
+    assert pm._hook_side(24.5) == "key+0.5" and pm._hook_side(27.5) == "key−0.5"
+    assert pm._hook_side(26.0) == "other" and pm._hook_side(None) is None
+    assert "on_key" in pm._ORDER["hook_side"]
 
 
 def test_rule_masks_cover_policy_rules():

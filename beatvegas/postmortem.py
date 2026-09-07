@@ -98,11 +98,23 @@ _ORDER: Dict[str, List[str]] = {
     "division": ["fbs", "fbs_v_fcs", "non_fbs"],
     "neutral": ["home", "neutral"],
     "kick_window": ["noon", "afternoon", "evening", "night"],
-    "hr_vs_market": ["HR lower", "within 0.5", "HR higher"],
+    # Hard Rock minus the other books' median, banded on HR_OFF_MARKET_PTS.
+    # Exactly-on-the-market is its own band: it is the modal case.
+    "hr_vs_market": ["HR ≤ -0.5", "HR -0.5..0", "HR = market", "HR 0..+0.5", "HR ≥ +0.5"],
     "ev_band": [b[2] for b in EV_BANDS],
     "tier": ["BET", "EDGE", "PASS"],
     # paper-ledger gate (live): what blocked a real bet on each rated game
-    "blocker": ["none", "price", "off_market", "qb_out", "cap", "gap", "no_hr_line", "no_model"],
+    "blocker": [
+        "none",
+        "price",
+        "off_market",
+        "no_fair_price",
+        "qb_out",
+        "cap",
+        "gap",
+        "no_hr_line",
+        "no_model",
+    ],
 }
 
 HIST_DIMENSIONS = (
@@ -251,17 +263,33 @@ def regrade(
     return (under_result(f, ln), units_won(f, ln, price))
 
 
+_EPS = 1e-9
+
+
+def hr_vs_market_band(diff: Optional[float]) -> Optional[str]:
+    """Five bands on Hard Rock's line minus the other books' median, with
+    HR_OFF_MARKET_PTS as the threshold: <= -0.5, (-0.5, 0), exactly 0,
+    (0, +0.5), >= +0.5. Float noise around 0 and the thresholds reads as the
+    exact value (lines are half points)."""
+    v = _num(diff)
+    if v is None:
+        return None
+    if v <= -HR_OFF_MARKET_PTS + _EPS:
+        return "HR ≤ -0.5"
+    if v >= HR_OFF_MARKET_PTS - _EPS:
+        return "HR ≥ +0.5"
+    if abs(v) < _EPS:
+        return "HR = market"
+    return "HR -0.5..0" if v < 0 else "HR 0..+0.5"
+
+
 def hr_vs_market(hr_line: Optional[float], market_line: Optional[float]) -> Optional[str]:
-    """Where Hard Rock's number sits vs the consensus (strict half-point)."""
+    """Where Hard Rock's number sits vs the consensus (hr_vs_market_band of the
+    difference); None without both lines."""
     h, m = _num(hr_line), _num(market_line)
     if h is None or m is None:
         return None
-    diff = h - m
-    if diff > HR_OFF_MARKET_PTS:
-        return "HR higher"
-    if diff < -HR_OFF_MARKET_PTS:
-        return "HR lower"
-    return "within 0.5"
+    return hr_vs_market_band(h - m)
 
 
 def _kick_hour_et(start: Any) -> Optional[float]:
@@ -501,7 +529,13 @@ def build_live_frame(
                 "units_market": u_mk,
                 "outcome_close": o_cl,
                 "units_close": u_cl,
-                "hr_vs_market": hr_vs_market(hr_line, market_line),
+                # new cards carry Hard Rock minus the OTHER books' median; old
+                # cards fall back to the HR-inclusive market median
+                "hr_vs_market": (
+                    hr_vs_market_band(it["hr_vs_market"])
+                    if _num(it.get("hr_vs_market")) is not None
+                    else hr_vs_market(hr_line, market_line)
+                ),
                 # Hard Rock's own opener -> pre-kick close (the number you bet)
                 "hr_open": hr_open,
                 "hr_close": hr_close,

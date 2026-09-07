@@ -386,12 +386,12 @@ def test_build_live_frame_grades_hr_market_close_and_labels_off_consensus():
     }
     closes = {1: 27.5, 2: 23.5}
     df = pm.build_live_frame(items, games, closes).set_index("game_id")
-    assert df.loc[1, "hr_vs_market"] == "HR higher" and df.loc[1, "outcome_hr"] == "under"
+    assert df.loc[1, "hr_vs_market"] == "HR ≥ +0.5" and df.loc[1, "outcome_hr"] == "under"
     assert df.loc[1, "outcome_market"] == "over" and df.loc[1, "outcome_close"] == "over"
     assert abs(df.loc[1, "units_hr"] - 100 / 160) < 1e-9
-    assert df.loc[2, "hr_vs_market"] == "HR lower" and df.loc[2, "outcome_hr"] == "over"
+    assert df.loc[2, "hr_vs_market"] == "HR ≤ -0.5" and df.loc[2, "outcome_hr"] == "over"
     assert df.loc[2, "outcome_market"] == "under"
-    assert df.loc[3, "hr_vs_market"] == "within 0.5" and pd.isna(df.loc[3, "outcome_hr"])
+    assert df.loc[3, "hr_vs_market"] == "HR ≥ +0.5" and pd.isna(df.loc[3, "outcome_hr"])
     assert pd.isna(df.loc[4, "hr_vs_market"]) and df.loc[4, "outcome_market"] == "under"
     masks = pm.live_rule_masks(df.reset_index())
     assert list(masks["price_read"]) == [False, True, False, False]
@@ -399,11 +399,42 @@ def test_build_live_frame_grades_hr_market_close_and_labels_off_consensus():
     assert list(masks["all_hr"]) == [True, True, True, False]
 
 
-def test_live_hr_vs_market_threshold_is_strict_half_point():
-    assert pm.hr_vs_market(28.0, 27.5) == "within 0.5"
-    assert pm.hr_vs_market(28.5, 27.5) == "HR higher"
-    assert pm.hr_vs_market(26.5, 27.5) == "HR lower"
-    assert pm.hr_vs_market(None, 27.5) is None
+def test_live_hr_vs_market_has_five_bands_at_the_half_point_threshold():
+    """Hard Rock minus the other books, banded on HR_OFF_MARKET_PTS: the two
+    half-point-or-more bands, the two inside bands, and EXACTLY on the market
+    (the modal case: most weeks Hard Rock matches the consensus number)."""
+    assert pm.hr_vs_market(26.5, 27.5) == "HR ≤ -0.5"
+    assert pm.hr_vs_market(27.0, 27.5) == "HR ≤ -0.5"  # the threshold itself is in the band
+    assert pm.hr_vs_market(27.25, 27.5) == "HR -0.5..0"
+    assert pm.hr_vs_market(27.5, 27.5) == "HR = market"
+    assert pm.hr_vs_market(27.75, 27.5) == "HR 0..+0.5"
+    assert pm.hr_vs_market(28.0, 27.5) == "HR ≥ +0.5"
+    assert pm.hr_vs_market(28.5, 27.5) == "HR ≥ +0.5"
+    assert pm.hr_vs_market(None, 27.5) is None and pm.hr_vs_market(27.5, None) is None
+    assert pm._ORDER["hr_vs_market"] == [
+        "HR ≤ -0.5",
+        "HR -0.5..0",
+        "HR = market",
+        "HR 0..+0.5",
+        "HR ≥ +0.5",
+    ]
+    assert pm.hr_vs_market_band(0.1 + 0.2 - 0.3) == "HR = market"  # float noise reads as zero
+
+
+def test_build_live_frame_prefers_the_cards_hr_vs_market_field():
+    """New cards carry hr_vs_market = Hard Rock minus the OTHER books' median;
+    old cards did not, so the frame falls back to hr_line - market_line (a
+    median that includes Hard Rock)."""
+    new = _item(1, hr_line=27.5, market_line=27.5)
+    new["hr_vs_market"] = 0.25  # the other books sit at 27.25; the HR-inclusive median is 27.5
+    old = _item(2, hr_line=28.5, market_line=27.5)  # pre-PR-6 card: no field
+    games = {
+        gid: {"season": 2026, "week": 3, "first_half_total": None, "first_half_source": None}
+        for gid in (1, 2)
+    }
+    df = pm.build_live_frame([new, old], games, {}).set_index("game_id")
+    assert df.loc[1, "hr_vs_market"] == "HR 0..+0.5"
+    assert df.loc[2, "hr_vs_market"] == "HR ≥ +0.5"
 
 
 # ---------------------------------------------------------------- report

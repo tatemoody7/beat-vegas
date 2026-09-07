@@ -126,7 +126,7 @@ def _wire(monkeypatch, frame, scored_empty=True):
     monkeypatch.setattr(wu, "try_init_db", lambda: True)
     monkeypatch.setattr(wu, "detect_week", lambda season: 5)
     monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0: frame)
-    monkeypatch.setattr(wu, "opening_line_lookup", lambda season, week: ({}, {}))
+    monkeypatch.setattr(wu, "ranking_line_lookup", lambda season, week, basis="opener": ({}, {}))
     if scored_empty:
         monkeypatch.setattr(wu, "score_slate", lambda *a, **k: pd.DataFrame())
     monkeypatch.setattr(sys, "argv", ["weekly_update.py", "--season", "2026"])
@@ -175,7 +175,9 @@ def test_weekly_update_passes_min_games_frame_to_score_slate(monkeypatch):
     wu = _wire(monkeypatch, frame, scored_empty=False)
     got = {}
 
-    def fake_score(season, target_week=None, line_lookup=None, line_kind_lookup=None, df=None):
+    def fake_score(
+        season, target_week=None, line_lookup=None, line_kind_lookup=None, df=None, **kw
+    ):
         got["df"] = df
         return pd.DataFrame()
 

@@ -65,18 +65,16 @@ export default async function BoardPage({
   const games = board.games.filter((g) => matchesFilters(g, filters));
   const counts = tierCounts(games);
   const filtered = games.length !== board.games.length;
+  // Kept as one string so the phone-collapsed <details> copy and the sm+
+  // always-visible copy stay byte-for-byte identical.
+  const introCopy = `Every game with a Hard Rock total, best spot first. The score is 0–100 — it ranks the board and nothing else. BET only appears when every rule passes: a model read, Hard Rock’s own first-half number ${BET_GAP_PTS}+ points above ours, a live line, and a price no worse than the market.`;
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="bv-page-title">
-            {board.week !== null ? `Board · Week ${board.week}` : "Board"}
-          </h1>
-          <p className="bv-page-sub mt-1">
-            {`Every game with a Hard Rock total, best spot first. The score is 0–100 — it ranks the board and nothing else. BET only appears when every rule passes: a model read, Hard Rock’s own first-half number ${BET_GAP_PTS}+ points above ours, a live line, and a price no worse than the market.`}
-          </p>
-        </div>
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
+        <h1 className="bv-page-title">
+          {board.week !== null ? `Board · Week ${board.week}` : "Board"}
+        </h1>
         <div className="flex flex-wrap items-center gap-3">
           {board.weeks.length > 0 && board.week !== null && (
             <WeekSelect weeks={board.weeks} current={board.week} />
@@ -85,6 +83,21 @@ export default async function BoardPage({
             <SeasonSelect seasons={seasons} current={season} />
           )}
         </div>
+      </div>
+
+      {/* Phone: the intro is what pushed the bet slip below the fold, so it
+          collapses behind a tap. sm+: always visible, no disclosure control. */}
+      <div className="mb-4">
+        <p className="bv-page-sub mt-1 hidden sm:block">{introCopy}</p>
+        <details className="sm:hidden">
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-[var(--text-muted)]">
+            <span>How this works</span>
+            <span aria-hidden="true" className="text-xs text-[var(--text-dim)]">
+              ▾
+            </span>
+          </summary>
+          <p className="bv-page-sub mt-1">{introCopy}</p>
+        </details>
       </div>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />

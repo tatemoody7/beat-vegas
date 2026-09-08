@@ -546,60 +546,67 @@ export default function GameCard({ g }: { g: HomeGame }) {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-start gap-4 p-4 text-left"
+        className="block w-full p-4 text-left"
       >
-        <ScoreBadge
-          score={edge.score}
-          settled={g.settled}
-          label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-base font-semibold text-[var(--text)]">
+        <span className="flex items-start gap-3">
+          <ScoreBadge
+            score={edge.score}
+            settled={g.settled}
+            label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold leading-snug text-[var(--text)]">
               {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
               {row.home}
             </span>
-            <span className="text-xs text-[var(--text-dim)]">
+            <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
               {g.kickoff ?? "kickoff time TBD"}
             </span>
           </span>
-          {(g.picked ||
-            g.overCap ||
-            g.earlySeason ||
-            tag !== null ||
-            (g.kickedOff && g.settled === null)) && (
-            <span className="mt-1.5 flex flex-wrap gap-1.5">
-              {g.picked && <Tag tone="accent">bet logged</Tag>}
-              {g.overCap && (
-                <Tag tone="push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</Tag>
-              )}
-              {g.kickedOff && g.settled === null && (
-                <Tag tone="push">already kicked off</Tag>
-              )}
-              {g.earlySeason && <Tag tone="warn">early season</Tag>}
-              {tag !== null && <Tag tone="warn">{tag}</Tag>}
-            </span>
-          )}
-          <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
-            <span>{`Hard Rock ${hr}`}</span>
-            <span>{`our number ${fmt(row.bvLine)}`}</span>
-            <span>
-              {g.gap === null
-                ? "gap —"
-                : `gap ${signed(g.gap, 1)} ${basisPhrase(basis, g.basisBooks)}`}
-            </span>
-            {check?.hrLine == null && line !== null && (
-              <span>
-                {`${row.curLine !== null ? "market line" : "our reference line"} ${fmt(line)}`}
+          <span
+            aria-hidden
+            className="shrink-0 pt-1 text-xs text-[var(--text-dim)]"
+          >
+            {open ? "▲ less" : "▼ more"}
+          </span>
+        </span>
+        {(g.picked ||
+          g.overCap ||
+          g.earlySeason ||
+          tag !== null ||
+          (g.kickedOff && g.settled === null)) && (
+          <span className="mt-2 flex flex-wrap gap-1.5">
+            {g.picked && <Tag tone="accent">bet logged</Tag>}
+            {g.overCap && (
+              <Tag tone="push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</Tag>
+            )}
+            {g.kickedOff && g.settled === null && (
+              <Tag tone="push">already kicked off</Tag>
+            )}
+            {g.earlySeason && <Tag tone="warn">early season</Tag>}
+            {tag !== null && (
+              <span className="bv-badge bv-badge--warn bv-badge--wrap">
+                {tag}
               </span>
             )}
           </span>
-          <span className="mt-2 block text-sm text-[var(--text)]">
-            {resultLine ?? edge.action}
+        )}
+        <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
+          <span>{`Hard Rock ${hr}`}</span>
+          <span>{`our number ${fmt(row.bvLine)}`}</span>
+          <span>
+            {g.gap === null
+              ? "gap —"
+              : `gap ${signed(g.gap, 1)} ${basisPhrase(basis, g.basisBooks)}`}
           </span>
+          {check?.hrLine == null && line !== null && (
+            <span>
+              {`${row.curLine !== null ? "market line" : "our reference line"} ${fmt(line)}`}
+            </span>
+          )}
         </span>
-        <span aria-hidden className="shrink-0 text-xs text-[var(--text-dim)]">
-          {open ? "▲ less" : "▼ more"}
+        <span className="mt-2 block text-sm text-[var(--text)]">
+          {resultLine ?? edge.action}
         </span>
       </button>
 

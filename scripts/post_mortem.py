@@ -225,13 +225,13 @@ def load_live(
     hr_closes = _hr_closes(session, ids, kickoffs) if ids else {}
     engines: Dict[int, Optional[str]] = {}
     if ids:
-        for pr in (
+        rows = (
             session.query(Prediction)
             .filter(Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(ids))
-            .order_by(Prediction.created_at)
             .all()
-        ):
-            engines[pr.game_id] = pm.engine_of(pr.factors_json)  # newest row wins
+        )
+        for pr in sorted(rows, key=pm.created_order):  # newest row wins; NULL = oldest
+            engines[pr.game_id] = pm.engine_of(pr.factors_json)
     return items, games, closes, hr_closes, engines
 
 

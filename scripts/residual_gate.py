@@ -12,7 +12,9 @@ back to the published post-mortem headline. See beatvegas/backtest/residual_gate
     python scripts/residual_gate.py --train-seasons 2023 2024 --test-season 2025 \
         --out reports/residual_gate [--write-model-run] [--bv-train-seasons all|match]
 
-Writes <out>_<UTC>.md and .json, appends the markdown to $GITHUB_STEP_SUMMARY
+Writes <out>_<UTC>.md, .json and .csv (the per-game frame: picks, outcomes and
+gaps per engine, so the tables can be interrogated without re-running the
+one-shot test), appends the markdown to $GITHUB_STEP_SUMMARY
 when set, and exits 0 whatever the numbers say: it is a report, not a CI gate.
 Needs the CFBD key (the feature-frame builder fetches the quality priors even
 though the residual feature set drops them) and the database. Spends no Odds
@@ -30,6 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from beatvegas.backtest import residual_gate as G
+from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.config import REPO_ROOT
 from beatvegas.db.models import Game, ModelRun, Prediction
 from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
@@ -37,9 +40,13 @@ from beatvegas.etl.features import build_feature_frame, training_frame
 from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
 from beatvegas.model.residual import ResidualFitError
 from beatvegas.model.score import MODEL_VERSION
-from beatvegas.postmortem import engine_of
+from beatvegas.postmortem import created_order, engine_of
 
 RUN_VERSION = "resid_gate"  # model_runs.version for --write-model-run
+# Only these are data-coverage states worth a soft "NOT EVALUATED" report and
+# exit 0. Anything else (a NaN season, a length mismatch) is a defect and must
+# fail the run with its traceback, not be blamed on coverage.
+SOFT_FAILURES = (ResidualFitError, GateNotEvaluable)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -98,20 +105,21 @@ def load_closes(session, game_ids: Sequence[int]) -> Dict[int, float]:
 
 def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:
     """game_id -> the incumbent's stored bv_line (model_version MODEL_VERSION);
-    the newest row per game wins. Rows tagged `factors_json.engine == "residual"`
+    the newest row per game wins (a NULL created_at counts as oldest — see
+    postmortem.created_order). Rows tagged `factors_json.engine == "residual"`
     are excluded — the gate's "stored" column stands in for the incumbent, so a
     future engine flip to residual must not contaminate it with its own output."""
     ids = [int(g) for g in game_ids]
     out: Dict[int, float] = {}
     for i in range(0, len(ids), 1000):
-        for p in (
+        rows = (
             session.query(Prediction)
             .filter(
                 Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(ids[i : i + 1000])
             )
-            .order_by(Prediction.created_at)
             .all()
-        ):
+        )
+        for p in sorted(rows, key=created_order):
             if p.bv_line is not None and engine_of(p.factors_json) != "residual":
                 out[p.game_id] = float(p.bv_line)
     return out
@@ -120,12 +128,13 @@ def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:
 # ---------------------------------------------------------------- outputs
 
 
-def report_paths(out: str, stamp: Optional[str] = None) -> Tuple[Path, Path]:
+def report_paths(out: str, stamp: Optional[str] = None) -> Tuple[Path, Path, Path]:
+    """(markdown, json, per-game csv) for one run, sharing a UTC stamp."""
     stamp = stamp or datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     base = Path(out)
     if not base.is_absolute():
         base = REPO_ROOT / base
-    return base.with_name(f"{base.name}_{stamp}.md"), base.with_name(f"{base.name}_{stamp}.json")
+    return tuple(base.with_name(f"{base.name}_{stamp}.{ext}") for ext in ("md", "json", "csv"))
 
 
 def append_step_summary(md: str) -> None:
@@ -191,7 +200,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"[residual_gate] played feature frame: {len(df)} rows, seasons {sorted(df['season'].unique())}"
     )
 
-    md_path, json_path = report_paths(args.out)
+    md_path, json_path, csv_path = report_paths(args.out)
     md_path.parent.mkdir(parents=True, exist_ok=True)
     with session_scope() as session:
         in_scope = df[df["season"].isin(seasons)]["id"].tolist()
@@ -209,22 +218,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 closes,
                 args.train_seasons,
                 args.test_season,
-                stored_bv=stored or None,
+                stored_bv=stored,  # {} -> the report says why 'stored' is absent
                 bv_train_seasons=args.bv_train_seasons,
             )
-        except (ResidualFitError, ValueError) as err:
+        except SOFT_FAILURES as err:
             print(f"::error::residual gate not evaluated: {err}", file=sys.stderr)
             md = _failure_markdown(args, err)
-            md_path.write_text(md)
+            md_path.write_text(md, encoding="utf-8")
             append_step_summary(md)
             print(f"[residual_gate] wrote {md_path}")
             return 0
 
         md = G.render_markdown(result.report)
-        md_path.write_text(md)
-        json_path.write_text(json.dumps(result.report, indent=2))
+        md_path.write_text(md, encoding="utf-8")
+        json_path.write_text(json.dumps(result.report, indent=2), encoding="utf-8")
+        result.per_game.to_csv(csv_path, index=False)
         append_step_summary(md)
-        print(f"[residual_gate] wrote {md_path} and {json_path.name}")
+        print(f"[residual_gate] wrote {md_path}, {json_path.name} and {csv_path.name}")
         if args.write_model_run:
             write_model_run(session, result.report, args)
             print(f"[residual_gate] model_runs row added (version {RUN_VERSION})")

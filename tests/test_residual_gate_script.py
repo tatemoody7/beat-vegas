@@ -78,13 +78,6 @@ def test_parser_rejects_an_unknown_bv_mode(load_script):
         mod.parse_args(["--bv-train-seasons", "some"])
 
 
-def test_report_paths_carry_a_utc_stamp(load_script, tmp_path):
-    mod = load_script("residual_gate")
-    md, js = mod.report_paths(str(tmp_path / "residual_gate"), stamp="20260908T120000Z")
-    assert md.name == "residual_gate_20260908T120000Z.md"
-    assert js.name == "residual_gate_20260908T120000Z.json"
-
-
 def test_step_summary_appends_when_the_variable_is_set(load_script, tmp_path, monkeypatch):
     mod = load_script("residual_gate")
     path = tmp_path / "summary.md"
@@ -122,3 +115,34 @@ def test_load_stored_bv_falls_back_to_an_older_non_residual_row(load_script):
     ]
     out = mod.load_stored_bv(_FakeSession(rows), [1])
     assert out == {1: 20.5}
+
+
+def test_load_stored_bv_treats_a_null_created_at_as_the_oldest_row(load_script):
+    """Postgres sorts NULL last under ORDER BY ASC, so a legacy untagged row
+    would win 'newest' by accident; the loader must sort NULL as oldest."""
+    mod = load_script("residual_gate")
+    rows = [
+        _row(1, 24.0, engine="bv_line", created_at=5),
+        _row(1, 20.5, engine=None, created_at=None),  # legacy row, no timestamp
+    ]
+    out = mod.load_stored_bv(_FakeSession(rows), [1])
+    assert out == {1: 24.0}
+
+
+def test_report_paths_include_the_per_game_csv(load_script, tmp_path):
+    mod = load_script("residual_gate")
+    md, js, csv = mod.report_paths(str(tmp_path / "residual_gate"), stamp="20260908T120000Z")
+    assert md.name == "residual_gate_20260908T120000Z.md"
+    assert js.name == "residual_gate_20260908T120000Z.json"
+    assert csv.name == "residual_gate_20260908T120000Z.csv"
+
+
+def test_only_not_evaluable_errors_are_reported_as_a_soft_failure(load_script):
+    """Any other exception (a NaN season, a length mismatch) must propagate:
+    a green run that blames data coverage hides the real defect."""
+    mod = load_script("residual_gate")
+    from beatvegas.backtest.residual_gate import GateNotEvaluable
+    from beatvegas.model.residual import ResidualFitError
+
+    assert mod.SOFT_FAILURES == (ResidualFitError, GateNotEvaluable)
+    assert ValueError not in mod.SOFT_FAILURES

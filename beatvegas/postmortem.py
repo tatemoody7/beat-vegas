@@ -339,6 +339,14 @@ def engine_of(factors_json: Any) -> Optional[str]:
     return e if isinstance(e, str) and e else None
 
 
+def created_order(row: Any) -> Tuple[int, datetime]:
+    """Sort key for 'newest row wins' scans of `predictions`: oldest first, with
+    a NULL created_at as the OLDEST row. Postgres sorts NULL last under ORDER BY
+    ASC, which would let a legacy untagged row win as 'newest'."""
+    ts = getattr(row, "created_at", None)
+    return (0, datetime.min) if ts is None else (1, ts)
+
+
 def _mean2(a: Any, b: Any) -> Optional[float]:
     x, y = _num(a), _num(b)
     vals = [v for v in (x, y) if v is not None]

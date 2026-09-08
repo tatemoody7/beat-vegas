@@ -327,3 +327,81 @@ def test_render_markdown_without_stored():
     rep = G.evaluate(df, closes, [2023, 2024], 2025).report
     md = G.render_markdown(rep)
     assert "| stored |" not in md and "| residual | cap5 |" in md
+
+
+# --- review fixes (2026-09-08) ---------------------------------------------------
+
+
+def test_breakeven_is_the_minus_110_win_rate_and_verdicts_read_against_it():
+    """100/210 (47.6%) is the wrong side of the juice: the -110 breakeven is
+    110/210 = 52.4%, the number every other report in the repo uses."""
+    assert abs(G.BREAKEVEN - 110 / 210) < 1e-3
+    assert G.ci_verdict(0.48, 0.51) == "sits below breakeven"
+    assert G.ci_verdict(0.50, 0.55) == "straddles breakeven"
+    assert G.ci_verdict(0.53, 0.60) == "clears breakeven"
+
+
+def test_report_caveat_prints_the_real_breakeven(gate):
+    assert "breakeven at -110 is 52.4%" in " ".join(gate.report["caveats"])
+
+
+def test_season_span_shows_holes():
+    assert G.season_span([2016, 2017, 2018]) == "2016-2018"
+    assert G.season_span([2016, 2017, 2019, 2021]) == "2016-2021 (missing 2018, 2020)"
+    assert G.season_span([2025]) == "2025"
+    assert G.season_span([]) == "—"
+
+
+def test_evaluate_with_an_empty_stored_map_says_so_instead_of_dropping_it_silently():
+    df, closes = _frame(per_season=40)
+    rep = G.evaluate(df, closes, [2023, 2024], 2025, stored_bv={}).report
+    assert "stored" not in rep["engines"]
+    joined = " ".join(rep["caveats"])
+    assert "No stored" in joined and G.STORED_MODEL_VERSION in joined
+    assert "No stored" in G.render_markdown(rep)
+
+
+def test_evaluate_names_a_missing_incumbent_kickoff_instead_of_claiming_overlap():
+    df, closes = _frame(per_season=40)
+    df.loc[df["season"] == 2016, "start_date"] = pd.NaT  # outside the residual's split
+    with pytest.raises(ValueError, match="kickoff is missing"):
+        G.evaluate(df, closes, [2023, 2024], 2025)
+
+
+def test_evaluate_incumbent_guard_uses_the_earliest_played_test_kickoff():
+    """A prior-season row whose kickoff falls inside the test season must trip
+    the guard even if it is before the first test game that has a close."""
+    df, closes = _frame(per_season=40)
+    late = df[df["season"] == 2016].index[0]
+    df.loc[late, "start_date"] = pd.Timestamp("2025-10-02")  # inside 2025's schedule
+    test = df[df["season"] == 2025]
+    for gid in test.loc[test["start_date"] == test["start_date"].min(), "id"]:
+        closes.pop(gid)  # the opening-day test games now carry no close
+    with pytest.raises(ValueError, match="overlap"):
+        G.evaluate(df, closes, [2023, 2024], 2025)
+
+
+def test_gaps_are_rounded_to_two_places_like_the_board(gate):
+    pg = gate.per_game
+    for col in ("pred_resid", "gap_resid", "pred_bv", "gap_bv"):
+        v = pg[col].dropna()
+        np.testing.assert_allclose(v, v.round(2), atol=1e-9, err_msg=col)
+
+
+def test_accuracy_rows_state_the_row_count_they_were_measured_on(gate):
+    eng = gate.report["engines"]
+    assert eng["residual"]["mae_n"] == 100 and eng["incumbent"]["mae_n"] == 100
+    assert eng["stored"]["mae_n"] == eng["stored"]["coverage_n"] == 50
+    assert "| n MAE |" in G.render_markdown(gate.report) or "n MAE" in G.render_markdown(
+        gate.report
+    )
+
+
+def test_overlap_vs_stored_is_measured_on_covered_games_only(gate):
+    pg, rep = gate.per_game, gate.report
+    cov = pg["pred_stored"].notna()
+    o = rep["overlap_vs_stored"]["gap175"]
+    assert o["on_n"] == int(cov.sum()) == 50
+    assert o["n_a"] == int((pg["gap175_resid"] & cov).sum())
+    md = G.render_markdown(rep)
+    assert "covered" in md

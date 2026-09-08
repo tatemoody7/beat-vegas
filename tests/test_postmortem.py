@@ -978,3 +978,16 @@ def test_hist_caveat_names_the_close_as_us_region_consensus_not_hard_rock():
     )
     assert pm.PROXY_LABEL["real"] in md
     assert "no Hard Rock" in pm.PROXY_LABEL["real"]
+
+
+def test_created_order_puts_a_null_timestamp_first():
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    rows = [
+        SimpleNamespace(created_at=datetime(2026, 9, 1)),
+        SimpleNamespace(created_at=None),
+        SimpleNamespace(created_at=datetime(2026, 8, 1)),
+    ]
+    ordered = sorted(rows, key=pm.created_order)
+    assert [r.created_at for r in ordered] == [None, datetime(2026, 8, 1), datetime(2026, 9, 1)]

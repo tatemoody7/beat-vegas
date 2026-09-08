@@ -40,9 +40,14 @@ from ..model import residual as R
 from ..model.bv_line import BV_FEATURE_COLS, bv_line_for_slate
 from ..model.bv_line import TARGET as BV_TARGET
 from ..model.score import MODEL_VERSION as STORED_MODEL_VERSION
+from .engine import BREAKEVEN
 
 __all__ = [
+    "BREAKEVEN",
+    "GateNotEvaluable",
     "GateResult",
+    "ci_verdict",
+    "season_span",
     "walk_forward_split",
     "evaluate",
     "cap_picks",
@@ -53,6 +58,35 @@ __all__ = [
 ]
 
 UNDER_PRICE = -110
+
+
+class GateNotEvaluable(ValueError):
+    """The database does not hold enough to run the gate: no test-season rows,
+    no training rows, or no test game with a real 1H close. A data-coverage
+    state, not a defect — the script reports it softly and exits 0. Every other
+    error propagates."""
+
+
+def ci_verdict(ci_lo: float, ci_hi: float, breakeven: float = BREAKEVEN) -> str:
+    """Where a Wilson interval sits against the -110 breakeven (52.4%)."""
+    if ci_lo <= breakeven <= ci_hi:
+        return "straddles breakeven"
+    return "clears breakeven" if ci_lo > breakeven else "sits below breakeven"
+
+
+def season_span(seasons: Sequence[int]) -> str:
+    """'2016-2024', or '2016-2024 (missing 2020)' when the list has holes —
+    never a range that implies seasons the database does not hold."""
+    s = sorted({int(x) for x in seasons})
+    if not s:
+        return "—"
+    if len(s) == 1:
+        return str(s[0])
+    missing = sorted(set(range(s[0], s[-1] + 1)) - set(s))
+    span = f"{s[0]}-{s[-1]}"
+    return span + (f" (missing {', '.join(str(m) for m in missing)})" if missing else "")
+
+
 CAP_TIE_COLS = ("kickoff", "game_id")  # card.apply_weekly_cap's rank minus ev
 ENGINES = ("residual", "incumbent", "stored")
 SELECTIONS = ("all", "gap175", "cap5")
@@ -80,17 +114,22 @@ def walk_forward_split(df: pd.DataFrame, train_seasons: Sequence[int], test_seas
     train = df[df["season"].isin(seasons)].copy()
     test = df[df["season"] == int(test_season)].copy()
     if test.empty:
-        raise ValueError(f"walk_forward_split: no rows for test season {test_season}")
+        raise GateNotEvaluable(f"walk_forward_split: no rows for test season {test_season}")
     if train.empty:
-        raise ValueError(f"walk_forward_split: no rows for training seasons {seasons}")
+        raise GateNotEvaluable(f"walk_forward_split: no rows for training seasons {seasons}")
     shared = set(train["id"]) & set(test["id"])
     if shared:
         raise ValueError(f"walk_forward_split: {len(shared)} game id(s) in both train and test")
     if not (test["season"] == int(test_season)).all():
         raise ValueError("walk_forward_split: a test row is not the test season")
-    last_train, first_test = _kick(train).max(), _kick(test).min()
-    if pd.isna(last_train) or pd.isna(first_test):
-        raise ValueError("walk_forward_split: a kickoff is missing; cannot prove the order")
+    k_train, k_test = _kick(train), _kick(test)
+    n_missing = int(k_train.isna().sum() + k_test.isna().sum())
+    if n_missing:  # .max()/.min() would skip NaT and silently pass the guard
+        raise ValueError(
+            f"walk_forward_split: {n_missing} row(s) have no kickoff; a kickoff is missing, "
+            "cannot prove the order"
+        )
+    last_train, first_test = k_train.max(), k_test.min()
     if not last_train < first_test:
         raise ValueError(
             f"walk_forward_split: latest training kickoff {last_train} is not before the "
@@ -247,7 +286,9 @@ def evaluate(
     train_r = R.residual_training_frame(train, closes)
     test_r = R.residual_training_frame(test, closes)
     if test_r.empty:
-        raise ValueError(f"no test-season game carries a real 1H close (season {test_season})")
+        raise GateNotEvaluable(
+            f"no test-season game carries a real 1H close (season {test_season})"
+        )
     model = R.fit_residual(train_r)  # raises ResidualFitError under the floor
     r_hat_train = R.predict_residual(model, train_r)
     r_hat_test = R.predict_residual(model, test_r)
@@ -255,9 +296,20 @@ def evaluate(
     # --- incumbent: refit as production does (every played prior season) and
     # predicted on the same test rows; one fit gives both in-sample and test
     bv_train = _incumbent_frame(df_played, train, test_season, bv_train_seasons)
-    _last_bv, _first_test = _kick(bv_train).max(), _kick(test_r).min()
+    # Guard against the earliest PLAYED test kickoff (as walk_forward_split does),
+    # not the earliest test game that happens to carry a close.
+    k_bv = _kick(bv_train)
+    if k_bv.isna().any():  # .max() would skip NaT and silently pass the guard
+        raise ValueError(
+            f"incumbent training: {int(k_bv.isna().sum())} row(s) have no kickoff; a kickoff "
+            "is missing, cannot prove the order"
+        )
+    _last_bv, _first_test = k_bv.max(), _kick(test).min()
     if not _last_bv < _first_test:
-        raise ValueError("incumbent training kickoffs overlap the test season")
+        raise ValueError(
+            f"incumbent training kickoffs overlap the test season (latest training kickoff "
+            f"{_last_bv} is not before the earliest test kickoff {_first_test})"
+        )
     both = pd.concat([bv_train, test_r], ignore_index=True, sort=False)
     bv_pred = bv_line_for_slate(bv_train, both)
     bv_pred_train = np.asarray(bv_pred[: len(bv_train)], dtype=float)
@@ -280,14 +332,18 @@ def evaluate(
     )
     pg["outcome"] = [under_result(a, c) for a, c in zip(pg["actual"], pg["close"])]
     pg["units"] = [units_won(a, c, UNDER_PRICE) for a, c in zip(pg["actual"], pg["close"])]
-    pg["pred_resid"] = close.to_numpy() + r_hat_test
-    pg["gap_resid"] = -r_hat_test
-    pg["pred_bv"] = bv_pred_test
-    pg["gap_bv"] = pg["close"] - pg["pred_bv"]
+    # Round predictions and gaps to 2 dp BEFORE selecting, as the board does
+    # (model/score.py rounds bv_line and bv_gap), so the ≥1.75 / cap-5 sets
+    # here are the picks that would actually have been shown.
+    pg["pred_resid"] = np.round(close.to_numpy() + r_hat_test, 2)
+    pg["gap_resid"] = (pg["close"] - pg["pred_resid"]).round(2)
+    pg["pred_bv"] = np.round(bv_pred_test, 2)
+    pg["gap_bv"] = (pg["close"] - pg["pred_bv"]).round(2)
     engines = ["residual", "incumbent"]
-    if stored_bv is not None:
+    stored_absent = stored_bv is not None and len(stored_bv) == 0
+    if stored_bv:
         pg["pred_stored"] = pg["game_id"].map(stored_bv).astype(float)
-        pg["gap_stored"] = pg["close"] - pg["pred_stored"]
+        pg["gap_stored"] = (pg["close"] - pg["pred_stored"]).round(2)
         engines.append("stored")
     masks: Dict[str, Dict[str, pd.Series]] = {}
     for eng in engines:
@@ -313,20 +369,19 @@ def evaluate(
     for eng in engines:
         sfx = _SUFFIX[eng]
         pred_col = f"pred_{sfx}"
-        # The stored column only covers rows with a saved prediction; grade
-        # its all/mae/calibration on that subset only, not the full test
-        # universe (see caveat + coverage line), so it isn't compared against
-        # a benchmark it never had a chance to predict.
-        if eng == "stored":
-            cov_mask = masks[eng]["all"]
-            pg_eng = pg[cov_mask]
-            eng_close_mae = _mae(pg_eng["actual"], pg_eng["close"])
-        else:
-            pg_eng = pg
-            eng_close_mae = close_mae
+        # MAE, bias and calibration are measured on the rows the engine actually
+        # predicted, and the close MAE they are anchored to is measured on the
+        # SAME rows — for stored that is its coverage subset (see caveat +
+        # coverage line); for residual/incumbent normally every row, but a
+        # NaN prediction must not leave the engine graded on fewer rows than
+        # its benchmark. `mae_n` states the count.
+        cov_mask = pg[pred_col].notna()
+        pg_eng = pg[cov_mask]
+        eng_close_mae = _mae(pg_eng["actual"], pg_eng["close"])
         rep: Dict[str, Any] = {
             "selections": {sel: record(pg, masks[eng][sel]) for sel in SELECTIONS},
-            "n_pred": int(pg[pred_col].notna().sum()),
+            "n_pred": int(cov_mask.sum()),
+            "mae_n": int(cov_mask.sum()),
             "mae": _mae(pg_eng["actual"], pg_eng[pred_col]),
             "bias_test": _bias(pg_eng["actual"], pg_eng[pred_col]),
             "calibration": _calibration(pg_eng, f"gap_{sfx}", pred_col),
@@ -384,9 +439,15 @@ def evaluate(
         for sel in ("cap5", "gap175")
     }
     if "stored" in masks:
+        # Compare pick sets on the games the stored column covers; otherwise
+        # every residual pick on an uncovered game reads as "only residual".
+        cov = masks["stored"]["all"]
         ov_stored = {
             sel: dict(
-                a="residual", b="stored", **overlap(masks["residual"][sel], masks["stored"][sel])
+                a="residual",
+                b="stored",
+                on_n=int(cov.sum()),
+                **overlap(masks["residual"][sel] & cov, masks["stored"][sel]),
             )
             for sel in ("cap5", "gap175")
         }
@@ -398,18 +459,14 @@ def evaluate(
         set(R.missing_required(train_r)) | set(R.missing_required(test_r))
     )
     n_all = eng_reports["residual"]["selections"]["all"]["n"]
-    breakeven = 100.0 / 210.0  # -110 both sides
+    breakeven = BREAKEVEN  # 110/210: the win rate that beats -110 both sides
     ci_bits = []
     for e in engines:
         r = eng_reports[e]["selections"]["cap5"]
         if r["ci_lo"] is None:
             ci_bits.append(f"{e} cap-5: no decided games")
             continue
-        verdict = (
-            "straddles breakeven"
-            if r["ci_lo"] <= breakeven <= r["ci_hi"]
-            else ("clears breakeven" if r["ci_lo"] > breakeven else "sits below breakeven")
-        )
+        verdict = ci_verdict(r["ci_lo"], r["ci_hi"], breakeven)
         ci_bits.append(
             f"{e} cap-5 n={r['n']}, 95% CI {100 * r['ci_lo']:.1f}–{100 * r['ci_hi']:.1f}% "
             f"({verdict})"
@@ -433,7 +490,7 @@ def evaluate(
         f"-110 is {100 * breakeven:.1f}%. Read the intervals, not the point estimates.",
         f"Asymmetric training: the incumbent trains on {eng_reports['incumbent']['train_rows_are']} "
         f"({eng_reports['incumbent']['n_train']} rows, seasons "
-        f"{eng_reports['incumbent']['train_seasons'][0]}-{eng_reports['incumbent']['train_seasons'][-1]})"
+        f"{season_span(eng_reports['incumbent']['train_seasons'])})"
         f"{', matching how production refits it,' if bv_train_seasons == 'all' else ''} while the "
         "residual trains only on the "
         f"{'-'.join(str(s)[-2:] if i else str(s) for i, s in enumerate(seasons))} real-close rows "
@@ -465,6 +522,13 @@ def evaluate(
         caveats.append(
             f"Residual features absent or all-NaN in the frame: {fp['missing_features']} — the "
             "model conditioned on a NaN column."
+        )
+    if stored_absent:
+        caveats.append(
+            f"No stored non-residual `{STORED_MODEL_VERSION}` predictions exist for the "
+            f"{test_season} test games, so the 'stored' column — the incumbent's numbers as "
+            "actually published — is absent from this report. (After an engine flip every "
+            "stored row is the residual's own, and those are excluded on purpose.)"
         )
     report: Dict[str, Any] = {
         "kind": "residual_gate",
@@ -533,8 +597,8 @@ def render_markdown(report: Dict[str, Any]) -> str:
         f"# Residual engine gate — walk-forward, test season {rep['test_season']}",
         "",
         f"Residual engine trained on the {'/'.join(str(s) for s in rep['train_seasons'])} real-close "
-        f"rows; incumbent trained on {inc['train_rows_are']} ({inc['train_seasons'][0]}-"
-        f"{inc['train_seasons'][-1]}{how}; `--bv-train-seasons {rep['bv_train_seasons']}`). "
+        f"rows; incumbent trained on {inc['train_rows_are']} ({season_span(inc['train_seasons'])}"
+        f"{how}; `--bv-train-seasons {rep['bv_train_seasons']}`). "
         f"Universe: {rep['n_test']} of {rep['n_test_played']} played {rep['test_season']} games "
         f"with a us-region consensus 1H close inside {rep['close_window_h']:g} h of kickoff and a "
         f"trusted 1H actual. Under at {rep['under_price']}, graded at that close.",
@@ -568,15 +632,16 @@ def render_markdown(report: Dict[str, Any]) -> str:
         "",
         "## Accuracy",
         "",
-        "| Engine | MAE (pts) | MAE − close MAE | Bias train (actual − pred) | Bias test | n train | n pred |",
-        "|---|---|---|---|---|---|---|",
+        "| Engine | MAE (pts) | MAE − close MAE | n MAE | Bias train (actual − pred) | Bias test "
+        "| n train | n pred |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for e in ENGINES:
         if e not in eng:
             continue
         r = eng[e]
         L.append(
-            f"| {e} | {_num(r['mae'], '{:.2f}')} | {_num(r['mae_minus_close'])} | "
+            f"| {e} | {_num(r['mae'], '{:.2f}')} | {_num(r['mae_minus_close'])} | {r['mae_n']} | "
             f"{_num(r['bias_train'])} | {_num(r['bias_test'])} | "
             f"{r['n_train'] if r['n_train'] is not None else '—'} | {r['n_pred']} |"
         )
@@ -604,7 +669,8 @@ def render_markdown(report: Dict[str, Any]) -> str:
     if rep.get("overlap_vs_stored"):
         for sel, o in rep["overlap_vs_stored"].items():
             L.append(
-                f"| {sel} | {o['a']} | {o['b']} | {o['both']} | {o['only_a']} | {o['only_b']} | "
+                f"| {sel} | {o['a']} | {o['b']} (on {o['on_n']} covered games) | {o['both']} | "
+                f"{o['only_a']} | {o['only_b']} | "
                 f"{o['n_a']} | {o['n_b']} | {_num(o['jaccard'], '{:.2f}')} |"
             )
     fp, ifp = rep["fingerprint"], rep["incumbent_fingerprint"]
@@ -618,7 +684,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
         f"sd {_num(fp['target_std'], '{:.3f}')} · sklearn {fp['sklearn_version']}"
         + (f" · MISSING {fp['missing_features']}" if fp.get("missing_features") else ""),
         f"- incumbent: `{ifp['model_version']}` · {ifp['n_rows']} rows · seasons "
-        f"{ifp['seasons'][0]}-{ifp['seasons'][-1]} · games {ifp['min_game_date']} → "
+        f"{season_span(ifp['seasons'])} · games {ifp['min_game_date']} → "
         f"{ifp['max_game_date']} · {ifp['n_features']} features (hash `{ifp['feature_hash']}`)",
         "",
         "## Caveats",

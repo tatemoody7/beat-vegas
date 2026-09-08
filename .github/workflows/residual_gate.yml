@@ -3,7 +3,7 @@ name: Residual engine gate (walk-forward report)
 # Manual only. Fits the market-residual 1H engine on the training seasons'
 # real-close rows and the incumbent BV line on every played prior season, then
 # grades both on the held-out test season at the us-region consensus 1H close.
-# Writes reports/residual_gate_<UTC>.md/.json, appends the markdown to the run
+# Writes reports/residual_gate_<UTC>.md/.json/.csv, appends the markdown to the run
 # summary and uploads the files as an artifact (the repo's first). It is a
 # REPORT, not a CI gate: the job exits 0 whatever the numbers say. Reads Neon;
 # writes a model_runs row only when write_model_run is "true" (hence the shared
@@ -19,8 +19,9 @@ on:
         description: 'held-out season graded once'
         default: '2025'
       write_model_run:
-        description: 'true = also log a model_runs row (version resid_gate)'
-        default: 'false'
+        description: 'also log a model_runs row (version resid_gate)'
+        type: boolean
+        default: false
 
 concurrency:
   group: neon-writers
@@ -47,10 +48,12 @@ jobs:
           IN_TEST_SEASON: ${{ inputs.test_season }}
           IN_WRITE_MODEL_RUN: ${{ inputs.write_model_run }}
         run: |
-          ARGS="--train-seasons $IN_TRAIN_SEASONS --test-season $IN_TEST_SEASON --out reports/residual_gate"
-          if [ "$IN_WRITE_MODEL_RUN" = "true" ]; then ARGS="$ARGS --write-model-run"; fi
-          echo "running: residual_gate.py $ARGS"
-          python scripts/residual_gate.py $ARGS
+          # Arrays, not a word-split string: no glob expansion, no flag injection.
+          read -ra SEASONS <<< "$IN_TRAIN_SEASONS"
+          ARGS=(--train-seasons "${SEASONS[@]}" --test-season "$IN_TEST_SEASON" --out reports/residual_gate)
+          if [ "$IN_WRITE_MODEL_RUN" = "true" ]; then ARGS+=(--write-model-run); fi
+          echo "running: residual_gate.py ${ARGS[*]}"
+          python scripts/residual_gate.py "${ARGS[@]}"
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4

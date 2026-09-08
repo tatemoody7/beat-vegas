@@ -132,7 +132,8 @@ def test_residual_gate_passes_inputs_through_env_and_uploads_the_report():
     assert set(inputs) == {"train_seasons", "test_season", "write_model_run"}
     assert inputs["train_seasons"]["default"] == "2023 2024"
     assert inputs["test_season"]["default"] == "2025"
-    assert inputs["write_model_run"]["default"] == "false"
+    assert inputs["write_model_run"]["type"] == "boolean"
+    assert inputs["write_model_run"]["default"] is False
     assert (data.get("concurrency") or {}).get("group") == NEON_GROUP
     steps = data["jobs"]["gate"]["steps"]
     run_steps = [s for s in steps if isinstance(s.get("run"), str)]

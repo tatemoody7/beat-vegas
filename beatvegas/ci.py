@@ -32,6 +32,12 @@ ET = ZoneInfo("America/New_York")
 # costs ~50% more per event and buys nothing. The card's exchange-first fair
 # price (beatvegas/card.py) stays in place, dormant, for the day one does.
 SWEEP_ARGS: Dict[str, str] = {
+    # Tue-Sat ~8:05am ET: the whole week's upcoming games, every morning. The
+    # board is one rolling week (each game locks at its own kickoff), so every
+    # morning build is the decision build for the games kicking off before the
+    # next one. ~60 events x 2 credits.
+    "morning": "--hr-universe --hours-back 0 --days-ahead 6",
+    # --- dispatch-only legacy slots (no crons since 2026-09-08) ---
     # Tue/Wed/Thu ~4:05pm ET: tonight's games (kicking off within 10 hours)
     "weeknight": "--hr-universe --kickoff-within-min 600 --hours-back 0",
     # Fri ~6:05pm ET preview: the whole weekend slate
@@ -47,6 +53,7 @@ SWEEP_ARGS: Dict[str, str] = {
 # input overrides both with "degraded" — tests/test_card_degraded.py asserts
 # every slot in SWEEP_ARGS has an entry here.
 CARD_STATUS_BY_SLOT: Dict[str, str] = {
+    "morning": "final",  # today's decision build for every game before the next build
     "weeknight": "final",  # the decision build for tonight's games
     "friday": "preview",  # the Saturday final replaces it
     "saturday": "final",  # the card Tate bets off in one sitting
@@ -55,6 +62,9 @@ CARD_STATUS_BY_SLOT: Dict[str, str] = {
 # Paper-log only games kicking off within N hours of the build (the DECISION
 # build for those games — docs/BETTING_POLICY.md). None = every upcoming game.
 PAPER_WINDOW_HOURS: Dict[str, Optional[float]] = {
+    # 24 h, not more: Friday's 8am build must stop short of Saturday's noon
+    # kickoffs so each game is paper-logged exactly once, by ITS morning build.
+    "morning": 24.0,
     "weeknight": 10.0,
     "friday": 6.0,
     "saturday": 20.0,
@@ -63,20 +73,16 @@ PAPER_WINDOW_HOURS: Dict[str, Optional[float]] = {
 # cron string -> (slot, retry_since_utc_hhmm | None). A retry slot only runs
 # when no SCHEDULED run of the workflow succeeded since that UTC time today.
 CRON_SLOTS: Dict[str, tuple] = {
-    "5 20 * * 2,3,4": ("weeknight", None),
-    "50 20 * * 2,3,4": ("weeknight", "19:45"),
-    "5 22 * * 5": ("friday", None),
-    "0 23 * * 5": ("friday", "21:45"),
-    # Saturday final: four UTC slots so one of them lands 8:05-8:45am ET in
-    # both EDT (12:05Z/12:35Z) and EST (13:05Z/13:35Z); the ET gate below
+    # Morning build, Tue-Sat: four UTC slots so one of them lands 8:05-8:45am ET
+    # in both EDT (12:05Z/12:35Z) and EST (13:05Z/13:35Z); the ET gate below
     # picks the right ones and the retry check skips a second success.
-    "5 12 * * 6": ("saturday", None),
-    "35 12 * * 6": ("saturday", None),
-    "5 13 * * 6": ("saturday", None),
-    "35 13 * * 6": ("saturday", None),
+    "5 12 * * 2-6": ("morning", None),
+    "35 12 * * 2-6": ("morning", None),
+    "5 13 * * 2-6": ("morning", None),
+    "35 13 * * 2-6": ("morning", None),
 }
-SATURDAY_GATE_ET = (time(7, 45), time(9, 15))  # run only inside this ET window
-SATURDAY_RETRY_SINCE_ET = time(7, 30)  # skip if a scheduled run succeeded since
+MORNING_GATE_ET = (time(7, 45), time(9, 15))  # run only inside this ET window
+MORNING_RETRY_SINCE_ET = time(7, 30)  # skip if a scheduled run succeeded since
 
 
 def warn(message: str) -> None:
@@ -96,7 +102,7 @@ def resolve_slot(schedule: str, now_utc: datetime, input_slot: str = "") -> Dict
 
     Returns {slot, retry_since (UTC ISO or ''), force_sweep, force_preview,
     paper_window ('' or hours), sweep_args, reason}. slot == 'skip' when the
-    Saturday slot fired outside its ET window. Raises ValueError on an unmapped
+    morning slot fired outside its ET window. Raises ValueError on an unmapped
     cron or unknown input so the workflow fails loudly instead of building the
     wrong card."""
     if now_utc.tzinfo is None:
@@ -116,9 +122,9 @@ def resolve_slot(schedule: str, now_utc: datetime, input_slot: str = "") -> Dict
         if retry_hhmm:
             h, m = (int(x) for x in retry_hhmm.split(":"))
             retry_since = now_utc.replace(hour=h, minute=m, second=0, microsecond=0).isoformat()
-        if slot == "saturday":
+        if slot == "morning":
             et = now_utc.astimezone(ET)
-            lo, hi = SATURDAY_GATE_ET
+            lo, hi = MORNING_GATE_ET
             if not (lo <= et.time() <= hi):
                 return {
                     "slot": "skip",
@@ -127,20 +133,20 @@ def resolve_slot(schedule: str, now_utc: datetime, input_slot: str = "") -> Dict
                     "force_preview": False,
                     "paper_window": "",
                     "sweep_args": "",
-                    "reason": f"saturday slot at {et:%H:%M} ET is outside {lo:%H:%M}-{hi:%H:%M} ET",
+                    "reason": f"morning slot at {et:%H:%M} ET is outside {lo:%H:%M}-{hi:%H:%M} ET",
                 }
-            since_et = datetime.combine(et.date(), SATURDAY_RETRY_SINCE_ET, tzinfo=ET)
+            since_et = datetime.combine(et.date(), MORNING_RETRY_SINCE_ET, tzinfo=ET)
             retry_since = since_et.astimezone(timezone.utc).isoformat()
     window = PAPER_WINDOW_HOURS[slot]
     return {
         "slot": slot,
         "retry_since": retry_since,
-        # The preview and the final always re-sweep: an evening close poll
-        # would otherwise satisfy "a 1H snapshot exists today" and the
-        # Saturday card would build on Friday's numbers.
-        "force_sweep": slot in ("friday", "saturday", "manual"),
-        # Fresh Saturday-morning QB news on the final card.
-        "force_preview": slot == "saturday",
+        # Every decision build re-sweeps: an evening close poll would
+        # otherwise satisfy "a 1H snapshot exists today" and the morning card
+        # would build on yesterday's numbers.
+        "force_sweep": slot in ("morning", "friday", "saturday", "manual"),
+        # Fresh QB news on every morning card (0 Odds credits).
+        "force_preview": slot in ("morning", "saturday"),
         "paper_window": "" if window is None else f"{window:g}",
         "sweep_args": SWEEP_ARGS[slot],
         "reason": reason,

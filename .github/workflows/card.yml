@@ -10,15 +10,15 @@ name: Bet card (cloud)
 #
 # SLOTS — one source of truth: beatvegas/ci.py::resolve_slot (tests/test_ci_slots.py
 # + tests/test_workflows.py keep this schedule and that table in lock-step):
-#   weeknight  Tue/Wed/Thu 20:05Z (~4:05pm ET; retry 20:50Z) — sweep tonight's
-#              games, build, paper-log games kicking off within 10 h.
-#   friday     22:05Z (~6:05pm ET; retry 23:00Z) — PREVIEW: full sweep of the
-#              weekend slate, build, paper-log Friday-night games only (6 h).
-#   saturday   12:05Z / 12:35Z / 13:05Z / 13:35Z — FINAL: gated on the Eastern
-#              clock (runs only 7:45-9:15am ET, and only once per Saturday),
-#              so it lands 8:05-8:45am ET in EDT and EST alike. Forced fresh
-#              sweep + research preview, then build; paper-logs the Saturday
-#              slate (20 h). Tate bets in one sitting off this card ~9am ET.
+#   morning    Tue-Sat 12:05Z / 12:35Z / 13:05Z / 13:35Z — the DECISION build:
+#              gated on the Eastern clock (runs only 7:45-9:15am ET, once per
+#              day), so it lands 8:05-8:45am ET in EDT and EST alike. Forced
+#              fresh sweep of the whole week's Hard Rock games + research
+#              preview, then build; paper-logs games kicking off within 24 h.
+#              The board is one rolling week: each game locks at its own
+#              kickoff, and the morning card is final for every game that kicks
+#              off before the next morning (Thu night, Fri night, Saturday).
+#   weeknight / friday / saturday — legacy slots, workflow_dispatch only.
 #   manual     workflow_dispatch (input `slot` may name one of the above; input
 #              `max_credits` caps the sweep so a DEGRADED card can be rehearsed).
 #
@@ -27,26 +27,22 @@ name: Bet card (cloud)
 # credit floor/cap, or an empty injury feed (which makes the QB-out gate pass
 # every game), marks the games it touched paper only and the card "degraded" —
 # visible on the board banner and as line 2 of the build summary.
-# The preview and the final ALWAYS re-sweep (an evening close poll would
-# otherwise satisfy "a 1H snapshot exists today" and the final would build on
-# Friday's numbers); weeknight builds sweep only what is missing.
+# Every morning build ALWAYS re-sweeps (an evening close poll would otherwise
+# satisfy "a 1H snapshot exists today" and the card would build on yesterday's
+# numbers); legacy weeknight builds sweep only what is missing.
 #
 # CONCURRENCY: shared `neon-writers` group (see lines_watch.yml header).
 
 on:
   schedule:
-    - cron: '5 20 * * 2,3,4'   # weeknight
-    - cron: '50 20 * * 2,3,4'  # weeknight retry
-    - cron: '5 22 * * 5'       # friday preview
-    - cron: '0 23 * * 5'       # friday retry
-    - cron: '5 12 * * 6'       # saturday final (EDT primary)
-    - cron: '35 12 * * 6'      # saturday final (EDT retry)
-    - cron: '5 13 * * 6'       # saturday final (EST primary / EDT last retry)
-    - cron: '35 13 * * 6'      # saturday final (EST retry)
+    - cron: '5 12 * * 2-6'    # morning (EDT primary)
+    - cron: '35 12 * * 2-6'   # morning (EDT retry)
+    - cron: '5 13 * * 2-6'    # morning (EST primary / EDT last retry)
+    - cron: '35 13 * * 2-6'   # morning (EST retry)
   workflow_dispatch:
     inputs:
       slot:
-        description: 'weeknight | friday | saturday | manual (default: manual full refresh)'
+        description: 'morning | weeknight | friday | saturday | manual (default: manual full refresh)'
         required: false
         default: ''
       season:

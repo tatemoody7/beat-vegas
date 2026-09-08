@@ -1,11 +1,11 @@
-name: Weekly grading (results + ledger)
+name: Daily grading (results + ledger)
 
 # Refreshes final scores from CFBD and grades the market/model/pick ledgers,
 # writing to Neon. Runs in the cloud because the local Mac's usual network
-# can't reach Neon (port 5432 filtered). Monday morning: Saturday finals are
-# in CFBD by early Sunday, so hours of GHA cron lag still land Monday US time.
-# grade.py is delete-then-rewrite idempotent — late Sun/Mon games simply grade
-# on the following Monday's run. Off-season every step is a green no-op.
+# can't reach Neon (port 5432 filtered). Every morning (since 2026-09-08): a
+# Thursday game is graded Friday morning, Friday's on Saturday, Saturday's on
+# Sunday, and Monday's run is the full weekly pass. grade.py is season-wide and
+# delete-then-rewrite idempotent, so a late final simply grades next morning. Off-season every step is a green no-op.
 # Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
 # ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
 # (sunday.yml). A red run here means "the ledger or PBP factors are stale";
@@ -14,12 +14,12 @@ name: Weekly grading (results + ledger)
 
 on:
   schedule:
-    # 12:00 UTC Monday = 8am EDT / 7am EST. GitHub cron is best-effort (it
-    # dropped 17 of 19 scheduled runs Aug 28-30 2026), so two retries follow;
-    # grading is delete-then-rewrite idempotent and spends no API credits.
-    - cron: '0 12 * * 1'
-    - cron: '0 14 * * 1'
-    - cron: '0 17 * * 1'
+    # 10:30 UTC daily = 6:30am EDT / 5:30am EST, well ahead of card.yml's
+    # 12:05Z morning build in the shared neon-writers group (GitHub cancels the
+    # older PENDING run when a third arrives). 16:00Z is the retry / late-finals
+    # pass. GitHub cron is best-effort; grading spends no Odds API credits.
+    - cron: '30 10 * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch: {}
 
 concurrency:

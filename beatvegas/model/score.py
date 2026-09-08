@@ -242,7 +242,11 @@ def _factors(
                 "n_rows": fingerprint.get("n_rows"),
                 "max_game_date": fingerprint.get("max_game_date"),
             }
-            if fingerprint
+            # Only a row the residual model actually produced may carry its
+            # fingerprint. A fallback row on the same slate came from the
+            # incumbent, so stamping the residual fit on it would misattribute
+            # the number inside a payload we freeze and grade against later.
+            if fingerprint and row.get("engine") == "residual"
             else None
         ),
         # genuine 1H-scoring signal chips (corr_1h drivers)

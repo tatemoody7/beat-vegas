@@ -360,9 +360,16 @@ def test_residual_engine_falls_back_row_by_row_without_a_real_posted_line():
     # ...and the two engines' rows carry their OWN noise band, not each other's.
     assert by_id.loc[derived_id, "bv_sigma"] != by_id.loc[hr_ids[0], "bv_sigma"]
 
-    # the per-row factors payload reports the engine that made THAT row
-    f = score_mod._factors(by_id.loc[derived_id], 23.0)
+    # the per-row factors payload reports the engine that made THAT row, and a
+    # fallback row must NOT carry the residual fit's fingerprint even though the
+    # same slate produced one — the number came from the incumbent.
+    fp = art["fingerprint"]
+    f = score_mod._factors(by_id.loc[derived_id], 23.0, fingerprint=fp)
     assert f["engine"] == "bv_line" and f["resid_hat"] is None
+    assert f["model_fingerprint"] is None
+    r = score_mod._factors(by_id.loc[hr_ids[0]], 23.0, fingerprint=fp)
+    assert r["engine"] == "residual"
+    assert r["model_fingerprint"]["feature_hash"] == fp["feature_hash"]
 
 
 def test_residual_engine_on_an_all_proxy_slate_is_the_incumbent_board():

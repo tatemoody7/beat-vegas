@@ -166,10 +166,14 @@ def _hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) 
 
 def load_live(
     session, season: int
-) -> Tuple[List[Dict], Dict[int, Dict], Dict[int, float], Dict[int, float]]:
+) -> Tuple[
+    List[Dict], Dict[int, Dict], Dict[int, float], Dict[int, float], Dict[int, Optional[str]]
+]:
     """Every rated game across the season's cards (newest card wins per game,
     so a game only the morning build carried still counts); games for those
-    ids; consensus closes; Hard Rock's own pre-kick closes."""
+    ids; consensus closes; Hard Rock's own pre-kick closes; and the engine tag
+    each stored prediction carries (factors_json.engine, None before the field
+    existed) — an added split beside the model_version tag, not a replacement."""
     cards = session.query(Card).filter(Card.season == season).order_by(Card.built_at.desc()).all()
     items: List[Dict] = []
     seen_games = set()
@@ -219,7 +223,16 @@ def load_live(
             if line is not None:
                 closes[r.game_id] = float(line)
     hr_closes = _hr_closes(session, ids, kickoffs) if ids else {}
-    return items, games, closes, hr_closes
+    engines: Dict[int, Optional[str]] = {}
+    if ids:
+        rows = (
+            session.query(Prediction)
+            .filter(Prediction.model_version == MODEL_VERSION, Prediction.game_id.in_(ids))
+            .all()
+        )
+        for pr in sorted(rows, key=pm.created_order):  # newest row wins; NULL = oldest
+            engines[pr.game_id] = pm.engine_of(pr.factors_json)
+    return items, games, closes, hr_closes, engines
 
 
 # ---------------------------------------------------------------- writer
@@ -351,8 +364,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 out["run_id"] = run_id
                 outs.append(out)
         if args.scope in ("live", "both"):
-            items, games, closes, hr_closes = load_live(session, live_season)
-            ldf = pm.build_live_frame(items, games, closes, hr_closes)
+            items, games, closes, hr_closes, engines = load_live(session, live_season)
+            ldf = pm.build_live_frame(items, games, closes, hr_closes, engines=engines)
             print(
                 f"[live] season {live_season}: {len(items)} card items, {len(games)} games, {len(closes)} closes"
             )

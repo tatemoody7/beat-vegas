@@ -87,8 +87,10 @@ export const RULE_LABEL: Record<string, string> = {
 };
 
 export const PROXY_LABEL: Record<string, string> = {
-  real: "real closing line",
-  fg: "full-game under, real full-game close",
+  // NOT a Hard Rock number: the us-region consensus (Hard Rock did not exist
+  // historically), captured once about 30 minutes before kickoff.
+  real: "us-region consensus close (no Hard Rock), ~30 min pre-kick",
+  fg: "full-game under at the us-region consensus full-game close",
   step: "fair line",
   flat: "old 0.52 line",
   hr: "Hard Rock's number",

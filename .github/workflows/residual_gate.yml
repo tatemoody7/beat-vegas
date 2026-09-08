@@ -1,0 +1,63 @@
+name: Residual engine gate (walk-forward report)
+
+# Manual only. Fits the market-residual 1H engine on the training seasons'
+# real-close rows and the incumbent BV line on every played prior season, then
+# grades both on the held-out test season at the us-region consensus 1H close.
+# Writes reports/residual_gate_<UTC>.md/.json/.csv, appends the markdown to the run
+# summary and uploads the files as an artifact (the repo's first). It is a
+# REPORT, not a CI gate: the job exits 0 whatever the numbers say. Reads Neon;
+# writes a model_runs row only when write_model_run is "true" (hence the shared
+# neon-writers group). Spends no Odds API credits.
+
+on:
+  workflow_dispatch:
+    inputs:
+      train_seasons:
+        description: 'seasons the residual trains on (space-separated)'
+        default: '2023 2024'
+      test_season:
+        description: 'held-out season graded once'
+        default: '2025'
+      write_model_run:
+        description: 'also log a model_runs row (version resid_gate)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Run the gate
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_TRAIN_SEASONS: ${{ inputs.train_seasons }}
+          IN_TEST_SEASON: ${{ inputs.test_season }}
+          IN_WRITE_MODEL_RUN: ${{ inputs.write_model_run }}
+        run: |
+          # Arrays, not a word-split string: no glob expansion, no flag injection.
+          read -ra SEASONS <<< "$IN_TRAIN_SEASONS"
+          ARGS=(--train-seasons "${SEASONS[@]}" --test-season "$IN_TEST_SEASON" --out reports/residual_gate)
+          if [ "$IN_WRITE_MODEL_RUN" = "true" ]; then ARGS+=(--write-model-run); fi
+          echo "running: residual_gate.py ${ARGS[*]}"
+          python scripts/residual_gate.py "${ARGS[@]}"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: residual-gate-report
+          path: reports/residual_gate_*
+          if-no-files-found: warn

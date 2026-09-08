@@ -872,3 +872,122 @@ def test_compute_hist_adds_the_fg_column_graded_on_full_points():
     )
     assert out["notes"]["fg_lines"]["n"] == 6
     assert any("'fg' grades the SAME picks" in c for c in out["notes"]["caveats"])
+
+
+# --- PR-3: weekly_cap tie_cols, engine dimension, honest close label ----------
+
+
+def test_weekly_cap_tie_cols_default_is_game_id_only():
+    """Default unchanged: equal gaps fall to the lowest game_id, whatever the kickoff."""
+    rows = [
+        _pred(i, 2025, 5, gap=2.0, score=50, fh=20, start=f"2025-10-0{4 + (5 - i) % 3}T20:00:00")
+        for i in range(6)
+    ]
+    df = pm.build_hist_frame(rows, STEP, FBS)
+    assert set(df.loc[pm.weekly_cap(df, "gap_flat"), "game_id"]) == {0, 1, 2, 3, 4}
+
+
+def test_weekly_cap_honours_tie_cols_kickoff_then_game_id():
+    """With tie_cols=[kickoff, game_id] an earlier kickoff wins an equal gap
+    (card.apply_weekly_cap minus ev), and game_id only breaks a kickoff tie."""
+    rows = [
+        _pred(i, 2025, 5, gap=2.0, score=50, fh=20, start="2025-10-04T20:00:00") for i in range(5)
+    ]
+    rows.append(_pred(99, 2025, 5, gap=2.0, score=50, fh=20, start="2025-10-02T20:00:00"))
+    df = pm.build_hist_frame(rows, STEP, FBS)
+    kicks = {r["game_id"]: pd.Timestamp(r["start_date"]) for r in rows}
+    df["kickoff"] = df["game_id"].map(kicks)
+    mask = pm.weekly_cap(df, "gap_flat", tie_cols=["kickoff", "game_id"])
+    assert set(df.loc[mask, "game_id"]) == {99, 0, 1, 2, 3}  # Thursday game in, id 4 out
+
+
+def test_engine_of_reads_factors_json():
+    assert pm.engine_of('{"engine": "residual"}') == "residual"
+    assert pm.engine_of('{"engine": "bv_line"}') == "bv_line"
+    assert pm.engine_of('{"bv_line": 24.0}') is None  # written before the field existed
+    assert pm.engine_of(None) is None
+    assert pm.engine_of("not json") is None
+    assert pm.engine_of({"engine": "residual"}) == "residual"
+
+
+def test_build_live_frame_carries_engine_from_stored_predictions():
+    items = [_item(1), _item(2), _item(3)]
+    games = {
+        gid: {
+            "season": 2026,
+            "week": 3,
+            "first_half_total": 20,
+            "first_half_source": "pbp",
+            "home_points": 30,
+            "away_points": 10,
+            "spread": -7.0,
+            "full_game_total": 55.5,
+        }
+        for gid in (1, 2, 3)
+    }
+    df = pm.build_live_frame(items, games, {}, engines={1: "residual", 2: "bv_line"}).set_index(
+        "game_id"
+    )
+    assert df.loc[1, "engine"] == "residual"
+    assert df.loc[2, "engine"] == "bv_line"
+    assert pd.isna(df.loc[3, "engine"])  # None locally, NaN under pandas' string dtype
+    assert "engine" in pm.LIVE_DIMENSIONS
+    assert pm._ORDER["engine"] == ["bv_line", "residual"]
+    d = pm.assign_dimensions(df.reset_index(), "hr")
+    assert list(d["engine"][:2]) == ["residual", "bv_line"] and pd.isna(d["engine"].iloc[2])
+
+
+def test_compute_live_emits_the_engine_dimension():
+    items = [_item(1, hr_line=24.5), _item(2, hr_line=24.5)]
+    games = {
+        gid: {
+            "season": 2026,
+            "week": 3,
+            "first_half_total": 20,
+            "first_half_source": "pbp",
+            "home_points": 30,
+            "away_points": 10,
+            "spread": -7.0,
+            "full_game_total": 55.5,
+        }
+        for gid in (1, 2)
+    }
+    df = pm.build_live_frame(items, games, {}, engines={1: "residual", 2: "residual"})
+    out = pm.compute_live(df, season=2026, run_id="r", computed_at="t")
+    eng = [b for b in out["buckets"] if b["dimension"] == "engine" and b["selection"] == "all_hr"]
+    assert eng and eng[0]["bucket"] == "residual" and eng[0]["n"] == 2
+
+
+def test_hist_caveat_names_the_close_as_us_region_consensus_not_hard_rock():
+    preds = [
+        _pred(1, 2025, 5, gap=2.0, score=55, fh=20),
+        _pred(2, 2025, 5, gap=0.5, score=48, fh=31),
+    ]
+    for p in preds:
+        p["close_line"] = 26.5
+    df = pm.build_hist_frame(preds, STEP, FBS)
+    out = pm.compute_hist(df, run_id="r", computed_at="t")
+    real = [c for c in out["notes"]["caveats"] if c.startswith("'real'")]
+    assert len(real) == 1
+    assert "us-region consensus" in real[0] and "no Hard Rock" in real[0]
+    assert "30 minutes before kickoff" in real[0]
+    md = pm.render_markdown(
+        [{"scope": pm.HIST_SCOPE, "computed_at": "t", "n_games": 2, "notes": out["notes"]}],
+        out["buckets"],
+        [],
+    )
+    assert pm.PROXY_LABEL["real"] in md
+    assert "no Hard Rock" in pm.PROXY_LABEL["real"]
+
+
+def test_created_order_puts_a_null_timestamp_first():
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    rows = [
+        SimpleNamespace(created_at=datetime(2026, 9, 1)),
+        SimpleNamespace(created_at=None),
+        SimpleNamespace(created_at=datetime(2026, 8, 1)),
+    ]
+    ordered = sorted(rows, key=pm.created_order)
+    assert [r.created_at for r in ordered] == [None, datetime(2026, 8, 1), datetime(2026, 9, 1)]

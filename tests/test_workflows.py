@@ -119,3 +119,29 @@ def test_card_rescores_with_the_residual_engine_after_the_sweep():
     # Gated exactly like the sweep: no sweep, nothing new to condition on.
     assert steps[rescore].get("if") == steps[sweep].get("if")
     assert "need_sweep" in steps[rescore]["if"]
+
+
+def test_residual_gate_passes_inputs_through_env_and_uploads_the_report():
+    """residual_gate.yml: dispatch-only, inputs reach bash only via env:, the
+    Neon secret puts it in the shared writers group, and the report files are
+    uploaded as an artifact (the repo's first upload-artifact step)."""
+    data = _load(WF_DIR / "residual_gate.yml")
+    on = _on(data)
+    assert set(on) == {"workflow_dispatch"}
+    inputs = on["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"train_seasons", "test_season", "write_model_run"}
+    assert inputs["train_seasons"]["default"] == "2023 2024"
+    assert inputs["test_season"]["default"] == "2025"
+    assert inputs["write_model_run"]["type"] == "boolean"
+    assert inputs["write_model_run"]["default"] is False
+    assert (data.get("concurrency") or {}).get("group") == NEON_GROUP
+    steps = data["jobs"]["gate"]["steps"]
+    run_steps = [s for s in steps if isinstance(s.get("run"), str)]
+    for s in run_steps:
+        assert "inputs." not in s["run"], "an input is inlined into a run: block"
+    gate = next(s for s in run_steps if "residual_gate.py" in s["run"])
+    assert set(gate["env"]) == {"IN_TRAIN_SEASONS", "IN_TEST_SEASON", "IN_WRITE_MODEL_RUN"}
+    assert all(v.startswith("${{ inputs.") for v in gate["env"].values())
+    upload = next(s for s in steps if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+    assert upload["with"]["path"] == "reports/residual_gate_*"
+    assert upload.get("if") == "always()"

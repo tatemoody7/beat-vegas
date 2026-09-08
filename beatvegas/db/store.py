@@ -75,6 +75,8 @@ _MIGRATIONS = {
         "spread_source": "VARCHAR",
     },
     "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
+    # which 1H engine froze the record (2026-09-07, after the table existed)
+    "game_records": {"engine": "VARCHAR"},
 }
 
 # One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH

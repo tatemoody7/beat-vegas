@@ -40,14 +40,23 @@ def outcome_of(first_half_total, line) -> Tuple[Optional[bool], Optional[str]]:
 def record_fields(
     row: pd.Series, model_version: str, feature_cols: List[str] = FEATURE_COLS
 ) -> dict:
-    """The frozen GameRecord fields for one scored game (excludes captured_at)."""
+    """The frozen GameRecord fields for one scored game (excludes captured_at).
+
+    `engine` is the PER-ROW 1H engine score_slate stamped on the row (the same
+    value that reaches factors_json) — under the residual engine one slate can
+    carry both, because a row with no real posted 1H line falls back to the
+    incumbent. It is an added dimension alongside `model_version`, not a
+    replacement; a slate scored before the column existed freezes it NULL.
+    """
     feats = {c: _clean(row.get(c)) for c in feature_cols}
     us = row.get("under_score")
+    eng = row.get("engine")
     return {
         "game_id": int(row["id"]),
         "season": int(row["season"]),
         "week": int(row["week"]),
         "model_version": model_version,
+        "engine": eng if isinstance(eng, str) else None,
         "features_json": json.dumps(feats),
         "line": _clean(row.get("line")),
         "line_kind": row.get("line_kind") if isinstance(row.get("line_kind"), str) else None,

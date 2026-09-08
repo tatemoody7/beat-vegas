@@ -352,6 +352,11 @@ class GameRecord(Base):
     week = Column(Integer)
     captured_at = Column(DateTime)  # when the pre-kickoff snapshot was frozen
     model_version = Column(String)  # model that produced the as-of bv_line
+    # Which 1H engine produced that bv_line: 'bv_line' (incumbent, market-blind)
+    # or 'residual' (market-residual). Stamped PER ROW, because under the
+    # residual engine a row with no real posted 1H line falls back to the
+    # incumbent. NULL on records frozen before this field existed.
+    engine = Column(String)
     features_json = Column(String)  # leak-free feature vector, as-of kickoff
     line = Column(Float)  # 1H line at snapshot
     line_kind = Column(String)  # 'hr_1h' | 'observed_1h' | 'derived_fg' | 'proxy'

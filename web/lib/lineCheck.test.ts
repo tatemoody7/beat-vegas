@@ -3,7 +3,10 @@ import { devigTwoWay, evUnder } from "@/lib/devig";
 import {
   EXCHANGE_MAX_AGE_H,
   EXCHANGE_MAX_HOLD,
+  FAIR_PRICE_LINE_WINDOW,
+  FAIR_PRICE_WIDE_WINDOW,
   evVerdictFor,
+  fairPriceWindow,
   marketFairUnderAt,
   type FairObs,
 } from "@/lib/lineCheck";
@@ -158,6 +161,47 @@ test("three or more exchange quotes use the median, not the mean", () => {
     devigTwoWay(-101, 101).fairUnder,
   ].sort((a, b) => a - b);
   expect(marketFairUnderAt(24.5, byBook).fairUnder).toBeCloseTo(fairs[1], 12);
+});
+
+// The comparable window (card.py fair_price_window).
+test("the reference window widens below Hard Rock only when HR is above the market", () => {
+  expect(FAIR_PRICE_LINE_WINDOW).toBe(0.5);
+  expect(FAIR_PRICE_WIDE_WINDOW).toBe(1.5);
+  expect(fairPriceWindow(0.5)).toEqual({ below: 1.5, above: 0.5 });
+  expect(fairPriceWindow(0)).toEqual({ below: 0.5, above: 0.5 });
+  expect(fairPriceWindow(-0.5)).toEqual({ below: 0.5, above: 0.5 });
+  expect(fairPriceWindow(null)).toEqual({ below: 0.5, above: 0.5 });
+});
+
+test("Hard Rock a point above the market is priced by the book a point below", () => {
+  const byBook = new Map<string, FairObs>([
+    ["hardrockbet", obs(25.5, -110, -110)],
+    ["draftkings", obs(24.5, 100, -120)],
+    ["fanduel", obs(24.5, 100, -120)],
+  ]);
+  const r = marketFairUnderAt(25.5, byBook);
+  expect(r.source).toBe("books");
+  expect(r.fairUnder).toBeCloseTo(12 / 23, 12);
+  // ...but two points below is still out of reach.
+  const far = new Map<string, FairObs>([
+    ["hardrockbet", obs(25.5, -110, -110)],
+    ["draftkings", obs(23.5, 100, -120)],
+    ["fanduel", obs(23.5, 100, -120)],
+  ]);
+  expect(marketFairUnderAt(25.5, far)).toEqual({
+    fairUnder: null,
+    source: null,
+  });
+  // Hard Rock BELOW the market keeps the half-point window both ways.
+  const below = new Map<string, FairObs>([
+    ["hardrockbet", obs(24.5, -110, -110)],
+    ["draftkings", obs(25.5, 100, -120)],
+    ["fanduel", obs(25.5, 100, -120)],
+  ]);
+  expect(marketFairUnderAt(24.5, below)).toEqual({
+    fairUnder: null,
+    source: null,
+  });
 });
 
 test("no comparable price -> null (the card's no_fair_price gate)", () => {

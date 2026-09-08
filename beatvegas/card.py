@@ -65,6 +65,15 @@ FAIR_PRICE_EXCLUDED = frozenset({HR_BOOK_KEY, "fliff", "consensus"} | EXCHANGE_B
 # many points of it (same window as web/lib/lineCheck.ts). Python-only name for
 # the literal both sides share; not a verdict gate.
 FAIR_PRICE_LINE_WINDOW = 0.5
+# ...except BELOW Hard Rock's line when Hard Rock is posting ABOVE the market
+# (hr_vs_market > 0). That is the single best case for an under — and the case
+# where, by construction, no book sits within half a point, so a real BET would
+# silently become paper for want of a price to judge. A book priced at a LOWER
+# total is a CONSERVATIVE reference for an under (the under is likelier at the
+# lower number, so its fair under-probability is higher, so the price bar it
+# sets is harder): clearing the price gate against it is a strictly safe test
+# and cannot manufacture a bet a like-for-like price would have blocked.
+FAIR_PRICE_WIDE_WINDOW = 1.5
 # CFBD's synthetic aggregate is not a book anyone can bet and double-counts the
 # real ones: it never enters the market line either (web/lib/books.ts).
 SYNTHETIC_BOOKS = frozenset({"consensus"})
@@ -209,6 +218,19 @@ def _median(xs: Sequence[float]) -> Optional[float]:
     return statistics.median(xs) if xs else None
 
 
+def fair_price_window(hr_vs_market: Optional[float]) -> tuple:
+    """(points BELOW Hard Rock's line, points ABOVE it) a book may sit and still
+    price Hard Rock's number. Half a point both ways, widened below to
+    FAIR_PRICE_WIDE_WINDOW when Hard Rock is above the market — see the constant.
+    Mirrored by web/lib/lineCheck.ts fairPriceWindow."""
+    below = (
+        FAIR_PRICE_WIDE_WINDOW
+        if hr_vs_market is not None and hr_vs_market > 0
+        else FAIR_PRICE_LINE_WINDOW
+    )
+    return (below, FAIR_PRICE_LINE_WINDOW)
+
+
 def json_clean(obj: Any) -> Any:
     """Recursively replace NaN/inf floats with None so the payload is strict JSON."""
     if isinstance(obj, dict):
@@ -302,8 +324,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     """Hard Rock's line/price/open, the market median line, and the market's
     no-vig fair under at Hard Rock's number — EXCHANGE-FIRST: the median of the
     tight, fresh exchanges quoting Hard Rock's exact line, else the median over
-    comparable books (within FAIR_PRICE_LINE_WINDOW, FAIR_PRICE_EXCLUDED
-    dropped), else
+    comparable books (`fair_price_window`, FAIR_PRICE_EXCLUDED dropped), else
     None (the price cannot be judged). Also Hard Rock's distance from the other
     books' median (`hr_vs_market`) and each side's hold for the slate note.
 
@@ -314,6 +335,13 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     hr = by_book.get(HR_BOOK_KEY)
     hr_line = hr["line"] if hr else None
     lines = [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS]
+    # Hard Rock vs the OTHER books' median (a display chip + why sentence, and
+    # the reason the comparable window widens below). `market_line` keeps Hard
+    # Rock in its median so off_market and the web's liveLine are untouched.
+    others = _median(
+        [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
+    )
+    hr_vs_market = round2(hr_line - others) if hr_line is not None and others is not None else None
     # Exchanges at the SAME line (exact equality — a half point off is another
     # market), each one tight and recent enough to be a live price.
     exchange = [
@@ -323,12 +351,13 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
         for f in [_exchange_fair_under(o, ref_now)]
         if f is not None
     ]
+    lo, hi = fair_price_window(hr_vs_market)
     comparable = [
         _fair_under_of(o)
         for b, o in by_book.items()
         if b not in FAIR_PRICE_EXCLUDED
         and hr_line is not None
-        and abs(o["line"] - hr_line) <= FAIR_PRICE_LINE_WINDOW
+        and -lo <= (o["line"] - hr_line) <= hi
         and _fair_under_of(o) is not None
     ]
     fair_source: Optional[str]
@@ -342,13 +371,6 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
         fair_under, fair_source = None, None
     hr_price = hr["under_price"] if hr else None
     ev = ev_under(fair_under, hr_price) if fair_under is not None and hr_price is not None else None
-    # Hard Rock vs the OTHER books' median (a display chip + why sentence).
-    # `market_line` keeps Hard Rock in its median so off_market and the web's
-    # liveLine are untouched.
-    others = _median(
-        [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
-    )
-    hr_vs_market = round2(hr_line - others) if hr_line is not None and others is not None else None
     market_holds = [
         h
         for b, o in by_book.items()

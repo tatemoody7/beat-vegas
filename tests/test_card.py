@@ -15,9 +15,12 @@ from beatvegas.card import (
     EXCHANGE_MAX_AGE_H,
     EXCHANGE_MAX_HOLD,
     FAIR_PRICE_EXCLUDED,
+    FAIR_PRICE_LINE_WINDOW,
+    FAIR_PRICE_WIDE_WINDOW,
     PAPER_BLOCKERS,
     break_even_price,
     build_card,
+    fair_price_window,
     hold_note,
     kill_line,
     market_read,
@@ -324,6 +327,47 @@ def test_three_or_more_exchange_quotes_use_the_median_not_the_mean():
     fairs = sorted(devig_two_way(o, u)[1] for o, u in ((100, -102), (-104, 102), (-101, 101)))
     m = market_read(snaps, now=NOW)
     assert m["n_exchange"] == 3 and m["fair_under"] == pytest.approx(fairs[1])
+
+
+def test_fair_price_window_widens_below_only_when_hard_rock_is_above_the_market():
+    assert (FAIR_PRICE_LINE_WINDOW, FAIR_PRICE_WIDE_WINDOW) == (0.5, 1.5)
+    assert fair_price_window(0.5) == (1.5, 0.5)
+    assert fair_price_window(0.0) == (0.5, 0.5)
+    assert fair_price_window(-0.5) == (0.5, 0.5)
+    assert fair_price_window(None) == (0.5, 0.5)
+
+
+def test_hard_rock_above_the_market_is_priced_by_the_books_a_point_below():
+    """Hard Rock a full point ABOVE the market is the best case for an under —
+    and by construction no book is within half a point, so the like-for-like
+    window would leave the price unjudgeable and paper the bet. A book at a
+    LOWER total is a conservative reference, so it is allowed in to 1.5."""
+    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 23.0)]))
+    assert it["hr_vs_market"] == 1.0 and it["gap"] == 2.5
+    assert it["fair_source"] == "books"
+    assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4)
+    assert it["tier"] == "BET" and it["blocker"] is None and it["paper_blocker"] is None
+
+
+def test_a_book_two_points_below_hard_rock_is_still_no_fair_price():
+    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(1, 23.5)
+    it = only(card([game()], snaps, [model(1, 23.0)]))
+    assert it["hr_vs_market"] == 2.0
+    assert it["fair_under"] is None and it["fair_source"] is None
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price"
+
+
+def test_hard_rock_below_the_market_keeps_the_half_point_window_and_off_market():
+    """The widening is one-directional: below the market Hard Rock is still an
+    off-market number, which is the blocker that fires."""
+    snaps = [snap(1, "hardrockbet", 23.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 21.0)]))
+    assert it["hr_vs_market"] == -1.0
+    assert it["fair_under"] is None  # the 24.5 books stay outside the 0.5 window
+    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
+    assert it["paper_blocker"] == "off_market"
 
 
 def test_hr_vs_market_is_hard_rock_minus_the_other_books_median():

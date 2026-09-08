@@ -60,8 +60,9 @@ export type LineCheckRow = {
 // tests/test_gate_parity.py asserts the two agree.
 export const FAIR_PRICE_EXCLUDED_EXTRA = new Set(["fliff"]);
 // A book is "comparable" to Hard Rock's number within this many points
-// (card.py FAIR_PRICE_LINE_WINDOW).
+// (card.py FAIR_PRICE_LINE_WINDOW / FAIR_PRICE_WIDE_WINDOW).
 export const FAIR_PRICE_LINE_WINDOW = 0.5;
+export const FAIR_PRICE_WIDE_WINDOW = 1.5;
 // An exchange quote enters only when it is genuinely ~0-hold and still live
 // (card.py EXCHANGE_MAX_HOLD / EXCHANGE_MAX_AGE_H): one wide illiquid two-way
 // de-vigs to a fair under near 0.71 and a delisted quote stays "latest" forever.
@@ -89,11 +90,35 @@ const timeOf = (t: string | null | undefined): number | null => {
 };
 
 /**
+ * (points BELOW Hard Rock's line, points ABOVE it) a book may sit and still
+ * price Hard Rock's number — mirrors card.py fair_price_window. Half a point
+ * both ways, widened below to FAIR_PRICE_WIDE_WINDOW when Hard Rock is posting
+ * ABOVE the market: that is the best case for an under and the case where no
+ * book is within half a point by construction, so the price would be unjudgeable
+ * and the game silently paper. A book at a LOWER total is a conservative
+ * reference for an under (its fair under-probability is higher, so the price bar
+ * it sets is harder) — clearing the gate against it cannot manufacture a bet a
+ * like-for-like price would have blocked.
+ */
+export function fairPriceWindow(hrVsMarket: number | null): {
+  below: number;
+  above: number;
+} {
+  return {
+    below:
+      hrVsMarket !== null && hrVsMarket > 0
+        ? FAIR_PRICE_WIDE_WINDOW
+        : FAIR_PRICE_LINE_WINDOW,
+    above: FAIR_PRICE_LINE_WINDOW,
+  };
+}
+
+/**
  * The market's no-vig fair P(under) at Hard Rock's number — EXCHANGE-FIRST
  * (mirrors beatvegas/card.py market_read): the median of the tight, fresh
  * exchanges quoting Hard Rock's EXACT line, else the median over comparable
- * books (within half a point; Hard Rock, fliff, the synthetic aggregate and
- * the exchanges excluded), else null — the price cannot be judged.
+ * books (fairPriceWindow; Hard Rock, fliff, the synthetic aggregate and the
+ * exchanges excluded), else null — the price cannot be judged.
  *
  * `now` is the instant the read is "as of" (epoch ms or a parseable string);
  * without one the newest snapshot in `byBook` stands in.
@@ -104,6 +129,18 @@ export function marketFairUnderAt(
   now?: number | string | Date | null,
 ): { fairUnder: number | null; source: FairSource | null } {
   if (hrLine === null) return { fairUnder: null, source: null };
+  // Hard Rock vs the OTHER books' median, which decides how far below Hard
+  // Rock's line a book may sit (card.py hr_vs_market -> fair_price_window).
+  const otherLines: number[] = [];
+  for (const [key, o] of byBook) {
+    const k = key.toLowerCase();
+    if (HR_KEYS.includes(k) || isSynthetic(k)) continue;
+    otherLines.push(o.line);
+  }
+  const others = median(otherLines);
+  const { below, above } = fairPriceWindow(
+    others === null ? null : hrLine - others,
+  );
   const caps = [...byBook.values()]
     .map((o) => timeOf(o.capturedAt))
     .filter((t): t is number => t !== null);
@@ -141,7 +178,7 @@ export function marketFairUnderAt(
         continue;
       }
       exchange.push(d.fairUnder);
-    } else if (Math.abs(o.line - hrLine) <= FAIR_PRICE_LINE_WINDOW) {
+    } else if (o.line - hrLine <= above && hrLine - o.line <= below) {
       books.push(d.fairUnder);
     }
   }
@@ -265,8 +302,8 @@ export async function getLineCheck(
 
     // Devig / EV layer. Compare HR's under price to the market's no-vig fair
     // under at Hard Rock's number: tight, fresh exchanges at the exact line
-    // first, else the comparable books (within half a point) — the same read as
-    // the card (beatvegas/card.py), so site and card never disagree on EV.
+    // first, else the comparable books (fairPriceWindow) — the same read as the
+    // card (beatvegas/card.py), so the site and the card never disagree on EV.
     // No `now`: this page renders whole seasons, so each game's own newest
     // snapshot is the instant its exchange quotes are aged against.
     const hrUnderPrice = hrObs?.underPrice ?? null;

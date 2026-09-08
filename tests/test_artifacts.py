@@ -168,6 +168,33 @@ def test_fingerprint_json_coerces_numpy_scalars(mem):
         assert row.n_rows == 60 and isinstance(row.n_rows, int)
 
 
+def test_fingerprint_with_nan_numpy_date_and_array_serialises(mem):
+    """One json_safe (etl.context): NaN -> None, numpy int -> int, date -> ISO,
+    small array -> list. None of these may raise and roll back the row."""
+    import datetime as dt
+
+    eng, scope = mem
+    model, _ = _fitted()
+    fp = _fp()
+    fp["target_mean"] = float("nan")
+    fp["n_rows"] = np.int64(fp["n_rows"])
+    fp["fitted_on"] = dt.date(2026, 9, 12)
+    fp["feature_importances"] = np.array([0.5, 0.25, 0.25])
+    with scope() as s:
+        persist_artifact(
+            s, engine="residual", model=model, fingerprint=fp, season=2026, week=3,
+            metrics={"sigma": float("nan"), "at": dt.datetime(2026, 9, 12, 12, 30)}, now=NOW,
+        )  # fmt: skip
+    with Session(eng) as s:
+        row = latest_artifact(s, "residual")
+        stored = json.loads(row.fingerprint_json)
+        assert stored["target_mean"] is None
+        assert stored["n_rows"] == 60 and row.n_rows == 60
+        assert stored["fitted_on"] == "2026-09-12"
+        assert stored["feature_importances"] == [0.5, 0.25, 0.25]
+        assert json.loads(row.metrics_json) == {"sigma": None, "at": "2026-09-12T12:30:00"}
+
+
 # --- fingerprint_changed --------------------------------------------------------------
 
 

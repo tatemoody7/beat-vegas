@@ -38,6 +38,7 @@ import pandas as pd
 from beatvegas.config import engine_name
 from beatvegas.db.models import Game, ModelRun, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.etl.context import json_safe
 from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.hardrock import HR_BOOK_KEY
@@ -49,7 +50,6 @@ from beatvegas.lines import (
 )
 from beatvegas.model.artifacts import (
     fingerprint_changed,
-    json_safe,
     latest_artifact,
     persist_artifact,
 )

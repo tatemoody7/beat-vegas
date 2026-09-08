@@ -310,6 +310,33 @@ def test_json_safe_scrubs_nested_nan_and_numpy():
     assert isinstance(out["c"]["d"], int)
 
 
+def test_json_safe_dates_to_iso_and_arrays_to_lists():
+    """The one json_safe: dates/datetimes -> ISO strings, numpy arrays -> lists
+    (model/artifacts.py fingerprints carry both), NaT -> None."""
+    import datetime as dt
+
+    import numpy as np
+    import pandas as pd
+
+    out = json_safe(
+        {
+            "d": dt.date(2025, 9, 6),
+            "ts": dt.datetime(2025, 9, 6, 19, 30),
+            "pd_ts": pd.Timestamp("2025-09-06 19:30"),
+            "nat": pd.NaT,
+            "arr": np.array([1, 2, 3]),
+            "arr_f": np.array([0.5, float("nan")]),
+        }
+    )
+    assert out["d"] == "2025-09-06"
+    assert out["ts"] == "2025-09-06T19:30:00"
+    assert out["pd_ts"] == "2025-09-06T19:30:00"
+    assert out["nat"] is None
+    assert out["arr"] == [1, 2, 3]
+    assert out["arr_f"] == [0.5, None]
+    json.dumps(out)  # never raises
+
+
 def test_unknown_game_ids_are_skipped(session):
     out = context_for_games(session, SEASON, WEEK, [100, 999])
     assert set(out) == {100}

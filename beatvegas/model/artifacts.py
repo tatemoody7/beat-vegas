@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import io
 import json
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import joblib
 from sqlalchemy.orm import Session
 
 from ..db.models import ModelArtifact
+from ..etl.context import json_safe
 
 # The fingerprint fields whose movement means "the model did not see the same
 # history as last time": more/fewer rows, a later last game, a different
@@ -40,20 +41,6 @@ def dump_model(model) -> bytes:
 def load_model(blob: bytes):
     """Inverse of dump_model."""
     return joblib.load(io.BytesIO(blob))
-
-
-def _json_default(v: Any):
-    """Coerce what json.dumps cannot: numpy scalars -> Python, dates -> ISO."""
-    if hasattr(v, "item"):  # numpy scalar
-        return v.item()
-    if isinstance(v, (datetime, date)):
-        return v.isoformat()
-    raise TypeError(f"not JSON-serialisable: {type(v).__name__}")
-
-
-def json_safe(obj: Any) -> Any:
-    """A copy of `obj` made of plain JSON types (ints, floats, str, lists, dicts)."""
-    return json.loads(json.dumps(obj, default=_json_default))
 
 
 def _opt_int(v: Any) -> Optional[int]:

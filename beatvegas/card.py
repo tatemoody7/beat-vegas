@@ -48,6 +48,14 @@ HOLD_NOTE_CENTS = 0.03
 # quote at Hard Rock's EXACT number is the sharpest fair price we can get and
 # wins outright over the books' de-vigged median (exchange-first, PR-6).
 EXCHANGE_BOOKS = frozenset({"kalshi", "polymarket", "novig", "prophetx", "betopenly"})
+# An exchange only earns that privilege by actually being ~zero hold and live.
+# One wide illiquid two-way (+200/-500, hold 0.167) de-vigs to a fair under near
+# 0.71 — on its own enough to flip a BET and set the kill price — and
+# _latest_by_book keeps a book's newest row forever, so a delisted Friday quote
+# is still "latest" on Saturday. Books need neither guard: they enter as a
+# MEDIAN over several quotes, which absorbs one bad one.
+EXCHANGE_MAX_HOLD = 0.02
+EXCHANGE_MAX_AGE_H = 24.0
 # Books that never enter the BOOK median fair price: Hard Rock (it is the book
 # being judged), the sweepstakes book, CFBD's synthetic aggregate and the
 # exchanges (their prices are not a comparable two-way hold; they enter through
@@ -258,28 +266,62 @@ def _hold_of(obs: Dict) -> Optional[float]:
     return devig_two_way(obs["over_price"], obs["under_price"])[2]
 
 
-def market_read(snaps: Sequence[Dict]) -> Dict[str, Any]:
+def _reference_now(snaps: Sequence[Dict], now: Optional[datetime]) -> Optional[datetime]:
+    """The instant the market read is "as of" (naive UTC). The card passes its
+    build time; without one, the newest snapshot in the set stands in, so a
+    replayed historical week judges staleness against its own clock."""
+    n = _naive_utc(now)
+    if n is not None:
+        return n
+    caps = [c for c in (_naive_utc(sn.get("captured_at")) for sn in snaps) if c is not None]
+    return max(caps) if caps else None
+
+
+def _exchange_fair_under(obs: Dict, ref_now: Optional[datetime]) -> Optional[float]:
+    """The de-vigged fair under from ONE exchange quote, or None when the quote
+    is one-sided, wider than EXCHANGE_MAX_HOLD, or older than EXCHANGE_MAX_AGE_H.
+    An unknown capture time is not evidence of staleness — keep the quote."""
+    if obs.get("over_price") is None or obs.get("under_price") is None:
+        return None
+    hold = _hold_of(obs)
+    if hold is None or hold > EXCHANGE_MAX_HOLD:
+        return None
+    cap = obs.get("_cap")
+    if (
+        cap is not None
+        and ref_now is not None
+        and (ref_now - cap).total_seconds() > EXCHANGE_MAX_AGE_H * 3600.0
+    ):
+        return None
+    # Two-way multiplicative de-vig: on a ~0-hold quote this is (almost exactly)
+    # the raw midpoint of the two implied probabilities.
+    return devig_two_way(obs["over_price"], obs["under_price"], "multiplicative")[1]
+
+
+def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[str, Any]:
     """Hard Rock's line/price/open, the market median line, and the market's
-    no-vig fair under at Hard Rock's number — EXCHANGE-FIRST: the mean of the
-    exchanges quoting Hard Rock's exact line, else the median over comparable
-    books (within FAIR_PRICE_LINE_WINDOW, FAIR_PRICE_EXCLUDED dropped), else
+    no-vig fair under at Hard Rock's number — EXCHANGE-FIRST: the median of the
+    tight, fresh exchanges quoting Hard Rock's exact line, else the median over
+    comparable books (within FAIR_PRICE_LINE_WINDOW, FAIR_PRICE_EXCLUDED
+    dropped), else
     None (the price cannot be judged). Also Hard Rock's distance from the other
-    books' median (`hr_vs_market`) and each side's hold for the slate note."""
+    books' median (`hr_vs_market`) and each side's hold for the slate note.
+
+    `now`: the instant the read is "as of" (the card's build time), used only to
+    age out exchange quotes; defaults to the newest snapshot in `snaps`."""
     by_book = _latest_by_book(snaps)
+    ref_now = _reference_now(snaps, now)
     hr = by_book.get(HR_BOOK_KEY)
     hr_line = hr["line"] if hr else None
     lines = [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS]
     # Exchanges at the SAME line (exact equality — a half point off is another
-    # market). Two-way multiplicative de-vig: on a ~0-hold exchange quote this
-    # is (almost exactly) the raw midpoint of the two implied probabilities.
+    # market), each one tight and recent enough to be a live price.
     exchange = [
-        devig_two_way(o["over_price"], o["under_price"], "multiplicative")[1]
+        f
         for b, o in by_book.items()
-        if b in EXCHANGE_BOOKS
-        and hr_line is not None
-        and abs(o["line"] - hr_line) < 1e-9
-        and o.get("over_price") is not None
-        and o.get("under_price") is not None
+        if b in EXCHANGE_BOOKS and hr_line is not None and abs(o["line"] - hr_line) < 1e-9
+        for f in [_exchange_fair_under(o, ref_now)]
+        if f is not None
     ]
     comparable = [
         _fair_under_of(o)
@@ -291,7 +333,9 @@ def market_read(snaps: Sequence[Dict]) -> Dict[str, Any]:
     ]
     fair_source: Optional[str]
     if exchange:
-        fair_under, fair_source = statistics.mean(exchange), "exchange"
+        # MEDIAN, so one odd quote among three or more cannot drag the fair
+        # price (for one or two quotes the median IS the mean).
+        fair_under, fair_source = statistics.median(exchange), "exchange"
     elif comparable:
         fair_under, fair_source = _median(comparable), "books"
     else:
@@ -419,10 +463,12 @@ def build_item(
     prediction: Optional[Dict],
     reference_line: Optional[float],
     preview: Optional[Dict],
+    now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """One card item for one game (the edge.ts rules, minus the context-only
-    score, which never decides a tier)."""
-    m = market_read(snaps)
+    score, which never decides a tier). `now` is the build time — it only ages
+    out stale exchange quotes (market_read)."""
+    m = market_read(snaps, now)
     hr_line, hr_price, ev = m["hr_line"], m["hr_price"], m["ev"]
     market_line, fair_under = m["market_line"], m["fair_under"]
     ev_v = ev_verdict(ev)
@@ -758,6 +804,7 @@ def build_card(
                 model_by_game.get(gid),
                 reference_by_game.get(gid),
                 preview_by_game.get(gid),
+                now_n,
             )
         )
     items.sort(key=_sort_key)

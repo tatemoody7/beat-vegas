@@ -1,6 +1,12 @@
 import { expect, test } from "vitest";
 import { devigTwoWay, evUnder } from "@/lib/devig";
-import { evVerdictFor, marketFairUnderAt, type FairObs } from "@/lib/lineCheck";
+import {
+  EXCHANGE_MAX_AGE_H,
+  EXCHANGE_MAX_HOLD,
+  evVerdictFor,
+  marketFairUnderAt,
+  type FairObs,
+} from "@/lib/lineCheck";
 import { EV_FLOOR } from "@/lib/verdict";
 
 // The EV verdict bands: > +0.5% pos, < EV_FLOOR (-5%) neg, else fair.
@@ -48,11 +54,17 @@ const obs = (
   line: number,
   over: number | null,
   under: number | null,
+  capturedAt: string | null = null,
 ): FairObs => ({
   line,
   overPrice: over,
   underPrice: under,
+  capturedAt,
 });
+
+const NOW = "2026-09-18T22:05:00Z"; // the card's build time in the Python tests
+const hoursBefore = (h: number): string =>
+  new Date(Date.parse(NOW) - h * 3600_000).toISOString();
 
 test("an exchange quoting Hard Rock's exact line IS the fair price", () => {
   const byBook = new Map<string, FairObs>([
@@ -97,6 +109,55 @@ test("Hard Rock, fliff, the synthetic aggregate and exchanges never enter the bo
   const r = marketFairUnderAt(24.5, byBook);
   expect(r.source).toBe("books");
   expect(r.fairUnder).toBeCloseTo(0.5, 12);
+});
+
+// Exchange quality guards (card.py EXCHANGE_MAX_HOLD / EXCHANGE_MAX_AGE_H).
+test("a wide exchange quote is ignored and the book median wins", () => {
+  expect(EXCHANGE_MAX_HOLD).toBe(0.02);
+  const wide = devigTwoWay(200, -500);
+  expect(wide.hold).toBeGreaterThan(EXCHANGE_MAX_HOLD);
+  expect(wide.fairUnder).toBeGreaterThan(0.7); // what it would have claimed
+  const byBook = new Map<string, FairObs>([
+    ["hardrockbet", obs(24.5, -110, -110, NOW)],
+    ["draftkings", obs(24.5, 100, -120, NOW)],
+    ["kalshi", obs(24.5, 200, -500, NOW)],
+  ]);
+  const r = marketFairUnderAt(24.5, byBook, NOW);
+  expect(r.source).toBe("books");
+  expect(r.fairUnder).toBeCloseTo(12 / 23, 12);
+});
+
+test("a stale exchange quote is ignored; an undated one is kept", () => {
+  expect(EXCHANGE_MAX_AGE_H).toBe(24);
+  const stale = new Map<string, FairObs>([
+    ["hardrockbet", obs(24.5, -110, -110, NOW)],
+    ["draftkings", obs(24.5, 100, -120, NOW)],
+    ["kalshi", obs(24.5, 100, -102, hoursBefore(30))],
+  ]);
+  expect(marketFairUnderAt(24.5, stale, NOW).source).toBe("books");
+  // with no reference instant the newest snapshot in the map stands in for now
+  expect(marketFairUnderAt(24.5, stale).source).toBe("books");
+  // fresh enough
+  stale.set("kalshi", obs(24.5, 100, -102, hoursBefore(6)));
+  expect(marketFairUnderAt(24.5, stale, NOW).source).toBe("exchange");
+  // an unknown capture time is not evidence of staleness
+  stale.set("kalshi", obs(24.5, 100, -102));
+  expect(marketFairUnderAt(24.5, stale, NOW).source).toBe("exchange");
+});
+
+test("three or more exchange quotes use the median, not the mean", () => {
+  const byBook = new Map<string, FairObs>([
+    ["hardrockbet", obs(24.5, -110, -110)],
+    ["kalshi", obs(24.5, 100, -102)],
+    ["novig", obs(24.5, -104, 102)],
+    ["prophetx", obs(24.5, -101, 101)],
+  ]);
+  const fairs = [
+    devigTwoWay(100, -102).fairUnder,
+    devigTwoWay(-104, 102).fairUnder,
+    devigTwoWay(-101, 101).fairUnder,
+  ].sort((a, b) => a - b);
+  expect(marketFairUnderAt(24.5, byBook).fairUnder).toBeCloseTo(fairs[1], 12);
 });
 
 test("no comparable price -> null (the card's no_fair_price gate)", () => {

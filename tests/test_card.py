@@ -12,6 +12,8 @@ import pytest
 
 from beatvegas.card import (
     EXCHANGE_BOOKS,
+    EXCHANGE_MAX_AGE_H,
+    EXCHANGE_MAX_HOLD,
     FAIR_PRICE_EXCLUDED,
     PAPER_BLOCKERS,
     break_even_price,
@@ -256,6 +258,72 @@ def test_exchange_with_one_side_unpriced_does_not_count():
     snaps = [snap(1, "hardrockbet", 24.5), snap(1, "kalshi", 24.5, None, -102)]
     m = market_read(snaps)
     assert m["fair_under"] is None and m["fair_source"] is None and m["n_exchange"] == 0
+
+
+def test_a_wide_exchange_quote_is_ignored_and_the_book_median_wins():
+    """An exchange only earns the fair price by being ~0-hold. One wide illiquid
+    two-way (+200/-500, hold 16.7%) de-vigs to a fair under near 0.71 — enough on
+    its own to flip a BET and set the kill price — so it never enters."""
+    assert EXCHANGE_MAX_HOLD == 0.02
+    assert devig_two_way(200, -500)[2] > EXCHANGE_MAX_HOLD
+    assert devig_two_way(200, -500)[1] > 0.7  # what it would have claimed as fair
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 200, -500),  # wide: dropped
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 0 and m["fair_source"] == "books"
+    assert m["fair_under"] == pytest.approx(FAIR_UNDER)
+    # ...and a hold exactly ON the cap still counts (the bound is "exceeds").
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110), snap(1, "kalshi", 24.5, 100, -102)]
+    assert market_read(snaps, now=NOW)["n_exchange"] == 1
+
+
+def test_a_stale_exchange_quote_is_ignored():
+    """_latest_by_book keeps a book's newest row forever, so a delisted Friday
+    exchange quote is still 'latest' on Saturday. Anything older than
+    EXCHANGE_MAX_AGE_H before the build is not a live price."""
+    assert EXCHANGE_MAX_AGE_H == 24.0
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102, hours_ago=30),  # stale: dropped
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 0 and m["fair_source"] == "books"
+    assert m["fair_under"] == pytest.approx(FAIR_UNDER)
+    # the card build passes its own `now`, so the same row is stale on the card
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["fair_source"] == "books"
+    # with no reference instant the newest snapshot in the set stands in for now
+    assert market_read(snaps)["n_exchange"] == 0
+    # an unknown capture time is not evidence of staleness: keep the quote
+    undated = dict(snap(1, "kalshi", 24.5, 100, -102), captured_at=None)
+    assert (
+        market_read([snap(1, "hardrockbet", 24.5, -110, -110), undated], now=NOW)["n_exchange"] == 1
+    )
+
+
+def test_a_tight_fresh_exchange_quote_still_wins_over_the_books():
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102, hours_ago=6),
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 1 and m["fair_source"] == "exchange"
+    assert m["fair_under"] == pytest.approx(devig_two_way(100, -102)[1])
+
+
+def test_three_or_more_exchange_quotes_use_the_median_not_the_mean():
+    """One odd quote among several must not drag the fair price."""
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102),
+        snap(1, "novig", 24.5, -104, 102),
+        snap(1, "prophetx", 24.5, -101, 101),
+    ]
+    fairs = sorted(devig_two_way(o, u)[1] for o, u in ((100, -102), (-104, 102), (-101, 101)))
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 3 and m["fair_under"] == pytest.approx(fairs[1])
 
 
 def test_hr_vs_market_is_hard_rock_minus_the_other_books_median():

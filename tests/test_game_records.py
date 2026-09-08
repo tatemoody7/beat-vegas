@@ -82,3 +82,88 @@ def test_snapshot_is_immutable_and_grade_fills_outcome(db):
         rec = s.query(GameRecord).filter_by(game_id=1).one()
         assert rec.outcome == "under" and rec.under_hit is True
         assert rec.line == 24.5 and rec.first_half_total == 20
+
+
+# --- the engine dimension --------------------------------------------------
+#
+# A slate can be produced by EITHER 1H engine, and under the residual engine it
+# can be produced by both at once (a row with no real posted 1H line falls back
+# to the incumbent). The frozen record has to say which one made it, or the two
+# engines' history is one indistinguishable bucket after the fact.
+
+
+def _sqlite_session():
+    """An in-memory records table — the shared PG sandbox is not needed here."""
+    from sqlalchemy import create_engine as _ce
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import GameRecord
+
+    eng = _ce("sqlite:///:memory:")
+    GameRecord.__table__.create(eng)
+    return Session(eng)
+
+
+def _scored(*engines) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "id": i + 1,
+                "season": 2026,
+                "week": 5,
+                "line": 24.5,
+                "line_kind": "hr_1h" if e == "residual" else "derived_fg",
+                "bv_line": 22.0,
+                "bv_gap": 2.5,
+                "bv_gap_z": 0.8,
+                "under_score": 58,
+                "engine": e,
+            }
+            for i, e in enumerate(engines)
+        ]
+    )
+
+
+def test_record_fields_freezes_the_engine_that_made_the_number():
+    row = _scored("residual").iloc[0]
+    assert record_fields(row, "gbm_v1")["engine"] == "residual"
+    # the model-version tag is an independent dimension, not replaced by it
+    assert record_fields(row, "gbm_v1")["model_version"] == "gbm_v1"
+
+
+def test_record_fields_engine_is_null_for_a_slate_that_predates_the_field():
+    row = pd.Series({"id": 1, "season": 2026, "week": 5, "line": 24.5, "under_score": 58})
+    assert record_fields(row, "gbm_v1")["engine"] is None
+
+
+def test_snapshot_freezes_each_row_under_its_own_engine():
+    """Under the residual engine a mixed slate splits per row: the game with a
+    real posted 1H line is the residual's, the derived/proxy game is the
+    incumbent's. Both freeze on the same slate, stamped separately."""
+    from beatvegas.db.models import GameRecord
+
+    s = _sqlite_session()
+    assert snapshot_slate(s, _scored("residual", "bv_line"), "gbm_v1", dt.datetime(2026, 9, 6)) == 2
+    got = {r.game_id: r.engine for r in s.query(GameRecord).all()}
+    assert got == {1: "residual", 2: "bv_line"}
+
+
+def test_snapshot_of_an_incumbent_only_slate_is_stamped_bv_line():
+    from beatvegas.db.models import GameRecord
+
+    s = _sqlite_session()
+    assert snapshot_slate(s, _scored("bv_line", "bv_line"), "gbm_v1", dt.datetime(2026, 9, 6)) == 2
+    assert {r.engine for r in s.query(GameRecord).all()} == {"bv_line"}
+
+
+def test_migration_adds_the_engine_column_to_a_legacy_records_table():
+    from sqlalchemy import create_engine, inspect, text
+
+    from beatvegas.db.store import _MIGRATIONS, _apply_migrations
+
+    assert _MIGRATIONS["game_records"]["engine"] == "VARCHAR"
+    eng = create_engine("sqlite:///:memory:")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE game_records (id INTEGER PRIMARY KEY, game_id INTEGER)"))
+    _apply_migrations(eng)
+    assert "engine" in {col["name"] for col in inspect(eng).get_columns("game_records")}

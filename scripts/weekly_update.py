@@ -2,11 +2,18 @@
 """Score the upcoming slate and log the model's picks (predictions).
 
 Builds features, scores each game's 1H-under probability + 0-100 score, and
-stores predictions with the current **opening consensus** line as `line_used`
-(proxy fallback when no line is posted yet). Auto-detects the current week.
+stores predictions with the ranking line as `line_used` (proxy fallback when no
+line is posted yet). Auto-detects the current week.
+
+The ranking line's basis follows the engine (config model.engine / BV_ENGINE):
+the incumbent bv_line ranks against the **opening consensus** 1H line; the
+residual engine conditions on the **current** line (Hard Rock's latest 1H
+number, else the books' latest consensus, else derived from the full-game
+opener) and is handed the training rows' REAL 1H closes.
 
     python scripts/weekly_update.py                 # current season, auto week
     python scripts/weekly_update.py --season 2025 --week 8
+    python scripts/weekly_update.py --line-basis current   # force the basis
 """
 
 from __future__ import annotations
@@ -18,11 +25,18 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 
+from beatvegas.config import engine_name
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
-from beatvegas.lines import consensus_open_close
+from beatvegas.hardrock import HR_BOOK_KEY
+from beatvegas.lines import (
+    REAL_1H_CLOSE_WINDOW_H,
+    consensus_open_close,
+    pre_kickoff,
+    real_closes,
+)
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
@@ -46,13 +60,37 @@ def _full_game_opener(snaps: list) -> Tuple[Optional[float], Optional[float]]:
     return open_total, open_spread
 
 
-def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[int, str]]:
-    """Per-game ranking line + provenance.
+LINE_BASES = ("opener", "current")
 
-    Prefers an OBSERVED retail 1H opener (kind 'observed_1h'); else DERIVES a 1H
-    number from the captured full-game opener via the spread-adjusted multiplier
-    (kind 'derived_fg') — which on Sunday is every game, before the retail 1H
-    market posts. Games with neither are left to score_slate's internal proxy."""
+
+def resolve_basis(basis: str, engine: str) -> str:
+    """`auto` -> the basis the engine expects: the residual engine conditions
+    on the line you can bet NOW, the incumbent ranks against the opener."""
+    if basis == "auto":
+        return "current" if engine == "residual" else "opener"
+    return basis
+
+
+def _latest(snaps: list):
+    return sorted(snaps, key=lambda s: s.captured_at)[-1]
+
+
+def ranking_line_lookup(
+    season: int, week: int, basis: str = "opener"
+) -> Tuple[Dict[int, float], Dict[int, str]]:
+    """Per-game ranking line + provenance for the week.
+
+    basis="opener": an OBSERVED retail 1H opener (consensus of each book's first
+    snapshot; kind 'observed_1h'); else a 1H number DERIVED from the captured
+    full-game opener via the spread-adjusted multiplier (kind 'derived_fg') —
+    which on Sunday is every game, before the retail 1H market posts.
+    basis="current": Hard Rock's LATEST PRE-KICKOFF 1H line (kind 'hr_1h'); else
+    the median of each book's latest pre-kick 1H line ('observed_1h'); else
+    'derived_fg' as above. A game whose only 1H captures are in-play has no
+    bettable 1H number and falls through to derived_fg too.
+    Games with none are left to score_slate's internal proxy."""
+    if basis not in LINE_BASES:
+        raise ValueError(f"unknown line basis {basis!r}; expected one of {LINE_BASES}")
     lines: Dict[int, float] = {}
     kinds: Dict[int, str] = {}
     with session_scope() as s:
@@ -64,6 +102,7 @@ def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[
                 OddsSnapshot.spread,
                 OddsSnapshot.market,
                 OddsSnapshot.captured_at,
+                Game.start_date,
             )
             .join(Game, Game.id == OddsSnapshot.game_id)
             .filter(
@@ -75,22 +114,68 @@ def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[
         )
     h1: Dict[int, list] = {}
     fg: Dict[int, list] = {}
-    for gid, book, line, spread, market, cap in rows:
+    kickoffs: Dict[int, object] = {}
+    for gid, book, line, spread, market, cap, start_date in rows:
         snap = type("S", (), {"book": book, "line": line, "spread": spread, "captured_at": cap})
         (h1 if market == "1H_total" else fg).setdefault(gid, []).append(snap)
+        kickoffs[gid] = start_date
 
     for gid, snaps in h1.items():
-        opening = consensus_open_close(snaps)[0]
-        if opening is not None:
-            lines[gid], kinds[gid] = opening, "observed_1h"
+        if basis == "current":
+            # A midweek re-run can catch in-play snapshots (poll_lines defaults
+            # to --hours-back 24, well past kickoff for games already underway).
+            # Never condition the residual model on a live line.
+            kick = kickoffs.get(gid)
+            snaps = pre_kickoff(snaps, kick)
+            # lines.pre_kickoff hands back EVERY snapshot when none is pre-kick,
+            # so for a game we only ever caught in-play the filter is a no-op and
+            # the "latest" line would be a LIVE number. Skip its 1H market
+            # outright: the loop below derives a 1H line from the full-game opener.
+            if kick is not None and not any(
+                sn.captured_at is None or sn.captured_at <= kick for sn in snaps
+            ):
+                continue
+            hr = [sn for sn in snaps if sn.book == HR_BOOK_KEY and sn.line is not None]
+            if hr:
+                lines[gid], kinds[gid] = float(_latest(hr).line), "hr_1h"
+                continue
+            line = consensus_open_close(snaps)[1]  # median of each book's LATEST
+            kind = "observed_1h"
+        else:
+            line = consensus_open_close(snaps)[0]  # median of each book's FIRST
+            kind = "observed_1h"
+        if line is not None:
+            lines[gid], kinds[gid] = line, kind
     for gid, snaps in fg.items():
         if gid in lines:
-            continue  # observed 1H opener wins
+            continue  # a posted 1H line wins
         open_total, open_spread = _full_game_opener(snaps)
         if open_total is not None:
             lines[gid] = proxy_total(open_total, spread=open_spread)
             kinds[gid] = "derived_fg"
     return lines, kinds
+
+
+def opening_line_lookup(season: int, week: int) -> Tuple[Dict[int, float], Dict[int, str]]:
+    """The incumbent lookup: ranking_line_lookup(basis="opener")."""
+    return ranking_line_lookup(season, week, basis="opener")
+
+
+def training_real_closes(frame: pd.DataFrame, season: int) -> Dict[int, float]:
+    """game_id -> REAL pre-kick 1H close for the residual engine's training rows
+    (prior seasons only, within REAL_1H_CLOSE_WINDOW_H of kickoff). Rows with
+    no known kickoff are skipped: without one the window cannot be enforced
+    and a stale opener could masquerade as a close."""
+    train = frame[frame["season"] < season]
+    kick = pd.to_datetime(train["start_date"], errors="coerce")
+    ok = kick.notna()
+    kickoffs = {int(g): k.to_pydatetime() for g, k in zip(train.loc[ok, "id"], kick[ok])}
+    if not kickoffs:
+        return {}
+    with session_scope() as s:
+        return real_closes(
+            s, list(kickoffs), kickoffs, "1H_total", within_hours=REAL_1H_CLOSE_WINDOW_H
+        )
 
 
 def _enrich_qb_out(scored) -> None:
@@ -133,7 +218,16 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument("--week", type=int)
     ap.add_argument("--min-games", type=int, default=2)
+    ap.add_argument(
+        "--line-basis",
+        choices=("auto", *LINE_BASES),
+        default="auto",
+        help="ranking line: opener (incumbent), current (HR latest > consensus latest > "
+        "derived), auto = current for the residual engine else opener",
+    )
     args = ap.parse_args()
+    engine = engine_name()
+    basis = resolve_basis(args.line_basis, engine)
     if not try_init_db():
         return
 
@@ -154,9 +248,18 @@ def main() -> None:
     df = apply_min_games(frame, args.min_games)
     n_eligible = int(((df["season"] == args.season) & (df["week"] == week)).sum())
 
-    lines, kinds = opening_line_lookup(args.season, week)
+    lines, kinds = ranking_line_lookup(args.season, week, basis=basis)
+    # The residual engine can only learn from games with a REAL close; the
+    # incumbent never looks (no behaviour change, no extra query).
+    closes = training_real_closes(frame, args.season) if engine == "residual" else None
     scored = score_slate(
-        args.season, target_week=week, line_lookup=lines, line_kind_lookup=kinds, df=df
+        args.season,
+        target_week=week,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+        df=df,
+        engine=engine,
+        real_closes=closes,
     )
     if scored.empty:
         if n_with_total == 0:
@@ -180,11 +283,29 @@ def main() -> None:
         sys.exit(1)
     _enrich_qb_out(scored)
     n = store_predictions(scored)
+    hr = sum(1 for k in kinds.values() if k == "hr_1h")
     obs = sum(1 for k in kinds.values() if k == "observed_1h")
     der = sum(1 for k in kinds.values() if k == "derived_fg")
+    fallback = scored.attrs.get("engine_fallback")
+    # Prefer the ROWS THE MODEL ACTUALLY TRAINED ON (score_slate's residual
+    # branch, via the fingerprint it stamps into engine_artifact) over
+    # len(closes): closes is computed off the pre-apply_min_games frame, so it
+    # can count games score_slate's min-games/training cut later drops.
+    artifact = scored.attrs.get("engine_artifact") or {}
+    fingerprint = artifact.get("fingerprint") or {}
+    n_train = fingerprint.get("n_rows")
+    train_rows = n_train if n_train is not None else len(closes or {})
+    # The residual only runs on rows with a REAL posted 1H line; the rest keep
+    # the incumbent's number. Say how the board actually split.
+    split = ""
+    if engine == "residual":
+        n_resid = artifact.get("n_rows_residual", 0)
+        split = f" rows_residual={n_resid} rows_fallback={artifact.get('n_rows_fallback', n)}"
     print(
         f"scored {n} games for {args.season} wk{week} "
-        f"({obs} observed 1H, {der} derived-from-full-game, rest proxy)"
+        f"({hr} Hard Rock 1H, {obs} observed 1H, {der} derived-from-full-game, rest proxy) "
+        f"engine={engine} basis={basis} train_rows_with_close={train_rows}{split}"
+        + (f" FALLBACK={fallback}" if fallback else "")
     )
     top = scored.head(5)
     for _, r in top.iterrows():

@@ -1,7 +1,9 @@
 """The verdict gates live twice — model/score.py (Python) and web/lib/verdict.ts
 (the This Week page). They are POINT gates from the validated top-20%-by-gap
 rule, never sigma thresholds. This test reads the TypeScript constants by regex
-and fails the moment the two drift apart."""
+and fails the moment the two drift apart. The same guard covers the fair-price
+constants and book sets hand-mirrored from beatvegas/card.py into
+web/lib/lineCheck.ts and web/lib/books.ts."""
 
 from __future__ import annotations
 
@@ -10,9 +12,12 @@ from pathlib import Path
 
 import pytest
 
+from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.model import score
 
 _TS = Path(__file__).resolve().parent.parent / "web" / "lib" / "verdict.ts"
+_BOOKS_TS = _TS.parent / "books.ts"
+_LINE_CHECK_TS = _TS.parent / "lineCheck.ts"
 
 PARITY = {
     "BET_GAP_PTS": score.BET_GAP_PTS,
@@ -27,8 +32,9 @@ PARITY = {
 
 
 def _ts_const(src: str, name: str) -> float:
+    """The numeric value of `export const <name> = <number>;` in a TS source."""
     m = re.search(rf"export\s+const\s+{name}\s*=\s*(-?[0-9.]+)\s*;", src)
-    assert m, f"{name} not exported from {_TS}"
+    assert m, f"{name} is not exported as a numeric const (it must be, for this parity guard)"
     return float(m.group(1))
 
 
@@ -58,13 +64,53 @@ def test_every_numeric_gate_in_verdict_ts_is_mirrored():
 
 def test_exchange_books_match_books_ts():
     """card.EXCHANGE_BOOKS (exchange-first fair price) mirrors web/lib/books.ts
-    EXCHANGE_KEYS — the site's Line Check must pick the same exchanges."""
+    EXCHANGE_KEYS — the site's Line Check must pick the same exchanges. A missing
+    books.ts is a FAILURE, not a skip: renaming the file must not silently
+    delete the guard."""
     from beatvegas import card
 
-    ts = _TS.parent / "books.ts"
-    if not ts.exists():
-        pytest.skip(f"{ts} not present in this checkout")
-    m = re.search(r"EXCHANGE_KEYS = new Set\(\[(.*?)\]\)", ts.read_text(), re.S)
+    assert _BOOKS_TS.exists(), f"{_BOOKS_TS} is missing — this parity guard must not vanish with it"
+    m = re.search(r"EXCHANGE_KEYS = new Set\(\[(.*?)\]\)", _BOOKS_TS.read_text(), re.S)
     assert m, "EXCHANGE_KEYS not found in books.ts"
     keys = set(re.findall(r'"([a-z_]+)"', m.group(1)))
     assert keys == set(card.EXCHANGE_BOOKS)
+
+
+def test_fair_price_constants_match_line_check_ts():
+    """The fair-price windows and the exchange quality guards are hand-mirrored
+    into web/lib/lineCheck.ts (beatvegas/card.py is the original). Drift here
+    means the card and the Line Check page disagree about which books may price
+    Hard Rock's number, or about which exchange quotes count as a fair price."""
+    from beatvegas import card
+
+    assert _LINE_CHECK_TS.exists(), f"{_LINE_CHECK_TS} is missing — the guard must not vanish"
+    src = _LINE_CHECK_TS.read_text()
+    for name, expected in (
+        ("FAIR_PRICE_LINE_WINDOW", card.FAIR_PRICE_LINE_WINDOW),
+        ("FAIR_PRICE_WIDE_WINDOW", card.FAIR_PRICE_WIDE_WINDOW),
+        ("EXCHANGE_MAX_HOLD", card.EXCHANGE_MAX_HOLD),
+        ("EXCHANGE_MAX_AGE_H", card.EXCHANGE_MAX_AGE_H),
+    ):
+        assert _ts_const(src, name) == pytest.approx(expected), name
+
+
+def test_non_exchange_fair_price_exclusions_match_line_check_ts():
+    """card.FAIR_PRICE_EXCLUDED is the FULL list. lineCheck.ts already filters
+    Hard Rock, the synthetic aggregate and the exchanges through HR_KEYS /
+    isSynthetic / isExchange, so its own set holds exactly the REMAINDER — hence
+    the _EXTRA name. A set called FAIR_PRICE_EXCLUDED there would read as the
+    full list and mislead anyone diffing the two."""
+    from beatvegas import card
+
+    assert _LINE_CHECK_TS.exists(), f"{_LINE_CHECK_TS} is missing — the guard must not vanish"
+    m = re.search(
+        r"FAIR_PRICE_EXCLUDED_EXTRA = new Set\(\[(.*?)\]\)", _LINE_CHECK_TS.read_text(), re.S
+    )
+    assert m, "FAIR_PRICE_EXCLUDED_EXTRA not found in lineCheck.ts"
+    keys = set(re.findall(r'"([a-z_]+)"', m.group(1)))
+    assert keys == (
+        set(card.FAIR_PRICE_EXCLUDED)
+        - set(card.EXCHANGE_BOOKS)
+        - set(card.SYNTHETIC_BOOKS)
+        - {HR_BOOK_KEY}
+    )

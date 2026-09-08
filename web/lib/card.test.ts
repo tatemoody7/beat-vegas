@@ -117,6 +117,7 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   fairSource: null,
   reason: null,
   degradedInputs: [],
+  gateBlocker: null,
   ...o,
 });
 
@@ -734,6 +735,7 @@ describe("parseCard (2026-09 contract)", () => {
             tier: "PASS",
             blocker: "degraded",
             degraded_inputs: ["injuries", "weather"],
+            gate_blocker: "gap",
           }),
         ],
       }),
@@ -756,7 +758,9 @@ describe("parseCard (2026-09 contract)", () => {
     expect(c!.items[2]).toMatchObject({
       blocker: "degraded",
       degradedInputs: ["injuries", "weather"],
+      gateBlocker: "gap",
     });
+    expect(c!.items[0].gateBlocker).toBeNull();
   });
 
   it("defaults: no slot → null, no status → final, no degraded → []", () => {
@@ -769,6 +773,7 @@ describe("parseCard (2026-09 contract)", () => {
       fairSource: null,
       reason: null,
       degradedInputs: [],
+      gateBlocker: null,
     });
   });
 

@@ -619,6 +619,59 @@ def test_a_healthy_preview_still_holds_the_games_with_no_qb_read_from_today(env,
     assert by_id[1]["blocker"] == "degraded" and by_id[2]["blocker"] is None
 
 
+def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
+    """Game 5 qualifies but was blocked on price; game 1 was a clean BET. A
+    truncated sweep that never reached either degrades both, and neither loses
+    its gate: the item and the paper pick's frozen chips carry gate_blocker,
+    the pick's blocker is "degraded" (the ledger key the site parses), and the
+    EDGE summary line shows the gate with a degraded marker."""
+    mod, eng = env
+    seed_week(eng)
+    sweep = _write(
+        tmp_path,
+        "sweep.json",
+        {
+            "complete": False,
+            "reason": "credit_cap",
+            "events_in_window": 5,
+            "events_polled": 3,
+            "unpolled_game_ids": [1, 5],
+        },
+    )
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=sweep) == 0
+    )
+    lines = _summary(capsys)
+    edge = [ln for ln in lines if ln.startswith("  EDGE Iowa @ Nebraska")]
+    assert len(edge) == 1 and edge[0].startswith("  EDGE Iowa @ Nebraska [price · degraded]: ")
+    # an untouched EDGE keeps the plain bracket
+    assert any(ln.startswith("  EDGE Toledo @ Akron [no_hr_line]: ") for ln in lines)
+
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+        picks = {p.game_id: p for p in s.query(ManualPick).all()}
+    by_id = {i["game_id"]: i for i in payload["items"]}
+    assert by_id[1]["blocker"] == "degraded" and by_id[1]["gate_blocker"] == "none"
+    assert by_id[5]["blocker"] == "degraded" and by_id[5]["gate_blocker"] == "price"
+    assert by_id[5]["tier"] == "EDGE" and by_id[5]["paper_blocker"] == "degraded"
+    assert by_id[3]["gate_blocker"] is None  # not degraded
+    assert set(picks) == {1, 5}
+    for gid, gate in ((1, "none"), (5, "price")):
+        assert picks[gid].blocker == "degraded" and picks[gid].is_paper is True
+        chips = json.loads(picks[gid].factors_json_at_pick)
+        assert chips["gate_blocker"] == gate
+    # a clean pick carries no gate_blocker chip value
+    with Session(eng) as s:
+        s.query(ManualPick).delete()
+        s.query(Card).delete()
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    with Session(eng) as s:
+        pick = s.query(ManualPick).filter(ManualPick.game_id == 1).one()
+    assert pick.blocker == "none"
+    assert json.loads(pick.factors_json_at_pick)["gate_blocker"] is None
+
+
 def test_an_unreadable_status_file_is_ignored_not_treated_as_a_failure(env, capsys, tmp_path):
     mod, eng = env
     seed_week(eng)

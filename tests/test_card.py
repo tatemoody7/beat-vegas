@@ -527,6 +527,8 @@ ITEM_KEYS = {
     "cap_rank",
     "over_cap",
     "degraded_inputs",
+    # the gate a degraded item was blocked on (None unless degraded)
+    "gate_blocker",
     # display chips
     "full_game_total",
     "spread",

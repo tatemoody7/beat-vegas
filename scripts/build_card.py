@@ -229,7 +229,15 @@ def log_paper_picks(
                 "market_line",
             )
         }
-        chips.update({"tier": it["tier"], "cap_rank": it.get("cap_rank")})
+        # gate_blocker: on a degraded pick, the gate result the failed input
+        # overrode ("none" = every gate passed); null otherwise.
+        chips.update(
+            {
+                "tier": it["tier"],
+                "cap_rank": it.get("cap_rank"),
+                "gate_blocker": it.get("gate_blocker"),
+            }
+        )
         add_pick(
             session,
             game_id=gid,
@@ -309,7 +317,13 @@ def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
             )
     for it in card["items"]:
         if it["tier"] == "EDGE":
-            out.append(f"  EDGE {it['away']} @ {it['home']} [{it['blocker']}]: {it['action']}")
+            # A degraded EDGE keeps its gate in the bracket: "[price · degraded]".
+            tag = (
+                f"{it.get('gate_blocker')} · degraded"
+                if it.get("blocker") == "degraded"
+                else it["blocker"]
+            )
+            out.append(f"  EDGE {it['away']} @ {it['home']} [{tag}]: {it['action']}")
     for it in card["items"]:
         if it["tier"] == "BET" and it.get("blocker") == "degraded":
             out.append(

@@ -44,6 +44,7 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   fairSource: null,
   reason: null,
   degradedInputs: [],
+  gateBlocker: null,
   ...o,
 });
 

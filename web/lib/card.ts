@@ -20,7 +20,7 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 //            bv_line, gap, kill_line, kill_price, action, why:[...], paper_logged,
 //            qualifies, paper_blocker, cap_rank, over_cap,
 //            full_game_total, spread, total_band, hook_side, key_dist,
-//            hr_vs_market, fair_source, degraded_inputs, reason}],
+//            hr_vs_market, fair_source, degraded_inputs, gate_blocker, reason}],
 //    notes:[...]}
 // slot/status/degraded and the per-item provenance fields arrived 2026-09;
 // older rows lack them and parse to null / "final" / [] so nothing breaks.
@@ -98,6 +98,8 @@ export type CardItem = {
   reason: PickReason | null;
   /** Inputs that failed for this game on this build. */
   degradedInputs: string[];
+  /** On a degraded item, the gate result the failure overrode: "none" (every gate passed) or the gate; null otherwise. */
+  gateBlocker: string | null;
 };
 
 export type Card = {
@@ -213,6 +215,7 @@ function parseItem(raw: unknown): CardItem | null {
       ? (raw.reason as PickReason)
       : null,
     degradedInputs: strList(raw.degraded_inputs),
+    gateBlocker: str(raw.gate_blocker),
   };
 }
 

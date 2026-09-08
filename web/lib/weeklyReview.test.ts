@@ -135,6 +135,8 @@ describe("blockerRows", () => {
       paperPick({ id: 5, blocker: null }), // logged before tagging
       paperPick({ id: 6, isPaper: false, blocker: null }), // real: never in this table
       paperPick({ id: 7, market: "full", blocker: "none" }), // full game: out
+      // held by a failed card input: its own gate, never the catch-all
+      paperPick({ id: 9, blocker: "degraded", result: "over", units: -1 }),
     ];
     const rows = blockerRows(picks);
     expect(rows.map((r) => [r.blocker, r.paperBets])).toEqual([
@@ -142,8 +144,13 @@ describe("blockerRows", () => {
       ["price", 1],
       ["no_fair_price", 1],
       ["cap", 1],
+      ["degraded", 1],
       ["untagged", 1],
     ]);
+    expect(rows[4].paper).toMatchObject({ record: "0-1" });
+    expect(BLOCKER_LABEL.degraded).toBe(
+      "Held: a card input failed, so this bet was paper-only",
+    );
     expect(rows[0].paper).toMatchObject({ record: "1-1" });
     expect(rows[3].paper).toBeNull(); // pending only: no graded record
     expect(BLOCKER_LABEL.no_fair_price).toBe(

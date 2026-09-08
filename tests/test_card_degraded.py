@@ -376,6 +376,7 @@ def test_apply_degraded_keeps_the_tier_and_writes_a_paper_only_action():
     (out,) = items
     assert out["tier"] == "BET"  # the read is unchanged
     assert out["blocker"] == "degraded" and out["degraded_inputs"] == ["sweep"]
+    assert out["gate_blocker"] == "none"  # every gate had passed
     assert out["paper_blocker"] == "degraded"  # it qualifies, so the ledger tags it
     assert out["action"] == (
         "Degraded inputs (sweep): paper only — re-check Hard Rock’s number and the "
@@ -396,6 +397,21 @@ def test_apply_degraded_lists_every_input_that_touched_the_game():
     assert items[0]["action"].startswith("Degraded inputs (sweep, tempo): paper only")
 
 
+def test_apply_degraded_preserves_the_gate_that_had_blocked_a_real_bet():
+    """A qualifying game blocked on price must not become "just degraded":
+    the gate survives as gate_blocker, and a second pass over an already
+    degraded item does not overwrite it with "degraded"."""
+    items = [
+        {"game_id": 1, "tier": "EDGE", "blocker": "price", "qualifies": True, "action": ""},
+        {"game_id": 2, "tier": "EDGE", "blocker": "no_hr_line", "qualifies": False, "action": ""},
+    ]
+    apply_degraded(items, [{"input": "sweep", "detail": "", "game_ids": [1, 2]}])
+    assert items[0]["blocker"] == "degraded" and items[0]["gate_blocker"] == "price"
+    assert items[1]["blocker"] == "degraded" and items[1]["gate_blocker"] == "no_hr_line"
+    apply_degraded(items, [{"input": "tempo", "detail": "", "game_ids": [1]}])
+    assert items[0]["blocker"] == "degraded" and items[0]["gate_blocker"] == "price"
+
+
 def test_apply_degraded_leaves_untouched_games_alone():
     items = [
         {"game_id": 1, "tier": "BET", "blocker": None, "qualifies": True, "action": "Bet now"},
@@ -403,6 +419,7 @@ def test_apply_degraded_leaves_untouched_games_alone():
     ]
     apply_degraded(items, [{"input": "sweep", "detail": "", "game_ids": [2]}])
     assert items[0]["blocker"] is None and items[0]["action"] == "Bet now"
+    assert items[0].get("gate_blocker") is None
     assert items[1]["blocker"] == "degraded"
 
 
@@ -478,7 +495,7 @@ def test_status_is_degraded_whatever_the_slot_says():
     ]
     (it,) = c["items"]
     assert it["blocker"] == "degraded" and it["degraded_inputs"] == ["sweep"]
-    assert it["cap_rank"] is None
+    assert it["gate_blocker"] == "none" and it["cap_rank"] is None
 
 
 def test_counts_bet_excludes_a_degraded_bet():
@@ -505,6 +522,7 @@ def test_counts_bet_excludes_a_degraded_bet():
 def test_a_build_with_no_slot_still_reads_final():
     c = build_card([game(1)], bet_snaps(1), [model(1, 22.4)], [], season=2026, week=3, now=NOW)
     assert c["slot"] is None and c["status"] == "final"
+    assert c["items"][0]["gate_blocker"] is None  # not degraded: no gate to preserve
 
 
 def test_payload_keys_match_the_web_contract():
@@ -525,7 +543,7 @@ def test_payload_keys_match_the_web_contract():
     }
     assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap", "degraded"}
     assert set(c["degraded"][0]) == {"input", "detail", "game_ids"}
-    assert "degraded_inputs" in c["items"][0]
+    assert "degraded_inputs" in c["items"][0] and "gate_blocker" in c["items"][0]
     # strict JSON, as the cards row is written
     assert json.loads(json.dumps(c, allow_nan=False)) == c
 

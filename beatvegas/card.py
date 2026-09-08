@@ -716,8 +716,11 @@ def build_item(
         "paper_blocker": paper_blocker,
         "cap_rank": None,
         "over_cap": False,
-        # inputs that failed for this game on this build (apply_degraded)
+        # inputs that failed for this game on this build (apply_degraded), and the
+        # gate result they overrode: None unless degraded; then "none" (every
+        # gate passed) or the gate that had blocked a real bet (price, ...).
         "degraded_inputs": [],
+        "gate_blocker": None,
         # display chips (not gates)
         "full_game_total": _num(game.get("total")),
         "spread": _num(game.get("spread")),
@@ -943,6 +946,11 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
     that failed, and a paper-only action. The TIER is unchanged — the read is
     still the read; what changed is that we cannot trust the inputs behind it.
 
+    The gate result survives as `gate_blocker` ("none" when every gate had
+    passed, else the gate — price, off_market, ...) so a qualifying game that
+    was blocked on price does not lose that fact: the paper pick freezes it in
+    its chips and the by-gate ledger can still read it.
+
     Runs BEFORE apply_weekly_cap so a degraded bet consumes no weekly slot.
     Mutates + returns `items`."""
     by_game: Dict[int, List[str]] = {}
@@ -959,6 +967,8 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
             continue
         uniq = sorted(set(names), key=lambda n: (order.get(n, len(order)), n))
         it["degraded_inputs"] = uniq
+        if it.get("blocker") != DEGRADED_BLOCKER:
+            it["gate_blocker"] = it.get("blocker") or "none"
         it["blocker"] = DEGRADED_BLOCKER
         if it.get("qualifies"):
             it["paper_blocker"] = DEGRADED_BLOCKER

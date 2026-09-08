@@ -124,6 +124,25 @@ def test_both_sources_empty_writes_the_status_before_the_fatal_exit(env, monkeyp
         assert s.query(GamePreview).count() == 0  # nothing written
 
 
+def test_an_unreachable_database_is_not_ok(env, monkeypatch, tmp_path):
+    """Symmetric with poll_lines: nothing was written, so the card must not read
+    this exit as a healthy QB read. Before, it wrote ok True."""
+    mod, eng = env
+    mod.try_init_db = lambda: False
+    out = tmp_path / "preview.json"
+    _run(mod, monkeypatch, "--status-file", str(out))
+    assert _status(out) == {
+        "ok": False,
+        "reason": "db_unreachable",
+        "rotowire_rows": 1,
+        "espn_ok": True,
+        "games": 0,
+        "qb_outs": 0,
+    }
+    with Session(eng) as s:
+        assert s.query(GamePreview).count() == 0
+
+
 def test_no_status_file_flag_writes_nothing(env, monkeypatch, tmp_path):
     mod, _ = env
     _run(mod, monkeypatch)

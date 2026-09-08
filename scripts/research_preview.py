@@ -102,11 +102,11 @@ def main() -> None:
     if not report:
         reason = "both_empty" if not espn_ok else "rotowire_empty"
 
-    def status(games: int, outs: int) -> None:
+    def status(games: int, outs: int, why: Optional[str] = reason) -> None:
         write_status(
             args.status_file,
-            ok=reason is None,
-            reason=reason,
+            ok=why is None,
+            reason=why,
             rotowire_rows=len(report),
             espn_ok=bool(espn_ok),
             games=games,
@@ -119,7 +119,9 @@ def main() -> None:
         sys.exit(3)
 
     if not try_init_db():
-        status(0, 0)
+        # Nothing was written, so the QB read on file is whatever it was: say
+        # so (symmetric with poll_lines) rather than reporting a healthy run.
+        status(0, 0, why=reason or "db_unreachable")
         return
 
     now = datetime.utcnow()

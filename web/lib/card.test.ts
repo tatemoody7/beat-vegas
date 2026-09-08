@@ -546,6 +546,30 @@ describe("parseCard: paper ledger fields", () => {
     });
   });
 
+  it("derives counts.bet without degraded BETs when the payload lacks counts", () => {
+    const items = [
+      rawItem({ cap_rank: 1, over_cap: false }),
+      rawItem({
+        game_id: 402,
+        blocker: "degraded",
+        degraded_inputs: ["sweep"],
+        cap_rank: null,
+      }),
+      rawItem({ game_id: 403, blocker: "cap", cap_rank: 6, over_cap: true }),
+    ];
+    const derived = parseCard(rawCard({ counts: undefined, items }))!;
+    expect(derived.counts).toEqual({
+      bet: 1,
+      edge: 0,
+      pass: 0,
+      overCap: 1,
+      degraded: 1,
+    });
+    // ...and the panel's headline agrees with it.
+    expect(summarizeCard(derived).headline).toBe("1 bet this week.");
+    expect(summarizeCard(derived).bets.map((r) => r.gameId)).toEqual([401]);
+  });
+
   it("reads fair_source / hr_vs_market and the no_fair_price blocker (PR-6)", () => {
     const c = parseCard(
       rawCard({
@@ -641,6 +665,43 @@ describe("summarizeCard: the weekly cap", () => {
     expect(
       s.overCap.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
     ).toEqual([[3, "cap", true]]);
+    expect(s.degraded).toEqual([]);
+  });
+
+  it("keeps degraded BETs out of the bet rows and the headline, listing them apart", () => {
+    const c = card({
+      items: [
+        item({ gameId: 1, tier: "BET", capRank: 1, gap: 3 }),
+        item({
+          gameId: 2,
+          tier: "BET",
+          gap: 2.8,
+          blocker: "degraded",
+          degradedInputs: ["sweep"],
+          paperBlocker: "degraded",
+          paperLogged: true,
+        }),
+      ],
+    });
+    const s = summarizeCard(c);
+    expect(s.headline).toBe("1 bet this week.");
+    expect(s.bets.map((r) => r.gameId)).toEqual([1]);
+    expect(
+      s.degraded.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
+    ).toEqual([[2, "degraded", true]]);
+    // Every bet held: no bets this week, and the held rows still show.
+    const all = summarizeCard(
+      card({
+        items: [
+          item({ gameId: 2, tier: "BET", blocker: "degraded" }),
+          item({ gameId: 3, tier: "EDGE", blocker: "price", ev: 0.01 }),
+        ],
+      }),
+    );
+    expect(all.headline).toBe("No bets this week.");
+    expect(all.hasBets).toBe(false);
+    expect(all.degraded.map((r) => r.gameId)).toEqual([2]);
+    expect(all.closest.map((r) => r.gameId)).toEqual([3]);
   });
 });
 

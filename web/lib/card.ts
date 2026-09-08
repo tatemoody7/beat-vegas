@@ -24,12 +24,13 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 //    notes:[...]}
 // slot/status/degraded and the per-item provenance fields arrived 2026-09;
 // older rows lack them and parse to null / "final" / [] so nothing breaks.
-// counts.bet excludes over-cap BETs (the bettable count).
+// counts.bet excludes over-cap and degraded BETs (the bettable count).
 // Items arrive pre-sorted: BET, then EDGE, then PASS — each tier by gap desc
 // (the cap-5 rule the real-close backtest measured ranks by gap). The 6th+
 // BET by gap keeps tier BET but carries blocker "cap" and over_cap: every
 // gate passed, the weekly cap (docs/BETTING_POLICY.md) makes it paper only.
-// counts.bet is the bettable BETs (inside the cap); counts.over_cap the rest.
+// counts.bet is the bettable BETs (inside the cap, no failed input);
+// counts.over_cap and counts.degraded tally the rest.
 
 export type CardTier = "BET" | "EDGE" | "PASS";
 export type CardBlocker =
@@ -108,7 +109,7 @@ export type Card = {
   slot: CardSlot | null;
   status: CardStatus;
   degraded: DegradedInput[];
-  /** bet = bettable BETs (inside the cap); overCap = BETs beyond it; degraded = items blocked by a failed input. */
+  /** bet = bettable BETs (inside the cap, no failed input); overCap = BETs beyond it; degraded = items blocked by a failed input. */
   counts: {
     bet: number;
     edge: number;
@@ -251,7 +252,9 @@ export function parseCard(raw: unknown): Card | null {
     ? obj.items.map(parseItem).filter((i): i is CardItem => i !== null)
     : [];
   const derived = {
-    bet: items.filter((i) => i.tier === "BET" && !i.overCap).length,
+    bet: items.filter(
+      (i) => i.tier === "BET" && !i.overCap && i.blocker !== "degraded",
+    ).length,
     edge: items.filter((i) => i.tier === "EDGE").length,
     pass: items.filter((i) => i.tier === "PASS").length,
     overCap: items.filter((i) => i.overCap).length,
@@ -467,10 +470,12 @@ export type CardSummary = {
   /** "No bets this week." / "1 bet this week." / "3 bets this week." */
   headline: string;
   hasBets: boolean;
-  /** One row per bettable BET (inside the weekly cap), in card order (never more than MAX_CARD_ROWS). */
+  /** One row per bettable BET (inside the weekly cap, no failed input), in card order (never more than MAX_CARD_ROWS). */
   bets: CardRow[];
   /** BETs beyond the weekly cap: every gate passed, paper only. */
   overCap: CardRow[];
+  /** BETs held because an input failed on this build (blocker "degraded"): paper only, no cap slot. */
+  degraded: CardRow[];
   /** On a no-bet week: up to CLOSEST_ROWS EDGE items, best ev first. */
   closest: CardRow[];
   /** On a no-bet week: the first note, shown right under the headline. */
@@ -515,11 +520,14 @@ function toRow(item: CardItem): CardRow {
 /** Pure: everything the card panel draws, worked out once from the card. */
 export function summarizeCard(card: Card): CardSummary {
   const bets = card.items
-    .filter((i) => i.tier === "BET" && !i.overCap)
+    .filter((i) => i.tier === "BET" && !i.overCap && i.blocker !== "degraded")
     .slice(0, MAX_CARD_ROWS)
     .map(toRow);
   const overCap = card.items
     .filter((i) => i.tier === "BET" && i.overCap)
+    .map(toRow);
+  const degraded = card.items
+    .filter((i) => i.tier === "BET" && i.blocker === "degraded")
     .map(toRow);
   const hasBets = bets.length > 0;
   const closest = hasBets
@@ -541,6 +549,7 @@ export function summarizeCard(card: Card): CardSummary {
     hasBets,
     bets,
     overCap,
+    degraded,
     closest,
     reason,
     notes: reason === null ? card.notes : card.notes.slice(1),

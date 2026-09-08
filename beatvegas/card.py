@@ -1066,10 +1066,15 @@ def build_card(
         notes.append(note)
 
     public = [{k: v for k, v in it.items() if not k.startswith("_")} for it in items]
-    # counts.bet = bettable BETs (inside the weekly cap): what the site and the
-    # Saturday text read. Over-cap BETs keep tier BET but are tallied apart.
+    # counts.bet = bettable BETs (inside the weekly cap, no failed input): what
+    # the site and the Saturday text read, so it agrees with the "  BET #" lines.
+    # Over-cap and degraded BETs keep tier BET but are tallied apart.
     counts = {
-        "bet": sum(1 for it in public if it["tier"] == "BET" and not it["over_cap"]),
+        "bet": sum(
+            1
+            for it in public
+            if it["tier"] == "BET" and not it["over_cap"] and it["blocker"] != DEGRADED_BLOCKER
+        ),
         "edge": sum(1 for it in public if it["tier"] == "EDGE"),
         "pass": sum(1 for it in public if it["tier"] == "PASS"),
         "over_cap": sum(1 for it in public if it["over_cap"]),

@@ -449,6 +449,27 @@ def test_status_is_degraded_whatever_the_slot_says():
     assert it["cap_rank"] is None
 
 
+def test_counts_bet_excludes_a_degraded_bet():
+    """Owner decision (2026-09-08): a degraded BET is tallied in counts.degraded
+    only, so the header agrees with the "  BET #" lines beneath it and the
+    site's "N bets this week"."""
+    deg = [{"input": "sweep", "detail": "stopped early (credit_cap)", "game_ids": [2]}]
+    c = build_card(
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4), model(2, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        degraded=deg,
+    )
+    by_id = {it["game_id"]: it for it in c["items"]}
+    assert by_id[1]["tier"] == by_id[2]["tier"] == "BET"
+    assert by_id[1]["blocker"] is None and by_id[2]["blocker"] == "degraded"
+    assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 1}
+
+
 def test_a_build_with_no_slot_still_reads_final():
     c = build_card([game(1)], bet_snaps(1), [model(1, 22.4)], [], season=2026, week=3, now=NOW)
     assert c["slot"] is None and c["status"] == "final"

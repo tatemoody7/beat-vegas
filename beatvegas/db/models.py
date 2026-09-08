@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -402,6 +403,33 @@ class ModelRun(Base):
     metrics_json = Column(String)
     notes = Column(String)
     created_at = Column(DateTime)
+
+
+class ModelArtifact(Base):
+    """One fitted model per refit: the joblib blob plus the training fingerprint
+    it was fitted on (model/artifacts.py). The scoring job refits from scratch
+    every run; this is the record of WHAT it fitted on, so a refit is
+    reproducible and a quiet mid-season correction to the training history
+    shows up as a moved fingerprint (n_rows / max_game_date / feature_hash) in
+    the job log. Written only by an engine that hands score_slate a fitted
+    model (the residual engine); the incumbent writes nothing here."""
+
+    __tablename__ = "model_artifacts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    engine = Column(String, index=True)  # config model.engine that produced it
+    model_version = Column(String)  # the engine's version tag (resid_v1)
+    season = Column(Integer)  # the slate scored, not the training seasons
+    week = Column(Integer)
+    fitted_at = Column(DateTime)
+    n_rows = Column(Integer)
+    min_game_date = Column(String(10))  # ISO YYYY-MM-DD of the training rows
+    max_game_date = Column(String(10))
+    feature_hash = Column(String(32), index=True)
+    n_features = Column(Integer)
+    fingerprint_json = Column(Text)
+    metrics_json = Column(Text)
+    sklearn_version = Column(String)
+    blob = Column(LargeBinary)  # joblib dump of the fitted regressor
 
 
 class GamePreview(Base):

@@ -11,11 +11,20 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { labelOf, LINE_SOURCE_TEXT } from "@/lib/labels";
 import type { LineBucket } from "@/lib/lineStudy";
 
-// Interactive chart + highlight + table. Mirrors the Streamlit Line Study tab:
-// bars color-coded green/red vs the 52.4% breakeven, dashed breakeven line,
-// a highlighted line metric, and the full ranked table.
+// Interactive chart + highlight + table: bars coloured green/red against the
+// break-even rate, a dashed break-even line, one total picked out, and the
+// full ranked table. "Line from" says whether the total is a book's open or
+// our estimate — never the raw enum (spec §24.18).
+
+// Chart chrome comes from the design tokens' literal values: Recharts takes
+// colour strings, not CSS variables.
+const AXIS = "#aab6cc"; // --text-muted
+const GRID = "#3a4a6b"; // --border
+const GOOD = "#3ddc84"; // --good
+const BAD = "#f87171"; // --bad
 export default function LineStudyView({
   buckets,
   breakeven,
@@ -35,7 +44,7 @@ export default function LineStudyView({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-        Highlight line
+        Show one total
         <input
           type="number"
           step={0.5}
@@ -45,20 +54,19 @@ export default function LineStudyView({
         />
         {hl ? (
           <span className="text-[var(--text-muted)]">
-            Under {highlight}:{" "}
-            <b
-              style={{
-                color: hl.under_pct >= breakeven ? "#16a34a" : "#dc2626",
-              }}
-            >
-              {hl.under_pct}%
-            </b>{" "}
-            ({hl.under}/{hl.games} ·{" "}
-            {hl.under_pct >= breakeven ? "beats" : "below"} breakeven)
+            {`Under ${highlight}: `}
+            <b style={{ color: hl.under_pct >= breakeven ? GOOD : BAD }}>
+              {`${hl.under_pct}%`}
+            </b>
+            {` (${hl.under} of ${hl.games} · ${
+              hl.under_pct >= breakeven
+                ? "beats break-even"
+                : "below break-even"
+            })`}
           </span>
         ) : (
           <span className="text-[var(--text-dim)]">
-            no bucket at {highlight}
+            {`no games at ${highlight}`}
           </span>
         )}
       </div>
@@ -71,28 +79,28 @@ export default function LineStudyView({
           >
             <XAxis
               dataKey="line"
-              tick={{ fill: "#97a3bd", fontSize: 11 }}
+              tick={{ fill: AXIS, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#243049" }}
+              axisLine={{ stroke: GRID }}
             />
             <YAxis
               domain={[0, yMax]}
-              tick={{ fill: "#97a3bd", fontSize: 11 }}
+              tick={{ fill: AXIS, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#243049" }}
+              axisLine={{ stroke: GRID }}
               label={{
                 value: "Under %",
                 angle: -90,
                 position: "insideLeft",
-                fill: "#97a3bd",
+                fill: AXIS,
                 fontSize: 11,
               }}
             />
             <Tooltip
-              cursor={{ fill: "#243049", opacity: 0.4 }}
+              cursor={{ fill: GRID, opacity: 0.4 }}
               contentStyle={{
                 background: "#0a0f1e",
-                border: "1px solid #243049",
+                border: `1px solid ${GRID}`,
                 borderRadius: 8,
                 color: "#eef2f9",
                 fontSize: 12,
@@ -104,11 +112,11 @@ export default function LineStudyView({
             />
             <ReferenceLine
               y={breakeven}
-              stroke="#97a3bd"
+              stroke={AXIS}
               strokeDasharray="4 4"
               label={{
                 value: `${breakeven}% break-even`,
-                fill: "#97a3bd",
+                fill: AXIS,
                 fontSize: 10,
                 position: "right",
               }}
@@ -117,7 +125,7 @@ export default function LineStudyView({
               {chartData.map((b) => (
                 <Cell
                   key={b.line}
-                  fill={b.under_pct >= breakeven ? "#16a34a" : "#dc2626"}
+                  fill={b.under_pct >= breakeven ? GOOD : BAD}
                 />
               ))}
             </Bar>
@@ -129,12 +137,12 @@ export default function LineStudyView({
         <table className="bv-table">
           <thead>
             <tr>
-              <th>Line</th>
-              <th>Games</th>
-              <th>Under</th>
-              <th>Push</th>
-              <th>Under %</th>
-              <th>Source</th>
+              <th className="bv-num">Total</th>
+              <th className="bv-num">Games</th>
+              <th className="bv-num">Under</th>
+              <th className="bv-num">Push</th>
+              <th className="bv-num">Under %</th>
+              <th>Line from</th>
             </tr>
           </thead>
           <tbody>
@@ -145,24 +153,29 @@ export default function LineStudyView({
                   b.line === highlight ? "bg-[var(--accent-soft)]" : ""
                 }
               >
-                <td className="font-mono text-[var(--text)]">{b.line}</td>
-                <td className="text-[var(--text-muted)]">{b.games}</td>
-                <td className="text-[var(--text-muted)]">{b.under}</td>
-                <td className="text-[var(--text-muted)]">{b.push}</td>
-                <td
-                  className="font-mono font-semibold"
-                  style={{
-                    color: b.under_pct >= breakeven ? "#16a34a" : "#dc2626",
-                  }}
-                >
-                  {b.under_pct}%
+                <td className="bv-num font-mono text-[var(--text)]">
+                  {b.line}
                 </td>
-                <td className="text-[var(--text-dim)]">{b.line_source}</td>
+                <td className="bv-num text-[var(--text-muted)]">{b.games}</td>
+                <td className="bv-num text-[var(--text-muted)]">{b.under}</td>
+                <td className="bv-num text-[var(--text-muted)]">{b.push}</td>
+                <td
+                  className="bv-num font-mono font-semibold"
+                  style={{ color: b.under_pct >= breakeven ? GOOD : BAD }}
+                >
+                  {`${b.under_pct}%`}
+                </td>
+                <td className="text-[var(--text-dim)]">
+                  {labelOf(LINE_SOURCE_TEXT, b.line_source, "our estimate")}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-[var(--text-dim)]">
+        {`Bars above the dashed line beat the ${breakeven}% you need at -110.`}
+      </p>
     </div>
   );
 }

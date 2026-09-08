@@ -964,7 +964,7 @@ describe("cardHealth", () => {
     );
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "Card is 24h ago — this morning's build has not landed",
+      "This card was built 24h ago. This morning's update has not landed.",
     );
   });
 
@@ -982,11 +982,11 @@ describe("cardHealth", () => {
     const h = cardHealth(card({ builtAt: "2026-09-18T22:00:00Z" }), SAT_9AM);
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "Card is 15h ago — this morning's build has not landed",
+      "This card was built 15h ago. This morning's update has not landed.",
     );
   });
 
-  it("warns on a preview build any day, naming the slot", () => {
+  it("warns on a preview build any day, without naming the slot", () => {
     const h = cardHealth(
       card({
         slot: "friday",
@@ -997,7 +997,7 @@ describe("cardHealth", () => {
     );
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "Preview card (friday) — this morning's build (8:05–8:45am ET) has not replaced it",
+      "An earlier build. This morning's 8am ET line sweep is not in it yet.",
     );
   });
 
@@ -1012,7 +1012,7 @@ describe("cardHealth", () => {
     );
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "Manual card built Sat 8:07am ET — this morning's build has not replaced it",
+      "Built by hand Sat 8:07am ET. This morning's automatic update has not replaced it.",
     );
   });
 
@@ -1022,7 +1022,7 @@ describe("cardHealth", () => {
       SAT_9AM,
     );
     expect(h.title).toBe(
-      "Manual card — this morning's build has not replaced it",
+      "Built by hand. This morning's automatic update has not replaced it.",
     );
   });
 
@@ -1033,11 +1033,11 @@ describe("cardHealth", () => {
     );
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "Card has no build time — this morning's build has not landed",
+      "This card has no build time. This morning's update has not landed.",
     );
   });
 
-  it("lists every degraded input on a degraded card", () => {
+  it("names each failed input in words, never the key or the raw detail", () => {
     const h = cardHealth(
       card({
         slot: "saturday",
@@ -1054,11 +1054,15 @@ describe("cardHealth", () => {
       SAT_9AM,
     );
     expect(h.level).toBe("warn");
-    expect(h.title).toBe("Degraded card · saturday");
+    expect(h.title).toBe("Some inputs failed this morning — paper only");
     expect(h.details).toEqual([
-      "preview: rotowire_empty",
-      "sweep: stopped early (credit_cap)",
+      "The rules behind these games could not be checked, so nothing here is a real bet today.",
+      "the injury and news pull did not finish",
+      "the morning line sweep did not finish",
     ]);
+    // No input key, no Python detail string, and never the slot.
+    expect(h.title).not.toMatch(/saturday/);
+    expect(h.details.join(" ")).not.toMatch(/rotowire_empty|credit_cap|sweep:/);
   });
 
   it("does not show the degraded banner for a pace-only Saturday final", () => {

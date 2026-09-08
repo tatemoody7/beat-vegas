@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PickFull } from "./picks";
-import {
-  BLOCKER_LABEL,
-  blockerRows,
-  reasonRows,
-  weekRows,
-} from "./weeklyReview";
+import { GATE_TEXT } from "./labels";
+import { blockerRows, reasonRows, weekRows } from "./weeklyReview";
 
 const pick = (o: Partial<PickFull>): PickFull => ({
   id: 1,
@@ -148,13 +144,11 @@ describe("blockerRows", () => {
       ["untagged", 1],
     ]);
     expect(rows[4].paper).toMatchObject({ record: "0-1" });
-    expect(BLOCKER_LABEL.degraded).toBe(
-      "Held: a card input failed, so this bet was paper-only",
-    );
+    expect(GATE_TEXT.degraded).toBe("An input failed that morning");
     expect(rows[0].paper).toMatchObject({ record: "1-1" });
     expect(rows[3].paper).toBeNull(); // pending only: no graded record
-    expect(BLOCKER_LABEL.no_fair_price).toBe(
-      "Blocked: no comparable price to judge Hard Rock’s under",
+    expect(GATE_TEXT.no_fair_price).toBe(
+      "Hard Rock's price could not be compared",
     );
   });
 });

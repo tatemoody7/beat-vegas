@@ -72,33 +72,6 @@ export type PostMortem = { runs: PmRun[]; buckets: PmBucket[] };
 
 export const HIST_SCOPE = "hist_2023_25";
 
-export const RULE_LABEL: Record<string, string> = {
-  cap5: "Followed the system (≤5 a week by gap, gap ≥ 1.75)",
-  gap175: "Every gap ≥ 1.75",
-  gap300: "Every gap ≥ 3.0 (strong)",
-  top20: "Top 20% by gap, per season",
-  score53: "Every score ≥ 53",
-  both: "Gap ≥ 1.75 and score ≥ 53",
-  all: "Every rated game (blanket under)",
-  bet: "Card BET tier",
-  price_read: "Price read (Hard Rock pays at least fair)",
-  all_hr: "Every Hard Rock number (blanket under)",
-  qualifying: "Qualifying (Hard Rock gap ≥ 1.75, any gate — the paper ledger)",
-};
-
-export const PROXY_LABEL: Record<string, string> = {
-  // NOT a Hard Rock number: the us-region consensus (Hard Rock did not exist
-  // historically), captured once about 30 minutes before kickoff.
-  real: "us-region consensus close (no Hard Rock), ~30 min pre-kick",
-  fg: "full-game under at the us-region consensus full-game close",
-  step: "fair line",
-  flat: "old 0.52 line",
-  hr: "Hard Rock's number",
-  hr_close: "Hard Rock's pre-kick close",
-  market: "consensus at build",
-  market_close: "consensus close",
-};
-
 type RawRun = {
   scope: string;
   run_id: string | null;

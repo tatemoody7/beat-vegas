@@ -1,16 +1,15 @@
 import { getSeasons } from "@/lib/board";
 import { getDecisionQuality } from "@/lib/decision-quality";
+import { usd } from "@/lib/format";
 import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
+import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
 import { loadPostMortem } from "@/lib/postmortem";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
-import {
-  BLOCKER_LABEL,
-  getWeeklyReview,
-  REASON_LABEL,
-} from "@/lib/weeklyReview";
+import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
+import { getWeeklyReview } from "@/lib/weeklyReview";
 import BankrollCurve from "@/app/components/BankrollCurve";
 import PicksList from "@/app/components/PicksList";
 import PostMortemPanel from "@/app/components/PostMortemPanel";
@@ -21,9 +20,14 @@ import WeekSelect from "@/app/components/WeekSelect";
 export const dynamic = "force-dynamic";
 
 // Results: how the market, the model and you did — season summary, one week's
-// scorecard, week by week, by the reason each pick was logged, the
-// decision-quality lens, and every pick (delete while ungraded). Replaces the
-// old /ledger, /weekly-review and /picks pages.
+// scorecard, week by week, by the reason each pick was logged, the decision
+// lens, and every pick (delete while ungraded). Replaces the old /ledger,
+// /weekly-review and /picks pages.
+//
+// Copy rule (docs/superpowers/specs/2026-09-08-site-copy.md §21-§23): nothing
+// this page explains lives in a `title=` tooltip — a phone never shows one —
+// so every definition is a visible caption, and every enum word (a reason, a
+// blocker, an outcome) is rendered through lib/labels.
 
 const pct = (v: number | null | undefined) =>
   v == null ? "—" : `${v.toFixed(1)}%`;
@@ -33,8 +37,8 @@ const unitColor = (s: string | undefined | null) =>
   !s || s === "—"
     ? "var(--text-dim)"
     : s.startsWith("-")
-      ? "var(--over)"
-      : "var(--under-strong)";
+      ? "var(--bad)"
+      : "var(--good)";
 
 function RecordCard({
   title,
@@ -45,22 +49,19 @@ function RecordCard({
   title: string;
   rec: Record3 | null;
   emptyHint: string;
-  hint?: string;
+  /** Shown as a visible line, never a tooltip: what this record counts. */
+  hint: string;
 }) {
   return (
-    <div className="bv-card p-4" title={hint}>
-      <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">{title}</h3>
+    <div className="bv-card p-4">
+      <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
+      <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">{hint}</p>
       {rec === null ? (
         <p className="text-xs text-[var(--text-dim)]">{emptyHint}</p>
       ) : (
         <dl className="space-y-3">
           <div>
-            <dt
-              className="bv-stat-label"
-              title="Share of decided bets that won."
-            >
-              Win rate
-            </dt>
+            <dt className="bv-stat-label">Win rate</dt>
             <dd className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-[var(--text)]">
               {rec.hit}
               <span className="ml-2 font-sans text-sm font-normal text-[var(--text-dim)]">
@@ -70,12 +71,7 @@ function RecordCard({
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <div>
-              <dt
-                className="bv-stat-label"
-                title="Profit in units. 1 unit = one standard bet."
-              >
-                Units
-              </dt>
+              <dt className="bv-stat-label">Units</dt>
               <dd
                 className="mt-0.5 font-mono text-lg font-semibold tabular-nums"
                 style={{ color: unitColor(rec.units) }}
@@ -84,23 +80,13 @@ function RecordCard({
               </dd>
             </div>
             <div>
-              <dt
-                className="bv-stat-label"
-                title="Return on units staked: units won ÷ units risked over graded bets."
-              >
-                ROI
-              </dt>
+              <dt className="bv-stat-label">ROI</dt>
               <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
                 {rec.roi}
               </dd>
             </div>
             <div>
-              <dt
-                className="bv-stat-label"
-                title="Average line value (CLV): did the line move our way after the bet? Positive = beat the close."
-              >
-                Avg line value
-              </dt>
+              <dt className="bv-stat-label">Line value</dt>
               <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
                 {rec.clv}
               </dd>
@@ -116,21 +102,21 @@ function RecCells({ rec }: { rec: Record3 | null }) {
   if (!rec) {
     return (
       <>
-        <td className="text-[var(--text-dim)]">—</td>
-        <td className="text-[var(--text-dim)]">—</td>
-        <td className="text-[var(--text-dim)]">—</td>
-        <td className="text-[var(--text-dim)]">—</td>
+        <td className="bv-num text-[var(--text-dim)]">—</td>
+        <td className="bv-num text-[var(--text-dim)]">—</td>
+        <td className="bv-num text-[var(--text-dim)]">—</td>
+        <td className="bv-num text-[var(--text-dim)]">—</td>
       </>
     );
   }
   return (
     <>
-      <td className="font-mono text-[var(--text)]">{rec.record}</td>
-      <td className="font-mono" style={{ color: unitColor(rec.units) }}>
+      <td className="bv-num font-mono text-[var(--text)]">{rec.record}</td>
+      <td className="bv-num font-mono" style={{ color: unitColor(rec.units) }}>
         {rec.units}
       </td>
-      <td className="font-mono text-[var(--text-muted)]">{rec.roi}</td>
-      <td className="font-mono text-[var(--text-muted)]">{rec.clv}</td>
+      <td className="bv-num font-mono text-[var(--text-muted)]">{rec.roi}</td>
+      <td className="bv-num font-mono text-[var(--text-muted)]">{rec.clv}</td>
     </>
   );
 }
@@ -138,15 +124,15 @@ function RecCells({ rec }: { rec: Record3 | null }) {
 function RecHead() {
   return (
     <>
-      <th title="Wins-losses(-pushes) on graded bets.">W-L-P</th>
-      <th title="Profit in units. 1 unit = one standard bet.">Units</th>
-      <th title="Units won ÷ units staked.">ROI</th>
-      <th title="Average line value (CLV): positive = the line moved our way after the bet.">
-        Avg CLV
-      </th>
+      <th className="bv-num">W-L-P</th>
+      <th className="bv-num">Units</th>
+      <th className="bv-num">ROI</th>
+      <th className="bv-num">Line value</th>
     </>
   );
 }
+
+const CAPTION = "mb-2 text-xs leading-relaxed text-[var(--text-dim)]";
 
 export default async function ResultsPage({
   searchParams,
@@ -174,6 +160,13 @@ export default async function ResultsPage({
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
   const curve = bankrollCurve(allPicks, startUsd, unitUsd);
+  // Widen off the literal type: the constant is 0 today, so `=== 1` would be
+  // a type error against a literal-0 type even though it is a real branch.
+  const needGames: number = MIN_GAMES_FOR_MODEL;
+  const modelEmpty =
+    needGames > 0
+      ? `Fills in once a week is scored and graded. The model needs ${needGames} game${needGames === 1 ? "" : "s"} played by both teams.`
+      : "Fills in once a week is scored and graded.";
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -181,7 +174,12 @@ export default async function ResultsPage({
         <div>
           <h1 className="bv-page-title">Results</h1>
           <p className="bv-page-sub mt-1">
-            {`How the market, the model and you did in ${season}. Market = the first-half under at the real closing line · Model = the model’s picks · You = your real-money first-half bets, with paper picks kept apart.`}
+            {`How the market, the model and you did in ${season}.`}
+          </p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--text-dim)]">
+            Market = betting every first-half under at the closing line. Model =
+            the model’s picks. You = your own real-money bets, with paper kept
+            separate.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -201,39 +199,42 @@ export default async function ResultsPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {/* Season summary */}
-      <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
         {`Season summary · ${season}`}
       </h2>
+      <p className={CAPTION}>
+        {`Win rate is the share of settled bets that won — pushes do not count either way. Units are what was won or lost, at one unit = ${usd(unitUsd)}. ROI is units won divided by units risked. Line value is how far the line moved our way after the bet, on average; positive is good.`}
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <RecordCard
           title="Market — first half"
           rec={ledger.market}
-          emptyHint="Fills in once first-half lines are captured before kickoff and the games settle."
-          hint="Every game's first-half under at the real closing line — the blanket-under baseline."
+          emptyHint="Fills in once first-half lines are captured and games are graded."
+          hint="Every game’s first-half under at the closing line. The baseline to beat."
         />
         <RecordCard
           title="Model — first half"
           rec={ledger.model}
-          emptyHint="Fills in once the week is scored and settled (the model sits out weeks 1–2)."
-          hint="The model's under picks graded at the closing line."
+          emptyHint={modelEmpty}
+          hint="The model’s own under picks, graded at the closing line."
         />
         <RecordCard
-          title="You — real money (first half)"
+          title="You — real money"
           rec={ledger.you}
-          emptyHint="No settled real-money bets yet. Log bets from the board."
-          hint="Real-money first-half picks only — the record the bankroll follows."
+          emptyHint="Nothing settled yet. Log bets from the board."
+          hint="Your real-money first-half bets. This is the record the bankroll follows."
         />
         <RecordCard
-          title="You — paper (no money)"
+          title="You — paper"
           rec={ledger.paper}
           emptyHint="No settled paper picks yet."
-          hint="Tracked with nothing at risk; never merged into the real record."
+          hint="Tracked with no money on them. Never mixed into the real record."
         />
         <RecordCard
           title="Market — full game"
           rec={ledger.marketFull}
           emptyHint="Fills in once full-game lines settle."
-          hint="Context only: the full-game under at the closing line. We do not bet full game."
+          hint="Context only. We do not bet the full game."
         />
       </div>
 
@@ -243,13 +244,13 @@ export default async function ResultsPage({
       </h2>
       {curve.length < 2 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          {`No settled real-money bets yet — the curve starts once a week grades. Starting bankroll is $${startUsd}, one unit is $${unitUsd}.`}
+          {`Nothing settled yet. This starts once a week is graded. Starting bankroll ${usd(startUsd)}, one unit ${usd(unitUsd)}.`}
         </p>
       ) : (
         <>
           <BankrollCurve points={curve} startUsd={startUsd} />
           <p className="mt-1 text-xs text-[var(--text-dim)]">
-            {`Settled real-money first-half bets only, at $${unitUsd} a unit. The dashed line is the $${startUsd} starting bankroll; pending bets do not move it.`}
+            {`Settled real-money bets only, at ${usd(unitUsd)} a unit. The dashed line is the ${usd(startUsd)} you started with. Pending bets do not move it.`}
           </p>
         </>
       )}
@@ -257,16 +258,21 @@ export default async function ResultsPage({
       {/* One week's scorecard */}
       {review.week !== null && (
         <>
-          <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
+          <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
             {`Week ${review.week} scorecard`}
           </h2>
+          <p className={CAPTION}>
+            Same games, three ways: the market, the model, and you. W-L-P is
+            wins-losses-pushes. Under % is the share of settled bets the under
+            won. Line value positive means the line moved our way after the bet.
+          </p>
           <div className="bv-table-wrap">
             <table className="bv-table">
               <thead>
                 <tr>
                   <th>Who</th>
                   <th>Market</th>
-                  <th>Under %</th>
+                  <th className="bv-num">Under %</th>
                   <RecHead />
                 </tr>
               </thead>
@@ -274,7 +280,7 @@ export default async function ResultsPage({
                 {settled.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-[var(--text-muted)]">
-                      {`Nothing graded for week ${review.week} yet — grading runs Monday morning.`}
+                      {`Nothing graded for week ${review.week} yet. Games are graded the morning after they are played.`}
                     </td>
                   </tr>
                 ) : (
@@ -282,7 +288,7 @@ export default async function ResultsPage({
                     <tr key={i}>
                       <td className="text-[var(--text)]">{l.entity}</td>
                       <td className="text-[var(--text-muted)]">{l.market}</td>
-                      <td className="font-mono text-[var(--text-muted)]">
+                      <td className="bv-num font-mono text-[var(--text-muted)]">
                         {l.rec!.hit}
                       </td>
                       <RecCells rec={l.rec} />
@@ -296,42 +302,46 @@ export default async function ResultsPage({
       )}
 
       {/* Week by week */}
-      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-        Week by week — your first-half picks
+      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
+        Week by week
       </h2>
+      <p className={CAPTION}>
+        Your own picks only, real money and paper side by side. Bets and Picks
+        count everything logged, including bets not yet graded.
+      </p>
       {review.byWeek.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          {`No picks logged for ${season} yet. Log bets from the board; this table fills in as weeks settle.`}
+          {`No picks logged for ${season} yet. Log bets from the board.`}
         </p>
       ) : (
         <div className="bv-table-wrap">
           <table className="bv-table">
             <thead>
               <tr>
-                <th rowSpan={2}>Week</th>
+                <th rowSpan={2} className="bv-num">
+                  Week
+                </th>
                 <th colSpan={5}>Real money</th>
                 <th colSpan={5}>Paper</th>
               </tr>
               <tr>
-                <th title="Real-money first-half bets logged (pending included).">
-                  Bets
-                </th>
+                <th className="bv-num">Bets</th>
                 <RecHead />
-                <th title="Paper first-half picks logged (pending included).">
-                  Picks
-                </th>
+                <th className="bv-num">Picks</th>
                 <RecHead />
               </tr>
             </thead>
             <tbody>
               {review.byWeek.map((w) => (
                 <tr key={w.week}>
-                  <td className="font-mono text-[var(--text)]">{w.week}</td>
-                  <td className="font-mono text-[var(--text-muted)]">
+                  <td className="bv-num font-mono text-[var(--text)]">
+                    {w.week}
+                  </td>
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
                     {w.realBets}
                   </td>
                   <RecCells rec={w.real} />
-                  <td className="font-mono text-[var(--text-muted)]">
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
                     {w.paperBets}
                   </td>
                   <RecCells rec={w.paper} />
@@ -344,11 +354,11 @@ export default async function ResultsPage({
 
       {/* By reason */}
       <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-        By reason — which kind of bet is paying?
+        By reason
       </h2>
-      <p className="mb-2 text-xs text-[var(--text-dim)]">
-        The reason is frozen onto the pick when you log it, so this cannot be
-        rewritten after the fact.
+      <p className={CAPTION}>
+        Which kind of bet is paying. The reason is frozen onto the pick when you
+        log it, so it cannot be rewritten later.
       </p>
       {review.byReason.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
@@ -364,9 +374,9 @@ export default async function ResultsPage({
                 <th colSpan={5}>Paper</th>
               </tr>
               <tr>
-                <th>Bets</th>
+                <th className="bv-num">Bets</th>
                 <RecHead />
-                <th>Picks</th>
+                <th className="bv-num">Picks</th>
                 <RecHead />
               </tr>
             </thead>
@@ -374,13 +384,13 @@ export default async function ResultsPage({
               {review.byReason.map((r) => (
                 <tr key={r.reason}>
                   <td className="text-[var(--text)]">
-                    {REASON_LABEL[r.reason]}
+                    {REASON_TEXT[r.reason].long}
                   </td>
-                  <td className="font-mono text-[var(--text-muted)]">
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
                     {r.realBets}
                   </td>
                   <RecCells rec={r.real} />
-                  <td className="font-mono text-[var(--text-muted)]">
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
                     {r.paperBets}
                   </td>
                   <RecCells rec={r.paper} />
@@ -391,26 +401,24 @@ export default async function ResultsPage({
         </div>
       )}
 
-      {/* Paper ledger by gate */}
-      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-        Paper record by gate — what each rule would have done
+      {/* Paper ledger by what blocked a real bet */}
+      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
+        Paper record by what blocked it
       </h2>
-      <p className="mb-2 text-xs text-[var(--text-dim)]">
-        Every game whose Hard Rock first-half line sat 1.75+ above our number is
-        logged as a paper pick and tagged with the gate that blocked a real bet.
-        Counts, not conclusions, until a row has 30 graded picks.
+      <p className={CAPTION}>
+        {`Every game whose Hard Rock line sat ${BET_GAP_PTS}+ above our number is logged as a paper pick, tagged with the one thing that stopped a real bet. Counts, not conclusions, until a row has 30 graded picks.`}
       </p>
       {review.byBlocker.length === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No qualifying games logged yet.
+          Nothing logged yet.
         </p>
       ) : (
         <div className="bv-table-wrap">
           <table className="bv-table">
             <thead>
               <tr>
-                <th>Gate</th>
-                <th>Picks</th>
+                <th>What blocked it</th>
+                <th className="bv-num">Picks</th>
                 <RecHead />
               </tr>
             </thead>
@@ -418,9 +426,9 @@ export default async function ResultsPage({
               {review.byBlocker.map((r) => (
                 <tr key={r.blocker}>
                   <td className="text-[var(--text)]">
-                    {BLOCKER_LABEL[r.blocker]}
+                    {labelOf(GATE_TEXT, r.blocker, "An input failed")}
                   </td>
-                  <td className="font-mono text-[var(--text-muted)]">
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
                     {r.paperBets}
                   </td>
                   <RecCells rec={r.paper} />
@@ -431,41 +439,38 @@ export default async function ResultsPage({
         </div>
       )}
 
-      {/* Decision quality */}
-      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-        Decision quality — all graded picks
+      {/* Your decisions */}
+      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
+        Your decisions
       </h2>
+      <p className={CAPTION}>
+        Every graded pick of yours: whether your calls beat our number, beat the
+        closing line, and which factors you read well.
+      </p>
       {dq.n === 0 ? (
         <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No graded picks yet. Once picks settle this shows whether your calls
-          beat your model, beat the close, and which factors you lean on well.
+          Nothing graded yet.
         </p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
-                Beat my model
+              <h3 className="text-sm font-semibold text-[var(--text)]">
+                Vs our number
               </h3>
+              <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">
+                Your win rate when you agreed with our number, and when you went
+                against it.
+              </p>
               <dl className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Win rate when the line you took sat above our number (the model agreed)."
-                  >
-                    With model
-                  </dt>
+                  <dt className="bv-stat-label">Agreed with it</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${pct(dq.beatModel.agreed.hitPct)} (${dq.beatModel.agreed.n})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Win rate when you picked against our number."
-                  >
-                    Against model
-                  </dt>
+                  <dt className="bv-stat-label">Went against it</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${pct(dq.beatModel.against.hitPct)} (${dq.beatModel.against.n})`}
                   </dd>
@@ -473,39 +478,29 @@ export default async function ResultsPage({
               </dl>
             </div>
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
-                Beat the close
+              <h3 className="text-sm font-semibold text-[var(--text)]">
+                Vs the closing line
               </h3>
+              <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">
+                Whether the line moved your way after you bet. Price movement is
+                the same idea for the odds instead of the total, in percentage
+                points.
+              </p>
               <dl className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Average closing-line value."
-                  >
-                    Avg CLV
-                  </dt>
+                  <dt className="bv-stat-label">Line value</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)} (${dq.clv.n})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Share of picks with positive CLV."
-                  >
-                    % positive
-                  </dt>
+                  <dt className="bv-stat-label">Share that moved your way</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${pct(dq.clv.pctPositive)} (${dq.clv.n})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="No-vig PRICE CLV: average open-to-close move in the under's fair price, in percentage points. Isolates the juice; line movement is in Avg CLV."
-                  >
-                    Price CLV
-                  </dt>
+                  <dt className="bv-stat-label">Price movement</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${dq.clv.avgPricePp == null ? "—" : `${dq.clv.avgPricePp >= 0 ? "+" : ""}${dq.clv.avgPricePp.toFixed(2)}pp`} (${dq.clv.nPrice})`}
                   </dd>
@@ -513,28 +508,22 @@ export default async function ResultsPage({
               </dl>
             </div>
             <div className="bv-card p-4">
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
+              <h3 className="text-sm font-semibold text-[var(--text)]">
                 Timing
               </h3>
+              <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">
+                Whether you got in at a good number. For an under, a higher
+                total is better.
+              </p>
               <dl className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Share of picks taken at or above the opening line (for an under, higher is better)."
-                  >
-                    At or above open
-                  </dt>
+                  <dt className="bv-stat-label">At or better than the open</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${pct(dq.timing.pctAtOrBetterThanOpen)} (${dq.timing.nOpen})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt
-                    className="bv-stat-label"
-                    title="Share of picks with a better number than the close."
-                  >
-                    Beat close
-                  </dt>
+                  <dt className="bv-stat-label">Better than the close</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
                     {`${pct(dq.timing.pctBeatingClose)} (${dq.timing.nClose})`}
                   </dd>
@@ -543,48 +532,52 @@ export default async function ResultsPage({
             </div>
           </div>
           {dq.factors.length > 0 && (
-            <div className="bv-table-wrap mt-3">
-              <table className="bv-table">
-                <thead>
-                  <tr>
-                    <th>Factor (green on your picks)</th>
-                    <th>Your n</th>
-                    <th>Your hit %</th>
-                    <th title="Real-line under rate when this factor is green, from the factor ledger.">
-                      Ledger hit %
-                    </th>
-                    <th>Read</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dq.factors.map((f) => (
-                    <tr key={f.key}>
-                      <td className="text-[var(--text)]">{f.label}</td>
-                      <td className="font-mono text-[var(--text-muted)]">
-                        {f.n}
-                      </td>
-                      <td className="font-mono text-[var(--text-muted)]">
-                        {pct(f.yourHitPct)}
-                      </td>
-                      <td className="font-mono text-[var(--text-muted)]">
-                        {f.ledgerHitPct == null ? "—" : pct(f.ledgerHitPct)}
-                      </td>
-                      <td>
-                        <span className="bv-pill">
-                          <span className="bv-pill-value">
-                            {f.weight === "even"
-                              ? "balanced"
-                              : f.weight === "under"
-                                ? "you use it well"
-                                : "you over-lean on it"}
-                          </span>
-                        </span>
-                      </td>
+            <>
+              <p className="mt-3 text-xs leading-relaxed text-[var(--text-dim)]">
+                Only factors that were green on your picks. “Rate across all
+                games” is how the under did whenever that factor was green.
+              </p>
+              <div className="bv-table-wrap mt-1">
+                <table className="bv-table">
+                  <thead>
+                    <tr>
+                      <th>Factor</th>
+                      <th className="bv-num">Your picks</th>
+                      <th className="bv-num">Your win rate</th>
+                      <th className="bv-num">Rate across all games</th>
+                      <th>Read</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {dq.factors.map((f) => (
+                      <tr key={f.key}>
+                        <td className="text-[var(--text)]">{f.label}</td>
+                        <td className="bv-num font-mono text-[var(--text-muted)]">
+                          {f.n}
+                        </td>
+                        <td className="bv-num font-mono text-[var(--text-muted)]">
+                          {pct(f.yourHitPct)}
+                        </td>
+                        <td className="bv-num font-mono text-[var(--text-muted)]">
+                          {f.ledgerHitPct == null ? "—" : pct(f.ledgerHitPct)}
+                        </td>
+                        <td>
+                          <span className="bv-pill">
+                            <span className="bv-pill-value">
+                              {f.weight === "even"
+                                ? "about right"
+                                : f.weight === "under"
+                                  ? "you read this well"
+                                  : "you lean on this too much"}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </>
       )}

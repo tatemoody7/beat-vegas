@@ -26,3 +26,11 @@ export function median(xs: number[]): number | null {
 
 /** Round to two decimals (line arithmetic). */
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** Whole-dollar money: "$10", "$100". Stakes and bankrolls are never cents. */
+export const usd = (n: number): string =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
+  });

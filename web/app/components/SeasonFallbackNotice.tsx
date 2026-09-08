@@ -15,7 +15,7 @@ export default function SeasonFallbackNotice({
           collapsed the space after an expression before ("2026season's"). */}
       {`No ${fallbackFrom} data yet — showing `}
       <span className="font-semibold text-[var(--text)]">{season}</span>
-      {`. This view fills in once the ${fallbackFrom} season's first lines and predictions land.`}
+      {`. This page switches over once ${fallbackFrom} lines and scores land.`}
     </p>
   );
 }

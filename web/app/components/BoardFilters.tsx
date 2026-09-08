@@ -10,7 +10,8 @@ import {
 
 // Day / my-teams / Hard Rock filters for the board. Everything lives in the URL
 // (?days=sat,sun&mine=1&hr=1) so a filtered board is a shareable link and the
-// server does the filtering.
+// server does the filtering. What each toggle does is said in a visible line,
+// not a `title=` a phone cannot show (spec §12).
 export default function BoardFilters({ current }: { current: Filters }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -49,39 +50,42 @@ export default function BoardFilters({ current }: { current: Filters }) {
     }`;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
-        Day
-      </span>
-      {DAYS.map((d) => (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
+          Day
+        </span>
+        {DAYS.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => toggleDay(d)}
+            aria-pressed={current.days.includes(d)}
+            className={chip(current.days.includes(d))}
+          >
+            {DAY_LABEL[d]}
+          </button>
+        ))}
         <button
-          key={d}
           type="button"
-          onClick={() => toggleDay(d)}
-          aria-pressed={current.days.includes(d)}
-          className={chip(current.days.includes(d))}
+          onClick={() => toggleFlag("mine", current.myTeams)}
+          aria-pressed={current.myTeams}
+          className={chip(current.myTeams)}
         >
-          {DAY_LABEL[d]}
+          My teams
         </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => toggleFlag("mine", current.myTeams)}
-        aria-pressed={current.myTeams}
-        className={chip(current.myTeams)}
-        title={`Only games involving ${MY_TEAMS.join(", ")}.`}
-      >
-        My teams
-      </button>
-      <button
-        type="button"
-        onClick={() => toggleFlag("hr", current.hrOnly)}
-        aria-pressed={current.hrOnly}
-        className={chip(current.hrOnly)}
-        title="Only games Hard Rock has posted a first-half line for — the only ones you can bet today."
-      >
-        Hard Rock line posted
-      </button>
+        <button
+          type="button"
+          onClick={() => toggleFlag("hr", current.hrOnly)}
+          aria-pressed={current.hrOnly}
+          className={chip(current.hrOnly)}
+        >
+          Hard Rock line posted
+        </button>
+      </div>
+      <p className="text-xs text-[var(--text-dim)]">
+        {`My teams: only ${MY_TEAMS.join(", ")}. Hard Rock line posted: the only games you can bet today.`}
+      </p>
     </div>
   );
 }

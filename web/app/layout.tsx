@@ -18,8 +18,9 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "Beat Vegas — 1H Unders",
-  description: "College football first-half unders research board.",
+  title: "Beat Vegas — first-half unders",
+  description:
+    "College football first-half under totals. What to bet, and the numbers behind it.",
 };
 
 export default function RootLayout({
@@ -44,7 +45,7 @@ export default function RootLayout({
               <span className="text-[var(--accent)]">BEAT</span>
               <span className="text-[var(--text)]"> VEGAS</span>
               <span className="ml-2 hidden align-middle text-xs font-medium uppercase tracking-widest text-[var(--text-dim)] sm:inline">
-                1H Unders
+                First-half unders
               </span>
             </Link>
             <MainNav />
@@ -59,7 +60,7 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="mx-auto w-full max-w-7xl px-6 py-6 text-xs text-[var(--text-dim)]">
-          Research and decision support only. It never places bets.
+          This site rates bets. It never places one.
         </footer>
       </body>
     </html>

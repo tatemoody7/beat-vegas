@@ -11,6 +11,7 @@ import {
 } from "@/lib/betSlip";
 import { lineLabel } from "@/lib/card";
 import { american, fmt } from "@/lib/format";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
 
 // The Saturday-morning bet slip, used on a phone: this week's BETs from the
 // latest card, ranked by gap, each reconciled against Hard Rock's LIVE line
@@ -227,12 +228,14 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
           </span>
         )}
         {status === "over_cap" && (
-          <span
-            className="rounded-md border border-[var(--border)] px-1.5 py-0.5 text-xs text-[var(--text-dim)]"
-            title="Every gate passed; beyond the weekly cap, so paper only."
-          >
-            over cap · paper only
-          </span>
+          <>
+            <span className="rounded-md border border-[var(--border)] px-1.5 py-0.5 text-xs text-[var(--text-dim)]">
+              {`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}
+            </span>
+            <span className="text-xs text-[var(--text-dim)]">
+              Everything checked out on this one. The weekly cap makes it paper.
+            </span>
+          </>
         )}
         {status === "kicked_off" && (
           <span className="text-xs text-[var(--text-dim)]">kicked off</span>

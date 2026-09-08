@@ -187,7 +187,11 @@ export default async function BoardPage({
                       <h2 className="bv-day-head">{grp.label}</h2>
                       <div className="flex flex-col gap-3">
                         {grp.games.map((g) => (
-                          <GameCard key={g.row.gameId} g={g} />
+                          <GameCard
+                            key={g.row.gameId}
+                            g={g}
+                            unitUsd={board.bankroll.unitUsd}
+                          />
                         ))}
                       </div>
                     </section>

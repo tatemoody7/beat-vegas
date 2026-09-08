@@ -2,27 +2,57 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  BLOCKER_SHORT,
+  labelOf,
+  REASON_TEXT,
+  RESULT_PENDING,
+  RESULT_TEXT,
+} from "@/lib/labels";
 import type { PickFull } from "@/lib/picks";
 import { isOffPolicy } from "@/lib/picks";
-import type { PickReason } from "@/lib/verdict";
 
-const REASON_SHORT: Record<PickReason, string> = {
-  model_gap: "model gap",
-  price_edge: "price edge",
-  manual: "your call",
+// The word frozen onto the pick. "EDGE" is legacy for the amber tier and reads
+// "Watch" like everywhere else on screen.
+const VERDICT_WORD: Record<string, string> = {
+  BET: "Bet",
+  WATCH: "Watch",
+  EDGE: "Watch",
+  PASS: "Pass",
 };
 
-// "BET · model gap · HR gap +2.2" — the decision frozen at log time; legacy
-// picks (before the tracking columns) show a dash.
+// Outcome colours (never cyan): won green, lost red, push grey.
+const RESULT_COLOR: Record<string, string> = {
+  under: "var(--good)",
+  over: "var(--bad)",
+  push: "var(--push)",
+};
+
+// Every logged pick, with the decision frozen at log time. Nothing here is
+// explained in a `title=` tooltip (a phone never shows one) — the caption under
+// the table carries it, and every enum goes through lib/labels.
+
+// "Bet · model gap · +2.2 vs our number · real money on a Watch · blocked by
+// price". Legacy picks (logged before the tracking columns) show a dash.
 function loggedAs(p: PickFull): string {
   if (!p.verdictAtPick && !p.reason) return "—";
-  const parts = [p.verdictAtPick, p.reason ? REASON_SHORT[p.reason] : null];
+  const parts: (string | null)[] = [
+    p.verdictAtPick
+      ? labelOf(VERDICT_WORD, p.verdictAtPick, p.verdictAtPick)
+      : null,
+    p.reason ? REASON_TEXT[p.reason].short : null,
+  ];
   if (p.gapAtPick !== null) {
-    parts.push(`HR gap ${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)}`);
+    parts.push(
+      `${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)} vs our number`,
+    );
   }
-  if (isOffPolicy(p)) parts.push("OFF-POLICY");
-  if (p.isPaper && p.blocker && p.blocker !== "none")
-    parts.push(`gate: ${p.blocker}`);
+  if (isOffPolicy(p)) parts.push("real money on a Watch");
+  if (p.isPaper && p.blocker && p.blocker !== "none") {
+    parts.push(
+      `blocked by ${labelOf(BLOCKER_SHORT, p.blocker, "an input").toLowerCase()}`,
+    );
+  }
   return parts.filter(Boolean).join(" · ");
 }
 
@@ -43,7 +73,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
   if (picks.length === 0) {
     return (
       <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-        No picks logged for this selection. Log bets from the board cards.
+        No picks here. Log bets from the board.
       </p>
     );
   }
@@ -52,106 +82,104 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
     n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
 
   return (
-    <div className="bv-table-wrap">
-      <table className="bv-table">
-        <thead>
-          <tr>
-            <th>Wk</th>
-            <th>Matchup</th>
-            <th>Market</th>
-            <th>Your line</th>
-            <th title="The under score and our number at the time you logged the pick.">
-              Model @ pick
-            </th>
-            <th title="The board verdict, the reason, and Hard Rock’s gap vs our number when you logged it.">
-              Logged as
-            </th>
-            <th>Result</th>
-            <th title="Profit in units. 1 unit = one standard bet.">Units</th>
-            <th title="Line value (CLV): positive = the line moved your way after you'd bet.">
-              Line value
-            </th>
-            <th>Note</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {picks.map((p) => (
-            <tr key={p.id} className="align-top">
-              <td className="text-[var(--text-muted)]">{p.week ?? "—"}</td>
-              <td className="text-[var(--text)]">
-                {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
-                {p.home}
-              </td>
-              <td className="text-[var(--text-muted)]">
-                {p.market === "full" ? "Full game" : "1H"}
-                {p.isPaper && (
+    <>
+      <div className="bv-table-wrap">
+        <table className="bv-table">
+          <thead>
+            <tr>
+              <th className="bv-num">Week</th>
+              <th>Matchup</th>
+              <th>Market</th>
+              <th className="bv-num">Your line</th>
+              <th className="bv-num">Our number then</th>
+              <th>Why you logged it</th>
+              <th>Result</th>
+              <th className="bv-num">Units</th>
+              <th className="bv-num">Line value</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {picks.map((p) => (
+              <tr key={p.id} className="align-top">
+                <td className="bv-num text-[var(--text-muted)]">
+                  {p.week ?? "—"}
+                </td>
+                <td className="text-[var(--text)]">
+                  {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+                  {p.home}
+                </td>
+                <td className="text-[var(--text-muted)]">
+                  {p.market === "full" ? "Full game" : "First half"}
+                  {p.isPaper && (
+                    <span className="bv-badge bv-badge--warn ml-1">
+                      paper — no money on it
+                    </span>
+                  )}
+                </td>
+                <td className="bv-num text-[var(--text-muted)]">
+                  {p.line !== null ? `under ${p.line}` : "—"}
+                </td>
+                <td className="bv-num text-[var(--text-muted)]">
+                  {p.modelLine ?? "—"}
+                </td>
+                <td className="text-xs text-[var(--text-muted)]">
+                  {loggedAs(p)}
+                </td>
+                <td>
                   <span
-                    className="bv-fac-badge bv-fac-badge-amber ml-1"
-                    title="Paper pick — nothing at risk; kept out of your real record."
+                    style={{
+                      color: p.graded
+                        ? labelOf(RESULT_COLOR, p.result, "var(--text-dim)")
+                        : "var(--text-dim)",
+                    }}
                   >
-                    PAPER
+                    {p.graded
+                      ? labelOf(RESULT_TEXT, p.result, RESULT_PENDING)
+                      : RESULT_PENDING}
                   </span>
-                )}
-              </td>
-              <td className="text-[var(--text-muted)]">
-                {p.line !== null ? `under ${p.line}` : "—"}
-              </td>
-              <td className="text-[var(--text-muted)]">
-                {p.modelScore !== null ? `${p.modelScore}` : "—"}
-                {p.modelLine !== null ? ` @ ${p.modelLine}` : ""}
-              </td>
-              <td className="text-xs text-[var(--text-muted)]">
-                {loggedAs(p)}
-              </td>
-              <td>
-                <span
+                </td>
+                <td
+                  className="bv-num font-mono"
                   style={{
                     color:
-                      p.result === "under"
-                        ? "var(--under-strong)"
-                        : p.result === "over"
-                          ? "var(--over)"
-                          : "var(--text-dim)",
+                      p.units === null
+                        ? "var(--text-dim)"
+                        : p.units >= 0
+                          ? "var(--good)"
+                          : "var(--bad)",
                   }}
                 >
-                  {p.result}
-                </span>
-              </td>
-              <td
-                className="font-mono"
-                style={{
-                  color:
-                    p.units === null
-                      ? "var(--text-dim)"
-                      : p.units >= 0
-                        ? "var(--under-strong)"
-                        : "var(--over)",
-                }}
-              >
-                {num(p.units)}
-              </td>
-              <td className="font-mono text-[var(--text-muted)]">
-                {num(p.clv)}
-              </td>
-              <td className="max-w-xs text-[var(--text-dim)]">
-                {p.note ?? "—"}
-              </td>
-              <td>
-                {!p.graded && (
-                  <button
-                    onClick={() => del(p.id)}
-                    disabled={deleting === p.id}
-                    className="text-xs text-[var(--text-dim)] hover:text-red-400 disabled:opacity-50"
-                  >
-                    {deleting === p.id ? "…" : "delete"}
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                  {num(p.units)}
+                </td>
+                <td className="bv-num font-mono text-[var(--text-muted)]">
+                  {num(p.clv)}
+                </td>
+                <td className="max-w-xs text-[var(--text-dim)]">
+                  {p.note ?? "—"}
+                </td>
+                <td>
+                  {!p.graded && (
+                    <button
+                      onClick={() => del(p.id)}
+                      disabled={deleting === p.id}
+                      className="text-xs text-[var(--text-dim)] hover:text-[var(--bad)] disabled:opacity-50"
+                    >
+                      {deleting === p.id ? "…" : "delete"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
+        “Our number then” and “Why you logged it” are frozen at the moment you
+        logged the pick. Line value positive means the line moved your way
+        afterwards.
+      </p>
+    </>
   );
 }

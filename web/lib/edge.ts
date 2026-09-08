@@ -142,11 +142,13 @@ export function contextScore(c: EdgeContext): number {
 
 function killText(line: number | null, price: number | null): string {
   if (line !== null && price !== null) {
-    return `Not worth it below u${fmt(line)} or worse than ${american(price)}.`;
+    return `No longer a bet below u${fmt(line)}, or at a worse price than ${american(price)}.`;
   }
-  if (line !== null) return `Not worth it below u${fmt(line)}.`;
-  if (price !== null) return `Not worth it worse than ${american(price)}.`;
-  return "No kill point without a model read.";
+  if (line !== null) return `No longer a bet below u${fmt(line)}.`;
+  if (price !== null) {
+    return `No longer a bet at a worse price than ${american(price)}.`;
+  }
+  return "No kill numbers without a model number.";
 }
 
 export function edgeScore(i: EdgeInput): EdgeResult {
@@ -223,45 +225,49 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   }
 
   // --- Action ---------------------------------------------------------------
+  // One plain sentence saying what to do, and for anything that is not a bet
+  // yet, the number or price that would make it one (spec §13). "Wait" became
+  // "Not yet" so the sentence names a condition rather than an instruction.
   let action: string;
   if (tier === "BET") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
-    action = `Bet now: 1H under ${fmt(i.hrLine)}${at} on Hard Rock.`;
+    action = `Bet one unit: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (!hasModel) {
     action = pricePos
-      ? `Price only: Hard Rock pays ${fmt((i.ev ?? 0) * 100)}% better than the market on this under. No model behind it.`
-      : "Pass: no model read this week and no price edge at Hard Rock.";
+      ? `Watch: Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under. No model number behind it.`
+      : "Pass: no model number yet, and Hard Rock’s price is no better than the market.";
   } else if (blocker === "no_hr_line" || basis === null) {
-    const lead =
-      basis === null ? "No line captured yet." : "No Hard Rock line yet.";
-    action = `${lead} A bet at under ${fmt(killLine)} or higher, -110 or better.`;
+    if (basis === null) {
+      action = `Not yet — no first-half line anywhere. It becomes a bet at under ${fmt(killLine)} or higher.`;
+    } else {
+      const at =
+        killPrice !== null ? `, at ${american(killPrice)} or better` : "";
+      action = `Not yet — Hard Rock has no first-half line. It becomes a bet at under ${fmt(killLine)} or higher${at}.`;
+    }
   } else if (blocker === "off_market") {
     const diff = round2(i.marketLine! - i.hrLine!);
-    action = `Wait: Hard Rock’s ${fmt(i.hrLine)} is ${fmt(diff)} below the market’s ${fmt(i.marketLine)} — giving up points and a void risk. Bet if it moves to ${fmt(i.marketLine! - 0.5)} or higher.`;
+    action = `Not yet — Hard Rock’s ${fmt(i.hrLine)} is ${fmt(diff)} below the market line of ${fmt(i.marketLine)}. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to ${fmt(i.marketLine! - HR_OFF_MARKET_PTS)} or higher.`;
   } else if (blocker === "price") {
-    const needs =
-      killPrice !== null
-        ? `${american(killPrice)} or better`
-        : "a fair price (-110 or better)";
-    const hr = i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "unpriced";
-    action = `Wait: Hard Rock is ${hr}; needs ${needs}.`;
+    const needs = `${american(killPrice ?? -110)} or better`;
+    const hr =
+      i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "not posted";
+    action = `Not yet — Hard Rock’s price is ${hr}; needs ${needs}.`;
   } else if (blocker === "no_fair_price") {
     if (i.hrUnderPrice === null) {
-      action = `Wait: Hard Rock hasn’t priced its ${fmt(i.hrLine)} under yet — nothing to judge. Paper only until Hard Rock posts a price.`;
+      action = `Not yet — Hard Rock has not priced its ${fmt(i.hrLine)} under. Paper only until it does.`;
     } else {
       const hr = american(i.hrUnderPrice);
-      action = `Wait: Hard Rock’s ${hr} can’t be judged — no other book or exchange is priced at ${fmt(i.hrLine)}. Paper only until a comparable price appears.`;
+      action = `Not yet — no other book is at ${fmt(i.hrLine)}, so ${hr} cannot be compared. Paper only until one is.`;
     }
   } else if (blocker === "qb_out") {
-    action =
-      "Wait: a starting QB is listed out — re-check the number after the news settles.";
+    action = "Starting QB out — recheck. Our number does not know about it.";
   } else {
     // blocker "gap" (EDGE) or PASS on a model row: the line is short of the bar.
     const g = gap ?? 0;
     action =
       g > 0
-        ? `Pass: the line is only ${fmt(g)} above our number; needs ${fmt(killLine)} or higher.`
-        : `Pass: the line is ${fmt(Math.abs(g))} below our number (leans over); needs ${fmt(killLine)} or higher.`;
+        ? `Pass: the line is ${fmt(g)} above our number. It needs ${fmt(killLine)} or higher.`
+        : `Pass: the line is ${fmt(Math.abs(g))} below our number, so this leans over. We only bet unders.`;
   }
 
   return { score, tier, blocker, action, kill, gap, lineBasis, verdict };

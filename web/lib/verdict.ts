@@ -110,7 +110,7 @@ export function deriveReason(
 
 export function priceSentence(i: VerdictInput): string {
   if (i.hrLine === null) {
-    return "Hard Rock hasn’t posted a first-half line for this game yet.";
+    return "Hard Rock has not posted a first-half line yet.";
   }
   const at =
     i.hrUnderPrice === null
@@ -121,17 +121,19 @@ export function priceSentence(i: VerdictInput): string {
     // the other books when Hard Rock itself posted no price contradicts it (and
     // is simply wrong — the books may all be priced). Mirrors card.py.
     return i.hrUnderPrice === null
-      ? `Hard Rock has ${at}, but hasn’t posted a price for it yet — nothing to judge.`
-      : `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
+      ? `Hard Rock has the under at ${fmt(i.hrLine)} but no price on it yet, so there is nothing to compare.`
+      : `Hard Rock has the under at ${fmt(i.hrLine)}. Not enough other books are at that number to compare the price.`;
   }
   const pctTxt = fmt(Math.abs(i.ev) * 100);
+  // "Fair price" is defined in the sentence rather than in a parenthetical the
+  // reader has to decode (spec §14a).
   switch (i.evVerdict) {
     case "pos":
-      return `Hard Rock’s ${at} pays about ${pctTxt}% better than the market’s fair price (books plus no-vig exchanges) — a good price.`;
+      return `Hard Rock’s ${at} pays about ${pctTxt}% more than the fair price. Fair price = the other books and the exchanges with the vig taken out.`;
     case "neg":
-      return `Hard Rock’s ${at} pays about ${pctTxt}% worse than the market’s fair price (books plus no-vig exchanges) — you’d be paying extra vig.`;
+      return `Hard Rock’s ${at} pays about ${pctTxt}% less than the fair price. You would be paying extra vig.`;
     default:
-      return `Hard Rock’s ${at} is priced about the same as the rest of the market — a fair price, no extra edge.`;
+      return `Hard Rock’s ${at} is priced about the same as the rest of the market.`;
   }
 }
 

@@ -90,7 +90,7 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -5% floor
     # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
     assert it["kill_line"] == 24.5 and it["kill_price"] == -120
-    assert it["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
+    assert it["action"] == "Bet one unit: first-half under 24.5 at -110 on Hard Rock."
     assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 0}
     assert c["model_read"] is True and c["notes"] == []
     assert it["paper_logged"] is False
@@ -103,8 +103,10 @@ def test_edge_no_hr_line_uses_the_market_median_as_basis():
     assert it["hr_line"] is None and it["market_line"] == 25.0 and it["gap"] == 2.6
     assert it["gap_basis"] == "market"
     assert it["kill_line"] == 24.5
-    assert it["action"] == "No Hard Rock line yet. A bet at under 24.5 or higher, -110 or better."
-    assert "Hard Rock hasn’t posted a first-half line for this game yet." in it["why"]
+    assert it["action"] == (
+        "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.5 or higher."
+    )
+    assert "Hard Rock has not posted a first-half line yet." in it["why"]
 
 
 def test_edge_off_market_when_hard_rock_sits_below_the_market():
@@ -114,8 +116,9 @@ def test_edge_off_market_when_hard_rock_sits_below_the_market():
     assert it["market_line"] == 25.0 and it["gap"] == 2.5  # gap is vs Hard Rock's own number
     assert it["fair_under"] is None and it["ev"] is None  # no other book at 24.0 -> no fair price
     assert it["action"] == (
-        "Wait: Hard Rock’s 24.0 is 1.0 below the market’s 25.0 — giving up points and a void "
-        "risk. Bet if it moves to 24.5 or higher."
+        "Not yet — Hard Rock’s 24.0 is 1.0 below the market line of 25.0. You would be giving "
+        "up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock "
+        "moves to 24.5 or higher."
     )
 
 
@@ -125,8 +128,8 @@ def test_edge_price_when_hard_rock_is_worse_than_fair():
     assert it["tier"] == "EDGE" and it["blocker"] == "price"
     assert it["ev"] == pytest.approx(-0.0609, abs=1e-3) and it["ev"] < EV_FLOOR
     assert it["kill_price"] == -120  # worst price still inside the floor vs the market's fair
-    assert it["action"] == "Wait: Hard Rock is -125; needs -120 or better."
-    assert any("worse than the market’s fair price" in w for w in it["why"])
+    assert it["action"] == "Not yet — Hard Rock’s price is -125; needs -120 or better."
+    assert any("less than the fair price" in w for w in it["why"])
 
 
 def test_edge_qb_out_blocks_the_bet_and_flags_it():
@@ -134,9 +137,7 @@ def test_edge_qb_out_blocks_the_bet_and_flags_it():
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "Missouri QB Smith (knee) out"}]
     it = only(card([game()], snaps, [model(1, 22.4)], prev))
     assert it["tier"] == "EDGE" and it["blocker"] == "qb_out"
-    assert it["action"] == (
-        "Wait: a starting QB is listed out — re-check the number after the news settles."
-    )
+    assert it["action"] == ("Starting QB out — recheck. Our number does not know about it.")
     assert any(w.startswith("QB OUT") and "Smith" in w for w in it["why"])
 
 
@@ -145,7 +146,7 @@ def test_edge_gap_blocker_when_the_score_clears_60_short_of_the_bar():
     it = only(card([game()], snaps, [model(1, 23.2)]))  # gap 1.3 -> score 63
     assert it["tier"] == "EDGE" and it["blocker"] == "gap"
     assert it["gap"] == 1.3 and it["kill_line"] == 25.0
-    assert it["action"] == "Pass: the line is only 1.3 above our number; needs 25.0 or higher."
+    assert it["action"] == ("Pass: the line is 1.3 above our number. It needs 25.0 or higher.")
 
 
 def test_no_model_price_only_edge():
@@ -157,18 +158,22 @@ def test_no_model_price_only_edge():
     assert it["gap_basis"] is None
     assert it["ev"] == pytest.approx(0.0696, abs=1e-3)
     assert it["action"] == (
-        "Price only: Hard Rock pays 7.0% better than the market on this under. No model behind it."
+        "Watch: Hard Rock pays about 7.0% more than the market on this under. "
+        "No model number behind it."
     )
     assert c["model_read"] is False
-    assert c["notes"][0].startswith("No model read this week (weeks 1-2)")
+    assert c["notes"][0].startswith("No model number this week")
+    assert "weeks 1-2" not in c["notes"][0]
 
 
 def test_no_model_pass_and_reference_line_in_why():
     snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
     it = only(card([game()], snaps))
     assert it["tier"] == "PASS" and it["blocker"] is None
-    assert it["action"] == "Pass: no model read this week and no price edge at Hard Rock."
-    assert it["why"][0].startswith("No model read yet")
+    assert it["action"] == (
+        "Pass: no model number yet, and Hard Rock’s price is no better than the market."
+    )
+    assert it["why"][0].startswith("No model number yet")
 
 
 def test_model_pass_leans_over_wording():
@@ -177,7 +182,7 @@ def test_model_pass_leans_over_wording():
     assert it["tier"] == "PASS"
     assert it["gap"] == -2.0 and it["kill_line"] == 26.0
     assert it["action"] == (
-        "Pass: the line is 2.0 below our number (leans over); needs 26.0 or higher."
+        "Pass: the line is 2.0 below our number, so this leans over. We only bet unders."
     )
 
 
@@ -196,13 +201,17 @@ def test_derived_reference_is_the_basis_when_no_book_has_posted():
     it = only(card([game()], [], preds))
     assert it["market_line"] is None and it["gap"] == 2.0  # derived_lines row wins
     assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
-    assert it["action"] == "No Hard Rock line yet. A bet at under 24.0 or higher, -110 or better."
+    assert it["action"] == (
+        "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher."
+    )
 
 
 def test_no_line_at_all_wording():
     it = only(card([game()], [], [model(1, 22.0)]))
     assert it["gap"] is None and it["tier"] == "PASS" and it["blocker"] is None
-    assert it["action"] == "No line captured yet. A bet at under 24.0 or higher, -110 or better."
+    assert it["action"] == (
+        "Not yet — no first-half line anywhere. It becomes a bet at under 24.0 or higher."
+    )
     assert it["why"][0].startswith("Our number for the first half is 22.0, but no Vegas line")
 
 
@@ -433,7 +442,7 @@ def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
     assert at_110["ev"] == pytest.approx(-0.0455, abs=1e-3) and at_110["ev"] >= EV_FLOOR
     assert at_110["tier"] == "BET" and at_110["blocker"] is None
     assert at_110["kill_price"] == -110
-    assert at_110["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
+    assert at_110["action"] == ("Bet one unit: first-half under 24.5 at -110 on Hard Rock.")
 
     at_115 = only(
         card([game()], [snap(1, "hardrockbet", 24.5, -110, -115)] + balanced, [model(1, 22.4)])
@@ -441,7 +450,7 @@ def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
     assert at_115["ev"] == pytest.approx(-0.0652, abs=1e-3) and at_115["ev"] < EV_FLOOR
     assert at_115["tier"] == "EDGE" and at_115["blocker"] == "price"
     assert at_115["kill_price"] == -110
-    assert at_115["action"] == "Wait: Hard Rock is -115; needs -110 or better."
+    assert at_115["action"] == "Not yet — Hard Rock’s price is -115; needs -110 or better."
 
 
 # --- ordering, filtering, notes -------------------------------------------------
@@ -613,8 +622,7 @@ def test_no_comparable_price_is_a_paper_only_edge_with_blocker_no_fair_price():
     assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
     assert it["paper_blocker"] == "no_fair_price"
     assert it["action"] == (
-        "Wait: Hard Rock’s -110 can’t be judged — no other book or exchange is priced at 24.5. "
-        "Paper only until a comparable price appears."
+        "Not yet — no other book is at 24.5, so -110 cannot be compared. Paper only until one is."
     )
     assert it["hr_vs_market"] is None
     assert c["counts"] == {"bet": 0, "edge": 1, "pass": 0, "over_cap": 0, "degraded": 0}
@@ -628,11 +636,11 @@ def test_unpriced_hard_rock_line_is_blocked_as_no_fair_price():
     assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4) and it["fair_source"] == "books"
     assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
     assert it["paper_blocker"] == "no_fair_price"
-    assert it["action"].startswith("Wait: Hard Rock hasn’t priced its 24.5 under yet")
+    assert it["action"].startswith("Not yet — Hard Rock has not priced its 24.5 under")
     # The why sentence must not contradict that action by blaming the other
     # books: three of them ARE priced at 24.5 — Hard Rock is the one that isn't.
     assert (
-        "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge."
+        "Hard Rock has the under at 24.5 but no price on it yet, so there is nothing to compare."
     ) in it["why"]
 
 
@@ -641,8 +649,8 @@ def test_price_sentence_blames_the_other_books_only_when_hard_rock_has_a_price()
     it = only(card([game()], snaps, [model(1, 22.4)]))
     assert it["ev"] is None
     assert (
-        "Hard Rock has under 24.5 at -110; not enough other books at that number to judge "
-        "the price."
+        "Hard Rock has the under at 24.5. Not enough other books are at that number to "
+        "compare the price."
     ) in it["why"]
 
 
@@ -735,7 +743,7 @@ def test_weekly_cap_ranks_bets_by_gap_and_papers_the_sixth():
     assert [it["over_cap"] for it in bets] == [False] * 5 + [True]
     sixth = bets[-1]
     assert sixth["tier"] == "BET" and sixth["blocker"] == "cap"
-    assert sixth["action"].startswith("Over the weekly cap (#6 by gap): paper only")
+    assert sixth["action"].startswith("Past the 5-bet cap — paper only. Number 6 by gap")
     # counts.bet is what the site and the Saturday text read: bettable BETs only.
     assert c["counts"] == {"bet": 5, "edge": 0, "pass": 0, "over_cap": 1, "degraded": 0}
     assert c["paper"] == {"qualifying": 6, "over_cap": 1, "cap": WEEKLY_BET_CAP}

@@ -36,6 +36,7 @@ from .model.score import (
     BET_GAP_PTS,
     EV_FLOOR,
     HR_OFF_MARKET_PTS,
+    MIN_GAMES_FOR_MODEL,
     MODEL_VERSION,
     SCORE_BET_MIN,
     SCORE_WATCH_MIN,
@@ -127,6 +128,15 @@ PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
 # every week, on a healthy build.
 DEGRADED_INPUTS = ("sweep", "preview", "pace", "tempo")
 DEGRADED_BLOCKER = "degraded"
+# What each failed input is called on screen. Mirrors web/lib/labels.ts
+# CARD_INPUT_TEXT — the key itself is never shown to a reader.
+DEGRADED_INPUT_TEXT = {
+    "sweep": "the morning line sweep did not finish",
+    "preview": "the injury and news pull did not finish",
+    "tempo": "the pace numbers did not load",
+    "pace": "the pace read is missing on some games",
+}
+DEGRADED_INPUT_FALLBACK = "an input did not load"
 # Which of those flip the CARD's status to "degraded" (and so the site banner
 # and the lead of the Saturday text). Only the BUILD-WIDE inputs do — a failure
 # there means the whole build ran on a bad read. `pace` is per game: it is
@@ -446,7 +456,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
 def _price_sentence(hr_line, hr_price, ev, ev_v) -> str:
     """verdict.ts priceSentence, word for word."""
     if hr_line is None:
-        return "Hard Rock hasn’t posted a first-half line for this game yet."
+        return "Hard Rock has not posted a first-half line yet."
     at = (
         f"under {fmt(hr_line)}"
         if hr_price is None
@@ -457,20 +467,26 @@ def _price_sentence(hr_line, hr_price, ev, ev_v) -> str:
         # them: blaming the other books when Hard Rock itself posted no price
         # contradicts it (and is simply wrong — the books may all be priced).
         if hr_price is None:
-            return f"Hard Rock has {at}, but hasn’t posted a price for it yet — nothing to judge."
-        return f"Hard Rock has {at}; not enough other books at that number to judge the price."
+            return (
+                f"Hard Rock has the under at {fmt(hr_line)} but no price on it yet, so there "
+                "is nothing to compare."
+            )
+        return (
+            f"Hard Rock has the under at {fmt(hr_line)}. Not enough other books are at that "
+            "number to compare the price."
+        )
     pct = fmt(abs(ev) * 100)
     if ev_v == "pos":
         return (
-            f"Hard Rock’s {at} pays about {pct}% better than the market’s fair price "
-            "(books plus no-vig exchanges) — a good price."
+            f"Hard Rock’s {at} pays about {pct}% more than the fair price. Fair price = the "
+            "other books and the exchanges with the vig taken out."
         )
     if ev_v == "neg":
         return (
-            f"Hard Rock’s {at} pays about {pct}% worse than the market’s fair price "
-            "(books plus no-vig exchanges) — you’d be paying extra vig."
+            f"Hard Rock’s {at} pays about {pct}% less than the fair price. You would be paying "
+            "extra vig."
         )
-    return f"Hard Rock’s {at} is priced about the same as the rest of the market — a fair price, no extra edge."
+    return f"Hard Rock’s {at} is priced about the same as the rest of the market."
 
 
 def _gap_sentence(has_model, bv_line, hr_line, market_line, reference, gap) -> str:
@@ -487,7 +503,13 @@ def _gap_sentence(has_model, bv_line, hr_line, market_line, reference, gap) -> s
             if line is not None
             else "No first-half line has been posted yet."
         )
-        return f"No model read yet — the model needs both teams to have played 2 games this season. {ref}"
+        need = (
+            f" — the model needs both teams to have played {MIN_GAMES_FOR_MODEL} "
+            f"game{'' if MIN_GAMES_FOR_MODEL == 1 else 's'} this season"
+            if MIN_GAMES_FOR_MODEL > 0
+            else ""
+        )
+        return f"No model number yet{need}. {ref}"
     if hr_line is not None:
         hr_gap = round2(hr_line - bv_line)
         direction = (
@@ -648,54 +670,64 @@ def build_item(
     else:
         tier = "PASS"
 
-    # --- action (edge.ts wording) --------------------------------------------
+    # --- action (edge.ts wording — keep the two in step) ---------------------
+    # "Not yet —" states the condition and names the number or price that would
+    # change it, rather than instructing the reader to wait.
     if tier == "BET":
         at = f" at {american(hr_price)}" if hr_price is not None else ""
-        action = f"Bet now: 1H under {fmt(hr_line)}{at} on Hard Rock."
+        action = f"Bet one unit: first-half under {fmt(hr_line)}{at} on Hard Rock."
     elif not has_model:
         action = (
-            f"Price only: Hard Rock pays {fmt((ev or 0) * 100)}% better than the market on this "
-            "under. No model behind it."
+            f"Watch: Hard Rock pays about {fmt((ev or 0) * 100)}% more than the market on this "
+            "under. No model number behind it."
             if price_pos
-            else "Pass: no model read this week and no price edge at Hard Rock."
+            else "Pass: no model number yet, and Hard Rock’s price is no better than the market."
         )
     elif blocker == "no_hr_line" or basis is None:
-        lead = "No line captured yet." if basis is None else "No Hard Rock line yet."
-        action = f"{lead} A bet at under {fmt(k_line)} or higher, -110 or better."
+        if basis is None:
+            action = (
+                "Not yet — no first-half line anywhere. It becomes a bet at under "
+                f"{fmt(k_line)} or higher."
+            )
+        else:
+            at = f", at {american(k_price)} or better" if k_price is not None else ""
+            action = (
+                "Not yet — Hard Rock has no first-half line. It becomes a bet at under "
+                f"{fmt(k_line)} or higher{at}."
+            )
     elif blocker == "off_market":
         diff = round2(market_line - hr_line)
         action = (
-            f"Wait: Hard Rock’s {fmt(hr_line)} is {fmt(diff)} below the market’s {fmt(market_line)} "
-            f"— giving up points and a void risk. Bet if it moves to {fmt(market_line - 0.5)} or higher."
+            f"Not yet — Hard Rock’s {fmt(hr_line)} is {fmt(diff)} below the market line of "
+            f"{fmt(market_line)}. You would be giving up points, and Hard Rock can void a bet "
+            f"that far off the market. Bet it if Hard Rock moves to "
+            f"{fmt(market_line - HR_OFF_MARKET_PTS)} or higher."
         )
     elif blocker == "price":
-        needs = (
-            f"{american(k_price)} or better"
-            if k_price is not None
-            else "a fair price (-110 or better)"
-        )
-        hr = american(hr_price) if hr_price is not None else "unpriced"
-        action = f"Wait: Hard Rock is {hr}; needs {needs}."
+        needs = f"{american(k_price if k_price is not None else -110)} or better"
+        hr = american(hr_price) if hr_price is not None else "not posted"
+        action = f"Not yet — Hard Rock’s price is {hr}; needs {needs}."
     elif blocker == "no_fair_price":
         if hr_price is None:
             action = (
-                f"Wait: Hard Rock hasn’t priced its {fmt(hr_line)} under yet — nothing to judge. "
-                "Paper only until Hard Rock posts a price."
+                f"Not yet — Hard Rock has not priced its {fmt(hr_line)} under. "
+                "Paper only until it does."
             )
         else:
             hr = american(hr_price)
             action = (
-                f"Wait: Hard Rock’s {hr} can’t be judged — no other book or exchange is priced at "
-                f"{fmt(hr_line)}. Paper only until a comparable price appears."
+                f"Not yet — no other book is at {fmt(hr_line)}, so {hr} cannot be compared. "
+                "Paper only until one is."
             )
     elif blocker == "qb_out":
-        action = "Wait: a starting QB is listed out — re-check the number after the news settles."
+        action = "Starting QB out — recheck. Our number does not know about it."
     else:
         g = gap or 0
         action = (
-            f"Pass: the line is only {fmt(g)} above our number; needs {fmt(k_line)} or higher."
+            f"Pass: the line is {fmt(g)} above our number. It needs {fmt(k_line)} or higher."
             if g > 0
-            else f"Pass: the line is {fmt(abs(g))} below our number (leans over); needs {fmt(k_line)} or higher."
+            else f"Pass: the line is {fmt(abs(g))} below our number, so this leans over. "
+            "We only bet unders."
         )
 
     # --- why (2-4 plain sentences) ---------------------------------------------
@@ -818,8 +850,8 @@ def apply_weekly_cap(
             it["over_cap"] = True
             it["blocker"] = "cap"
             it["action"] = (
-                f"Over the weekly cap (#{rank} by gap): paper only — the card carries "
-                f"{cap} real bets."
+                f"Past the {cap}-bet cap — paper only. Number {rank} by gap this week; "
+                "everything checked out, the cap makes it paper."
             )
     return items
 
@@ -1016,9 +1048,12 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
         it["blocker"] = DEGRADED_BLOCKER
         if it.get("qualifies"):
             it["paper_blocker"] = DEGRADED_BLOCKER
+        # Input keys never reach a reader: DEGRADED_INPUT_TEXT is the same
+        # wording web/lib/labels.ts CARD_INPUT_TEXT renders.
+        words = ", ".join(DEGRADED_INPUT_TEXT.get(n, DEGRADED_INPUT_FALLBACK) for n in uniq)
         it["action"] = (
-            f"Degraded inputs ({', '.join(uniq)}): paper only — re-check Hard Rock’s "
-            "number and the QB report yourself before betting."
+            f"An input failed this morning — paper only. This morning {words}, so check "
+            "Hard Rock’s number and the injury list yourself before betting."
         )
     return list(items)
 
@@ -1134,7 +1169,7 @@ def build_card(
     notes: List[str] = []
     if items and not model_read:
         notes.append(
-            "No model read this week (weeks 1-2): every call below is a price read, not a model bet."
+            "No model number this week: every call below is a price read, not a model bet."
         )
     if items and all(it["hr_line"] is None for it in items):
         notes.append("Hard Rock has not posted a first-half line on any game yet.")

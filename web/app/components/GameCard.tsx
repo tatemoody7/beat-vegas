@@ -512,7 +512,15 @@ function NewsSection({ g }: { g: HomeGame }) {
 
 // --- the card ---------------------------------------------------------------
 
-export default function GameCard({ g }: { g: HomeGame }) {
+export default function GameCard({
+  g,
+  unitUsd,
+}: {
+  g: HomeGame;
+  /** The flat stake, read from the environment server-side and passed in —
+   *  a client component cannot read a non-public env var. */
+  unitUsd: number;
+}) {
   const [open, setOpen] = useState(false);
   const { row, edge, check } = g;
   const hr =
@@ -618,6 +626,7 @@ export default function GameCard({ g }: { g: HomeGame }) {
           <NewsSection g={g} />
           <div className="border-t border-[var(--border)] px-4 py-3">
             <LogPickButton
+              unitUsd={unitUsd}
               prefill={{
                 gameId: row.gameId,
                 away: row.away,
@@ -629,7 +638,6 @@ export default function GameCard({ g }: { g: HomeGame }) {
                 gap: edge.verdict.hrGap,
                 ev: check?.ev ?? null,
                 hrLine: check?.hrLine ?? null,
-                fairUnder: check?.marketFairUnder ?? null,
               }}
               picked={g.picked}
               kickedOff={g.kickedOff}

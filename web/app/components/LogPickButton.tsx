@@ -8,25 +8,28 @@ export default function LogPickButton({
   prefill,
   picked,
   kickedOff,
+  unitUsd,
 }: {
   prefill: PickPrefill;
   /** A real-money first-half pick is already logged on this game. */
   picked: boolean;
   kickedOff: boolean;
+  /** The flat stake, passed down from the server page. */
+  unitUsd: number;
 }) {
   const [open, setOpen] = useState(false);
 
   if (kickedOff) {
     return (
       <span className="text-xs text-[var(--text-dim)]">
-        Kicked off — no more bets on this game.
+        Already kicked off.
       </span>
     );
   }
   if (picked) {
     return (
       <span className="text-xs text-[var(--text-dim)]">
-        Already logged — see Results.
+        Already logged. It is on Results.
       </span>
     );
   }
@@ -43,7 +46,11 @@ export default function LogPickButton({
   }
   return (
     <div className="mt-2 w-full">
-      <LogPickForm prefill={prefill} onDone={() => setOpen(false)} />
+      <LogPickForm
+        prefill={prefill}
+        unitUsd={unitUsd}
+        onDone={() => setOpen(false)}
+      />
     </div>
   );
 }

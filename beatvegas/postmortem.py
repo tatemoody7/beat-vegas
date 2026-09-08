@@ -35,6 +35,7 @@ from .model import score as _score
 
 BET_GAP_PTS = float(getattr(_score, "BET_GAP_PTS", 1.75))
 STRONG_GAP_PTS = float(getattr(_score, "STRONG_GAP_PTS", 3.0))
+WATCH_GAP_PTS = float(getattr(_score, "WATCH_GAP_PTS", 1.0))
 MODEL_BET_THRESHOLD = int(getattr(_score, "MODEL_BET_THRESHOLD", 53))
 HR_OFF_MARKET_PTS = float(getattr(_score, "HR_OFF_MARKET_PTS", 0.5))
 EV_FLOOR = float(getattr(_score, "EV_FLOOR", -0.05))
@@ -1133,7 +1134,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
                 _flag(
                     "score_gate",
                     "change",
-                    f"under_score does not separate outcomes ({_fmt_pct(_pct(s60))} at 60+ vs {_fmt_pct(_pct(s47))} below 47). Drop the 'score ≥ {MODEL_BET_THRESHOLD}' clause from the confidence label; keep the score as a display chip.",
+                    f"The old classifier score does not separate outcomes ({_fmt_pct(_pct(s60))} at 60+ vs {_fmt_pct(_pct(s47))} below 47). It is no longer shown on the site.",
                     score60=_pct(s60),
                     n60=s60["n"],
                     score_lt47=_pct(s47),
@@ -1145,7 +1146,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
                 _flag(
                     "score_gate",
                     "ok",
-                    f"under_score 60+ hits {_fmt_pct(_pct(s60))} vs {_fmt_pct(_pct(s47))} below 47.",
+                    f"The old classifier score at 60+ hits {_fmt_pct(_pct(s60))} vs {_fmt_pct(_pct(s47))} below 47.",
                     score60=_pct(s60),
                     n60=s60["n"],
                     score_lt47=_pct(s47),
@@ -1173,13 +1174,13 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
         )
         beats = head is not None and _pct(head) is not None and _pct(head) >= BREAKEVEN
         text = (
-            f"Gap discriminates ({_fmt_pct(_pct(g175))} at 1.75–3, {_fmt_pct(_pct(g3))} at 3+, vs {_fmt_pct(_pct(gneg))} below 0); keep the 1.75 gate as a ranking rule."
+            f"Gap discriminates ({_fmt_pct(_pct(g175))} at {BET_GAP_PTS:g}–{STRONG_GAP_PTS:g}, {_fmt_pct(_pct(g3))} at {STRONG_GAP_PTS:g}+, vs {_fmt_pct(_pct(gneg))} below 0); keep the {BET_GAP_PTS:g} gap bar as a ranking rule."
             if discriminates
-            else f"Gap bands do not separate cleanly ({_fmt_pct(_pct(g175))} at 1.75–3 vs {_fmt_pct(_pct(gneg))} below 0)."
+            else f"Gap bands do not separate cleanly ({_fmt_pct(_pct(g175))} at {BET_GAP_PTS:g}–{STRONG_GAP_PTS:g} vs {_fmt_pct(_pct(gneg))} below 0)."
         )
         if head is not None:
             text += (
-                f" Followed-the-system hit rate against the fair line is {_fmt_pct(_pct(head))} (n {head['n']}), "
+                f" Followed-the-system hit rate against the estimated line is {_fmt_pct(_pct(head))} (n {head['n']}), "
                 + (
                     "at or above breakeven."
                     if beats
@@ -1209,11 +1210,11 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
             _flag(
                 "gap_dip",
                 "watch" if diff > 2 * se else "ok",
-                f"1–1.75 band hits {_fmt_pct(_pct(gdip))} vs {_fmt_pct(_pct(g175))} at 1.75–3 (difference {100 * diff:+.1f} pts, about {diff / se if se else 0:.1f} SE). "
+                f"{WATCH_GAP_PTS:g}–{BET_GAP_PTS:g} band hits {_fmt_pct(_pct(gdip))} vs {_fmt_pct(_pct(g175))} at {BET_GAP_PTS:g}–{STRONG_GAP_PTS:g} (difference {100 * diff:+.1f} pts, about {diff / se if se else 0:.1f} SE). "
                 + (
                     "A real step at the cut would be unusual; treat as noise until real lines say otherwise."
                     if diff > 2 * se
-                    else "Within noise: 1.75 is a ranking convenience, not where an edge starts."
+                    else f"Within noise: {BET_GAP_PTS:g} is a ranking convenience, not where an edge starts."
                 ),
                 dip=_pct(gdip),
                 n_dip=gdip["n"],
@@ -1225,7 +1226,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
             _flag(
                 "strong_label",
                 "ok" if _pct(g3) <= _pct(g175) + 0.02 else "watch",
-                f"'Strong' (gap ≥ 3) hits {_fmt_pct(_pct(g3))} vs {_fmt_pct(_pct(g175))} for 1.75–3: "
+                f"Gap {STRONG_GAP_PTS:g}+ hits {_fmt_pct(_pct(g3))} vs {_fmt_pct(_pct(g175))} for {BET_GAP_PTS:g}–{STRONG_GAP_PTS:g}: "
                 + (
                     "no extra hit rate; keep 3.0 as a sort label only."
                     if _pct(g3) <= _pct(g175) + 0.02
@@ -1336,7 +1337,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
         _flag(
             "multiple_comparisons",
             "ok",
-            f"{n_tests} comparisons were run; expect roughly {max(1, round(0.05 * n_tests))} false positives at p < 0.05. Only q < 0.10 with |d| ≥ 0.2 is flagged.",
+            f"{n_tests} comparisons were run, so about {max(1, round(0.05 * n_tests))} would look meaningful by luck alone. Only differences that clear that bar by a wide margin are flagged.",
             n_tests=n_tests,
         )
     )

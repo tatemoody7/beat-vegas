@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { PROXY_TEXT, RULE_TEXT } from "./labels";
 import {
   bandTable,
   flagsFrom,
   headline,
   liveNotesFrom,
-  RULE_LABEL,
   type PmBucket,
   type PmRun,
 } from "./postmortem";
@@ -241,21 +241,40 @@ describe("flagsFrom / liveNotesFrom", () => {
   });
 });
 
-describe("RULE_LABEL", () => {
-  it("names every rule the script emits", () => {
+describe("RULE_TEXT / PROXY_TEXT", () => {
+  it("names every surviving rule the script emits", () => {
     for (const k of [
       "cap5",
       "gap175",
       "gap300",
       "top20",
-      "score53",
-      "both",
       "all",
       "bet",
       "price_read",
       "all_hr",
+      "qualifying",
     ]) {
-      expect(RULE_LABEL[k]).toBeTruthy();
+      expect(RULE_TEXT[k]).toBeTruthy();
+    }
+  });
+
+  it("drops the retired classifier rules and the old flat line", () => {
+    expect(RULE_TEXT.score53).toBeUndefined();
+    expect(RULE_TEXT.both).toBeUndefined();
+    expect(PROXY_TEXT.flat).toBeUndefined();
+  });
+
+  it("names every proxy the script emits", () => {
+    for (const k of [
+      "real",
+      "fg",
+      "step",
+      "hr",
+      "hr_close",
+      "market",
+      "market_close",
+    ]) {
+      expect(PROXY_TEXT[k]).toBeTruthy();
     }
   });
 });

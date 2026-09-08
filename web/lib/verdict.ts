@@ -36,8 +36,9 @@ export const HR_OFF_MARKET_PTS = 0.5;
 // through and rejects -115 or worse unless the market itself leans under.
 export const EV_FLOOR = -0.05;
 // weekly_update.py --min-games: the model needs this many games played by both
-// teams, so weeks 1–2 have no model read at all.
-export const MIN_GAMES_FOR_MODEL = 2;
+// teams this season (1 since 2026-09-08; rows built on one game are tagged
+// "early season" on the board).
+export const MIN_GAMES_FOR_MODEL = 1;
 
 export type Verdict = "BET" | "WATCH" | "PASS";
 export type Confidence = "high" | "medium" | "low" | "none";
@@ -159,7 +160,7 @@ function gapSentence(i: VerdictInput, hrGap: number | null): string {
       line !== null
         ? `The ${fmt(line)} shown is a reference first-half number worked out from the full-game total (${share}; the share is higher when one side is a heavy favorite), not a prediction.`
         : "No first-half line has been posted yet.";
-    return `No model read yet — the model needs both teams to have played ${MIN_GAMES_FOR_MODEL} games this season. ${ref}`;
+    return `No model read yet — the model needs both teams to have played at least ${MIN_GAMES_FOR_MODEL === 1 ? "one game" : `${MIN_GAMES_FOR_MODEL} games`} this season. ${ref}`;
   }
   // Prefer the number you can actually bet.
   if (hrGap !== null && i.hrLine !== null) {

@@ -134,7 +134,7 @@ export default async function BoardPage({
             No model read this week.
           </p>
           <p className="mt-1">
-            {`The model needs both teams to have played ${MIN_GAMES_FOR_MODEL} games this season, so it sits out weeks 1–2 by design. Until then the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
+            {`The model needs both teams to have played at least ${MIN_GAMES_FOR_MODEL === 1 ? "one game" : `${MIN_GAMES_FOR_MODEL} games`} this season. Until then the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
           </p>
         </div>
       )}

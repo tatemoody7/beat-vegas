@@ -89,9 +89,9 @@ def seed_week(eng, *, kick_offset=timedelta(days=1)):
         s.add(_snap(1, "hardrockbet", "1H_total", 24.5, -110, -110))
         s.add(_snap(1, "draftkings", "1H_total", 24.5, 100, -120))
         s.add(_snap(1, "fanduel", "1H_total", 24.5, 100, -120))
-        # 2: PASS (gap 0.5)
-        s.add(_snap(2, "hardrockbet", "1H_total", 24.5))
-        s.add(_snap(2, "draftkings", "1H_total", 24.5, 100, -120))
+        # 2: PASS (gap 0.0 — under the 55 watch cut; 0.5 would now be Watch)
+        s.add(_snap(2, "hardrockbet", "1H_total", 24.0))
+        s.add(_snap(2, "draftkings", "1H_total", 24.0, 100, -120))
         # 3: EDGE no_hr_line (market 25.0, bv 22.4)
         s.add(_snap(3, "draftkings", "1H_total", 25.0))
         s.add(_snap(3, "fanduel", "1H_total", 25.0))
@@ -140,7 +140,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert by_id[5]["tier"] == "EDGE" and by_id[5]["blocker"] == "price"
     assert by_id[5]["qualifies"] is True and by_id[5]["paper_logged"] is True
     assert by_id[3]["paper_logged"] is False  # no Hard Rock line: nothing to log
-    assert by_id[2]["paper_logged"] is False  # gap 0.5: does not qualify
+    assert by_id[2]["paper_logged"] is False  # gap 0.0: does not qualify
 
     p, q = picks
     assert p.game_id == 1 and p.is_paper is True and p.stake == 1.0

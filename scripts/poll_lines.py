@@ -146,9 +146,9 @@ def main() -> None:
         "--regions",
         default=None,
         help="Odds API regions for the per-event 1H calls (default: config odds_api.regions, "
-        "us,us2). The Friday/Saturday card sweeps pass us,us2,us_ex so the exchanges "
-        "(Kalshi, Novig, ...) price Hard Rock's number for the exchange-first fair price; "
-        "each extra region costs one more credit per event",
+        "us,us2); each extra region costs one more credit per event. NB: us_ex buys nothing "
+        "here — the exchanges (Kalshi, Novig, ...) post no first-half totals (verified "
+        "2026-09-07 against the live API), so no scheduled sweep passes it",
     )
     args = ap.parse_args()
 

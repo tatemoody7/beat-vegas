@@ -108,21 +108,26 @@ def write_status(
     events_in_window: int,
     events_polled: int,
     credits_spent: Optional[int],
-    unpolled_game_ids: List[int],
+    unpolled_game_ids: Optional[List[int]],
 ) -> None:
     """The run's coverage, for scripts/build_card.py. Written on EVERY exit path
     — a sweep that stopped at the credit floor still exits 0, and only this file
-    tells the card which games carry a stale Hard Rock number."""
+    tells the card which games carry a stale Hard Rock number.
+
+    unpolled_game_ids None = coverage UNKNOWN (the run stopped before it could
+    work out the slate, e.g. the database was unreachable): the key is left
+    out, and the card holds every game. [] means every game was reached."""
     if not path:
         return
-    payload = {
+    payload: Dict[str, object] = {
         "complete": bool(complete),
         "reason": reason,
         "events_in_window": int(events_in_window),
         "events_polled": int(events_polled),
         "credits_spent": credits_spent,
-        "unpolled_game_ids": unpolled_game_ids,
     }
+    if unpolled_game_ids is not None:
+        payload["unpolled_game_ids"] = unpolled_game_ids
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh)
     print(f"[status] {path}: {json.dumps(payload)}")
@@ -207,6 +212,17 @@ def main() -> None:
     args = ap.parse_args()
 
     if not try_init_db():
+        # Nothing was swept and the slate is unknown: say so, or the card
+        # build could not tell this exit from a sweep that never ran.
+        write_status(
+            args.status_file,
+            complete=False,
+            reason="db_unreachable",
+            events_in_window=0,
+            events_polled=0,
+            credits_spent=0,
+            unpolled_game_ids=None,
+        )
         return
     cfg = load_config().get("odds_api", {}) or {}
     client = OddsAPIClient()

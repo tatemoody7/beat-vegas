@@ -406,6 +406,32 @@ def test_a_fetch_error_writes_the_status_before_failing_the_run(env, monkeypatch
     assert st["events_polled"] == 1 and st["unpolled_game_ids"] == [2, 3]
 
 
+def test_an_unreachable_database_writes_a_status_with_unknown_coverage(env, monkeypatch, tmp_path):
+    """The early return when the DB is unreachable used to write no file at
+    all, so the card build could not tell it from a sweep that never ran.
+    Coverage is unknown (no unpolled_game_ids key), which holds every game."""
+    from beatvegas.card import degraded_inputs
+
+    mod, eng = env
+    mod.try_init_db = lambda: False
+    client = FakeClient(EVENTS, PAYLOADS)
+    out = tmp_path / "sweep.json"
+    _run(mod, monkeypatch, client, "--days-ahead", "6", "--status-file", str(out))
+    assert client.calls == []  # nothing was spent
+    st = _status(out)
+    assert st == {
+        "complete": False,
+        "reason": "db_unreachable",
+        "events_in_window": 0,
+        "events_polled": 0,
+        "credits_spent": 0,
+    }
+    assert "unpolled_game_ids" not in st
+    d = degraded_inputs([{"game_id": 1}, {"game_id": 2}], sweep_status=st, now=NOW)
+    assert [(e["input"], e["game_ids"]) for e in d] == [("sweep", [1, 2])]
+    assert d[0]["detail"] == "stopped early (db_unreachable) after 0 of 0 events; coverage unknown"
+
+
 def test_no_status_file_flag_writes_nothing(env, monkeypatch, tmp_path):
     mod, eng = env
     _seed(eng, GAMES, hr_fg_for=(1, 2, 3))

@@ -404,7 +404,9 @@ export function cardHealth(card: Card, now: Date): CardHealth {
   ) {
     if (card.slot === "manual") {
       const when =
-        card.builtAt === null ? "" : ` built ${builtET(new Date(card.builtAt))} ET`;
+        card.builtAt === null
+          ? ""
+          : ` built ${builtET(new Date(card.builtAt))} ET`;
       return {
         level: "warn",
         title: `Manual card${when} — re-run with slot=saturday for a final`,

@@ -405,9 +405,11 @@ def test_apply_degraded_keeps_the_tier_and_writes_a_paper_only_action():
     assert out["blocker"] == "degraded" and out["degraded_inputs"] == ["sweep"]
     assert out["gate_blocker"] == "none"  # every gate had passed
     assert out["paper_blocker"] == "degraded"  # it qualifies, so the ledger tags it
+    # The input KEY never reaches a reader: it is named in words.
     assert out["action"] == (
-        "Degraded inputs (sweep): paper only — re-check Hard Rock’s number and the "
-        "QB report yourself before betting."
+        "An input failed this morning — paper only. This morning the morning line sweep "
+        "did not finish, so check Hard Rock’s number and the injury list yourself before "
+        "betting."
     )
 
 
@@ -421,11 +423,20 @@ def test_apply_degraded_lists_every_input_that_touched_the_game():
         ],
     )
     assert items[0]["degraded_inputs"] == ["sweep", "tempo"]  # DEGRADED_INPUTS order
-    assert items[0]["action"].startswith("Degraded inputs (sweep, tempo): paper only")
+    assert items[0]["action"].startswith("An input failed this morning — paper only.")
+    assert (
+        "the morning line sweep did not finish, the pace numbers did not load" in items[0]["action"]
+    )
     # A second pass with a different list MERGES into the first, never replaces it.
     apply_degraded(items, [{"input": "pace", "detail": "", "game_ids": [1]}])
     assert items[0]["degraded_inputs"] == ["sweep", "pace", "tempo"]
-    assert items[0]["action"].startswith("Degraded inputs (sweep, pace, tempo): paper only")
+    assert (
+        "the morning line sweep did not finish, the pace read is missing on some games, "
+        "the pace numbers did not load" in items[0]["action"]
+    )
+    # No raw key, ever ("line sweep" is prose; "(sweep" / "tempo" are keys).
+    assert "(sweep" not in items[0]["action"]
+    assert "tempo" not in items[0]["action"]
 
 
 def test_apply_degraded_preserves_the_gate_that_had_blocked_a_real_bet():

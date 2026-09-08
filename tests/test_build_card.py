@@ -150,7 +150,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.gap_at_pick == 2.1 and p.hr_line_at_pick == 24.5 and p.ev_at_pick is not None
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
-    assert p.note.startswith("card 2026-09-18 [none]: Bet now")
+    assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
     chips = json.loads(p.factors_json_at_pick)
     assert chips["total_band"] == "45–52" and chips["hook_side"] == "key+0.5"
     assert chips["tier"] == "BET" and chips["cap_rank"] == 1
@@ -160,7 +160,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
 
     assert q.game_id == 5 and q.is_paper is True and q.blocker == "price"
     assert q.verdict_at_pick == "WATCH" and q.price == -125 and q.gap_at_pick == 2.0
-    assert q.note.startswith("card 2026-09-18 [price]: Wait: Hard Rock is -125")
+    assert q.note.startswith("card 2026-09-18 [price]: Not yet — Hard Rock’s price is -125")
 
 
 def test_rerun_adds_a_card_row_but_never_a_second_pick(env):
@@ -426,7 +426,7 @@ def test_no_comparable_price_logs_a_paper_pick_with_blocker_no_fair_price(env):
     assert pick.blocker == "no_fair_price" and pick.verdict_at_pick == "WATCH"
     assert pick.ev_at_pick is None and pick.price == -110
     assert pick.note.startswith(
-        "card 2026-09-18 [no_fair_price]: Wait: Hard Rock’s -110 can’t be judged"
+        "card 2026-09-18 [no_fair_price]: Not yet — no other book is at 24.5"
     )
     chips = json.loads(pick.factors_json_at_pick)
     assert chips["fair_source"] is None and chips["fair_under"] is None
@@ -472,7 +472,7 @@ def test_step_summary_lists_the_bets(env, tmp_path, monkeypatch):
     assert "## Bet card 2026 wk3" in text
     assert "**1 BET · 2 EDGE · 1 PASS**" in text
     assert (
-        "- Bet now: 1H under 24.5 at -110 on Hard Rock. (Kansas @ Missouri)"
+        "- Bet one unit: first-half under 24.5 at -110 at Hard Rock. (Kansas @ Missouri)"
         " | kill: below u24.5 or worse than -120" in text
     )
 

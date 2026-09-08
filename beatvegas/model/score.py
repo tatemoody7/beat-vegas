@@ -353,8 +353,12 @@ def score_slate(
         whole slate falls back to the incumbent and attrs["engine_fallback"]
         says so ("insufficient_real_closes"). A residual fit/predict that
         RAISES falls back the same way instead of killing the run:
-        attrs["engine_fallback"] becomes "residual_error:<exception repr>"
-        and every row keeps the incumbent's number.
+        attrs["engine_fallback"] becomes "residual_error:<exception repr>",
+        every row keeps the incumbent's number, and no engine_artifact is
+        attached (nothing was fitted). residual.ResidualFitError — the engine's
+        own row floor, RESIDUAL_MIN_FIT_ROWS — arrives through that path, so a
+        caller who lowers RESIDUAL_MIN_TRAIN gets a named demotion rather than
+        a stack trace from inside sklearn.
 
         The fallback is also PER ROW: only rows whose `line_kind` is a real
         posted 1H number (REAL_LINE_KINDS) get the residual read. A 'derived_fg'

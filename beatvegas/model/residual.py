@@ -40,6 +40,17 @@ MODEL_VERSION_TAG = "resid_v1"
 # Below this many training games with a real close, score_slate falls back to
 # the incumbent (and says so in attrs["engine_fallback"]).
 RESIDUAL_MIN_TRAIN = 300
+# The regressor's leaf size, kept as a name because the fit floor is derived
+# from it (see RESIDUAL_MIN_FIT_ROWS).
+MIN_SAMPLES_LEAF = 30
+# The fewest rows fit_residual will accept. A HistGradientBoostingRegressor
+# with min_samples_leaf=30 cannot make even ONE split below 2*30 rows: both
+# children of the root would have to hold 30 rows. Under the floor the "model"
+# is the training mean wearing a regressor's clothes — and newer
+# numpy/scikit-learn report that with an opaque binning error rather than
+# saying so. RESIDUAL_MIN_TRAIN (300) is the production gate; this is the
+# floor for any caller of the public entry point.
+RESIDUAL_MIN_FIT_ROWS = 2 * MIN_SAMPLES_LEAF
 # A 1H close outside this range is a data error (wrong market / bad parse),
 # not a football game.
 CLOSE_MIN, CLOSE_MAX = 10.0, 60.0
@@ -98,6 +109,16 @@ _LINE_DERIVED = {LINE_COL, "implied_1h_share", "wx_wind_band"}
 # these three are not — a residual has little signal to spare, so their absence
 # is a loud warning plus fingerprint["missing_features"], not a quiet NaN column.
 REQUIRED_FEATURES: Tuple[str, ...] = (LINE_COL, "full_game_total", "spread")
+
+
+class ResidualFitError(ValueError):
+    """The residual model cannot be fitted on what it was handed.
+
+    Raised (never swallowed) so a caller sees a typed, self-describing failure
+    instead of an opaque error from deep inside the estimator. score_slate
+    catches it and demotes the board to the incumbent with the reason attached
+    to attrs["engine_fallback"].
+    """
 
 
 def assert_residual_features(cols) -> None:
@@ -202,16 +223,52 @@ def _new_regressor() -> HistGradientBoostingRegressor:
         max_depth=3,
         l2_regularization=1.0,
         max_iter=200,
-        min_samples_leaf=30,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
         random_state=7,
     )
 
 
+def _require_fit_rows(n: int, what: str = "residual fit") -> None:
+    """Refuse a fit that cannot produce a real tree. Names the count and the
+    floor, so the job log says which one it was."""
+    if n < RESIDUAL_MIN_FIT_ROWS:
+        raise ResidualFitError(
+            f"{what}: {n} training row(s) is under the floor of "
+            f"{RESIDUAL_MIN_FIT_ROWS} (2 x min_samples_leaf={MIN_SAMPLES_LEAF}, "
+            "the fewest rows that can make a single split)"
+        )
+
+
+def _fit_matrix(train: pd.DataFrame) -> pd.DataFrame:
+    """The feature matrix handed to the estimator at FIT time.
+
+    A wholly-NaN training column carries no information — but scikit-learn's
+    binner cannot describe one. It drops the missing values first, so an
+    all-NaN column leaves ZERO distinct values and
+    `sliding_window_view(distinct, 2)` raises "window shape cannot be larger
+    than input array shape" (newer numpy/scikit-learn; older builds happened
+    to tolerate it). A CONSTANT column holds exactly the same amount of
+    information and bins cleanly, so an all-NaN training column becomes a
+    constant 0.0 here.
+
+    Fit time only. Filling NaN at PREDICT time would send a genuinely unknown
+    value into a real bin instead of down the model's missing branch, which is
+    a different — and wrong — prediction.
+    """
+    X = train[RESIDUAL_FEATURE_COLS].astype(float)
+    dead = [c for c in RESIDUAL_FEATURE_COLS if bool(X[c].isna().all())]
+    for c in dead:
+        X[c] = 0.0
+    return X
+
+
 def fit_residual(train: pd.DataFrame) -> HistGradientBoostingRegressor:
+    """Fit the residual regressor. Raises ResidualFitError below the row floor."""
     assert_residual_features(RESIDUAL_FEATURE_COLS)
     train = _ensure_numeric(train.copy())
+    _require_fit_rows(len(train))
     model = _new_regressor()
-    model.fit(train[RESIDUAL_FEATURE_COLS], train[TARGET].astype(float))
+    model.fit(_fit_matrix(train), train[TARGET].astype(float))
     return model
 
 
@@ -231,17 +288,31 @@ def predict_1h_total(model, df: pd.DataFrame) -> np.ndarray:
     return line + predict_residual(model, df)
 
 
+def cv_min_rows(k: int = 5) -> int:
+    """Rows a k-fold sigma needs. Each fold fits on (k-1)/k of the frame, so
+    the FOLD's training split — not the whole frame — must clear the fit floor.
+    Below k rows KFold cannot even split."""
+    if k < 2:
+        return RESIDUAL_MIN_FIT_ROWS
+    return max(k, -(-RESIDUAL_MIN_FIT_ROWS * k // (k - 1)))
+
+
 def residual_sigma(train: pd.DataFrame, k: int = 5) -> Dict:
     """{"sigma", "lo_off", "hi_off"} from k-fold out-of-fold residuals of the
     residual model on TRAIN only (the target slate never enters). Offsets are
-    added to the predicted 1H total for an 80% band; empty-safe."""
+    added to the predicted 1H total for an 80% band.
+
+    Guarded like fit_residual, but through the documented sentinel the caller
+    already handles rather than an exception: a frame too small for every fold
+    to clear RESIDUAL_MIN_FIT_ROWS returns all-None, and score_slate leaves the
+    band NaN. Empty-safe."""
     empty = {"sigma": None, "lo_off": None, "hi_off": None}
-    if train is None or len(train) < max(k, 2):
+    if train is None or len(train) < cv_min_rows(k):
         return empty
     train = _ensure_numeric(train.copy())
     y = train[TARGET].astype(float).to_numpy()
     cv = KFold(n_splits=k, shuffle=True, random_state=7)
-    oof = cross_val_predict(_new_regressor(), train[RESIDUAL_FEATURE_COLS], y, cv=cv)
+    oof = cross_val_predict(_new_regressor(), _fit_matrix(train), y, cv=cv)
     err = y - np.asarray(oof, dtype=float)
     if len(err) == 0:
         return empty
@@ -297,7 +368,8 @@ def residual_1h_for_slate(
 
     A REQUIRED_FEATURES column missing from either frame warns (RuntimeWarning)
     and lands in fingerprint["missing_features"]; the long tail stays a silent
-    NaN fill."""
+    NaN fill. A training frame under RESIDUAL_MIN_FIT_ROWS raises
+    ResidualFitError (score_slate demotes the board to the incumbent)."""
     if train_resid is None or train_resid.empty or target.empty:
         return np.array([], dtype=float), None, {}
     model = fit_residual(train_resid)

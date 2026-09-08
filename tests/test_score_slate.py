@@ -200,27 +200,27 @@ def _closes_for(df: pd.DataFrame, seasons_below: int, n: int = None) -> dict:
     return {int(r.id): round(float(r.proxy_line) * 2) / 2 for r in played.itertuples()}
 
 
-# Pinned from the incumbent code path (default args) before the engine switch
-# landed: the bv_line engine must keep producing these numbers. Compared with a
-# tolerance, not ==: CI runs ubuntu/py3.11, where a different BLAS can sum the
-# tree ensemble in another order and shift the .round(2) value.
-_PIN_TOL = 0.011  # one cent of rounding: a BLAS-order flip lands exactly 0.01 away
-_BV_LINE_PIN = {
-    723: 24.33,
-    733: 19.47,
-    743: 23.06,
-    753: 22.32,
-    763: 28.51,
-    773: 22.79,
-    783: 21.77,
-    793: 20.79,
-}
+def _incumbent_bv_lines(df: pd.DataFrame) -> dict:
+    """The incumbent engine's own bv_line for every row of the same slate,
+    computed IN THIS PROCESS.
+
+    These tests mean to assert INVARIANCE — that flipping the engine switch on
+    does not move a row the residual model did not produce — so the baseline has
+    to be measured, not pinned. An absolute pin only ever pinned this machine's
+    build: the gradient booster genuinely predicts a different number under
+    CI's newer numpy/scikit-learn (24.54 there vs 24.33 here, twenty times the
+    "one cent of rounding" a tolerance could absorb). Recomputing the incumbent
+    here cancels that on both sides, which is why the comparisons below are
+    exact rather than approximate.
+    """
+    out = score_mod.score_slate(2025, target_week=5, df=df, engine="bv_line")
+    return {int(r.id): float(r.bv_line) for r in out.itertuples()}
 
 
-def _assert_matches_pin(got: dict) -> None:
-    assert set(got) == set(_BV_LINE_PIN)
-    for gid, want in _BV_LINE_PIN.items():
-        assert got[gid] == pytest.approx(want, abs=_PIN_TOL), gid
+def _assert_matches_incumbent(got: dict, df: pd.DataFrame) -> None:
+    want = _incumbent_bv_lines(df)
+    assert set(got) == set(want)
+    assert got == want
 
 
 def _real_lines(df: pd.DataFrame, kind: str = "hr_1h", season: int = 2025, week: int = 5):
@@ -237,10 +237,15 @@ def _real_lines(df: pd.DataFrame, kind: str = "hr_1h", season: int = 2025, week:
 
 def test_bv_line_engine_output_unchanged_by_engine_switch(monkeypatch):
     monkeypatch.delenv("BV_ENGINE", raising=False)
+    df = _frame()
     # explicit engine: a local config.yaml must not be able to flip this test
-    out = score_mod.score_slate(2025, target_week=5, df=_frame(), engine="bv_line")
+    out = score_mod.score_slate(2025, target_week=5, df=df, engine="bv_line")
     got = {int(r.id): float(r.bv_line) for r in out.itertuples()}
-    _assert_matches_pin(got)
+    # The switch itself: a residual run with nothing to train on falls all the
+    # way back, and must reproduce the incumbent's board row for row.
+    switched = score_mod.score_slate(2025, target_week=5, df=df, engine="residual")
+    assert switched.attrs["engine_fallback"] == "insufficient_real_closes"
+    assert got == {int(r.id): float(r.bv_line) for r in switched.itertuples()}
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
     assert "engine_fallback" not in out.attrs and "engine_artifact" not in out.attrs
@@ -320,7 +325,7 @@ def test_residual_engine_falls_back_when_closes_are_scarce(monkeypatch):
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
     got = {int(r.id): float(r.bv_line) for r in out.itertuples()}
-    _assert_matches_pin(got)  # the incumbent's numbers, untouched
+    _assert_matches_incumbent(got, df)  # the incumbent's numbers, untouched
 
 
 def test_residual_engine_fit_failure_falls_back_to_the_incumbent_loudly(monkeypatch):
@@ -350,7 +355,34 @@ def test_residual_engine_fit_failure_falls_back_to_the_incumbent_loudly(monkeypa
     assert "engine_artifact" not in out.attrs
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
-    _assert_matches_pin({int(r.id): float(r.bv_line) for r in out.itertuples()})
+    _assert_matches_incumbent({int(r.id): float(r.bv_line) for r in out.itertuples()}, df)
+
+
+def test_residual_engine_fit_floor_error_falls_back_with_the_real_reason(monkeypatch):
+    """The same demotion, driven by the REAL guard rather than a fake raise: a
+    training frame that clears the production gate but not residual.py's fit
+    floor. The board is the incumbent's, the reason names ResidualFitError, and
+    no engine_artifact is attached (nothing was fitted)."""
+    monkeypatch.setattr(score_mod, "RESIDUAL_MIN_TRAIN", 10)
+    df = _frame()
+    few = _closes_for(df, 2025, n=20)  # > the (patched) gate, < the fit floor of 60
+    lines, kinds = _real_lines(df)
+    out = score_mod.score_slate(
+        2025,
+        target_week=5,
+        df=df,
+        engine="residual",
+        real_closes=few,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+    )
+    reason = out.attrs["engine_fallback"]
+    assert reason.startswith("residual_error:") and "ResidualFitError" in reason
+    assert "20 training row(s)" in reason and "60" in reason
+    assert "engine_artifact" not in out.attrs
+    assert (out["engine"] == "bv_line").all()
+    assert out["resid_hat"].isna().all()
+    _assert_matches_incumbent({int(r.id): float(r.bv_line) for r in out.itertuples()}, df)
 
 
 def test_residual_engine_falls_back_row_by_row_without_a_real_posted_line():
@@ -375,13 +407,14 @@ def test_residual_engine_falls_back_row_by_row_without_a_real_posted_line():
     )
     art = out.attrs["engine_artifact"]
     by_id = out.set_index("id")
+    incumbent = _incumbent_bv_lines(df)
 
     for gid in (derived_id, proxy_id):
         assert by_id.loc[gid, "engine"] == "bv_line"
-        assert by_id.loc[gid, "bv_line"] == pytest.approx(_BV_LINE_PIN[gid], abs=_PIN_TOL)
+        assert float(by_id.loc[gid, "bv_line"]) == incumbent[gid]
         assert pd.isna(by_id.loc[gid, "resid_hat"])
 
-    hr_ids = [gid for gid in _BV_LINE_PIN if gid not in (derived_id, proxy_id)]
+    hr_ids = [gid for gid in incumbent if gid not in (derived_id, proxy_id)]
     for gid in hr_ids:
         assert by_id.loc[gid, "engine"] == "residual"
         assert by_id.loc[gid, "bv_gap"] == pytest.approx(-by_id.loc[gid, "resid_hat"], abs=0.011)
@@ -410,7 +443,7 @@ def test_residual_engine_on_an_all_proxy_slate_is_the_incumbent_board():
     out = score_mod.score_slate(2025, target_week=5, df=df, engine="residual", real_closes=closes)
     assert (out["engine"] == "bv_line").all()
     assert out["resid_hat"].isna().all()
-    _assert_matches_pin({int(r.id): float(r.bv_line) for r in out.itertuples()})
+    _assert_matches_incumbent({int(r.id): float(r.bv_line) for r in out.itertuples()}, df)
     art = out.attrs["engine_artifact"]
     assert art["n_rows_residual"] == 0 and art["n_rows_fallback"] == 8
 

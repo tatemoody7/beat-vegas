@@ -199,6 +199,56 @@ def test_predict_1h_total_is_line_plus_residual():
     )
 
 
+def test_fit_residual_refuses_a_training_set_under_the_floor():
+    """Below 2 x min_samples_leaf the booster cannot make a single split. The
+    caller gets a typed, self-describing ResidualFitError naming the row count
+    and the floor — not an opaque stride/binning error from inside sklearn
+    (which is what newer numpy/scikit-learn raise there)."""
+    floor = R.RESIDUAL_MIN_FIT_ROWS
+    df, closes = _frame(seasons=[2020], per_season=floor - 1)
+    train_r = R.residual_training_frame(df, closes)
+    assert len(train_r) == floor - 1
+    with pytest.raises(R.ResidualFitError) as e:
+        R.fit_residual(train_r)
+    assert str(floor - 1) in str(e.value) and str(floor) in str(e.value)
+
+
+def test_fit_residual_accepts_the_floor_exactly():
+    df, closes = _frame(seasons=[2020], per_season=R.RESIDUAL_MIN_FIT_ROWS)
+    train_r = R.residual_training_frame(df, closes)
+    assert len(train_r) == R.RESIDUAL_MIN_FIT_ROWS
+    model = R.fit_residual(train_r)
+    assert len(R.predict_residual(model, train_r)) == R.RESIDUAL_MIN_FIT_ROWS
+
+
+def test_fit_residual_survives_an_all_nan_feature_column():
+    """A feature the frame cannot supply is an all-NaN column, and sklearn's
+    binner cannot describe one (zero distinct values -> "window shape cannot be
+    larger than input array shape" on newer numpy). It carries no information,
+    so the fit treats it as a constant and still trains on everything else."""
+    df, closes = _frame(per_season=40)
+    df = df.drop(columns=["wx_wind_band", "spread"])  # both all-NaN after _ensure_numeric
+    train_r = R.residual_training_frame(df, closes)
+    assert train_r["spread"].isna().all() and train_r["wx_wind_band"].isna().all()
+    model = R.fit_residual(train_r)
+    pred = R.predict_residual(model, train_r)
+    assert len(pred) == len(train_r) and not np.isnan(pred).any()
+
+
+def test_residual_sigma_returns_the_sentinel_under_the_fold_floor():
+    """Each of the k folds fits on (k-1)/k of the frame, so the FOLD's split —
+    not the whole frame — has to clear the fit floor."""
+    k = 5
+    need = R.cv_min_rows(k)
+    assert need == -(-R.RESIDUAL_MIN_FIT_ROWS * k // (k - 1))
+    empty = {"sigma": None, "lo_off": None, "hi_off": None}
+    df, closes = _frame(seasons=[2020], per_season=need - 1)
+    assert R.residual_sigma(R.residual_training_frame(df, closes), k=k) == empty
+    df, closes = _frame(seasons=[2020], per_season=need)
+    band = R.residual_sigma(R.residual_training_frame(df, closes), k=k)
+    assert band["sigma"] is not None and band["sigma"] > 0
+
+
 def test_residual_sigma_positive_and_ordered():
     df, closes = _frame(per_season=60)
     train_r = R.residual_training_frame(df[df["season"] < 2025], closes)

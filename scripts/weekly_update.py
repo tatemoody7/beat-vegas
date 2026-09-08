@@ -291,13 +291,20 @@ def main() -> None:
     # branch, via the fingerprint it stamps into engine_artifact) over
     # len(closes): closes is computed off the pre-apply_min_games frame, so it
     # can count games score_slate's min-games/training cut later drops.
-    fingerprint = (scored.attrs.get("engine_artifact") or {}).get("fingerprint") or {}
+    artifact = scored.attrs.get("engine_artifact") or {}
+    fingerprint = artifact.get("fingerprint") or {}
     n_train = fingerprint.get("n_rows")
     train_rows = n_train if n_train is not None else len(closes or {})
+    # The residual only runs on rows with a REAL posted 1H line; the rest keep
+    # the incumbent's number. Say how the board actually split.
+    split = ""
+    if engine == "residual":
+        n_resid = artifact.get("n_rows_residual", 0)
+        split = f" rows_residual={n_resid} rows_fallback={artifact.get('n_rows_fallback', n)}"
     print(
         f"scored {n} games for {args.season} wk{week} "
         f"({hr} Hard Rock 1H, {obs} observed 1H, {der} derived-from-full-game, rest proxy) "
-        f"engine={engine} basis={basis} train_rows_with_close={train_rows}"
+        f"engine={engine} basis={basis} train_rows_with_close={train_rows}{split}"
         + (f" FALLBACK={fallback}" if fallback else "")
     )
     top = scored.head(5)

@@ -306,6 +306,42 @@ def test_main_prints_actual_train_rows_not_all_fetched_closes(monkeypatch, wu, c
     assert "train_rows_with_close=3" not in out
 
 
+def test_main_reports_the_residual_fallback_split(monkeypatch, wu, capsys):
+    """score_slate falls back PER ROW (no real posted 1H line -> the incumbent's
+    number), so the summary must say how the board actually split."""
+    _wire(monkeypatch, wu, "residual")
+
+    def fake_score_split(
+        season, target_week=None, line_lookup=None, line_kind_lookup=None, df=None, **kw
+    ):
+        out = pd.DataFrame(
+            {
+                "id": [1],
+                "rank": [1],
+                "under_score": [55],
+                "away_team": ["A1"],
+                "home_team": ["H1"],
+                "line": [25.0],
+            }
+        )
+        out.attrs["engine_artifact"] = {
+            "fingerprint": {"n_rows": 3},
+            "n_rows_residual": 4,
+            "n_rows_fallback": 6,
+        }
+        return out
+
+    monkeypatch.setattr(wu, "score_slate", fake_score_split)
+    wu.main()
+    assert "rows_residual=4 rows_fallback=6" in capsys.readouterr().out
+
+
+def test_main_bv_line_summary_has_no_split(monkeypatch, wu, capsys):
+    _wire(monkeypatch, wu, "bv_line")
+    wu.main()
+    assert "rows_residual" not in capsys.readouterr().out
+
+
 def test_main_line_basis_flag_overrides_auto(monkeypatch, wu):
     got = _wire(monkeypatch, wu, "bv_line", argv_extra=("--line-basis", "current"))
     wu.main()

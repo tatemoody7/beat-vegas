@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from beatvegas.etl.features import FEATURE_COLS, apply_min_games, training_frame
+from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.model import score as score_mod
 
 
@@ -222,6 +223,18 @@ def _assert_matches_pin(got: dict) -> None:
         assert got[gid] == pytest.approx(want, abs=_PIN_TOL), gid
 
 
+def _real_lines(df: pd.DataFrame, kind: str = "hr_1h", season: int = 2025, week: int = 5):
+    """Present the slate's own proxy numbers as a REAL posted 1H market, so the
+    residual engine runs on every row while the `line` values stay identical to
+    the no-lookup default (which score_slate would label kind 'proxy')."""
+    slate = df[(df["season"] == season) & (df["week"] == week)]
+    lines = {
+        int(r.id): proxy_total(float(r.full_game_total), spread=float(r.spread))
+        for r in slate.itertuples()
+    }
+    return lines, {gid: kind for gid in lines}
+
+
 def test_bv_line_engine_output_unchanged_by_engine_switch(monkeypatch):
     monkeypatch.delenv("BV_ENGINE", raising=False)
     # explicit engine: a local config.yaml must not be able to flip this test
@@ -238,7 +251,16 @@ def test_bv_line_engine_output_unchanged_by_engine_switch(monkeypatch):
 def test_residual_engine_conditions_on_the_line():
     df = _frame()
     closes = _closes_for(df, 2025)  # 720 played training rows with a "real" close
-    out = score_mod.score_slate(2025, target_week=5, df=df, engine="residual", real_closes=closes)
+    lines, kinds = _real_lines(df)
+    out = score_mod.score_slate(
+        2025,
+        target_week=5,
+        df=df,
+        engine="residual",
+        real_closes=closes,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+    )
     assert len(out) == 8
     assert out["bv_line"].notna().all() and out["resid_hat"].notna().all()
     assert (out["engine"] == "residual").all()
@@ -259,13 +281,23 @@ def test_residual_engine_conditions_on_the_line():
     assert art["fingerprint"]["n_rows"] == len(closes)
     assert art["fingerprint"]["model_version"] == "resid_v1"
     assert art["sigma"]["sigma"] == out["bv_sigma"].iloc[0]
+    assert art["n_rows_residual"] == 8 and art["n_rows_fallback"] == 0
     assert "factor_refs" in out.attrs
 
 
 def test_residual_engine_factors_json_keys():
     df = _frame()
     closes = _closes_for(df, 2025)
-    out = score_mod.score_slate(2025, target_week=5, df=df, engine="residual", real_closes=closes)
+    lines, kinds = _real_lines(df)
+    out = score_mod.score_slate(
+        2025,
+        target_week=5,
+        df=df,
+        engine="residual",
+        real_closes=closes,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+    )
     r = out.iloc[0]
     f = score_mod._factors(
         r, float(r["line"]), fingerprint=out.attrs["engine_artifact"]["fingerprint"]
@@ -289,6 +321,92 @@ def test_residual_engine_falls_back_when_closes_are_scarce(monkeypatch):
     assert out["resid_hat"].isna().all()
     got = {int(r.id): float(r.bv_line) for r in out.itertuples()}
     _assert_matches_pin(got)  # the incumbent's numbers, untouched
+
+
+def test_residual_engine_falls_back_row_by_row_without_a_real_posted_line():
+    """A derived_fg / proxy row has no real posted 1H number, so there is no
+    market error for the residual to model: those rows keep the incumbent's
+    market-blind bv_line and are stamped engine='bv_line'. Only rows with a real
+    line (hr_1h / observed_1h) get the residual read."""
+    df = _frame()
+    closes = _closes_for(df, 2025)
+    lines, kinds = _real_lines(df)
+    derived_id, proxy_id = 733, 743
+    kinds[derived_id] = "derived_fg"
+    del lines[proxy_id], kinds[proxy_id]  # no lookup at all -> kind 'proxy'
+    out = score_mod.score_slate(
+        2025,
+        target_week=5,
+        df=df,
+        engine="residual",
+        real_closes=closes,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+    )
+    art = out.attrs["engine_artifact"]
+    by_id = out.set_index("id")
+
+    for gid in (derived_id, proxy_id):
+        assert by_id.loc[gid, "engine"] == "bv_line"
+        assert by_id.loc[gid, "bv_line"] == pytest.approx(_BV_LINE_PIN[gid], abs=_PIN_TOL)
+        assert pd.isna(by_id.loc[gid, "resid_hat"])
+
+    hr_ids = [gid for gid in _BV_LINE_PIN if gid not in (derived_id, proxy_id)]
+    for gid in hr_ids:
+        assert by_id.loc[gid, "engine"] == "residual"
+        assert by_id.loc[gid, "bv_gap"] == pytest.approx(-by_id.loc[gid, "resid_hat"], abs=0.011)
+    assert art["n_rows_residual"] == len(hr_ids) and art["n_rows_fallback"] == 2
+
+    # ...and the two engines' rows carry their OWN noise band, not each other's.
+    assert by_id.loc[derived_id, "bv_sigma"] != by_id.loc[hr_ids[0], "bv_sigma"]
+
+    # the per-row factors payload reports the engine that made THAT row
+    f = score_mod._factors(by_id.loc[derived_id], 23.0)
+    assert f["engine"] == "bv_line" and f["resid_hat"] is None
+
+
+def test_residual_engine_on_an_all_proxy_slate_is_the_incumbent_board():
+    """Sunday: no retail 1H market is posted yet, so every row is derived/proxy.
+    The board must be exactly the incumbent's, not a residual off a fake line."""
+    df = _frame()
+    closes = _closes_for(df, 2025)
+    out = score_mod.score_slate(2025, target_week=5, df=df, engine="residual", real_closes=closes)
+    assert (out["engine"] == "bv_line").all()
+    assert out["resid_hat"].isna().all()
+    _assert_matches_pin({int(r.id): float(r.bv_line) for r in out.itertuples()})
+    art = out.attrs["engine_artifact"]
+    assert art["n_rows_residual"] == 0 and art["n_rows_fallback"] == 8
+
+
+def test_engine_artifact_is_attached_after_the_final_reshape():
+    """pandas deep-copies .attrs on sort_values/reset_index, so a fitted model
+    parked there before the final sort is cloned for nothing. The artifact must
+    be the object score_slate fitted, attached once at the end."""
+    df = _frame()
+    closes = _closes_for(df, 2025)
+    lines, kinds = _real_lines(df)
+    seen = {}
+    real_fit = score_mod.residual_1h_for_slate
+
+    def spy(train_r, target, line):
+        pred, model, fp = real_fit(train_r, target, line)
+        seen["model"] = model
+        return pred, model, fp
+
+    try:
+        score_mod.residual_1h_for_slate = spy
+        out = score_mod.score_slate(
+            2025,
+            target_week=5,
+            df=df,
+            engine="residual",
+            real_closes=closes,
+            line_lookup=lines,
+            line_kind_lookup=kinds,
+        )
+    finally:
+        score_mod.residual_1h_for_slate = real_fit
+    assert out.attrs["engine_artifact"]["model"] is seen["model"]
 
 
 def test_residual_engine_without_closes_falls_back():

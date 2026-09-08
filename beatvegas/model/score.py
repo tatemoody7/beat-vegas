@@ -38,6 +38,11 @@ from .residual import (
 )
 
 MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the engine itself is the gbm_v2 gap ranker
+
+# line_kind values that are a REAL posted 1H market number. Only these rows can
+# carry a residual read; 'derived_fg' and 'proxy' are our own arithmetic off the
+# full-game total, so there is no market error there for the residual to model.
+REAL_LINE_KINDS = ("hr_1h", "observed_1h")
 MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
 
 # Verdict gates, in POINTS of bv_gap (line - our 1H number), from the validated
@@ -340,9 +345,20 @@ def score_slate(
         = the ranking line the model was GIVEN + its predicted residual, so
         `bv_gap == -resid_hat`. It trains only on prior-season games with a
         REAL pre-kick 1H close (`real_closes`, game_id -> close, from
-        lines.real_closes); with fewer than RESIDUAL_MIN_TRAIN such games it
-        falls back to the incumbent and says so in attrs["engine_fallback"].
-    Either way bv_gap = line - bv_line and the board sorts by it.
+        lines.real_closes); with fewer than RESIDUAL_MIN_TRAIN such games the
+        whole slate falls back to the incumbent and attrs["engine_fallback"]
+        says so.
+
+        The fallback is also PER ROW: only rows whose `line_kind` is a real
+        posted 1H number (REAL_LINE_KINDS) get the residual read. A 'derived_fg'
+        or 'proxy' row keeps the incumbent's market-blind bv_line, stays stamped
+        engine='bv_line', and leaves resid_hat NaN — so a Sunday board with no
+        retail 1H market posted is exactly the incumbent's board.
+        attrs["engine_artifact"] counts both (n_rows_residual/n_rows_fallback).
+    Either way bv_gap = line - bv_line and the board sorts by it. Each row's
+    noise band (bv_sigma/bv_lo/bv_hi/bv_gap_z) comes from the engine that
+    produced THAT row: residual_sigma(train_r) for residual rows, the
+    incumbent's residual_band(train) for fallback rows.
     """
     engine = engine or engine_name()
     if engine not in ENGINES:
@@ -385,31 +401,62 @@ def score_slate(
     # not an edge). Display + gap sort only; does NOT influence under_score.
     target["engine"] = "bv_line"
     target["resid_hat"] = float("nan")
-    band: Dict = {}
+    # The incumbent's number for EVERY row: under the bv_line engine it is the
+    # whole board, and under the residual engine it is the per-row fallback.
+    # (An independent calibrated "BV line" from a MARKET-BLIND regressor.)
+    target["bv_line"] = bv_line_for_slate(train, target).round(2)
+    band = residual_band(train)
+    bands: List = [(pd.Series(True, index=target.index), band)]
+    fallback: Optional[str] = None
+    artifact: Optional[Dict] = None
     if engine == "residual":
         train_r = residual_training_frame(train, real_closes or {})
         if len(train_r) < RESIDUAL_MIN_TRAIN:
             # Never silently: the caller/board must see the engine that ran.
-            target.attrs["engine_fallback"] = "insufficient_real_closes"
+            fallback = "insufficient_real_closes"
         else:
-            pred, model, fp = residual_1h_for_slate(train_r, target, target["line"])
-            target["engine"] = "residual"
-            target["bv_line"] = pd.Series(pred, index=target.index).round(2)
-            target["resid_hat"] = (target["bv_line"] - target["line"]).round(2)
-            band = residual_sigma(train_r)
-            target.attrs["engine_artifact"] = {"model": model, "fingerprint": fp, "sigma": band}
-    if "bv_line" not in target.columns:
-        # Incumbent: an independent calibrated "BV line" from a MARKET-BLIND
-        # regressor (no Vegas inputs).
-        target["bv_line"] = bv_line_for_slate(train, target).round(2)
-        band = residual_band(train)
+            # PER-ROW fallback. The residual models the market's error, so it is
+            # only meaningful where a real 1H number is actually posted. A
+            # derived_fg / proxy row is OUR arithmetic off the full-game total,
+            # not a market to be wrong — feeding it to the residual would just
+            # relabel the proxy. Those rows keep the incumbent's market-blind
+            # number and stay stamped engine='bv_line'.
+            real = target["line_kind"].isin(REAL_LINE_KINDS)
+            real_idx = target.index[real.to_numpy()]
+            pred, model, fp = residual_1h_for_slate(
+                train_r, target.loc[real_idx], target.loc[real_idx, "line"]
+            )
+            if len(pred):
+                target.loc[real_idx, "bv_line"] = pd.Series(pred, index=real_idx).round(2)
+                target.loc[real_idx, "engine"] = "residual"
+                target.loc[real_idx, "resid_hat"] = (
+                    target.loc[real_idx, "bv_line"] - target.loc[real_idx, "line"]
+                ).round(2)
+            band_r = residual_sigma(train_r)
+            bands = [(~real, band), (real, band_r)]
+            artifact = {
+                "model": model,
+                "fingerprint": fp,
+                "sigma": band_r,
+                "n_rows_residual": int(real.sum()),
+                "n_rows_fallback": int((~real).sum()),
+            }
     target["bv_gap"] = (target["line"] - target["bv_line"]).round(2)
-    sigma = band.get("sigma")
-    lo_off, hi_off = band.get("lo_off"), band.get("hi_off")
-    target["bv_sigma"] = sigma
-    target["bv_lo"] = (target["bv_line"] + lo_off).round(2) if lo_off is not None else None
-    target["bv_hi"] = (target["bv_line"] + hi_off).round(2) if hi_off is not None else None
-    target["bv_gap_z"] = (target["bv_gap"] / sigma).round(2) if sigma else None
+    # The noise band is PER ROW, from the engine that produced that row: sizing a
+    # residual gap against the incumbent's sigma (or the reverse) would compare
+    # one engine's edge to the other engine's noise.
+    sigma_s = pd.Series(float("nan"), index=target.index, dtype=float)
+    lo_s = pd.Series(float("nan"), index=target.index, dtype=float)
+    hi_s = pd.Series(float("nan"), index=target.index, dtype=float)
+    for mask, b in bands:
+        for col, key in ((sigma_s, "sigma"), (lo_s, "lo_off"), (hi_s, "hi_off")):
+            v = b.get(key)
+            if v is not None:
+                col.loc[mask] = float(v)
+    target["bv_sigma"] = sigma_s
+    target["bv_lo"] = (target["bv_line"] + lo_s).round(2)
+    target["bv_hi"] = (target["bv_line"] + hi_s).round(2)
+    target["bv_gap_z"] = (target["bv_gap"] / sigma_s.where(sigma_s != 0)).round(2)
 
     # PRIMARY ENGINE (gbm_v2, validated Phase 3): rank the board by the raw gap
     # (line ABOVE our predicted 1H total = under lean). The BET/WATCH/PASS call is
@@ -420,7 +467,15 @@ def score_slate(
     # Stash historical board references (median/spread per factor) on the frame
     # so store_predictions can tint the factor board against HISTORY, not the
     # current slate. Computed from the full frame (display-only, not a model input).
+    #
+    # Everything below is attached AFTER the final reshape on purpose: pandas
+    # deep-copies .attrs through sort_values/reset_index, and engine_artifact
+    # holds a fitted regressor. Attaching it earlier clones the model for nothing.
     target.attrs["factor_refs"] = factor_references(df)
+    if fallback:
+        target.attrs["engine_fallback"] = fallback
+    if artifact is not None:
+        target.attrs["engine_artifact"] = artifact
     return target
 
 

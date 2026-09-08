@@ -27,7 +27,6 @@ training history is visible in the job log. The incumbent writes nothing new.
 from __future__ import annotations
 
 import argparse
-import json
 import statistics
 import sys
 from datetime import datetime
@@ -36,9 +35,8 @@ from typing import Dict, Optional, Tuple
 import pandas as pd
 
 from beatvegas.config import engine_name
-from beatvegas.db.models import Game, ModelRun, OddsSnapshot
+from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.etl.context import json_safe
 from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.hardrock import HR_BOOK_KEY
@@ -53,7 +51,6 @@ from beatvegas.model.artifacts import (
     latest_artifact,
     persist_artifact,
 )
-from beatvegas.model.residual import MODEL_VERSION_TAG
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
@@ -199,27 +196,38 @@ def persist_engine_artifact(
     scored: pd.DataFrame, *, engine: str, season: int, week: int, now: Optional[datetime] = None
 ) -> Optional[str]:
     """Store the fitted model score_slate attached (attrs["engine_artifact"]) as
-    one model_artifacts row plus a model_runs row, and return the log line
-    `fingerprint <hash> n_rows=<n> max_game_date=<d> changed=[...]` — comparing
+    one model_artifacts row and return the log line
+    `fingerprint <hash> n_rows=<n> max_game_date=<d> changed=<...>` — comparing
     against the previous artifact for this engine, so a mid-season data
-    correction shows in the job log. Returns None (and writes NOTHING) when the
-    frame carries no artifact: the incumbent engine, or a demoted residual run."""
+    correction shows in the job log. `changed=first_fit` when there is no
+    previous artifact for the engine (distinct from `changed=[]`, same history
+    as last time). Returns None (and writes NOTHING) when the frame carries no
+    artifact: the incumbent engine, or a demoted residual run.
+
+    No model_runs row is written. model_runs is retrain.py's run log; the
+    Research page (web/lib/research.ts) reads the NEWEST FIVE rows looking for
+    `bv_residual` calibration metrics, so a per-scoring-run row without them
+    would blank that panel within a week of the engine being on and pad the
+    "Model runs over time" table. Everything a run-log row would have carried
+    (fingerprint, sigma, n_train, fallback) sits on the artifact row —
+    fingerprint_json + metrics_json — and each game's factors_json carries the
+    fingerprint too."""
     artifact = scored.attrs.get("engine_artifact") or {}
     model = artifact.get("model")
     if model is None:
         return None
     fp = artifact.get("fingerprint") or {}
     now = now or datetime.utcnow()
-    seasons = fp.get("seasons") or []
     metrics = {
         "sigma": artifact.get("sigma"),
+        "n_train": fp.get("n_rows"),
         "n_rows_residual": artifact.get("n_rows_residual"),
         "n_rows_fallback": artifact.get("n_rows_fallback"),
         "fallback": scored.attrs.get("engine_fallback"),
     }
     with session_scope() as s:
         prev = latest_artifact(s, engine)
-        changed = fingerprint_changed(prev, fp)
+        changed = "first_fit" if prev is None else str(fingerprint_changed(prev, fp))
         persist_artifact(
             s,
             engine=engine,
@@ -229,27 +237,6 @@ def persist_engine_artifact(
             week=week,
             metrics=metrics,
             now=now,
-        )
-        s.add(
-            ModelRun(
-                version=fp.get("model_version") or MODEL_VERSION_TAG,
-                train_window=f"{seasons[0]}-{seasons[-1]}" if seasons else None,
-                # Same coercion the artifact row uses: a numpy scalar leaking
-                # into the fingerprint must not raise here and roll back the
-                # artifact that was just written in this session.
-                metrics_json=json.dumps(
-                    json_safe(
-                        {
-                            "fingerprint": fp,
-                            "sigma": artifact.get("sigma"),
-                            "n_train": fp.get("n_rows"),
-                            "fallback": scored.attrs.get("engine_fallback"),
-                        }
-                    )
-                ),
-                notes=f"weekly_update {season} wk{week} engine={engine}",
-                created_at=now,
-            )
         )
     return (
         f"fingerprint {fp.get('feature_hash')} n_rows={fp.get('n_rows')} "

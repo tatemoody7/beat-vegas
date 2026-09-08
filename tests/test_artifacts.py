@@ -283,6 +283,10 @@ def _wire(monkeypatch, mem, scored: pd.DataFrame, engine: str = "residual"):
 
 
 def test_weekly_update_persists_one_artifact_and_prints_the_fingerprint(monkeypatch, mem, capsys):
+    """First fit for the engine: one model_artifacts row, `changed=first_fit`
+    (no previous row to compare against), and NO model_runs row — the Research
+    page reads the newest five model_runs for retrain.py's bv_residual metrics,
+    and a per-scoring-run row without it would blank that panel."""
     eng, _ = mem
     fp = _fp()
     wu = _wire(monkeypatch, mem, _scored(True, fp))
@@ -291,7 +295,8 @@ def test_weekly_update_persists_one_artifact_and_prints_the_fingerprint(monkeypa
     line = [ln for ln in out.splitlines() if ln.startswith("fingerprint ")]
     assert len(line) == 1, out
     assert line[0] == (
-        f"fingerprint {fp['feature_hash']} n_rows=60 max_game_date={fp['max_game_date']} changed=[]"
+        f"fingerprint {fp['feature_hash']} n_rows=60 "
+        f"max_game_date={fp['max_game_date']} changed=first_fit"
     )
     with Session(eng) as s:
         rows = s.query(ModelArtifact).all()
@@ -299,20 +304,34 @@ def test_weekly_update_persists_one_artifact_and_prints_the_fingerprint(monkeypa
         art = rows[0]
         assert (art.engine, art.season, art.week) == ("residual", 2026, 5)
         assert art.n_rows == 60 and art.feature_hash == fp["feature_hash"]
-        assert json.loads(art.metrics_json)["sigma"] == {
-            "sigma": 5.2,
-            "lo_off": -6.1,
-            "hi_off": 6.4,
-        }
-        runs = s.query(ModelRun).all()
-        assert len(runs) == 1
-        assert runs[0].version == residual.MODEL_VERSION_TAG
-        assert runs[0].train_window == "2024-2025"
-        metrics = json.loads(runs[0].metrics_json)
-        assert metrics["fingerprint"] == fp
+        metrics = json.loads(art.metrics_json)
         assert metrics["sigma"] == {"sigma": 5.2, "lo_off": -6.1, "hi_off": 6.4}
         assert metrics["n_train"] == 60
         assert metrics["fallback"] is None
+        assert (metrics["n_rows_residual"], metrics["n_rows_fallback"]) == (2, 0)
+        assert s.query(ModelRun).count() == 0
+
+
+def test_weekly_update_same_history_as_last_fit_prints_an_empty_change_list(
+    monkeypatch, mem, capsys
+):
+    """A previous fit on the SAME history: `changed=[]`, distinct from first_fit."""
+    eng, scope = mem
+    model, _ = _fitted()
+    fp = _fp()
+    with scope() as s:
+        persist_artifact(
+            s, engine="residual", model=model, fingerprint=fp, season=2026, week=4,
+            metrics={}, now=NOW - timedelta(days=7),
+        )  # fmt: skip
+    wu = _wire(monkeypatch, mem, _scored(True, fp))
+    wu.main()
+    out = capsys.readouterr().out
+    line = [ln for ln in out.splitlines() if ln.startswith("fingerprint ")][0]
+    assert line.endswith("changed=[]"), line
+    with Session(eng) as s:
+        assert s.query(ModelArtifact).count() == 2
+        assert s.query(ModelRun).count() == 0
 
 
 def test_weekly_update_names_what_moved_since_the_last_fit(monkeypatch, mem, capsys):
@@ -360,6 +379,44 @@ def test_weekly_update_persists_nothing_when_the_residual_fell_back(monkeypatch,
     with Session(eng) as s:
         assert s.query(ModelArtifact).count() == 0
         assert s.query(ModelRun).count() == 0
+
+
+# --- single transaction ----------------------------------------------------------------
+
+
+def test_dump_failure_mid_persist_writes_no_artifact_row(monkeypatch, mem):
+    """persist_engine_artifact is one transaction: a dump_model failure after
+    the previous-artifact lookup rolls everything back — no half-written row."""
+    eng, _ = mem
+    from beatvegas.model import artifacts as art_mod
+
+    def boom(model):
+        raise RuntimeError("joblib exploded")
+
+    monkeypatch.setattr(art_mod, "dump_model", boom)
+    wu = _wire(monkeypatch, mem, _scored(True))
+    with pytest.raises(RuntimeError, match="joblib exploded"):
+        wu.main()
+    with Session(eng) as s:
+        assert s.query(ModelArtifact).count() == 0
+        assert s.query(ModelRun).count() == 0
+
+
+def test_persist_artifact_only_flushes_so_the_caller_owns_the_commit(mem):
+    """A failure AFTER persist_artifact returned (still inside the caller's
+    session) must take the flushed row with it."""
+    eng, scope = mem
+    model, _ = _fitted()
+    with pytest.raises(RuntimeError, match="after persist"):
+        with scope() as s:
+            rid = persist_artifact(
+                s, engine="residual", model=model, fingerprint=_fp(), season=2026, week=3,
+                metrics={}, now=NOW,
+            )  # fmt: skip
+            assert rid > 0  # flushed, id assigned, not yet committed
+            raise RuntimeError("after persist")
+    with Session(eng) as s:
+        assert s.query(ModelArtifact).count() == 0
 
 
 # --- --if-engine -----------------------------------------------------------------

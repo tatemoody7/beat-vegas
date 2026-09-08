@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 from conftest import _load_script
 from sklearn.ensemble import HistGradientBoostingRegressor
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session
 
 from beatvegas.db.models import Base, ModelArtifact, ModelRun
@@ -30,6 +30,7 @@ from beatvegas.model.artifacts import (
     fingerprint_changed,
     latest_artifact,
     load_model,
+    newest_artifacts,
     persist_artifact,
 )
 
@@ -126,6 +127,28 @@ def test_persist_then_latest_round_trips_the_fingerprint(mem):
         assert json.loads(row.metrics_json) == {"sigma": 5.1, "n_rows_residual": 40}
         np.testing.assert_array_equal(load_model(row.blob).predict(X), model.predict(X))
         assert latest_artifact(s, "bv_line") is None
+
+
+def test_latest_and_newest_defer_the_blob(mem):
+    """Comparing three fingerprint scalars must not pull a ~300 KB blob per
+    row; the blob loads only if something asks for it."""
+    eng, scope = mem
+    model, X = _fitted()
+    with scope() as s:
+        for i in range(2):
+            persist_artifact(
+                s, engine="residual", model=model, fingerprint=_fp(), season=2026, week=2 + i,
+                metrics={}, now=NOW + timedelta(days=7 * i),
+            )  # fmt: skip
+    with Session(eng) as s:
+        row = latest_artifact(s, "residual")
+        assert "blob" in inspect(row).unloaded
+        assert row.n_rows == 60 and row.feature_hash  # scalars are loaded
+        rows = newest_artifacts(s, "residual", limit=5)
+        assert [r.week for r in rows] == [3, 2]
+        assert all("blob" in inspect(r).unloaded for r in rows)
+        # Still reachable on demand (lazy load), and still the same model.
+        np.testing.assert_array_equal(load_model(row.blob).predict(X), model.predict(X))
 
 
 def test_latest_is_the_newest_fit_for_that_engine(mem):
@@ -465,7 +488,7 @@ def test_model_artifacts_list_prints_the_newest_first(monkeypatch, mem, capsys):
                 season=2026, week=2 + i, metrics={}, now=NOW + timedelta(days=7 * i),
             )  # fmt: skip
     ma = _load_script("model_artifacts")
-    monkeypatch.setattr(ma, "try_init_db", lambda: True)
+    monkeypatch.setattr(ma, "get_engine", lambda: eng)
     monkeypatch.setattr(ma, "session_scope", scope)
     monkeypatch.setattr(
         sys, "argv", ["model_artifacts.py", "list", "--engine", "residual", "--limit", "2"]
@@ -483,10 +506,31 @@ def test_model_artifacts_list_prints_the_newest_first(monkeypatch, mem, capsys):
 
 
 def test_model_artifacts_list_empty(monkeypatch, mem, capsys):
-    _, scope = mem
+    eng, scope = mem
     ma = _load_script("model_artifacts")
-    monkeypatch.setattr(ma, "try_init_db", lambda: True)
+    monkeypatch.setattr(ma, "get_engine", lambda: eng)
     monkeypatch.setattr(ma, "session_scope", scope)
     monkeypatch.setattr(sys, "argv", ["model_artifacts.py", "list"])
     ma.main()
     assert "no artifacts" in capsys.readouterr().out
+
+
+def test_model_artifacts_list_runs_no_ddl_and_names_the_missing_table(monkeypatch, capsys):
+    """A read-only listing must not create_all/migrate/resync (try_init_db).
+    Against a DB without the table it says so instead of creating it."""
+    eng = create_engine("sqlite:///:memory:")  # schema NOT created
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    ma = _load_script("model_artifacts")
+    assert not hasattr(ma, "try_init_db") and not hasattr(ma, "init_db")
+    monkeypatch.setattr(ma, "get_engine", lambda: eng)
+    monkeypatch.setattr(ma, "session_scope", scope)
+    monkeypatch.setattr(sys, "argv", ["model_artifacts.py", "list"])
+    ma.main()
+    assert "no artifacts yet (table not created; run migrate.yml)" in capsys.readouterr().out
+    assert not inspect(eng).has_table("model_artifacts")  # still not created

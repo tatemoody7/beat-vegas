@@ -7,14 +7,22 @@ One line per refit, newest first: when it was fitted, the slate it scored,
 how many rows it trained on, the last game date it saw, the feature hash and
 the scikit-learn version. A moved n_rows / max_game_date / feature_hash between
 two rows in the same week is a mid-season change to the training history.
+
+Read-only: no create_all / migrations / sequence resync (that is migrate.yml's
+job, not a listing's). The blob column is never loaded.
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
+
+from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError
 
 from beatvegas.db.models import ModelArtifact
-from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.db.store import get_engine, session_scope
+from beatvegas.model.artifacts import newest_artifacts
 
 
 def _fmt(row: ModelArtifact) -> str:
@@ -28,14 +36,11 @@ def _fmt(row: ModelArtifact) -> str:
 
 
 def list_artifacts(engine: str, limit: int) -> None:
+    if not inspect(get_engine()).has_table(ModelArtifact.__tablename__):
+        print("no artifacts yet (table not created; run migrate.yml)")
+        return
     with session_scope() as s:
-        rows = (
-            s.query(ModelArtifact)
-            .filter(ModelArtifact.engine == engine)
-            .order_by(ModelArtifact.fitted_at.desc(), ModelArtifact.id.desc())
-            .limit(limit)
-            .all()
-        )
+        rows = newest_artifacts(s, engine, limit)
         if not rows:
             print(f"no artifacts for engine {engine!r}")
             return
@@ -51,10 +56,12 @@ def main() -> None:
     ls.add_argument("--engine", default="residual")
     ls.add_argument("--limit", type=int, default=10)
     args = ap.parse_args()
-    if not try_init_db():
-        return
     if args.cmd == "list":
-        list_artifacts(args.engine, args.limit)
+        try:
+            list_artifacts(args.engine, args.limit)
+        except OperationalError as e:
+            print(f"database unreachable: {e.orig or e}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,18 @@ names which of n_rows / max_game_date / feature_hash moved since the previous
 fit, and the job log prints it.
 
 joblib ships with scikit-learn; the blob is a few hundred KB.
+
+Cross-version blob caveat. Blobs are written by the cloud job (GitHub Actions,
+Python 3.11, whatever scikit-learn pip resolves that day) and would be loaded
+locally (Python 3.9, scikit-learn 1.6.x). scikit-learn pickles are only
+guaranteed within one version: loading across minor versions warns
+(InconsistentVersionWarning) and may fail outright. Before load_model on a
+row, install the `sklearn_version` that row records (the column exists;
+`scripts/model_artifacts.py list` prints it). The fingerprint columns are
+plain SQL and read fine from anywhere.
+
+Reads never pull the blob unless asked: latest_artifact / newest_artifacts
+defer it (fingerprint comparison needs three scalars, not 300 KB per row).
 """
 
 from __future__ import annotations
@@ -19,7 +31,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import joblib
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from ..db.models import ModelArtifact
 from ..etl.context import json_safe
@@ -83,14 +95,25 @@ def persist_artifact(
     return int(row.id)
 
 
-def latest_artifact(session: Session, engine: str) -> Optional[ModelArtifact]:
-    """The newest fit for `engine` (by fitted_at, then id), or None."""
+def newest_artifacts(session: Session, engine: str, limit: int) -> List[ModelArtifact]:
+    """The `limit` newest fits for `engine` (fitted_at desc, then id desc) with
+    the joblib blob DEFERRED — it loads lazily only if a caller touches
+    `.blob`. Comparing fingerprints and listing rows never do."""
     return (
         session.query(ModelArtifact)
+        .options(defer(ModelArtifact.blob))
         .filter(ModelArtifact.engine == engine)
         .order_by(ModelArtifact.fitted_at.desc(), ModelArtifact.id.desc())
-        .first()
+        .limit(limit)
+        .all()
     )
+
+
+def latest_artifact(session: Session, engine: str) -> Optional[ModelArtifact]:
+    """The newest fit for `engine` (by fitted_at, then id), or None. Blob
+    deferred (see newest_artifacts)."""
+    rows = newest_artifacts(session, engine, limit=1)
+    return rows[0] if rows else None
 
 
 def fingerprint_changed(prev: Optional[ModelArtifact], fp: Dict) -> List[str]:

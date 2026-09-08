@@ -412,7 +412,11 @@ class ModelArtifact(Base):
     reproducible and a quiet mid-season correction to the training history
     shows up as a moved fingerprint (n_rows / max_game_date / feature_hash) in
     the job log. Written only by an engine that hands score_slate a fitted
-    model (the residual engine); the incumbent writes nothing here."""
+    model (the residual engine); the incumbent writes nothing here.
+
+    Retention: ~300 KB per row, about six rows a week under the residual
+    engine (one per card-day re-score); nothing reads old blobs, so prune
+    rows older than the current season after it ends."""
 
     __tablename__ = "model_artifacts"
     id = Column(Integer, primary_key=True, autoincrement=True)

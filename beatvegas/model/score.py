@@ -56,11 +56,12 @@ WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
 # Hard Rock's 1H total more than this far BELOW the market's = off-market
 # number: giving up points on an under + void risk under HR house rules. WATCH.
 HR_OFF_MARKET_PTS = 0.5
-# weekly_update --min-games: both teams need this many games played this season
-# for a model read. Lowered 2 -> 1 on 2026-09-08 so week 2 has model numbers;
-# rows built on a single game carry h/a_games_played so the web tags them
-# "early season" instead of hiding them.
-MIN_GAMES_FOR_MODEL = 1
+# weekly_update --min-games: both teams need this many FBS-vs-FBS games played
+# this season for a model read. 0 since 2026-09-08 (Tate: score every game off
+# last season's priors until 2026 data exists; a week-1 game vs an FCS school
+# does not count because the frame is FBS-only). Rows carry h/a_games_played so
+# the web tags anything under 2 games "early season" instead of hiding it.
+MIN_GAMES_FOR_MODEL = 0
 # Worst per-$1 EV of Hard Rock's under (vs the market's no-vig fair under) still
 # treated as a fair price: the unavoidable ~2 cents of vig. Below it the price
 # gate fails (web/lib/edge.ts FAIR_EV_FLOOR / lineCheck.ts "neg").

@@ -86,3 +86,50 @@ def test_card_yml_crons_match_ci_slots_exactly():
     data = _load(WF_DIR / "card.yml")
     assert any("beatvegas.ci" in r for r in _run_blocks(data))
     assert set(_cron_strings(data)) == set(CRON_SLOTS), "card.yml and CRON_SLOTS drifted"
+
+
+# --- card-day re-score (PR-4): the residual engine conditions on the live 1H line,
+# so weekly_update must run again AFTER the sweep refreshes it. Under the
+# incumbent `--if-engine residual` makes the step a no-op, so today's card-day
+# behaviour is unchanged.
+
+CARD_CRONS = {
+    "5 20 * * 2,3,4",
+    "50 20 * * 2,3,4",
+    "5 22 * * 5",
+    "0 23 * * 5",
+    "5 12 * * 6",
+    "35 12 * * 6",
+    "5 13 * * 6",
+    "35 13 * * 6",
+}
+
+
+def _card_steps():
+    data = _load(WF_DIR / "card.yml")
+    return data["jobs"]["card"]["steps"]
+
+
+def _step_index(steps, needle: str) -> int:
+    hits = [i for i, st in enumerate(steps) if needle in (st.get("run") or "")]
+    assert len(hits) == 1, f"expected exactly one step running {needle!r}, got {hits}"
+    return hits[0]
+
+
+def test_card_rescores_with_the_residual_engine_after_the_sweep():
+    steps = _card_steps()
+    sweep = _step_index(steps, "scripts/poll_lines.py")
+    rescore = _step_index(steps, "scripts/weekly_update.py")
+    build = _step_index(steps, "scripts/build_card.py")
+    assert sweep < rescore < build
+    run = steps[rescore]["run"]
+    assert "--if-engine residual" in run
+    assert "--season" in run and "--week" in run
+    assert "steps.active.outputs.season" in run and "steps.active.outputs.week" in run
+    # Gated exactly like the sweep: no sweep, nothing new to condition on.
+    assert steps[rescore].get("if") == steps[sweep].get("if")
+    assert "need_sweep" in steps[rescore]["if"]
+
+
+def test_card_crons_unchanged_by_the_rescore_step():
+    assert set(_cron_strings(_load(WF_DIR / "card.yml"))) == CARD_CRONS

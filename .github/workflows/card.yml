@@ -158,6 +158,14 @@ jobs:
       - name: 1H sweep (forced for the preview / final; else only when today's is missing)
         if: steps.inputs.outputs.need_sweep == 'true'
         run: python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }}
+      - name: Re-score after the sweep (residual engine only; no-op under the incumbent)
+        # The residual engine conditions on the LIVE 1H line, so its numbers
+        # must be refitted after the sweep refreshes those lines. Gated exactly
+        # like the sweep: no sweep, nothing new to condition on. `--if-engine`
+        # exits 0 without touching the database when config model.engine is
+        # not `residual`, so the incumbent's card day is unchanged.
+        if: steps.inputs.outputs.need_sweep == 'true'
+        run: python scripts/weekly_update.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --if-engine residual
       - name: Research preview (forced on the final; else only when today's is missing)
         if: steps.inputs.outputs.need_preview == 'true'
         # Unofficial sources (ESPN / Rotowire) may be down; the card still builds

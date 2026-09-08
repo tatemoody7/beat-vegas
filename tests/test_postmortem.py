@@ -930,11 +930,11 @@ def test_build_live_frame_carries_engine_from_stored_predictions():
     )
     assert df.loc[1, "engine"] == "residual"
     assert df.loc[2, "engine"] == "bv_line"
-    assert df.loc[3, "engine"] is None
+    assert pd.isna(df.loc[3, "engine"])  # None locally, NaN under pandas' string dtype
     assert "engine" in pm.LIVE_DIMENSIONS
     assert pm._ORDER["engine"] == ["bv_line", "residual"]
     d = pm.assign_dimensions(df.reset_index(), "hr")
-    assert list(d["engine"]) == ["residual", "bv_line", None]
+    assert list(d["engine"][:2]) == ["residual", "bv_line"] and pd.isna(d["engine"].iloc[2])
 
 
 def test_compute_live_emits_the_engine_dimension():

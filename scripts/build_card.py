@@ -175,12 +175,19 @@ def load_status(path: Optional[str]) -> Optional[Dict]:
     return data if isinstance(data, dict) else None
 
 
-def tempo_row_count(session) -> int:
-    """How many teams the pace lookup can actually see. 0 means the TeamRankings
-    mapper stored nothing and no game has a real pace."""
+def tempo_row_count(session, season: int, week: int) -> int:
+    """How many teams the pace lookup can actually see for THIS card's
+    (season, week) — the same filter beatvegas.etl.context.pace_for_games
+    reads pace with. 0 means the TeamRankings mapper stored nothing for the
+    week and no game on the card has a real pace. Prior seasons and weeks are
+    deliberately not counted: they would hide a current-week failure."""
     return (
         session.query(TeamTempo.team)
-        .filter(TeamTempo.seconds_per_play.isnot(None))
+        .filter(
+            TeamTempo.season == season,
+            TeamTempo.week == week,
+            TeamTempo.seconds_per_play.isnot(None),
+        )
         .distinct()
         .count()
     )
@@ -275,13 +282,19 @@ def _kill_text(it: Dict) -> str:
 
 
 def _status_line(card: Dict) -> str:
-    """`CARD STATUS: {status} slot={slot} degraded={n}` plus the failed inputs.
-    Line 2 of the summary, so the Saturday text routine can see at a glance
-    whether this card is the one to bet off."""
+    """`CARD STATUS: {status} slot={slot} held={n} (bets {m})` plus the failed
+    inputs. n = every game a failed input held (counts.degraded, what the web
+    reads); m = how many of those were BETs, so the operator sees at a glance
+    how many real bets the failure took off the card. Line 2 of the summary,
+    so the Saturday text routine can see whether this card is the one to bet
+    off."""
     deg = card.get("degraded") or []
+    held_bets = sum(
+        1 for it in card["items"] if it["tier"] == "BET" and it.get("blocker") == "degraded"
+    )
     line = (
         f"CARD STATUS: {card.get('status')} slot={card.get('slot')} "
-        f"degraded={card['counts'].get('degraded', 0)}"
+        f"held={card['counts'].get('degraded', 0)} (bets {held_bets})"
     )
     if deg:
         line += " [" + "; ".join(f"{d['input']}: {d['detail']}" for d in deg) + "]"
@@ -403,7 +416,7 @@ def run(
             preview_status=load_status(preview_status_path),
             previews=previews,
             predictions=preds,
-            tempo_rows=tempo_row_count(s),
+            tempo_rows=tempo_row_count(s, season, week),
             now=now,
         )
         card = build_card(

@@ -507,7 +507,7 @@ def test_a_final_card_prints_its_status_on_line_two(env, capsys):
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
     lines = _summary(capsys)
     assert lines[0].startswith("Card 2026 wk3 built ")
-    assert lines[1] == "CARD STATUS: final slot=saturday degraded=0"
+    assert lines[1] == "CARD STATUS: final slot=saturday held=0 (bets 0)"
     with Session(eng) as s:
         payload = json.loads(s.query(Card).one().payload)
     assert payload["slot"] == "saturday" and payload["status"] == "final"
@@ -531,7 +531,7 @@ def test_missing_status_files_do_not_degrade_a_healthy_card(env, capsys, tmp_pat
         )
         == 0
     )
-    assert _summary(capsys)[1] == "CARD STATUS: preview slot=friday degraded=0"
+    assert _summary(capsys)[1] == "CARD STATUS: preview slot=friday held=0 (bets 0)"
 
 
 def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, capsys, tmp_path):
@@ -553,7 +553,7 @@ def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, c
     )
     lines = _summary(capsys)
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday degraded=1 "
+        "CARD STATUS: degraded slot=saturday held=1 (bets 1) "
         "[sweep: stopped early (credit_cap) after 3 of 5 events]"
     )
     # the bet is no longer texted as a bet...
@@ -586,7 +586,7 @@ def test_a_failed_research_preview_holds_every_game_on_the_card(env, capsys, tmp
     lines = _summary(capsys)
     assert lines[0].startswith("Card 2026 wk3 built ") and " 0 BET / " in lines[0]
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday degraded=4 "
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) "
         "[preview: rotowire_empty: the injury read failed, so the quarterback gate "
         "could not run on any of the 4 games]"
     )
@@ -683,7 +683,7 @@ def test_an_unreadable_status_file_is_ignored_not_treated_as_a_failure(env, caps
     )
     lines = _summary(capsys)
     assert any("could not read status file" in ln for ln in lines)
-    assert "CARD STATUS: final slot=saturday degraded=0" in lines
+    assert "CARD STATUS: final slot=saturday held=0 (bets 0)" in lines
 
 
 def test_an_empty_tempo_table_degrades_every_model_game(env, capsys):
@@ -695,5 +695,35 @@ def test_an_empty_tempo_table_degrades_every_model_game(env, capsys):
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
     lines = _summary(capsys)
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday degraded=4 [tempo: the tempo table stored 0 rows]"
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
     )
+
+
+def test_tempo_rows_from_other_seasons_and_weeks_do_not_hide_an_empty_current_week(env, capsys):
+    """tempo_row_count mirrors pace_for_games: only THIS card's (season, week)
+    counts. Last season's table (and last week's) being full says nothing about
+    whether the mapper stored anything for this week."""
+    mod, eng = env
+    seed_week(eng)
+    with Session(eng) as s:
+        s.query(TeamTempo).delete()
+        s.add_all(
+            TeamTempo(season=SEASON - 1, week=WEEK, team=t, seconds_per_play=27.5)
+            for t in ("Kansas", "Missouri", "Kansas State", "Florida")
+        )
+        s.add_all(
+            TeamTempo(season=SEASON, week=WEEK - 1, team=t, seconds_per_play=27.5)
+            for t in ("Kansas", "Missouri")
+        )
+        s.commit()
+        assert mod.tempo_row_count(s, SEASON, WEEK) == 0
+        assert mod.tempo_row_count(s, SEASON - 1, WEEK) == 4
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    lines = _summary(capsys)
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
+    )
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    assert payload["status"] == "degraded"
+    assert [d["input"] for d in payload["degraded"]] == ["tempo"]

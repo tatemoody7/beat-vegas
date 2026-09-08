@@ -145,3 +145,38 @@ def test_residual_gate_passes_inputs_through_env_and_uploads_the_report():
     upload = next(s for s in steps if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
     assert upload["with"]["path"] == "reports/residual_gate_*"
     assert upload.get("if") == "always()"
+
+
+def _card_steps_by_id():
+    job = _load(WF_DIR / "card.yml")["jobs"]["card"]
+    return {s["id"]: s for s in job["steps"] if s.get("id")}
+
+
+def test_card_yml_wires_the_status_files_through_to_the_build():
+    """PR-7: the two steps that can degrade write a status file, and the build
+    reads both plus the resolved slot — otherwise a card built on a half-swept
+    slate or a blank injury feed ships as the Saturday final."""
+    steps = _card_steps_by_id()
+    sweep, preview, build = (
+        steps["sweep"],
+        steps["preview"],
+        _load(WF_DIR / "card.yml")["jobs"]["card"]["steps"][-1],
+    )
+    assert '--status-file "$RUNNER_TEMP/sweep_status.json"' in sweep["run"]
+    assert '--status-file "$RUNNER_TEMP/preview_status.json"' in preview["run"]
+    assert "--slot" in build["run"] and "steps.slot.outputs.slot" in build["run"]
+    assert '--sweep-status "$RUNNER_TEMP/sweep_status.json"' in build["run"]
+    assert '--preview-status "$PREVIEW_STATUS"' in build["run"]
+    # A preview step that died before writing its own file still reaches the
+    # card as a failure.
+    assert '{"ok": false, "reason": "step_failed"}' in build["run"]
+    assert build["env"]["PREVIEW_OUTCOME"] == "${{ steps.preview.outcome }}"
+
+
+def test_card_yml_can_rehearse_a_degraded_card_on_demand():
+    data = _load(WF_DIR / "card.yml")
+    inputs = _on(data)["workflow_dispatch"]["inputs"]
+    assert "max_credits" in inputs
+    sweep = _card_steps_by_id()["sweep"]
+    assert sweep["env"]["MAX_CREDITS"] == "${{ inputs.max_credits }}"
+    assert "--max-credits-per-run $MAX_CREDITS" in sweep["run"]

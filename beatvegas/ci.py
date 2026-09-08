@@ -41,6 +41,17 @@ SWEEP_ARGS: Dict[str, str] = {
     # workflow_dispatch with no slot: a full refresh of the week
     "manual": "--hr-universe --hours-back 0 --days-ahead 6",
 }
+# The card status a CLEAN build of each slot publishes (beatvegas/card.py
+# build_card -> payload["status"]; web/lib/card.ts CardStatus). "final" = bet
+# off it; "preview" = an earlier build the Saturday final replaces. A failed
+# input overrides both with "degraded" — tests/test_card_degraded.py asserts
+# every slot in SWEEP_ARGS has an entry here.
+CARD_STATUS_BY_SLOT: Dict[str, str] = {
+    "weeknight": "final",  # the decision build for tonight's games
+    "friday": "preview",  # the Saturday final replaces it
+    "saturday": "final",  # the card Tate bets off in one sitting
+    "manual": "preview",  # an ad-hoc refresh is never the final
+}
 # Paper-log only games kicking off within N hours of the build (the DECISION
 # build for those games — docs/BETTING_POLICY.md). None = every upcoming game.
 PAPER_WINDOW_HOURS: Dict[str, Optional[float]] = {

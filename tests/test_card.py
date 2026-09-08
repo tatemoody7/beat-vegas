@@ -90,7 +90,7 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
     assert it["kill_line"] == 24.5 and it["kill_price"] == -120
     assert it["action"] == "Bet now: 1H under 24.5 at -110 on Hard Rock."
-    assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0}
+    assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 0}
     assert c["model_read"] is True and c["notes"] == []
     assert it["paper_logged"] is False
 
@@ -463,7 +463,7 @@ def test_items_sort_bet_then_edge_by_gap_then_pass_by_gap_then_ev():
     order = [(it["game_id"], it["tier"]) for it in c["items"]]
     # gap first (4: 2.6 beats 2: 2.1); equal gaps (5 and 1, both 0.5) fall back to ev
     assert order == [(3, "BET"), (4, "EDGE"), (2, "EDGE"), (5, "PASS"), (1, "PASS")]
-    assert c["counts"] == {"bet": 1, "edge": 2, "pass": 2, "over_cap": 0}
+    assert c["counts"] == {"bet": 1, "edge": 2, "pass": 2, "over_cap": 0, "degraded": 0}
 
 
 def test_only_games_still_to_kick_off_are_on_the_card():
@@ -526,6 +526,7 @@ ITEM_KEYS = {
     "paper_blocker",
     "cap_rank",
     "over_cap",
+    "degraded_inputs",
     # display chips
     "full_game_total",
     "spread",
@@ -545,12 +546,15 @@ def test_payload_contract_and_strict_json_round_trip():
         "week",
         "built_at",
         "model_read",
+        "slot",
+        "status",
+        "degraded",
         "counts",
         "paper",
         "items",
         "notes",
     }
-    assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap"}
+    assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap", "degraded"}
     it = only(c)
     assert set(it) == ITEM_KEYS
     assert it["hr_price"] is None and it["bv_line"] is None  # NaN read as missing
@@ -605,7 +609,7 @@ def test_no_comparable_price_is_a_paper_only_edge_with_blocker_no_fair_price():
         "Paper only until a comparable price appears."
     )
     assert it["hr_vs_market"] is None
-    assert c["counts"] == {"bet": 0, "edge": 1, "pass": 0, "over_cap": 0}
+    assert c["counts"] == {"bet": 0, "edge": 1, "pass": 0, "over_cap": 0, "degraded": 0}
     assert c["paper"]["qualifying"] == 1
 
 
@@ -725,7 +729,7 @@ def test_weekly_cap_ranks_bets_by_gap_and_papers_the_sixth():
     assert sixth["tier"] == "BET" and sixth["blocker"] == "cap"
     assert sixth["action"].startswith("Over the weekly cap (#6 by gap): paper only")
     # counts.bet is what the site and the Saturday text read: bettable BETs only.
-    assert c["counts"] == {"bet": 5, "edge": 0, "pass": 0, "over_cap": 1}
+    assert c["counts"] == {"bet": 5, "edge": 0, "pass": 0, "over_cap": 1, "degraded": 0}
     assert c["paper"] == {"qualifying": 6, "over_cap": 1, "cap": WEEKLY_BET_CAP}
 
 

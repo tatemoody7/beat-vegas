@@ -1376,10 +1376,10 @@ RULE_LABEL = {
 PROXY_LABEL = {
     "real": "us-region consensus close (no Hard Rock), ~30 min pre-kick",
     "fg": "full-game under at the us-region consensus full-game close",
-    "step": "fair step proxy line",
-    "flat": "old 0.52 proxy line",
-    "hr": "Hard Rock's number at build",
-    "hr_close": "Hard Rock's own pre-kick close",
+    "step": "fair line",
+    "flat": "old 0.52 line",
+    "hr": "Hard Rock's number",
+    "hr_close": "Hard Rock's pre-kick close",
     "market": "consensus at build",
     "market_close": "consensus close",
 }

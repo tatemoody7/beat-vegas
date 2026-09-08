@@ -37,6 +37,7 @@ from beatvegas.etl.features import build_feature_frame, training_frame
 from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
 from beatvegas.model.residual import ResidualFitError
 from beatvegas.model.score import MODEL_VERSION
+from beatvegas.postmortem import engine_of
 
 RUN_VERSION = "resid_gate"  # model_runs.version for --write-model-run
 
@@ -97,7 +98,9 @@ def load_closes(session, game_ids: Sequence[int]) -> Dict[int, float]:
 
 def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:
     """game_id -> the incumbent's stored bv_line (model_version MODEL_VERSION);
-    the newest row per game wins."""
+    the newest row per game wins. Rows tagged `factors_json.engine == "residual"`
+    are excluded — the gate's "stored" column stands in for the incumbent, so a
+    future engine flip to residual must not contaminate it with its own output."""
     ids = [int(g) for g in game_ids]
     out: Dict[int, float] = {}
     for i in range(0, len(ids), 1000):
@@ -109,7 +112,7 @@ def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:
             .order_by(Prediction.created_at)
             .all()
         ):
-            if p.bv_line is not None:
+            if p.bv_line is not None and engine_of(p.factors_json) != "residual":
                 out[p.game_id] = float(p.bv_line)
     return out
 

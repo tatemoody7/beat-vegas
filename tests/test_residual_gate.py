@@ -233,11 +233,17 @@ def test_evaluate_per_game_columns_and_gap_identities(gate):
 
 def test_evaluate_records_and_caps_are_consistent(gate):
     rep, pg = gate.report, gate.per_game
-    for eng in ("residual", "incumbent", "stored"):
+    for eng in ("residual", "incumbent"):
         sel = rep["engines"][eng]["selections"]
         assert set(sel) == {"all", "gap175", "cap5"}
         assert sel["all"]["n"] == 100
         assert sel["cap5"]["n"] <= sel["gap175"]["n"]
+    # stored only covers half the games (planted fixture); its "all" is
+    # masked to that coverage subset, not the full 100-game test universe.
+    stored_sel = rep["engines"]["stored"]["selections"]
+    assert set(stored_sel) == {"all", "gap175", "cap5"}
+    assert stored_sel["all"]["n"] == 50
+    assert stored_sel["cap5"]["n"] <= stored_sel["gap175"]["n"]
     # cap5 is at most 5 per week
     assert pg.groupby("week")["cap5_resid"].sum().max() <= 5
     assert pg.groupby("week")["cap5_bv"].sum().max() <= 5
@@ -246,6 +252,14 @@ def test_evaluate_records_and_caps_are_consistent(gate):
     # overlap block names both engines
     assert set(rep["overlap"]) == {"cap5", "gap175"}
     assert rep["overlap"]["cap5"]["a"] == "residual" and rep["overlap"]["cap5"]["b"] == "incumbent"
+
+
+def test_stored_engine_reports_its_own_coverage(gate):
+    rep = gate.report
+    st = rep["engines"]["stored"]
+    assert st["coverage_n"] == 50 and st["coverage_n_total"] == 100
+    # mae/bias/calibration are computed on the covered subset only
+    assert sum(c["n"] for c in st["calibration"]) == 50
 
 
 def test_evaluate_match_trains_the_incumbent_on_the_same_seasons():
@@ -289,8 +303,22 @@ def test_render_markdown_has_both_cap5_lines_the_close_benchmark_and_caveats(gat
         "not Hard Rock",
         "every played prior season",
         "2023-24 real-close rows",
+        "matching how production refits it",
+        # MAE anchoring (fix 1): the residual's MAE is anchored to the close.
+        "low bar for the residual",
+        "Weight the record comparison",
+        # gap scale (fix 3): fixed threshold, different gap spreads.
+        "Gap scale differs by construction",
+        "not the same bet volume",
+        # residual fit floor vs production floor (fix 5).
+        "falls back to the incumbent",
+        # stored coverage (fix 2), printed in the stored engine's own section.
+        "Stored coverage: 50 of 100 test games",
     ):
         assert phrase in md, phrase
+    # caveat 3 (asymmetric training) reads as one sentence, not two stacked
+    # parentheticals back to back.
+    assert "(how production refits it) (" not in md
     assert "## Fingerprint" in md and gate.report["fingerprint"]["feature_hash"] in md
 
 

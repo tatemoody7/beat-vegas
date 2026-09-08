@@ -293,8 +293,13 @@ def evaluate(
     for eng in engines:
         sfx = _SUFFIX[eng]
         gap = pd.to_numeric(pg[f"gap_{sfx}"], errors="coerce")
+        # The stored column only covers games with a saved prediction; unlike
+        # residual/incumbent (which predict every test row), its "all" means
+        # "every row it has an opinion on", not "every test row" — see the
+        # coverage line in each engine's report.
+        all_mask = pg[f"pred_{sfx}"].notna() if eng == "stored" else pd.Series(True, index=pg.index)
         m = {
-            "all": pd.Series(True, index=pg.index),
+            "all": all_mask,
             "gap175": gap.notna() & (gap >= pm.BET_GAP_PTS),
             "cap5": cap_picks(pg, f"gap_{sfx}"),
         }
@@ -308,16 +313,32 @@ def evaluate(
     for eng in engines:
         sfx = _SUFFIX[eng]
         pred_col = f"pred_{sfx}"
+        # The stored column only covers rows with a saved prediction; grade
+        # its all/mae/calibration on that subset only, not the full test
+        # universe (see caveat + coverage line), so it isn't compared against
+        # a benchmark it never had a chance to predict.
+        if eng == "stored":
+            cov_mask = masks[eng]["all"]
+            pg_eng = pg[cov_mask]
+            eng_close_mae = _mae(pg_eng["actual"], pg_eng["close"])
+        else:
+            pg_eng = pg
+            eng_close_mae = close_mae
         rep: Dict[str, Any] = {
             "selections": {sel: record(pg, masks[eng][sel]) for sel in SELECTIONS},
             "n_pred": int(pg[pred_col].notna().sum()),
-            "mae": _mae(pg["actual"], pg[pred_col]),
-            "bias_test": _bias(pg["actual"], pg[pred_col]),
-            "calibration": _calibration(pg, f"gap_{sfx}", pred_col),
+            "mae": _mae(pg_eng["actual"], pg_eng[pred_col]),
+            "bias_test": _bias(pg_eng["actual"], pg_eng[pred_col]),
+            "calibration": _calibration(pg_eng, f"gap_{sfx}", pred_col),
         }
         rep["mae_minus_close"] = (
-            (rep["mae"] - close_mae) if (rep["mae"] is not None and close_mae is not None) else None
+            (rep["mae"] - eng_close_mae)
+            if (rep["mae"] is not None and eng_close_mae is not None)
+            else None
         )
+        if eng == "stored":
+            rep["coverage_n"] = int(cov_mask.sum())
+            rep["coverage_n_total"] = int(len(pg))
         if eng == "residual":
             rep.update(
                 {
@@ -393,6 +414,14 @@ def evaluate(
             f"{e} cap-5 n={r['n']}, 95% CI {100 * r['ci_lo']:.1f}–{100 * r['ci_hi']:.1f}% "
             f"({verdict})"
         )
+    gap_sd_bits = [
+        f"sd(gap_resid)={pd.to_numeric(pg['gap_resid'], errors='coerce').std():.2f}",
+        f"sd(gap_bv)={pd.to_numeric(pg['gap_bv'], errors='coerce').std():.2f}",
+    ]
+    if "gap_stored" in pg.columns:
+        gap_sd_bits.append(
+            f"sd(gap_stored)={pd.to_numeric(pg['gap_stored'], errors='coerce').std():.2f}"
+        )
     caveats = [
         "This is a one-shot test of the residual engine on the held-out season — do not tune "
         f"anything against the {test_season} result. A second look at the same season is no "
@@ -402,13 +431,14 @@ def evaluate(
         f"played ({n_test_with_close} had any real close). The cap-5 sets are much smaller "
         f"and their Wilson intervals correspondingly wide — {'; '.join(ci_bits)}; breakeven at "
         f"-110 is {100 * breakeven:.1f}%. Read the intervals, not the point estimates.",
-        f"Asymmetric training: the incumbent trains on {eng_reports['incumbent']['train_rows_are']}"
-        f"{' (how production refits it)' if bv_train_seasons == 'all' else ''} "
+        f"Asymmetric training: the incumbent trains on {eng_reports['incumbent']['train_rows_are']} "
         f"({eng_reports['incumbent']['n_train']} rows, seasons "
-        f"{eng_reports['incumbent']['train_seasons'][0]}-{eng_reports['incumbent']['train_seasons'][-1]}), "
-        f"the residual only on the {'-'.join(str(s)[-2:] if i else str(s) for i, s in enumerate(seasons))} "
-        f"real-close rows ({eng_reports['residual']['n_train']} rows). The residual has less data "
-        "and a smaller target; the incumbent has more data but never sees the line.",
+        f"{eng_reports['incumbent']['train_seasons'][0]}-{eng_reports['incumbent']['train_seasons'][-1]})"
+        f"{', matching how production refits it,' if bv_train_seasons == 'all' else ''} while the "
+        "residual trains only on the "
+        f"{'-'.join(str(s)[-2:] if i else str(s) for i, s in enumerate(seasons))} real-close rows "
+        f"({eng_reports['residual']['n_train']} rows). The residual has less data and a smaller "
+        "target; the incumbent has more data but never sees the line.",
         "The 'real' closes are the us-region consensus close (The Odds API history, captured "
         "once about 30 minutes before kickoff), not Hard Rock: Hard Rock did not exist historically. "
         "A Hard Rock number can sit off this consensus, and that difference is the live edge the "
@@ -419,6 +449,17 @@ def evaluate(
         "The market benchmark is the close's own MAE against the actual. An engine whose MAE is "
         "not below it adds nothing over reading the line; a lower MAE is necessary, not sufficient, "
         "for a betting edge.",
+        "The residual predicts close + r̂, so a near-zero r̂ already gives it an MAE almost equal "
+        "to the close's by construction: 'beats the close MAE' is a low bar for the residual and a "
+        "high bar for the incumbent, which has to reconstruct the market from scratch. Weight the "
+        "record comparison (hit rate, units) more than the MAE gap.",
+        f"Gap scale differs by construction: {', '.join(gap_sd_bits)} on the test set. The same "
+        f"{pm.BET_GAP_PTS:g}-point threshold therefore selects far fewer residual picks than "
+        "incumbent picks, so the two cap-5 records are not the same bet volume.",
+        f"The gate will fit the residual down to {R.RESIDUAL_MIN_FIT_ROWS} training rows (this run "
+        f"used {eng_reports['residual']['n_train']}), while production falls back to the incumbent "
+        f"below {R.RESIDUAL_MIN_TRAIN} rows — a residual result here can come from a fit production "
+        "would never have served.",
     ]
     if fp["missing_features"]:
         caveats.append(
@@ -515,6 +556,14 @@ def render_markdown(report: Dict[str, Any]) -> str:
             continue
         for sel in SELECTIONS:
             L.append(_rec_row(e, sel, eng[e]["selections"][sel]))
+    if "stored" in eng:
+        st = eng["stored"]
+        L += [
+            "",
+            f"Stored coverage: {st['coverage_n']} of {st['coverage_n_total']} test games carry a "
+            "stored prediction; the stored row's 'all'/MAE/calibration figures above cover only "
+            "that subset, not the full test universe.",
+        ]
     L += [
         "",
         "## Accuracy",

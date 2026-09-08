@@ -1,7 +1,43 @@
 """scripts/residual_gate.py imports without a database and its parser accepts
 the documented flags (the workflow builds exactly these)."""
 
+import json
+from types import SimpleNamespace
+
 import pytest
+
+
+class _FakeQuery:
+    """Stands in for the SQLAlchemy Query chain load_stored_bv drives —
+    .filter()/.order_by() are no-ops here; the rows are pre-selected by the
+    test, so this only needs to hand them back through .all()."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def filter(self, *args, **kwargs):
+        return self
+
+    def order_by(self, *args, **kwargs):
+        return self
+
+    def all(self):
+        return self._rows
+
+
+class _FakeSession:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def query(self, model):
+        return _FakeQuery(self._rows)
+
+
+def _row(game_id, bv_line, engine=None, created_at=0):
+    factors = json.dumps({"engine": engine}) if engine is not None else None
+    return SimpleNamespace(
+        game_id=game_id, bv_line=bv_line, factors_json=factors, created_at=created_at
+    )
 
 
 def test_parser_defaults(load_script):
@@ -59,3 +95,30 @@ def test_step_summary_appends_when_the_variable_is_set(load_script, tmp_path, mo
     monkeypatch.delenv("GITHUB_STEP_SUMMARY")
     mod.append_step_summary("ignored")  # no variable: no-op, no error
     assert "ignored" not in path.read_text()
+
+
+def test_load_stored_bv_excludes_rows_tagged_residual_engine(load_script):
+    """The 'stored' column stands in for the incumbent; a row the residual
+    engine itself wrote (factors_json.engine == 'residual') must not leak in,
+    or a future engine flip would contaminate the gate's own baseline."""
+    mod = load_script("residual_gate")
+    rows = [
+        _row(1, 20.5, engine="bv_line"),
+        _row(2, 21.0, engine="residual"),
+        _row(3, 22.0, engine=None),  # legacy row, written before the field existed
+    ]
+    out = mod.load_stored_bv(_FakeSession(rows), [1, 2, 3])
+    assert out == {1: 20.5, 3: 22.0}
+    assert 2 not in out
+
+
+def test_load_stored_bv_falls_back_to_an_older_non_residual_row(load_script):
+    """Newest-row-wins, but only among non-residual rows: if the latest row
+    for a game is the residual's own, the last incumbent row still counts."""
+    mod = load_script("residual_gate")
+    rows = [
+        _row(1, 20.5, engine="bv_line", created_at=1),
+        _row(1, 25.0, engine="residual", created_at=2),
+    ]
+    out = mod.load_stored_bv(_FakeSession(rows), [1])
+    assert out == {1: 20.5}

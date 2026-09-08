@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from beatvegas.card import (
+    CARD_STATUS_INPUTS,
     DEGRADED_INPUTS,
     apply_degraded,
     apply_weekly_cap,
@@ -151,11 +152,34 @@ def test_incomplete_sweep_that_never_recorded_its_coverage_degrades_every_game()
     assert d[0]["detail"] == "stopped early (fetch_error); coverage unknown"
 
 
+def test_incomplete_sweep_detail_survives_a_missing_events_in_window():
+    """An old status file (or a stop before the slate was sized) carries
+    events_polled but no events_in_window: the detail must not read
+    "after 3 of None events"."""
+    d = degraded_inputs(
+        [game(1), game(2)],
+        sweep_status={"complete": False, "reason": "fetch_error", "events_polled": 3},
+        previews=[preview_row(1), preview_row(2)],
+        predictions=[model(1, 22.4), model(2, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d[0]["detail"] == "stopped early (fetch_error) after 3 events; coverage unknown"
+    d = degraded_inputs(
+        [game(1)],
+        sweep_status={"complete": False, "reason": "fetch_error", "events_polled": None},
+        predictions=[model(1, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d[0]["detail"] == "stopped early (fetch_error); coverage unknown"
+
+
 @pytest.mark.parametrize("unpolled", [[], [98, 99]])
 def test_incomplete_sweep_whose_unreached_games_are_all_off_card_degrades_nothing(unpolled):
     """The key is PRESENT and none of the ids are on this card (a truncated
     sweep whose unreached events all fall outside the card's week): no game is
-    held, but the truncation still shows in the card's status detail as a
+    held, but the truncation still shows in the card's `degraded` detail as a
     build-wide entry (game_ids [])."""
     d = degraded_inputs(
         [game(1), game(2)],
@@ -190,7 +214,10 @@ def test_incomplete_sweep_whose_unreached_games_are_all_off_card_degrades_nothin
         slot="saturday",
         degraded=d,
     )
-    assert c["status"] == "degraded" and c["counts"]["degraded"] == 0
+    # Owner decision (2026-09-08): a sweep that held no card game does not flip
+    # the card — the status stays what the slot implies; the detail still shows.
+    assert c["status"] == "final" and c["counts"]["degraded"] == 0
+    assert c["degraded"] == d
     assert [it["blocker"] for it in c["items"]] == [None, None]
     assert c["counts"]["bet"] == 2
 
@@ -395,6 +422,10 @@ def test_apply_degraded_lists_every_input_that_touched_the_game():
     )
     assert items[0]["degraded_inputs"] == ["sweep", "tempo"]  # DEGRADED_INPUTS order
     assert items[0]["action"].startswith("Degraded inputs (sweep, tempo): paper only")
+    # A second pass with a different list MERGES into the first, never replaces it.
+    apply_degraded(items, [{"input": "pace", "detail": "", "game_ids": [1]}])
+    assert items[0]["degraded_inputs"] == ["sweep", "pace", "tempo"]
+    assert items[0]["action"].startswith("Degraded inputs (sweep, pace, tempo): paper only")
 
 
 def test_apply_degraded_preserves_the_gate_that_had_blocked_a_real_bet():
@@ -487,6 +518,7 @@ def test_status_comes_from_the_slot_on_a_clean_build(slot, expected):
 
 
 def test_status_is_degraded_whatever_the_slot_says():
+    """A sweep that held a card game is build-wide: the status flips."""
     c = _degraded_card(slot="saturday")
     assert c["status"] == "degraded" and c["slot"] == "saturday"
     assert c["counts"]["degraded"] == 1
@@ -517,6 +549,100 @@ def test_counts_bet_excludes_a_degraded_bet():
     assert by_id[1]["tier"] == by_id[2]["tier"] == "BET"
     assert by_id[1]["blocker"] is None and by_id[2]["blocker"] == "degraded"
     assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 1}
+
+
+def test_card_status_inputs_are_the_build_wide_ones():
+    assert CARD_STATUS_INPUTS == frozenset({"sweep", "preview", "tempo"})
+    assert CARD_STATUS_INPUTS < set(DEGRADED_INPUTS)
+    assert "pace" not in CARD_STATUS_INPUTS
+
+
+@pytest.mark.parametrize("slot,expected", [("saturday", "final"), ("friday", "preview")])
+def test_a_pace_only_failure_holds_its_game_but_does_not_flip_the_card(slot, expected):
+    """Owner decision (2026-09-08): pace is missing on ~5% of games, so a
+    per-game pace failure must not turn every Saturday's banner red. The game
+    is still held (paper only, counted, listed under Held); the card's status
+    stays what the slot implies."""
+    deg = [{"input": "pace", "detail": "1 model games have no pace read", "game_ids": [1]}]
+    c = build_card(
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4, {"pace": None}), model(2, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot=slot,
+        degraded=deg,
+    )
+    assert c["status"] == expected
+    assert c["degraded"] == deg  # the detail still surfaces
+    assert c["counts"]["degraded"] == 1 and c["counts"]["bet"] == 1
+    by_id = {it["game_id"]: it for it in c["items"]}
+    assert by_id[1]["blocker"] == "degraded" and by_id[1]["degraded_inputs"] == ["pace"]
+    assert by_id[1]["tier"] == "BET" and by_id[1]["cap_rank"] is None
+    assert by_id[2]["blocker"] is None and by_id[2]["cap_rank"] == 1
+
+
+def test_a_failed_preview_flips_the_card_status():
+    deg = [{"input": "preview", "detail": "rotowire_empty: ...", "game_ids": [1]}]
+    c = build_card(
+        [game(1)],
+        bet_snaps(1),
+        [model(1, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=deg,
+    )
+    assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
+
+
+def test_an_empty_tempo_table_flips_the_card_status():
+    deg = [{"input": "tempo", "detail": "the tempo table stored 0 rows", "game_ids": [1]}]
+    c = build_card(
+        [game(1)],
+        bet_snaps(1),
+        [model(1, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=deg,
+    )
+    assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
+
+
+def test_a_sweep_that_held_a_card_game_flips_the_card_status():
+    deg = [{"input": "sweep", "detail": "stopped early (credit_cap)", "game_ids": [2]}]
+    c = build_card(
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4), model(2, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=deg,
+    )
+    assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
+    # ...and a pace entry alongside a build-wide one changes nothing about that.
+    c2 = build_card(
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4), model(2, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=deg + [{"input": "pace", "detail": "", "game_ids": [1]}],
+    )
+    assert c2["status"] == "degraded" and c2["counts"]["degraded"] == 2
 
 
 def test_a_build_with_no_slot_still_reads_final():

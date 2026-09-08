@@ -159,7 +159,7 @@ export default function CardPanel({
         <>
           <p
             className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]"
-            title="A card input failed on this build (see the banner), so the gate behind these could not be trusted: paper only, no weekly-cap slot."
+            title="A card input failed on this build (a build-wide one shows in the banner; a missing pace read holds just its game), so the gate behind these could not be trusted: paper only, no weekly-cap slot."
           >
             Held · an input failed · paper only
           </p>

@@ -147,6 +147,15 @@ const SLOTS: readonly CardSlot[] = [
   "manual",
 ];
 const STATUSES: readonly CardStatus[] = ["final", "preview", "degraded"];
+/** The BUILD-WIDE degraded inputs — the only ones that flip the card's status
+ *  (and the banner) to "degraded". Mirrors beatvegas/card.py CARD_STATUS_INPUTS:
+ *  `pace` is per game (missing on ~5% of games every week), so it holds its
+ *  own games under Held without turning every Saturday's banner red. */
+export const CARD_STATUS_INPUTS: readonly string[] = [
+  "sweep",
+  "preview",
+  "tempo",
+];
 const FAIR_SOURCES: readonly FairSource[] = ["exchange", "books"];
 
 const num = (v: unknown): number | null => {
@@ -219,6 +228,16 @@ function parseItem(raw: unknown): CardItem | null {
   };
 }
 
+/** Does this degraded list flip the card's status? Only a build-wide input
+ *  (CARD_STATUS_INPUTS) that held at least one card game does. */
+export function cardStatusDegraded(
+  degraded: readonly DegradedInput[],
+): boolean {
+  return degraded.some(
+    (d) => CARD_STATUS_INPUTS.includes(d.input) && d.gameIds.length > 0,
+  );
+}
+
 function parseDegraded(raw: unknown): DegradedInput | null {
   if (!isObj(raw)) return null;
   const input = str(raw.input);
@@ -279,13 +298,14 @@ export function parseCard(raw: unknown): Card | null {
   const slot = SLOTS.includes(obj.slot as CardSlot)
     ? (obj.slot as CardSlot)
     : null;
-  // A failed input always shows as degraded, whatever the builder said.
-  const status: CardStatus =
-    degraded.length > 0
-      ? "degraded"
-      : STATUSES.includes(obj.status as CardStatus)
-        ? (obj.status as CardStatus)
-        : "final";
+  // A failed BUILD-WIDE input that held a game shows as degraded, whatever the
+  // builder said. A pace-only list (or a sweep truncation that held no card
+  // game) leaves the status to the builder: those games sit under Held instead.
+  const status: CardStatus = cardStatusDegraded(degraded)
+    ? "degraded"
+    : STATUSES.includes(obj.status as CardStatus)
+      ? (obj.status as CardStatus)
+      : "final";
   const pp = isObj(obj.paper) ? obj.paper : {};
   const paper = {
     qualifying: int(pp.qualifying) ?? items.filter((i) => i.qualifies).length,

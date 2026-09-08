@@ -106,7 +106,7 @@ PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
 #            missing on ~5% of games, which is a team-mapping failure);
 #   tempo    the tempo table stored zero teams (TeamRankings mapper collapse).
 # Order = the order degraded_inputs reports them. Mirrored by the card status
-# banner in web/lib/card.ts (cardHealth).
+# banner in web/lib/card.ts (parseCard + cardHealth).
 #
 # NOT a signal — weather. Do not re-add it. Weather is structurally sparse data
 # the model already handles as missing, not a Saturday failure: live Neon had a
@@ -116,6 +116,17 @@ PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
 # every week, on a healthy build.
 DEGRADED_INPUTS = ("sweep", "preview", "pace", "tempo")
 DEGRADED_BLOCKER = "degraded"
+# Which of those flip the CARD's status to "degraded" (and so the site banner
+# and the lead of the Saturday text). Only the BUILD-WIDE inputs do — a failure
+# there means the whole build ran on a bad read. `pace` is per game: it is
+# missing on ~5% of games every week, usually a PASS, so it holds its own games
+# (paper only, no cap slot, listed under Held, counted in counts.degraded)
+# WITHOUT flipping the card — otherwise the banner would fire most Saturdays
+# while every bet on the card is fine (owner decision 2026-09-08). A build-wide
+# entry that held no card game (a sweep truncation whose unreached events all
+# fall off this card, game_ids []) does not flip the card either; its detail
+# still surfaces in `degraded`. Mirrored in web/lib/card.ts::parseCard.
+CARD_STATUS_INPUTS = frozenset({"sweep", "preview", "tempo"})
 
 
 def total_band(total: Optional[float]) -> Optional[str]:
@@ -869,7 +880,12 @@ def degraded_inputs(
         reason = sweep_status.get("reason") or "incomplete"
         polled = sweep_status.get("events_polled")
         total = sweep_status.get("events_in_window")
-        where = f" after {polled} of {total} events" if polled is not None else ""
+        if polled is None:
+            where = ""
+        elif total is None:
+            where = f" after {polled} events"
+        else:
+            where = f" after {polled} of {total} events"
         detail = f"stopped early ({reason}){where}"
         if "unpolled_game_ids" not in sweep_status:
             # Unknown coverage (an old status file, or a stop before the ids
@@ -965,7 +981,12 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
         names = by_game.get(int(it["game_id"]))
         if not names:
             continue
-        uniq = sorted(set(names), key=lambda n: (order.get(n, len(order)), n))
+        # Merge with any earlier pass: a second call with a different list adds
+        # to the game's inputs, never replaces them.
+        uniq = sorted(
+            set(it.get("degraded_inputs") or ()) | set(names),
+            key=lambda n: (order.get(n, len(order)), n),
+        )
         it["degraded_inputs"] = uniq
         if it.get("blocker") != DEGRADED_BLOCKER:
             it["gate_blocker"] = it.get("blocker") or "none"
@@ -977,6 +998,14 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
             "number and the QB report yourself before betting."
         )
     return list(items)
+
+
+def card_status_degraded(degraded: Sequence[Dict]) -> bool:
+    """Does this list of failed inputs flip the CARD's status to "degraded"?
+    Only a build-wide input (CARD_STATUS_INPUTS) that held at least one card
+    game does; a per-game pace entry, or a truncation that reached every card
+    game, holds/shows without flipping the card. See CARD_STATUS_INPUTS."""
+    return any(d.get("input") in CARD_STATUS_INPUTS and bool(d.get("game_ids")) for d in degraded)
 
 
 def hold_note(items: Sequence[Dict]) -> Optional[str]:
@@ -1025,8 +1054,9 @@ def build_card(
     previews:    {game_id, qb_out, qb_out_detail}
     slot:        which build wrote this card (beatvegas.ci.CARD_STATUS_BY_SLOT);
                  None on an ad-hoc build.
-    degraded:    the failed inputs from `degraded_inputs`. Any entry makes the
-                 card status "degraded" and every game it touched paper only.
+    degraded:    the failed inputs from `degraded_inputs`. Every game an entry
+                 touched goes paper only; a build-wide entry that held a game
+                 (CARD_STATUS_INPUTS) also makes the card status "degraded".
     Only games kicking off after `now` are on the card.
     """
     now_n = _naive_utc(now)
@@ -1116,9 +1146,14 @@ def build_card(
             "built_at": _iso(now),
             "model_read": model_read,
             "slot": slot,
-            # A failed input beats the slot's own status: the site's banner and
-            # the Saturday text both key off this one word.
-            "status": ("degraded" if deg else CARD_STATUS_BY_SLOT.get(slot or "", "final")),
+            # A failed BUILD-WIDE input beats the slot's own status: the site's
+            # banner and the Saturday text both key off this one word. A pace
+            # entry holds its games but leaves the status to the slot.
+            "status": (
+                "degraded"
+                if card_status_degraded(deg)
+                else CARD_STATUS_BY_SLOT.get(slot or "", "final")
+            ),
             "degraded": deg,
             "counts": counts,
             "paper": paper,

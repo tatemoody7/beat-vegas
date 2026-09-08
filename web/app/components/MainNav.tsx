@@ -11,7 +11,6 @@ const LINKS = [
   { href: "/results", label: "Results" },
   { href: "/research", label: "Research" },
   { href: "/glossary", label: "Glossary" },
-  { href: "/trust", label: "Trust" },
 ];
 
 export default function MainNav() {

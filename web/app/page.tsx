@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSeasons } from "@/lib/board";
 import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
@@ -89,14 +88,8 @@ export default async function BoardPage({
         </div>
       </div>
 
-      <p className="bv-page-sub mt-1">
+      <p className="bv-page-sub mb-4 mt-1">
         {`Every game this week, highest score first. ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching, under ${SCORE_WATCH_MIN} is a pass.`}
-      </p>
-      <p className="mb-4 mt-1 text-xs text-[var(--text-dim)]">
-        {`One first half is close to a coin flip — the score ranks games, it does not promise wins. `}
-        <Link href="/trust" className="text-[var(--accent)] hover:underline">
-          How much to trust this
-        </Link>
       </p>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />

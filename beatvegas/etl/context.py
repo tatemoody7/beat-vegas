@@ -23,6 +23,7 @@ only: nothing here feeds a model.
 from __future__ import annotations
 
 import math
+from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
@@ -65,8 +66,10 @@ def _num(v) -> Optional[float]:
 
 
 def json_safe(obj: Any) -> Any:
-    """Recursively scrub a payload for json.dumps: NaN/inf -> None, numpy
-    scalars -> Python, tuples -> lists. Strings/bools/None pass through."""
+    """Recursively scrub a payload for json.dumps: NaN/inf/NaT -> None, numpy
+    scalars -> Python, numpy arrays and tuples -> lists, date/datetime -> ISO
+    string. Strings/bools/None pass through. Never raises. The ONE such
+    helper — model/artifacts.py and scripts use this too."""
     if isinstance(obj, dict):
         return {str(k): json_safe(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -75,6 +78,13 @@ def json_safe(obj: Any) -> Any:
         return obj
     if isinstance(obj, int):
         return int(obj)
+    if isinstance(obj, (datetime, date)):  # pd.Timestamp and pd.NaT are datetimes
+        try:
+            return None if pd.isna(obj) else obj.isoformat()
+        except (TypeError, ValueError):
+            return None
+    if hasattr(obj, "tolist") and getattr(obj, "ndim", 0) > 0:  # numpy array
+        return [json_safe(v) for v in obj.tolist()]
     if hasattr(obj, "item") and not isinstance(obj, float):  # numpy scalar
         try:
             obj = obj.item()

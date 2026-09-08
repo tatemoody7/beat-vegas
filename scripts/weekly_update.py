@@ -14,6 +14,14 @@ opener) and is handed the training rows' REAL 1H closes.
     python scripts/weekly_update.py                 # current season, auto week
     python scripts/weekly_update.py --season 2025 --week 8
     python scripts/weekly_update.py --line-basis current   # force the basis
+    python scripts/weekly_update.py --if-engine residual   # card-day re-score:
+        # no-op (exit 0, no DB work) unless config model.engine is `residual`
+
+When the engine hands back a fitted model (score_slate attrs["engine_artifact"],
+residual engine only) the run persists it with its training fingerprint
+(model_artifacts + a model_runs row) and prints one `fingerprint ...` line
+naming what moved since the previous fit, so a mid-season change to the
+training history is visible in the job log. The incumbent writes nothing new.
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ from __future__ import annotations
 import argparse
 import statistics
 import sys
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 import pandas as pd
@@ -36,6 +45,11 @@ from beatvegas.lines import (
     consensus_open_close,
     pre_kickoff,
     real_closes,
+)
+from beatvegas.model.artifacts import (
+    fingerprint_changed,
+    latest_artifact,
+    persist_artifact,
 )
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
@@ -178,6 +192,58 @@ def training_real_closes(frame: pd.DataFrame, season: int) -> Dict[int, float]:
         )
 
 
+def persist_engine_artifact(
+    scored: pd.DataFrame, *, engine: str, season: int, week: int, now: Optional[datetime] = None
+) -> Optional[str]:
+    """Store the fitted model score_slate attached (attrs["engine_artifact"]) as
+    one model_artifacts row and return the log line
+    `fingerprint <hash> n_rows=<n> max_game_date=<d> changed=<...>` — comparing
+    against the previous artifact for this engine, so a mid-season data
+    correction shows in the job log. `changed=first_fit` when there is no
+    previous artifact for the engine (distinct from `changed=[]`, same history
+    as last time). Returns None (and writes NOTHING) when the frame carries no
+    artifact: the incumbent engine, or a demoted residual run.
+
+    No model_runs row is written. model_runs is retrain.py's run log; the
+    Research page (web/lib/research.ts) reads the NEWEST FIVE rows looking for
+    `bv_residual` calibration metrics, so a per-scoring-run row without them
+    would blank that panel within a week of the engine being on and pad the
+    "Model runs over time" table. Everything a run-log row would have carried
+    (fingerprint, sigma, n_train, fallback) sits on the artifact row —
+    fingerprint_json + metrics_json — and each game's factors_json carries the
+    fingerprint too."""
+    artifact = scored.attrs.get("engine_artifact") or {}
+    model = artifact.get("model")
+    if model is None:
+        return None
+    fp = artifact.get("fingerprint") or {}
+    now = now or datetime.utcnow()
+    metrics = {
+        "sigma": artifact.get("sigma"),
+        "n_train": fp.get("n_rows"),
+        "n_rows_residual": artifact.get("n_rows_residual"),
+        "n_rows_fallback": artifact.get("n_rows_fallback"),
+        "fallback": scored.attrs.get("engine_fallback"),
+    }
+    with session_scope() as s:
+        prev = latest_artifact(s, engine)
+        changed = "first_fit" if prev is None else str(fingerprint_changed(prev, fp))
+        persist_artifact(
+            s,
+            engine=engine,
+            model=model,
+            fingerprint=fp,
+            season=season,
+            week=week,
+            metrics=metrics,
+            now=now,
+        )
+    return (
+        f"fingerprint {fp.get('feature_hash')} n_rows={fp.get('n_rows')} "
+        f"max_game_date={fp.get('max_game_date')} changed={changed}"
+    )
+
+
 def _enrich_qb_out(scored) -> None:
     """Forward-only: tag the upcoming slate with live 'QB OUT' flags from the
     Rotowire injury report (ESPN publishes no college injuries).
@@ -225,8 +291,17 @@ def main() -> None:
         help="ranking line: opener (incumbent), current (HR latest > consensus latest > "
         "derived), auto = current for the residual engine else opener",
     )
+    ap.add_argument(
+        "--if-engine",
+        metavar="NAME",
+        help="only run when config model.engine is NAME; otherwise print one line and "
+        "exit 0 without touching the database (the card-day re-score step)",
+    )
     args = ap.parse_args()
     engine = engine_name()
+    if args.if_engine and engine != args.if_engine:
+        print(f"engine is {engine!r}, not {args.if_engine!r}: nothing to re-score")
+        return
     basis = resolve_basis(args.line_basis, engine)
     if not try_init_db():
         return
@@ -283,6 +358,9 @@ def main() -> None:
         sys.exit(1)
     _enrich_qb_out(scored)
     n = store_predictions(scored)
+    fp_line = persist_engine_artifact(scored, engine=engine, season=args.season, week=week)
+    if fp_line:
+        print(fp_line)
     hr = sum(1 for k in kinds.values() if k == "hr_1h")
     obs = sum(1 for k in kinds.values() if k == "observed_1h")
     der = sum(1 for k in kinds.values() if k == "derived_fg")

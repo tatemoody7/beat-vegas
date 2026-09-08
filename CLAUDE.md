@@ -5,16 +5,29 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
-- **2026-09-01 (week-1 audit, PRs #23-#26):** landing page `/` is the plain-English
-  **This Week** verdict page (BET / WATCH / PASS + why + bankroll strip,
-  `web/lib/verdict.ts`); the ranked board moved to `/board`. Betting rules live in
+- **2026-09-08 (site rebuild + rolling week, PRs #76-#81; real money from week 2, Sep 12):**
+  the board (`/`) is ONE rolling week grouped by ET day; each game locks at its own kickoff.
+  Grade = a coloured 0-100 **score** (`web/lib/grade.ts`: 70+ green/bet, 55-69 amber/watch,
+  <55 red/pass; settled games colour by result), scaled so a gap of exactly `BET_GAP_PTS` at a
+  fair price = 70 (`edge.ts`/`card.py` `SCORE_PER_GAP_PT`). "EDGE" renders as **Watch**. A
+  strong-but-blocked game keeps its colour and carries a plain tag (`lib/labels.ts::blockerTag`).
+  Score/gap basis = Hard Rock's line → market consensus → our reference line, said in words;
+  a real-money BET still needs Hard Rock's own line. **Model minimum is 0 games** (every FBS
+  game scored off last season's priors; rows with <2 games carry `h/a_games_played` → "early
+  season" tag). **Morning card Tue-Sat ~8:05am ET** (`ci.py` slot `morning`, status `final`,
+  24 h paper window); `grade.yml` runs daily 6:30am ET; `lines_watch` opener crons retired
+  (~930 credits/wk). Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
+  caveat line (Tate). Specs: `docs/superpowers/specs/2026-09-08-*.md`. Dev on a network that
+  filters Neon:5432: `NEON_HTTP=1` in `web/.env` (Prisma Neon adapter over 443).
+- **2026-09-01 (week-1 audit, PRs #23-#26):** verdict logic (BET / WATCH / PASS + why,
+  `web/lib/verdict.ts`) behind the board; `/board` redirects to `/` since 2026-09-02. Betting rules live in
   `docs/BETTING_POLICY.md` ($100 roll, $10 flat units, ≤5 bets/wk, 1H unders only).
   **Gates are in POINTS from the validated top-20%-by-gap rule (≥1.75 pts) — never
   σ:** `bv_sigma` ≈ 12 pts is per-game outcome noise, so a 1σ gap never occurs.
   Paper picks (`manual_picks.is_paper`, stake forced to 1 flat unit so units/ROI are
   comparable) sit apart from the real ledger. Sunday job now refreshes pace/weather before scoring; Monday job refreshes
-  1H PBP and grades `game_records` + the factor ledger. The model cannot score
-  weeks 1–2 (needs 2 games/team) — by design. **Florida platforms (verified
+  1H PBP and grades `game_records` + the factor ledger. (Grading is daily and the
+  model minimum is 0 games since 2026-09-08 — see the top bullet.) **Florida platforms (verified
   2026-09-01):** Hard Rock Bet is still the only sportsbook; "FanDuel in Florida"
   = FanDuel Predicts (CFTC prediction market), not a sportsbook. Exchanges
   (Kalshi/Novig/ProphetX/BetOpenly, Odds API `us_ex`) are captured on the Sunday
@@ -73,10 +86,10 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
   `card.yml`, `grade.yml`, `research_preview.yml`). No notification code: GitHub emails
   failed runs. Nothing runs the engine on the Mac; two Mac routines text Tate:
-  `cfb-saturday-card` (Sat 8:50am ET: verify/kick the FINAL card, text the BET list
+  `cfb-saturday-card` (Sat 8:50am ET: verify/kick the morning card, text the BET list
   with line, price and kill numbers) and `cfb-sunday-ops` (verify/kick `sunday.yml`,
   text the recap). The bet card itself is built in the cloud (`card.yml`; slots in
-  `beatvegas/ci.py::resolve_slot`, Saturday final ET-gated ~8:05–8:45am).
+  `beatvegas/ci.py::resolve_slot`, morning slot Tue-Sat ET-gated ~8:05–8:45am).
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the
@@ -137,24 +150,28 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 ## Web app (`web/`) — shipped + redesigned
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
 Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
-- **Views (4 tabs)**: Board (`/`, THE home page — one ranked list of every game with a
-  Hard Rock total, edge score 0-100 + BET/EDGE/PASS tier + action line from
-  `web/lib/edge.ts`, composed by `web/lib/homeBoard.ts`; bankroll strip, day/my-teams/
-  Hard-Rock filters, expandable cards with Lines / Model / Why / News and writable picks,
-  `POST /api/picks`), Results (market/model/you ledgers with CLV + bankroll curve),
-  Research (calibration, gap-vs-CLV, model_runs), Glossary. `/board` redirects to `/`.
-  Score-color thresholds +
-  chip logic live in `web/lib/score.ts` (ported from `model/score.py`; keep the two in sync);
-  the point gates are exported from `model/score.py` and parity-tested against `verdict.ts`. API routes read the same SQL
+- **Views (4 tabs)**: Board (`/`, THE home page — the week grouped by day, every game with a
+  Hard Rock total, coloured score 0-100 + Bet/Watch/Pass word + action line from
+  `web/lib/edge.ts` + `web/lib/grade.ts`, composed by `web/lib/homeBoard.ts`; bankroll strip,
+  day/my-teams/Hard-Rock filters, expandable cards with Lines / Our number / What is behind it /
+  Injuries and news, writable picks via `POST /api/picks`), Results (market/model/you ledgers with
+  line value + bankroll curve + post-mortem), Research (accuracy, gap vs line value, line study),
+  Glossary (15 terms). `/board` redirects to `/`. Grade bands live in `web/lib/grade.ts`
+  (`SCORE_BET_MIN`/`SCORE_WATCH_MIN` mirrored in `model/score.py`); every enum label lives in
+  `web/lib/labels.ts`; the point gates are exported from `model/score.py` and parity-tested
+  against `verdict.ts`. API routes read the same SQL
   the page loaders use; the app is locked by `middleware.ts` + `APP_PASSWORD` cookie.
 - **Design system**: plain-English copy + a modern sportsbook look in
   `web/app/globals.css` — deep-navy canvas, electric-cyan brand accent, Archivo display
   font, reusable `.bv-card`/`.bv-pill`/`.bv-stat`/`.bv-table`/`.bv-btn`/`.bv-nav-link`
-  classes. **Green/red are reserved for under/over outcomes** — never use them as a UI
-  accent (cyan is the brand). `MainNav.tsx` gives the active-route highlight.
+  classes plus `.bv-badge` / `.bv-num` / `.bv-day-head`. **Colour is the grade language:**
+  `--good` (bet / won), `--warn` (watch / warning), `--bad` (pass / lost), `--push`; cyan is
+  chrome only (links, active nav, buttons) and never a grade. `MainNav.tsx` gives the
+  active-route highlight.
 - **Dev**: `web/.env` `DATABASE_URL` points at Neon (prod) or the local sim PG
-  (`simulate_week.py`); the Neon line is commented as a fallback. Neon is unreachable
-  from the campus/fgcu network — use the sim there. `npm run lint` / `npm run format`
+  (`simulate_week.py`); the Neon line is commented as a fallback. On a network that filters
+  Neon:5432 (campus) set `NEON_HTTP=1` in `web/.env` — `lib/prisma.ts` then uses the Prisma
+  Neon adapter over HTTPS/WebSockets (443). `npm run lint` / `npm run format`
   before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas

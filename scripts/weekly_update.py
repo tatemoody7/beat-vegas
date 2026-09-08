@@ -283,7 +283,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument("--week", type=int)
-    ap.add_argument("--min-games", type=int, default=2)
+    ap.add_argument("--min-games", type=int, default=1)
     ap.add_argument(
         "--line-basis",
         choices=("auto", *LINE_BASES),

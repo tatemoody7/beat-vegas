@@ -135,15 +135,18 @@ def _wire(monkeypatch, frame, scored_empty=True):
 
 
 def _target_frame(n_played: int) -> pd.DataFrame:
-    """Two 2026 wk5 rows: both have a total; `n_played` of them clear min_games=2."""
+    """Two 2026 wk5 rows: both have a total; `n_played` of them clear the model
+    minimum (MIN_GAMES_FOR_MODEL games played by both teams)."""
+    from beatvegas.model.score import MIN_GAMES_FOR_MODEL as m
+
     return pd.DataFrame(
         {
             "id": [1, 2],
             "season": [2026, 2026],
             "week": [5, 5],
             "full_game_total": [50.0, 52.0],
-            "h_games_played": [2 if i < n_played else 1 for i in range(2)],
-            "a_games_played": [2, 2],
+            "h_games_played": [m if i < n_played else m - 1 for i in range(2)],
+            "a_games_played": [m, m],
         }
     )
 
@@ -152,7 +155,9 @@ def test_weekly_update_exits_zero_when_min_games_filters_everything(monkeypatch,
     wu = _wire(monkeypatch, _target_frame(n_played=0))
     wu.main()  # no SystemExit
     out = capsys.readouterr().out
-    assert "need >= 2 games played" in out
+    from beatvegas.model.score import MIN_GAMES_FOR_MODEL
+
+    assert f"need >= {MIN_GAMES_FOR_MODEL} games played" in out
 
 
 def test_weekly_update_exits_zero_when_week_has_no_totals_yet(monkeypatch, capsys):
@@ -499,3 +504,15 @@ def test_derived_factors_carry_no_engine():
     f = score_mod.derived_factors(24.5, 50.0, -3.0, 0.49)
     assert f["engine"] is None and f["resid_hat"] is None and f["model_fingerprint"] is None
     assert f["line_kind"] == "derived_fg"
+
+
+def test_model_reads_from_one_game_played_and_factors_carry_games_played():
+    """2026-09-08: the model minimum dropped to one game played (Tate: bet week 2),
+    and each scored row carries both teams' prior games so the web can tag
+    early-season numbers instead of hiding them."""
+    from beatvegas.model import score
+
+    assert score.MIN_GAMES_FOR_MODEL == 1
+    assert {"h_games_played", "a_games_played"} <= set(score.CONTEXT_NUMERIC_KEYS)
+    df = pd.DataFrame({"h_games_played": [0, 1, 5], "a_games_played": [5, 1, 5]})
+    assert apply_min_games(df, score.MIN_GAMES_FOR_MODEL)["h_games_played"].tolist() == [1, 5]

@@ -115,7 +115,12 @@ export function priceSentence(i: VerdictInput): string {
       ? `under ${fmt(i.hrLine)}`
       : `under ${fmt(i.hrLine)} at ${american(i.hrUnderPrice)}`;
   if (i.ev === null) {
-    return `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
+    // Two different causes, and the headline already branches on them: blaming
+    // the other books when Hard Rock itself posted no price contradicts it (and
+    // is simply wrong — the books may all be priced). Mirrors card.py.
+    return i.hrUnderPrice === null
+      ? `Hard Rock has ${at}, but hasn’t posted a price for it yet — nothing to judge.`
+      : `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
   }
   const pctTxt = fmt(Math.abs(i.ev) * 100);
   switch (i.evVerdict) {

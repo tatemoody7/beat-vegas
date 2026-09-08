@@ -140,6 +140,12 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(unpriced.headline).toBe(
       "Model edge in range, but Hard Rock hasn’t priced its under yet — the price can’t be judged. Paper only.",
     );
+    // ...and the why sentence must agree with that headline rather than blaming
+    // the other books, which may all be priced (card.py _price_sentence).
+    expect(unpriced.why[1]).toBe(
+      "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge.",
+    );
+    expect(unpriced.why[1]).not.toContain("other books");
     // A judgeable fair-or-better price is what makes it a BET.
     expect(verdictFor({ ...base, ev: 0, evVerdict: "fair" }).verdict).toBe(
       "BET",

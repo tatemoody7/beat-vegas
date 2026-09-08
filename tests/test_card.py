@@ -617,6 +617,21 @@ def test_unpriced_hard_rock_line_is_blocked_as_no_fair_price():
     assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
     assert it["paper_blocker"] == "no_fair_price"
     assert it["action"].startswith("Wait: Hard Rock hasn’t priced its 24.5 under yet")
+    # The why sentence must not contradict that action by blaming the other
+    # books: three of them ARE priced at 24.5 — Hard Rock is the one that isn't.
+    assert (
+        "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge."
+    ) in it["why"]
+
+
+def test_price_sentence_blames_the_other_books_only_when_hard_rock_has_a_price():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)]  # Hard Rock alone
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["ev"] is None
+    assert (
+        "Hard Rock has under 24.5 at -110; not enough other books at that number to judge "
+        "the price."
+    ) in it["why"]
 
 
 def test_blocker_order_off_market_then_price_then_no_fair_price_then_qb_out():

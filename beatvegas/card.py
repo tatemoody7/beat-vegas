@@ -407,6 +407,11 @@ def _price_sentence(hr_line, hr_price, ev, ev_v) -> str:
         else f"under {fmt(hr_line)} at {american(hr_price)}"
     )
     if ev is None:
+        # Two different causes, and the action line above already branches on
+        # them: blaming the other books when Hard Rock itself posted no price
+        # contradicts it (and is simply wrong — the books may all be priced).
+        if hr_price is None:
+            return f"Hard Rock has {at}, but hasn’t posted a price for it yet — nothing to judge."
         return f"Hard Rock has {at}; not enough other books at that number to judge the price."
     pct = fmt(abs(ev) * 100)
     if ev_v == "pos":

@@ -21,11 +21,17 @@ modes, driven by lines_watch.yml / card.yml:
 Per-event 1H calls cost markets x regions credits (2). --max-credits-per-run is
 the runaway guard; --credit-floor protects the month's reserve for sunday.yml.
 Every run prints credits_spent= and calls_404= so the budget is auditable.
+
+A run that stops early at either guard still exits 0, so --status-file writes
+this run's COVERAGE (complete / reason / events polled / the game ids it never
+reached) for scripts/build_card.py, which marks a card built on a partial sweep
+degraded instead of shipping it as the Saturday final.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -80,6 +86,46 @@ def _changed(prev, line, over, under) -> bool:
     if prev is None:
         return True
     return prev.line != line or prev.over_price != over or prev.under_price != under
+
+
+def _unpolled_game_ids(events: List[Dict], ctx: Dict[str, Dict], start: int) -> List[int]:
+    """Game ids for the events from `start` on — the ones this run never paid
+    for. Events the matcher could not tie to a game contribute nothing (the card
+    only knows games)."""
+    out = set()
+    for ev in events[start:]:
+        c = ctx.get(ev["id"])
+        if c is not None and c.get("game_id") is not None:
+            out.add(int(c["game_id"]))
+    return sorted(out)
+
+
+def write_status(
+    path: Optional[str],
+    *,
+    complete: bool,
+    reason: Optional[str],
+    events_in_window: int,
+    events_polled: int,
+    credits_spent: Optional[int],
+    unpolled_game_ids: List[int],
+) -> None:
+    """The run's coverage, for scripts/build_card.py. Written on EVERY exit path
+    — a sweep that stopped at the credit floor still exits 0, and only this file
+    tells the card which games carry a stale Hard Rock number."""
+    if not path:
+        return
+    payload = {
+        "complete": bool(complete),
+        "reason": reason,
+        "events_in_window": int(events_in_window),
+        "events_polled": int(events_polled),
+        "credits_spent": credits_spent,
+        "unpolled_game_ids": unpolled_game_ids,
+    }
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    print(f"[status] {path}: {json.dumps(payload)}")
 
 
 def main() -> None:
@@ -149,6 +195,14 @@ def main() -> None:
         "us,us2); each extra region costs one more credit per event. NB: us_ex buys nothing "
         "here — the exchanges (Kalshi, Novig, ...) post no first-half totals (verified "
         "2026-09-07 against the live API), so no scheduled sweep passes it",
+    )
+    ap.add_argument(
+        "--status-file",
+        default=None,
+        dest="status_file",
+        help="write this run's coverage as JSON here (complete, reason, "
+        "events_in_window, events_polled, credits_spent, unpolled_game_ids) so "
+        "scripts/build_card.py can mark a card built on a partial sweep degraded",
     )
     args = ap.parse_args()
 
@@ -226,6 +280,15 @@ def main() -> None:
             f"<= {args.credit_floor}) — skipping the 1H sweep to protect the "
             "Sunday opener budget."
         )
+        write_status(
+            args.status_file,
+            complete=False,
+            reason="floor_skip",
+            events_in_window=len(in_window),
+            events_polled=0,
+            credits_spent=0,
+            unpolled_game_ids=_unpolled_game_ids(in_window, ctx, 0),
+        )
         return
 
     # 2) Paid (markets x regions credits/event): fetch totals_h1 per event.
@@ -236,6 +299,10 @@ def main() -> None:
     fetch_error: Optional[str] = None
     calls_404 = 0
     used_at_start = client.last_credits.used if client.last_credits else None
+    # How far the loop got, and why it stopped: the card marks the games from
+    # `polled` on as degraded (a stale or absent Hard Rock number).
+    polled = 0
+    stop_reason: Optional[str] = None
 
     def _spent() -> Optional[int]:
         c = client.last_credits
@@ -248,11 +315,13 @@ def main() -> None:
             data = client.event_first_half_totals(ev["id"])
         except requests.RequestException as e:
             fetch_error = redact_key(f"{type(e).__name__}: {e}")
+            stop_reason = "fetch_error"  # this event was NOT polled
             print(
                 f"[fetch] FAILED at event {i + 1}/{len(in_window)} ({fetch_error}) — "
                 "processing what was already fetched."
             )
             break
+        polled = i + 1
         if not data:
             calls_404 += 1  # no odds posted yet for this event
         if data:
@@ -270,6 +339,7 @@ def main() -> None:
                 f"({client.last_credits.remaining} left this month) after "
                 f"{i + 1}/{len(in_window)} events — processing what was fetched."
             )
+            stop_reason = "credit_floor"
             break
         spent = _spent()
         if (
@@ -283,6 +353,7 @@ def main() -> None:
                 f"(spent {spent}) after {i + 1}/{len(in_window)} events — "
                 "processing what was fetched."
             )
+            stop_reason = "credit_cap"
             break
     written = matched = unmatched = skipped = 0
     unmatched_names = []
@@ -318,6 +389,15 @@ def main() -> None:
 
     c = client.last_credits
     spent = _spent()
+    write_status(
+        args.status_file,
+        complete=stop_reason is None,
+        reason=stop_reason,
+        events_in_window=len(in_window),
+        events_polled=polled,
+        credits_spent=spent,
+        unpolled_game_ids=_unpolled_game_ids(in_window, ctx, polled),
+    )
     print(
         f"events_total={len(all_events)} in_window={len(in_window)} "
         f"odds_rows={len(rows)} matched={matched} unmatched={unmatched} "

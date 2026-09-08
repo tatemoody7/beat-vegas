@@ -75,17 +75,16 @@ def test_every_cron_slot_has_sweep_args_and_a_paper_window():
         assert slot in SWEEP_ARGS and slot in PAPER_WINDOW_HOURS
 
 
-def test_friday_and_saturday_sweeps_add_the_exchange_region():
-    """The exchange-first fair price (beatvegas/card.py) needs a us_ex quote at
-    Hard Rock's number on the decision builds; ~1 extra credit per event on
-    those two sweeps only. Weeknight and manual sweeps stay on us,us2."""
+def test_no_sweep_pays_for_the_exchange_region():
+    """us_ex buys nothing on this market: probed against the live Odds API on
+    2026-09-07, the region returned ZERO first-half-total bookmakers across
+    three upcoming NCAAF games, at ~50% more credits per event. Every slot
+    stays on the config regions (us,us2) — the sweeps never pass --regions."""
     from beatvegas.ci import SWEEP_ARGS
 
-    for slot in ("friday", "saturday"):
-        assert "--regions us,us2,us_ex" in SWEEP_ARGS[slot], slot
-    for slot in ("weeknight", "manual"):
+    for slot in SWEEP_ARGS:
         assert "--regions" not in SWEEP_ARGS[slot], slot
-    r = resolve_slot("5 22 * * 5", utc(2026, 9, 25, 22, 9))
-    assert "--regions us,us2,us_ex" in r["sweep_args"]
-    r = resolve_slot("5 12 * * 6", utc(2026, 9, 19, 12, 9))
-    assert "--regions us,us2,us_ex" in r["sweep_args"]
+        assert "us_ex" not in SWEEP_ARGS[slot], slot
+    for cron in ("5 22 * * 5", "5 12 * * 6"):
+        now = utc(2026, 9, 25, 22, 9) if cron.endswith("5") else utc(2026, 9, 19, 12, 9)
+        assert "--regions" not in resolve_slot(cron, now)["sweep_args"]

@@ -12,7 +12,16 @@ from conftest import _load_script
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import Base, Card, Game, GamePreview, ManualPick, OddsSnapshot, Prediction
+from beatvegas.db.models import (
+    Base,
+    Card,
+    Game,
+    GamePreview,
+    ManualPick,
+    OddsSnapshot,
+    Prediction,
+    TeamTempo,
+)
 
 NOW = datetime(2026, 9, 18, 22, 5)
 SEASON, WEEK = 2026, 3
@@ -40,6 +49,14 @@ def env():
     mod = _load_script("build_card")
     eng = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(eng)
+    # A healthy tempo table: an EMPTY one is a degraded input (PR-7), which
+    # would put every model game on the card into paper-only.
+    with Session(eng) as s:
+        s.add_all(
+            TeamTempo(season=SEASON, week=WEEK, team=t, seconds_per_play=27.5)
+            for t in ("Kansas", "Missouri", "Kansas State", "Florida", "Toledo", "Akron")
+        )
+        s.commit()
 
     @contextmanager
     def scope():
@@ -112,7 +129,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert (row.season, row.week, row.built_at) == (SEASON, WEEK, NOW)
     payload = json.loads(row.payload)
     assert payload["season"] == SEASON and payload["week"] == WEEK
-    assert payload["counts"] == {"bet": 1, "edge": 2, "pass": 1, "over_cap": 0}
+    assert payload["counts"] == {"bet": 1, "edge": 2, "pass": 1, "over_cap": 0, "degraded": 0}
     assert payload["paper"] == {"qualifying": 2, "over_cap": 0, "cap": 5}
     ids = [it["game_id"] for it in payload["items"]]
     # BET; EDGE by gap (3: 2.6 no_hr_line, 5: 2.0 price); PASS. Outside-universe 4 dropped.
@@ -469,3 +486,244 @@ def test_cards_table_is_created_by_create_all():
     assert cols == {"id", "season", "week", "built_at", "payload"}
     idx = {i["name"]: i["column_names"] for i in inspect(eng).get_indexes("cards")}
     assert idx["ix_cards_season_week_built"] == ["season", "week", "built_at"]
+
+
+# --- PR-7: status files in, degraded card out ---------------------------------------
+
+
+def _write(tmp_path, name, payload):
+    p = tmp_path / name
+    p.write_text(json.dumps(payload))
+    return str(p)
+
+
+def _summary(capsys):
+    return capsys.readouterr().out.splitlines()
+
+
+def test_a_final_card_prints_its_status_on_line_two(env, capsys):
+    mod, eng = env
+    seed_week(eng)
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    lines = _summary(capsys)
+    assert lines[0].startswith("Card 2026 wk3 built ")
+    assert lines[1] == "CARD STATUS: final slot=saturday held=0 (bets 0)"
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    assert payload["slot"] == "saturday" and payload["status"] == "final"
+    assert payload["degraded"] == [] and payload["counts"]["degraded"] == 0
+
+
+def test_missing_status_files_do_not_degrade_a_healthy_card(env, capsys, tmp_path):
+    """The weeknight slots skip the sweep when today's snapshots already exist,
+    so "no file" must never read as "the sweep failed"."""
+    mod, eng = env
+    seed_week(eng)
+    assert (
+        mod.run(
+            SEASON,
+            WEEK,
+            dry_run=False,
+            now=NOW,
+            slot="friday",
+            sweep_status_path=str(tmp_path / "nope.json"),
+            preview_status_path=str(tmp_path / "also-nope.json"),
+        )
+        == 0
+    )
+    assert _summary(capsys)[1] == "CARD STATUS: preview slot=friday held=0 (bets 0)"
+
+
+def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, capsys, tmp_path):
+    mod, eng = env
+    seed_week(eng)
+    sweep = _write(
+        tmp_path,
+        "sweep.json",
+        {
+            "complete": False,
+            "reason": "credit_cap",
+            "events_in_window": 5,
+            "events_polled": 3,
+            "unpolled_game_ids": [1],  # the BET game was never re-priced
+        },
+    )
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=sweep) == 0
+    )
+    lines = _summary(capsys)
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday held=1 (bets 1) "
+        "[sweep: stopped early (credit_cap) after 3 of 5 events]"
+    )
+    # the bet is no longer texted as a bet...
+    assert not [ln for ln in lines if ln.startswith("  BET #")]
+    # ...it is called out as degraded instead
+    assert "  DEGRADED Kansas @ Missouri: 1H under 24.5 (gap +2.10) — paper only [sweep]" in lines
+
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+        pick = s.query(ManualPick).filter(ManualPick.game_id == 1).one()
+    assert payload["status"] == "degraded" and payload["counts"]["degraded"] == 1
+    assert payload["degraded"][0]["game_ids"] == [1]
+    it = next(i for i in payload["items"] if i["game_id"] == 1)
+    assert it["tier"] == "BET" and it["blocker"] == "degraded"
+    assert it["degraded_inputs"] == ["sweep"] and it["cap_rank"] is None
+    assert pick.blocker == "degraded" and pick.is_paper is True
+
+
+def test_a_failed_research_preview_holds_every_game_on_the_card(env, capsys, tmp_path):
+    """Owner decision (2026-09-08): an empty injury feed means the QB gate ran on
+    nothing, so EVERY game is held — game 2's fresh (blank) row included. The
+    header count, the "  BET #" lines and the status line all say so."""
+    mod, eng = env
+    seed_week(eng)
+    prev = _write(tmp_path, "preview.json", {"ok": False, "reason": "rotowire_empty"})
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
+        == 0
+    )
+    lines = _summary(capsys)
+    assert lines[0].startswith("Card 2026 wk3 built ") and " 0 BET / " in lines[0]
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) "
+        "[preview: rotowire_empty: the injury read failed, so the quarterback gate "
+        "could not run on any of the 4 games]"
+    )
+    assert not [ln for ln in lines if ln.startswith("  BET #")]
+    assert "  DEGRADED Kansas @ Missouri: 1H under 24.5 (gap +2.10) — paper only [preview]" in lines
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    (entry,) = payload["degraded"]
+    assert entry["input"] == "preview" and sorted(entry["game_ids"]) == [1, 2, 3, 5]
+    assert payload["status"] == "degraded"
+    assert payload["counts"]["bet"] == 0 and payload["counts"]["degraded"] == 4
+    assert all(i["blocker"] == "degraded" for i in payload["items"])
+
+
+def test_a_healthy_preview_still_holds_the_games_with_no_qb_read_from_today(env, capsys, tmp_path):
+    """Only game 2 has a preview row (written at NOW); the feed was fine, so
+    just the games with no row for today are held."""
+    mod, eng = env
+    seed_week(eng)
+    prev = _write(tmp_path, "preview.json", {"ok": True, "reason": None})
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
+        == 0
+    )
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    (entry,) = payload["degraded"]
+    assert entry["input"] == "preview" and sorted(entry["game_ids"]) == [1, 3, 5]
+    by_id = {i["game_id"]: i for i in payload["items"]}
+    assert by_id[1]["blocker"] == "degraded" and by_id[2]["blocker"] is None
+
+
+def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
+    """Game 5 qualifies but was blocked on price; game 1 was a clean BET. A
+    truncated sweep that never reached either degrades both, and neither loses
+    its gate: the item and the paper pick's frozen chips carry gate_blocker,
+    the pick's blocker is "degraded" (the ledger key the site parses), and the
+    EDGE summary line shows the gate with a degraded marker."""
+    mod, eng = env
+    seed_week(eng)
+    sweep = _write(
+        tmp_path,
+        "sweep.json",
+        {
+            "complete": False,
+            "reason": "credit_cap",
+            "events_in_window": 5,
+            "events_polled": 3,
+            "unpolled_game_ids": [1, 5],
+        },
+    )
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=sweep) == 0
+    )
+    lines = _summary(capsys)
+    edge = [ln for ln in lines if ln.startswith("  EDGE Iowa @ Nebraska")]
+    assert len(edge) == 1 and edge[0].startswith("  EDGE Iowa @ Nebraska [price · degraded]: ")
+    # an untouched EDGE keeps the plain bracket
+    assert any(ln.startswith("  EDGE Toledo @ Akron [no_hr_line]: ") for ln in lines)
+
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+        picks = {p.game_id: p for p in s.query(ManualPick).all()}
+    by_id = {i["game_id"]: i for i in payload["items"]}
+    assert by_id[1]["blocker"] == "degraded" and by_id[1]["gate_blocker"] == "none"
+    assert by_id[5]["blocker"] == "degraded" and by_id[5]["gate_blocker"] == "price"
+    assert by_id[5]["tier"] == "EDGE" and by_id[5]["paper_blocker"] == "degraded"
+    assert by_id[3]["gate_blocker"] is None  # not degraded
+    assert set(picks) == {1, 5}
+    for gid, gate in ((1, "none"), (5, "price")):
+        assert picks[gid].blocker == "degraded" and picks[gid].is_paper is True
+        chips = json.loads(picks[gid].factors_json_at_pick)
+        assert chips["gate_blocker"] == gate
+    # a clean pick carries no gate_blocker chip value
+    with Session(eng) as s:
+        s.query(ManualPick).delete()
+        s.query(Card).delete()
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    with Session(eng) as s:
+        pick = s.query(ManualPick).filter(ManualPick.game_id == 1).one()
+    assert pick.blocker == "none"
+    assert json.loads(pick.factors_json_at_pick)["gate_blocker"] is None
+
+
+def test_an_unreadable_status_file_is_ignored_not_treated_as_a_failure(env, capsys, tmp_path):
+    mod, eng = env
+    seed_week(eng)
+    bad = tmp_path / "sweep.json"
+    bad.write_text("{not json")
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=str(bad))
+        == 0
+    )
+    lines = _summary(capsys)
+    assert any("could not read status file" in ln for ln in lines)
+    assert "CARD STATUS: final slot=saturday held=0 (bets 0)" in lines
+
+
+def test_an_empty_tempo_table_degrades_every_model_game(env, capsys):
+    mod, eng = env
+    seed_week(eng)
+    with Session(eng) as s:
+        s.query(TeamTempo).delete()
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    lines = _summary(capsys)
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
+    )
+
+
+def test_tempo_rows_from_other_seasons_and_weeks_do_not_hide_an_empty_current_week(env, capsys):
+    """tempo_row_count mirrors pace_for_games: only THIS card's (season, week)
+    counts. Last season's table (and last week's) being full says nothing about
+    whether the mapper stored anything for this week."""
+    mod, eng = env
+    seed_week(eng)
+    with Session(eng) as s:
+        s.query(TeamTempo).delete()
+        s.add_all(
+            TeamTempo(season=SEASON - 1, week=WEEK, team=t, seconds_per_play=27.5)
+            for t in ("Kansas", "Missouri", "Kansas State", "Florida")
+        )
+        s.add_all(
+            TeamTempo(season=SEASON, week=WEEK - 1, team=t, seconds_per_play=27.5)
+            for t in ("Kansas", "Missouri")
+        )
+        s.commit()
+        assert mod.tempo_row_count(s, SEASON, WEEK) == 0
+        assert mod.tempo_row_count(s, SEASON - 1, WEEK) == 4
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    lines = _summary(capsys)
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
+    )
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    assert payload["status"] == "degraded"
+    assert [d["input"] for d in payload["degraded"]] == ["tempo"]

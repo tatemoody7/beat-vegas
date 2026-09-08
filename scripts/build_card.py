@@ -12,6 +12,15 @@ code path as `pick.py add` (beatvegas.picks.add_pick), never twice for one game.
     python scripts/build_card.py                      # active season/week
     python scripts/build_card.py --season 2026 --week 3
     python scripts/build_card.py --dry-run            # print the payload, write nothing
+    python scripts/build_card.py --slot saturday \
+        --sweep-status "$RUNNER_TEMP/sweep_status.json" \
+        --preview-status "$RUNNER_TEMP/preview_status.json"
+
+--slot sets the card's clean status (beatvegas.ci.CARD_STATUS_BY_SLOT); the two
+status files say whether the sweep and the research preview actually covered the
+slate. Any failure marks the games it touched paper only, the card status
+"degraded", and prints it as line 2 of the summary ("CARD STATUS: ...") — the
+Saturday text routine only ever saw a green workflow before.
 
 Exit 1 when the Hard Rock universe has games but the card came out empty (every
 game already kicked off, or the inputs are missing) so the run goes red instead
@@ -27,8 +36,16 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
-from beatvegas.card import REFERENCE_MODEL_VERSION, build_card
-from beatvegas.db.models import Card, Game, GamePreview, ManualPick, OddsSnapshot, Prediction
+from beatvegas.card import REFERENCE_MODEL_VERSION, build_card, card_games, degraded_inputs
+from beatvegas.db.models import (
+    Card,
+    Game,
+    GamePreview,
+    ManualPick,
+    OddsSnapshot,
+    Prediction,
+    TeamTempo,
+)
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
 from beatvegas.model.score import MODEL_VERSION
@@ -117,6 +134,8 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
             "bv_line": p.bv_line,
             "under_score": p.under_score,
             "line_used": p.line_used,
+            # the stored pace chip: degraded_inputs reads it
+            "factors_json": p.factors_json,
         }
         for p in session.query(Prediction)
         .filter(
@@ -126,10 +145,52 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
         .all()
     ]
     previews = [
-        {"game_id": p.game_id, "qb_out": p.qb_out, "qb_out_detail": p.qb_out_detail}
+        {
+            "game_id": p.game_id,
+            "qb_out": p.qb_out,
+            "qb_out_detail": p.qb_out_detail,
+            # how fresh the QB read is (a preview written before today is stale)
+            "updated_at": p.updated_at,
+        }
         for p in session.query(GamePreview).filter(GamePreview.game_id.in_(game_ids)).all()
     ]
     return snaps, preds, previews
+
+
+def load_status(path: Optional[str]) -> Optional[Dict]:
+    """A --status-file written by poll_lines.py / research_preview.py, or None.
+
+    None means "that step did not run" (the weeknight slots skip the sweep when
+    today's snapshots already exist, and the workflow only writes the preview
+    file when the step ran), which is NOT a failure. A file that is missing or
+    unreadable is treated the same way rather than degrading a healthy card."""
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        print(f"[card] WARNING: could not read status file {path}: {e}")
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def tempo_row_count(session, season: int, week: int) -> int:
+    """How many teams the pace lookup can actually see for THIS card's
+    (season, week) — the same filter beatvegas.etl.context.pace_for_games
+    reads pace with. 0 means the TeamRankings mapper stored nothing for the
+    week and no game on the card has a real pace. Prior seasons and weeks are
+    deliberately not counted: they would hide a current-week failure."""
+    return (
+        session.query(TeamTempo.team)
+        .filter(
+            TeamTempo.season == season,
+            TeamTempo.week == week,
+            TeamTempo.seconds_per_play.isnot(None),
+        )
+        .distinct()
+        .count()
+    )
 
 
 PAPER_VERDICT = {"BET": "BET", "EDGE": "WATCH", "PASS": "PASS"}
@@ -141,7 +202,7 @@ def log_paper_picks(
     """Insert one PAPER pick per QUALIFYING item (Hard Rock's 1H line >=
     BET_GAP_PTS above ours — any tier) that has no paper pick yet, tagged with
     the gate that blocked a real bet (`blocker`: none = BET, price, off_market,
-    no_fair_price, qb_out, cap). Tate's real ticket on the same game never blocks it and is
+    no_fair_price, qb_out, cap, degraded). Tate's real ticket on the same game never blocks it and is
     never blocked by it (per-ledger guard). `window_hours` restricts logging to
     games kicking off within that many hours (the DECISION build for that game:
     Thursday/Friday evening for weeknight games, Saturday morning for the
@@ -175,7 +236,15 @@ def log_paper_picks(
                 "market_line",
             )
         }
-        chips.update({"tier": it["tier"], "cap_rank": it.get("cap_rank")})
+        # gate_blocker: on a degraded pick, the gate result the failed input
+        # overrode ("none" = every gate passed); null otherwise.
+        chips.update(
+            {
+                "tier": it["tier"],
+                "cap_rank": it.get("cap_rank"),
+                "gate_blocker": it.get("gate_blocker"),
+            }
+        )
         add_pick(
             session,
             game_id=gid,
@@ -212,6 +281,26 @@ def _kill_text(it: Dict) -> str:
     return f" | kill: {' or '.join(parts)}" if parts else ""
 
 
+def _status_line(card: Dict) -> str:
+    """`CARD STATUS: {status} slot={slot} held={n} (bets {m})` plus the failed
+    inputs. n = every game a failed input held (counts.degraded, what the web
+    reads); m = how many of those were BETs, so the operator sees at a glance
+    how many real bets the failure took off the card. Line 2 of the summary,
+    so the Saturday text routine can see whether this card is the one to bet
+    off."""
+    deg = card.get("degraded") or []
+    held_bets = sum(
+        1 for it in card["items"] if it["tier"] == "BET" and it.get("blocker") == "degraded"
+    )
+    line = (
+        f"CARD STATUS: {card.get('status')} slot={card.get('slot')} "
+        f"held={card['counts'].get('degraded', 0)} (bets {held_bets})"
+    )
+    if deg:
+        line += " [" + "; ".join(f"{d['input']}: {d['detail']}" for d in deg) + "]"
+    return line
+
+
 def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
     c = card["counts"]
     paper = card.get("paper", {})
@@ -220,10 +309,13 @@ def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
         f"{c['bet']} BET / {c['edge']} EDGE / {c['pass']} PASS "
         f"({len(card['items'])} of {universe} Hard Rock games still to kick off; "
         f"model read: {'yes' if card['model_read'] else 'no'}; "
-        f"qualifying: {paper.get('qualifying', 0)}; paper picks added: {picks_added})"
+        f"qualifying: {paper.get('qualifying', 0)}; paper picks added: {picks_added})",
+        _status_line(card),
     ]
     for it in card["items"]:
-        if it["tier"] == "BET" and not it.get("over_cap"):
+        # A degraded bet is NEVER listed as a bet: the Saturday routine greps
+        # "  BET #" for the list it texts.
+        if it["tier"] == "BET" and not it.get("over_cap") and it.get("blocker") != "degraded":
             price = f" {it['hr_price']:+d}" if it["hr_price"] is not None else ""
             out.append(
                 f"  BET #{it.get('cap_rank')}  {it['away']} @ {it['home']}: 1H under {it['hr_line']}{price} "
@@ -238,7 +330,19 @@ def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
             )
     for it in card["items"]:
         if it["tier"] == "EDGE":
-            out.append(f"  EDGE {it['away']} @ {it['home']} [{it['blocker']}]: {it['action']}")
+            # A degraded EDGE keeps its gate in the bracket: "[price · degraded]".
+            tag = (
+                f"{it.get('gate_blocker')} · degraded"
+                if it.get("blocker") == "degraded"
+                else it["blocker"]
+            )
+            out.append(f"  EDGE {it['away']} @ {it['home']} [{tag}]: {it['action']}")
+    for it in card["items"]:
+        if it["tier"] == "BET" and it.get("blocker") == "degraded":
+            out.append(
+                f"  DEGRADED {it['away']} @ {it['home']}: 1H under {it['hr_line']} "
+                f"(gap {it['gap']:+.2f}) — paper only [{', '.join(it['degraded_inputs'])}]"
+            )
     logged = [it for it in card["items"] if it.get("paper_logged")]
     if logged:
         out.append("  PAPER (qualifying games logged, by blocker):")
@@ -282,6 +386,9 @@ def run(
     *,
     paper_window_hours: Optional[float] = None,
     no_paper: bool = False,
+    slot: Optional[str] = None,
+    sweep_status_path: Optional[str] = None,
+    preview_status_path: Optional[str] = None,
 ) -> int:
     """Build + persist; returns the process exit code."""
     now = now or datetime.utcnow()
@@ -300,6 +407,18 @@ def run(
         snaps, preds, previews = load_inputs(s, [g["game_id"] for g in games])
         held = bet_slots_this_week(s, season, week)
         real = real_bets_this_week(s, season, week)
+        # Which inputs failed on THIS build (PR-7). Every one of them either
+        # narrows the slate or makes a gate read clear for the wrong reason, so
+        # the games they touch go out paper only instead of looking final.
+        degraded = degraded_inputs(
+            card_games(games, now),
+            sweep_status=load_status(sweep_status_path),
+            preview_status=load_status(preview_status_path),
+            previews=previews,
+            predictions=preds,
+            tempo_rows=tempo_row_count(s, season, week),
+            now=now,
+        )
         card = build_card(
             games,
             snaps,
@@ -310,6 +429,8 @@ def run(
             now=now,
             held_game_ids=held,
             prior_bet_game_ids=real,
+            slot=slot,
+            degraded=degraded,
         )
         picks_added = 0
         if not dry_run and card["items"]:
@@ -357,6 +478,25 @@ def main() -> None:
         dest="no_paper",
         help="publish the card without logging paper picks (preview builds)",
     )
+    ap.add_argument(
+        "--slot",
+        default=None,
+        help="which build this is (weeknight|friday|saturday|manual, "
+        "beatvegas.ci.CARD_STATUS_BY_SLOT); sets the card's clean status",
+    )
+    ap.add_argument(
+        "--sweep-status",
+        default=None,
+        dest="sweep_status",
+        help="path to the --status-file scripts/poll_lines.py wrote this run "
+        "(missing = the sweep did not run, which is not a failure)",
+    )
+    ap.add_argument(
+        "--preview-status",
+        default=None,
+        dest="preview_status",
+        help="path to the --status-file scripts/research_preview.py wrote this run",
+    )
     args = ap.parse_args()
     if not try_init_db():
         return
@@ -367,6 +507,9 @@ def main() -> None:
             args.dry_run,
             paper_window_hours=args.paper_window_hours,
             no_paper=args.no_paper,
+            slot=args.slot,
+            sweep_status_path=args.sweep_status,
+            preview_status_path=args.preview_status,
         )
     )
 

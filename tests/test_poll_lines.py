@@ -253,3 +253,187 @@ def test_regions_flag_sets_the_clients_regions(env, monkeypatch):
     client.regions = "us,us2"
     _run(mod, monkeypatch, client, "--hr-universe")
     assert client.regions == "us,us2"
+
+
+# --- --status-file: this run's coverage, on every exit path (PR-7) ----------------
+
+
+def _status(path):
+    import json
+
+    return json.loads(path.read_text())
+
+
+def test_a_clean_sweep_reports_complete_coverage(env, monkeypatch, tmp_path):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    client = FakeClient(EVENTS, PAYLOADS)
+    out = tmp_path / "sweep.json"
+    _run(
+        mod,
+        monkeypatch,
+        client,
+        "--hours-back",
+        "0",
+        "--days-ahead",
+        "3",
+        "--status-file",
+        str(out),
+    )
+    assert _status(out) == {
+        "complete": True,
+        "reason": None,
+        "events_in_window": 3,
+        "events_polled": 3,
+        "credits_spent": 6,
+        "unpolled_game_ids": [],
+    }
+
+
+def test_a_credit_cap_truncation_names_the_games_it_never_reached(env, monkeypatch, tmp_path):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    client = FakeClient(EVENTS, PAYLOADS)
+    out = tmp_path / "sweep.json"
+    _run(
+        mod,
+        monkeypatch,
+        client,
+        "--hours-back",
+        "0",
+        "--days-ahead",
+        "6",
+        "--max-credits-per-run",
+        "4",
+        "--status-file",
+        str(out),
+    )
+    st = _status(out)
+    assert client.calls == ["e1", "e2"]
+    assert st["complete"] is False and st["reason"] == "credit_cap"
+    assert (st["events_in_window"], st["events_polled"]) == (3, 2)
+    assert st["credits_spent"] == 4
+    assert st["unpolled_game_ids"] == [3]  # e3 -> game 3, never paid for
+
+
+def test_a_credit_floor_break_mid_loop_is_recorded(env, monkeypatch, tmp_path):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    # 62 remaining: after e1 (2 credits) the client is at 60 == the floor.
+    client = FakeClient(EVENTS, PAYLOADS, remaining=62)
+    out = tmp_path / "sweep.json"
+    _run(
+        mod,
+        monkeypatch,
+        client,
+        "--hours-back",
+        "0",
+        "--days-ahead",
+        "6",
+        "--credit-floor",
+        "60",
+        "--status-file",
+        str(out),
+    )
+    st = _status(out)
+    assert client.calls == ["e1"]
+    assert st["complete"] is False and st["reason"] == "credit_floor"
+    assert st["events_polled"] == 1 and st["unpolled_game_ids"] == [2, 3]
+
+
+def test_the_floor_skip_before_the_paid_loop_writes_a_status_too(env, monkeypatch, tmp_path):
+    """list_events is free but carries the credit headers: at the floor the run
+    returns without spending, and every game on the slate is unpolled."""
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    client = FakeClient(EVENTS, PAYLOADS, remaining=50)
+    out = tmp_path / "sweep.json"
+    _run(
+        mod,
+        monkeypatch,
+        client,
+        "--hours-back",
+        "0",
+        "--days-ahead",
+        "6",
+        "--credit-floor",
+        "60",
+        "--status-file",
+        str(out),
+    )
+    assert client.calls == []
+    assert _status(out) == {
+        "complete": False,
+        "reason": "floor_skip",
+        "events_in_window": 3,
+        "events_polled": 0,
+        "credits_spent": 0,
+        "unpolled_game_ids": [1, 2, 3],
+    }
+
+
+def test_a_fetch_error_writes_the_status_before_failing_the_run(env, monkeypatch, tmp_path):
+    import requests
+
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    client = FakeClient(EVENTS, PAYLOADS)
+    real = client.event_first_half_totals
+
+    def boom(event_id):
+        if event_id == "e2":
+            raise requests.RequestException("503 Server Error: key=abc")
+        return real(event_id)
+
+    client.event_first_half_totals = boom
+    out = tmp_path / "sweep.json"
+    with pytest.raises(SystemExit) as exc:
+        _run(
+            mod,
+            monkeypatch,
+            client,
+            "--hours-back",
+            "0",
+            "--days-ahead",
+            "6",
+            "--status-file",
+            str(out),
+        )
+    assert exc.value.code == 1  # the run still goes red
+    st = _status(out)
+    assert st["complete"] is False and st["reason"] == "fetch_error"
+    # e2 raised, so it was NOT polled: games 2 and 3 are unreached.
+    assert st["events_polled"] == 1 and st["unpolled_game_ids"] == [2, 3]
+
+
+def test_an_unreachable_database_writes_a_status_with_unknown_coverage(env, monkeypatch, tmp_path):
+    """The early return when the DB is unreachable used to write no file at
+    all, so the card build could not tell it from a sweep that never ran.
+    Coverage is unknown (no unpolled_game_ids key), which holds every game."""
+    from beatvegas.card import degraded_inputs
+
+    mod, eng = env
+    mod.try_init_db = lambda: False
+    client = FakeClient(EVENTS, PAYLOADS)
+    out = tmp_path / "sweep.json"
+    _run(mod, monkeypatch, client, "--days-ahead", "6", "--status-file", str(out))
+    assert client.calls == []  # nothing was spent
+    st = _status(out)
+    assert st == {
+        "complete": False,
+        "reason": "db_unreachable",
+        "events_in_window": 0,
+        "events_polled": 0,
+        "credits_spent": 0,
+    }
+    assert "unpolled_game_ids" not in st
+    d = degraded_inputs([{"game_id": 1}, {"game_id": 2}], sweep_status=st, now=NOW)
+    assert [(e["input"], e["game_ids"]) for e in d] == [("sweep", [1, 2])]
+    assert d[0]["detail"] == "stopped early (db_unreachable) after 0 of 0 events; coverage unknown"
+
+
+def test_no_status_file_flag_writes_nothing(env, monkeypatch, tmp_path):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+    _run(mod, monkeypatch, FakeClient(EVENTS, PAYLOADS), "--hours-back", "0", "--days-ahead", "3")
+    assert list(tmp_path.iterdir()) == []

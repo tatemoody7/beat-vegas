@@ -3,6 +3,8 @@ import {
   asIso,
   cardAge,
   cardHealth,
+  CARD_STATUS_INPUTS,
+  cardStatusDegraded,
   CLOSEST_ROWS,
   killLabel,
   lineLabel,
@@ -117,6 +119,7 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   fairSource: null,
   reason: null,
   degradedInputs: [],
+  gateBlocker: null,
   ...o,
 });
 
@@ -242,7 +245,7 @@ describe("parseCard", () => {
           rawItem({
             game_id: "409",
             tier: "MAYBE",
-            blocker: "weather",
+            blocker: "sweep",
             hr_line: "24.5",
             hr_price: "abc",
             ev: null,
@@ -546,6 +549,30 @@ describe("parseCard: paper ledger fields", () => {
     });
   });
 
+  it("derives counts.bet without degraded BETs when the payload lacks counts", () => {
+    const items = [
+      rawItem({ cap_rank: 1, over_cap: false }),
+      rawItem({
+        game_id: 402,
+        blocker: "degraded",
+        degraded_inputs: ["sweep"],
+        cap_rank: null,
+      }),
+      rawItem({ game_id: 403, blocker: "cap", cap_rank: 6, over_cap: true }),
+    ];
+    const derived = parseCard(rawCard({ counts: undefined, items }))!;
+    expect(derived.counts).toEqual({
+      bet: 1,
+      edge: 0,
+      pass: 0,
+      overCap: 1,
+      degraded: 1,
+    });
+    // ...and the panel's headline agrees with it.
+    expect(summarizeCard(derived).headline).toBe("1 bet this week.");
+    expect(summarizeCard(derived).bets.map((r) => r.gameId)).toEqual([401]);
+  });
+
   it("reads fair_source / hr_vs_market and the no_fair_price blocker (PR-6)", () => {
     const c = parseCard(
       rawCard({
@@ -641,6 +668,43 @@ describe("summarizeCard: the weekly cap", () => {
     expect(
       s.overCap.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
     ).toEqual([[3, "cap", true]]);
+    expect(s.degraded).toEqual([]);
+  });
+
+  it("keeps degraded BETs out of the bet rows and the headline, listing them apart", () => {
+    const c = card({
+      items: [
+        item({ gameId: 1, tier: "BET", capRank: 1, gap: 3 }),
+        item({
+          gameId: 2,
+          tier: "BET",
+          gap: 2.8,
+          blocker: "degraded",
+          degradedInputs: ["sweep"],
+          paperBlocker: "degraded",
+          paperLogged: true,
+        }),
+      ],
+    });
+    const s = summarizeCard(c);
+    expect(s.headline).toBe("1 bet this week.");
+    expect(s.bets.map((r) => r.gameId)).toEqual([1]);
+    expect(
+      s.degraded.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
+    ).toEqual([[2, "degraded", true]]);
+    // Every bet held: no bets this week, and the held rows still show.
+    const all = summarizeCard(
+      card({
+        items: [
+          item({ gameId: 2, tier: "BET", blocker: "degraded" }),
+          item({ gameId: 3, tier: "EDGE", blocker: "price", ev: 0.01 }),
+        ],
+      }),
+    );
+    expect(all.headline).toBe("No bets this week.");
+    expect(all.hasBets).toBe(false);
+    expect(all.degraded.map((r) => r.gameId)).toEqual([2]);
+    expect(all.closest.map((r) => r.gameId)).toEqual([3]);
   });
 });
 
@@ -672,7 +736,8 @@ describe("parseCard (2026-09 contract)", () => {
             game_id: 403,
             tier: "PASS",
             blocker: "degraded",
-            degraded_inputs: ["injuries", "weather"],
+            degraded_inputs: ["sweep", "pace"],
+            gate_blocker: "gap",
           }),
         ],
       }),
@@ -694,8 +759,10 @@ describe("parseCard (2026-09 contract)", () => {
     });
     expect(c!.items[2]).toMatchObject({
       blocker: "degraded",
-      degradedInputs: ["injuries", "weather"],
+      degradedInputs: ["sweep", "pace"],
+      gateBlocker: "gap",
     });
+    expect(c!.items[0].gateBlocker).toBeNull();
   });
 
   it("defaults: no slot → null, no status → final, no degraded → []", () => {
@@ -708,6 +775,7 @@ describe("parseCard (2026-09 contract)", () => {
       fairSource: null,
       reason: null,
       degradedInputs: [],
+      gateBlocker: null,
     });
   });
 
@@ -721,7 +789,7 @@ describe("parseCard (2026-09 contract)", () => {
             hr_vs_market: "abc",
             fair_source: "vibes",
             reason: "gut",
-            degraded_inputs: ["weather", 3, ""],
+            degraded_inputs: ["pace", 3, ""],
           }),
         ],
       }),
@@ -732,7 +800,7 @@ describe("parseCard (2026-09 contract)", () => {
       hrVsMarket: null,
       fairSource: null,
       reason: null,
-      degradedInputs: ["weather"],
+      degradedInputs: ["pace"],
     });
     expect(parseCard(rawCard({ slot: "friday" }))!.slot).toBe("friday");
     expect(parseCard(rawCard({ slot: "weeknight" }))!.slot).toBe("weeknight");
@@ -740,25 +808,88 @@ describe("parseCard (2026-09 contract)", () => {
     expect(parseCard(rawCard({ status: "preview" }))!.status).toBe("preview");
   });
 
-  it("a non-empty degraded list forces status to degraded and keeps only well-formed entries", () => {
+  it("a build-wide degraded entry that held a game forces status to degraded and keeps only well-formed entries", () => {
     const c = parseCard(
       rawCard({
         status: "final",
         degraded: [
-          { input: "injuries", detail: "Rotowire 503", game_ids: [401, "x"] },
+          { input: "preview", detail: "rotowire_empty", game_ids: [401, "x"] },
           { input: "", detail: "nope" },
-          { input: "weather" },
+          { input: "pace" },
           "junk",
         ],
       }),
     );
     expect(c!.status).toBe("degraded");
     expect(c!.degraded).toEqual([
-      { input: "injuries", detail: "Rotowire 503", gameIds: [401] },
-      { input: "weather", detail: "", gameIds: [] },
+      { input: "preview", detail: "rotowire_empty", gameIds: [401] },
+      { input: "pace", detail: "", gameIds: [] },
     ]);
     // An explicit "degraded" status with an empty list is still honoured.
     expect(parseCard(rawCard({ status: "degraded" }))!.status).toBe("degraded");
+  });
+
+  it("a pace-only degraded list does not force the status (owner decision 2026-09-08)", () => {
+    // pace is per game and missing on ~5% of games; the game is held, the
+    // card's status stays what the builder said.
+    const pace = [
+      {
+        input: "pace",
+        detail: "1 model games have no pace read",
+        game_ids: [401],
+      },
+    ];
+    const fin = parseCard(rawCard({ status: "final", degraded: pace }));
+    expect(fin!.status).toBe("final");
+    expect(fin!.degraded).toEqual([
+      {
+        input: "pace",
+        detail: "1 model games have no pace read",
+        gameIds: [401],
+      },
+    ]);
+    expect(
+      parseCard(rawCard({ status: "preview", degraded: pace }))!.status,
+    ).toBe("preview");
+    // ...and a sweep truncation that held no card game leaves it alone too.
+    const offCard = [
+      { input: "sweep", detail: "stopped early (credit_cap)", game_ids: [] },
+    ];
+    expect(
+      parseCard(rawCard({ status: "final", degraded: offCard }))!.status,
+    ).toBe("final");
+    // A build-wide entry alongside the pace one still flips it.
+    expect(
+      parseCard(
+        rawCard({
+          status: "final",
+          degraded: [
+            ...pace,
+            { input: "tempo", detail: "0 rows", game_ids: [401] },
+          ],
+        }),
+      )!.status,
+    ).toBe("degraded");
+  });
+
+  it("cardStatusDegraded mirrors beatvegas/card.py CARD_STATUS_INPUTS", () => {
+    expect(CARD_STATUS_INPUTS).toEqual(["sweep", "preview", "tempo"]);
+    expect(cardStatusDegraded([])).toBe(false);
+    expect(
+      cardStatusDegraded([{ input: "pace", detail: "", gameIds: [1] }]),
+    ).toBe(false);
+    expect(
+      cardStatusDegraded([{ input: "sweep", detail: "", gameIds: [] }]),
+    ).toBe(false);
+    expect(
+      cardStatusDegraded([{ input: "sweep", detail: "", gameIds: [1] }]),
+    ).toBe(true);
+    expect(
+      cardStatusDegraded([{ input: "preview", detail: "", gameIds: [1] }]),
+    ).toBe(true);
+    expect(
+      cardStatusDegraded([{ input: "tempo", detail: "", gameIds: [1] }]),
+    ).toBe(true);
   });
 
   it("counts.bet excludes over-cap BETs when the payload omits counts; overCap/degraded derive too", () => {
@@ -891,8 +1022,12 @@ describe("cardHealth", () => {
         slot: "saturday",
         status: "degraded",
         degraded: [
-          { input: "injuries", detail: "Rotowire 503", gameIds: [] },
-          { input: "odds", detail: "Hard Rock sweep timed out", gameIds: [1] },
+          { input: "preview", detail: "rotowire_empty", gameIds: [1, 2] },
+          {
+            input: "sweep",
+            detail: "stopped early (credit_cap)",
+            gameIds: [1],
+          },
         ],
       }),
       SAT_9AM,
@@ -900,9 +1035,31 @@ describe("cardHealth", () => {
     expect(h.level).toBe("warn");
     expect(h.title).toBe("Degraded card · saturday");
     expect(h.details).toEqual([
-      "injuries: Rotowire 503",
-      "odds: Hard Rock sweep timed out",
+      "preview: rotowire_empty",
+      "sweep: stopped early (credit_cap)",
     ]);
+  });
+
+  it("does not show the degraded banner for a pace-only Saturday final", () => {
+    // The parser leaves a pace-only card's status at "final"; the held game
+    // sits under Held on the panel, not in the banner.
+    const c = parseCard(
+      rawCard({
+        slot: "saturday",
+        status: "final",
+        built_at: "2026-09-19T12:45:00Z",
+        degraded: [
+          {
+            input: "pace",
+            detail: "1 model games have no pace read",
+            game_ids: [401],
+          },
+        ],
+      }),
+    );
+    expect(c!.status).toBe("final");
+    const h = cardHealth(c!, SAT_9AM);
+    expect(h.level).toBe("ok");
   });
 
   it("is ok for a preview read on a Tuesday (the final is not due yet)", () => {

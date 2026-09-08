@@ -48,6 +48,8 @@ export type BlockerKey =
   | "no_fair_price"
   | "qb_out"
   | "cap"
+  /** A card input failed on the build (sweep, injury feed, pace, tempo): held, paper only. */
+  | "degraded"
   | "untagged";
 
 export type BlockerRow = {
@@ -63,6 +65,7 @@ export const BLOCKER_LABEL: Record<BlockerKey, string> = {
   no_fair_price: "Blocked: no comparable price to judge Hard Rock’s under",
   qb_out: "Blocked: starting QB listed out",
   cap: "Over the weekly cap (6th+ by gap)",
+  degraded: "Held: a card input failed, so this bet was paper-only",
   untagged: "Paper pick logged before gate tagging",
 };
 
@@ -148,6 +151,7 @@ const BLOCKER_ORDER: BlockerKey[] = [
   "no_fair_price",
   "qb_out",
   "cap",
+  "degraded",
   "untagged",
 ];
 
@@ -157,7 +161,8 @@ const asBlocker = (v: string | null): BlockerKey =>
   v === "off_market" ||
   v === "no_fair_price" ||
   v === "qb_out" ||
-  v === "cap"
+  v === "cap" ||
+  v === "degraded"
     ? v
     : "untagged";
 

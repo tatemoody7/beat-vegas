@@ -19,7 +19,14 @@ name: Bet card (cloud)
 #              so it lands 8:05-8:45am ET in EDT and EST alike. Forced fresh
 #              sweep + research preview, then build; paper-logs the Saturday
 #              slate (20 h). Tate bets in one sitting off this card ~9am ET.
-#   manual     workflow_dispatch (input `slot` may name one of the above).
+#   manual     workflow_dispatch (input `slot` may name one of the above; input
+#              `max_credits` caps the sweep so a DEGRADED card can be rehearsed).
+#
+# DEGRADED INPUTS (PR-7): the sweep and the research preview each write a status
+# file ($RUNNER_TEMP), and the build reads both. A sweep that stopped at the
+# credit floor/cap, or an empty injury feed (which makes the QB-out gate pass
+# every game), marks the games it touched paper only and the card "degraded" —
+# visible on the board banner and as line 2 of the build summary.
 # The preview and the final ALWAYS re-sweep (an evening close poll would
 # otherwise satisfy "a 1H snapshot exists today" and the final would build on
 # Friday's numbers); weeknight builds sweep only what is missing.
@@ -48,6 +55,10 @@ on:
         default: ''
       week:
         description: 'week (default: the active week)'
+        required: false
+        default: ''
+      max_credits:
+        description: 'cap the 1H sweep at N Odds API credits (rehearse a degraded card)'
         required: false
         default: ''
 
@@ -156,8 +167,18 @@ jobs:
         continue-on-error: true
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --days-ahead 3
       - name: 1H sweep (forced for the preview / final; else only when today's is missing)
+        id: sweep
         if: steps.inputs.outputs.need_sweep == 'true'
-        run: python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }}
+        # --status-file records the run's COVERAGE: the sweep can stop at the
+        # credit floor or the per-run cap and still exit 0, and only that file
+        # tells the build which games carry a stale Hard Rock number.
+        env:
+          MAX_CREDITS: ${{ inputs.max_credits }}
+        run: |
+          extra=""
+          if [ -n "$MAX_CREDITS" ]; then extra="--max-credits-per-run $MAX_CREDITS"; fi
+          python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }} \
+            --status-file "$RUNNER_TEMP/sweep_status.json" $extra
       - name: Re-score after the sweep (residual engine only; no-op under the incumbent)
         # The residual engine conditions on the LIVE 1H line, so its numbers
         # must be refitted after the sweep refreshes those lines. Gated exactly
@@ -167,15 +188,23 @@ jobs:
         if: steps.inputs.outputs.need_sweep == 'true'
         run: python scripts/weekly_update.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --if-engine residual
       - name: Research preview (forced on the final; else only when today's is missing)
+        id: preview
         if: steps.inputs.outputs.need_preview == 'true'
         # Unofficial sources (ESPN / Rotowire) may be down; the card still builds
-        # with the QB-out gate reading whatever preview is on file.
+        # with the QB-out gate reading whatever preview is on file — but an empty
+        # injury feed makes that gate pass EVERY game, so --status-file records it
+        # and the build marks those games degraded.
         continue-on-error: true
-        run: python scripts/research_preview.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
+        run: |
+          python scripts/research_preview.py \
+            --season "${{ steps.active.outputs.season }}" \
+            --week "${{ steps.active.outputs.week }}" \
+            --status-file "$RUNNER_TEMP/preview_status.json"
       - name: Build + publish the card (+ paper-log qualifying games in the slot's window)
         if: steps.slot.outputs.slot != 'skip'
         env:
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
+          PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
         run: |
           if [ -z "${{ steps.active.outputs.week }}" ]; then
             echo "no active week — nothing to build"
@@ -184,4 +213,14 @@ jobs:
           fi
           extra=""
           if [ -n "$PAPER_WINDOW" ]; then extra="--paper-log-window-hours $PAPER_WINDOW"; fi
-          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" $extra
+          # A preview step that died before writing its own status (an import
+          # error, a timeout) still has to reach the card as a failure: without
+          # this the QB-out gate would read a stale file and look clear.
+          PREVIEW_STATUS="$RUNNER_TEMP/preview_status.json"
+          if [ "$PREVIEW_OUTCOME" = "failure" ] && [ ! -f "$PREVIEW_STATUS" ]; then
+            echo '{"ok": false, "reason": "step_failed"}' > "$PREVIEW_STATUS"
+          fi
+          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" $extra \
+            --slot "${{ steps.slot.outputs.slot }}" \
+            --sweep-status "$RUNNER_TEMP/sweep_status.json" \
+            --preview-status "$PREVIEW_STATUS"

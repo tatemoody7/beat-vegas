@@ -23,11 +23,13 @@ Docs: docs/BETTING_POLICY.md ("The board"). Tests: tests/test_card.py.
 
 from __future__ import annotations
 
+import json
 import math
 import statistics
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
+from .ci import CARD_STATUS_BY_SLOT
 from .devig import devig_two_way, ev_under
 from .hardrock import HR_BOOK_KEY, normalize_book
 from .model.score import BET_GAP_PTS, EV_FLOOR, HR_OFF_MARKET_PTS, MODEL_VERSION, WEEKLY_BET_CAP
@@ -92,6 +94,39 @@ TOTAL_BANDS = ((45.0, "<45"), (52.0, "45–52"), (60.0, "52–60"), (math.inf, "
 # Hard Rock itself unpriced) so it follows price; qb_out is transient news
 # resolved by kickoff.
 PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
+
+# Inputs that can fail on a build while every job still reports success. Each
+# one either narrows the slate the card was built from or makes a gate read
+# "clear" for the wrong reason, so a card built on one is PAPER ONLY:
+#   sweep    the 1H sweep stopped early (credit floor/cap, fetch error) — the
+#            games it never reached carry a stale or absent Hard Rock number;
+#   preview  the research preview failed — the QB-out gate is reading a stale
+#            (or empty) injury file, which passes EVERY game;
+#   pace     a model game with no pace read (the strongest genuine 1H signal;
+#            missing on ~5% of games, which is a team-mapping failure);
+#   tempo    the tempo table stored zero teams (TeamRankings mapper collapse).
+# Order = the order degraded_inputs reports them. Mirrored by the card status
+# banner in web/lib/card.ts (parseCard + cardHealth).
+#
+# NOT a signal — weather. Do not re-add it. Weather is structurally sparse data
+# the model already handles as missing, not a Saturday failure: live Neon had a
+# forecast on 27 of 303 week-2 games and none in weeks 3-6, and historically
+# 394 of 637 games with a first-half line carry no weather string. A weather
+# signal would mark nearly every model game degraded and every bet paper-only,
+# every week, on a healthy build.
+DEGRADED_INPUTS = ("sweep", "preview", "pace", "tempo")
+DEGRADED_BLOCKER = "degraded"
+# Which of those flip the CARD's status to "degraded" (and so the site banner
+# and the lead of the Saturday text). Only the BUILD-WIDE inputs do — a failure
+# there means the whole build ran on a bad read. `pace` is per game: it is
+# missing on ~5% of games every week, usually a PASS, so it holds its own games
+# (paper only, no cap slot, listed under Held, counted in counts.degraded)
+# WITHOUT flipping the card — otherwise the banner would fire most Saturdays
+# while every bet on the card is fine (owner decision 2026-09-08). A build-wide
+# entry that held no card game (a sweep truncation whose unreached events all
+# fall off this card, game_ids []) does not flip the card either; its detail
+# still surfaces in `degraded`. Mirrored in web/lib/card.ts::parseCard.
+CARD_STATUS_INPUTS = frozenset({"sweep", "preview", "tempo"})
 
 
 def total_band(total: Optional[float]) -> Optional[str]:
@@ -692,6 +727,11 @@ def build_item(
         "paper_blocker": paper_blocker,
         "cap_rank": None,
         "over_cap": False,
+        # inputs that failed for this game on this build (apply_degraded), and the
+        # gate result they overrode: None unless degraded; then "none" (every
+        # gate passed) or the gate that had blocked a real bet (price, ...).
+        "degraded_inputs": [],
+        "gate_blocker": None,
         # display chips (not gates)
         "full_game_total": _num(game.get("total")),
         "spread": _num(game.get("spread")),
@@ -733,9 +773,13 @@ def apply_weekly_cap(
     card are ignored here (they rank through `held`). Mutates + returns.
 
     Rank key: (held-first, gap desc, ev desc, kickoff asc, away). Mirrored by
-    postmortem.weekly_cap minus ev (historical rows carry none)."""
+    postmortem.weekly_cap minus ev (historical rows carry none).
+
+    Only BETs whose blocker is CLEAR are ranked: apply_degraded runs first and
+    tags a bet built on a failed input with blocker "degraded", so a degraded
+    bet consumes no weekly slot and the real bets below it rank 1..cap."""
     held = set(held_game_ids or ())
-    bets = [it for it in items if it["tier"] == "BET"]
+    bets = [it for it in items if it["tier"] == "BET" and it["blocker"] is None]
     on_card = {it["game_id"] for it in bets}
     used = len({g for g in (prior_bet_game_ids or ()) if g not in on_card})
 
@@ -755,6 +799,213 @@ def apply_weekly_cap(
                 f"{cap} real bets."
             )
     return items
+
+
+# --- degraded inputs -------------------------------------------------------------
+
+
+def _pred_factors(pred: Dict) -> Optional[Dict]:
+    """The stored factors payload of a prediction row, or None when the row
+    carries none. None means "cannot tell", NOT "missing": a caller that never
+    loaded factors must not make every game read as degraded."""
+    f = pred.get("factors")
+    if f is None:
+        f = pred.get("factors_json")
+    if isinstance(f, str):
+        try:
+            f = json.loads(f)
+        except (TypeError, ValueError):
+            return None
+    return f if isinstance(f, dict) else None
+
+
+def _blank(v: Any) -> bool:
+    return v is None or (isinstance(v, str) and v.strip() == "")
+
+
+def _day_start(now: Optional[datetime]) -> Optional[datetime]:
+    n = _naive_utc(now)
+    return None if n is None else n.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def card_games(games: Sequence[Dict], now: Optional[datetime]) -> List[Dict]:
+    """The games build_card will put on the card: kickoff strictly after `now`.
+    Exposed so a caller can work out the degraded inputs for exactly that set
+    without rebuilding the card."""
+    now_n = _naive_utc(now)
+    out = []
+    for g in games:
+        kick = _naive_utc(g.get("kick"))
+        if kick is None or (now_n is not None and kick <= now_n):
+            continue
+        out.append(g)
+    return out
+
+
+def degraded_inputs(
+    items: Sequence[Dict],
+    *,
+    sweep_status: Optional[Dict] = None,
+    preview_status: Optional[Dict] = None,
+    previews: Sequence[Dict] = (),
+    predictions: Sequence[Dict] = (),
+    tempo_rows: Optional[int] = None,
+    now: Optional[datetime] = None,
+) -> List[Dict]:
+    """Which of DEGRADED_INPUTS failed for this card, and on which games.
+
+    `items` only needs a game_id per entry — card items or the `card_games`
+    rows they are built from. Every returned game id is on this card.
+
+    sweep_status / preview_status: the JSON scripts/poll_lines.py and
+    scripts/research_preview.py write with --status-file. None (the file was
+    never written because the step did not run) is NOT a failure — only a
+    status that says so is.
+    previews:    {game_id, updated_at} rows on file (a preview last written
+                 before today is a stale QB read).
+    predictions: the model rows, with their stored `factors` (or factors_json).
+    tempo_rows:  how many tempo rows the pace lookup can see; 0 = the table
+                 stored nothing. None = not checked.
+    """
+    card_ids = {int(it["game_id"]) for it in items}
+    out: List[Dict] = []
+    if not card_ids:
+        return out
+
+    def add(name: str, detail: str, ids: Sequence[int]) -> None:
+        out.append({"input": name, "detail": detail, "game_ids": sorted(set(ids))})
+
+    # sweep: the games the run never reached carry a stale/absent HR number.
+    if sweep_status is not None and not sweep_status.get("complete", True):
+        reason = sweep_status.get("reason") or "incomplete"
+        polled = sweep_status.get("events_polled")
+        total = sweep_status.get("events_in_window")
+        if polled is None:
+            where = ""
+        elif total is None:
+            where = f" after {polled} events"
+        else:
+            where = f" after {polled} of {total} events"
+        detail = f"stopped early ({reason}){where}"
+        if "unpolled_game_ids" not in sweep_status:
+            # Unknown coverage (an old status file, or a stop before the ids
+            # were known): we cannot say which games are stale — all of them.
+            add("sweep", detail + "; coverage unknown", sorted(card_ids))
+        else:
+            # Known coverage. Only the unreached games ON THIS CARD are held; a
+            # truncation that touched none of them still shows build-wide
+            # (game_ids []) so the card's status says the sweep was short.
+            unpolled = [
+                int(g) for g in (sweep_status.get("unpolled_game_ids") or []) if int(g) in card_ids
+            ]
+            if not unpolled:
+                detail += "; no game on this card was among the unreached"
+            add("sweep", detail, unpolled)
+
+    # preview: the QB-out gate reads whatever preview is on file, and a blank
+    # file passes EVERY game. A failed injury read (ok False) therefore holds
+    # every game on the card — the run that failed still upserts a fresh blank
+    # row per game, so no single row would look stale. When the feed was fine,
+    # the narrower trigger still holds any game whose row is missing or older
+    # than today. None = the step did not run, which is not a failure.
+    if preview_status is not None:
+        if not preview_status.get("ok", True):
+            reason = preview_status.get("reason") or "failed"
+            ids = sorted(card_ids)
+            add(
+                "preview",
+                f"{reason}: the injury read failed, so the quarterback gate could not run "
+                f"on any of the {len(ids)} games",
+                ids,
+            )
+        else:
+            cutoff = _day_start(now)
+            fresh = set()
+            for p in previews:
+                gid = int(p["game_id"])
+                up = _naive_utc(p.get("updated_at"))
+                if up is not None and (cutoff is None or up >= cutoff):
+                    fresh.add(gid)
+            ids = sorted(card_ids - fresh)
+            if ids:
+                add("preview", f"{len(ids)} games with no QB read from today", ids)
+
+    # pace: a per-game model input, read off the stored factors.
+    model_ids: Set[int] = set()
+    no_pace: List[int] = []
+    for p in predictions:
+        gid = int(p["game_id"])
+        if gid not in card_ids or p.get("model_version") != MODEL_VERSION:
+            continue
+        if _num(p.get("bv_line")) is None:
+            continue
+        model_ids.add(gid)
+        f = _pred_factors(p)
+        if f is None:
+            continue
+        if _blank(f.get("pace")):
+            no_pace.append(gid)
+    if no_pace:
+        add("pace", f"{len(no_pace)} model games have no pace read", no_pace)
+
+    # tempo: the whole pace lookup is empty, so no game has a real pace.
+    if tempo_rows is not None and tempo_rows == 0 and model_ids:
+        add("tempo", "the tempo table stored 0 rows", sorted(model_ids))
+
+    order = {name: i for i, name in enumerate(DEGRADED_INPUTS)}
+    out.sort(key=lambda d: order.get(d["input"], len(order)))
+    return out
+
+
+def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict]:
+    """Tag every item a failed input touched: blocker "degraded", the inputs
+    that failed, and a paper-only action. The TIER is unchanged — the read is
+    still the read; what changed is that we cannot trust the inputs behind it.
+
+    The gate result survives as `gate_blocker` ("none" when every gate had
+    passed, else the gate — price, off_market, ...) so a qualifying game that
+    was blocked on price does not lose that fact: the paper pick freezes it in
+    its chips and the by-gate ledger can still read it.
+
+    Runs BEFORE apply_weekly_cap so a degraded bet consumes no weekly slot.
+    Mutates + returns `items`."""
+    by_game: Dict[int, List[str]] = {}
+    for d in degraded:
+        name = d.get("input")
+        if not name:
+            continue
+        for gid in d.get("game_ids") or ():
+            by_game.setdefault(int(gid), []).append(name)
+    order = {name: i for i, name in enumerate(DEGRADED_INPUTS)}
+    for it in items:
+        names = by_game.get(int(it["game_id"]))
+        if not names:
+            continue
+        # Merge with any earlier pass: a second call with a different list adds
+        # to the game's inputs, never replaces them.
+        uniq = sorted(
+            set(it.get("degraded_inputs") or ()) | set(names),
+            key=lambda n: (order.get(n, len(order)), n),
+        )
+        it["degraded_inputs"] = uniq
+        if it.get("blocker") != DEGRADED_BLOCKER:
+            it["gate_blocker"] = it.get("blocker") or "none"
+        it["blocker"] = DEGRADED_BLOCKER
+        if it.get("qualifies"):
+            it["paper_blocker"] = DEGRADED_BLOCKER
+        it["action"] = (
+            f"Degraded inputs ({', '.join(uniq)}): paper only — re-check Hard Rock’s "
+            "number and the QB report yourself before betting."
+        )
+    return list(items)
+
+
+def card_status_degraded(degraded: Sequence[Dict]) -> bool:
+    """Does this list of failed inputs flip the CARD's status to "degraded"?
+    Only a build-wide input (CARD_STATUS_INPUTS) that held at least one card
+    game does; a per-game pace entry, or a truncation that reached every card
+    game, holds/shows without flipping the card. See CARD_STATUS_INPUTS."""
+    return any(d.get("input") in CARD_STATUS_INPUTS and bool(d.get("game_ids")) for d in degraded)
 
 
 def hold_note(items: Sequence[Dict]) -> Optional[str]:
@@ -789,6 +1040,8 @@ def build_card(
     now: datetime,
     held_game_ids: Optional[Set[int]] = None,
     prior_bet_game_ids: Optional[Set[int]] = None,
+    slot: Optional[str] = None,
+    degraded: Sequence[Dict] = (),
 ) -> Dict[str, Any]:
     """The card payload for one week.
 
@@ -799,6 +1052,11 @@ def build_card(
                  (with bv_line) is the model read; a derived_lines row (or the
                  gbm_v1 line_used) is the reference line when no book has posted.
     previews:    {game_id, qb_out, qb_out_detail}
+    slot:        which build wrote this card (beatvegas.ci.CARD_STATUS_BY_SLOT);
+                 None on an ad-hoc build.
+    degraded:    the failed inputs from `degraded_inputs`. Every game an entry
+                 touched goes paper only; a build-wide entry that held a game
+                 (CARD_STATUS_INPUTS) also makes the card status "degraded".
     Only games kicking off after `now` are on the card.
     """
     now_n = _naive_utc(now)
@@ -835,6 +1093,18 @@ def build_card(
             )
         )
     items.sort(key=_sort_key)
+    # Degrade FIRST: a bet built on a failed input is paper only, so it must
+    # not consume one of the week's real-money cap slots.
+    deg = [
+        {
+            "input": d.get("input"),
+            "detail": d.get("detail") or "",
+            "game_ids": sorted({int(g) for g in (d.get("game_ids") or ())}),
+        }
+        for d in degraded
+        if d.get("input")
+    ]
+    apply_degraded(items, deg)
     apply_weekly_cap(items, held_game_ids, prior_bet_game_ids)
 
     model_read = any(it["_has_model"] for it in items)
@@ -850,13 +1120,19 @@ def build_card(
         notes.append(note)
 
     public = [{k: v for k, v in it.items() if not k.startswith("_")} for it in items]
-    # counts.bet = bettable BETs (inside the weekly cap): what the site and the
-    # Saturday text read. Over-cap BETs keep tier BET but are tallied apart.
+    # counts.bet = bettable BETs (inside the weekly cap, no failed input): what
+    # the site and the Saturday text read, so it agrees with the "  BET #" lines.
+    # Over-cap and degraded BETs keep tier BET but are tallied apart.
     counts = {
-        "bet": sum(1 for it in public if it["tier"] == "BET" and not it["over_cap"]),
+        "bet": sum(
+            1
+            for it in public
+            if it["tier"] == "BET" and not it["over_cap"] and it["blocker"] != DEGRADED_BLOCKER
+        ),
         "edge": sum(1 for it in public if it["tier"] == "EDGE"),
         "pass": sum(1 for it in public if it["tier"] == "PASS"),
         "over_cap": sum(1 for it in public if it["over_cap"]),
+        "degraded": sum(1 for it in public if it["blocker"] == DEGRADED_BLOCKER),
     }
     paper = {
         "qualifying": sum(1 for it in public if it["qualifies"]),
@@ -869,6 +1145,16 @@ def build_card(
             "week": int(week),
             "built_at": _iso(now),
             "model_read": model_read,
+            "slot": slot,
+            # A failed BUILD-WIDE input beats the slot's own status: the site's
+            # banner and the Saturday text both key off this one word. A pace
+            # entry holds its games but leaves the status to the slot.
+            "status": (
+                "degraded"
+                if card_status_degraded(deg)
+                else CARD_STATUS_BY_SLOT.get(slot or "", "final")
+            ),
+            "degraded": deg,
             "counts": counts,
             "paper": paper,
             "items": public,

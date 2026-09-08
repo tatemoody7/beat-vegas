@@ -155,6 +155,22 @@ export default function CardPanel({
         )
       )}
 
+      {s.degraded.length > 0 && (
+        <>
+          <p
+            className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]"
+            title="A card input failed on this build (a build-wide one shows in the banner; a missing pace read holds just its game), so the gate behind these could not be trusted: paper only, no weekly-cap slot."
+          >
+            Held · an input failed · paper only
+          </p>
+          <ul className="mt-1">
+            {s.degraded.map((r) => (
+              <Row key={r.gameId} r={r} />
+            ))}
+          </ul>
+        </>
+      )}
+
       {notes.length > 0 && (
         <ul className="mt-3 flex flex-col gap-1 border-t border-[var(--border-soft)] pt-2 text-xs text-[var(--text-dim)]">
           {notes.map((n) => (

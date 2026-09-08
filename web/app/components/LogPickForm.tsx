@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { usd } from "@/lib/format";
-import { bankrollEnv } from "@/lib/homeBoard";
 import { REASON_TEXT } from "@/lib/labels";
 import type { PickReason, Verdict } from "@/lib/verdict";
 
@@ -42,9 +41,13 @@ const VERDICT_WORD: Record<string, string> = {
 // from the bankroll. WATCH defaults to paper — WATCH is not a bet (policy).
 export default function LogPickForm({
   prefill,
+  unitUsd,
   onDone,
 }: {
   prefill: PickPrefill;
+  /** The flat stake. Passed in: lib/homeBoard reads the environment (and
+   *  pulls in Prisma), which a client component must never import. */
+  unitUsd: number;
   onDone?: () => void;
 }) {
   const router = useRouter();
@@ -105,7 +108,6 @@ export default function LogPickForm({
   const labelCls =
     "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
   const hintCls = "text-xs text-[var(--text-dim)]";
-  const { unitUsd } = bankrollEnv();
   const verdictWord = VERDICT_WORD[prefill.verdict] ?? prefill.verdict;
 
   return (

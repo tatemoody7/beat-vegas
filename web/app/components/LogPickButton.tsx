@@ -8,11 +8,14 @@ export default function LogPickButton({
   prefill,
   picked,
   kickedOff,
+  unitUsd,
 }: {
   prefill: PickPrefill;
   /** A real-money first-half pick is already logged on this game. */
   picked: boolean;
   kickedOff: boolean;
+  /** The flat stake, passed down from the server page. */
+  unitUsd: number;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -43,7 +46,11 @@ export default function LogPickButton({
   }
   return (
     <div className="mt-2 w-full">
-      <LogPickForm prefill={prefill} onDone={() => setOpen(false)} />
+      <LogPickForm
+        prefill={prefill}
+        unitUsd={unitUsd}
+        onDone={() => setOpen(false)}
+      />
     </div>
   );
 }

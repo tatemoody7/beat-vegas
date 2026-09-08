@@ -8,9 +8,10 @@ never disagree about a game:
   * gap basis  = Hard Rock's 1H line if posted, else the market median, else the
                  derived reference line baked in at scoring time;
   * BET        = model read AND Hard Rock posted AND Hard Rock's own gap >=
-                 BET_GAP_PTS AND price fair-or-better (ev >= EV_FLOOR; an
-                 unjudgeable price is not a failure, as on the site) AND NOT an
-                 off-market number AND no QB listed out;
+                 BET_GAP_PTS AND a JUDGEABLE price that is fair-or-better
+                 (ev >= EV_FLOOR against the exchange-first fair price; no
+                 comparable price = blocker no_fair_price, paper only) AND NOT
+                 an off-market number AND no QB listed out;
   * EDGE       = the edge score clears 60 (gap + price bonus, minus the
                  off-market / QB-out penalties) with one gate failing — the
                  blocker names it — or a no-model row where Hard Rock's price
@@ -42,12 +43,37 @@ QB_OUT_PENALTY = 5
 # the other books' before the card says so (3 cents per dollar).
 HOLD_NOTE_CENTS = 0.03
 
-# Books that never enter the market fair price: Hard Rock (it is the book being
-# judged), the sweepstakes book, CFBD's synthetic aggregate and the ~0-vig
-# exchanges (their prices are not a comparable two-way hold).
-FAIR_PRICE_EXCLUDED = frozenset(
-    {HR_BOOK_KEY, "fliff", "consensus", "kalshi", "polymarket", "novig", "prophetx", "betopenly"}
-)
+# CFTC-regulated exchanges / prediction markets (Odds API region us_ex; mirrors
+# web/lib/books.ts EXCHANGE_KEYS — tests/test_gate_parity.py). ~Zero hold, so a
+# quote at Hard Rock's EXACT number is the sharpest fair price we can get and
+# wins outright over the books' de-vigged median (exchange-first, PR-6).
+EXCHANGE_BOOKS = frozenset({"kalshi", "polymarket", "novig", "prophetx", "betopenly"})
+# An exchange only earns that privilege by actually being ~zero hold and live.
+# One wide illiquid two-way (+200/-500, hold 0.167) de-vigs to a fair under near
+# 0.71 — on its own enough to flip a BET and set the kill price — and
+# _latest_by_book keeps a book's newest row forever, so a delisted Friday quote
+# is still "latest" on Saturday. Books need neither guard: they enter as a
+# MEDIAN over several quotes, which absorbs one bad one.
+EXCHANGE_MAX_HOLD = 0.02
+EXCHANGE_MAX_AGE_H = 24.0
+# Books that never enter the BOOK median fair price: Hard Rock (it is the book
+# being judged), the sweepstakes book, CFBD's synthetic aggregate and the
+# exchanges (their prices are not a comparable two-way hold; they enter through
+# the exchange-first path above instead).
+FAIR_PRICE_EXCLUDED = frozenset({HR_BOOK_KEY, "fliff", "consensus"} | EXCHANGE_BOOKS)
+# A book is "comparable" to Hard Rock's number when its line sits within this
+# many points of it (same window as web/lib/lineCheck.ts). Python-only name for
+# the literal both sides share; not a verdict gate.
+FAIR_PRICE_LINE_WINDOW = 0.5
+# ...except BELOW Hard Rock's line when Hard Rock is posting ABOVE the market
+# (hr_vs_market > 0). That is the single best case for an under — and the case
+# where, by construction, no book sits within half a point, so a real BET would
+# silently become paper for want of a price to judge. A book priced at a LOWER
+# total is a CONSERVATIVE reference for an under (the under is likelier at the
+# lower number, so its fair under-probability is higher, so the price bar it
+# sets is harder): clearing the price gate against it is a strictly safe test
+# and cannot manufacture a bet a like-for-like price would have blocked.
+FAIR_PRICE_WIDE_WINDOW = 1.5
 # CFBD's synthetic aggregate is not a book anyone can bet and double-counts the
 # real ones: it never enters the market line either (web/lib/books.ts).
 SYNTHETIC_BOOKS = frozenset({"consensus"})
@@ -60,8 +86,12 @@ REFERENCE_MODEL_VERSION = "derived_lines"
 # and the historical tables read alike.
 KEY_NUMBERS_1H = (24.0, 28.0, 31.0)
 TOTAL_BANDS = ((45.0, "<45"), (52.0, "45–52"), (60.0, "52–60"), (math.inf, "60+"))
-# Paper-ledger blockers, in the order the gates are checked.
-PAPER_BLOCKERS = ("off_market", "price", "qb_out")
+# Paper-ledger blockers, in the order the gates are checked. off_market and
+# price are market reads on Hard Rock's number; no_fair_price is the price
+# gate's "cannot judge" branch (no book or exchange priced at that number, or
+# Hard Rock itself unpriced) so it follows price; qb_out is transient news
+# resolved by kickoff.
+PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
 
 
 def total_band(total: Optional[float]) -> Optional[str]:
@@ -188,6 +218,19 @@ def _median(xs: Sequence[float]) -> Optional[float]:
     return statistics.median(xs) if xs else None
 
 
+def fair_price_window(hr_vs_market: Optional[float]) -> tuple:
+    """(points BELOW Hard Rock's line, points ABOVE it) a book may sit and still
+    price Hard Rock's number. Half a point both ways, widened below to
+    FAIR_PRICE_WIDE_WINDOW when Hard Rock is above the market — see the constant.
+    Mirrored by web/lib/lineCheck.ts fairPriceWindow."""
+    below = (
+        FAIR_PRICE_WIDE_WINDOW
+        if hr_vs_market is not None and hr_vs_market > 0
+        else FAIR_PRICE_LINE_WINDOW
+    )
+    return (below, FAIR_PRICE_LINE_WINDOW)
+
+
 def json_clean(obj: Any) -> Any:
     """Recursively replace NaN/inf floats with None so the payload is strict JSON."""
     if isinstance(obj, dict):
@@ -245,23 +288,87 @@ def _hold_of(obs: Dict) -> Optional[float]:
     return devig_two_way(obs["over_price"], obs["under_price"])[2]
 
 
-def market_read(snaps: Sequence[Dict]) -> Dict[str, Any]:
+def _reference_now(snaps: Sequence[Dict], now: Optional[datetime]) -> Optional[datetime]:
+    """The instant the market read is "as of" (naive UTC). The card passes its
+    build time; without one, the newest snapshot in the set stands in, so a
+    replayed historical week judges staleness against its own clock."""
+    n = _naive_utc(now)
+    if n is not None:
+        return n
+    caps = [c for c in (_naive_utc(sn.get("captured_at")) for sn in snaps) if c is not None]
+    return max(caps) if caps else None
+
+
+def _exchange_fair_under(obs: Dict, ref_now: Optional[datetime]) -> Optional[float]:
+    """The de-vigged fair under from ONE exchange quote, or None when the quote
+    is one-sided, wider than EXCHANGE_MAX_HOLD, or older than EXCHANGE_MAX_AGE_H.
+    An unknown capture time is not evidence of staleness — keep the quote."""
+    if obs.get("over_price") is None or obs.get("under_price") is None:
+        return None
+    hold = _hold_of(obs)
+    if hold is None or hold > EXCHANGE_MAX_HOLD:
+        return None
+    cap = obs.get("_cap")
+    if (
+        cap is not None
+        and ref_now is not None
+        and (ref_now - cap).total_seconds() > EXCHANGE_MAX_AGE_H * 3600.0
+    ):
+        return None
+    # Two-way multiplicative de-vig: on a ~0-hold quote this is (almost exactly)
+    # the raw midpoint of the two implied probabilities.
+    return devig_two_way(obs["over_price"], obs["under_price"], "multiplicative")[1]
+
+
+def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[str, Any]:
     """Hard Rock's line/price/open, the market median line, and the market's
-    no-vig fair under at Hard Rock's SAME number (median over comparable books,
-    FAIR_PRICE_EXCLUDED dropped). Also each side's hold for the slate note."""
+    no-vig fair under at Hard Rock's number — EXCHANGE-FIRST: the median of the
+    tight, fresh exchanges quoting Hard Rock's exact line, else the median over
+    comparable books (`fair_price_window`, FAIR_PRICE_EXCLUDED dropped), else
+    None (the price cannot be judged). Also Hard Rock's distance from the other
+    books' median (`hr_vs_market`) and each side's hold for the slate note.
+
+    `now`: the instant the read is "as of" (the card's build time), used only to
+    age out exchange quotes; defaults to the newest snapshot in `snaps`."""
     by_book = _latest_by_book(snaps)
+    ref_now = _reference_now(snaps, now)
     hr = by_book.get(HR_BOOK_KEY)
     hr_line = hr["line"] if hr else None
     lines = [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS]
+    # Hard Rock vs the OTHER books' median (a display chip + why sentence, and
+    # the reason the comparable window widens below). `market_line` keeps Hard
+    # Rock in its median so off_market and the web's liveLine are untouched.
+    others = _median(
+        [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
+    )
+    hr_vs_market = round2(hr_line - others) if hr_line is not None and others is not None else None
+    # Exchanges at the SAME line (exact equality — a half point off is another
+    # market), each one tight and recent enough to be a live price.
+    exchange = [
+        f
+        for b, o in by_book.items()
+        if b in EXCHANGE_BOOKS and hr_line is not None and abs(o["line"] - hr_line) < 1e-9
+        for f in [_exchange_fair_under(o, ref_now)]
+        if f is not None
+    ]
+    lo, hi = fair_price_window(hr_vs_market)
     comparable = [
         _fair_under_of(o)
         for b, o in by_book.items()
         if b not in FAIR_PRICE_EXCLUDED
         and hr_line is not None
-        and abs(o["line"] - hr_line) <= 0.5  # same window as web/lib/lineCheck.ts
+        and -lo <= (o["line"] - hr_line) <= hi
         and _fair_under_of(o) is not None
     ]
-    fair_under = _median(comparable)
+    fair_source: Optional[str]
+    if exchange:
+        # MEDIAN, so one odd quote among three or more cannot drag the fair
+        # price (for one or two quotes the median IS the mean).
+        fair_under, fair_source = statistics.median(exchange), "exchange"
+    elif comparable:
+        fair_under, fair_source = _median(comparable), "books"
+    else:
+        fair_under, fair_source = None, None
     hr_price = hr["under_price"] if hr else None
     ev = ev_under(fair_under, hr_price) if fair_under is not None and hr_price is not None else None
     market_holds = [
@@ -278,6 +385,9 @@ def market_read(snaps: Sequence[Dict]) -> Dict[str, Any]:
         "hr_hold": _hold_of(hr) if hr else None,
         "market_line": _median(lines),
         "fair_under": fair_under,
+        "fair_source": fair_source,
+        "n_exchange": len(exchange),
+        "hr_vs_market": hr_vs_market,
         "ev": ev,
         "market_hold": _median(market_holds),
         "n_books": len(lines),
@@ -297,6 +407,11 @@ def _price_sentence(hr_line, hr_price, ev, ev_v) -> str:
         else f"under {fmt(hr_line)} at {american(hr_price)}"
     )
     if ev is None:
+        # Two different causes, and the action line above already branches on
+        # them: blaming the other books when Hard Rock itself posted no price
+        # contradicts it (and is simply wrong — the books may all be priced).
+        if hr_price is None:
+            return f"Hard Rock has {at}, but hasn’t posted a price for it yet — nothing to judge."
         return f"Hard Rock has {at}; not enough other books at that number to judge the price."
     pct = fmt(abs(ev) * 100)
     if ev_v == "pos":
@@ -375,10 +490,12 @@ def build_item(
     prediction: Optional[Dict],
     reference_line: Optional[float],
     preview: Optional[Dict],
+    now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """One card item for one game (the edge.ts rules, minus the context-only
-    score, which never decides a tier)."""
-    m = market_read(snaps)
+    score, which never decides a tier). `now` is the build time — it only ages
+    out stale exchange quotes (market_read)."""
+    m = market_read(snaps, now)
     hr_line, hr_price, ev = m["hr_line"], m["hr_price"], m["ev"]
     market_line, fair_under = m["market_line"], m["fair_under"]
     ev_v = ev_verdict(ev)
@@ -423,12 +540,15 @@ def build_item(
             score -= QB_OUT_PENALTY
         score = max(0, min(100, score))
 
+    # A BET needs a JUDGEABLE price: ev None (no book or exchange priced at
+    # Hard Rock's number, or Hard Rock unpriced) is paper only (verdict.ts).
     is_bet = (
         has_model
         and hr_gap is not None
         and hr_gap >= BET_GAP_PTS
         and not off_market
         and not price_neg
+        and ev is not None
         and not qb_out
     )
     # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
@@ -436,11 +556,17 @@ def build_item(
     # blocked a real bet (None = it was a BET). The weekly cap adds "cap" later.
     qualifies = has_model and hr_gap is not None and hr_gap >= BET_GAP_PTS
     paper_blocker: Optional[str] = None
+    # Gate order (PAPER_BLOCKERS): off_market and price are market reads on
+    # Hard Rock's number; no_fair_price is the price gate's "cannot judge"
+    # branch, so it follows price; qb_out is transient news resolved by
+    # kickoff; gap is the residual (EDGE only).
     if qualifies:
         if off_market:
             paper_blocker = "off_market"
         elif price_neg:
             paper_blocker = "price"
+        elif ev is None:
+            paper_blocker = "no_fair_price"
         elif qb_out:
             paper_blocker = "qb_out"
     blocker: Optional[str] = None
@@ -454,6 +580,8 @@ def build_item(
             blocker = "off_market"
         elif price_neg:
             blocker = "price"
+        elif ev is None:
+            blocker = "no_fair_price"
         elif qb_out:
             blocker = "qb_out"
         else:
@@ -491,6 +619,18 @@ def build_item(
         )
         hr = american(hr_price) if hr_price is not None else "unpriced"
         action = f"Wait: Hard Rock is {hr}; needs {needs}."
+    elif blocker == "no_fair_price":
+        if hr_price is None:
+            action = (
+                f"Wait: Hard Rock hasn’t priced its {fmt(hr_line)} under yet — nothing to judge. "
+                "Paper only until Hard Rock posts a price."
+            )
+        else:
+            hr = american(hr_price)
+            action = (
+                f"Wait: Hard Rock’s {hr} can’t be judged — no other book or exchange is priced at "
+                f"{fmt(hr_line)}. Paper only until a comparable price appears."
+            )
     elif blocker == "qb_out":
         action = "Wait: a starting QB is listed out — re-check the number after the news settles."
     else:
@@ -511,6 +651,13 @@ def build_item(
         why.append(
             f"Hard Rock opened at {fmt(m['hr_open'])} and has moved {moved} to {fmt(hr_line)}."
         )
+    d = m["hr_vs_market"]
+    if d is not None and abs(d) >= 0.05:
+        why.append(
+            f"Hard Rock’s {fmt(hr_line)} is {fmt(abs(d))} points {'above' if d > 0 else 'below'} "
+            f"the other books’ median ({fmt(hr_line - d)}) — a {'better' if d > 0 else 'worse'} "
+            "number for an under."
+        )
     if qb_out:
         why.append(
             "QB OUT (live Rotowire, unofficial): "
@@ -530,6 +677,8 @@ def build_item(
         "hr_open": m["hr_open"],
         "market_line": market_line,
         "fair_under": None if fair_under is None else round(fair_under, 4),
+        "fair_source": m["fair_source"],
+        "hr_vs_market": m["hr_vs_market"],
         "ev": None if ev is None else round(ev, 4),
         "bv_line": None if bv_line is None else round2(bv_line),
         "gap": gap,
@@ -682,6 +831,7 @@ def build_card(
                 model_by_game.get(gid),
                 reference_by_game.get(gid),
                 preview_by_game.get(gid),
+                now_n,
             )
         )
     items.sort(key=_sort_key)

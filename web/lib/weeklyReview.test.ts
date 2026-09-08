@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PickFull } from "./picks";
-import { blockerRows, reasonRows, weekRows } from "./weeklyReview";
+import {
+  BLOCKER_LABEL,
+  blockerRows,
+  reasonRows,
+  weekRows,
+} from "./weeklyReview";
 
 const pick = (o: Partial<PickFull>): PickFull => ({
   id: 1,
@@ -115,6 +120,12 @@ describe("blockerRows", () => {
       paperPick({ id: 2, blocker: "none", result: "over", units: -1 }),
       paperPick({ id: 3, blocker: "price", verdictAtPick: "WATCH" }),
       paperPick({
+        id: 8,
+        blocker: "no_fair_price",
+        verdictAtPick: "WATCH",
+        evAtPick: null,
+      }),
+      paperPick({
         id: 4,
         blocker: "cap",
         graded: false,
@@ -129,10 +140,14 @@ describe("blockerRows", () => {
     expect(rows.map((r) => [r.blocker, r.paperBets])).toEqual([
       ["none", 2],
       ["price", 1],
+      ["no_fair_price", 1],
       ["cap", 1],
       ["untagged", 1],
     ]);
     expect(rows[0].paper).toMatchObject({ record: "1-1" });
-    expect(rows[2].paper).toBeNull(); // pending only: no graded record
+    expect(rows[3].paper).toBeNull(); // pending only: no graded record
+    expect(BLOCKER_LABEL.no_fair_price).toBe(
+      "Blocked: no comparable price to judge Hard Rock’s under",
+    );
   });
 });

@@ -45,6 +45,7 @@ export type BlockerKey =
   | "none"
   | "price"
   | "off_market"
+  | "no_fair_price"
   | "qb_out"
   | "cap"
   | "untagged";
@@ -59,6 +60,7 @@ export const BLOCKER_LABEL: Record<BlockerKey, string> = {
   none: "BET — every gate passed",
   price: "Blocked by price (Hard Rock worse than fair)",
   off_market: "Blocked: Hard Rock's number below the market",
+  no_fair_price: "Blocked: no comparable price to judge Hard Rock’s under",
   qb_out: "Blocked: starting QB listed out",
   cap: "Over the weekly cap (6th+ by gap)",
   untagged: "Paper pick logged before gate tagging",
@@ -143,6 +145,7 @@ const BLOCKER_ORDER: BlockerKey[] = [
   "none",
   "price",
   "off_market",
+  "no_fair_price",
   "qb_out",
   "cap",
   "untagged",
@@ -152,6 +155,7 @@ const asBlocker = (v: string | null): BlockerKey =>
   v === "none" ||
   v === "price" ||
   v === "off_market" ||
+  v === "no_fair_price" ||
   v === "qb_out" ||
   v === "cap"
     ? v

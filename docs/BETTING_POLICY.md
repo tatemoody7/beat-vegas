@@ -151,7 +151,21 @@ week expected (`lines_watch.yml` header).
 - Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
   **every game whose Hard Rock first-half line sits ≥ 1.75 above our number**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
-  BET, `price`, `off_market`, `qb_out`, `cap` = the 6th+ by gap that week).
+  BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
+  Hard Rock's number so the price could not be judged, `qb_out`, `cap` = the
+  6th+ by gap that week). The fair price is exchange-first: the exchange
+  quotes at Hard Rock's exact line, else the median of the comparable books —
+  those within half a point of Hard Rock's number, **widened to 1.5 points
+  below it whenever Hard Rock is posting above the market**. That case is the
+  best one for an under, and it is exactly where no book sits within half a
+  point, so the like-for-like window would leave the price unjudgeable and
+  paper the bet. A book at a lower total is a conservative reference for an
+  under, so clearing the price gate against it cannot manufacture a bet.
+  **The exchanges post no first-half totals** — re-verified 2026-09-07 against
+  the live Odds API, where the `us_ex` region returned zero first-half-total
+  bookmakers across three upcoming games. So no first-half sweep pays for that
+  region (`beatvegas/ci.py` `SWEEP_ARGS`) and the exchange-first path sits
+  dormant until an exchange starts posting the market.
   That measures each gate, not just the survivors. The cloud card
   (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
   per qualifying game at its decision build — the Thursday/Friday evening

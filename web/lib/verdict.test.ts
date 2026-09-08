@@ -115,6 +115,43 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.reason).toBe("manual");
   });
 
+  it("WATCH, never BET, when the gap clears but no book or exchange prices Hard Rock's number (ev null)", () => {
+    // Hard Rock alone at 24.5 -110: the market median IS Hard Rock's line (so
+    // not off-market), but nothing comparable is priced — the price can't be
+    // judged. Paper only (card.py blocker no_fair_price).
+    const v = verdictFor({ ...base, ev: null, evVerdict: "na" });
+    expect(v.verdict).toBe("WATCH");
+    expect(v.confidence).toBe("medium");
+    expect(v.headline).toBe(
+      "Model edge in range, but no other book or exchange is priced at Hard Rock’s number — the price can’t be judged. Paper only.",
+    );
+    expect(v.hrGap).toBe(2.7);
+    expect(v.reason).toBe("model_gap"); // it still qualifies for the paper ledger
+    expect(v.why[1]).toContain("not enough other books at that number");
+    // Hard Rock posted the number but no price yet: same gate, different
+    // wording (the old text falsely implied no other book/exchange is priced).
+    const unpriced = verdictFor({
+      ...base,
+      hrUnderPrice: null,
+      ev: null,
+      evVerdict: "na",
+    });
+    expect(unpriced.verdict).toBe("WATCH");
+    expect(unpriced.headline).toBe(
+      "Model edge in range, but Hard Rock hasn’t priced its under yet — the price can’t be judged. Paper only.",
+    );
+    // ...and the why sentence must agree with that headline rather than blaming
+    // the other books, which may all be priced (card.py _price_sentence).
+    expect(unpriced.why[1]).toBe(
+      "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge.",
+    );
+    expect(unpriced.why[1]).not.toContain("other books");
+    // A judgeable fair-or-better price is what makes it a BET.
+    expect(verdictFor({ ...base, ev: 0, evVerdict: "fair" }).verdict).toBe(
+      "BET",
+    );
+  });
+
   it("WATCH when Hard Rock's gap clears the bar but its price is worse than the market", () => {
     // -0.065 ≈ -115 into a balanced market: below the -0.05 floor.
     const v = verdictFor({ ...base, evVerdict: "neg", ev: -0.065 });

@@ -25,7 +25,12 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 
 # Sweep arguments per slot (scripts/poll_lines.py). Every slot sweeps only the
-# Hard Rock universe and only upcoming games.
+# Hard Rock universe and only upcoming games, on the config regions (us,us2).
+# NO slot adds the exchange region us_ex: probed against the live Odds API on
+# 2026-09-07, us_ex returned ZERO first-half-total bookmakers across three
+# upcoming NCAAF games — the exchanges do not post this market, so the region
+# costs ~50% more per event and buys nothing. The card's exchange-first fair
+# price (beatvegas/card.py) stays in place, dormant, for the day one does.
 SWEEP_ARGS: Dict[str, str] = {
     # Tue/Wed/Thu ~4:05pm ET: tonight's games (kicking off within 10 hours)
     "weeknight": "--hr-universe --kickoff-within-min 600 --hours-back 0",

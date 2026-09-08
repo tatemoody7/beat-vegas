@@ -11,15 +11,22 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from beatvegas.card import (
+    EXCHANGE_BOOKS,
+    EXCHANGE_MAX_AGE_H,
+    EXCHANGE_MAX_HOLD,
     FAIR_PRICE_EXCLUDED,
+    FAIR_PRICE_LINE_WINDOW,
+    FAIR_PRICE_WIDE_WINDOW,
+    PAPER_BLOCKERS,
     break_even_price,
     build_card,
+    fair_price_window,
     hold_note,
     kill_line,
     market_read,
     round_half_up,
 )
-from beatvegas.devig import ev_under
+from beatvegas.devig import devig_two_way, ev_under
 from beatvegas.model.score import BET_GAP_PTS, EV_FLOOR
 
 NOW = datetime(2026, 9, 18, 22, 5)  # Friday 6:05pm ET, in UTC
@@ -103,7 +110,7 @@ def test_edge_off_market_when_hard_rock_sits_below_the_market():
     it = only(card([game()], snaps, [model(1, 21.5)]))
     assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
     assert it["market_line"] == 25.0 and it["gap"] == 2.5  # gap is vs Hard Rock's own number
-    assert it["fair_under"] is None  # no other book at 24.0 -> no fair price
+    assert it["fair_under"] is None and it["ev"] is None  # no other book at 24.0 -> no fair price
     assert it["action"] == (
         "Wait: Hard Rock’s 24.0 is 1.0 below the market’s 25.0 — giving up points and a void "
         "risk. Bet if it moves to 24.5 or higher."
@@ -199,22 +206,179 @@ def test_no_line_at_all_wording():
 # --- market read ------------------------------------------------------------------
 
 
-def test_fair_price_excludes_hard_rock_fliff_consensus_and_exchanges():
+def test_fair_price_excludes_hard_rock_fliff_consensus_and_off_line_exchanges():
     assert {"hardrockbet", "fliff", "consensus", "kalshi", "novig", "prophetx", "betopenly"} <= set(
         FAIR_PRICE_EXCLUDED
     )
+    assert EXCHANGE_BOOKS == {"kalshi", "polymarket", "novig", "prophetx", "betopenly"}
     snaps = [
         snap(1, "hardrockbet", 24.5, -110, -105),
         snap(1, "draftkings", 24.5, -110, -110),
         snap(1, "fliff", 24.5, 100, 100),  # would drag fair to 0.5 exactly; excluded
-        snap(1, "kalshi", 24.5, 100, 100),
+        snap(1, "kalshi", 25.0, 100, 100),  # exchange at ANOTHER line: never in the book median
         snap(1, "consensus", 30.0, -110, -110),  # synthetic: not in the market line either
         snap(1, "betmgm", 25.5, -105, -115),  # a full point away: outside the 0.5 window
     ]
     m = market_read(snaps)
-    assert m["fair_under"] == pytest.approx(0.5)
-    assert m["market_line"] == 24.5  # median of HR, DK, fliff, kalshi, MGM (24.5 x4, 25.5)
+    assert m["fair_under"] == pytest.approx(0.5) and m["fair_source"] == "books"
+    assert m["n_exchange"] == 0
+    assert m["market_line"] == 24.5  # median of HR, DK, fliff, kalshi, MGM (24.5 x3, 25.0, 25.5)
     assert m["hr_line"] == 24.5 and m["hr_price"] == -105
+
+
+def test_exchange_quote_at_hard_rocks_exact_line_is_the_fair_price():
+    """Exchange-first: a ~0-hold exchange priced at Hard Rock's SAME number is a
+    sharper fair price than the books' de-vigged median, so it wins outright."""
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "draftkings", 24.5, 100, -120),
+        snap(1, "kalshi", 24.5, 100, -102),
+    ]
+    m = market_read(snaps)
+    assert m["fair_source"] == "exchange" and m["n_exchange"] == 1
+    assert m["fair_under"] == pytest.approx(devig_two_way(100, -102)[1])
+    assert m["fair_under"] != pytest.approx(FAIR_UNDER)  # DK's shaded read no longer enters
+    assert m["ev"] == pytest.approx(ev_under(m["fair_under"], -110))
+    # two exchanges at the line -> the mean of their de-vigged unders
+    snaps.append(snap(1, "novig", 24.5, -104, 102))
+    m2 = market_read(snaps)
+    k, n = devig_two_way(100, -102)[1], devig_two_way(-104, 102)[1]
+    assert m2["n_exchange"] == 2 and m2["fair_under"] == pytest.approx((k + n) / 2)
+
+
+def test_exchange_at_another_line_falls_back_to_the_book_median():
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "draftkings", 24.5, 100, -120),
+        snap(1, "kalshi", 25.0, 100, -102),  # half a point off: not the same market
+    ]
+    m = market_read(snaps)
+    assert m["fair_source"] == "books" and m["n_exchange"] == 0
+    assert m["fair_under"] == pytest.approx(FAIR_UNDER)
+
+
+def test_exchange_with_one_side_unpriced_does_not_count():
+    snaps = [snap(1, "hardrockbet", 24.5), snap(1, "kalshi", 24.5, None, -102)]
+    m = market_read(snaps)
+    assert m["fair_under"] is None and m["fair_source"] is None and m["n_exchange"] == 0
+
+
+def test_a_wide_exchange_quote_is_ignored_and_the_book_median_wins():
+    """An exchange only earns the fair price by being ~0-hold. One wide illiquid
+    two-way (+200/-500, hold 16.7%) de-vigs to a fair under near 0.71 — enough on
+    its own to flip a BET and set the kill price — so it never enters."""
+    assert EXCHANGE_MAX_HOLD == 0.02
+    assert devig_two_way(200, -500)[2] > EXCHANGE_MAX_HOLD
+    assert devig_two_way(200, -500)[1] > 0.7  # what it would have claimed as fair
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 200, -500),  # wide: dropped
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 0 and m["fair_source"] == "books"
+    assert m["fair_under"] == pytest.approx(FAIR_UNDER)
+    # ...and a hold exactly ON the cap still counts (the bound is "exceeds").
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110), snap(1, "kalshi", 24.5, 100, -102)]
+    assert market_read(snaps, now=NOW)["n_exchange"] == 1
+
+
+def test_a_stale_exchange_quote_is_ignored():
+    """_latest_by_book keeps a book's newest row forever, so a delisted Friday
+    exchange quote is still 'latest' on Saturday. Anything older than
+    EXCHANGE_MAX_AGE_H before the build is not a live price."""
+    assert EXCHANGE_MAX_AGE_H == 24.0
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102, hours_ago=30),  # stale: dropped
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 0 and m["fair_source"] == "books"
+    assert m["fair_under"] == pytest.approx(FAIR_UNDER)
+    # the card build passes its own `now`, so the same row is stale on the card
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["fair_source"] == "books"
+    # with no reference instant the newest snapshot in the set stands in for now
+    assert market_read(snaps)["n_exchange"] == 0
+    # an unknown capture time is not evidence of staleness: keep the quote
+    undated = dict(snap(1, "kalshi", 24.5, 100, -102), captured_at=None)
+    assert (
+        market_read([snap(1, "hardrockbet", 24.5, -110, -110), undated], now=NOW)["n_exchange"] == 1
+    )
+
+
+def test_a_tight_fresh_exchange_quote_still_wins_over_the_books():
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102, hours_ago=6),
+    ] + market(1, 24.5)
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 1 and m["fair_source"] == "exchange"
+    assert m["fair_under"] == pytest.approx(devig_two_way(100, -102)[1])
+
+
+def test_three_or_more_exchange_quotes_use_the_median_not_the_mean():
+    """One odd quote among several must not drag the fair price."""
+    snaps = [
+        snap(1, "hardrockbet", 24.5, -110, -110),
+        snap(1, "kalshi", 24.5, 100, -102),
+        snap(1, "novig", 24.5, -104, 102),
+        snap(1, "prophetx", 24.5, -101, 101),
+    ]
+    fairs = sorted(devig_two_way(o, u)[1] for o, u in ((100, -102), (-104, 102), (-101, 101)))
+    m = market_read(snaps, now=NOW)
+    assert m["n_exchange"] == 3 and m["fair_under"] == pytest.approx(fairs[1])
+
+
+def test_fair_price_window_widens_below_only_when_hard_rock_is_above_the_market():
+    assert (FAIR_PRICE_LINE_WINDOW, FAIR_PRICE_WIDE_WINDOW) == (0.5, 1.5)
+    assert fair_price_window(0.5) == (1.5, 0.5)
+    assert fair_price_window(0.0) == (0.5, 0.5)
+    assert fair_price_window(-0.5) == (0.5, 0.5)
+    assert fair_price_window(None) == (0.5, 0.5)
+
+
+def test_hard_rock_above_the_market_is_priced_by_the_books_a_point_below():
+    """Hard Rock a full point ABOVE the market is the best case for an under —
+    and by construction no book is within half a point, so the like-for-like
+    window would leave the price unjudgeable and paper the bet. A book at a
+    LOWER total is a conservative reference, so it is allowed in to 1.5."""
+    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 23.0)]))
+    assert it["hr_vs_market"] == 1.0 and it["gap"] == 2.5
+    assert it["fair_source"] == "books"
+    assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4)
+    assert it["tier"] == "BET" and it["blocker"] is None and it["paper_blocker"] is None
+
+
+def test_a_book_two_points_below_hard_rock_is_still_no_fair_price():
+    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(1, 23.5)
+    it = only(card([game()], snaps, [model(1, 23.0)]))
+    assert it["hr_vs_market"] == 2.0
+    assert it["fair_under"] is None and it["fair_source"] is None
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price"
+
+
+def test_hard_rock_below_the_market_keeps_the_half_point_window_and_off_market():
+    """The widening is one-directional: below the market Hard Rock is still an
+    off-market number, which is the blocker that fires."""
+    snaps = [snap(1, "hardrockbet", 23.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 21.0)]))
+    assert it["hr_vs_market"] == -1.0
+    assert it["fair_under"] is None  # the 24.5 books stay outside the 0.5 window
+    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
+    assert it["paper_blocker"] == "off_market"
+
+
+def test_hr_vs_market_is_hard_rock_minus_the_other_books_median():
+    assert market_read([snap(1, "hardrockbet", 25.0)] + market(1, 24.5))["hr_vs_market"] == 0.5
+    assert market_read([snap(1, "hardrockbet", 24.0)] + market(1, 24.5))["hr_vs_market"] == -0.5
+    assert market_read([snap(1, "hardrockbet", 24.5)] + market(1, 24.5))["hr_vs_market"] == 0.0
+    assert market_read([snap(1, "hardrockbet", 24.5)])["hr_vs_market"] is None  # HR alone
+    assert market_read(market(1, 24.5))["hr_vs_market"] is None  # no Hard Rock
+    # the synthetic aggregate never enters the median; Hard Rock itself neither
+    snaps = [snap(1, "hardrockbet", 25.0), snap(1, "draftkings", 24.5), snap(1, "consensus", 30.0)]
+    assert market_read(snaps)["hr_vs_market"] == 0.5
 
 
 def test_latest_snapshot_per_book_and_hard_rock_open():
@@ -347,6 +511,8 @@ ITEM_KEYS = {
     "hr_open",
     "market_line",
     "fair_under",
+    "fair_source",
+    "hr_vs_market",
     "ev",
     "bv_line",
     "gap",
@@ -422,6 +588,92 @@ def test_off_market_pass_still_qualifies_with_blocker_off_market():
     it = only(card([game()], snaps, [model(1, 22.0)], prev))
     assert it["tier"] == "PASS" and it["blocker"] is None
     assert it["qualifies"] is True and it["paper_blocker"] == "off_market"
+
+
+def test_no_comparable_price_is_a_paper_only_edge_with_blocker_no_fair_price():
+    """Hard Rock alone at 24.5 -110: the gap qualifies but no book or exchange
+    is priced at that number, so the price cannot be judged. Never a BET."""
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)]
+    c = card([game()], snaps, [model(1, 22.4)])
+    it = only(c)
+    assert it["qualifies"] is True and it["gap"] == 2.1
+    assert it["ev"] is None and it["fair_under"] is None and it["fair_source"] is None
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price"
+    assert it["action"] == (
+        "Wait: Hard Rock’s -110 can’t be judged — no other book or exchange is priced at 24.5. "
+        "Paper only until a comparable price appears."
+    )
+    assert it["hr_vs_market"] is None
+    assert c["counts"] == {"bet": 0, "edge": 1, "pass": 0, "over_cap": 0}
+    assert c["paper"]["qualifying"] == 1
+
+
+def test_unpriced_hard_rock_line_is_blocked_as_no_fair_price():
+    snaps = [snap(1, "hardrockbet", 24.5, None, None)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["hr_price"] is None and it["ev"] is None
+    assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4) and it["fair_source"] == "books"
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price"
+    assert it["action"].startswith("Wait: Hard Rock hasn’t priced its 24.5 under yet")
+    # The why sentence must not contradict that action by blaming the other
+    # books: three of them ARE priced at 24.5 — Hard Rock is the one that isn't.
+    assert (
+        "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge."
+    ) in it["why"]
+
+
+def test_price_sentence_blames_the_other_books_only_when_hard_rock_has_a_price():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)]  # Hard Rock alone
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["ev"] is None
+    assert (
+        "Hard Rock has under 24.5 at -110; not enough other books at that number to judge "
+        "the price."
+    ) in it["why"]
+
+
+def test_blocker_order_off_market_then_price_then_no_fair_price_then_qb_out():
+    assert PAPER_BLOCKERS == ("off_market", "price", "no_fair_price", "qb_out")
+    # Hard Rock alone (no fair price) AND a QB out: the price gate's "cannot
+    # judge" branch is named first; the QB news is transient.
+    prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
+    it = only(card([game()], [snap(1, "hardrockbet", 24.5)], [model(1, 22.4)], prev))
+    assert it["blocker"] == "no_fair_price" and it["paper_blocker"] == "no_fair_price"
+    # Hard Rock 24.0 alone vs a market at 25.0: off-market is the market read on
+    # Hard Rock's number and comes before the price gates.
+    it = only(card([game()], [snap(1, "hardrockbet", 24.0)] + market(1, 25.0), [model(1, 21.5)]))
+    assert it["ev"] is None and it["blocker"] == "off_market"
+    assert it["paper_blocker"] == "off_market"
+
+
+def test_a_bet_needs_a_judgeable_price_but_an_exchange_quote_is_enough():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110), snap(1, "kalshi", 24.5, 100, -102)]
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["fair_source"] == "exchange" and it["tier"] == "BET" and it["blocker"] is None
+
+
+def test_hr_vs_market_chip_and_why_sentence():
+    snaps = [snap(1, "hardrockbet", 25.0, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["hr_vs_market"] == 0.5 and it["market_line"] == 24.5
+    assert it["tier"] == "BET"  # 24.5 is inside the 0.5 window, so the books still price it
+    assert (
+        "Hard Rock’s 25.0 is 0.5 points above the other books’ median (24.5) — a better number "
+        "for an under."
+    ) in it["why"]
+    snaps = [snap(1, "hardrockbet", 24.0, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.0)]))
+    assert it["hr_vs_market"] == -0.5
+    assert (
+        "Hard Rock’s 24.0 is 0.5 points below the other books’ median (24.5) — a worse number "
+        "for an under."
+    ) in it["why"]
+    # on the market: no sentence
+    it = only(card([game()], [snap(1, "hardrockbet", 24.5)] + market(1, 24.5), [model(1, 22.4)]))
+    assert it["hr_vs_market"] == 0.0
+    assert not any("other books’ median" in w for w in it["why"])
 
 
 def test_small_gap_does_not_qualify():

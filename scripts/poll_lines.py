@@ -142,12 +142,22 @@ def main() -> None:
         help="stop per-event odds calls once remaining monthly credits hit this "
         "floor (reserves budget for the Sunday opener capture); 0 disables",
     )
+    ap.add_argument(
+        "--regions",
+        default=None,
+        help="Odds API regions for the per-event 1H calls (default: config odds_api.regions, "
+        "us,us2); each extra region costs one more credit per event. NB: us_ex buys nothing "
+        "here — the exchanges (Kalshi, Novig, ...) post no first-half totals (verified "
+        "2026-09-07 against the live API), so no scheduled sweep passes it",
+    )
     args = ap.parse_args()
 
     if not try_init_db():
         return
     cfg = load_config().get("odds_api", {}) or {}
     client = OddsAPIClient()
+    if args.regions:
+        client.regions = args.regions
 
     # 1) Free: list events, then keep only those in the window (a days-ahead
     # sweep, or the games kicking off within --kickoff-within-min for a close).

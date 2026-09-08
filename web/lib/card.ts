@@ -16,8 +16,8 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 //    counts:{bet,edge,pass,over_cap,degraded},
 //    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
-//            hr_open, market_line, fair_under, ev, bv_line, gap, kill_line,
-//            kill_price, action, why:[...], paper_logged,
+//            hr_open, market_line, fair_under, fair_source, hr_vs_market, ev,
+//            bv_line, gap, kill_line, kill_price, action, why:[...], paper_logged,
 //            qualifies, paper_blocker, cap_rank, over_cap,
 //            full_game_total, spread, total_band, hook_side, key_dist,
 //            hr_vs_market, fair_source, degraded_inputs, reason}],
@@ -36,6 +36,7 @@ export type CardBlocker =
   | "no_hr_line"
   | "off_market"
   | "price"
+  | "no_fair_price"
   | "qb_out"
   | "gap"
   | "no_model"
@@ -128,6 +129,7 @@ const BLOCKERS: readonly CardBlocker[] = [
   "no_hr_line",
   "off_market",
   "price",
+  "no_fair_price",
   "qb_out",
   "gap",
   "no_model",

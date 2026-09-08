@@ -207,7 +207,60 @@ describe("edgeScore — model rows", () => {
     const lo = edgeScore({ ...base, ev: -0.2, evVerdict: "neg" });
     expect(lo.score).toBe(69); // 77 - 8
   });
+  it("no comparable price (ev null) → EDGE / no_fair_price, paper-only action", () => {
+    // Hard Rock alone at its number: gap 2.7 clears, nothing prices 24.5.
+    const e = edgeScore({
+      ...base,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(e.score).toBe(77); // no price bonus without an ev
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("no_fair_price");
+    expect(e.verdict.verdict).toBe("WATCH");
+    expect(e.action).toBe(
+      "Wait: Hard Rock’s -105 can’t be judged — no other book or exchange is priced at 24.5. Paper only until a comparable price appears.",
+    );
+    expect(e.kill.price).toBeNull();
+    // unpriced Hard Rock line: same gate, "hasn't priced" wording (not a false
+    // "no other book is priced" claim)
+    const u = edgeScore({
+      ...base,
+      hrUnderPrice: null,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(u.blocker).toBe("no_fair_price");
+    expect(u.action).toContain(
+      "Hard Rock hasn’t priced its 24.5 under yet — nothing to judge",
+    );
+    // Gate order: no_fair_price is named before qb_out (transient news) ...
+    const both = edgeScore({
+      ...base,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+      qbOut: true,
+    });
+    expect(both.blocker).toBe("no_fair_price");
+    // ... and after off_market (a market read on Hard Rock's number).
+    const off = edgeScore({
+      ...base,
+      liveLine: 26,
+      marketLine: 26,
+      bestLine: 26,
+      gap: 4.2,
+      hrLine: 24,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(off.blocker).toBe("off_market");
+  });
   it("QB out → EDGE / qb_out (−5) when the gap is short of the bar", () => {
+    // A judgeable fair price (ev 0) so the QB gate, not no_fair_price, is named.
     const e = edgeScore({
       ...base,
       hrLine: 23.3,
@@ -215,8 +268,8 @@ describe("edgeScore — model rows", () => {
       marketLine: 23.3,
       bestLine: 23.3,
       gap: 1.5,
-      ev: null,
-      evVerdict: "na",
+      ev: 0,
+      evVerdict: "fair",
       qbOut: true,
       qbOutDetail: "QB1 (knee) out",
     });

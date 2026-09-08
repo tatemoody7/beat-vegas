@@ -45,6 +45,7 @@ export type EdgeBlocker =
   | "no_hr_line"
   | "off_market"
   | "price"
+  | "no_fair_price"
   | "qb_out"
   | "gap";
 
@@ -189,9 +190,14 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     tier = "BET";
   } else if (score >= EDGE_SCORE_MIN || (!hasModel && pricePos)) {
     tier = "EDGE";
+    // Gate order (mirrors beatvegas/card.py): no_hr_line, off_market and price
+    // are market reads on Hard Rock's number; no_fair_price is the price
+    // gate's "cannot judge" branch, so it follows price; qb_out is transient
+    // news resolved by kickoff; gap is the residual.
     if (i.hrLine === null) blocker = "no_hr_line";
     else if (offMarket) blocker = "off_market";
     else if (priceNeg) blocker = "price";
+    else if (i.ev === null) blocker = "no_fair_price";
     else if (i.qbOut) blocker = "qb_out";
     else blocker = "gap";
   } else {
@@ -221,6 +227,13 @@ export function edgeScore(i: EdgeInput): EdgeResult {
         : "a fair price (-110 or better)";
     const hr = i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "unpriced";
     action = `Wait: Hard Rock is ${hr}; needs ${needs}.`;
+  } else if (blocker === "no_fair_price") {
+    if (i.hrUnderPrice === null) {
+      action = `Wait: Hard Rock hasn’t priced its ${fmt(i.hrLine)} under yet — nothing to judge. Paper only until Hard Rock posts a price.`;
+    } else {
+      const hr = american(i.hrUnderPrice);
+      action = `Wait: Hard Rock’s ${hr} can’t be judged — no other book or exchange is priced at ${fmt(i.hrLine)}. Paper only until a comparable price appears.`;
+    }
   } else if (blocker === "qb_out") {
     action =
       "Wait: a starting QB is listed out — re-check the number after the news settles.";

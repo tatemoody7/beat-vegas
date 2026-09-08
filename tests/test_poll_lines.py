@@ -237,3 +237,19 @@ def test_no_odds_yet_is_counted_not_billed_as_a_snapshot(env, monkeypatch, capsy
     _run(mod, monkeypatch, client, "--hours-back", "0", "--days-ahead", "6")
     assert len(_snaps(eng)) == 1
     assert "calls_404=2" in capsys.readouterr().out
+
+
+def test_regions_flag_sets_the_clients_regions(env, monkeypatch):
+    """--regions us,us2,us_ex (the Friday/Saturday sweeps) adds the exchanges
+    to every per-event call so the card's exchange-first fair price has a
+    quote at Hard Rock's number; without the flag the config's regions stand."""
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1,))
+    client = FakeClient(EVENTS, PAYLOADS)
+    client.regions = "us,us2"
+    _run(mod, monkeypatch, client, "--hr-universe", "--regions", "us,us2,us_ex")
+    assert client.regions == "us,us2,us_ex"
+    client = FakeClient(EVENTS, PAYLOADS)
+    client.regions = "us,us2"
+    _run(mod, monkeypatch, client, "--hr-universe")
+    assert client.regions == "us,us2"

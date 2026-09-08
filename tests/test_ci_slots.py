@@ -73,3 +73,18 @@ def test_every_cron_slot_has_sweep_args_and_a_paper_window():
 
     for slot, _ in CRON_SLOTS.values():
         assert slot in SWEEP_ARGS and slot in PAPER_WINDOW_HOURS
+
+
+def test_no_sweep_pays_for_the_exchange_region():
+    """us_ex buys nothing on this market: probed against the live Odds API on
+    2026-09-07, the region returned ZERO first-half-total bookmakers across
+    three upcoming NCAAF games, at ~50% more credits per event. Every slot
+    stays on the config regions (us,us2) — the sweeps never pass --regions."""
+    from beatvegas.ci import SWEEP_ARGS
+
+    for slot in SWEEP_ARGS:
+        assert "--regions" not in SWEEP_ARGS[slot], slot
+        assert "us_ex" not in SWEEP_ARGS[slot], slot
+    for cron in ("5 22 * * 5", "5 12 * * 6"):
+        now = utc(2026, 9, 25, 22, 9) if cron.endswith("5") else utc(2026, 9, 19, 12, 9)
+        assert "--regions" not in resolve_slot(cron, now)["sweep_args"]

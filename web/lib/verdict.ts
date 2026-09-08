@@ -115,7 +115,12 @@ export function priceSentence(i: VerdictInput): string {
       ? `under ${fmt(i.hrLine)}`
       : `under ${fmt(i.hrLine)} at ${american(i.hrUnderPrice)}`;
   if (i.ev === null) {
-    return `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
+    // Two different causes, and the headline already branches on them: blaming
+    // the other books when Hard Rock itself posted no price contradicts it (and
+    // is simply wrong — the books may all be priced). Mirrors card.py.
+    return i.hrUnderPrice === null
+      ? `Hard Rock has ${at}, but hasn’t posted a price for it yet — nothing to judge.`
+      : `Hard Rock has ${at}; not enough other books at that number to judge the price.`;
   }
   const pctTxt = fmt(Math.abs(i.ev) * 100);
   switch (i.evVerdict) {
@@ -312,9 +317,11 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       58 + hrGap * 10,
     );
   }
-  // BET needs Hard Rock's own number in the band at a price no worse than
-  // EV_FLOOR against the market's fair price (standard juice passes).
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg) {
+  // BET needs Hard Rock's own number in the band at a JUDGEABLE price no worse
+  // than EV_FLOOR against the market's fair price (standard juice passes). No
+  // fair price (no book or exchange at Hard Rock's number, or Hard Rock itself
+  // unpriced) is not a pass: it is paper only (card.py blocker no_fair_price).
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg && i.ev !== null) {
     // Confidence is the gap alone. The classifier's under_score used to gate
     // "high" (needed >= MODEL_BET_THRESHOLD); the 2026-09-06 post-mortem found
     // every score band hits the same rate against a fair line, so it no longer
@@ -337,6 +344,17 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
       false,
       60 + hrGap * 10,
+    );
+  }
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.ev === null) {
+    return out(
+      "WATCH",
+      "medium",
+      i.hrUnderPrice === null
+        ? "Model edge in range, but Hard Rock hasn’t priced its under yet — the price can’t be judged. Paper only."
+        : "Model edge in range, but no other book or exchange is priced at Hard Rock’s number — the price can’t be judged. Paper only.",
+      false,
+      59 + hrGap * 10,
     );
   }
   if (i.hrLine === null && consensusGap >= BET_GAP_PTS) {

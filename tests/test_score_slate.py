@@ -204,7 +204,7 @@ def _closes_for(df: pd.DataFrame, seasons_below: int, n: int = None) -> dict:
 # landed: the bv_line engine must keep producing these numbers. Compared with a
 # tolerance, not ==: CI runs ubuntu/py3.11, where a different BLAS can sum the
 # tree ensemble in another order and shift the .round(2) value.
-_PIN_TOL = 0.006
+_PIN_TOL = 0.011  # one cent of rounding: a BLAS-order flip lands exactly 0.01 away
 _BV_LINE_PIN = {
     723: 24.33,
     733: 19.47,

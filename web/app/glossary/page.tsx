@@ -116,10 +116,7 @@ export default function GlossaryPage() {
         <Link href="/" className="bv-nav-link">
           board
         </Link>
-        {`, in the bankroll strip. `}
-        <Link href="/trust" className="bv-nav-link">
-          How much to trust this →
-        </Link>
+        {`, in the bankroll strip.`}
       </p>
     </div>
   );

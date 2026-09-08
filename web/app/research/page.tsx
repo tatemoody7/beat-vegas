@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 // per-game records.
 //
 // Copy rule (spec §24): "gap" is never called an edge here, no headings are
-// questions, and the honesty caveats live once on /trust rather than being
+// questions, and the honesty caveat is said once, above, rather than being
 // repeated under every table.
 export default async function ResearchPage({
   searchParams,
@@ -106,10 +106,7 @@ export default async function ResearchPage({
             {`First halves come out around ${(100 * edge.mean).toFixed(1)}% of the full-game total, which is about where books set the first-half line. Where no real first-half line exists we estimate one: ${proxyShareText()}.`}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            {`Graded against that estimate, nothing here beat the ${BREAKEVEN_PCT}% you need at -110. `}
-            <Link href="/trust" className="bv-nav-link">
-              How much to trust this →
-            </Link>
+            {`Graded against that estimate, nothing here beat the ${BREAKEVEN_PCT}% you need at -110.`}
           </p>
         </>
       ) : (

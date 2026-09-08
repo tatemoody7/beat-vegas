@@ -1,3 +1,4 @@
+import { slipBlockText, type SlipBlockContext } from "@/lib/labels";
 import {
   killLabel,
   lineLabel,
@@ -143,27 +144,18 @@ export function killBlocks(
   return null;
 }
 
-const BLOCK_REASON: Record<SlipBlock, string> = {
-  degraded: "card inputs degraded — paper only",
-  kill_line: "below kill line",
-  kill_price: "worse than kill price",
-  cap: "over the weekly cap",
-};
-
-/** Only kill_line/kill_price change wording when the block is live-sourced. */
-const LIVE_BLOCK_REASON: Partial<Record<SlipBlock, string>> = {
-  kill_line: "Hard Rock’s live line is below the kill line",
-  kill_price: "Hard Rock’s live price is worse than the kill price",
-};
-
 /**
- * The disabled-reason text for a slip block. `live` is true when the block
- * came from Hard Rock's live number (row.blockedBy), false when it came from
- * the line/price the user typed in.
+ * The disabled-reason text for a slip block, in plain English (lib/labels.ts
+ * slipBlockText). `live` is true when the block came from Hard Rock's live
+ * number (row.blockedBy), false when it came from the line/price the user
+ * typed in; `ctx` carries the numbers so the sentence can name them.
  */
-export function blockReason(block: SlipBlock, live: boolean): string {
-  if (live) return LIVE_BLOCK_REASON[block] ?? BLOCK_REASON[block];
-  return BLOCK_REASON[block];
+export function blockReason(
+  block: SlipBlock,
+  live: boolean,
+  ctx: SlipBlockContext = {},
+): string {
+  return slipBlockText(block, live, ctx);
 }
 
 export type EffectiveBlock = { block: SlipBlock | null; isLive: boolean };

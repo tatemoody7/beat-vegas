@@ -161,6 +161,44 @@ def test_failed_preview_degrades_the_games_with_no_qb_read_from_today():
     assert d[0]["detail"] == "rotowire_empty: 2 games with no QB read from today"
 
 
+def test_a_preview_that_wrote_blanks_today_degrades_the_card_but_no_single_game():
+    """KNOWN SHAPE, worth pinning: when Rotowire is empty but ESPN is up, the
+    preview run still upserts a row per game — dated TODAY, with blank injuries.
+    By the "missing or written before today" rule no single game is stale, so
+    the entry comes back BUILD-WIDE (game_ids []), which web/lib/card.ts renders
+    as a whole-card warning. The banner and the CARD STATUS line fire; no
+    individual bet is blocked."""
+    d = degraded_inputs(
+        [game(1)],
+        preview_status={"ok": False, "reason": "rotowire_empty"},
+        previews=[preview_row(1, updated_at=NOW)],
+        predictions=[model(1, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d == [
+        {
+            "input": "preview",
+            "detail": "rotowire_empty: 0 games with no QB read from today",
+            "game_ids": [],
+        }
+    ]
+    c = build_card(
+        [game(1)],
+        bet_snaps(1),
+        [model(1, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=d,
+    )
+    assert c["status"] == "degraded" and c["counts"]["degraded"] == 0
+    assert c["items"][0]["blocker"] is None  # still a bettable BET
+    assert c["items"][0]["cap_rank"] == 1
+
+
 def test_missing_pace_and_missing_weather_are_separate_per_game_signals():
     d = degraded_inputs(
         [game(1), game(2), game(3)],

@@ -99,8 +99,6 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   hrOpen: null,
   marketLine: null,
   fairUnder: null,
-  fairSource: null,
-  hrVsMarket: null,
   ev: null,
   bvLine: null,
   gap: null,

@@ -71,10 +71,6 @@ export type CardItem = {
   hrOpen: number | null;
   marketLine: number | null;
   fairUnder: number | null;
-  /** Where the fair price came from: exchanges at Hard Rock's exact line, else the book median; null = none (no_fair_price). */
-  fairSource: "exchange" | "books" | null;
-  /** Hard Rock's line minus the other books' median; null without both. */
-  hrVsMarket: number | null;
   ev: number | null;
   bvLine: number | null;
   gap: number | null;
@@ -194,11 +190,6 @@ function parseItem(raw: unknown): CardItem | null {
     hrOpen: num(raw.hr_open),
     marketLine: num(raw.market_line),
     fairUnder: num(raw.fair_under),
-    fairSource:
-      raw.fair_source === "exchange" || raw.fair_source === "books"
-        ? raw.fair_source
-        : null,
-    hrVsMarket: num(raw.hr_vs_market),
     ev: num(raw.ev),
     bvLine: num(raw.bv_line),
     gap: num(raw.gap),

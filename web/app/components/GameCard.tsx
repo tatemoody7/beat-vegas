@@ -546,7 +546,7 @@ export default function GameCard({ g }: { g: HomeGame }) {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="block w-full p-4 text-left"
+        className="flex w-full flex-col items-stretch p-4 text-left"
       >
         <span className="flex items-start gap-3">
           <ScoreBadge

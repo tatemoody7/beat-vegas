@@ -25,6 +25,12 @@
   --over-lean: #ea580c; /* orange */
   --over: #dc2626; /* red    */
 
+  /* Warnings, disabled reasons, stale/degraded notices — amber. Never
+     green/red here: those are reserved for under/over outcomes. */
+  --warn: #e0a44a;
+  --warn-border: #6b4a1f;
+  --warn-bg: #241a0c;
+
   /* Elevation */
   --shadow-card:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
@@ -188,9 +194,9 @@ body {
     border-color: var(--accent-strong);
   }
   .bv-fac-badge-amber {
-    color: #e0a44a;
-    border-color: #6b4a1f;
-    background: #241a0c;
+    color: var(--warn);
+    border-color: var(--warn-border);
+    background: var(--warn-bg);
   }
   .bv-fac-track {
     position: relative;
@@ -329,8 +335,11 @@ body {
     /* Underline lives INSIDE the box (bottom: 0) so the nav never needs
        vertical overflow — an overflow-x scroll container clips overflow-y too,
        which is what cut the tab text off at the top in production. */
-    padding: 0.35rem 0.1rem 0.75rem;
-    margin-bottom: -0.75rem;
+    display: inline-flex;
+    align-items: center;
+    /* 44px accessible tap target — must survive the tighter phone layout. */
+    min-height: 2.75rem;
+    padding-inline: 0.1rem;
     font-size: 0.9rem;
     color: var(--text-muted);
     white-space: nowrap;
@@ -353,6 +362,16 @@ body {
     border-radius: 2px;
     background: var(--accent);
     box-shadow: 0 0 10px var(--accent);
+  }
+}
+
+/* Phones only: below `sm` the header's nav row (MainNav) holds all four
+   labels — Board/Results/Research/Glossary — on one line at a tighter
+   gap-x-4. Drop the label size a touch so they fit at 375px without
+   wrapping; `sm`+ keeps the normal 0.9rem from .bv-nav-link above. */
+@media (max-width: 640px) {
+  .bv-nav-link {
+    font-size: 0.82rem;
   }
 }
 

@@ -32,10 +32,14 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-[var(--bg)]/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl items-center gap-8 px-6 py-3">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 sm:px-6">
+            {/* Below `sm`, order puts the wordmark + Lock button on row 1
+                (justify-between via ml-auto) and forces MainNav's own
+                `w-full` onto row 2 by itself. At `sm`+ the orders collapse
+                back to today's single row: wordmark, nav, Lock. */}
             <Link
               href="/"
-              className="shrink-0 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight"
+              className="order-1 shrink-0 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight"
             >
               <span className="text-[var(--accent)]">BEAT</span>
               <span className="text-[var(--text)]"> VEGAS</span>
@@ -45,7 +49,7 @@ export default function RootLayout({
             </Link>
             <MainNav />
             {gateEnabled() && (
-              <div className="ml-auto shrink-0">
+              <div className="order-2 ml-auto shrink-0 sm:order-4">
                 <LogoutButton />
               </div>
             )}

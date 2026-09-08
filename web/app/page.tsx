@@ -1,5 +1,5 @@
 import { getSeasons } from "@/lib/board";
-import { buildBetSlip } from "@/lib/betSlip";
+import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
 import {
   getHomeBoard,
@@ -12,6 +12,7 @@ import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BetSlip from "@/app/components/BetSlip";
 import BoardFilters from "@/app/components/BoardFilters";
+import CardStatusBanner from "@/app/components/CardStatusBanner";
 import CardPanel from "@/app/components/CardPanel";
 import GameCard from "@/app/components/GameCard";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -48,7 +49,17 @@ export default async function BoardPage({
   ]);
   const card =
     latestCard !== null && latestCard.week === board.week ? latestCard : null;
-  const slip = buildBetSlip(card, board.weekPicks, board.bankroll.cap);
+  // The slip reconciles the frozen card against the live Hard Rock numbers
+  // this same render loaded, so a moved line or a kill breach shows before
+  // the tap, not after the server says no.
+  const live = liveLinesFrom(board.games);
+  const slip = buildBetSlip(
+    card,
+    board.weekPicks,
+    board.bankroll.cap,
+    new Date(),
+    live,
+  );
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -78,9 +89,25 @@ export default async function BoardPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <BankrollStrip b={board.bankroll} />
-
-      {card !== null && <BetSlip slip={slip} week={board.week} />}
+      {/* Phone: the slip first (it is what Saturday morning is for), bankroll
+          under it. md+: bankroll first, then the slip. */}
+      <div className="flex flex-col">
+        <div className="order-1 md:order-2">
+          {card !== null && (
+            <>
+              <CardStatusBanner card={card} />
+              <BetSlip
+                slip={slip}
+                week={board.week}
+                unitUsd={board.bankroll.unitUsd}
+              />
+            </>
+          )}
+        </div>
+        <div className="order-2 md:order-1">
+          <BankrollStrip b={board.bankroll} />
+        </div>
+      </div>
 
       <CardPanel card={card} />
 
@@ -89,7 +116,7 @@ export default async function BoardPage({
       </div>
 
       {board.noModel && (
-        <div className="bv-card mb-4 border-l-2 border-[#e0a44a] p-4 text-sm text-[var(--text-muted)]">
+        <div className="bv-card mb-4 border-l-2 border-[var(--warn)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
             No model read this week.
           </p>

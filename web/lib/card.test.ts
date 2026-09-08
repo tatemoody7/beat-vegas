@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   asIso,
   cardAge,
+  cardHealth,
   CLOSEST_ROWS,
   killLabel,
   lineLabel,
   MAX_CARD_ROWS,
   parseCard,
   relativeAge,
+  STALE_CARD_HOURS,
   summarizeCard,
   type Card,
   type CardItem,
@@ -111,6 +113,10 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   overCap: false,
   totalBand: null,
   hookSide: null,
+  hrVsMarket: null,
+  fairSource: null,
+  reason: null,
+  degradedInputs: [],
   ...o,
 });
 
@@ -119,7 +125,10 @@ const card = (o: Partial<Card> = {}): Card => ({
   week: 3,
   builtAt: "2026-09-11T22:07:12Z",
   modelRead: true,
-  counts: { bet: 0, edge: 0, pass: 0, overCap: 0 },
+  slot: null,
+  status: "final",
+  degraded: [],
+  counts: { bet: 0, edge: 0, pass: 0, overCap: 0, degraded: 0 },
   paper: { qualifying: 0, overCap: 0, cap: 5 },
   items: [],
   notes: [],
@@ -136,7 +145,13 @@ describe("parseCard", () => {
     expect(c!.week).toBe(3);
     expect(c!.builtAt).toBe("2026-09-11T22:07:12.000Z");
     expect(c!.modelRead).toBe(true);
-    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 });
+    expect(c!.counts).toEqual({
+      bet: 1,
+      edge: 2,
+      pass: 1,
+      overCap: 0,
+      degraded: 0,
+    });
     expect(c!.notes).toEqual([
       "Hard Rock is holding 6% on first halves this week.",
     ]);
@@ -189,16 +204,31 @@ describe("parseCard", () => {
       week: 3,
       builtAt: null,
       modelRead: false,
-      counts: { bet: 0, edge: 0, pass: 0, overCap: 0 },
+      slot: null,
+      status: "final",
+      degraded: [],
+      counts: { bet: 0, edge: 0, pass: 0, overCap: 0, degraded: 0 },
       paper: { qualifying: 0, overCap: 0, cap: 5 },
       items: [],
       notes: [],
     });
     const d = parseCard(rawCard({ counts: "nope", notes: null }));
-    expect(d!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 });
+    expect(d!.counts).toEqual({
+      bet: 1,
+      edge: 2,
+      pass: 1,
+      overCap: 0,
+      degraded: 0,
+    });
     expect(d!.notes).toEqual([]);
     const e = parseCard(rawCard({ counts: { bet: 4 } }));
-    expect(e!.counts).toEqual({ bet: 4, edge: 2, pass: 1, overCap: 0 });
+    expect(e!.counts).toEqual({
+      bet: 4,
+      edge: 2,
+      pass: 1,
+      overCap: 0,
+      degraded: 0,
+    });
   });
 
   it("drops items with no game id or team and defaults odd fields", () => {
@@ -237,7 +267,13 @@ describe("parseCard", () => {
       why: ["ok"],
       paperLogged: true,
     });
-    expect(c!.counts).toEqual({ bet: 1, edge: 2, pass: 1, overCap: 0 }); // payload's own
+    expect(c!.counts).toEqual({
+      bet: 1,
+      edge: 2,
+      pass: 1,
+      overCap: 0,
+      degraded: 0,
+    }); // payload's own
   });
 
   it("normalises a naive Postgres timestamp as UTC", () => {
@@ -484,12 +520,30 @@ describe("parseCard: paper ledger fields", () => {
     const own = parseCard(
       rawCard({ counts: { bet: 1, edge: 1, pass: 0, over_cap: 1 }, items }),
     )!;
-    expect(own.counts).toEqual({ bet: 1, edge: 1, pass: 0, overCap: 1 });
+    expect(own.counts).toEqual({
+      bet: 1,
+      edge: 1,
+      pass: 0,
+      overCap: 1,
+      degraded: 0,
+    });
     // A payload from before counts.over_cap existed: derive both from the items.
     const derived = parseCard(rawCard({ counts: undefined, items }))!;
-    expect(derived.counts).toEqual({ bet: 1, edge: 1, pass: 0, overCap: 1 });
+    expect(derived.counts).toEqual({
+      bet: 1,
+      edge: 1,
+      pass: 0,
+      overCap: 1,
+      degraded: 0,
+    });
     const partial = parseCard(rawCard({ counts: { bet: 2 }, items }))!;
-    expect(partial.counts).toEqual({ bet: 2, edge: 1, pass: 0, overCap: 1 });
+    expect(partial.counts).toEqual({
+      bet: 2,
+      edge: 1,
+      pass: 0,
+      overCap: 1,
+      degraded: 0,
+    });
   });
 
   it("derives the paper tallies and defaults when the payload predates them", () => {
@@ -547,5 +601,279 @@ describe("summarizeCard: the weekly cap", () => {
     expect(
       s.overCap.map((r) => [r.gameId, r.paperBlocker, r.paperLogged]),
     ).toEqual([[3, "cap", true]]);
+  });
+});
+
+// --- 2026-09 contract: slot / status / degraded / per-item provenance --------
+
+describe("parseCard (2026-09 contract)", () => {
+  it("parses slot, status, degraded and the per-item provenance fields", () => {
+    const c = parseCard(
+      rawCard({
+        slot: "saturday",
+        status: "final",
+        degraded: [],
+        counts: { bet: 1, edge: 2, pass: 1, over_cap: 0, degraded: 0 },
+        items: [
+          rawItem({
+            hr_vs_market: 0.5,
+            fair_source: "exchange",
+            reason: "model_gap",
+            degraded_inputs: [],
+          }),
+          rawItem({
+            game_id: 402,
+            tier: "EDGE",
+            blocker: "no_fair_price",
+            fair_source: "books",
+            reason: "price_edge",
+          }),
+          rawItem({
+            game_id: 403,
+            tier: "PASS",
+            blocker: "degraded",
+            degraded_inputs: ["injuries", "weather"],
+          }),
+        ],
+      }),
+    );
+    expect(c).not.toBeNull();
+    expect(c!.slot).toBe("saturday");
+    expect(c!.status).toBe("final");
+    expect(c!.degraded).toEqual([]);
+    expect(c!.items[0]).toMatchObject({
+      hrVsMarket: 0.5,
+      fairSource: "exchange",
+      reason: "model_gap",
+      degradedInputs: [],
+    });
+    expect(c!.items[1]).toMatchObject({
+      blocker: "no_fair_price",
+      fairSource: "books",
+      reason: "price_edge",
+    });
+    expect(c!.items[2]).toMatchObject({
+      blocker: "degraded",
+      degradedInputs: ["injuries", "weather"],
+    });
+  });
+
+  it("defaults: no slot → null, no status → final, no degraded → []", () => {
+    const c = parseCard(rawCard());
+    expect(c!.slot).toBeNull();
+    expect(c!.status).toBe("final");
+    expect(c!.degraded).toEqual([]);
+    expect(c!.items[0]).toMatchObject({
+      hrVsMarket: null,
+      fairSource: null,
+      reason: null,
+      degradedInputs: [],
+    });
+  });
+
+  it("junk slot/status/fair_source/reason fall back; hr_vs_market must be numeric", () => {
+    const c = parseCard(
+      rawCard({
+        slot: "tuesday",
+        status: "wat",
+        items: [
+          rawItem({
+            hr_vs_market: "abc",
+            fair_source: "vibes",
+            reason: "gut",
+            degraded_inputs: ["weather", 3, ""],
+          }),
+        ],
+      }),
+    );
+    expect(c!.slot).toBeNull();
+    expect(c!.status).toBe("final");
+    expect(c!.items[0]).toMatchObject({
+      hrVsMarket: null,
+      fairSource: null,
+      reason: null,
+      degradedInputs: ["weather"],
+    });
+    expect(parseCard(rawCard({ slot: "friday" }))!.slot).toBe("friday");
+    expect(parseCard(rawCard({ slot: "weeknight" }))!.slot).toBe("weeknight");
+    expect(parseCard(rawCard({ slot: "manual" }))!.slot).toBe("manual");
+    expect(parseCard(rawCard({ status: "preview" }))!.status).toBe("preview");
+  });
+
+  it("a non-empty degraded list forces status to degraded and keeps only well-formed entries", () => {
+    const c = parseCard(
+      rawCard({
+        status: "final",
+        degraded: [
+          { input: "injuries", detail: "Rotowire 503", game_ids: [401, "x"] },
+          { input: "", detail: "nope" },
+          { input: "weather" },
+          "junk",
+        ],
+      }),
+    );
+    expect(c!.status).toBe("degraded");
+    expect(c!.degraded).toEqual([
+      { input: "injuries", detail: "Rotowire 503", gameIds: [401] },
+      { input: "weather", detail: "", gameIds: [] },
+    ]);
+    // An explicit "degraded" status with an empty list is still honoured.
+    expect(parseCard(rawCard({ status: "degraded" }))!.status).toBe("degraded");
+  });
+
+  it("counts.bet excludes over-cap BETs when the payload omits counts; overCap/degraded derive too", () => {
+    const c = parseCard(
+      rawCard({
+        counts: undefined,
+        items: [
+          rawItem({ game_id: 1 }),
+          rawItem({ game_id: 2, cap_rank: 6, over_cap: true, blocker: "cap" }),
+          rawItem({ game_id: 3, tier: "PASS", blocker: "degraded" }),
+        ],
+      }),
+    );
+    expect(c!.counts).toEqual({
+      bet: 1,
+      edge: 0,
+      pass: 1,
+      overCap: 1,
+      degraded: 1,
+    });
+    const d = parseCard(
+      rawCard({
+        counts: { bet: 3, edge: 0, pass: 0, over_cap: 2, degraded: 1 },
+      }),
+    );
+    expect(d!.counts).toEqual({
+      bet: 3,
+      edge: 0,
+      pass: 0,
+      overCap: 2,
+      degraded: 1,
+    });
+  });
+});
+
+describe("cardHealth", () => {
+  const SAT_9AM = new Date("2026-09-19T13:00:00Z"); // Sat 9:00am ET
+  const TUE = new Date("2026-09-15T13:00:00Z"); // Tue 9:00am ET
+
+  it("is ok for a Saturday final built minutes before it is read", () => {
+    const h = cardHealth(
+      card({
+        slot: "saturday",
+        status: "final",
+        builtAt: "2026-09-19T12:05:00Z",
+      }),
+      new Date("2026-09-19T12:10:00Z"),
+    );
+    expect(h.level).toBe("ok");
+  });
+
+  it("warns on a Friday preview read on Saturday, naming the slot", () => {
+    const h = cardHealth(
+      card({
+        slot: "friday",
+        status: "preview",
+        builtAt: "2026-09-18T22:07:00Z",
+      }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe(
+      "Preview card (friday) — the Saturday final builds 8:05–8:45am ET",
+    );
+  });
+
+  it("warns on a legacy row (no slot/status) built Friday evening and read Saturday morning", () => {
+    const h = cardHealth(card({ builtAt: "2026-09-18T22:00:00Z" }), SAT_9AM);
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe("Card is 15h ago — the Saturday final has not landed");
+    expect(STALE_CARD_HOURS).toBe(6);
+  });
+
+  it("is ok for a Saturday final built 8:45am ET and read 3pm ET the same day (not stale)", () => {
+    const h = cardHealth(
+      card({
+        slot: "saturday",
+        status: "final",
+        builtAt: "2026-09-19T12:45:00Z", // 8:45am ET
+      }),
+      new Date("2026-09-19T19:00:00Z"), // 3:00pm ET
+    );
+    expect(h.level).toBe("ok");
+  });
+
+  it("still warns a Friday preview read at 3pm ET Saturday (preview rule, not the stale rule)", () => {
+    const h = cardHealth(
+      card({
+        slot: "friday",
+        status: "preview",
+        builtAt: "2026-09-18T22:07:00Z",
+      }),
+      new Date("2026-09-19T19:00:00Z"), // 3:00pm ET Saturday
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe(
+      "Preview card (friday) — the Saturday final builds 8:05–8:45am ET",
+    );
+  });
+
+  it("warns with manual-specific copy for a manual-slot preview read on Saturday", () => {
+    const h = cardHealth(
+      card({
+        slot: "manual",
+        status: "preview",
+        builtAt: "2026-09-19T12:07:00Z", // Sat 8:07am ET
+      }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toContain("Manual card");
+    expect(h.title).toContain("slot=saturday");
+    expect(h.title).toBe(
+      "Manual card built Sat 8:07am ET — re-run with slot=saturday for a final",
+    );
+  });
+
+  it("omits the time when a manual card has no builtAt", () => {
+    const h = cardHealth(
+      card({ slot: "manual", status: "preview", builtAt: null }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe("Manual card — re-run with slot=saturday for a final");
+  });
+
+  it("lists every degraded input on a degraded card", () => {
+    const h = cardHealth(
+      card({
+        slot: "saturday",
+        status: "degraded",
+        degraded: [
+          { input: "injuries", detail: "Rotowire 503", gameIds: [] },
+          { input: "odds", detail: "Hard Rock sweep timed out", gameIds: [1] },
+        ],
+      }),
+      SAT_9AM,
+    );
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe("Degraded card · saturday");
+    expect(h.details).toEqual([
+      "injuries: Rotowire 503",
+      "odds: Hard Rock sweep timed out",
+    ]);
+  });
+
+  it("is ok for a preview read on a Tuesday (the final is not due yet)", () => {
+    const h = cardHealth(
+      card({
+        slot: "weeknight",
+        status: "preview",
+        builtAt: "2026-09-14T22:00:00Z",
+      }),
+      TUE,
+    );
+    expect(h.level).toBe("ok");
   });
 });

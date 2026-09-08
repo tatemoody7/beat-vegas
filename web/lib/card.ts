@@ -1,7 +1,7 @@
 import { american, fmt } from "@/lib/format";
 import { kickoffET } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
-import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 
 // The bet card. scripts/build_card.py (GitHub Actions: weeknight and Friday
 // preview builds, then the Saturday-morning FINAL ~8:45am ET) writes one row
@@ -11,14 +11,20 @@ import { WEEKLY_BET_CAP } from "@/lib/verdict";
 // instead of a 500.
 //
 // Payload contract (exact, from the Python side):
-//   {season, week, built_at, model_read, counts:{bet,edge,pass,over_cap},
+//   {season, week, built_at, model_read, slot, status,
+//    degraded:[{input, detail, game_ids?}],
+//    counts:{bet,edge,pass,over_cap,degraded},
 //    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
 //            hr_open, market_line, fair_under, ev, bv_line, gap, kill_line,
 //            kill_price, action, why:[...], paper_logged,
 //            qualifies, paper_blocker, cap_rank, over_cap,
-//            full_game_total, spread, total_band, hook_side, key_dist}],
+//            full_game_total, spread, total_band, hook_side, key_dist,
+//            hr_vs_market, fair_source, degraded_inputs, reason}],
 //    notes:[...]}
+// slot/status/degraded and the per-item provenance fields arrived 2026-09;
+// older rows lack them and parse to null / "final" / [] so nothing breaks.
+// counts.bet excludes over-cap BETs (the bettable count).
 // Items arrive pre-sorted: BET, then EDGE, then PASS — each tier by gap desc
 // (the cap-5 rule the real-close backtest measured ranks by gap). The 6th+
 // BET by gap keeps tier BET but carries blocker "cap" and over_cap: every
@@ -33,7 +39,23 @@ export type CardBlocker =
   | "qb_out"
   | "gap"
   | "no_model"
-  | "cap";
+  | "cap"
+  /** No fair price to judge Hard Rock's against (no exchange/books at the number). */
+  | "no_fair_price"
+  /** An input the gate needs failed on this build (see Card.degraded). */
+  | "degraded";
+/** Which build wrote the card: weeknight/Friday previews, the Saturday final, or a manual run. */
+export type CardSlot = "weeknight" | "friday" | "saturday" | "manual";
+/** final = bet off it; preview = an earlier build; degraded = an input failed. */
+export type CardStatus = "final" | "preview" | "degraded";
+export type DegradedInput = {
+  input: string;
+  detail: string;
+  /** Games the failure touched; [] when it was build-wide. */
+  gameIds: number[];
+};
+/** Where the fair price came from: a no-vig exchange, or the books' consensus. */
+export type FairSource = "exchange" | "books";
 
 export type CardItem = {
   gameId: number;
@@ -67,6 +89,13 @@ export type CardItem = {
   /** Display chips (never gates): full-game total band and hook position. */
   totalBand: string | null;
   hookSide: string | null;
+  /** Hard Rock's 1H line minus the market's (+ = Hard Rock is higher, better for an under). */
+  hrVsMarket: number | null;
+  fairSource: FairSource | null;
+  /** The reason a pick off this item would log (model_gap / price_edge / manual). */
+  reason: PickReason | null;
+  /** Inputs that failed for this game on this build. */
+  degradedInputs: string[];
 };
 
 export type Card = {
@@ -75,8 +104,17 @@ export type Card = {
   /** When the card was built, UTC ISO; null when the payload did not say. */
   builtAt: string | null;
   modelRead: boolean;
-  /** bet = BETs inside the weekly cap (bettable); overCap = BETs beyond it (paper only). */
-  counts: { bet: number; edge: number; pass: number; overCap: number };
+  slot: CardSlot | null;
+  status: CardStatus;
+  degraded: DegradedInput[];
+  /** bet = bettable BETs (inside the cap); overCap = BETs beyond it; degraded = items blocked by a failed input. */
+  counts: {
+    bet: number;
+    edge: number;
+    pass: number;
+    overCap: number;
+    degraded: number;
+  };
   /** Paper ledger tallies: qualifying games, BETs over the cap, the cap. */
   paper: { qualifying: number; overCap: number; cap: number };
   items: CardItem[];
@@ -94,7 +132,17 @@ const BLOCKERS: readonly CardBlocker[] = [
   "gap",
   "no_model",
   "cap",
+  "no_fair_price",
+  "degraded",
 ];
+const SLOTS: readonly CardSlot[] = [
+  "weeknight",
+  "friday",
+  "saturday",
+  "manual",
+];
+const STATUSES: readonly CardStatus[] = ["final", "preview", "degraded"];
+const FAIR_SOURCES: readonly FairSource[] = ["exchange", "books"];
 
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "" || typeof v === "boolean") {
@@ -154,7 +202,25 @@ function parseItem(raw: unknown): CardItem | null {
     overCap: raw.over_cap === true || raw.over_cap === 1,
     totalBand: str(raw.total_band),
     hookSide: str(raw.hook_side),
+    hrVsMarket: num(raw.hr_vs_market),
+    fairSource: FAIR_SOURCES.includes(raw.fair_source as FairSource)
+      ? (raw.fair_source as FairSource)
+      : null,
+    reason: REASONS.includes(raw.reason as PickReason)
+      ? (raw.reason as PickReason)
+      : null,
+    degradedInputs: strList(raw.degraded_inputs),
   };
+}
+
+function parseDegraded(raw: unknown): DegradedInput | null {
+  if (!isObj(raw)) return null;
+  const input = str(raw.input);
+  if (input === null) return null;
+  const gameIds = Array.isArray(raw.game_ids)
+    ? raw.game_ids.map(int).filter((n): n is number => n !== null)
+    : [];
+  return { input, detail: str(raw.detail) ?? "", gameIds };
 }
 
 /**
@@ -187,6 +253,7 @@ export function parseCard(raw: unknown): Card | null {
     edge: items.filter((i) => i.tier === "EDGE").length,
     pass: items.filter((i) => i.tier === "PASS").length,
     overCap: items.filter((i) => i.overCap).length,
+    degraded: items.filter((i) => i.blocker === "degraded").length,
   };
   const c = isObj(obj.counts) ? obj.counts : {};
   const counts = {
@@ -194,7 +261,23 @@ export function parseCard(raw: unknown): Card | null {
     edge: int(c.edge) ?? derived.edge,
     pass: int(c.pass) ?? derived.pass,
     overCap: int(c.over_cap) ?? derived.overCap,
+    degraded: int(c.degraded) ?? derived.degraded,
   };
+  const degraded = Array.isArray(obj.degraded)
+    ? obj.degraded
+        .map(parseDegraded)
+        .filter((d): d is DegradedInput => d !== null)
+    : [];
+  const slot = SLOTS.includes(obj.slot as CardSlot)
+    ? (obj.slot as CardSlot)
+    : null;
+  // A failed input always shows as degraded, whatever the builder said.
+  const status: CardStatus =
+    degraded.length > 0
+      ? "degraded"
+      : STATUSES.includes(obj.status as CardStatus)
+        ? (obj.status as CardStatus)
+        : "final";
   const pp = isObj(obj.paper) ? obj.paper : {};
   const paper = {
     qualifying: int(pp.qualifying) ?? items.filter((i) => i.qualifies).length,
@@ -207,6 +290,9 @@ export function parseCard(raw: unknown): Card | null {
     week,
     builtAt: asIso(obj.built_at),
     modelRead: obj.model_read === true || obj.model_read === 1,
+    slot,
+    status,
+    degraded,
     counts,
     paper,
     items,
@@ -272,6 +358,80 @@ export function cardAge(
   if (iso === null) return null;
   const d = new Date(iso);
   return `built ${builtET(d)} ET · ${relativeAge(d, now)}`;
+}
+
+// --- health (is this the card to bet off?) ---------------------------------------
+
+/** A card older than this, read on a Saturday, means the final never landed. */
+export const STALE_CARD_HOURS = 6;
+
+/** Weekday in ET ("Sat"). */
+function weekdayET(d: Date): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: ET, weekday: "short" })
+    .format(d)
+    .slice(0, 3);
+}
+
+export type CardHealth = {
+  level: "ok" | "warn";
+  title: string;
+  details: string[];
+};
+
+/**
+ * Pure: whether the card on screen is the one to bet off. In order: a
+ * degraded build warns and lists the failed inputs; on a Saturday (ET) a
+ * preview build, or one built for another slot, warns that the final has not
+ * replaced it; on a Saturday a legacy row (no slot/status) older than
+ * STALE_CARD_HOURS warns the same way. Anything else is ok — a Friday preview
+ * read on Friday is exactly what it should be.
+ */
+export function cardHealth(card: Card, now: Date): CardHealth {
+  if (card.status === "degraded") {
+    return {
+      level: "warn",
+      title: `Degraded card · ${card.slot ?? "unknown slot"}`,
+      details: card.degraded.map((d) =>
+        d.detail === "" ? d.input : `${d.input}: ${d.detail}`,
+      ),
+    };
+  }
+  const saturday = weekdayET(now) === "Sat";
+  if (
+    saturday &&
+    (card.status === "preview" ||
+      (card.slot !== null && card.slot !== "saturday"))
+  ) {
+    if (card.slot === "manual") {
+      const when =
+        card.builtAt === null
+          ? ""
+          : ` built ${builtET(new Date(card.builtAt))} ET`;
+      return {
+        level: "warn",
+        title: `Manual card${when} — re-run with slot=saturday for a final`,
+        details: [],
+      };
+    }
+    return {
+      level: "warn",
+      title: `Preview card (${card.slot ?? "preview"}) — the Saturday final builds 8:05–8:45am ET`,
+      details: [],
+    };
+  }
+  const isSaturdayFinal = card.slot === "saturday" && card.status === "final";
+  if (saturday && !isSaturdayFinal && card.builtAt !== null) {
+    const built = new Date(card.builtAt);
+    const ageMs = now.getTime() - built.getTime();
+    if (ageMs > STALE_CARD_HOURS * 3_600_000) {
+      return {
+        level: "warn",
+        title: `Card is ${relativeAge(built, now)} — the Saturday final has not landed`,
+        details: [],
+      };
+    }
+  }
+  return { level: "ok", title: "", details: [] };
 }
 
 // --- summary (what the panel shows) --------------------------------------------

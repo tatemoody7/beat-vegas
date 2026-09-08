@@ -1,20 +1,18 @@
 import type { Bankroll } from "@/lib/homeBoard";
 
-// Bankroll + discipline strip for the This Week page. Cyan is the brand accent;
-// green/red appear only on the signed units figure (an outcome).
-export default function BankrollStrip({ b }: { b: Bankroll }) {
-  const usd = (n: number) =>
-    n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-  const unitsColor =
-    b.realUnits > 0
-      ? "var(--under-strong)"
-      : b.realUnits < 0
-        ? "var(--over)"
-        : "var(--text-muted)";
-  const capHit = b.weekBets >= b.cap;
+// Bankroll + discipline strip on the home board. On a phone it folds into one
+// summary line (the slip sits above it on Saturday morning); md+ shows the
+// full grid. Cyan is the brand accent; amber marks a used-up cap. Green/red
+// never appear here — outcomes are graded on the ledger, not the strip.
+const usd = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
+const signedUnits = (u: number) => `${u > 0 ? "+" : ""}${u.toFixed(2)}u`;
+
+function Grid({ b }: { b: Bankroll }) {
+  const capHit = b.weekBets >= b.cap;
   return (
-    <div className="bv-card mb-6 p-4">
+    <>
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div
           className="bv-stat"
@@ -39,8 +37,8 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
           title="Profit or loss in units on settled real-money first-half bets this season. ROI = units won ÷ units staked."
         >
           <span className="bv-stat-label">Season</span>
-          <span className="bv-stat-value text-xl" style={{ color: unitsColor }}>
-            {`${b.realUnits > 0 ? "+" : ""}${b.realUnits.toFixed(2)}u`}
+          <span className="bv-stat-value text-xl text-[var(--text)]">
+            {signedUnits(b.realUnits)}
           </span>
           <span className="text-xs text-[var(--text-dim)]">
             {b.real
@@ -55,7 +53,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
           <span className="bv-stat-label">This week</span>
           <span
             className="bv-stat-value text-xl"
-            style={{ color: capHit ? "#e0a44a" : "var(--text)" }}
+            style={{ color: capHit ? "var(--warn)" : "var(--text)" }}
           >
             {`${b.weekBets} / ${b.cap} bets`}
           </span>
@@ -88,6 +86,31 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
             <span className="bv-pill-value">{rule}</span>
           </span>
         ))}
+      </div>
+    </>
+  );
+}
+
+export default function BankrollStrip({ b }: { b: Bankroll }) {
+  const summary = `${usd(b.currentUsd)} · ${signedUnits(b.realUnits)} · ${b.weekBets}/${b.cap} this week`;
+  return (
+    <div className="bv-card mb-6 p-4">
+      <details className="md:hidden">
+        <summary
+          className="flex min-h-11 cursor-pointer items-center justify-between gap-2 font-mono text-sm text-[var(--text)]"
+          title="Bankroll, season units and this week’s bets against the cap. Tap for the full strip."
+        >
+          <span>{summary}</span>
+          <span aria-hidden="true" className="text-xs text-[var(--text-dim)]">
+            ▾
+          </span>
+        </summary>
+        <div className="mt-3">
+          <Grid b={b} />
+        </div>
+      </details>
+      <div className="hidden md:flex md:flex-col">
+        <Grid b={b} />
       </div>
     </div>
   );

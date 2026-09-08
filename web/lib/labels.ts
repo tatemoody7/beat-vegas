@@ -120,10 +120,12 @@ export function blockerTag(
       return ctx.killLine != null
         ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`
         : "Not yet — the gap is too small";
-    case "no_model":
-      return MIN_GAMES_FOR_MODEL > 0
-        ? `No model number yet — needs ${MIN_GAMES_FOR_MODEL} game${MIN_GAMES_FOR_MODEL === 1 ? "" : "s"} played`
+    case "no_model": {
+      const need: number = MIN_GAMES_FOR_MODEL;
+      return need > 0
+        ? `No model number yet — needs ${need} game${need === 1 ? "" : "s"} played`
         : "No model number yet — the week has not been scored";
+    }
     case "cap":
       return `Past the ${WEEKLY_BET_CAP}-bet week — paper only`;
     case "degraded":

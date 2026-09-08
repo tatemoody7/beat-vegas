@@ -104,11 +104,15 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(82); // 50 + 27 + round(1.2)
     expect(e.tier).toBe("BET");
     expect(e.blocker).toBeNull();
-    expect(e.action).toBe("Bet now: 1H under 24.5 at -105 on Hard Rock.");
+    expect(e.action).toBe(
+      "Bet one unit: first-half under 24.5 at -105 at Hard Rock.",
+    );
     expect(e.verdict.verdict).toBe("BET");
     expect(e.kill.line).toBe(24);
     expect(e.kill.price).toBe(-120); // fair 0.52: -120 is -4.7%, -125 is -6.4%
-    expect(e.kill.text).toBe("Not worth it below u24.0 or worse than -120.");
+    expect(e.kill.text).toBe(
+      "No longer a bet below u24.0, or at a worse price than -120.",
+    );
   });
   it("no Hard Rock line + big market gap → EDGE / no_hr_line, action names the line to take", () => {
     const e = edgeScore({
@@ -123,10 +127,10 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
-      "No Hard Rock line yet. A bet at under 24.0 or higher, -110 or better.",
+      "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher.",
     );
     expect(e.kill.price).toBeNull();
-    expect(e.kill.text).toBe("Not worth it below u24.0.");
+    expect(e.kill.text).toBe("No longer a bet below u24.0.");
   });
   it("falls back to the derived line when nothing live is posted", () => {
     const e = edgeScore({
@@ -163,7 +167,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("off_market");
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.action).toBe(
-      "Wait: Hard Rock’s 24.0 is 2.0 below the market’s 26.0 — giving up points and a void risk. Bet if it moves to 25.5 or higher.",
+      "Not yet — Hard Rock’s 24.0 is 2.0 below the market line of 26.0. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to 25.5 or higher.",
     );
   });
   it("Hard Rock within half a point of the market is not off-market", () => {
@@ -184,7 +188,9 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("price");
     expect(e.verdict.verdict).toBe("WATCH");
-    expect(e.action).toBe("Wait: Hard Rock is -125; needs -120 or better.");
+    expect(e.action).toBe(
+      "Not yet — Hard Rock’s price is -125; needs -120 or better.",
+    );
     expect(e.kill.price).toBe(-120);
   });
   it("price too high with no market fair price asks for a fair price", () => {
@@ -197,7 +203,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(e.blocker).toBe("price");
     expect(e.action).toBe(
-      "Wait: Hard Rock is -125; needs a fair price (-110 or better).",
+      "Not yet — Hard Rock’s price is -125; needs -110 or better.",
     );
     expect(e.kill.price).toBeNull();
   });
@@ -220,7 +226,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("no_fair_price");
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.action).toBe(
-      "Wait: Hard Rock’s -105 can’t be judged — no other book or exchange is priced at 24.5. Paper only until a comparable price appears.",
+      "Not yet — no other book is at 24.5, so -105 cannot be compared. Paper only until one is.",
     );
     expect(e.kill.price).toBeNull();
     // unpriced Hard Rock line: same gate, "hasn't priced" wording (not a false
@@ -234,7 +240,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(u.blocker).toBe("no_fair_price");
     expect(u.action).toContain(
-      "Hard Rock hasn’t priced its 24.5 under yet — nothing to judge",
+      "Hard Rock has not priced its 24.5 under. Paper only until it does.",
     );
     // Gate order: no_fair_price is named before qb_out (transient news) ...
     const both = edgeScore({
@@ -277,7 +283,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
     expect(e.action).toBe(
-      "Wait: a starting QB is listed out — re-check the number after the news settles.",
+      "Starting QB out — recheck. Our number does not know about it.",
     );
   });
   it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH) and costs 5 points", () => {
@@ -299,7 +305,7 @@ describe("edgeScore — model rows", () => {
     );
     expect(e.verdict.strength).toBe(58 + 2.7 * 10);
     expect(e.action).toBe(
-      "Wait: a starting QB is listed out — re-check the number after the news settles.",
+      "Starting QB out — recheck. Our number does not know about it.",
     );
     expect(e.verdict.flags[0]).toMatch(/QB OUT/);
     expect(e.verdict.flags[0]).toContain("QB1 (knee) out");
@@ -324,7 +330,9 @@ describe("edgeScore — model rows", () => {
     expect(at110.tier).toBe("BET");
     expect(at110.blocker).toBeNull();
     expect(at110.kill.price).toBe(-110);
-    expect(at110.action).toBe("Bet now: 1H under 24.5 at -110 on Hard Rock.");
+    expect(at110.action).toBe(
+      "Bet one unit: first-half under 24.5 at -110 at Hard Rock.",
+    );
 
     const ev115 = evUnder(fair, -115);
     expect(ev115).toBeCloseTo(-0.0652, 3);
@@ -340,7 +348,9 @@ describe("edgeScore — model rows", () => {
     expect(at115.blocker).toBe("price");
     expect(at115.verdict.verdict).toBe("WATCH");
     expect(at115.kill.price).toBe(-110);
-    expect(at115.action).toBe("Wait: Hard Rock is -115; needs -110 or better.");
+    expect(at115.action).toBe(
+      "Not yet — Hard Rock’s price is -115; needs -110 or better.",
+    );
   });
   it("gap just short of the bar at a good price → EDGE / gap", () => {
     const e = edgeScore({
@@ -355,7 +365,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("gap");
     expect(e.action).toBe(
-      "Pass: the line is only 1.5 above our number; needs 24.0 or higher.",
+      "Pass: the line is 1.5 above our number. It needs 24.0 or higher.",
     );
   });
   it("small gap → Watch (amber band) with blocker gap; a tiny gap → PASS", () => {
@@ -389,7 +399,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("gap");
     expect(e.kill.line).toBe(24);
     expect(e.action).toBe(
-      "Pass: the line is only 0.7 above our number; needs 24.0 or higher.",
+      "Pass: the line is 0.7 above our number. It needs 24.0 or higher.",
     );
   });
   it("line below our number reads as an over lean", () => {
@@ -406,7 +416,7 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(35);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
-      "Pass: the line is 1.3 below our number (leans over); needs 24.0 or higher.",
+      "Pass: the line is 1.3 below our number, so this leans over. We only bet unders.",
     );
   });
   it("model read but no line anywhere → PASS at 50, action names the line to take", () => {
@@ -426,7 +436,7 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(50);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
-      "No line captured yet. A bet at under 24.0 or higher, -110 or better.",
+      "Not yet — no first-half line anywhere. It becomes a bet at under 24.0 or higher.",
     );
   });
   it("score clamps to 0..100", () => {
@@ -521,9 +531,9 @@ describe("edgeScore — no model read", () => {
     expect(e.blocker).toBeNull();
     expect(e.kill.line).toBeNull();
     expect(e.action).toBe(
-      "Pass: no model read this week and no price edge at Hard Rock.",
+      "Pass: no model number yet, and Hard Rock’s price is no better than the market.",
     );
-    expect(e.kill.text).toBe("No kill point without a model read.");
+    expect(e.kill.text).toBe("No kill numbers without a model number.");
   });
   it("dome + big spread scores lower than the slow/windy game", () => {
     const windy = edgeScore({
@@ -563,11 +573,11 @@ describe("edgeScore — no model read", () => {
     expect(e.blocker).toBe("gap");
     expect(e.verdict.priceEdgeOnly).toBe(true);
     expect(e.action).toBe(
-      "Price only: Hard Rock pays 3.0% better than the market on this under. No model behind it.",
+      "Watch: Hard Rock pays about 3.0% more than the market on this under. No model number behind it.",
     );
     expect(e.kill.line).toBeNull();
     expect(e.kill.price).toBe(-110); // fair 0.5: standard juice is the floor
-    expect(e.kill.text).toBe("Not worth it worse than -110.");
+    expect(e.kill.text).toBe("No longer a bet at a worse price than -110.");
   });
   it("price edge on top of a strong context caps at 55", () => {
     const e = edgeScore({

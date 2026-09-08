@@ -34,13 +34,6 @@
   --warn-border: rgba(240, 176, 74, 0.4);
   --badge-ink: #04121f; /* text on a filled good/warn/bad badge */
 
-  /* Legacy outcome names — aliases kept until every caller moves to the
-     four grade tokens above (PR 19 removes them). */
-  --under-strong: var(--good);
-  --neutral: var(--warn);
-  --over-lean: var(--warn);
-  --over: var(--bad);
-
   /* Radii (3) */
   --r-sm: 0.375rem; /* badges, chips, inputs, buttons */
   --r-md: 0.625rem; /* tables, inner panels */

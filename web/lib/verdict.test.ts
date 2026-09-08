@@ -78,7 +78,7 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.why[0]).toContain("top ~20%");
     expect(v.why[0]).toContain("coin flip");
     expect(v.why[0]).not.toMatch(/54/);
-    expect(v.why[1]).toContain("good price");
+    expect(v.why[1]).toContain("more than the fair price");
   });
 
   it("BET at a FAIR Hard Rock price too (only a negative price blocks)", () => {
@@ -127,7 +127,7 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     );
     expect(v.hrGap).toBe(2.7);
     expect(v.reason).toBe("model_gap"); // it still qualifies for the paper ledger
-    expect(v.why[1]).toContain("not enough other books at that number");
+    expect(v.why[1]).toContain("Not enough other books are at that number");
     // Hard Rock posted the number but no price yet: same gate, different
     // wording (the old text falsely implied no other book/exchange is priced).
     const unpriced = verdictFor({
@@ -143,7 +143,7 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     // ...and the why sentence must agree with that headline rather than blaming
     // the other books, which may all be priced (card.py _price_sentence).
     expect(unpriced.why[1]).toBe(
-      "Hard Rock has under 24.5, but hasn’t posted a price for it yet — nothing to judge.",
+      "Hard Rock has the under at 24.5 but no price on it yet, so there is nothing to compare.",
     );
     expect(unpriced.why[1]).not.toContain("other books");
     // A judgeable fair-or-better price is what makes it a BET.
@@ -374,7 +374,7 @@ describe("verdictFor — no model (weeks 1–2 / derived lines)", () => {
       evVerdict: "na",
     });
     expect(v.verdict).toBe("PASS");
-    expect(v.why[1]).toContain("hasn’t posted");
+    expect(v.why[1]).toContain("has not posted a first-half line yet");
   });
 
   it("describes the reference line with the real first-half share when stored", () => {

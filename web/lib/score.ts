@@ -1,8 +1,11 @@
-import { MODEL_BET_THRESHOLD } from "@/lib/verdict";
-
-// Port of the score-color + chip logic from beatvegas/dashboard/app.py and
-// beatvegas/model/score.py::_factors. Keep faithful to those so the web board
-// matches the Streamlit view exactly.
+// The factors_json payload the scorer writes (beatvegas/model/score.py
+// ::_factors) and the green/red explainer board (beatvegas/factors/board.py
+// ::build_factor_board), typed and parsed for the web board. Keep the shapes
+// faithful to those two.
+//
+// The old Streamlit colour bands, tier headings and 7-chip builder lived here
+// too; nothing renders them now (grades come from lib/grade.ts and the board
+// shows one flat factor list), so they are gone.
 
 // One factor on the green/red board (pure explainer; never affects the rank).
 // Mirrors beatvegas/factors/board.py::build_factor_board.
@@ -129,64 +132,6 @@ export function parseFactors(raw: string | null | undefined): Factors {
   }
 }
 
-// app.py::_score_color — 50 is the breakeven anchor (-110 ⇒ 52.4%).
-export function scoreColor(score: number | null | undefined): string {
-  if (score === null || score === undefined) return "#6b7280"; // grey
-  if (score >= 60) return "#16a34a"; // strong under (green)
-  if (score >= MODEL_BET_THRESHOLD) return "#65a30d"; // lean under (lime)
-  if (score >= 47) return "#ca8a04"; // neutral (amber)
-  if (score >= 40) return "#ea580c"; // lean over (orange)
-  return "#dc2626"; // over (red)
-}
-
-// Short tier label for the score, matching the scoreColor bands above.
-// Additive — purely for display; doesn't change any existing logic.
-export function scoreLabel(score: number | null | undefined): string {
-  if (score === null || score === undefined) return "no read";
-  if (score >= 60) return "Strong under";
-  if (score >= MODEL_BET_THRESHOLD) return "Lean under";
-  if (score >= 47) return "Coin flip";
-  if (score >= 40) return "Lean over";
-  return "Over";
-}
-
-// Group the board into the tiers the Option-A card renders. Hypotheses are
-// pulled into their own amber group regardless of tier (we never show them as
-// a plain green/red signal until the real-line ledger has earned them).
-export type FactorTierGroup = {
-  tier: number;
-  title: string;
-  factors: BoardFactor[];
-};
-
-export function groupFactorBoard(
-  board: BoardFactor[] | null | undefined,
-): FactorTierGroup[] {
-  const fb = board ?? [];
-  const proven = fb.filter((f) => !f.hypothesis && f.tier === 1);
-  const context = fb.filter((f) => !f.hypothesis && f.tier === 2);
-  const speculative = fb.filter((f) => !f.hypothesis && f.tier >= 3);
-  const hypotheses = fb.filter((f) => f.hypothesis);
-  return [
-    { tier: 1, title: "Proven — history + live", factors: proven },
-    {
-      tier: 2,
-      title: "Context — real info, flat in backtest",
-      factors: context,
-    },
-    {
-      tier: 3,
-      title: "Speculative — weight 0 until proven",
-      factors: speculative,
-    },
-    {
-      tier: 0,
-      title: "Unverified — amber until the ledger speaks",
-      factors: hypotheses,
-    },
-  ].filter((g) => g.factors.length > 0);
-}
-
 // rgba tint for a board row: color at an alpha scaled by intensity.
 export function factorTint(f: BoardFactor): { bg: string; dot: string } {
   const rgb: Record<string, string> = {
@@ -203,64 +148,4 @@ export function factorTint(f: BoardFactor): { bg: string; dot: string } {
       ? 0.05
       : 0.08 + 0.22 * f.intensity;
   return { bg: `rgba(${base},${alpha.toFixed(3)})`, dot: `rgb(${base})` };
-}
-
-export type Chip = { label: string; value: string; hint: string };
-
-const has = (v: unknown): v is number => v !== null && v !== undefined;
-
-// The 7 chips, matching the order/labels/tooltips/fallbacks in app.py.
-export function buildChips(f: Factors): Chip[] {
-  const oneH = has(f.fh_home_pf)
-    ? `${f.fh_home_pf}/${f.fh_home_pa} · ${f.fh_away_pf}/${f.fh_away_pa}`
-    : "—";
-  return [
-    {
-      label: "Pace",
-      value: f.pace || "live ✦",
-      hint: "How fast both teams play — seconds per play and plays per game.",
-    },
-    {
-      label: "Weather",
-      value: f.weather || "live ✦",
-      hint: "Temperature, wind, and rain near kickoff.",
-    },
-    {
-      label: "Defense",
-      value: has(f.def_ppa) ? String(f.def_ppa) : "—",
-      hint: "Points each team gives up per play this season (lower = tougher defense).",
-    },
-    {
-      label: "Offense",
-      value: has(f.off_ppa) ? String(f.off_ppa) : "—",
-      hint: "Points each team gains per play this season (lower = less explosive).",
-    },
-    {
-      label: "1st-half pts",
-      value: oneH,
-      hint: "Average first-half points scored / allowed this season — home · away.",
-    },
-    {
-      label: "1st-half offense",
-      value: has(f.fh_off_epa_home)
-        ? `${f.fh_off_epa_home!.toFixed(2)} · ${(f.fh_off_epa_away ?? 0).toFixed(2)}`
-        : "—",
-      hint: "How efficient each offense is per play in the first half (home · away).",
-    },
-    {
-      label: "Rest & travel",
-      value: f.spot || "—",
-      hint: "Days of rest, miles traveled, and kickoff time. Context only — not part of the pick.",
-    },
-    {
-      label: "History estimate",
-      value: has(f.proj_1h_total) ? f.proj_1h_total!.toFixed(1) : "—",
-      hint: "A rough first-half total from past scoring. Context only — the model, not this, drives the score.",
-    },
-    {
-      label: "Our number",
-      value: has(f.bv_line) ? f.bv_line!.toFixed(1) : "—",
-      hint: "Our model's own predicted first-half total, from the full feature set (pace, efficiency, weather). It never looks at the Vegas line.",
-    },
-  ];
 }

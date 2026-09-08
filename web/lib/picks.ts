@@ -239,22 +239,30 @@ export async function createPick(
   const market = input.market === "full" ? "full" : "1H";
 
   // The model (predictions) is 1H-only — only freeze its read onto a 1H pick.
+  // Prefer the MODEL row over the display-only derived_lines row (the same
+  // rule as board.ts: post_derived_lines writes seconds after scoring, so
+  // "newest" alone picked the reference row). model_line_at_pick is OUR
+  // NUMBER (bv_line) — the value Results compares your line against — with
+  // the scoring line as a fallback for legacy rows that have no bv_line.
   const pred =
     market === "1H"
       ? await prisma.$queryRaw<
           {
             under_score: number | bigint | null;
+            bv_line: number | null;
             line_used: number | null;
             factors_json: string | null;
           }[]
         >`
-    SELECT under_score, line_used, factors_json FROM predictions
-    WHERE game_id = ${input.gameId} ORDER BY created_at DESC LIMIT 1
+    SELECT under_score, bv_line, line_used, factors_json FROM predictions
+    WHERE game_id = ${input.gameId}
+    ORDER BY (model_version = 'derived_lines') ASC, created_at DESC
+    LIMIT 1
   `
       : [];
   const modelScore =
     pred[0]?.under_score == null ? null : Number(pred[0].under_score);
-  const modelLine = pred[0]?.line_used ?? null;
+  const modelLine = pred[0]?.bv_line ?? pred[0]?.line_used ?? null;
   const factorsAtPick = pred[0]?.factors_json ?? null;
 
   const isPaper = input.isPaper === true;

@@ -24,11 +24,12 @@ name: Hard Rock 1H line capture
 #
 # CREDIT BUDGET (paid tier; per-event 1H call = totals_h1 x us,us2 = 2 credits;
 # ~60 Hard Rock-priced FBS games/week):
-#   - openers: paid only while HR has not posted; ~2 polls/game  ~= 240/wk (worst 720)
+#   - card.yml morning sweeps (Tue-Sat, whole week, 5 x ~60 x 2) ~= 600/wk (cap 2,000)
+#   - card.yml full-game refresh (5 x 4)                        ~=  20/wk
 #   - closes: ~2.5 polls/game x 60 x 2                          ~= 300/wk (worst 360)
-#   - card.yml full sweeps (Fri preview + Sat final)            ~= 230/wk
 #   - sunday.yml full-game openers                              ~=   9/wk
-#   Expected ~800/wk, worst ~1,350/wk against 100K/month. poll_lines.py prints
+#   (opener sweeps here retired 2026-09-08: -240/wk)
+#   Expected ~930/wk, worst ~2,400/wk against 100K/month. poll_lines.py prints
 #   credits_spent= and calls_404= on every run; --max-credits-per-run 400 is the
 #   runaway guard and --credit-floor 300 the month-end reserve.
 #
@@ -47,10 +48,8 @@ name: Hard Rock 1H line capture
 
 on:
   schedule:
-    # --- 1h_open: opener sweeps (UTC) -------------------------------------
-    - cron: '0 18 * * 3'        # Wed 2pm EDT
-    - cron: '0 14,20 * * 4'     # Thu 10am + 4pm EDT
-    - cron: '0 12,16,20 * * 5'  # Fri 8am + noon + 4pm EDT
+    # --- 1h_open: retired 2026-09-08 — card.yml's morning build sweeps the
+    # whole week Tue-Sat 8am ET; `market=1h_open` stays workflow_dispatch-only.
     # --- 1h_close: per-game closes, every 30 min in the kickoff windows ---
     - cron: '*/30 15-23 * * 6'  # Sat 11am-7:30pm EDT
     - cron: '0,30 0-4 * * 0'    # Sat 8pm-12:30am EDT (Sun UTC)

@@ -1,5 +1,5 @@
 import { american, fmt } from "@/lib/format";
-import { kickoffET } from "@/lib/homeBoard";
+import { kickoffET, type GapBasis } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
 import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 
@@ -47,7 +47,12 @@ export type CardBlocker =
   /** An input the gate needs failed on this build (see Card.degraded). */
   | "degraded";
 /** Which build wrote the card: weeknight/Friday previews, the Saturday final, or a manual run. */
-export type CardSlot = "weeknight" | "friday" | "saturday" | "manual";
+export type CardSlot =
+  | "morning"
+  | "weeknight"
+  | "friday"
+  | "saturday"
+  | "manual";
 /** final = bet off it; preview = an earlier build; degraded = an input failed. */
 export type CardStatus = "final" | "preview" | "degraded";
 export type DegradedInput = {
@@ -58,6 +63,12 @@ export type DegradedInput = {
 };
 /** Where the fair price came from: a no-vig exchange, or the books' consensus. */
 export type FairSource = "exchange" | "books";
+
+const GAP_BASES: ReadonlySet<GapBasis> = new Set<GapBasis>([
+  "hardrock",
+  "market",
+  "reference",
+]);
 
 export type CardItem = {
   gameId: number;
@@ -75,6 +86,8 @@ export type CardItem = {
   ev: number | null;
   bvLine: number | null;
   gap: number | null;
+  /** Which line the gap is measured against; null when there is no gap. */
+  gapBasis: GapBasis | null;
   killLine: number | null;
   killPrice: number | null;
   action: string;
@@ -141,6 +154,7 @@ const BLOCKERS: readonly CardBlocker[] = [
   "degraded",
 ];
 const SLOTS: readonly CardSlot[] = [
+  "morning",
   "weeknight",
   "friday",
   "saturday",
@@ -205,6 +219,9 @@ function parseItem(raw: unknown): CardItem | null {
     ev: num(raw.ev),
     bvLine: num(raw.bv_line),
     gap: num(raw.gap),
+    gapBasis: GAP_BASES.has(raw.gap_basis as GapBasis)
+      ? (raw.gap_basis as GapBasis)
+      : null,
     killLine: num(raw.kill_line),
     killPrice: int(raw.kill_price),
     action: str(raw.action) ?? "",
@@ -390,15 +407,25 @@ export function cardAge(
 
 // --- health (is this the card to bet off?) ---------------------------------------
 
-/** A card older than this, read on a Saturday, means the final never landed. */
-export const STALE_CARD_HOURS = 6;
-
 /** Weekday in ET ("Sat"). */
 function weekdayET(d: Date): string {
   return new Intl.DateTimeFormat("en-US", { timeZone: ET, weekday: "short" })
     .format(d)
     .slice(0, 3);
 }
+
+/** Calendar day in ET, "2026-09-12". */
+function etDay(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ET,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/** Days with no morning build (no college games): a Saturday card is current. */
+const NO_BUILD_DAYS: ReadonlySet<string> = new Set(["Sun", "Mon"]);
 
 export type CardHealth = {
   level: "ok" | "warn";
@@ -407,12 +434,13 @@ export type CardHealth = {
 };
 
 /**
- * Pure: whether the card on screen is the one to bet off. In order: a
- * degraded build warns and lists the failed inputs; on a Saturday (ET) a
- * preview build, or one built for another slot, warns that the final has not
- * replaced it; on a Saturday a legacy row (no slot/status) older than
- * STALE_CARD_HOURS warns the same way. Anything else is ok — a Friday preview
- * read on Friday is exactly what it should be.
+ * Pure: whether the card on screen is the one to bet off. The card is one
+ * rolling week rebuilt every morning Tue–Sat (~8:05–8:45am ET), so in order:
+ * a degraded build warns and lists the failed inputs; a preview or manual
+ * build warns any day (it is never the one to bet off); a card not built
+ * today (ET) warns that this morning's build has not landed — except on
+ * Sunday/Monday, when nothing builds and Saturday's card stands. Anything
+ * else is ok.
  */
 export function cardHealth(card: Card, now: Date): CardHealth {
   if (card.status === "degraded") {
@@ -424,12 +452,7 @@ export function cardHealth(card: Card, now: Date): CardHealth {
       ),
     };
   }
-  const saturday = weekdayET(now) === "Sat";
-  if (
-    saturday &&
-    (card.status === "preview" ||
-      (card.slot !== null && card.slot !== "saturday"))
-  ) {
+  if (card.status === "preview" || card.slot === "manual") {
     if (card.slot === "manual") {
       const when =
         card.builtAt === null
@@ -437,27 +460,30 @@ export function cardHealth(card: Card, now: Date): CardHealth {
           : ` built ${builtET(new Date(card.builtAt))} ET`;
       return {
         level: "warn",
-        title: `Manual card${when} — re-run with slot=saturday for a final`,
+        title: `Manual card${when} — this morning's build has not replaced it`,
         details: [],
       };
     }
     return {
       level: "warn",
-      title: `Preview card (${card.slot ?? "preview"}) — the Saturday final builds 8:05–8:45am ET`,
+      title: `Preview card (${card.slot ?? "preview"}) — this morning's build (8:05–8:45am ET) has not replaced it`,
       details: [],
     };
   }
-  const isSaturdayFinal = card.slot === "saturday" && card.status === "final";
-  if (saturday && !isSaturdayFinal && card.builtAt !== null) {
-    const built = new Date(card.builtAt);
-    const ageMs = now.getTime() - built.getTime();
-    if (ageMs > STALE_CARD_HOURS * 3_600_000) {
-      return {
-        level: "warn",
-        title: `Card is ${relativeAge(built, now)} — the Saturday final has not landed`,
-        details: [],
-      };
-    }
+  if (card.builtAt === null) {
+    return {
+      level: "warn",
+      title: "Card has no build time — this morning's build has not landed",
+      details: [],
+    };
+  }
+  const built = new Date(card.builtAt);
+  if (!NO_BUILD_DAYS.has(weekdayET(now)) && etDay(built) !== etDay(now)) {
+    return {
+      level: "warn",
+      title: `Card is ${relativeAge(built, now)} — this morning's build has not landed`,
+      details: [],
+    };
   }
   return { level: "ok", title: "", details: [] };
 }

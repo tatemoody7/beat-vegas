@@ -234,6 +234,23 @@ export function strongestRed(
 }
 
 /** Which number the gap is measured against. */
+/**
+ * Pure. Whether a row has a model number, and whether the ONLY line it can be
+ * measured against is our reference line (no Hard Rock line, no market line).
+ * Decided from the live lines at request time, not from the line_kind baked in
+ * at scoring: a game scored off the full-game total on Sunday unlocks the
+ * moment a book posts a first-half total.
+ */
+export function lineState(
+  row: Pick<BoardRow, "underScore" | "bvLine" | "curLine">,
+  check: { hrLine: number | null } | null,
+): { hasModel: boolean; derived: boolean } {
+  return {
+    hasModel: row.underScore !== null && row.bvLine !== null,
+    derived: (check?.hrLine ?? null) === null && row.curLine === null,
+  };
+}
+
 export type GapBasis = "hardrock" | "market" | "reference";
 
 export const GAP_BASIS_LABEL: Record<GapBasis, string> = {
@@ -376,10 +393,7 @@ export async function getHomeBoard(
   ]);
   const checkById = new Map(checks.map((c) => [c.gameId, c]));
   const noModel =
-    rows.length > 0 &&
-    rows.every(
-      (r) => r.factors.line_kind === "derived_fg" || r.underScore === null,
-    );
+    rows.length > 0 && rows.every((r) => !lineState(r, null).hasModel);
 
   // Only real-money FIRST-HALF picks count toward the record, the bankroll and
   // the weekly cap (full game is context, paper is tracked apart).
@@ -390,10 +404,11 @@ export async function getHomeBoard(
   const games: HomeGame[] = rows.map((row) => {
     const check = checkById.get(row.gameId) ?? null;
     const fallbackLine = row.factors.line ?? null;
+    const state = lineState(row, check);
     const input: EdgeInput = {
       away: row.away,
       home: row.home,
-      derived: row.factors.line_kind === "derived_fg",
+      derived: state.derived,
       underScore: row.underScore,
       bvLine: row.bvLine,
       liveLine: row.curLine,
@@ -426,10 +441,7 @@ export async function getHomeBoard(
           : fallbackLine !== null
             ? "reference"
             : null;
-    const hasModel =
-      row.factors.line_kind !== "derived_fg" &&
-      row.underScore !== null &&
-      row.bvLine !== null;
+    const hasModel = state.hasModel;
     const start = asDate(row.startDate);
     return {
       row,

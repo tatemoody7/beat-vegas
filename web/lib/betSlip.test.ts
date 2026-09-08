@@ -29,6 +29,7 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   ev: -0.004,
   bvLine: 22.4,
   gap: 2.1,
+  gapBasis: null,
   killLine: 24.5,
   killPrice: -120,
   action: "Bet now: 1H under 24.5 at -110 on Hard Rock.",

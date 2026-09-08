@@ -554,6 +554,17 @@ def build_item(
         else reference_line
     )
     gap = round2(basis - bv_line) if has_model and basis is not None else None
+    # Which line the gap is measured against (web shows it in words; only a
+    # "hardrock" gap can make a real-money BET).
+    gap_basis = (
+        None
+        if gap is None
+        else "hardrock"
+        if hr_line is not None
+        else "market"
+        if market_line is not None
+        else "reference"
+    )
     hr_gap = round2(hr_line - bv_line) if has_model and hr_line is not None else None
 
     k_line = kill_line(bv_line) if has_model else None
@@ -717,6 +728,7 @@ def build_item(
         "ev": None if ev is None else round(ev, 4),
         "bv_line": None if bv_line is None else round2(bv_line),
         "gap": gap,
+        "gap_basis": gap_basis,
         "kill_line": k_line,
         "kill_price": k_price,
         "action": action,

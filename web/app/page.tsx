@@ -8,7 +8,7 @@ import {
   tierCounts,
 } from "@/lib/homeBoard";
 import { resolveSeason } from "@/lib/season";
-import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
+import { BET_GAP_PTS } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BetSlip from "@/app/components/BetSlip";
 import BoardFilters from "@/app/components/BoardFilters";
@@ -134,7 +134,7 @@ export default async function BoardPage({
             No model read this week.
           </p>
           <p className="mt-1">
-            {`The model needs both teams to have played at least ${MIN_GAMES_FOR_MODEL === 1 ? "one game" : `${MIN_GAMES_FOR_MODEL} games`} this season. Until then the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
+            {`The week has not been scored yet. Until it is, the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
           </p>
         </div>
       )}

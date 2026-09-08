@@ -20,7 +20,7 @@ the bet card follows. Change it here first, then in code.
 
 - **Edge-driven, capped at 5 real-money bets per week.** The cap is a
   ceiling, not a target. Zero bets is a valid, normal week.
-- Only games whose verdict on the This Week page is **BET** are bettable. Real bets are placed in one sitting Saturday morning (~9am ET) off the final card's Bet Slip; a weeknight (Tue–Fri) game may be bet off that evening's card and counts toward the same weekly cap. BETs are ranked by gap — the 6th+ by gap is paper only (`blocker: cap`).
+- Only games whose verdict on the This Week page is **BET** are bettable. Real bets are placed off that day's morning card (Tue–Sat ~8:05am ET) via the Bet Slip; Thursday and Friday games are bet off their own morning card and count toward the same weekly cap. BETs are ranked by gap — the 6th+ by gap is paper only (`blocker: cap`).
   A BET whose blocker is `degraded` is **held**: paper only, no cap slot (see
   "Degraded card" below). WATCH is not a bet. Passing costs nothing.
 - A bet placed anyway on a WATCH or PASS game is still logged as real money,
@@ -82,10 +82,10 @@ The site is one page: every game on the week in a single ranked list.
   the next half point, and the worst price still clearing the market's fair under
   by more than the unavoidable 2% of vig. Clearing one and not the other is not a
   bet.
-- **Degraded card** — every card carries a `status`: **final** (the build the
-  slot bets off: the Saturday final, or a weeknight card for that night's games),
-  **preview** (an earlier build — Friday's, or a manual run — the final has not
-  landed yet), or **degraded** (a build-wide input failed, so the card is not to
+- **Degraded card** — every card carries a `status`: **final** (a morning build:
+  the decision card for every game kicking off before the next morning),
+  **preview** (a manual or legacy build that a morning card replaces), or
+  **degraded** (a build-wide input failed, so the card is not to
   be bet off as-is). A card is degraded when the Hard Rock sweep stopped early
   and never reached a game on the card (`sweep`), the injury read failed so the
   QB-out gate ran on nothing (`preview`), or the tempo table stored zero teams
@@ -147,15 +147,12 @@ week expected (`lines_watch.yml` header).
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
-| Tue / Fri 9am                | News + injuries / QB-out → This Week cards                 | `research_preview.yml` |
-| Wed 2pm; Thu 10am, 4pm; Fri 8am, noon, 4pm | **Opener sweeps**: every Hard Rock-priced game without a Hard Rock 1H line yet (a game stops being polled once its opener is in) | `lines_watch.yml` |
-| Tue–Thu ~4:05pm              | Weeknight card: sweep tonight's games, build, paper-log games kicking off within 10 h | `card.yml` |
-| Fri ~6:05pm (retry 7pm)      | **Preview card** after a full sweep of the weekend slate; paper-logs Friday-night games only | `card.yml` |
+| Tue–Sat ~8:05–8:45am         | **Morning card** (the decision build, every day): forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build; paper-logs every qualifying game kicking off within 24 h with its blocker. Gated on the Eastern clock so DST needs no edit. The board is one rolling week — each game locks at its own kickoff | `card.yml` |
+| Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every morning build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
-| Sat ~8:05–8:45am             | **FINAL card**: forced fresh sweep + injury refresh, then build; paper-logs every qualifying Saturday game with its blocker. Gated on the Eastern clock so DST needs no edit | `card.yml` |
-| Sat 8:50am                   | **Card routine**: verify/kick the final, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
-| Sat ~9am                     | **Tate places every real bet in one sitting** off the Bet Slip on the Board (one tap logs the ticket) | you |
-| Mon 8am / 10am / 1pm         | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed | `grade.yml`         |
+| Sat 8:50am                   | **Card routine**: verify/kick the morning build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
+| Game days                    | **Tate bets off the Bet Slip** on the Board once that day's morning card is up (one tap logs the ticket); Thu/Fri games the same way, off their own morning card | you |
+| Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
 | Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 

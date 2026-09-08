@@ -7,6 +7,7 @@ import {
   dayKey,
   edgeContext,
   kickoffET,
+  lineState,
   matchesFilters,
   NO_FILTERS,
   parseFilters,
@@ -426,5 +427,26 @@ describe("assignCapRanks", () => {
       5,
     );
     expect(out.map((g) => g.capRank)).toEqual([null, 1]);
+  });
+});
+
+// --- lineState ----------------------------------------------------------------
+
+describe("lineState", () => {
+  it("has a model whenever the row carries a score and our number, whatever line it was scored on", () => {
+    const r = row({ factors: { line_kind: "derived_fg" }, curLine: 24.5 });
+    expect(lineState(r, null)).toEqual({ hasModel: true, derived: false });
+  });
+
+  it("is derived only when neither Hard Rock nor the market has posted a first-half line", () => {
+    const r = row({ curLine: null });
+    expect(lineState(r, null).derived).toBe(true);
+    expect(lineState(r, { hrLine: 24.5 }).derived).toBe(false);
+    expect(lineState(row({ curLine: 24 }), null).derived).toBe(false);
+  });
+
+  it("has no model without a score or our number", () => {
+    expect(lineState(row({ underScore: null }), null).hasModel).toBe(false);
+    expect(lineState(row({ bvLine: null }), null).hasModel).toBe(false);
   });
 });

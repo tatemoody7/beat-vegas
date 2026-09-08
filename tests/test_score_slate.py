@@ -512,7 +512,7 @@ def test_model_reads_from_one_game_played_and_factors_carry_games_played():
     early-season numbers instead of hiding them."""
     from beatvegas.model import score
 
-    assert score.MIN_GAMES_FOR_MODEL == 1
+    assert score.MIN_GAMES_FOR_MODEL == 0
     assert {"h_games_played", "a_games_played"} <= set(score.CONTEXT_NUMERIC_KEYS)
     df = pd.DataFrame({"h_games_played": [0, 1, 5], "a_games_played": [5, 1, 5]})
-    assert apply_min_games(df, score.MIN_GAMES_FOR_MODEL)["h_games_played"].tolist() == [1, 5]
+    assert apply_min_games(df, score.MIN_GAMES_FOR_MODEL)["h_games_played"].tolist() == [0, 1, 5]

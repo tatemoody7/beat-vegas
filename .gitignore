@@ -30,3 +30,6 @@ config.yaml
 /.deploy-verify/
 .vercel
 .env*
+
+# Residual-gate reports (timestamped; the workflow uploads them as an artifact)
+reports/residual_gate_*

@@ -105,7 +105,9 @@ Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_upd
 multiplier), `backfill_spread.py` (surgical `Game.spread` from CFBD), `deploy_neon_games.py`
 (additive games+spread push), `post_derived_lines.py` (writes display-only `derived_lines`
 predictions for the board), `build_card.py` (the weekly bet card → `cards` row + paper picks
-via `beatvegas/picks.py::add_pick`, the same insert `pick.py add` uses). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
+via `beatvegas/picks.py::add_pick`, the same insert `pick.py add` uses), `residual_gate.py`
+(one-shot walk-forward report: residual engine vs incumbent vs the close, dispatched by
+`.github/workflows/residual_gate.yml`; the report itself is the doc). **Sim/dev scripts**: `pg_sim.py` (throwaway local PG16 sandbox at
 `~/.cache/beatvegas/pg_sim`) + `simulate_week.py` (replay a real week into it, rendered by
 the real Next.js app, Neon-isolated). **Lint/format**: `ruff check` + `ruff
 format` for Python (`[tool.ruff]` in `pyproject.toml`, pragmatic F/E/I/B set — NOT pyupgrade,

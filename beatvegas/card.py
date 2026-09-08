@@ -102,12 +102,19 @@ PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
 #            games it never reached carry a stale or absent Hard Rock number;
 #   preview  the research preview failed — the QB-out gate is reading a stale
 #            (or empty) injury file, which passes EVERY game;
-#   pace     a model game with no pace read (the strongest genuine 1H signal);
-#   weather  an outdoor game with no weather;
+#   pace     a model game with no pace read (the strongest genuine 1H signal;
+#            missing on ~5% of games, which is a team-mapping failure);
 #   tempo    the tempo table stored zero teams (TeamRankings mapper collapse).
 # Order = the order degraded_inputs reports them. Mirrored by the card status
 # banner in web/lib/card.ts (cardHealth).
-DEGRADED_INPUTS = ("sweep", "preview", "pace", "weather", "tempo")
+#
+# NOT a signal — weather. Do not re-add it. Weather is structurally sparse data
+# the model already handles as missing, not a Saturday failure: live Neon had a
+# forecast on 27 of 303 week-2 games and none in weeks 3-6, and historically
+# 394 of 637 games with a first-half line carry no weather string. A weather
+# signal would mark nearly every model game degraded and every bet paper-only,
+# every week, on a healthy build.
+DEGRADED_INPUTS = ("sweep", "preview", "pace", "tempo")
 DEGRADED_BLOCKER = "degraded"
 
 
@@ -882,10 +889,9 @@ def degraded_inputs(
         reason = preview_status.get("reason") or "failed"
         add("preview", f"{reason}: {len(ids)} games with no QB read from today", ids)
 
-    # pace / weather: per-game model inputs, read off the stored factors.
+    # pace: a per-game model input, read off the stored factors.
     model_ids: Set[int] = set()
     no_pace: List[int] = []
-    no_weather: List[int] = []
     for p in predictions:
         gid = int(p["game_id"])
         if gid not in card_ids or p.get("model_version") != MODEL_VERSION:
@@ -898,14 +904,8 @@ def degraded_inputs(
             continue
         if _blank(f.get("pace")):
             no_pace.append(gid)
-        # _weather_str returns "Dome" for a dome, so a blank weather on a game
-        # that is not KNOWN to be a dome is a genuinely missing forecast.
-        if _blank(f.get("weather")) and f.get("dome") is not True:
-            no_weather.append(gid)
     if no_pace:
         add("pace", f"{len(no_pace)} model games have no pace read", no_pace)
-    if no_weather:
-        add("weather", f"{len(no_weather)} outdoor model games have no weather", no_weather)
 
     # tempo: the whole pace lookup is empty, so no game has a real pace.
     if tempo_rows is not None and tempo_rows == 0 and model_ids:

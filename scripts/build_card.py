@@ -134,7 +134,7 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
             "bv_line": p.bv_line,
             "under_score": p.under_score,
             "line_used": p.line_used,
-            # the stored pace / weather chips: degraded_inputs reads them
+            # the stored pace chip: degraded_inputs reads it
             "factors_json": p.factors_json,
         }
         for p in session.query(Prediction)

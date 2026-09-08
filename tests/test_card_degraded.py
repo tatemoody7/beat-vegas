@@ -26,7 +26,9 @@ from beatvegas.ci import CARD_STATUS_BY_SLOT, SWEEP_ARGS
 NOW = datetime(2026, 9, 19, 12, 40)  # Saturday 8:40am ET, in UTC
 KICK = NOW + timedelta(hours=8)
 
-FACTORS_OK = {"pace": "27.5s/play · 142 plays", "weather": "78°F · wind 6mph", "dome": False}
+# The stored factors chips as model/score.py::_factors writes them (no "dome" key
+# exists there — _weather_str folds a dome into the weather string).
+FACTORS_OK = {"pace": "27.5s/play · 142 plays", "weather": "78°F · wind 6mph"}
 
 
 def game(gid=1, away="Kansas", home="Missouri", kick=KICK, **extra):
@@ -49,8 +51,8 @@ def market(gid, line, books=("draftkings", "fanduel", "betmgm")):
 
 
 def model(gid, bv_line, factors=None):
-    """A gbm_v1 prediction row with its stored factors (the card reads pace and
-    weather off these)."""
+    """A gbm_v1 prediction row with its stored factors (the card reads pace off
+    these)."""
     return {
         "game_id": gid,
         "model_version": "gbm_v1",
@@ -199,33 +201,39 @@ def test_a_preview_that_wrote_blanks_today_degrades_the_card_but_no_single_game(
     assert c["items"][0]["cap_rank"] == 1
 
 
-def test_missing_pace_and_missing_weather_are_separate_per_game_signals():
+def test_missing_pace_is_a_per_game_signal():
     d = degraded_inputs(
         [game(1), game(2), game(3)],
         predictions=[
             model(1, 22.4),
-            model(2, 22.4, {"pace": None, "weather": "60°F", "dome": False}),
-            model(3, 22.4, {"pace": "27.5s/play", "weather": None, "dome": False}),
+            model(2, 22.4, {"pace": None, "weather": "60°F"}),
+            model(3, 22.4, {"pace": "27.5s/play", "weather": None}),
         ],
         previews=[preview_row(i) for i in (1, 2, 3)],
         tempo_rows=260,
         now=NOW,
     )
-    assert [(e["input"], e["game_ids"]) for e in d] == [("pace", [2]), ("weather", [3])]
+    assert [(e["input"], e["game_ids"]) for e in d] == [("pace", [2])]
     assert d[0]["detail"] == "1 model games have no pace read"
 
 
-def test_a_dome_game_with_no_weather_is_not_degraded():
-    """_weather_str returns "Dome" for a dome, so a blank forecast there is
-    expected — only an OUTDOOR game with no weather is a failure."""
+def test_missing_weather_on_a_healthy_build_is_not_degraded():
+    """Weather is structurally sparse (live Neon: 27 of 303 week-2 games have
+    a forecast, zero in weeks 3-6; historically 394 of 637 games with a 1H
+    line carry none). The model treats it as missing. A card must NOT go
+    paper-only over it, whatever else the game carries."""
     d = degraded_inputs(
-        [game(1)],
-        predictions=[model(1, 22.4, {"pace": "27.5s/play", "weather": "Dome", "dome": True})],
-        previews=[preview_row(1)],
+        [game(1), game(2)],
+        predictions=[
+            model(1, 22.4, {"pace": "27.5s/play", "weather": None}),
+            model(2, 22.4, {"pace": "27.5s/play", "weather": ""}),
+        ],
+        previews=[preview_row(1), preview_row(2)],
         tempo_rows=260,
         now=NOW,
     )
     assert d == []
+    assert "weather" not in DEGRADED_INPUTS
 
 
 def test_a_prediction_with_no_stored_factors_is_not_degraded():
@@ -265,12 +273,12 @@ def test_several_signals_at_once_come_back_in_declared_order():
         },
         preview_status={"ok": False, "reason": "both_empty"},
         previews=[],
-        predictions=[model(1, 22.4, {"pace": None, "weather": None, "dome": None}), model(2, 22.4)],
+        predictions=[model(1, 22.4, {"pace": None, "weather": None}), model(2, 22.4)],
         tempo_rows=0,
         now=NOW,
     )
     names = [e["input"] for e in d]
-    assert names == ["sweep", "preview", "pace", "weather", "tempo"]
+    assert names == ["sweep", "preview", "pace", "tempo"]
     assert list(DEGRADED_INPUTS) == names
     assert {e["input"]: e["game_ids"] for e in d}["sweep"] == [2]
 
@@ -300,12 +308,12 @@ def test_apply_degraded_lists_every_input_that_touched_the_game():
     apply_degraded(
         items,
         [
-            {"input": "weather", "detail": "", "game_ids": [1]},
+            {"input": "tempo", "detail": "", "game_ids": [1]},
             {"input": "sweep", "detail": "", "game_ids": [1, 2]},
         ],
     )
-    assert items[0]["degraded_inputs"] == ["sweep", "weather"]  # DEGRADED_INPUTS order
-    assert items[0]["action"].startswith("Degraded inputs (sweep, weather): paper only")
+    assert items[0]["degraded_inputs"] == ["sweep", "tempo"]  # DEGRADED_INPUTS order
+    assert items[0]["action"].startswith("Degraded inputs (sweep, tempo): paper only")
 
 
 def test_apply_degraded_leaves_untouched_games_alone():

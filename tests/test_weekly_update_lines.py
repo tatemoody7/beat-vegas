@@ -336,6 +336,34 @@ def test_main_reports_the_residual_fallback_split(monkeypatch, wu, capsys):
     assert "rows_residual=4 rows_fallback=6" in capsys.readouterr().out
 
 
+def test_main_reports_a_residual_fit_failure_in_the_summary(monkeypatch, wu, capsys):
+    """A residual fit that blew up demotes the board to the incumbent. The
+    summary is the job log, so the reason (with the exception) has to land in
+    it — a silent demotion looks like a normal incumbent run."""
+    _wire(monkeypatch, wu, "residual")
+
+    def fake_score_boom(
+        season, target_week=None, line_lookup=None, line_kind_lookup=None, df=None, **kw
+    ):
+        out = pd.DataFrame(
+            {
+                "id": [1],
+                "rank": [1],
+                "under_score": [55],
+                "away_team": ["A1"],
+                "home_team": ["H1"],
+                "line": [25.0],
+            }
+        )
+        out.attrs["engine_fallback"] = "residual_error:RuntimeError('fit exploded')"
+        return out
+
+    monkeypatch.setattr(wu, "score_slate", fake_score_boom)
+    wu.main()
+    out = capsys.readouterr().out
+    assert "FALLBACK=residual_error:RuntimeError('fit exploded')" in out
+
+
 def test_main_bv_line_summary_has_no_split(monkeypatch, wu, capsys):
     _wire(monkeypatch, wu, "bv_line")
     wu.main()

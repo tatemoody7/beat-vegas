@@ -351,7 +351,10 @@ def score_slate(
         REAL pre-kick 1H close (`real_closes`, game_id -> close, from
         lines.real_closes); with fewer than RESIDUAL_MIN_TRAIN such games the
         whole slate falls back to the incumbent and attrs["engine_fallback"]
-        says so.
+        says so ("insufficient_real_closes"). A residual fit/predict that
+        RAISES falls back the same way instead of killing the run:
+        attrs["engine_fallback"] becomes "residual_error:<exception repr>"
+        and every row keeps the incumbent's number.
 
         The fallback is also PER ROW: only rows whose `line_kind` is a real
         posted 1H number (REAL_LINE_KINDS) get the residual read. A 'derived_fg'
@@ -427,24 +430,33 @@ def score_slate(
             # number and stay stamped engine='bv_line'.
             real = target["line_kind"].isin(REAL_LINE_KINDS)
             real_idx = target.index[real.to_numpy()]
-            pred, model, fp = residual_1h_for_slate(
-                train_r, target.loc[real_idx], target.loc[real_idx, "line"]
-            )
-            if len(pred):
-                target.loc[real_idx, "bv_line"] = pd.Series(pred, index=real_idx).round(2)
-                target.loc[real_idx, "engine"] = "residual"
-                target.loc[real_idx, "resid_hat"] = (
-                    target.loc[real_idx, "bv_line"] - target.loc[real_idx, "line"]
-                ).round(2)
-            band_r = residual_sigma(train_r)
-            bands = [(~real, band), (real, band_r)]
-            artifact = {
-                "model": model,
-                "fingerprint": fp,
-                "sigma": band_r,
-                "n_rows_residual": int(real.sum()),
-                "n_rows_fallback": int((~real).sum()),
-            }
+            # Every fallible step (fit, predict, sigma) runs BEFORE `target` is
+            # touched, so a modelling error leaves the incumbent's numbers — and
+            # the whole weekly run — intact instead of aborting it.
+            try:
+                pred, model, fp = residual_1h_for_slate(
+                    train_r, target.loc[real_idx], target.loc[real_idx, "line"]
+                )
+                band_r = residual_sigma(train_r)
+            except Exception as e:  # noqa: BLE001 - a bad fit demotes, never kills
+                # Loudly: the reason names the exception so the job log says what
+                # actually broke, rather than looking like a normal incumbent run.
+                fallback = f"residual_error:{e!r}"
+            else:
+                if len(pred):
+                    target.loc[real_idx, "bv_line"] = pd.Series(pred, index=real_idx).round(2)
+                    target.loc[real_idx, "engine"] = "residual"
+                    target.loc[real_idx, "resid_hat"] = (
+                        target.loc[real_idx, "bv_line"] - target.loc[real_idx, "line"]
+                    ).round(2)
+                bands = [(~real, band), (real, band_r)]
+                artifact = {
+                    "model": model,
+                    "fingerprint": fp,
+                    "sigma": band_r,
+                    "n_rows_residual": int(real.sum()),
+                    "n_rows_fallback": int((~real).sum()),
+                }
     target["bv_gap"] = (target["line"] - target["bv_line"]).round(2)
     # The noise band is PER ROW, from the engine that produced that row: sizing a
     # residual gap against the incumbent's sigma (or the reverse) would compare

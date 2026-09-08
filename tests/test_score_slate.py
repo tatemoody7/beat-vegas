@@ -323,6 +323,36 @@ def test_residual_engine_falls_back_when_closes_are_scarce(monkeypatch):
     _assert_matches_pin(got)  # the incumbent's numbers, untouched
 
 
+def test_residual_engine_fit_failure_falls_back_to_the_incumbent_loudly(monkeypatch):
+    """A modelling error inside the residual engine must NOT abort the weekly
+    run: the incumbent's numbers are already computed, so every row keeps them
+    and the fallback reason names the exception (never a silent swallow)."""
+    df = _frame()
+    closes = _closes_for(df, 2025)
+    lines, kinds = _real_lines(df)
+
+    def boom(train_r, target, line):
+        raise RuntimeError("fit exploded")
+
+    monkeypatch.setattr(score_mod, "residual_1h_for_slate", boom)
+    out = score_mod.score_slate(
+        2025,
+        target_week=5,
+        df=df,
+        engine="residual",
+        real_closes=closes,
+        line_lookup=lines,
+        line_kind_lookup=kinds,
+    )
+    reason = out.attrs["engine_fallback"]
+    assert reason.startswith("residual_error:")
+    assert "RuntimeError" in reason and "fit exploded" in reason
+    assert "engine_artifact" not in out.attrs
+    assert (out["engine"] == "bv_line").all()
+    assert out["resid_hat"].isna().all()
+    _assert_matches_pin({int(r.id): float(r.bv_line) for r in out.itertuples()})
+
+
 def test_residual_engine_falls_back_row_by_row_without_a_real_posted_line():
     """A derived_fg / proxy row has no real posted 1H number, so there is no
     market error for the residual to model: those rows keep the incumbent's

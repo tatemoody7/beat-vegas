@@ -85,6 +85,7 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     assert it["tier"] == "BET" and it["blocker"] is None
     assert it["hr_line"] == 24.5 and it["hr_price"] == -110
     assert it["market_line"] == 24.5 and it["gap"] == 2.1 and it["bv_line"] == 22.4
+    assert it["gap_basis"] == "hardrock"
     assert it["fair_under"] == pytest.approx(FAIR_UNDER, abs=1e-4)
     assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -5% floor
     # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
@@ -100,6 +101,7 @@ def test_edge_no_hr_line_uses_the_market_median_as_basis():
     it = only(c)
     assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
     assert it["hr_line"] is None and it["market_line"] == 25.0 and it["gap"] == 2.6
+    assert it["gap_basis"] == "market"
     assert it["kill_line"] == 24.5
     assert it["action"] == "No Hard Rock line yet. A bet at under 24.5 or higher, -110 or better."
     assert "Hard Rock hasn’t posted a first-half line for this game yet." in it["why"]
@@ -152,6 +154,7 @@ def test_no_model_price_only_edge():
     it = only(c)
     assert it["tier"] == "EDGE" and it["blocker"] == "no_model"
     assert it["bv_line"] is None and it["gap"] is None and it["kill_line"] is None
+    assert it["gap_basis"] is None
     assert it["ev"] == pytest.approx(0.0696, abs=1e-3)
     assert it["action"] == (
         "Price only: Hard Rock pays 7.0% better than the market on this under. No model behind it."
@@ -516,6 +519,7 @@ ITEM_KEYS = {
     "ev",
     "bv_line",
     "gap",
+    "gap_basis",
     "kill_line",
     "kill_price",
     "action",

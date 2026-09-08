@@ -884,18 +884,32 @@ def degraded_inputs(
             add("sweep", detail, unpolled)
 
     # preview: the QB-out gate reads whatever preview is on file, and a blank
-    # file passes EVERY game. Affected = no preview, or one written before today.
-    if preview_status is not None and not preview_status.get("ok", True):
-        cutoff = _day_start(now)
-        fresh = set()
-        for p in previews:
-            gid = int(p["game_id"])
-            up = _naive_utc(p.get("updated_at"))
-            if up is not None and (cutoff is None or up >= cutoff):
-                fresh.add(gid)
-        ids = sorted(card_ids - fresh)
-        reason = preview_status.get("reason") or "failed"
-        add("preview", f"{reason}: {len(ids)} games with no QB read from today", ids)
+    # file passes EVERY game. A failed injury read (ok False) therefore holds
+    # every game on the card — the run that failed still upserts a fresh blank
+    # row per game, so no single row would look stale. When the feed was fine,
+    # the narrower trigger still holds any game whose row is missing or older
+    # than today. None = the step did not run, which is not a failure.
+    if preview_status is not None:
+        if not preview_status.get("ok", True):
+            reason = preview_status.get("reason") or "failed"
+            ids = sorted(card_ids)
+            add(
+                "preview",
+                f"{reason}: the injury read failed, so the quarterback gate could not run "
+                f"on any of the {len(ids)} games",
+                ids,
+            )
+        else:
+            cutoff = _day_start(now)
+            fresh = set()
+            for p in previews:
+                gid = int(p["game_id"])
+                up = _naive_utc(p.get("updated_at"))
+                if up is not None and (cutoff is None or up >= cutoff):
+                    fresh.add(gid)
+            ids = sorted(card_ids - fresh)
+            if ids:
+                add("preview", f"{len(ids)} games with no QB read from today", ids)
 
     # pace: a per-game model input, read off the stored factors.
     model_ids: Set[int] = set()

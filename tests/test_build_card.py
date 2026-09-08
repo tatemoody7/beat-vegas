@@ -572,9 +572,10 @@ def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, c
     assert pick.blocker == "degraded" and pick.is_paper is True
 
 
-def test_a_failed_research_preview_degrades_the_games_with_a_stale_qb_read(env, capsys, tmp_path):
-    """Only game 2 has a preview row, written at NOW — every other game on the
-    card is running on no QB read at all."""
+def test_a_failed_research_preview_holds_every_game_on_the_card(env, capsys, tmp_path):
+    """Owner decision (2026-09-08): an empty injury feed means the QB gate ran on
+    nothing, so EVERY game is held — game 2's fresh (blank) row included. The
+    header count, the "  BET #" lines and the status line all say so."""
     mod, eng = env
     seed_week(eng)
     prev = _write(tmp_path, "preview.json", {"ok": False, "reason": "rotowire_empty"})
@@ -582,12 +583,38 @@ def test_a_failed_research_preview_degrades_the_games_with_a_stale_qb_read(env, 
         mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
         == 0
     )
+    lines = _summary(capsys)
+    assert lines[0].startswith("Card 2026 wk3 built ") and " 0 BET / " in lines[0]
+    assert lines[1] == (
+        "CARD STATUS: degraded slot=saturday degraded=4 "
+        "[preview: rotowire_empty: the injury read failed, so the quarterback gate "
+        "could not run on any of the 4 games]"
+    )
+    assert not [ln for ln in lines if ln.startswith("  BET #")]
+    assert "  DEGRADED Kansas @ Missouri: 1H under 24.5 (gap +2.10) — paper only [preview]" in lines
     with Session(eng) as s:
         payload = json.loads(s.query(Card).one().payload)
     (entry,) = payload["degraded"]
-    assert entry["input"] == "preview" and 2 not in entry["game_ids"]
-    assert sorted(entry["game_ids"]) == [1, 3, 5]
+    assert entry["input"] == "preview" and sorted(entry["game_ids"]) == [1, 2, 3, 5]
     assert payload["status"] == "degraded"
+    assert payload["counts"]["bet"] == 0 and payload["counts"]["degraded"] == 4
+    assert all(i["blocker"] == "degraded" for i in payload["items"])
+
+
+def test_a_healthy_preview_still_holds_the_games_with_no_qb_read_from_today(env, capsys, tmp_path):
+    """Only game 2 has a preview row (written at NOW); the feed was fine, so
+    just the games with no row for today are held."""
+    mod, eng = env
+    seed_week(eng)
+    prev = _write(tmp_path, "preview.json", {"ok": True, "reason": None})
+    assert (
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
+        == 0
+    )
+    with Session(eng) as s:
+        payload = json.loads(s.query(Card).one().payload)
+    (entry,) = payload["degraded"]
+    assert entry["input"] == "preview" and sorted(entry["game_ids"]) == [1, 3, 5]
     by_id = {i["game_id"]: i for i in payload["items"]}
     assert by_id[1]["blocker"] == "degraded" and by_id[2]["blocker"] is None
 

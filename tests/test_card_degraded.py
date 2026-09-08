@@ -195,9 +195,10 @@ def test_incomplete_sweep_whose_unreached_games_are_all_off_card_degrades_nothin
     assert c["counts"]["bet"] == 2
 
 
-def test_failed_preview_degrades_the_games_with_no_qb_read_from_today():
-    """Game 1's preview was refreshed this morning, so its QB read still stands;
-    game 2's is yesterday's and game 3 has none at all."""
+def test_failed_preview_holds_every_game_on_the_card():
+    """Owner decision (2026-09-08): an empty injury feed means the QB-out gate
+    could not run on ANY game, so every game is held — including game 1, whose
+    row was refreshed this morning (by a run that had no injuries to write)."""
     d = degraded_inputs(
         [game(1), game(2), game(3)],
         preview_status={"ok": False, "reason": "rotowire_empty"},
@@ -206,47 +207,78 @@ def test_failed_preview_degrades_the_games_with_no_qb_read_from_today():
         tempo_rows=260,
         now=NOW,
     )
-    assert len(d) == 1 and d[0]["input"] == "preview"
-    assert d[0]["game_ids"] == [2, 3]
-    assert d[0]["detail"] == "rotowire_empty: 2 games with no QB read from today"
-
-
-def test_a_preview_that_wrote_blanks_today_degrades_the_card_but_no_single_game():
-    """KNOWN SHAPE, worth pinning: when Rotowire is empty but ESPN is up, the
-    preview run still upserts a row per game — dated TODAY, with blank injuries.
-    By the "missing or written before today" rule no single game is stale, so
-    the entry comes back BUILD-WIDE (game_ids []), which web/lib/card.ts renders
-    as a whole-card warning. The banner and the CARD STATUS line fire; no
-    individual bet is blocked."""
-    d = degraded_inputs(
-        [game(1)],
-        preview_status={"ok": False, "reason": "rotowire_empty"},
-        previews=[preview_row(1, updated_at=NOW)],
-        predictions=[model(1, 22.4)],
-        tempo_rows=260,
-        now=NOW,
-    )
     assert d == [
         {
             "input": "preview",
-            "detail": "rotowire_empty: 0 games with no QB read from today",
-            "game_ids": [],
+            "detail": "rotowire_empty: the injury read failed, so the quarterback gate "
+            "could not run on any of the 3 games",
+            "game_ids": [1, 2, 3],
         }
     ]
+
+
+def test_an_empty_injury_feed_makes_every_bet_paper_only():
+    """The case that defeated the purpose before: Rotowire empty but ESPN up,
+    so the preview run still upserted a row per game dated TODAY with blank
+    injuries. No row looked stale, the entry came back with no game ids and no
+    bet was held. Now every bet on the card is paper only and the header
+    count agrees."""
+    d = degraded_inputs(
+        [game(1), game(2)],
+        preview_status={"ok": False, "reason": "rotowire_empty"},
+        previews=[preview_row(1, updated_at=NOW), preview_row(2, updated_at=NOW)],
+        predictions=[model(1, 22.4), model(2, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert [e["game_ids"] for e in d] == [[1, 2]]
     c = build_card(
-        [game(1)],
-        bet_snaps(1),
-        [model(1, 22.4)],
-        [],
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4), model(2, 22.4)],
+        [preview_row(1), preview_row(2)],
         season=2026,
         week=3,
         now=NOW,
         slot="saturday",
         degraded=d,
     )
-    assert c["status"] == "degraded" and c["counts"]["degraded"] == 0
-    assert c["items"][0]["blocker"] is None  # still a bettable BET
-    assert c["items"][0]["cap_rank"] == 1
+    assert c["status"] == "degraded"
+    assert c["counts"]["degraded"] == 2 and c["counts"]["bet"] == 0
+    for it in c["items"]:
+        assert it["tier"] == "BET" and it["blocker"] == "degraded"
+        assert it["paper_blocker"] == "degraded" and it["cap_rank"] is None
+
+
+def test_a_healthy_feed_still_holds_a_game_whose_preview_is_missing_or_old():
+    """The narrower trigger survives: the feed was fine (ok True) but game 2's
+    row is yesterday's and game 3 has none — those two carry no QB read for
+    today; game 1 does."""
+    d = degraded_inputs(
+        [game(1), game(2), game(3)],
+        preview_status={"ok": True, "reason": None},
+        previews=[preview_row(1), preview_row(2, updated_at=NOW - timedelta(days=1))],
+        predictions=[model(i, 22.4) for i in (1, 2, 3)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d == [
+        {"input": "preview", "detail": "2 games with no QB read from today", "game_ids": [2, 3]}
+    ]
+
+
+def test_no_preview_status_means_the_step_did_not_run_and_is_not_a_failure():
+    """The weeknight slots skip the preview when today's rows exist; a missing
+    file must not hold games whose rows happen to be older."""
+    d = degraded_inputs(
+        [game(1), game(2)],
+        preview_status=None,
+        previews=[preview_row(2, updated_at=NOW - timedelta(days=2))],
+        predictions=[model(1, 22.4), model(2, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d == []
 
 
 def test_missing_pace_is_a_per_game_signal():

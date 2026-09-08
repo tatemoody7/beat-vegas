@@ -62,6 +62,12 @@ HR_OFF_MARKET_PTS = 0.5
 # does not count because the frame is FBS-only). Rows carry h/a_games_played so
 # the web tags anything under 2 games "early season" instead of hiding it.
 MIN_GAMES_FOR_MODEL = 0
+# The coloured 0-100 score (web/lib/grade.ts): >= SCORE_BET_MIN is green/bet,
+# >= SCORE_WATCH_MIN amber/watch, else red/pass. Scaled so a gap of exactly
+# BET_GAP_PTS at a fair price scores SCORE_BET_MIN — green means the gap rule
+# passed. 2026-09-08.
+SCORE_BET_MIN = 70
+SCORE_WATCH_MIN = 55
 # Worst per-$1 EV of Hard Rock's under (vs the market's no-vig fair under) still
 # treated as a fair price: the unavoidable ~2 cents of vig. Below it the price
 # gate fails (web/lib/edge.ts FAIR_EV_FLOOR / lineCheck.ts "neg").

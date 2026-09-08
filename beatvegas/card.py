@@ -32,12 +32,23 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 from .ci import CARD_STATUS_BY_SLOT
 from .devig import devig_two_way, ev_under
 from .hardrock import HR_BOOK_KEY, normalize_book
-from .model.score import BET_GAP_PTS, EV_FLOOR, HR_OFF_MARKET_PTS, MODEL_VERSION, WEEKLY_BET_CAP
+from .model.score import (
+    BET_GAP_PTS,
+    EV_FLOOR,
+    HR_OFF_MARKET_PTS,
+    MODEL_VERSION,
+    SCORE_BET_MIN,
+    SCORE_WATCH_MIN,
+    WEEKLY_BET_CAP,
+)
 
 # lineCheck.ts evVerdictFor: "pos" above this, "neg" below EV_FLOOR, else fair.
 PRICE_EDGE_EV = 0.005
 # edge.ts score constants (the tier boundary + the price/penalty terms).
-EDGE_SCORE_MIN = 60
+# Score scale: 50 + SCORE_PER_GAP_PT per point of gap, so a gap of exactly
+# BET_GAP_PTS lands on SCORE_BET_MIN (web/lib/edge.ts mirrors this).
+SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS
+EDGE_SCORE_MIN = SCORE_WATCH_MIN
 PRICE_BONUS_CAP = 8
 OFF_MARKET_PENALTY = 10
 QB_OUT_PENALTY = 5
@@ -578,7 +589,7 @@ def build_item(
     )
     score = 0
     if has_model:
-        score = max(0, min(100, round(50 + 10 * (gap or 0))))
+        score = max(0, min(100, round(50 + SCORE_PER_GAP_PT * (gap or 0))))
         score += price_bonus
         if off_market:
             score -= OFF_MARKET_PENALTY

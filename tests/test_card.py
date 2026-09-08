@@ -461,10 +461,12 @@ def test_items_sort_bet_then_edge_by_gap_then_pass_by_gap_then_ev():
     snaps += market(4, 25.0)
     # 5: PASS with a positive price (ev > 0) -> ahead of PASS #1
     snaps += [snap(5, "hardrockbet", 24.5, -120, 100)] + market(5, 24.5)
-    preds = [model(1, 24.0), model(2, 22.4), model(3, 22.4), model(4, 22.4), model(5, 24.0)]
+    # gap -0.3 -> score 47 (+7 price bonus on #5 = 54), under the 55 watch cut,
+    # so 1 and 5 stay PASS
+    preds = [model(1, 24.8), model(2, 22.4), model(3, 22.4), model(4, 22.4), model(5, 24.8)]
     c = card(games, snaps, preds)
     order = [(it["game_id"], it["tier"]) for it in c["items"]]
-    # gap first (4: 2.6 beats 2: 2.1); equal gaps (5 and 1, both 0.5) fall back to ev
+    # gap first (4: 2.6 beats 2: 2.1); equal gaps (5 and 1, both -0.3) fall back to ev
     assert order == [(3, "BET"), (4, "EDGE"), (2, "EDGE"), (5, "PASS"), (1, "PASS")]
     assert c["counts"] == {"bet": 1, "edge": 2, "pass": 2, "over_cap": 0, "degraded": 0}
 
@@ -589,14 +591,14 @@ def test_price_blocked_edge_qualifies_with_blocker_price():
     assert it["tier"] == "EDGE" and it["qualifies"] is True and it["paper_blocker"] == "price"
 
 
-def test_off_market_pass_still_qualifies_with_blocker_off_market():
-    """gap 2.0 at Hard Rock but 1.0 under the market: score 70-10 = 60 -> EDGE;
-    with a QB out too the score drops to 55 -> PASS. Either way it qualifies and
-    the paper ledger tags off_market first (gate order)."""
+def test_off_market_with_qb_out_still_qualifies_with_blocker_off_market():
+    """gap 2.0 at Hard Rock but 1.0 under the market: score 73-10 = 63; with a
+    QB out too it drops to 58 -> still the amber band (EDGE, blocker off_market
+    first in gate order). It qualifies and the paper ledger tags off_market."""
     snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
     it = only(card([game()], snaps, [model(1, 22.0)], prev))
-    assert it["tier"] == "PASS" and it["blocker"] is None
+    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
     assert it["qualifies"] is True and it["paper_blocker"] == "off_market"
 
 

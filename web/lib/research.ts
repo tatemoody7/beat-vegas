@@ -3,23 +3,13 @@ import { median } from "@/lib/format";
 import { MARKET_LEDGER_1H, MODEL_VERSION } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 import { hasFbsSeason, isFbsGame } from "@/lib/proxy";
+import { STRONG_GAP_PTS } from "@/lib/verdict";
 import { Prisma } from "@prisma/client";
 
 // Port of the "Research" tab in beatvegas/dashboard/app.py — the edge question
 // (realized 1H/full-game ratio) + model_runs over time.
 
 export type EdgeStats = { games: number; mean: number; median: number } | null;
-
-export type ModelRunRow = {
-  created_at: string;
-  version: string | null;
-  train_window: string | null;
-  test_window: string | null;
-  baseline_under_pct: number | null;
-  top_under_pct: number | null;
-  top_roi: number | null;
-  notes: string | null;
-};
 
 // --- Gap vs CLV: do our biggest BV-vs-Vegas gaps earn positive closing-line
 // value? The verdict on the whole "make our own number" method. Gap is in the
@@ -34,12 +24,14 @@ export type GapBucket = {
   underPct: number | null;
 };
 
+// Reader-facing labels: words, not maths (spec §24.13). The top band is our
+// own "biggest gaps of a season" bar, so it is named from the constant.
 const GAP_BUCKETS: { label: string; lo: number; hi: number }[] = [
-  { label: "<0", lo: -Infinity, hi: 0 },
-  { label: "0–1", lo: 0, hi: 1 },
-  { label: "1–2", lo: 1, hi: 2 },
-  { label: "2–3", lo: 2, hi: 3 },
-  { label: "3+", lo: 3, hi: Infinity },
+  { label: "under 0", lo: -Infinity, hi: 0 },
+  { label: "0 to 1", lo: 0, hi: 1 },
+  { label: "1 to 2", lo: 1, hi: 2 },
+  { label: "2 to 3", lo: 2, hi: 3 },
+  { label: `${STRONG_GAP_PTS}+`, lo: 3, hi: Infinity },
 ];
 
 const avg = (xs: number[]): number | null =>
@@ -212,48 +204,5 @@ async function getEdgeStatsUncached(season?: number): Promise<EdgeStats> {
 export const getEdgeStats = unstable_cache(
   getEdgeStatsUncached,
   ["edge-stats"],
-  { revalidate: 3600 },
-);
-
-function metric(js: string | null, key: string): number | null {
-  if (!js) return null;
-  try {
-    const v = JSON.parse(js)[key];
-    return typeof v === "number" ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-async function getModelRunsUncached(): Promise<ModelRunRow[]> {
-  const runs = await prisma.$queryRaw<
-    {
-      created_at: string | null;
-      version: string | null;
-      train_window: string | null;
-      test_window: string | null;
-      metrics_json: string | null;
-      notes: string | null;
-    }[]
-  >`
-    SELECT CAST(created_at AS TEXT) AS created_at, version, train_window,
-           test_window, metrics_json, notes
-    FROM model_runs ORDER BY created_at
-  `;
-  return runs.map((r) => ({
-    created_at: r.created_at ?? "",
-    version: r.version,
-    train_window: r.train_window,
-    test_window: r.test_window,
-    baseline_under_pct: metric(r.metrics_json, "baseline_under_pct"),
-    top_under_pct: metric(r.metrics_json, "top_under_pct"),
-    top_roi: metric(r.metrics_json, "top_roi"),
-    notes: r.notes,
-  }));
-}
-
-export const getModelRuns = unstable_cache(
-  getModelRunsUncached,
-  ["model-runs"],
   { revalidate: 3600 },
 );

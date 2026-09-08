@@ -1337,7 +1337,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
         _flag(
             "multiple_comparisons",
             "ok",
-            f"{n_tests} comparisons were run; expect roughly {max(1, round(0.05 * n_tests))} false positives at p < 0.05. Only q < 0.10 with |d| ≥ 0.2 is flagged.",
+            f"{n_tests} comparisons were run, so about {max(1, round(0.05 * n_tests))} would look meaningful by luck alone. Only differences that clear that bar by a wide margin are flagged.",
             n_tests=n_tests,
         )
     )

@@ -58,17 +58,6 @@ export type BlockerRow = {
   paperBets: number;
 };
 
-export const BLOCKER_LABEL: Record<BlockerKey, string> = {
-  none: "BET — every gate passed",
-  price: "Blocked by price (Hard Rock worse than fair)",
-  off_market: "Blocked: Hard Rock's number below the market",
-  no_fair_price: "Blocked: no comparable price to judge Hard Rock’s under",
-  qb_out: "Blocked: starting QB listed out",
-  cap: "Over the weekly cap (6th+ by gap)",
-  degraded: "Held: a card input failed, so this bet was paper-only",
-  untagged: "Paper pick logged before gate tagging",
-};
-
 export type WeeklyReview = {
   /** The week shown in the scorecard; null when nothing is graded yet. */
   week: number | null;
@@ -81,14 +70,6 @@ export type WeeklyReview = {
   byBlocker: BlockerRow[];
   /** Picks for the selected week (or all, when week is "all"). */
   picks: PickFull[];
-};
-
-export const REASON_LABEL: Record<ReasonRow["reason"], string> = {
-  model_gap: "Model gap (Hard Rock's number 1.75+ above ours)",
-  price_edge: "Price edge only (no model read)",
-  manual: "Your own call",
-  untagged: "Logged before tracking (no reason stored)",
-  off_policy: "Off-policy — real money where the site said WATCH/PASS",
 };
 
 const graded = (ps: PickFull[]) => ps.filter((p) => p.graded);

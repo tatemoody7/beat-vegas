@@ -313,7 +313,11 @@ export default function BetSlip({
 }) {
   const capUsed = slip.used >= slip.cap;
   return (
-    <section className="bv-card mb-4 p-4" aria-label="Bet slip">
+    <section
+      id="bet-slip"
+      className="bv-card mb-4 scroll-mt-4 p-4"
+      aria-label="Bet slip"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-[var(--text)]">
           {week === null ? "Bet slip" : `Bet slip · Week ${week}`}

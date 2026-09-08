@@ -1,14 +1,17 @@
+import Link from "next/link";
 import { getSeasons } from "@/lib/board";
 import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
+import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import {
   getHomeBoard,
+  groupByDay,
   matchesFilters,
   parseFilters,
   tierCounts,
 } from "@/lib/homeBoard";
 import { resolveSeason } from "@/lib/season";
-import { BET_GAP_PTS } from "@/lib/verdict";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BetSlip from "@/app/components/BetSlip";
 import BoardFilters from "@/app/components/BoardFilters";
@@ -21,9 +24,9 @@ import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
-// The board IS the home page: every game on the week in one ranked list, best
-// spot first, each with an edge score 0–100, a tier, and one line saying what
-// to do. Open a card for the lines, the model, the reasons and the news.
+// The board IS the home page: one rolling week, grouped by day, every game
+// with a coloured 0–100 score and one line saying what to do. Open a card for
+// the lines, our number, what is behind it, and the news.
 export default async function BoardPage({
   searchParams,
 }: {
@@ -60,14 +63,15 @@ export default async function BoardPage({
     new Date(),
     live,
   );
+  const slipOpen = slip.rows.some(
+    (r) => r.kickMinutes === null || r.kickMinutes > 0,
+  );
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
   const counts = tierCounts(games);
   const filtered = games.length !== board.games.length;
-  // Kept as one string so the phone-collapsed <details> copy and the sm+
-  // always-visible copy stay byte-for-byte identical.
-  const introCopy = `Every game with a Hard Rock total, best spot first. The score is 0–100 — it ranks the board and nothing else. BET only appears when every rule passes: a model read, Hard Rock’s own first-half number ${BET_GAP_PTS}+ points above ours, a live line, and a price no worse than the market.`;
+  const days = groupByDay(games);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -85,27 +89,26 @@ export default async function BoardPage({
         </div>
       </div>
 
-      {/* Phone: the intro is what pushed the bet slip below the fold, so it
-          collapses behind a tap. sm+: always visible, no disclosure control. */}
-      <div className="mb-4">
-        <p className="bv-page-sub mt-1 hidden sm:block">{introCopy}</p>
-        <details className="sm:hidden">
-          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-[var(--text-muted)]">
-            <span>How this works</span>
-            <span aria-hidden="true" className="text-xs text-[var(--text-dim)]">
-              ▾
-            </span>
-          </summary>
-          <p className="bv-page-sub mt-1">{introCopy}</p>
-        </details>
-      </div>
+      <p className="bv-page-sub mt-1">
+        {`Every game this week, highest score first. ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching, under ${SCORE_WATCH_MIN} is a pass.`}
+      </p>
+      <p className="mb-4 mt-1 text-xs text-[var(--text-dim)]">
+        {`One first half is close to a coin flip — the score ranks games, it does not promise wins. `}
+        <Link href="/trust" className="text-[var(--accent)] hover:underline">
+          How much to trust this
+        </Link>
+      </p>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      {/* Phone: the slip first (it is what Saturday morning is for), bankroll
-          under it. md+: bankroll first, then the slip. */}
+      {/* Phone: the graded game list comes first (that is what the site is
+          for); the slip and bankroll follow, with a sticky jump to the slip
+          when a bet is live. md+: bankroll, slip, card, then the board. */}
       <div className="flex flex-col">
-        <div className="order-1 md:order-2">
+        <div className="order-3 md:order-1">
+          <BankrollStrip b={board.bankroll} />
+        </div>
+        <div className="order-2 md:order-2">
           {card !== null && (
             <>
               <CardStatusBanner card={card} />
@@ -117,80 +120,103 @@ export default async function BoardPage({
             </>
           )}
         </div>
-        <div className="order-2 md:order-1">
-          <BankrollStrip b={board.bankroll} />
+        <div className="order-4 md:order-3">
+          <CardPanel card={card} />
         </div>
-      </div>
 
-      <CardPanel card={card} />
+        <div className="order-1 md:order-4">
+          <div className="mb-3">
+            <BoardFilters current={filters} />
+          </div>
 
-      <div className="mb-4">
-        <BoardFilters current={filters} />
-      </div>
+          {board.noModel && (
+            <div className="bv-card mb-4 border-l-2 border-[var(--warn)] p-4 text-sm text-[var(--text-muted)]">
+              <p className="font-medium text-[var(--text)]">
+                No model number this week.
+              </p>
+              <p className="mt-1">
+                {`The week has not been scored yet. Until it is, each score comes from pace, weather, the spread and last season’s first halves. Anything you bet this week is a price bet, not a model bet.`}
+              </p>
+            </div>
+          )}
 
-      {board.noModel && (
-        <div className="bv-card mb-4 border-l-2 border-[var(--warn)] p-4 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--text)]">
-            No model read this week.
-          </p>
-          <p className="mt-1">
-            {`The week has not been scored yet. Until it is, the cards compare our reference first-half number to the market and score the context (pace, weather, spread, last season’s first halves). Anything you bet this week is a price bet, not a model bet.`}
-          </p>
-        </div>
-      )}
+          {board.noHrLine && board.games.length > 0 && (
+            <div className="bv-card mb-4 border-l-2 border-[var(--accent)] p-4 text-sm text-[var(--text-muted)]">
+              <p className="font-medium text-[var(--text)]">
+                Hard Rock has not posted first-half lines yet.
+              </p>
+              <p className="mt-1">
+                {`First-half totals usually post later in the week. Each game says the line and price that would make it a bet.`}
+              </p>
+            </div>
+          )}
 
-      {board.noHrLine && board.games.length > 0 && (
-        <div className="bv-card mb-4 border-l-2 border-[var(--accent)] p-4 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--text)]">
-            Hard Rock has not posted first-half lines yet.
-          </p>
-          <p className="mt-1">
-            {`First-half totals usually post later in the week. Each card says the number and price that would make it a bet, so you know what to watch for.`}
-          </p>
-        </div>
-      )}
-
-      {board.games.length === 0 ? (
-        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          {`Nothing on the board for ${season} yet. It fills in automatically on Sunday afternoon once the week’s opening lines post.`}
-        </p>
-      ) : (
-        <>
-          <p className="mb-3 text-sm text-[var(--text-dim)]">
-            <span className="font-mono font-semibold text-[var(--accent)]">
-              {counts.bet}
-            </span>
-            {` bet · `}
-            <span className="font-mono font-semibold text-[var(--text)]">
-              {counts.edge}
-            </span>
-            {` edge · `}
-            <span className="font-mono font-semibold text-[var(--text-muted)]">
-              {counts.pass}
-            </span>
-            {` pass`}
-            {filtered ? ` · ${board.games.length} games before filters` : ""}
-          </p>
-
-          {games.length === 0 ? (
-            <p className="bv-card p-5 text-sm text-[var(--text-muted)]">
-              {`No games match those filters. Clear a filter to see the rest of the week.`}
+          {board.games.length === 0 ? (
+            <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
+              {`Nothing on the board for ${season} yet. The week’s lines are swept every morning from Tuesday, and the model scores the full week on Sunday.`}
             </p>
           ) : (
             <>
-              {counts.bet === 0 && counts.edge === 0 && (
-                <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
-                  {`Nothing clears the bar this week — no bets, no edges worth watching. That is a result, not a failure: passing costs nothing, and the weekly cap is a ceiling, not a target.`}
+              <p className="mb-1 text-sm text-[var(--text-dim)]">
+                <span className="font-mono font-semibold text-[var(--good)]">
+                  {counts.bet}
+                </span>
+                {` bet · `}
+                <span className="font-mono font-semibold text-[var(--warn)]">
+                  {counts.edge}
+                </span>
+                {` watch · `}
+                <span className="font-mono font-semibold text-[var(--bad)]">
+                  {counts.pass}
+                </span>
+                {` pass`}
+                {filtered
+                  ? ` · ${board.games.length} games before filters`
+                  : ""}
+              </p>
+              <p className="mb-3 text-xs text-[var(--text-dim)]">
+                {`Bet = score ${SCORE_BET_MIN}+. Watch = ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1}. Pass = under ${SCORE_WATCH_MIN}.`}
+              </p>
+
+              {games.length === 0 ? (
+                <p className="bv-card p-5 text-sm text-[var(--text-muted)]">
+                  {`No games match those filters. Clear a filter to see the rest of the week.`}
                 </p>
+              ) : (
+                <>
+                  {counts.bet === 0 && counts.edge === 0 && (
+                    <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
+                      {`Nothing clears the bar this week. No bets, nothing to watch. Zero bets is a normal week — the ${WEEKLY_BET_CAP}-bet cap is a ceiling, not a target.`}
+                    </p>
+                  )}
+                  {days.map((grp) => (
+                    <section key={grp.label} aria-label={grp.label}>
+                      <h2 className="bv-day-head">{grp.label}</h2>
+                      <div className="flex flex-col gap-3">
+                        {grp.games.map((g) => (
+                          <GameCard key={g.row.gameId} g={g} />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </>
               )}
-              <div className="flex flex-col gap-3">
-                {games.map((g) => (
-                  <GameCard key={g.row.gameId} g={g} />
-                ))}
-              </div>
             </>
           )}
-        </>
+        </div>
+      </div>
+
+      {/* Phone only: a sticky jump to the slip while a bet on it is still live. */}
+      {card !== null && slipOpen && (
+        <a
+          href="#bet-slip"
+          className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm md:hidden"
+        >
+          <span className="font-semibold text-[var(--text)]">Bet slip</span>
+          <span className="font-mono text-[var(--text-muted)]">
+            {`${slip.used} of ${slip.cap} used ↓`}
+          </span>
+        </a>
       )}
     </div>
   );

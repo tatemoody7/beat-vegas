@@ -9,7 +9,9 @@ view reads them. Run early in the week (locally or via a scheduled job).
 
 Injuries come from ONE Rotowire report call for the whole slate (ESPN publishes
 no college injuries — see sources/rotowire.py). If that call comes back empty
-the run says so loudly instead of writing 455 quiet blanks.
+the run says so loudly instead of writing 455 quiet blanks, and --status-file
+records it for scripts/build_card.py: an empty injury feed makes the card's
+QB-out gate pass EVERY game, so a card built on one is marked degraded.
 
     python scripts/research_preview.py                 # current season, upcoming week
     python scripts/research_preview.py --season 2026 --week 1
@@ -21,6 +23,7 @@ import argparse
 import json
 import sys
 from datetime import datetime
+from typing import Optional
 
 from beatvegas import ci
 from beatvegas.db.models import Game, GamePreview, Team
@@ -28,6 +31,35 @@ from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.season import current_season
 from beatvegas.sources import rotowire
 from beatvegas.sources.espn import espn_team_id, team_news, teams_available
+
+
+def write_status(
+    path: Optional[str],
+    *,
+    ok: bool,
+    reason: Optional[str],
+    rotowire_rows: int,
+    espn_ok: bool,
+    games: int,
+    qb_outs: int,
+) -> None:
+    """This run's health, for scripts/build_card.py. `ok` False means the QB-out
+    gate on the card is about to read a stale (or blank) injury file, which
+    passes EVERY game — the card marks those games degraded rather than
+    publishing a clean-looking final."""
+    if not path:
+        return
+    payload = {
+        "ok": bool(ok),
+        "reason": reason,
+        "rotowire_rows": int(rotowire_rows),
+        "espn_ok": bool(espn_ok),
+        "games": int(games),
+        "qb_outs": int(qb_outs),
+    }
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    print(f"[status] {path}: {json.dumps(payload)}")
 
 
 def _upcoming_week(s, season: int) -> int:
@@ -44,6 +76,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument("--week", type=int, default=None, help="default: the upcoming week")
+    ap.add_argument(
+        "--status-file",
+        default=None,
+        dest="status_file",
+        help="write this run's health as JSON here (ok, reason, rotowire_rows, "
+        "espn_ok, games, qb_outs) so scripts/build_card.py can mark a card built "
+        "on a stale QB read degraded",
+    )
     args = ap.parse_args()
 
     # Sources first, DB second: if BOTH are empty every row would be a blank
@@ -55,11 +95,31 @@ def main() -> None:
         ci.warn("[rotowire] injury report empty/unreachable — injuries will be blank")
     if not espn_ok:
         ci.warn("[espn] team list empty (blocked or down) — news will be blank")
+    # ok is about the INJURY feed only: it is what the card's QB-out gate reads,
+    # and an empty one passes every game. An empty ESPN news feed is recorded and
+    # warned about but is display-only, so it does not flip ok.
+    reason = None
+    if not report:
+        reason = "both_empty" if not espn_ok else "rotowire_empty"
+
+    def status(games: int, outs: int) -> None:
+        write_status(
+            args.status_file,
+            ok=reason is None,
+            reason=reason,
+            rotowire_rows=len(report),
+            espn_ok=bool(espn_ok),
+            games=games,
+            qb_outs=outs,
+        )
+
     if not report and not espn_ok:
         print("[espn] FATAL: both sources empty — refusing to write a blank slate. Fix, re-run.")
+        status(0, 0)
         sys.exit(3)
 
     if not try_init_db():
+        status(0, 0)
         return
 
     now = datetime.utcnow()
@@ -123,6 +183,7 @@ def main() -> None:
         f"{with_inj} with injuries ({len(report)} report rows, "
         f"{len(inj_by_school)} teams matched), {qb_outs} with a QB out"
     )
+    status(n, qb_outs)
     if n and not with_news:
         ci.warn("[espn] no news for any game — team list or news endpoint is failing")
 

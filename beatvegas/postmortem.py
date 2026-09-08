@@ -115,6 +115,9 @@ _ORDER: Dict[str, List[str]] = {
         "no_hr_line",
         "no_model",
     ],
+    # which 1H engine wrote the stored prediction (factors_json.engine); rows
+    # written before the field existed carry none and fall out of the split
+    "engine": ["bv_line", "residual"],
 }
 
 HIST_DIMENSIONS = (
@@ -141,6 +144,7 @@ LIVE_DIMENSIONS = (
     "hr_vs_market",
     "tier",
     "blocker",
+    "engine",
     "ev_band",
     "week_band",
     "spread_band",
@@ -326,6 +330,15 @@ def _loads(s: Any) -> Dict:
     return d if isinstance(d, dict) else {}
 
 
+def engine_of(factors_json: Any) -> Optional[str]:
+    """The 1H engine tag a stored prediction carries (`factors_json.engine`:
+    'bv_line' | 'residual'); None for rows written before the field existed,
+    or for anything that is not a JSON object."""
+    d = factors_json if isinstance(factors_json, dict) else _loads(factors_json)
+    e = d.get("engine") if isinstance(d, dict) else None
+    return e if isinstance(e, str) and e else None
+
+
 def _mean2(a: Any, b: Any) -> Optional[float]:
     x, y = _num(a), _num(b)
     vals = [v for v in (x, y) if v is not None]
@@ -472,12 +485,16 @@ def build_live_frame(
     games: Dict[int, Dict],
     closes: Dict[int, float],
     hr_closes: Optional[Dict[int, float]] = None,
+    engines: Optional[Dict[int, Optional[str]]] = None,
 ) -> pd.DataFrame:
     """Card items (the live ratings) graded at Hard Rock's number, the consensus
     number, the consensus close and (when captured) Hard Rock's own pre-kick
     close. Ungraded games keep fh=None. `hr_closes`: game_id -> Hard Rock's
-    pre-kickoff 1H close from the per-game close polls."""
+    pre-kickoff 1H close from the per-game close polls. `engines`: game_id ->
+    the engine tag of the stored prediction (engine_of), an added split on top
+    of the model_version tag, which stays as it is."""
     hr_closes = hr_closes or {}
+    engines = engines or {}
     rows: List[Dict] = []
     for it in items:
         gid = int(it["game_id"])
@@ -554,6 +571,7 @@ def build_live_frame(
                 "over_cap": bool(it.get("over_cap")),
                 "cap_rank": _num(it.get("cap_rank")),
                 "blocker_dim": live_blocker(it),
+                "engine": engines.get(gid),
             }
         )
     return pd.DataFrame(rows)
@@ -563,18 +581,25 @@ def build_live_frame(
 
 
 def weekly_cap(
-    df: pd.DataFrame, gap_col: str, cap: int = WEEKLY_CAP, min_gap: float = BET_GAP_PTS
+    df: pd.DataFrame,
+    gap_col: str,
+    cap: int = WEEKLY_CAP,
+    min_gap: float = BET_GAP_PTS,
+    tie_cols: Optional[Sequence[str]] = None,
 ) -> pd.Series:
     """Per (season, week): the top `cap` games by gap among gap >= min_gap.
-    Ties: lower game_id. Deterministic. Hist rows have no ev; mirrors
-    card.apply_weekly_cap minus ev (under_score is never a tie-break)."""
+    Ties: `tie_cols` ascending, default lower game_id. Deterministic. Hist rows
+    have no ev; mirrors card.apply_weekly_cap minus ev (under_score is never a
+    tie-break). The residual gate passes [kickoff, game_id] so both engines are
+    ranked the way the card ranks them."""
     mask = pd.Series(False, index=df.index)
     if df.empty or gap_col not in df:
         return mask
     elig = df[df[gap_col].notna() & (df[gap_col] >= min_gap)]
     if elig.empty:
         return mask
-    elig = elig.sort_values([gap_col, "game_id"], ascending=[False, True])
+    ties = list(tie_cols) if tie_cols else ["game_id"]
+    elig = elig.sort_values([gap_col] + ties, ascending=[False] + [True] * len(ties))
     keep = elig.groupby(["season", "week"], sort=False, dropna=False).head(cap)
     mask.loc[keep.index] = True
     return mask
@@ -1346,6 +1371,25 @@ RULE_LABEL = {
 }
 
 
+# What each grading column's line actually is. Mirrors web/lib/postmortem.ts
+# PROXY_LABEL; keep the two in sync. 'real' is NOT a Hard Rock number.
+PROXY_LABEL = {
+    "real": "us-region consensus close (no Hard Rock), ~30 min pre-kick",
+    "fg": "full-game under at the us-region consensus full-game close",
+    "step": "fair step proxy line",
+    "flat": "old 0.52 proxy line",
+    "hr": "Hard Rock's number at build",
+    "hr_close": "Hard Rock's own pre-kick close",
+    "market": "consensus at build",
+    "market_close": "consensus close",
+}
+
+
+def _proxy_text(prx: str) -> str:
+    label = PROXY_LABEL.get(prx)
+    return f"{prx} · {label}" if label else prx
+
+
 def _select(buckets: Sequence[Dict], **kw: Any) -> List[Dict]:
     out = [b for b in buckets if all(b.get(k) == v for k, v in kw.items())]
     return sorted(out, key=lambda b: (b.get("bucket_order", 0), str(b.get("bucket"))))
@@ -1394,7 +1438,7 @@ def render_markdown(
                     lines.append(
                         r.replace(
                             f"| {RULE_LABEL.get(b['selection'], b['selection'])} |",
-                            f"| {RULE_LABEL.get(b['selection'], b['selection'])} | {seg} | {prx} |",
+                            f"| {RULE_LABEL.get(b['selection'], b['selection'])} | {seg} | {_proxy_text(prx)} |",
                             1,
                         )
                     )
@@ -1442,7 +1486,9 @@ def render_markdown(
                         rows = _select(rows_any, segment=seg, proxy_kind=prx, selection=sel)
                         if not rows:
                             continue
-                        lines.append(f"**{RULE_LABEL.get(sel, sel)} · {seg} · graded at {prx}**")
+                        lines.append(
+                            f"**{RULE_LABEL.get(sel, sel)} · {seg} · graded at {_proxy_text(prx)}**"
+                        )
                         lines.append("")
                         if dim == "resid_by_gap":
                             lines.append(
@@ -1655,8 +1701,10 @@ def compute_hist(
         ]
         + (
             [
-                f"'real' grades at the captured pre-kickoff consensus first-half close (The Odds API history); "
-                f"{n_real} of {len(df)} rated games have one. Only those games appear in the real column."
+                f"'real' grades at the us-region consensus first-half close (no Hard Rock: it did "
+                f"not exist historically), captured once about 30 minutes before kickoff from The Odds "
+                f"API history; {n_real} of {len(df)} rated games have one. Only those games appear in "
+                f"the real column."
             ]
             if n_real
             else []

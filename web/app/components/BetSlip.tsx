@@ -172,7 +172,11 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
 
       {/* 2 — card vs live */}
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
-        <span>{`card ${r.line} → live ${liveLabel}`}</span>
+        {/* Each price group (line + price) stays on one line; a break can
+            only land at the arrow between them, never mid-value. */}
+        <span className="whitespace-nowrap">{`card ${r.line}`}</span>
+        <span>→</span>
+        <span className="whitespace-nowrap">{`live ${liveLabel}`}</span>
         {r.moved && (
           <span
             className="rounded-md border border-[var(--warn-border)] bg-[var(--warn-bg)] px-1.5 text-[var(--warn)]"
@@ -181,7 +185,11 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
             moved
           </span>
         )}
-        {r.hrVsMarket !== null && (
+        {/* Below 0.05 the gap is noise, not signal — mirrors the Python
+            why-sentence threshold in beatvegas/card.py (abs(...) >= 0.05)
+            that suppresses the same comparison there. One-line guard, kept
+            inline since hrVsMarket has no other pure helper in lib/betSlip.ts. */}
+        {r.hrVsMarket !== null && Math.abs(r.hrVsMarket) >= 0.05 && (
           <span
             className="text-[var(--text-dim)]"
             title="Hard Rock’s first-half line minus the market’s. Higher is better for an under."

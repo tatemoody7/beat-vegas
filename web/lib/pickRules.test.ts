@@ -48,7 +48,7 @@ describe("parsePickBody", () => {
   it("rejects a real-money full-game pick but allows it as paper", () => {
     const real = parsePickBody({ ...good, market: "full" });
     expect(real.ok).toBe(false);
-    if (!real.ok) expect(real.error).toMatch(/context only/);
+    if (!real.ok) expect(real.error).toMatch(/first-half unders only/);
     const paper = parsePickBody({ ...good, market: "full", isPaper: true });
     expect(paper.ok).toBe(true);
   });
@@ -102,7 +102,7 @@ describe("checkPolicy", () => {
   it("enforces the 5-bet weekly cap on real 1H picks only", () => {
     const r = checkPolicy(pick, { ...ctx, realWeekCount: 5 });
     expect(r).toMatchObject({ ok: false, status: 409 });
-    if (!r.ok) expect(r.error).toMatch(/Weekly cap reached: 5/);
+    if (!r.ok) expect(r.error).toMatch(/^5 real-money bets are already logged/);
     expect(checkPolicy(pick, { ...ctx, realWeekCount: 4 })).toEqual({
       ok: true,
     });
@@ -140,7 +140,7 @@ describe("checkPolicy", () => {
         expect(r.error).toMatch(/kill line/i);
         expect(r.error).toMatch(/u24\.5/);
         expect(r.error).toMatch(/u24\b/);
-        expect(r.error).toMatch(/is not the same bet the card rated/i);
+        expect(r.error).toMatch(/a different bet/i);
         expect(r.error).toMatch(/pass on it/i);
       }
     });
@@ -153,7 +153,7 @@ describe("checkPolicy", () => {
       expect(r).toMatchObject({ ok: false, status: 409 });
       if (!r.ok) {
         expect(r.error).toMatch(/-120/);
-        expect(r.error).toMatch(/is not the same bet the card rated/i);
+        expect(r.error).toMatch(/a different bet/i);
         expect(r.error).toMatch(/pass on it/i);
       }
       expect(checkPolicy({ ...bet, price: 105 }, kills)).toEqual({ ok: true });

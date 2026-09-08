@@ -1,41 +1,41 @@
+import { usd } from "@/lib/format";
 import type { Bankroll } from "@/lib/homeBoard";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
 
 // Bankroll + discipline strip on the home board. On a phone it folds into one
 // summary line (the slip sits above it on Saturday morning); md+ shows the
 // full grid. Cyan is the brand accent; amber marks a used-up cap. Green/red
-// never appear here — outcomes are graded on the ledger, not the strip.
-const usd = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+// never appear here — outcomes are graded on Results, not the strip.
+//
+// Copy rule (spec §10): every `title=` became a visible line under its value.
+// A tooltip is unreachable on the phone this strip is mostly read on.
 
 const signedUnits = (u: number) => `${u > 0 ? "+" : ""}${u.toFixed(2)}u`;
+
+const NOTE = "max-w-56 text-xs leading-snug text-[var(--text-dim)]";
 
 function Grid({ b }: { b: Bankroll }) {
   const capHit = b.weekBets >= b.cap;
   return (
     <>
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-        <div
-          className="bv-stat"
-          title="Starting bankroll plus settled real-money units × unit size."
-        >
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+        <div className="bv-stat">
           <span className="bv-stat-label">Bankroll</span>
           <span className="bv-stat-value text-xl">{usd(b.currentUsd)}</span>
           <span className="text-xs text-[var(--text-dim)]">{`started ${usd(b.startUsd)}`}</span>
-        </div>
-        <div
-          className="bv-stat"
-          title="Every bet is exactly one unit. Flat staking keeps results readable."
-        >
-          <span className="bv-stat-label">1 unit</span>
-          <span className="bv-stat-value text-xl">{usd(b.unitUsd)}</span>
-          <span className="text-xs text-[var(--text-dim)]">
-            flat, every bet
+          <span className={NOTE}>
+            {`Starting ${usd(b.startUsd)} plus what settled bets have won or lost.`}
           </span>
         </div>
-        <div
-          className="bv-stat"
-          title="Profit or loss in units on settled real-money first-half bets this season. ROI = units won ÷ units staked."
-        >
+        <div className="bv-stat">
+          <span className="bv-stat-label">One unit</span>
+          <span className="bv-stat-value text-xl">{usd(b.unitUsd)}</span>
+          <span className="text-xs text-[var(--text-dim)]">{`${usd(b.unitUsd)}, every bet`}</span>
+          <span className={NOTE}>
+            Every bet is the same size. It keeps the record readable.
+          </span>
+        </div>
+        <div className="bv-stat">
           <span className="bv-stat-label">Season</span>
           <span className="bv-stat-value text-xl text-[var(--text)]">
             {signedUnits(b.realUnits)}
@@ -43,13 +43,13 @@ function Grid({ b }: { b: Bankroll }) {
           <span className="text-xs text-[var(--text-dim)]">
             {b.real
               ? `${b.real.record} · ${b.real.hit} under · ROI ${b.real.roi}`
-              : "no settled bets yet"}
+              : "nothing settled yet"}
+          </span>
+          <span className={NOTE}>
+            Units won or lost on settled real-money first-half bets this season.
           </span>
         </div>
-        <div
-          className="bv-stat"
-          title="Real-money bets logged this week against the weekly cap. Zero is a fine week."
-        >
+        <div className="bv-stat">
           <span className="bv-stat-label">This week</span>
           <span
             className="bv-stat-value text-xl"
@@ -58,19 +58,24 @@ function Grid({ b }: { b: Bankroll }) {
             {`${b.weekBets} / ${b.cap} bets`}
           </span>
           <span className="text-xs text-[var(--text-dim)]">
-            {capHit ? "cap reached — no more this week" : "cap, not a target"}
+            {capHit
+              ? "cap reached — nothing more this week"
+              : "a ceiling, not a target"}
+          </span>
+          <span className={NOTE}>
+            {`Real-money bets logged this week. ${WEEKLY_BET_CAP} is the ceiling.`}
           </span>
         </div>
         {b.paper && (
-          <div
-            className="bv-stat"
-            title="Paper picks: tracked with nothing at risk, kept apart from the real record."
-          >
+          <div className="bv-stat">
             <span className="bv-stat-label">Paper</span>
             <span className="bv-stat-value text-xl text-[var(--text-muted)]">
               {b.paper.record}
             </span>
             <span className="text-xs text-[var(--text-dim)]">{`${b.paper.hit} under · ${b.paper.units}u · line value ${b.paper.clv}`}</span>
+            <span className={NOTE}>
+              Picks tracked with no money on them, kept out of the real record.
+            </span>
           </div>
         )}
       </div>
@@ -78,9 +83,9 @@ function Grid({ b }: { b: Bankroll }) {
         {[
           "First-half unders only",
           `At most ${b.cap} bets a week`,
-          "Flat 1 unit per bet",
-          "Only BET cards with a live line",
-          "Check injuries before every bet",
+          `${usd(b.unitUsd)} a bet, always`,
+          "Only games with a live Hard Rock line",
+          "Check the injury list before every bet",
         ].map((rule) => (
           <span key={rule} className="bv-pill">
             <span className="bv-pill-value">{rule}</span>
@@ -96,10 +101,7 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
   return (
     <div className="bv-card mb-6 p-4">
       <details className="md:hidden">
-        <summary
-          className="flex min-h-11 cursor-pointer items-center justify-between gap-2 font-mono text-sm text-[var(--text)]"
-          title="Bankroll, season units and this week’s bets against the cap. Tap for the full strip."
-        >
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 font-mono text-sm text-[var(--text)]">
           <span>{summary}</span>
           <span aria-hidden="true" className="text-xs text-[var(--text-dim)]">
             ▾
@@ -109,6 +111,9 @@ export default function BankrollStrip({ b }: { b: Bankroll }) {
           <Grid b={b} />
         </div>
       </details>
+      <p className="text-xs text-[var(--text-dim)] md:hidden">
+        Tap for the full strip.
+      </p>
       <div className="hidden md:flex md:flex-col">
         <Grid b={b} />
       </div>

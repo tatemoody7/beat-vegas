@@ -629,7 +629,6 @@ export default function GameCard({ g }: { g: HomeGame }) {
                 gap: edge.verdict.hrGap,
                 ev: check?.ev ?? null,
                 hrLine: check?.hrLine ?? null,
-                fairUnder: check?.marketFairUnder ?? null,
               }}
               picked={g.picked}
               kickedOff={g.kickedOff}

@@ -17,13 +17,16 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
+      // A rejected password is the only thing the endpoint can answer, so say
+      // that — never the raw server message, and never "login failed".
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "login failed");
+        setErr("Wrong password.");
+        setBusy(false);
+        return;
       }
       window.location.href = "/"; // full load so middleware sees the new cookie
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "login failed");
+    } catch {
+      setErr("Could not reach the server. Try again.");
       setBusy(false);
     }
   }
@@ -36,7 +39,7 @@ export default function LoginPage() {
           <span className="text-[var(--text)]"> VEGAS</span>
         </h1>
         <p className="mb-4 text-sm text-[var(--text-muted)]">
-          Enter the password to continue.
+          Enter the password.
         </p>
         <input
           type="password"

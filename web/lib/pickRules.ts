@@ -56,17 +56,19 @@ function optNumber(
 
 /** Shape + type checks on the JSON body. No DB. */
 export function parsePickBody(body: unknown): Parsed | Rejection {
-  if (!body || typeof body !== "object") return reject("invalid JSON body");
+  if (!body || typeof body !== "object") {
+    return reject("Could not read the request.");
+  }
   const b = body as Record<string, unknown>;
 
   const gameId = Number(b.gameId);
   // Number(null) is 0 and would pass isFinite — reject missing values first.
   if (b.gameId == null || !Number.isFinite(gameId)) {
-    return reject("gameId required");
+    return reject("Missing the game.");
   }
   const line = Number(b.line);
   if (b.line == null || !Number.isFinite(line) || line <= 0) {
-    return reject("line required (positive number)");
+    return reject("Enter the first-half total.");
   }
   const market: "1H" | "full" = b.market === "full" ? "full" : "1H";
   const isPaper = b.isPaper === true;
@@ -74,7 +76,7 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
   // Real money is first-half only. Full game is context — paper is fine.
   if (market === "full" && !isPaper) {
     return reject(
-      "Full-game picks are context only — real money is first-half unders. Log it as a paper pick instead.",
+      "Real money is first-half unders only. Log the full game as a paper pick.",
     );
   }
 
@@ -89,7 +91,7 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
     price = Number(b.price);
     // American odds are integers with |price| >= 100 (the column is an int).
     if (b.price === null || !Number.isInteger(price) || Math.abs(price) < 100) {
-      return reject("price must be integer American odds (e.g. -110)");
+      return reject("Enter the odds as a whole number, like -110.");
     }
   }
 
@@ -99,14 +101,14 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
   let verdict: Verdict | undefined;
   if (b.verdict !== undefined && b.verdict !== null) {
     if (!VERDICTS.includes(b.verdict as Verdict)) {
-      return reject("verdict must be BET, WATCH or PASS");
+      return reject("Unrecognized rating.");
     }
     verdict = b.verdict as Verdict;
   }
   let reason: PickReason | undefined;
   if (b.reason !== undefined && b.reason !== null) {
     if (!REASONS.includes(b.reason as PickReason)) {
-      return reject("reason must be model_gap, price_edge or manual");
+      return reject("Unrecognized reason.");
     }
     reason = b.reason as PickReason;
   }
@@ -156,10 +158,15 @@ export function checkPolicy(
   pick: PickRequest,
   ctx: PolicyContext,
 ): { ok: true } | Rejection {
-  if (!ctx.inSlate) return reject("game is not in the current scored slate");
-  if (ctx.kickedOff) return reject("game has already kicked off", 409);
+  if (!ctx.inSlate) return reject("That game is not on this week’s board.");
+  if (ctx.kickedOff) return reject("That game has already kicked off.", 409);
   if (ctx.duplicate) {
-    return reject(`a ${pick.market} pick already exists on this game`, 409);
+    return reject(
+      `You already have a ${
+        pick.market === "full" ? "full-game" : "first-half"
+      } pick on that game.`,
+      409,
+    );
   }
   // A real BET below the card's kill line, or at a worse price, is not the
   // bet the card rated: the edge is gone. Paper and WATCH/PASS (an owner
@@ -167,14 +174,14 @@ export function checkPolicy(
   if (!pick.isPaper && pick.market === "1H" && pick.verdict === "BET") {
     if (ctx.killLine !== null && pick.line < ctx.killLine) {
       return reject(
-        `Below the kill line: the card rated this bet at u${fmt(ctx.killLine)} or higher; u${fmt(pick.line)} is not the same bet the card rated. Pass on it.`,
+        `u${fmt(pick.line)} is below the kill line. We rated this at u${fmt(ctx.killLine)} or higher — at a lower total it is a different bet. Pass on it.`,
         409,
       );
     }
     // American odds: the larger signed value pays better (-105 beats -120).
     if (ctx.killPrice !== null && pick.price < ctx.killPrice) {
       return reject(
-        `Worse than the kill price: the card rated this bet at ${american(ctx.killPrice)} or better; ${american(pick.price)} is not the same bet the card rated. Pass on it.`,
+        `${american(pick.price)} is worse than the kill price. We rated this at ${american(ctx.killPrice)} or better — at a worse price it is a different bet. Pass on it.`,
         409,
       );
     }
@@ -189,7 +196,7 @@ export function checkPolicy(
     ctx.realWeekCount >= WEEKLY_BET_CAP
   ) {
     return reject(
-      `Weekly cap reached: ${WEEKLY_BET_CAP} real-money first-half bets are already logged for week ${ctx.week ?? "?"}. The cap is a ceiling — log this one as paper if you want to track it.`,
+      `${WEEKLY_BET_CAP} real-money bets are already logged for week ${ctx.week ?? "?"}. That is the ceiling. Log this one as paper if you want to track it.`,
       409,
     );
   }

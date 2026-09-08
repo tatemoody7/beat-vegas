@@ -1,4 +1,5 @@
 import { american, fmt } from "@/lib/format";
+import { CARD_INPUT_FALLBACK, CARD_INPUT_TEXT, labelOf } from "@/lib/labels";
 import { kickoffET, type GapBasis } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
 import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
@@ -444,36 +445,46 @@ export type CardHealth = {
  */
 export function cardHealth(card: Card, now: Date): CardHealth {
   if (card.status === "degraded") {
+    // Input KEYS and their raw Python detail strings never reach the screen
+    // (spec §8): each failed input is named in words, once.
+    const failed: string[] = [];
+    for (const d of card.degraded) {
+      const words = labelOf(CARD_INPUT_TEXT, d.input, CARD_INPUT_FALLBACK);
+      if (!failed.includes(words)) failed.push(words);
+    }
     return {
       level: "warn",
-      title: `Degraded card · ${card.slot ?? "unknown slot"}`,
-      details: card.degraded.map((d) =>
-        d.detail === "" ? d.input : `${d.input}: ${d.detail}`,
-      ),
+      title: "Some inputs failed this morning — paper only",
+      details: [
+        "The rules behind these games could not be checked, so nothing here is a real bet today.",
+        ...failed,
+      ],
     };
   }
   if (card.status === "preview" || card.slot === "manual") {
     if (card.slot === "manual") {
       const when =
-        card.builtAt === null
-          ? ""
-          : ` built ${builtET(new Date(card.builtAt))} ET`;
+        card.builtAt === null ? "" : ` ${builtET(new Date(card.builtAt))} ET`;
       return {
         level: "warn",
-        title: `Manual card${when} — this morning's build has not replaced it`,
-        details: [],
+        title: `Built by hand${when}. This morning's automatic update has not replaced it.`,
+        details: [
+          "Check Hard Rock's live numbers yourself before betting off this.",
+        ],
       };
     }
     return {
       level: "warn",
-      title: `Preview card (${card.slot ?? "preview"}) — this morning's build (8:05–8:45am ET) has not replaced it`,
+      title:
+        "An earlier build. This morning's 8am ET line sweep is not in it yet.",
       details: [],
     };
   }
   if (card.builtAt === null) {
     return {
       level: "warn",
-      title: "Card has no build time — this morning's build has not landed",
+      title:
+        "This card has no build time. This morning's update has not landed.",
       details: [],
     };
   }
@@ -481,7 +492,9 @@ export function cardHealth(card: Card, now: Date): CardHealth {
   if (!NO_BUILD_DAYS.has(weekdayET(now)) && etDay(built) !== etDay(now)) {
     return {
       level: "warn",
-      title: `Card is ${relativeAge(built, now)} — this morning's build has not landed`,
+      // relativeAge already reads "24h ago", so "was built" carries it —
+      // the spec's "is ${age} old" would print "24h ago old".
+      title: `This card was built ${relativeAge(built, now)}. This morning's update has not landed.`,
       details: [],
     };
   }

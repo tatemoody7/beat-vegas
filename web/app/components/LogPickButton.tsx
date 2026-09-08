@@ -19,14 +19,14 @@ export default function LogPickButton({
   if (kickedOff) {
     return (
       <span className="text-xs text-[var(--text-dim)]">
-        Kicked off — no more bets on this game.
+        Already kicked off.
       </span>
     );
   }
   if (picked) {
     return (
       <span className="text-xs text-[var(--text-dim)]">
-        Already logged — see Results.
+        Already logged. It is on Results.
       </span>
     );
   }

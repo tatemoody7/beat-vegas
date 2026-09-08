@@ -91,18 +91,8 @@ def test_card_yml_crons_match_ci_slots_exactly():
 # --- card-day re-score (PR-4): the residual engine conditions on the live 1H line,
 # so weekly_update must run again AFTER the sweep refreshes it. Under the
 # incumbent `--if-engine residual` makes the step a no-op, so today's card-day
-# behaviour is unchanged.
-
-CARD_CRONS = {
-    "5 20 * * 2,3,4",
-    "50 20 * * 2,3,4",
-    "5 22 * * 5",
-    "0 23 * * 5",
-    "5 12 * * 6",
-    "35 12 * * 6",
-    "5 13 * * 6",
-    "35 13 * * 6",
-}
+# behaviour is unchanged. (card.yml's crons are asserted against
+# beatvegas.ci.CRON_SLOTS above — the single source of truth — not re-listed here.)
 
 
 def _card_steps():
@@ -129,7 +119,3 @@ def test_card_rescores_with_the_residual_engine_after_the_sweep():
     # Gated exactly like the sweep: no sweep, nothing new to condition on.
     assert steps[rescore].get("if") == steps[sweep].get("if")
     assert "need_sweep" in steps[rescore]["if"]
-
-
-def test_card_crons_unchanged_by_the_rescore_step():
-    assert set(_cron_strings(_load(WF_DIR / "card.yml"))) == CARD_CRONS

@@ -529,12 +529,17 @@ def build_live_frame(
                 "units_market": u_mk,
                 "outcome_close": o_cl,
                 "units_close": u_cl,
-                # new cards carry Hard Rock minus the OTHER books' median; old
-                # cards fall back to the HR-inclusive market median
+                # Hard Rock minus the OTHER books' median, straight off the
+                # card. Cards built before 2026-09-07 carry no such field, and
+                # the old fallback (hr_line - market_line) is a DIFFERENT
+                # quantity — that median includes Hard Rock itself — so banding
+                # them together would mix two definitions in one set of buckets.
+                # They get None instead: the dimension covers only the weeks
+                # from the cutover on.
                 "hr_vs_market": (
                     hr_vs_market_band(it["hr_vs_market"])
                     if _num(it.get("hr_vs_market")) is not None
-                    else hr_vs_market(hr_line, market_line)
+                    else None
                 ),
                 # Hard Rock's own opener -> pre-kick close (the number you bet)
                 "hr_open": hr_open,

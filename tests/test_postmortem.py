@@ -317,6 +317,9 @@ def test_derive_flags_score_gate_fires_when_score_does_not_separate():
 
 
 def _item(gid, tier="PASS", hr_line=27.5, hr_price=-110, market_line=27.5, ev=-0.02):
+    """A post-cutover card item: it carries hr_vs_market (Hard Rock minus the
+    OTHER books' median). These fixtures have one other book, so that equals
+    hr_line - market_line."""
     return {
         "game_id": gid,
         "away": "A",
@@ -328,6 +331,7 @@ def _item(gid, tier="PASS", hr_line=27.5, hr_price=-110, market_line=27.5, ev=-0
         "hr_price": hr_price,
         "hr_open": hr_line,
         "market_line": market_line,
+        "hr_vs_market": (None if hr_line is None or market_line is None else hr_line - market_line),
         "fair_under": 0.5,
         "ev": ev,
         "bv_line": None,
@@ -421,20 +425,23 @@ def test_live_hr_vs_market_has_five_bands_at_the_half_point_threshold():
     assert pm.hr_vs_market_band(0.1 + 0.2 - 0.3) == "HR = market"  # float noise reads as zero
 
 
-def test_build_live_frame_prefers_the_cards_hr_vs_market_field():
-    """New cards carry hr_vs_market = Hard Rock minus the OTHER books' median;
-    old cards did not, so the frame falls back to hr_line - market_line (a
-    median that includes Hard Rock)."""
+def test_build_live_frame_bands_only_cards_that_carry_hr_vs_market():
+    """The dimension covers only comparable weeks. A card that carries the field
+    is banded on it (Hard Rock minus the OTHER books' median); a pre-cutover card
+    that does not is left out entirely rather than banded on hr_line -
+    market_line, a median that INCLUDES Hard Rock. Two different definitions must
+    never land in the same five buckets."""
     new = _item(1, hr_line=27.5, market_line=27.5)
     new["hr_vs_market"] = 0.25  # the other books sit at 27.25; the HR-inclusive median is 27.5
-    old = _item(2, hr_line=28.5, market_line=27.5)  # pre-PR-6 card: no field
+    old = _item(2, hr_line=28.5, market_line=27.5)
+    del old["hr_vs_market"]  # pre-cutover card: no field
     games = {
         gid: {"season": 2026, "week": 3, "first_half_total": None, "first_half_source": None}
         for gid in (1, 2)
     }
     df = pm.build_live_frame([new, old], games, {}).set_index("game_id")
     assert df.loc[1, "hr_vs_market"] == "HR 0..+0.5"
-    assert df.loc[2, "hr_vs_market"] == "HR ≥ +0.5"
+    assert pd.isna(df.loc[2, "hr_vs_market"])  # NOT "HR ≥ +0.5" off the old definition
 
 
 # ---------------------------------------------------------------- report

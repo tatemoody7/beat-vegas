@@ -21,7 +21,8 @@ the bet card follows. Change it here first, then in code.
 - **Edge-driven, capped at 5 real-money bets per week.** The cap is a
   ceiling, not a target. Zero bets is a valid, normal week.
 - Only games whose verdict on the This Week page is **BET** are bettable. Real bets are placed in one sitting Saturday morning (~9am ET) off the final card's Bet Slip; a weeknight (Tue–Fri) game may be bet off that evening's card and counts toward the same weekly cap. BETs are ranked by gap — the 6th+ by gap is paper only (`blocker: cap`).
-  WATCH is not a bet. Passing costs nothing.
+  A BET whose blocker is `degraded` is **held**: paper only, no cap slot (see
+  "Degraded card" below). WATCH is not a bet. Passing costs nothing.
 - A bet placed anyway on a WATCH or PASS game is still logged as real money,
   flagged **off-policy** on Results and broken out separately, so the record
   is complete and the overrides can be judged against the system.
@@ -81,6 +82,24 @@ The site is one page: every game on the week in a single ranked list.
   the next half point, and the worst price still clearing the market's fair under
   by more than the unavoidable 2% of vig. Clearing one and not the other is not a
   bet.
+- **Degraded card** — every card carries a `status`: **final** (the build the
+  slot bets off: the Saturday final, or a weeknight card for that night's games),
+  **preview** (an earlier build — Friday's, or a manual run — the final has not
+  landed yet), or **degraded** (a build-wide input failed, so the card is not to
+  be bet off as-is). A card is degraded when the Hard Rock sweep stopped early
+  and never reached a game on the card (`sweep`), the injury read failed so the
+  QB-out gate ran on nothing (`preview`), or the tempo table stored zero teams
+  (`tempo`). Those inputs hold every game they touched. A missing pace read on a
+  single game (`pace`, ~5% of games each week) holds that game only and does
+  **not** flip the card's status — the banner would fire most Saturdays with
+  every bet fine. A held bet keeps its tier but its blocker is `degraded`: it is
+  **paper only, takes no weekly-cap slot**, is never in the BET list or the Bet
+  Slip, and appears under "Held" on the board and in the Saturday text. The
+  build prints `CARD STATUS: <status> slot=<slot> held=<games> (bets <n>)` as
+  line 2 of its summary; the Saturday text flags a non-final status up front
+  (its BETS header reads `BETS (DEGRADED - n held back)`), lists the held bets
+  under `HELD BACK (input failed)`, and spells the status and each failed input
+  out in its CARD STATUS section.
 
 ## What BET means (lib/verdict.ts)
 
@@ -153,7 +172,9 @@ week expected (`lines_watch.yml` header).
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
   BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
   Hard Rock's number so the price could not be judged, `qb_out`, `cap` = the
-  6th+ by gap that week). The fair price is exchange-first: the exchange
+  6th+ by gap that week, `degraded` = a card input failed on the build, with
+  the gate it overrode kept as `gate_blocker` in the pick's chips). The fair
+  price is exchange-first: the exchange
   quotes at Hard Rock's exact line, else the median of the comparable books —
   those within half a point of Hard Rock's number, **widened to 1.5 points
   below it whenever Hard Rock is posting above the market**. That case is the

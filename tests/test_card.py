@@ -90,7 +90,7 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -5% floor
     # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
     assert it["kill_line"] == 24.5 and it["kill_price"] == -120
-    assert it["action"] == "Bet one unit: first-half under 24.5 at -110 at Hard Rock."
+    assert it["action"] == "Bet one unit: first-half under 24.5 at -110 on Hard Rock."
     assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 0}
     assert c["model_read"] is True and c["notes"] == []
     assert it["paper_logged"] is False
@@ -442,7 +442,7 @@ def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
     assert at_110["ev"] == pytest.approx(-0.0455, abs=1e-3) and at_110["ev"] >= EV_FLOOR
     assert at_110["tier"] == "BET" and at_110["blocker"] is None
     assert at_110["kill_price"] == -110
-    assert at_110["action"] == ("Bet one unit: first-half under 24.5 at -110 at Hard Rock.")
+    assert at_110["action"] == ("Bet one unit: first-half under 24.5 at -110 on Hard Rock.")
 
     at_115 = only(
         card([game()], [snap(1, "hardrockbet", 24.5, -110, -115)] + balanced, [model(1, 22.4)])

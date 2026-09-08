@@ -472,7 +472,7 @@ def test_step_summary_lists_the_bets(env, tmp_path, monkeypatch):
     assert "## Bet card 2026 wk3" in text
     assert "**1 BET · 2 EDGE · 1 PASS**" in text
     assert (
-        "- Bet one unit: first-half under 24.5 at -110 at Hard Rock. (Kansas @ Missouri)"
+        "- Bet one unit: first-half under 24.5 at -110 on Hard Rock. (Kansas @ Missouri)"
         " | kill: below u24.5 or worse than -120" in text
     )
 

@@ -231,7 +231,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   let action: string;
   if (tier === "BET") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
-    action = `Bet one unit: first-half under ${fmt(i.hrLine)}${at} at Hard Rock.`;
+    action = `Bet one unit: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (!hasModel) {
     action = pricePos
       ? `Watch: Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under. No model number behind it.`

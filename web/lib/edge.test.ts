@@ -105,7 +105,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("BET");
     expect(e.blocker).toBeNull();
     expect(e.action).toBe(
-      "Bet one unit: first-half under 24.5 at -105 at Hard Rock.",
+      "Bet one unit: first-half under 24.5 at -105 on Hard Rock.",
     );
     expect(e.verdict.verdict).toBe("BET");
     expect(e.kill.line).toBe(24);
@@ -331,7 +331,7 @@ describe("edgeScore — model rows", () => {
     expect(at110.blocker).toBeNull();
     expect(at110.kill.price).toBe(-110);
     expect(at110.action).toBe(
-      "Bet one unit: first-half under 24.5 at -110 at Hard Rock.",
+      "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
     );
 
     const ev115 = evUnder(fair, -115);

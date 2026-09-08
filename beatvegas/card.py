@@ -675,7 +675,7 @@ def build_item(
     # change it, rather than instructing the reader to wait.
     if tier == "BET":
         at = f" at {american(hr_price)}" if hr_price is not None else ""
-        action = f"Bet one unit: first-half under {fmt(hr_line)}{at} at Hard Rock."
+        action = f"Bet one unit: first-half under {fmt(hr_line)}{at} on Hard Rock."
     elif not has_model:
         action = (
             f"Watch: Hard Rock pays about {fmt((ev or 0) * 100)}% more than the market on this "

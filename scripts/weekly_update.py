@@ -47,7 +47,12 @@ from beatvegas.lines import (
     pre_kickoff,
     real_closes,
 )
-from beatvegas.model.artifacts import fingerprint_changed, latest_artifact, persist_artifact
+from beatvegas.model.artifacts import (
+    fingerprint_changed,
+    json_safe,
+    latest_artifact,
+    persist_artifact,
+)
 from beatvegas.model.residual import MODEL_VERSION_TAG
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
@@ -229,13 +234,18 @@ def persist_engine_artifact(
             ModelRun(
                 version=fp.get("model_version") or MODEL_VERSION_TAG,
                 train_window=f"{seasons[0]}-{seasons[-1]}" if seasons else None,
+                # Same coercion the artifact row uses: a numpy scalar leaking
+                # into the fingerprint must not raise here and roll back the
+                # artifact that was just written in this session.
                 metrics_json=json.dumps(
-                    {
-                        "fingerprint": fp,
-                        "sigma": artifact.get("sigma"),
-                        "n_train": fp.get("n_rows"),
-                        "fallback": scored.attrs.get("engine_fallback"),
-                    }
+                    json_safe(
+                        {
+                            "fingerprint": fp,
+                            "sigma": artifact.get("sigma"),
+                            "n_train": fp.get("n_rows"),
+                            "fallback": scored.attrs.get("engine_fallback"),
+                        }
+                    )
                 ),
                 notes=f"weekly_update {season} wk{week} engine={engine}",
                 created_at=now,

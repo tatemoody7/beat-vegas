@@ -863,17 +863,25 @@ def degraded_inputs(
 
     # sweep: the games the run never reached carry a stale/absent HR number.
     if sweep_status is not None and not sweep_status.get("complete", True):
-        unpolled = [
-            int(g) for g in (sweep_status.get("unpolled_game_ids") or []) if int(g) in card_ids
-        ]
-        # Unknown coverage (an old status file, or a stop before the ids were
-        # known) means we cannot say which games are stale — assume all of them.
-        ids = unpolled or sorted(card_ids)
         reason = sweep_status.get("reason") or "incomplete"
         polled = sweep_status.get("events_polled")
         total = sweep_status.get("events_in_window")
         where = f" after {polled} of {total} events" if polled is not None else ""
-        add("sweep", f"stopped early ({reason}){where}", ids)
+        detail = f"stopped early ({reason}){where}"
+        if "unpolled_game_ids" not in sweep_status:
+            # Unknown coverage (an old status file, or a stop before the ids
+            # were known): we cannot say which games are stale — all of them.
+            add("sweep", detail + "; coverage unknown", sorted(card_ids))
+        else:
+            # Known coverage. Only the unreached games ON THIS CARD are held; a
+            # truncation that touched none of them still shows build-wide
+            # (game_ids []) so the card's status says the sweep was short.
+            unpolled = [
+                int(g) for g in (sweep_status.get("unpolled_game_ids") or []) if int(g) in card_ids
+            ]
+            if not unpolled:
+                detail += "; no game on this card was among the unreached"
+            add("sweep", detail, unpolled)
 
     # preview: the QB-out gate reads whatever preview is on file, and a blank
     # file passes EVERY game. Affected = no preview, or one written before today.

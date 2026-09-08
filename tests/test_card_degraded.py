@@ -135,7 +135,10 @@ def test_incomplete_sweep_names_the_games_it_never_reached():
     assert d[0]["detail"] == "stopped early (credit_cap) after 1 of 3 events"
 
 
-def test_incomplete_sweep_with_no_ids_degrades_every_game_on_the_card():
+def test_incomplete_sweep_that_never_recorded_its_coverage_degrades_every_game():
+    """The `unpolled_game_ids` KEY is absent (an old status file, or a stop
+    before the ids were known): we cannot say which games are stale, so every
+    game on the card is."""
     d = degraded_inputs(
         [game(1), game(2)],
         sweep_status={"complete": False, "reason": "fetch_error"},
@@ -145,6 +148,51 @@ def test_incomplete_sweep_with_no_ids_degrades_every_game_on_the_card():
         now=NOW,
     )
     assert [e["input"] for e in d] == ["sweep"] and d[0]["game_ids"] == [1, 2]
+    assert d[0]["detail"] == "stopped early (fetch_error); coverage unknown"
+
+
+@pytest.mark.parametrize("unpolled", [[], [98, 99]])
+def test_incomplete_sweep_whose_unreached_games_are_all_off_card_degrades_nothing(unpolled):
+    """The key is PRESENT and none of the ids are on this card (a truncated
+    sweep whose unreached events all fall outside the card's week): no game is
+    held, but the truncation still shows in the card's status detail as a
+    build-wide entry (game_ids [])."""
+    d = degraded_inputs(
+        [game(1), game(2)],
+        sweep_status={
+            "complete": False,
+            "reason": "credit_cap",
+            "events_in_window": 9,
+            "events_polled": 7,
+            "unpolled_game_ids": unpolled,
+        },
+        previews=[preview_row(1), preview_row(2)],
+        predictions=[model(1, 22.4), model(2, 22.4)],
+        tempo_rows=260,
+        now=NOW,
+    )
+    assert d == [
+        {
+            "input": "sweep",
+            "detail": "stopped early (credit_cap) after 7 of 9 events; "
+            "no game on this card was among the unreached",
+            "game_ids": [],
+        }
+    ]
+    c = build_card(
+        [game(1), game(2)],
+        bet_snaps(1) + bet_snaps(2),
+        [model(1, 22.4), model(2, 22.4)],
+        [],
+        season=2026,
+        week=3,
+        now=NOW,
+        slot="saturday",
+        degraded=d,
+    )
+    assert c["status"] == "degraded" and c["counts"]["degraded"] == 0
+    assert [it["blocker"] for it in c["items"]] == [None, None]
+    assert c["counts"]["bet"] == 2
 
 
 def test_failed_preview_degrades_the_games_with_no_qb_read_from_today():

@@ -21,6 +21,8 @@ export type BoardRow = {
   bvLine: number | null;
   bvLo: number | null;
   bvHi: number | null;
+  /** Actual first-half points once the game is played (grading input); null before. */
+  firstHalfTotal: number | null;
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
@@ -38,6 +40,7 @@ type PredRow = {
   under_probability: number | null;
   rank: number | bigint | null;
   factors_json: string | null;
+  first_half_total: number | bigint | null;
   bv_line: number | null;
   bv_gap: number | null;
   bv_lo: number | null;
@@ -141,7 +144,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
-           g.week, g.start_date, g.away_team, g.home_team
+           g.week, g.start_date, g.away_team, g.home_team, g.first_half_total
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
       -- The site's game universe: games Hard Rock has posted a full-game total
@@ -196,6 +199,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       openLine: l?.open ?? null,
       curLine,
       bvLine,
+      firstHalfTotal: num(p.first_half_total),
       bvLo:
         adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
       bvHi:

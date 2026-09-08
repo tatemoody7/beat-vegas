@@ -10,6 +10,7 @@
 
 import { evUnder } from "@/lib/devig";
 import { american, fmt, round2 } from "@/lib/format";
+import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import {
   BET_GAP_PTS,
   HR_OFF_MARKET_PTS,
@@ -40,6 +41,8 @@ export type EdgeInput = VerdictInput & {
 };
 
 export type EdgeTier = "BET" | "EDGE" | "PASS";
+/** Which line the gap (and so the score) is measured against. */
+export type LineBasis = "hardrock" | "market" | "reference";
 /** Why an EDGE is not a BET — the first failing policy gate, in gate order. */
 export type EdgeBlocker =
   | "no_hr_line"
@@ -59,13 +62,20 @@ export type EdgeResult = {
   action: string;
   /** Where the edge is gone. */
   kill: { line: number | null; price: number | null; text: string };
+  /** The line minus our number, against `lineBasis`; null without a model. */
+  gap: number | null;
+  /** Which line is on screen for this game (Hard Rock, else market, else reference). */
+  lineBasis: LineBasis | null;
   /** From verdictFor, unchanged. */
   verdict: VerdictResult;
 };
 
 /** Worst EV (per $1) still treated as a fair price — mirrors lineCheck "neg". */
 export const FAIR_EV_FLOOR = EV_FLOOR; // single source: verdict.ts
-export const EDGE_SCORE_MIN = 60;
+/** Points of score per point of gap: a gap of BET_GAP_PTS lands on SCORE_BET_MIN. */
+export const SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS;
+/** The EDGE ("watch") tier starts where the amber band starts. */
+export const EDGE_SCORE_MIN = SCORE_WATCH_MIN;
 export const CONTEXT_BASE = 40;
 export const CONTEXT_CAP = 49;
 export const PRICE_ONLY_CAP = 55;
@@ -157,6 +167,14 @@ export function edgeScore(i: EdgeInput): EdgeResult {
 
   // Gap basis: the number you can bet, else the market, else the reference.
   const basis = i.hrLine ?? i.marketLine ?? i.fallbackLine;
+  const lineBasis: LineBasis | null =
+    i.hrLine !== null
+      ? "hardrock"
+      : i.marketLine !== null
+        ? "market"
+        : i.fallbackLine !== null
+          ? "reference"
+          : null;
   const gap = bvLine !== null && basis !== null ? round2(basis - bvLine) : null;
 
   const killLine = bvLine !== null ? roundHalfUp(bvLine + BET_GAP_PTS) : null;
@@ -171,7 +189,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   // --- Score --------------------------------------------------------------
   let score: number;
   if (hasModel) {
-    score = clamp(Math.round(50 + 10 * (gap ?? 0)), 0, 100);
+    score = clamp(Math.round(50 + SCORE_PER_GAP_PT * (gap ?? 0)), 0, 100);
     score += priceBonus;
     if (offMarket) score -= OFF_MARKET_PENALTY;
     if (i.qbOut) score -= QB_OUT_PENALTY;
@@ -246,5 +264,5 @@ export function edgeScore(i: EdgeInput): EdgeResult {
         : `Pass: the line is ${fmt(Math.abs(g))} below our number (leans over); needs ${fmt(killLine)} or higher.`;
   }
 
-  return { score, tier, blocker, action, kill, verdict };
+  return { score, tier, blocker, action, kill, gap, lineBasis, verdict };
 }

@@ -224,28 +224,31 @@ describe("killBlocks", () => {
 
 describe("blockReason", () => {
   it("names Hard Rock's live number when the block is live-sourced", () => {
-    expect(blockReason("kill_line", true)).toBe(
-      "Hard Rock’s live line is below the kill line",
-    );
-    expect(blockReason("kill_price", true)).toBe(
-      "Hard Rock’s live price is worse than the kill price",
-    );
+    expect(
+      blockReason("kill_line", true, { liveLine: 24, killLine: 24.5 }),
+    ).toBe("Hard Rock is now at u24.0, below the kill line of u24.5.");
+    expect(
+      blockReason("kill_price", true, { livePrice: -125, killPrice: -115 }),
+    ).toBe("Hard Rock is now -125, worse than the kill price of -115.");
   });
 
-  it("keeps the plain wording when the block is from the entered values", () => {
-    expect(blockReason("kill_line", false)).toBe("below kill line");
-    expect(blockReason("kill_price", false)).toBe("worse than kill price");
+  it("names the entered value when the block comes from what was typed", () => {
+    expect(blockReason("kill_line", false, { line: 24, killLine: 24.5 })).toBe(
+      "u24.0 is below the kill line of u24.5 — not the bet we rated.",
+    );
+    expect(
+      blockReason("kill_price", false, { price: -125, killPrice: -115 }),
+    ).toBe("-125 is worse than the kill price of -115 — not the bet we rated.");
   });
 
-  it("leaves degraded/cap wording the same regardless of source", () => {
+  it("reads the same for degraded/cap regardless of source", () => {
     expect(blockReason("degraded", true)).toBe(
-      "card inputs degraded — paper only",
+      "An input failed this morning, so this is paper only.",
     );
     expect(blockReason("degraded", false)).toBe(
-      "card inputs degraded — paper only",
+      "An input failed this morning, so this is paper only.",
     );
-    expect(blockReason("cap", true)).toBe("over the weekly cap");
-    expect(blockReason("cap", false)).toBe("over the weekly cap");
+    expect(blockReason("cap", false)).toMatch(/already logged this week/);
   });
 });
 

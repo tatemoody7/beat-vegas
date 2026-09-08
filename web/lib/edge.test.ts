@@ -101,7 +101,7 @@ describe("breakEvenPrice", () => {
 describe("edgeScore — model rows", () => {
   it("BET: score >= 60, tier BET, no blocker, bet-now action at Hard Rock's number and price", () => {
     const e = edgeScore(base);
-    expect(e.score).toBe(78); // 50 + 27 + round(1.2)
+    expect(e.score).toBe(82); // 50 + 27 + round(1.2)
     expect(e.tier).toBe("BET");
     expect(e.blocker).toBeNull();
     expect(e.action).toBe("Bet now: 1H under 24.5 at -105 on Hard Rock.");
@@ -119,7 +119,7 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    expect(e.score).toBe(77);
+    expect(e.score).toBe(81);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
@@ -142,7 +142,7 @@ describe("edgeScore — model rows", () => {
       fallbackLine: 23.8,
       gap: 2.0,
     });
-    expect(e.score).toBe(70);
+    expect(e.score).toBe(73);
     expect(e.blocker).toBe("no_hr_line");
   });
   it("off-market Hard Rock → EDGE / off_market with the −10 penalty and a wait-for line", () => {
@@ -158,7 +158,7 @@ describe("edgeScore — model rows", () => {
       marketFairUnder: null,
     });
     // hrGap 2.2 → 72, minus 10 off-market
-    expect(e.score).toBe(62);
+    expect(e.score).toBe(65);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("off_market");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -169,7 +169,7 @@ describe("edgeScore — model rows", () => {
   it("Hard Rock within half a point of the market is not off-market", () => {
     const e = edgeScore({ ...base, liveLine: 25, marketLine: 25, gap: 3.2 });
     expect(e.tier).toBe("BET");
-    expect(e.score).toBe(78);
+    expect(e.score).toBe(82);
   });
   it("price too high → EDGE / price with a computed break-even", () => {
     const ev = evUnder(0.52, -125); // ≈ -0.064, below the -0.05 floor
@@ -180,7 +180,7 @@ describe("edgeScore — model rows", () => {
       ev,
       evVerdict: evVerdictFor(ev),
     });
-    expect(e.score).toBe(71); // 77 + clamp(round(-6.4)) = 77 - 6
+    expect(e.score).toBe(75); // 77 + clamp(round(-6.4)) = 77 - 6
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("price");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -203,9 +203,9 @@ describe("edgeScore — model rows", () => {
   });
   it("price bonus is clamped to ±8", () => {
     const hi = edgeScore({ ...base, ev: 0.2, evVerdict: "pos" });
-    expect(hi.score).toBe(85); // 77 + 8
+    expect(hi.score).toBe(89); // 77 + 8
     const lo = edgeScore({ ...base, ev: -0.2, evVerdict: "neg" });
-    expect(lo.score).toBe(69); // 77 - 8
+    expect(lo.score).toBe(73); // 77 - 8
   });
   it("no comparable price (ev null) → EDGE / no_fair_price, paper-only action", () => {
     // Hard Rock alone at its number: gap 2.7 clears, nothing prices 24.5.
@@ -215,7 +215,7 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    expect(e.score).toBe(77); // no price bonus without an ev
+    expect(e.score).toBe(81); // no price bonus without an ev
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_fair_price");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -273,7 +273,7 @@ describe("edgeScore — model rows", () => {
       qbOut: true,
       qbOutDetail: "QB1 (knee) out",
     });
-    expect(e.score).toBe(60); // 50 + 15 - 5
+    expect(e.score).toBe(62); // 50 + 15 - 5
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
     expect(e.action).toBe(
@@ -292,7 +292,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
-    expect(e.score).toBe(73); // 78 - 5
+    expect(e.score).toBe(77); // 78 - 5
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.verdict.headline).toBe(
       "Our number clears the bar, but a starting quarterback is listed out and the model does not know it — re-check the number after the news settles.",
@@ -351,14 +351,28 @@ describe("edgeScore — model rows", () => {
       bestLine: 23.3,
       gap: 1.5,
     });
-    expect(e.score).toBe(66);
+    expect(e.score).toBe(68);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("gap");
     expect(e.action).toBe(
       "Pass: the line is only 1.5 above our number; needs 24.0 or higher.",
     );
   });
-  it("small gap → PASS with the kill line", () => {
+  it("small gap → Watch (amber band) with blocker gap; a tiny gap → PASS", () => {
+    const tiny = edgeScore({
+      ...base,
+      hrLine: 22.1,
+      liveLine: 22.1,
+      marketLine: 22.1,
+      bestLine: 22.1,
+      gap: 0.3,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(tiny.score).toBe(53);
+    expect(tiny.tier).toBe("PASS");
+    expect(tiny.blocker).toBeNull();
     const e = edgeScore({
       ...base,
       hrLine: 22.5,
@@ -366,13 +380,13 @@ describe("edgeScore — model rows", () => {
       marketLine: 22.5,
       bestLine: 22.5,
       gap: 0.7,
-      ev: null,
-      evVerdict: "na",
-      marketFairUnder: null,
+      ev: 0,
+      evVerdict: "fair",
+      marketFairUnder: 0.5238,
     });
-    expect(e.score).toBe(57);
-    expect(e.tier).toBe("PASS");
-    expect(e.blocker).toBeNull();
+    expect(e.score).toBe(58);
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("gap");
     expect(e.kill.line).toBe(24);
     expect(e.action).toBe(
       "Pass: the line is only 0.7 above our number; needs 24.0 or higher.",
@@ -389,7 +403,7 @@ describe("edgeScore — model rows", () => {
       ev: null,
       evVerdict: "na",
     });
-    expect(e.score).toBe(37);
+    expect(e.score).toBe(35);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
       "Pass: the line is 1.3 below our number (leans over); needs 24.0 or higher.",
@@ -439,7 +453,7 @@ describe("edgeScore — model rows", () => {
   it("uses Hard Rock's number as the gap basis even when the market differs", () => {
     // market 25.0 vs HR 24.5: HR gap 2.7 (not 3.2) drives the score
     const e = edgeScore({ ...base, liveLine: 25, marketLine: 25, gap: 3.2 });
-    expect(e.score).toBe(78);
+    expect(e.score).toBe(82);
   });
 });
 

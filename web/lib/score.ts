@@ -84,6 +84,9 @@ export type Factors = {
   away_fh_pf?: number | null;
   away_fh_pa?: number | null;
   fh_prior_source?: string | null;
+  /** Prior games played this season by each team (scripts/weekly_update.py). */
+  h_games_played?: number | null;
+  a_games_played?: number | null;
   combined_off_ppa?: number | null;
   combined_def_ppa?: number | null;
   home_rest_days?: number | null;

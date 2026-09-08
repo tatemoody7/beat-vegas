@@ -6,30 +6,45 @@
   --bg-2: #0a0f1e;
   --surface: #111a2e;
   --surface-2: #16213a;
-  --border: #243049; /* cyan-tinted slate */
-  --border-soft: #1b2336;
+  --border: #3a4a6b; /* visible card edge (2.2:1 on the canvas) */
+  --border-soft: var(--border);
+  --border-strong: #55688f; /* control edges: 3:1 on a card */
 
-  /* Text */
+  /* Text — every step clears WCAG AA (4.5:1) on --surface */
   --text: #eef2f9;
-  --text-muted: #97a3bd;
-  --text-dim: #5e6c87;
+  --text-muted: #aab6cc; /* 8.5:1 */
+  --text-dim: #8b98b0; /* 6.0:1 — labels, captions, table heads */
 
-  /* Brand accent — electric cyan/blue (never used for outcomes) */
+  /* Brand accent — electric cyan/blue: chrome, links, active states only */
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
   --accent-soft: rgba(56, 189, 248, 0.12);
 
-  /* Outcome semantics — mirror web/lib/score.ts scoreColor (do not change) */
-  --under-strong: #16a34a; /* green  */
-  --neutral: #ca8a04; /* amber  */
-  --over-lean: #ea580c; /* orange */
-  --over: #dc2626; /* red    */
+  /* GRADE + OUTCOME colours (lib/grade.ts). One language everywhere:
+     good = bet / won, warn = watch / warning, bad = pass / lost, push = grey.
+     Never cyan on a grade; never green/red on chrome. */
+  --good: #3ddc84; /* 9.7:1 on a card */
+  --warn: #f0b04a; /* 9.1:1 */
+  --bad: #f87171; /* 6.3:1 */
+  --push: #8b98b0;
+  --good-bg: rgba(61, 220, 132, 0.12);
+  --warn-bg: rgba(240, 176, 74, 0.12);
+  --bad-bg: rgba(248, 113, 113, 0.12);
+  --push-bg: rgba(139, 152, 176, 0.14);
+  --warn-border: rgba(240, 176, 74, 0.4);
+  --badge-ink: #04121f; /* text on a filled good/warn/bad badge */
 
-  /* Warnings, disabled reasons, stale/degraded notices — amber. Never
-     green/red here: those are reserved for under/over outcomes. */
-  --warn: #e0a44a;
-  --warn-border: #6b4a1f;
-  --warn-bg: #241a0c;
+  /* Legacy outcome names — aliases kept until every caller moves to the
+     four grade tokens above (PR 19 removes them). */
+  --under-strong: var(--good);
+  --neutral: var(--warn);
+  --over-lean: var(--warn);
+  --over: var(--bad);
+
+  /* Radii (3) */
+  --r-sm: 0.375rem; /* badges, chips, inputs, buttons */
+  --r-md: 0.625rem; /* tables, inner panels */
+  --r-lg: 0.875rem; /* cards */
 
   /* Elevation */
   --shadow-card:
@@ -48,25 +63,16 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  /* Atmosphere: faint cyan glow up top + subtle grid for depth, not flat */
-  background-image:
-    radial-gradient(
-      1200px 600px at 50% -10%,
-      rgba(56, 189, 248, 0.07),
-      transparent 70%
-    ),
-    linear-gradient(rgba(36, 48, 73, 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(36, 48, 73, 0.18) 1px, transparent 1px);
-  background-size:
-    100% 100%,
-    40px 40px,
-    40px 40px;
-  background-attachment: fixed;
 }
 
 /* Tabular figures everywhere numbers matter (prevents layout shift) */
-.tnum,
 .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numeric table cells: right-aligned, tabular. Put it on the th AND the td. */
+.bv-num {
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -74,15 +80,15 @@ body {
 :where(a, button, select, input, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 @layer components {
   /* Elevated surface card */
   .bv-card {
     position: relative;
-    border-radius: 1rem;
-    border: 1px solid var(--border-soft);
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
     background: linear-gradient(180deg, var(--surface), var(--bg-2));
     box-shadow: var(--shadow-card);
     transition:
@@ -90,10 +96,91 @@ body {
       border-color 0.18s ease-out,
       box-shadow 0.18s ease-out;
   }
-  .bv-card-interactive:hover {
+  .bv-card[data-interactive="true"]:hover {
     transform: translateY(-2px);
     border-color: rgba(56, 189, 248, 0.45);
     box-shadow: var(--shadow-card-hover);
+  }
+
+  /* One badge component for every chip on the site (tier word, status tags,
+     logged, paper, filters). Colour modifiers carry the grade language. */
+  .bv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    padding: 0.125rem 0.45rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background: transparent;
+  }
+  .bv-badge--good {
+    color: var(--good);
+    border-color: var(--good);
+    background: var(--good-bg);
+  }
+  .bv-badge--warn {
+    color: var(--warn);
+    border-color: var(--warn-border);
+    background: var(--warn-bg);
+  }
+  .bv-badge--bad {
+    color: var(--bad);
+    border-color: var(--bad);
+    background: var(--bad-bg);
+  }
+  .bv-badge--push {
+    color: var(--push);
+    border-color: var(--border-strong);
+    background: var(--push-bg);
+  }
+  .bv-badge--accent {
+    color: var(--accent);
+    border-color: var(--accent-strong);
+    background: var(--accent-soft);
+  }
+  .bv-badge--wrap {
+    white-space: normal;
+    text-align: left;
+    line-height: 1.3;
+  }
+  .bv-badge--solid {
+    border-color: transparent;
+    color: var(--badge-ink);
+  }
+  .bv-badge--solid.bv-badge--good {
+    background: var(--good);
+  }
+  .bv-badge--solid.bv-badge--warn {
+    background: var(--warn);
+  }
+  .bv-badge--solid.bv-badge--bad {
+    background: var(--bad);
+  }
+  .bv-badge--solid.bv-badge--push {
+    background: var(--push);
+  }
+
+  /* Sticky day header on the rolling board (Thu / Fri / Sat) */
+  .bv-day-head {
+    position: sticky;
+    top: 3.5rem;
+    z-index: 5;
+    margin: 1.25rem 0 0.5rem;
+    padding: 0.35rem 0;
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
 
   /* Compact stat block: dim label over a big mono value */
@@ -132,13 +219,6 @@ body {
     line-height: 1.3;
     color: var(--text);
   }
-  .bv-pill-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
   .bv-pill-value {
     font-family: var(--font-geist-mono), ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
@@ -156,17 +236,12 @@ body {
     text-transform: uppercase;
     color: var(--text-dim);
   }
-  .bv-fac-tier-dot {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 9999px;
-  }
   .bv-fac-row {
     display: flex;
     align-items: center;
     gap: 0.6rem;
     padding: 0.4rem 0.6rem;
-    border-radius: 0.5rem;
+    border-radius: var(--r-sm);
     border: 1px solid transparent;
     margin-bottom: 0.3rem;
     font-size: 0.85rem;
@@ -185,40 +260,20 @@ body {
     color: var(--text-dim);
     background: var(--bg-2);
     border: 1px solid var(--border);
-    border-radius: 0.35rem;
+    border-radius: var(--r-sm);
     padding: 0.1rem 0.4rem;
     white-space: nowrap;
-  }
-  .bv-fac-badge-live {
-    color: var(--accent);
-    border-color: var(--accent-strong);
   }
   .bv-fac-badge-amber {
     color: var(--warn);
     border-color: var(--warn-border);
     background: var(--warn-bg);
   }
-  .bv-fac-track {
-    position: relative;
-    flex-shrink: 0;
-    width: 3rem;
-    height: 0.3rem;
-    border-radius: 9999px;
-    background: var(--surface-2);
-  }
-  .bv-fac-track-dot {
-    position: absolute;
-    top: -0.12rem;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 9999px;
-    transform: translateX(-50%);
-  }
 
   /* Toolbar select (season / sort) */
   .bv-select {
     appearance: none;
-    border-radius: 0.5rem;
+    border-radius: var(--r-sm);
     border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--text);
@@ -259,8 +314,8 @@ body {
   /* Data table */
   .bv-table-wrap {
     overflow-x: auto;
-    border-radius: 0.85rem;
-    border: 1px solid var(--border-soft);
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
     background: linear-gradient(180deg, var(--surface), var(--bg-2));
     box-shadow: var(--shadow-card);
   }
@@ -287,7 +342,7 @@ body {
     font-variant-numeric: tabular-nums;
   }
   .bv-table tbody tr {
-    border-top: 1px solid var(--border-soft);
+    border-top: 1px solid var(--border);
   }
   .bv-table tbody tr:hover {
     background: rgba(56, 189, 248, 0.04);
@@ -295,7 +350,7 @@ body {
 
   /* Form input */
   .bv-input {
-    border-radius: 0.5rem;
+    border-radius: var(--r-sm);
     border: 1px solid var(--border);
     background: var(--surface-2);
     padding: 0.45rem 0.6rem;
@@ -313,7 +368,7 @@ body {
 
   /* Primary action button — brand cyan (never green; green = outcome) */
   .bv-btn {
-    border-radius: 0.5rem;
+    border-radius: var(--r-sm);
     background: var(--accent-strong);
     color: #04121f;
     font-weight: 600;
@@ -378,7 +433,7 @@ body {
 /* Respect reduced-motion: kill transforms/transitions */
 @media (prefers-reduced-motion: reduce) {
   .bv-card,
-  .bv-card-interactive:hover {
+  .bv-card[data-interactive="true"]:hover {
     transition: none;
     transform: none;
   }

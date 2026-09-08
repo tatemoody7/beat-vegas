@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { bookLabel } from "@/lib/books";
-import type { EdgeTier } from "@/lib/edge";
 import { american, fmt, signed } from "@/lib/format";
-import { GAP_BASIS_LABEL, strongestRed, type HomeGame } from "@/lib/homeBoard";
+import { SETTLED_WORD } from "@/lib/grade";
+import { strongestRed, type HomeGame } from "@/lib/homeBoard";
+import { basisPhrase, blockerTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
-  groupFactorBoard,
   type BoardFactor,
   type SplitLeg,
   type TeamForm,
@@ -23,34 +23,33 @@ import {
 } from "@/lib/verdict";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
+import ScoreBadge from "@/app/components/ScoreBadge";
 
-// One game on the home board: a scannable collapsed row (score, tier, the two
-// numbers, what to do) that expands into everything behind it — Lines, Model,
-// Why, News. Cyan is the brand accent; green/red only ever carry an under/over
-// reading on a factor row.
-
-const TIER_STYLE: Record<EdgeTier, { box: string; sub: string }> = {
-  BET: {
-    box: "border-transparent bg-[var(--accent-strong)] text-[#04121f]",
-    sub: "1 unit, first-half under",
-  },
-  EDGE: {
-    box: "border-[var(--accent-strong)] text-[var(--accent)]",
-    sub: "something is there, not yet a bet",
-  },
-  PASS: {
-    box: "border-[var(--border)] text-[var(--text-dim)]",
-    sub: "nothing to act on",
-  },
-};
+// One game on the rolling week board: a scannable collapsed row (the coloured
+// score, the matchup, the numbers, what to do) that expands into everything
+// behind it — Lines, Our number, What is behind it, Injuries and news. The
+// score carries the grade colour (lib/grade.ts); cyan stays chrome.
 
 function bandLabel(gap: number | null): string {
-  if (gap === null) return "no gap to measure";
-  if (gap >= STRONG_GAP_PTS) return "top ~10% of a season's gaps";
-  if (gap >= BET_GAP_PTS) return "top ~20% — the bettable band";
-  if (gap >= WATCH_GAP_PTS) return "a small lean, below the band";
-  if (gap > 0) return "line sits about on our number";
-  return "line sits below our number — leans over";
+  if (gap === null) return "nothing to measure it against";
+  if (gap >= STRONG_GAP_PTS)
+    return `${STRONG_GAP_PTS}+ — the biggest gaps of a season`;
+  if (gap >= BET_GAP_PTS) return `${BET_GAP_PTS}+ — the band we bet`;
+  if (gap >= WATCH_GAP_PTS) return `a small lean, under the ${BET_GAP_PTS} bar`;
+  if (gap > 0) return "the line sits about on our number";
+  return "the line is below our number, so this leans over";
+}
+
+/** One chip on the collapsed row. */
+function Tag({
+  tone,
+  children,
+}: {
+  tone: "good" | "warn" | "bad" | "push" | "accent" | "plain";
+  children: React.ReactNode;
+}) {
+  const mod = tone === "plain" ? "" : `bv-badge--${tone}`;
+  return <span className={`bv-badge ${mod}`}>{children}</span>;
 }
 
 function Section({
@@ -61,7 +60,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-t border-[var(--border-soft)] px-4 py-3">
+    <section className="border-t border-[var(--border)] px-4 py-3">
       <h4 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
         {title}
       </h4>
@@ -107,28 +106,31 @@ function BookTable({ m }: { m: MarketMovement }) {
         <thead>
           <tr>
             <th>Sportsbook</th>
-            <th title="The first first-half total this book posted.">Open</th>
-            <th title="The most recent first-half total captured.">Now</th>
-            <th title="How far the number has moved since it opened. Down is good for an under bet already placed.">
-              Move
-            </th>
+            <th className="bv-num">Open</th>
+            <th className="bv-num">Now</th>
+            <th className="bv-num">Move</th>
           </tr>
         </thead>
         <tbody>
           {m.books.map((b) => (
             <tr key={b.book}>
               <td className="text-[var(--text)]">{bookLabel(b.book)}</td>
-              <td className="font-mono text-[var(--text-muted)]">
+              <td className="bv-num font-mono text-[var(--text-muted)]">
                 {fmt(b.open)}
               </td>
-              <td className="font-mono text-[var(--text)]">{fmt(b.cur)}</td>
-              <td className="font-mono text-[var(--text-muted)]">
+              <td className="bv-num font-mono text-[var(--text)]">
+                {fmt(b.cur)}
+              </td>
+              <td className="bv-num font-mono text-[var(--text-muted)]">
                 {move(b.open, b.cur)}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <p className="px-3 py-2 text-xs text-[var(--text-dim)]">
+        {`Open is the first first-half total each book posted. Move is how far it has come since. Down is good for an under you already have.`}
+      </p>
     </div>
   );
 }
@@ -152,7 +154,7 @@ function LinesSection({ g }: { g: HomeGame }) {
             {`No sportsbook has posted a first-half total for this game yet.`}
           </p>
           <Row
-            label="Our reference 1H"
+            label="Our reference line"
             value={
               <>
                 <span className="font-mono text-[var(--text)]">
@@ -167,19 +169,19 @@ function LinesSection({ g }: { g: HomeGame }) {
             }
           />
           <p className="text-xs text-[var(--text-dim)]">
-            {`A reference number worked out from the posted full-game total, not a prediction and not a bet.`}
+            {`Worked out from the posted full-game total. Not a prediction and not a bet.`}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
           <Row
-            label="Consensus 1H"
+            label="Market line"
             value={
               <>
                 <span className="font-mono text-[var(--text)]">
                   {`${fmt(fh.open)} → ${fmt(fh.cur)}`}
                 </span>
-                {` (${move(fh.open, fh.cur)}) across ${fh.books.length} book${fh.books.length === 1 ? "" : "s"}`}
+                {` (${move(fh.open, fh.cur)}) — the middle of the ${fh.books.length} book${fh.books.length === 1 ? "" : "s"} that have posted`}
               </>
             }
           />
@@ -194,9 +196,9 @@ function LinesSection({ g }: { g: HomeGame }) {
         </div>
       )}
 
-      <div className="mt-3 border-t border-[var(--border-soft)] pt-2">
+      <div className="mt-3 border-t border-[var(--border)] pt-2">
         <Row
-          label="Full game (context)"
+          label="Full game"
           value={
             fg === null && f.full_game_total == null
               ? "—"
@@ -204,7 +206,7 @@ function LinesSection({ g }: { g: HomeGame }) {
           }
         />
         <p className="mt-1 text-xs text-[var(--text-dim)]">
-          {`We never bet the full game — it is here because the first-half number is priced off it.`}
+          {`We never bet the full game. It is here because the first-half line is priced off it.`}
         </p>
       </div>
     </Section>
@@ -217,13 +219,13 @@ function ModelSection({ g }: { g: HomeGame }) {
   const { row, edge } = g;
   const red = strongestRed(row.factors.factor_board);
   return (
-    <Section title="Model">
+    <Section title="Our number">
       <div className="space-y-1">
         <Row
           label="Our number"
           value={
             row.bvLine === null ? (
-              "no model read this week"
+              "no model number yet"
             ) : (
               <>
                 <span className="font-mono text-[var(--text)]">
@@ -233,7 +235,7 @@ function ModelSection({ g }: { g: HomeGame }) {
                   ? ` (range ${fmt(row.bvLo, 0)}–${fmt(row.bvHi, 0)})`
                   : ""}
                 {row.bvAdjust !== null && row.bvAdjust !== 0
-                  ? ` · includes a manual ${signed(row.bvAdjust, 1)}${row.bvAdjustReason ? ` (${row.bvAdjustReason})` : ""}`
+                  ? ` · includes a manual ${signed(row.bvAdjust, 1)} nudge${row.bvAdjustReason ? ` (${row.bvAdjustReason})` : ""}`
                   : ""}
               </>
             )
@@ -253,18 +255,15 @@ function ModelSection({ g }: { g: HomeGame }) {
                 <span className="font-mono text-[var(--text)]">
                   {signed(g.gap, 1)}
                 </span>
-                {` ${g.gapBasis ? GAP_BASIS_LABEL[g.gapBasis] : ""} — ${bandLabel(g.gap)}`}
+                {` ${basisPhrase(g.gapBasis, g.basisBooks)} — ${bandLabel(g.gap)}`}
               </>
             )
           }
         />
-        <Row label="Kill number" value={edge.kill.text} />
+        <Row label="Stops being a bet at" value={edge.kill.text} />
         <Row
-          label="What makes it wrong"
-          value={
-            red ??
-            "Nothing on the factor board argues against the under right now — which is itself a reason to stay humble: a single first half is close to a coin flip."
-          }
+          label="What argues against it"
+          value={red ?? "Nothing here argues against the under."}
         />
       </div>
       {edge.verdict.flags.length > 0 && (
@@ -272,9 +271,9 @@ function ModelSection({ g }: { g: HomeGame }) {
           {edge.verdict.flags.map((fl, i) => (
             <li
               key={i}
-              className="rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-1 text-xs text-amber-300"
+              className="rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]"
             >
-              {`⚠ ${fl}`}
+              {fl}
             </li>
           ))}
         </ul>
@@ -293,12 +292,7 @@ function FactorRow({ f }: { f: BoardFactor }) {
         {f.sentence || `${f.label} — ${f.value}`}
       </span>
       {f.hypothesis && (
-        <span
-          className="bv-fac-badge bv-fac-badge-amber"
-          title="Tracks more first-half scoring on the estimated line; unproven against real lines."
-        >
-          ⚠ unproven
-        </span>
+        <span className="bv-fac-badge bv-fac-badge-amber">unproven</span>
       )}
     </div>
   );
@@ -313,13 +307,13 @@ function formText(t: TeamForm | null | undefined): string {
   const pa = last(t.pa ?? [])
     .map((v) => fmt(v, 0))
     .join(", ");
-  const src = t.source === "prior_season" ? " (last season)" : "";
+  const src = t.source === "prior_season" ? " (last season's games)" : "";
   return `${pf} scored · ${pa || "—"} allowed${src}`;
 }
 
 function legText(leg: SplitLeg | undefined): string {
   if (!leg) return "—";
-  return `${fmt(leg.pf)} scored / ${fmt(leg.pa)} allowed in ${leg.n}`;
+  return `${fmt(leg.pf)} scored, ${fmt(leg.pa)} allowed over ${leg.n} game${leg.n === 1 ? "" : "s"}`;
 }
 
 function splitText(s: TeamSplit | null | undefined): string {
@@ -327,70 +321,84 @@ function splitText(s: TeamSplit | null | undefined): string {
   const home = s.at_home ?? s.home;
   const away = s.on_road ?? s.away;
   if (!home && !away) return "—";
-  return `at home ${legText(home)} · on the road ${legText(away)}`;
+  return `at home ${legText(home)} · away ${legText(away)}`;
 }
 
 function WhySection({ g }: { g: HomeGame }) {
   const f = g.row.factors;
-  const groups = groupFactorBoard(f.factor_board);
+  const factors = (f.factor_board ?? []).filter((x) => x && x.key);
+  const anyUnproven = factors.some((x) => x.hypothesis);
   // Each piece only appears when the context job actually wrote it, so the row
   // reads as prose instead of a line of dashes.
   const bits: string[] = [];
   if (f.home_rest_days != null || f.away_rest_days != null) {
     bits.push(
-      `rest ${fmt(f.home_rest_days, 0)} days at home vs ${fmt(f.away_rest_days, 0)} for the visitor`,
+      `${g.row.home} had ${fmt(f.home_rest_days, 0)} days off, ${g.row.away} had ${fmt(f.away_rest_days, 0)}`,
     );
   }
   if (f.away_travel_dist != null) {
-    bits.push(`visitor travelled ${Math.round(f.away_travel_dist)} miles`);
+    bits.push(
+      `${g.row.away} travelled ${Math.round(f.away_travel_dist)} miles`,
+    );
   }
   if (f.away_tz_shift != null && f.away_tz_shift !== 0) {
-    bits.push(`time-zone shift ${signed(f.away_tz_shift, 0)} hours`);
+    bits.push(
+      `${Math.abs(f.away_tz_shift)} hour${Math.abs(f.away_tz_shift) === 1 ? "" : "s"} of time change`,
+    );
   }
   if (f.kickoff_local_hour != null) {
-    bits.push(`local kickoff hour ${fmt(f.kickoff_local_hour, 0)}`);
+    const h = Math.round(f.kickoff_local_hour);
+    const local =
+      h === 12
+        ? "noon"
+        : h === 0
+          ? "midnight"
+          : h > 12
+            ? `${h - 12}pm`
+            : `${h}am`;
+    bits.push(`${local} local kickoff`);
   }
   const restTravel = bits.length > 0 ? bits.join(" · ") : "—";
 
   return (
-    <Section title="Why">
-      {groups.length > 0 ? (
+    <Section title="What is behind it">
+      {factors.length > 0 ? (
         <div className="mb-3">
-          {groups.map((grp) => (
-            <div key={grp.tier}>
-              <div className="bv-fac-tier">{grp.title}</div>
-              {grp.factors.map((fac) => (
-                <FactorRow key={fac.key} f={fac} />
-              ))}
-            </div>
+          {factors.map((fac) => (
+            <FactorRow key={fac.key} f={fac} />
           ))}
+          {anyUnproven && (
+            <p className="mt-1 text-xs text-[var(--text-dim)]">
+              {`Rows marked unproven have not been checked against real lines yet.`}
+            </p>
+          )}
         </div>
       ) : (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
-          {`No factor board on this card yet — it lands when the week is scored.`}
+          {`Nothing here yet. It fills in when the week is scored on Sunday.`}
         </p>
       )}
       <div className="space-y-1">
         <Row
-          label={`Last 3 1H · ${g.row.away}`}
+          label={`Last 3 first halves · ${g.row.away}`}
           value={formText(f.form_away)}
         />
         <Row
-          label={`Last 3 1H · ${g.row.home}`}
+          label={`Last 3 first halves · ${g.row.home}`}
           value={formText(f.form_home)}
         />
         <Row
-          label={`1H splits · ${g.row.away}`}
+          label={`Home and away · ${g.row.away}`}
           value={splitText(f.split_away)}
         />
         <Row
-          label={`1H splits · ${g.row.home}`}
+          label={`Home and away · ${g.row.home}`}
           value={splitText(f.split_home)}
         />
-        <Row label="Rest & travel" value={restTravel} />
+        <Row label="Rest and travel" value={restTravel} />
       </div>
       <p className="mt-2 text-xs text-[var(--text-dim)]">
-        {`These explain the rating; none of them move it.`}
+        {`These explain the score. None of them change it.`}
       </p>
     </Section>
   );
@@ -425,7 +433,7 @@ function TeamNews({
               className="text-xs"
               style={{
                 color: ALERT_STATUS.test(i)
-                  ? "var(--over-lean)"
+                  ? "var(--warn)"
                   : "var(--text-muted)",
               }}
             >
@@ -444,7 +452,7 @@ function TeamNews({
         </ul>
       ) : (
         injuries.length === 0 && (
-          <p className="text-xs text-[var(--text-dim)]">No news.</p>
+          <p className="text-xs text-[var(--text-dim)]">Nothing reported.</p>
         )
       )}
     </div>
@@ -469,15 +477,15 @@ function NewsSection({ g }: { g: HomeGame }) {
   const qbOut = Boolean(f.qb_out_home || f.qb_out_away);
   const at = pulledAt(p?.updatedAt ?? null);
   return (
-    <Section title="News">
+    <Section title="Injuries and news">
       {qbOut && (
-        <p className="mb-2 rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-1 text-xs text-amber-300">
-          {`⚠ QB OUT (live Rotowire, unofficial): ${f.qb_out_detail ?? "a starting quarterback is listed out"}. Our number does not know this.`}
+        <p className="mb-2 rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]">
+          {`Starting QB out: ${f.qb_out_detail ?? "a starting quarterback is listed out"}. Unofficial, from Rotowire. Our number does not know about it.`}
         </p>
       )}
       {p === null ? (
         <p className="text-xs text-[var(--text-dim)]">
-          {`No injury or news pull for this game yet (runs Tuesday and Friday mornings). Check the starters yourself before any real bet.`}
+          {`No injuries or news pulled for this game yet. Check the starting lineups yourself before any real bet.`}
         </p>
       ) : (
         <>
@@ -494,7 +502,7 @@ function NewsSection({ g }: { g: HomeGame }) {
             />
           </div>
           <p className="mt-2 text-xs text-[var(--text-dim)]">
-            {`Unofficial — Rotowire injuries and ESPN headlines${at ? `, pulled ${at} ET` : ""}.`}
+            {`Unofficial: Rotowire injuries and ESPN headlines${at ? `, pulled ${at} ET` : ""}. Check the lineups yourself.`}
           </p>
         </>
       )}
@@ -507,91 +515,98 @@ function NewsSection({ g }: { g: HomeGame }) {
 export default function GameCard({ g }: { g: HomeGame }) {
   const [open, setOpen] = useState(false);
   const { row, edge, check } = g;
-  const tier = TIER_STYLE[edge.tier];
   const hr =
     check?.hrLine == null
-      ? "no HR line"
+      ? "no line yet"
       : `u${fmt(check.hrLine)}${check.hrUnderPrice == null ? "" : ` ${american(check.hrUnderPrice)}`}`;
   const line = row.curLine ?? row.factors.line ?? null;
+  const basis = g.gapBasis;
+  const tag =
+    edge.tier === "EDGE"
+      ? blockerTag(edge.blocker, {
+          hrLine: check?.hrLine ?? null,
+          hrPrice: check?.hrUnderPrice ?? null,
+          marketLine: row.curLine,
+          killLine: edge.kill.line,
+          killPrice: edge.kill.price,
+        })
+      : null;
+  const resultLine =
+    g.settled !== null && row.firstHalfTotal !== null
+      ? `${SETTLED_WORD[g.settled][0].toUpperCase()}${SETTLED_WORD[g.settled].slice(1)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(check?.hrLine ?? line)}`
+      : null;
 
   return (
     <div
       id={`game-${row.gameId}`}
-      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "PASS" ? "opacity-70" : ""}`}
+      data-interactive="true"
+      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "PASS" && g.settled === null ? "opacity-85" : ""}`}
     >
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-start gap-4 p-4 text-left"
+        className="flex w-full flex-col items-stretch p-4 text-left"
       >
-        <span
-          className="w-12 shrink-0 font-mono text-3xl font-bold leading-none tabular-nums text-[var(--text)]"
-          title="Edge score, 0–100: how good this spot looks once the gap, Hard Rock's price and the flags are all counted. It ranks the board; it never overrides the BET rules."
-        >
-          {edge.score}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span
-              className={`rounded-md border px-2 py-0.5 text-xs font-bold tracking-wide ${tier.box}`}
-              title={tier.sub}
-            >
-              {edge.tier}
-            </span>
-            <span className="text-base font-semibold text-[var(--text)]">
+        <span className="flex items-start gap-3">
+          <ScoreBadge
+            score={edge.score}
+            settled={g.settled}
+            label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold leading-snug text-[var(--text)]">
               {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
               {row.home}
             </span>
-            <span className="text-xs text-[var(--text-dim)]">
-              {g.kickoff ?? "kickoff TBD"}
+            <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
+              {g.kickoff ?? "kickoff time TBD"}
             </span>
-            {g.picked && (
-              <span className="rounded-md border border-[var(--accent-strong)] px-1.5 text-xs text-[var(--accent)]">
-                logged
-              </span>
-            )}
-            {g.overCap && (
-              <span
-                className="rounded-md border border-[var(--border)] px-1.5 text-xs text-[var(--text-dim)]"
-                title={`BET #${g.capRank} by gap this week — beyond the ${WEEKLY_BET_CAP}-bet cap, so paper only. Every gate passed.`}
-              >
-                over cap · paper only
-              </span>
-            )}
           </span>
-          <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
-            <span title="Hard Rock's first-half total and under price — the only book you can bet from Florida.">
-              {`Hard Rock ${hr}`}
-            </span>
-            <span title="The model's own predicted first-half total. It never looks at the Vegas line.">
-              {`ours ${fmt(row.bvLine)}`}
-            </span>
-            <span
-              title={`The line minus our number, measured against the number you can actually bet when there is one. ${BET_GAP_PTS}+ is the bettable band.`}
-            >
-              {g.gap === null
-                ? "gap —"
-                : `gap ${signed(g.gap, 1)} ${g.gapBasis ? GAP_BASIS_LABEL[g.gapBasis] : ""}`}
-            </span>
-            {check?.hrLine == null && line !== null && (
-              <span
-                title={
-                  row.curLine !== null
-                    ? "The market's current first-half total across the books that have posted."
-                    : "Our reference first-half number, worked out from the full-game total — no book has posted a first-half line."
-                }
-              >
-                {`${row.curLine !== null ? "market" : "reference"} ${fmt(line)}`}
-              </span>
-            )}
-          </span>
-          <span className="mt-2 block text-sm text-[var(--text)]">
-            {edge.action}
+          <span
+            aria-hidden
+            className="shrink-0 pt-1 text-xs text-[var(--text-dim)]"
+          >
+            {open ? "▲ less" : "▼ more"}
           </span>
         </span>
-        <span aria-hidden className="shrink-0 text-xs text-[var(--text-dim)]">
-          {open ? "▲ less" : "▼ more"}
+        {(g.picked ||
+          g.overCap ||
+          g.earlySeason ||
+          tag !== null ||
+          (g.kickedOff && g.settled === null)) && (
+          <span className="mt-2 flex flex-wrap gap-1.5">
+            {g.picked && <Tag tone="accent">bet logged</Tag>}
+            {g.overCap && (
+              <Tag tone="push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</Tag>
+            )}
+            {g.kickedOff && g.settled === null && (
+              <Tag tone="push">already kicked off</Tag>
+            )}
+            {g.earlySeason && <Tag tone="warn">early season</Tag>}
+            {tag !== null && (
+              <span className="bv-badge bv-badge--warn bv-badge--wrap">
+                {tag}
+              </span>
+            )}
+          </span>
+        )}
+        <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
+          <span>{`Hard Rock ${hr}`}</span>
+          <span>{`our number ${fmt(row.bvLine)}`}</span>
+          <span>
+            {g.gap === null
+              ? "gap —"
+              : `gap ${signed(g.gap, 1)} ${basisPhrase(basis, g.basisBooks)}`}
+          </span>
+          {check?.hrLine == null && line !== null && (
+            <span>
+              {`${row.curLine !== null ? "market line" : "our reference line"} ${fmt(line)}`}
+            </span>
+          )}
+        </span>
+        <span className="mt-2 block text-sm text-[var(--text)]">
+          {resultLine ?? edge.action}
         </span>
       </button>
 
@@ -601,7 +616,7 @@ export default function GameCard({ g }: { g: HomeGame }) {
           <ModelSection g={g} />
           <WhySection g={g} />
           <NewsSection g={g} />
-          <div className="border-t border-[var(--border-soft)] px-4 py-3">
+          <div className="border-t border-[var(--border)] px-4 py-3">
             <LogPickButton
               prefill={{
                 gameId: row.gameId,

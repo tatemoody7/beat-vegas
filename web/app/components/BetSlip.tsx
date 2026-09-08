@@ -76,6 +76,14 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
   // the server (lib/pickRules.ts) judges on submit — the slip must never be
   // stricter than the rule it fronts.
   const { block, isLive: blockIsLive } = effectiveBlock(r, lineNum, priceNum);
+  const blockCtx = {
+    line: lineNum,
+    price: priceNum,
+    killLine: r.killLine,
+    killPrice: r.killPrice,
+    liveLine: r.liveLine,
+    livePrice: r.livePrice,
+  };
   const disabled = busy || block !== null;
 
   const status = done ? "logged" : r.status;
@@ -275,7 +283,7 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
               className="bv-btn min-h-11 text-sm"
               title={
                 block !== null
-                  ? blockReason(block, blockIsLive)
+                  ? blockReason(block, blockIsLive, blockCtx)
                   : armed
                     ? "Tap again to log this as a real-money first-half under at the number entered."
                     : "First tap arms; the second logs the bet."
@@ -291,7 +299,7 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
       </div>
       {open && block !== null && (
         <p className="mt-1 text-xs text-[var(--warn)]">
-          {blockReason(block, blockIsLive)}
+          {blockReason(block, blockIsLive, blockCtx)}
         </p>
       )}
       {err !== null && <p className="mt-1 text-xs text-[var(--warn)]">{err}</p>}
@@ -313,7 +321,11 @@ export default function BetSlip({
 }) {
   const capUsed = slip.used >= slip.cap;
   return (
-    <section className="bv-card mb-4 p-4" aria-label="Bet slip">
+    <section
+      id="bet-slip"
+      className="bv-card mb-4 scroll-mt-4 p-4"
+      aria-label="Bet slip"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-[var(--text)]">
           {week === null ? "Bet slip" : `Bet slip · Week ${week}`}

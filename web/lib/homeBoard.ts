@@ -1,9 +1,12 @@
+import { bookLabel } from "@/lib/books";
+import { settledOf, type Settled } from "@/lib/grade";
 import { getBoard, type BoardRow } from "@/lib/board";
 import {
   edgeScore,
   type EdgeContext,
   type EdgeInput,
   type EdgeResult,
+  type LineBasis,
 } from "@/lib/edge";
 import { round2 } from "@/lib/format";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
@@ -251,7 +254,43 @@ export function lineState(
   };
 }
 
-export type GapBasis = "hardrock" | "market" | "reference";
+export type GapBasis = LineBasis;
+
+/** Early season: a team on this row has fewer than 2 prior games this season. */
+export function earlySeasonFrom(f: Factors): boolean {
+  const gp = [f.h_games_played, f.a_games_played];
+  return gp.some((v) => typeof v === "number" && Number.isFinite(v) && v < 2);
+}
+
+/** The non-Hard-Rock, non-exchange books behind the market line, best first (max 2). */
+export function basisBooksFrom(check: LineCheckRow | null): string[] {
+  if (check === null) return [];
+  return check.books
+    .filter((b) => !b.isHR && !b.isExchange)
+    .slice(0, 2)
+    .map((b) => bookLabel(b.book));
+}
+
+export type DayGroup = { day: DayKey | null; label: string; games: HomeGame[] };
+
+/**
+ * Pure: the rolling week grouped by ET day in schedule order (Thu, Fri, Sat,
+ * Sun, then unknown), each group sorted like the board so kicked-off games
+ * sink within their own day. Empty days are omitted.
+ */
+export function groupByDay(games: HomeGame[]): DayGroup[] {
+  const order: (DayKey | null)[] = [...DAYS, "other", null];
+  return order
+    .map((day) => ({
+      day,
+      label:
+        day === null || day === "other"
+          ? "Other days"
+          : DAY_LABEL[day as (typeof DAYS)[number]],
+      games: sortGames(games.filter((g) => g.day === day)),
+    }))
+    .filter((grp) => grp.games.length > 0);
+}
 
 export const GAP_BASIS_LABEL: Record<GapBasis, string> = {
   hardrock: "vs Hard Rock",
@@ -278,6 +317,12 @@ export type HomeGame = {
   /** The line the gap is measured against, and which line that is. */
   gap: number | null;
   gapBasis: GapBasis | null;
+  /** Books behind the market line when that is the basis (max 2), for the basis phrase. */
+  basisBooks: string[];
+  /** A team on this row has played fewer than 2 games this season. */
+  earlySeason: boolean;
+  /** How the first-half under settled at the basis line; null until played. */
+  settled: Settled | null;
   /** One sentence on Hard Rock's price vs the market's no-vig fair price. */
   priceLine: string;
   /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
@@ -459,6 +504,9 @@ export async function getHomeBoard(
           ? round2(basisLine - row.bvLine)
           : null,
       gapBasis: hasModel ? gapBasis : null,
+      basisBooks: basisBooksFrom(check),
+      earlySeason: earlySeasonFrom(row.factors),
+      settled: settledOf(row.firstHalfTotal, basisLine),
       priceLine: priceSentence(input),
       capRank: null,
       overCap: false,

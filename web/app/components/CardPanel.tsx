@@ -5,16 +5,16 @@ import {
   type CardRow,
   type CardTier,
 } from "@/lib/card";
+import { BLOCKER_SHORT, labelOf, TIER_TEXT } from "@/lib/labels";
 
-// This week's bet card on the home board, between the bankroll strip and the
-// filters. Server component: everything it draws comes out of summarizeCard
-// (pure, tested). Cyan is the brand accent — the BET chip is filled cyan, EDGE
-// outlined — and green/red never appear here (nothing on the card has settled).
+// This week's bet list on the home board. Server component: everything it
+// draws comes out of summarizeCard (pure, tested). The tier chip carries the
+// grade colour (bet green, watch amber, pass grey); nothing here has settled.
 
 const TIER_CHIP: Record<CardTier, string> = {
-  BET: "border-transparent bg-[var(--accent-strong)] text-[#04121f]",
-  EDGE: "border-[var(--accent-strong)] text-[var(--accent)]",
-  PASS: "border-[var(--border)] text-[var(--text-dim)]",
+  BET: "bv-badge bv-badge--solid bv-badge--good",
+  EDGE: "bv-badge bv-badge--warn",
+  PASS: "bv-badge bv-badge--push",
 };
 
 const MAX_NOTES = 5;
@@ -23,11 +23,7 @@ function Row({ r }: { r: CardRow }) {
   return (
     <li className="border-t border-[var(--border-soft)] py-2 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span
-          className={`rounded-md border px-2 py-0.5 text-xs font-bold tracking-wide ${TIER_CHIP[r.tier]}`}
-        >
-          {r.tier}
-        </span>
+        <span className={TIER_CHIP[r.tier]}>{TIER_TEXT[r.tier]}</span>
         {r.capRank !== null && (
           <span
             className="font-mono text-xs text-[var(--text-dim)]"
@@ -48,11 +44,11 @@ function Row({ r }: { r: CardRow }) {
             className="rounded-md border border-[var(--accent-strong)] px-1.5 text-xs text-[var(--accent)]"
             title={
               r.paperBlocker
-                ? `Logged automatically as a paper pick (gate: ${r.paperBlocker}) — one notional unit, kept apart from the real record.`
-                : "Logged automatically as a paper pick — one notional unit, kept apart from the real record."
+                ? `Logged with no money on it — ${labelOf(BLOCKER_SHORT, r.paperBlocker, "an input failed")}.`
+                : "Logged with no money on it."
             }
           >
-            paper logged
+            logged as paper
           </span>
         )}
         <a
@@ -68,7 +64,7 @@ function Row({ r }: { r: CardRow }) {
       )}
       {r.tier === "BET" && !r.overCap && r.kill !== "" && (
         <p className="mt-0.5 font-mono text-xs text-[var(--text-dim)]">
-          {`kill: ${r.kill}`}
+          {`Stops being a bet ${r.kill}`}
         </p>
       )}
     </li>
@@ -86,7 +82,7 @@ export default function CardPanel({
     return (
       <div className="bv-card mb-4 p-4">
         <h2 className="text-sm font-semibold text-[var(--text)]">
-          {`This week’s card`}
+          {`This week’s bets`}
         </h2>
         <p className="mt-1 text-sm text-[var(--text-dim)]">
           {`A preview builds Friday evening; the final card lands Saturday between 8:05 and 8:45am ET off a fresh sweep of Hard Rock’s first-half lines.`}
@@ -100,10 +96,10 @@ export default function CardPanel({
   const notes = s.notes.slice(0, MAX_NOTES);
 
   return (
-    <section className="bv-card mb-4 p-4" aria-label="This week's card">
+    <section className="bv-card mb-4 p-4" aria-label="This week's bets">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-[var(--text)]">
-          {`This week’s card`}
+          {`This week’s bets`}
         </h2>
         {age !== null && (
           <span className="text-xs text-[var(--text-dim)]">{age}</span>

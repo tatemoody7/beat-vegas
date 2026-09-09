@@ -29,7 +29,7 @@ function terms(unitUsd: number): { term: string; body: string }[] {
   return [
     {
       term: "Score",
-      body: `The 0–100 number on every game, and the only thing the board sorts on. ${SCORE_BET_MIN} or higher is green and means bet. ${SCORE_WATCH_MIN} to ${SCORE_BET_MIN - 1} is amber and means watch. Under ${SCORE_WATCH_MIN} is red and means pass. It is built from the gap, Hard Rock’s price, and whatever is flagged on the game.`,
+      body: `The 0–100 number on every game, and the only thing the board sorts on. ${SCORE_BET_MIN} or higher is green and means bet. ${SCORE_WATCH_MIN} to ${SCORE_BET_MIN - 1} is amber and means watch. Under ${SCORE_WATCH_MIN} is red and means pass. The number is the gap alone: 50 at no gap, ${SCORE_BET_MIN} at a gap of ${BET_GAP_PTS}. Hard Rock’s price and anything flagged on the game decide whether it is a bet, not the number.`,
     },
     {
       term: "Gap",

@@ -12,11 +12,11 @@ never disagree about a game:
                  (ev >= EV_FLOOR against the exchange-first fair price; no
                  comparable price = blocker no_fair_price, paper only) AND NOT
                  an off-market number AND no QB listed out;
-  * EDGE       = the edge score clears 60 (gap + price bonus, minus the
-                 off-market / QB-out penalties) with one gate failing — the
-                 blocker names it — or a no-model row where Hard Rock's price
-                 alone beats the market's fair price ("price only");
-  * PASS       = everything else.
+  * EDGE       = the score (the GAP ALONE: floor(50 + SCORE_PER_GAP_PT * gap),
+                 so a gap of exactly BET_GAP_PTS is exactly SCORE_BET_MIN) clears
+                 SCORE_WATCH_MIN with one gate failing — the blocker names it;
+  * PASS       = everything else, including every no-model row (a good Hard
+                 Rock price alone is said in the action, never a tier).
 
 Docs: docs/BETTING_POLICY.md ("The board"). Tests: tests/test_card.py.
 """
@@ -45,14 +45,12 @@ from .model.score import (
 
 # lineCheck.ts evVerdictFor: "pos" above this, "neg" below EV_FLOOR, else fair.
 PRICE_EDGE_EV = 0.005
-# edge.ts score constants (the tier boundary + the price/penalty terms).
-# Score scale: 50 + SCORE_PER_GAP_PT per point of gap, so a gap of exactly
-# BET_GAP_PTS lands on SCORE_BET_MIN (web/lib/edge.ts mirrors this).
+# edge.ts score constants. The score is the gap alone: floor(50 + SCORE_PER_GAP_PT
+# per point of gap), so a gap of exactly BET_GAP_PTS lands on SCORE_BET_MIN
+# (web/lib/edge.ts mirrors this; tests/test_gate_parity.py guards the text).
+# Price, an off-market number and a QB out are blockers, never score terms.
 SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS
 EDGE_SCORE_MIN = SCORE_WATCH_MIN
-PRICE_BONUS_CAP = 8
-OFF_MARKET_PENALTY = 10
-QB_OUT_PENALTY = 5
 # Hard Rock's average hold on the slate must be at least this much worse than
 # the other books' before the card says so (3 cents per dollar).
 HOLD_NOTE_CENTS = 0.03
@@ -211,6 +209,13 @@ def round2(x: float) -> float:
 def fmt(n: Optional[float], dp: int = 1) -> str:
     """Fixed-decimal number, '—' for None (format.ts fmt)."""
     return "—" if n is None else f"{n:.{dp}f}"
+
+
+def gap_score(gap: Optional[float]) -> int:
+    """The 0-100 score for a model row: the gap alone, floored, clamped
+    (edge.ts). A gap of exactly BET_GAP_PTS is exactly SCORE_BET_MIN; a gap of
+    None (no line anywhere) sits at 50."""
+    return max(0, min(100, math.floor(50 + SCORE_PER_GAP_PT * (gap or 0))))
 
 
 def american(p: int) -> str:
@@ -604,20 +609,9 @@ def build_item(
     k_price = break_even_price(fair_under) if fair_under is not None else None
 
     # --- tier + blocker (edge.ts) -------------------------------------------
-    price_bonus = (
-        max(-PRICE_BONUS_CAP, min(PRICE_BONUS_CAP, round(ev * 100)))
-        if hr_price is not None and ev is not None
-        else 0
-    )
-    score = 0
-    if has_model:
-        score = max(0, min(100, round(50 + SCORE_PER_GAP_PT * (gap or 0))))
-        score += price_bonus
-        if off_market:
-            score -= OFF_MARKET_PENALTY
-        if qb_out:
-            score -= QB_OUT_PENALTY
-        score = max(0, min(100, score))
+    # Gap only, floored (edge.ts). The site gives no-model rows a context-only
+    # score under the amber band; the card never needs it, so 0 here.
+    score = gap_score(gap) if has_model else 0
 
     # A BET needs a JUDGEABLE price: ev None (no book or exchange priced at
     # Hard Rock's number, or Hard Rock unpriced) is paper only (verdict.ts).
@@ -665,8 +659,6 @@ def build_item(
             blocker = "qb_out"
         else:
             blocker = "gap"
-    elif not has_model and price_pos:
-        tier, blocker = "EDGE", "no_model"
     else:
         tier = "PASS"
 
@@ -678,8 +670,8 @@ def build_item(
         action = f"Bet one unit: first-half under {fmt(hr_line)}{at} on Hard Rock."
     elif not has_model:
         action = (
-            f"Watch: Hard Rock pays about {fmt((ev or 0) * 100)}% more than the market on this "
-            "under. No model number behind it."
+            f"Pass: no model number yet. Hard Rock pays about {fmt((ev or 0) * 100)}% more than "
+            "the market on this under, but a price alone is not a bet."
             if price_pos
             else "Pass: no model number yet, and Hard Rock’s price is no better than the market."
         )
@@ -721,7 +713,14 @@ def build_item(
             )
     elif blocker == "qb_out":
         action = "Starting QB out — recheck. Our number does not know about it."
+    elif tier == "EDGE":
+        # blocker "gap": the amber band — a model row short of the bar.
+        action = (
+            f"Not yet — the line is {fmt(gap or 0)} above our number. It becomes a bet at "
+            f"{fmt(k_line)} or higher."
+        )
     else:
+        # PASS on a model row: the line is short of the bar, or below our number.
         g = gap or 0
         action = (
             f"Pass: the line is {fmt(g)} above our number. It needs {fmt(k_line)} or higher."

@@ -15,7 +15,6 @@ import { evVerdictFor } from "./lineCheck";
 const base: EdgeInput = {
   away: "Ohio State",
   home: "Michigan",
-  derived: false,
   underScore: 56,
   bvLine: 21.8,
   liveLine: 24.5,
@@ -45,7 +44,6 @@ const base: EdgeInput = {
 
 const noModel: EdgeInput = {
   ...base,
-  derived: true,
   underScore: null,
   bvLine: null,
   gap: null,
@@ -99,9 +97,9 @@ describe("breakEvenPrice", () => {
 });
 
 describe("edgeScore — model rows", () => {
-  it("BET: score >= 60, tier BET, no blocker, bet-now action at Hard Rock's number and price", () => {
+  it("BET: score >= 70, tier BET, no blocker, bet-now action at Hard Rock's number and price", () => {
     const e = edgeScore(base);
-    expect(e.score).toBe(82); // 50 + 27 + round(1.2)
+    expect(e.score).toBe(80); // floor(50 + 2.7 * 20/1.75)
     expect(e.tier).toBe("BET");
     expect(e.blocker).toBeNull();
     expect(e.action).toBe(
@@ -123,7 +121,7 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    expect(e.score).toBe(81);
+    expect(e.score).toBe(80);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
@@ -132,7 +130,10 @@ describe("edgeScore — model rows", () => {
     expect(e.kill.price).toBeNull();
     expect(e.kill.text).toBe("No longer a bet below u24.0.");
   });
-  it("falls back to the derived line when nothing live is posted", () => {
+  it("a model row whose only line is our reference line is still a model row (Sunday to Tuesday)", () => {
+    // No Hard Rock line, no market line: the gap is measured against the
+    // reference line baked in at scoring, and the row is scored — not treated
+    // as a no-model row — because it carries a score and our number.
     const e = edgeScore({
       ...base,
       hrLine: null,
@@ -146,10 +147,16 @@ describe("edgeScore — model rows", () => {
       fallbackLine: 23.8,
       gap: 2.0,
     });
-    expect(e.score).toBe(73);
+    expect(e.lineBasis).toBe("reference");
+    expect(e.gap).toBe(2);
+    expect(e.score).toBe(72); // floor(50 + 2.0 * 20/1.75)
+    expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
+    expect(e.action).toBe(
+      "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher.",
+    );
   });
-  it("off-market Hard Rock → EDGE / off_market with the −10 penalty and a wait-for line", () => {
+  it("off-market Hard Rock → EDGE / off_market (the score is untouched) and a wait-for line", () => {
     const e = edgeScore({
       ...base,
       liveLine: 26,
@@ -161,8 +168,8 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    // hrGap 2.2 → 72, minus 10 off-market
-    expect(e.score).toBe(65);
+    // hrGap 2.2 → 75; off-market is a blocker, not a score term
+    expect(e.score).toBe(75);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("off_market");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -173,7 +180,7 @@ describe("edgeScore — model rows", () => {
   it("Hard Rock within half a point of the market is not off-market", () => {
     const e = edgeScore({ ...base, liveLine: 25, marketLine: 25, gap: 3.2 });
     expect(e.tier).toBe("BET");
-    expect(e.score).toBe(82);
+    expect(e.score).toBe(80);
   });
   it("price too high → EDGE / price with a computed break-even", () => {
     const ev = evUnder(0.52, -125); // ≈ -0.064, below the -0.05 floor
@@ -184,7 +191,7 @@ describe("edgeScore — model rows", () => {
       ev,
       evVerdict: evVerdictFor(ev),
     });
-    expect(e.score).toBe(75); // 77 + clamp(round(-6.4)) = 77 - 6
+    expect(e.score).toBe(80); // the price blocks the bet; it does not move the score
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("price");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -207,11 +214,35 @@ describe("edgeScore — model rows", () => {
     );
     expect(e.kill.price).toBeNull();
   });
-  it("price bonus is clamped to ±8", () => {
+  it("Hard Rock's price never moves the score, only the tier", () => {
     const hi = edgeScore({ ...base, ev: 0.2, evVerdict: "pos" });
-    expect(hi.score).toBe(89); // 77 + 8
+    expect(hi.score).toBe(80);
+    expect(hi.tier).toBe("BET");
     const lo = edgeScore({ ...base, ev: -0.2, evVerdict: "neg" });
-    expect(lo.score).toBe(73); // 77 - 8
+    expect(lo.score).toBe(80);
+    expect(lo.tier).toBe("EDGE");
+    expect(lo.blocker).toBe("price");
+  });
+  it("gap 1.75 scores exactly 70 (green) and 1.74 floors to 69 (amber)", () => {
+    const at = (hrLine: number) =>
+      edgeScore({
+        ...base,
+        bvLine: 22,
+        hrLine,
+        liveLine: hrLine,
+        marketLine: hrLine,
+        bestLine: hrLine,
+        gap: hrLine - 22,
+      });
+    const bar = at(23.75);
+    expect(bar.gap).toBe(1.75);
+    expect(bar.score).toBe(70);
+    expect(bar.tier).toBe("BET");
+    const short = at(23.74);
+    expect(short.gap).toBe(1.74);
+    expect(short.score).toBe(69);
+    expect(short.tier).toBe("EDGE");
+    expect(short.blocker).toBe("gap");
   });
   it("no comparable price (ev null) → EDGE / no_fair_price, paper-only action", () => {
     // Hard Rock alone at its number: gap 2.7 clears, nothing prices 24.5.
@@ -221,7 +252,7 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    expect(e.score).toBe(81); // no price bonus without an ev
+    expect(e.score).toBe(80);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_fair_price");
     expect(e.verdict.verdict).toBe("WATCH");
@@ -265,7 +296,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(off.blocker).toBe("off_market");
   });
-  it("QB out → EDGE / qb_out (−5) when the gap is short of the bar", () => {
+  it("QB out → EDGE / qb_out when the gap is short of the bar", () => {
     // A judgeable fair price (ev 0) so the QB gate, not no_fair_price, is named.
     const e = edgeScore({
       ...base,
@@ -279,14 +310,14 @@ describe("edgeScore — model rows", () => {
       qbOut: true,
       qbOutDetail: "QB1 (knee) out",
     });
-    expect(e.score).toBe(62); // 50 + 15 - 5
+    expect(e.score).toBe(67); // floor(50 + 1.5 * 20/1.75); QB out is a blocker, not a score term
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
     expect(e.action).toBe(
       "Starting QB out — recheck. Our number does not know about it.",
     );
   });
-  it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH) and costs 5 points", () => {
+  it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH), score unchanged", () => {
     // Everything else clears: in-band Hard Rock gap, on-market number, good
     // price. The QB news alone turns the BET into a WATCH the site renders as
     // EDGE with the qb_out blocker (gate order: no_hr_line → off_market →
@@ -298,7 +329,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
-    expect(e.score).toBe(77); // 78 - 5
+    expect(e.score).toBe(80);
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.verdict.headline).toBe(
       "Our number clears the bar, but a starting quarterback is listed out and the model does not know it — re-check the number after the news settles.",
@@ -361,11 +392,11 @@ describe("edgeScore — model rows", () => {
       bestLine: 23.3,
       gap: 1.5,
     });
-    expect(e.score).toBe(68);
+    expect(e.score).toBe(67);
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("gap");
     expect(e.action).toBe(
-      "Pass: the line is 1.5 above our number. It needs 24.0 or higher.",
+      "Not yet — the line is 1.5 above our number. It becomes a bet at 24.0 or higher.",
     );
   });
   it("small gap → Watch (amber band) with blocker gap; a tiny gap → PASS", () => {
@@ -399,7 +430,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("gap");
     expect(e.kill.line).toBe(24);
     expect(e.action).toBe(
-      "Pass: the line is 0.7 above our number. It needs 24.0 or higher.",
+      "Not yet — the line is 0.7 above our number. It becomes a bet at 24.0 or higher.",
     );
   });
   it("line below our number reads as an over lean", () => {
@@ -463,7 +494,7 @@ describe("edgeScore — model rows", () => {
   it("uses Hard Rock's number as the gap basis even when the market differs", () => {
     // market 25.0 vs HR 24.5: HR gap 2.7 (not 3.2) drives the score
     const e = edgeScore({ ...base, liveLine: 25, marketLine: 25, gap: 3.2 });
-    expect(e.score).toBe(82);
+    expect(e.score).toBe(80);
   });
 });
 
@@ -559,7 +590,7 @@ describe("edgeScore — no model read", () => {
     expect(dome.score).toBe(33);
     expect(dome.score).toBeLessThan(windy.score);
   });
-  it("Hard Rock price beats fair → EDGE / gap, price-only action, at most 55", () => {
+  it("Hard Rock price beats fair → still PASS; the action says the price is not a bet", () => {
     const e = edgeScore({
       ...noModel,
       hrLine: 24.5,
@@ -568,18 +599,18 @@ describe("edgeScore — no model read", () => {
       evVerdict: "pos",
       marketFairUnder: 0.5,
     });
-    expect(e.score).toBe(43); // 40 + 3
-    expect(e.tier).toBe("EDGE");
-    expect(e.blocker).toBe("gap");
-    expect(e.verdict.priceEdgeOnly).toBe(true);
+    expect(e.score).toBe(40); // context only; the price adds nothing
+    expect(e.tier).toBe("PASS");
+    expect(e.blocker).toBeNull();
+    expect(e.verdict.priceEdgeOnly).toBe(true); // verdict.ts is untouched; nothing renders it
     expect(e.action).toBe(
-      "Watch: Hard Rock pays about 3.0% more than the market on this under. No model number behind it.",
+      "Pass: no model number yet. Hard Rock pays about 3.0% more than the market on this under, but a price alone is not a bet.",
     );
     expect(e.kill.line).toBeNull();
     expect(e.kill.price).toBe(-110); // fair 0.5: standard juice is the floor
     expect(e.kill.text).toBe("No longer a bet at a worse price than -110.");
   });
-  it("price edge on top of a strong context caps at 55", () => {
+  it("price edge on top of a strong context still tops out at the context cap (49)", () => {
     const e = edgeScore({
       ...noModel,
       hrLine: 24.5,
@@ -595,8 +626,8 @@ describe("edgeScore — no model read", () => {
         fhPrior: 14,
       },
     });
-    expect(e.score).toBe(55);
-    expect(e.tier).toBe("EDGE");
-    expect(e.blocker).toBe("gap");
+    expect(e.score).toBe(49);
+    expect(e.tier).toBe("PASS");
+    expect(e.blocker).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ import {
   kickoffET,
   lineState,
   matchesFilters,
+  settledAgainst,
   NO_FILTERS,
   parseFilters,
   sortGames,
@@ -68,6 +69,7 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     basisBooks: [],
     earlySeason: false,
     settled: null,
+    settledLine: null,
     priceLine: "",
     capRank: null,
     overCap: false,
@@ -439,18 +441,32 @@ describe("assignCapRanks", () => {
 describe("lineState", () => {
   it("has a model whenever the row carries a score and our number, whatever line it was scored on", () => {
     const r = row({ factors: { line_kind: "derived_fg" }, curLine: 24.5 });
-    expect(lineState(r, null)).toEqual({ hasModel: true, derived: false });
-  });
-
-  it("is derived only when neither Hard Rock nor the market has posted a first-half line", () => {
-    const r = row({ curLine: null });
-    expect(lineState(r, null).derived).toBe(true);
-    expect(lineState(r, { hrLine: 24.5 }).derived).toBe(false);
-    expect(lineState(row({ curLine: 24 }), null).derived).toBe(false);
+    expect(lineState(r)).toEqual({ hasModel: true });
+    // No Hard Rock line and no market line (reference line only) is still a model row.
+    expect(lineState(row({ curLine: null }))).toEqual({ hasModel: true });
   });
 
   it("has no model without a score or our number", () => {
-    expect(lineState(row({ underScore: null }), null).hasModel).toBe(false);
-    expect(lineState(row({ bvLine: null }), null).hasModel).toBe(false);
+    expect(lineState(row({ underScore: null })).hasModel).toBe(false);
+    expect(lineState(row({ bvLine: null })).hasModel).toBe(false);
+  });
+});
+
+// --- settledAgainst -----------------------------------------------------------
+
+describe("settledAgainst", () => {
+  it("grades against Hard Rock's line or the market line", () => {
+    expect(settledAgainst("hardrock", 21, 24.5)).toBe("won");
+    expect(settledAgainst("market", 28, 24.5)).toBe("lost");
+    expect(settledAgainst("hardrock", 24, 24)).toBe("push");
+  });
+
+  it("played game with a reference basis only → settled null (nothing to grade)", () => {
+    expect(settledAgainst("reference", 21, 24.5)).toBeNull();
+    expect(settledAgainst(null, 21, 24.5)).toBeNull();
+  });
+
+  it("is null until the game is played", () => {
+    expect(settledAgainst("hardrock", null, 24.5)).toBeNull();
   });
 });

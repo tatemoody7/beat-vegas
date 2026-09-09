@@ -221,25 +221,34 @@ export function strongestRed(
   return reds[0].sentence.trim();
 }
 
-/** Which number the gap is measured against. */
 /**
- * Pure. Whether a row has a model number, and whether the ONLY line it can be
- * measured against is our reference line (no Hard Rock line, no market line).
- * Decided from the live lines at request time, not from the line_kind baked in
- * at scoring: a game scored off the full-game total on Sunday unlocks the
- * moment a book posts a first-half total.
+ * Pure. Whether a row has a model number: a score and our number, whatever
+ * line it was scored against. The ONE meaning of "has a model" on the site
+ * (edge.ts / verdict.ts / card.py agree) — which line the gap is measured
+ * against is a separate question (`GapBasis`), decided from the live lines at
+ * request time.
  */
-export function lineState(
-  row: Pick<BoardRow, "underScore" | "bvLine" | "curLine">,
-  check: { hrLine: number | null } | null,
-): { hasModel: boolean; derived: boolean } {
-  return {
-    hasModel: row.underScore !== null && row.bvLine !== null,
-    derived: (check?.hrLine ?? null) === null && row.curLine === null,
-  };
+export function lineState(row: Pick<BoardRow, "underScore" | "bvLine">): {
+  hasModel: boolean;
+} {
+  return { hasModel: row.underScore !== null && row.bvLine !== null };
 }
 
 export type GapBasis = LineBasis;
+
+/**
+ * Pure. How the first-half under settled, graded ONLY against a real book line
+ * (Hard Rock's, else the market's). A game whose only line was our reference
+ * number has nothing to grade: null, so the card stays neutral once played.
+ */
+export function settledAgainst(
+  basis: GapBasis | null,
+  actualFirstHalf: number | null,
+  line: number | null,
+): Settled | null {
+  if (basis !== "hardrock" && basis !== "market") return null;
+  return settledOf(actualFirstHalf, line);
+}
 
 /** Early season: a team on this row has fewer than 2 prior games this season. */
 export function earlySeasonFrom(f: Factors): boolean {
@@ -306,8 +315,11 @@ export type HomeGame = {
   basisBooks: string[];
   /** A team on this row has played fewer than 2 games this season. */
   earlySeason: boolean;
-  /** How the first-half under settled at the basis line; null until played. */
+  /** How the first-half under settled at a REAL book line (Hard Rock, else the
+   *  market); null until played, and null when no book ever posted one. */
   settled: Settled | null;
+  /** The line `settled` was graded against; null whenever `settled` is null. */
+  settledLine: number | null;
   /** One sentence on Hard Rock's price vs the market's no-vig fair price. */
   priceLine: string;
   /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
@@ -321,7 +333,7 @@ export type HomeBoard = {
   week: number | null;
   /** Weeks that have games on the board (for the week selector). */
   weeks: number[];
-  /** Every row is a derived reference line — the model has no read this week. */
+  /** No row carries a model number — the week has not been scored yet. */
   noModel: boolean;
   /** No book has posted a first-half line for any game on the week. */
   noHrLine: boolean;
@@ -422,8 +434,7 @@ export async function getHomeBoard(
     getMovements(rows.map((r) => r.gameId)),
   ]);
   const checkById = new Map(checks.map((c) => [c.gameId, c]));
-  const noModel =
-    rows.length > 0 && rows.every((r) => !lineState(r, null).hasModel);
+  const noModel = rows.length > 0 && rows.every((r) => !lineState(r).hasModel);
 
   // Only real-money FIRST-HALF picks count toward the record, the bankroll and
   // the weekly cap (full game is context, paper is tracked apart).
@@ -434,11 +445,10 @@ export async function getHomeBoard(
   const games: HomeGame[] = rows.map((row) => {
     const check = checkById.get(row.gameId) ?? null;
     const fallbackLine = row.factors.line ?? null;
-    const state = lineState(row, check);
+    const state = lineState(row);
     const input: EdgeInput = {
       away: row.away,
       home: row.home,
-      derived: state.derived,
       underScore: row.underScore,
       bvLine: row.bvLine,
       liveLine: row.curLine,
@@ -473,6 +483,7 @@ export async function getHomeBoard(
             : null;
     const hasModel = state.hasModel;
     const start = asDate(row.startDate);
+    const settled = settledAgainst(gapBasis, row.firstHalfTotal, basisLine);
     return {
       row,
       check,
@@ -491,7 +502,8 @@ export async function getHomeBoard(
       gapBasis: hasModel ? gapBasis : null,
       basisBooks: basisBooksFrom(check),
       earlySeason: earlySeasonFrom(row.factors),
-      settled: settledOf(row.firstHalfTotal, basisLine),
+      settled,
+      settledLine: settled === null ? null : basisLine,
       priceLine: priceSentence(input),
       capRank: null,
       overCap: false,

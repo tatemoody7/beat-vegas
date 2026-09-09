@@ -21,6 +21,7 @@ from beatvegas.card import (
     break_even_price,
     build_card,
     fair_price_window,
+    gap_score,
     hold_note,
     kill_line,
     market_read,
@@ -141,25 +142,46 @@ def test_edge_qb_out_blocks_the_bet_and_flags_it():
     assert any(w.startswith("QB OUT") and "Smith" in w for w in it["why"])
 
 
-def test_edge_gap_blocker_when_the_score_clears_60_short_of_the_bar():
+def test_edge_gap_blocker_when_the_score_clears_55_short_of_the_bar():
     snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
-    it = only(card([game()], snaps, [model(1, 23.2)]))  # gap 1.3 -> score 63
+    it = only(card([game()], snaps, [model(1, 23.2)]))  # gap 1.3 -> score 64
     assert it["tier"] == "EDGE" and it["blocker"] == "gap"
-    assert it["gap"] == 1.3 and it["kill_line"] == 25.0
-    assert it["action"] == ("Pass: the line is 1.3 above our number. It needs 25.0 or higher.")
+    assert it["gap"] == 1.3 and it["kill_line"] == 25.0 and gap_score(1.3) == 64
+    assert it["action"] == (
+        "Not yet — the line is 1.3 above our number. It becomes a bet at 25.0 or higher."
+    )
 
 
-def test_no_model_price_only_edge():
+def test_score_is_the_gap_alone_and_floors_at_the_bar():
+    """gap 1.75 -> exactly 70 (the bar, green); gap 1.74 -> 69 (floor, amber).
+    (20/1.75) * 1.75 may carry float noise above 20; floor still lands on 70."""
+    assert gap_score(1.75) == 70 and gap_score(1.74) == 69
+    assert gap_score(0.44) == 55 and gap_score(0.43) == 54  # the amber cut
+    assert gap_score(None) == 50 and gap_score(8.2) == 100 and gap_score(-7.3) == 0
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    bar = only(card([game()], snaps, [model(1, 22.75)]))
+    assert bar["gap"] == 1.75 and bar["tier"] == "BET"
+    short = only(card([game()], snaps, [model(1, 22.76)]))
+    assert short["gap"] == 1.74 and short["tier"] == "EDGE" and short["blocker"] == "gap"
+    # Neither a price nor a QB out moves the number — they only block: the same
+    # 1.75 gap stays in the green band and turns EDGE with the gate named.
+    priced = [snap(1, "hardrockbet", 24.5, -110, -125)] + market(1, 24.5)
+    assert only(card([game()], priced, [model(1, 22.75)]))["blocker"] == "price"
+    prev = [{"game_id": 1, "qb_out": True}]
+    assert only(card([game()], snaps, [model(1, 22.75)], prev))["blocker"] == "qb_out"
+
+
+def test_no_model_price_only_is_a_pass():
     snaps = [snap(1, "hardrockbet", 24.5, -115, 105)] + market(1, 24.5)
     c = card([game()], snaps)
     it = only(c)
-    assert it["tier"] == "EDGE" and it["blocker"] == "no_model"
+    assert it["tier"] == "PASS" and it["blocker"] is None
     assert it["bv_line"] is None and it["gap"] is None and it["kill_line"] is None
     assert it["gap_basis"] is None
     assert it["ev"] == pytest.approx(0.0696, abs=1e-3)
     assert it["action"] == (
-        "Watch: Hard Rock pays about 7.0% more than the market on this under. "
-        "No model number behind it."
+        "Pass: no model number yet. Hard Rock pays about 7.0% more than the market on this "
+        "under, but a price alone is not a bet."
     )
     assert c["model_read"] is False
     assert c["notes"][0].startswith("No model number this week")
@@ -470,8 +492,8 @@ def test_items_sort_bet_then_edge_by_gap_then_pass_by_gap_then_ev():
     snaps += market(4, 25.0)
     # 5: PASS with a positive price (ev > 0) -> ahead of PASS #1
     snaps += [snap(5, "hardrockbet", 24.5, -120, 100)] + market(5, 24.5)
-    # gap -0.3 -> score 47 (+7 price bonus on #5 = 54), under the 55 watch cut,
-    # so 1 and 5 stay PASS
+    # gap -0.3 -> score 46 on both (the price never moves the score), under the
+    # 55 watch cut, so 1 and 5 stay PASS
     preds = [model(1, 24.8), model(2, 22.4), model(3, 22.4), model(4, 22.4), model(5, 24.8)]
     c = card(games, snaps, preds)
     order = [(it["game_id"], it["tier"]) for it in c["items"]]
@@ -601,9 +623,9 @@ def test_price_blocked_edge_qualifies_with_blocker_price():
 
 
 def test_off_market_with_qb_out_still_qualifies_with_blocker_off_market():
-    """gap 2.0 at Hard Rock but 1.0 under the market: score 73-10 = 63; with a
-    QB out too it drops to 58 -> still the amber band (EDGE, blocker off_market
-    first in gate order). It qualifies and the paper ledger tags off_market."""
+    """gap 2.0 at Hard Rock but 1.0 under the market: score 72 (off-market and
+    QB out block, they do not move the score) -> EDGE, blocker off_market first
+    in gate order. It qualifies and the paper ledger tags off_market."""
     snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
     it = only(card([game()], snaps, [model(1, 22.0)], prev))

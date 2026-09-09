@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { bookLabel } from "@/lib/books";
+import { WATCH_GAP_MIN } from "@/lib/edge";
 import { american, fmt, signed } from "@/lib/format";
 import { SETTLED_WORD } from "@/lib/grade";
 import { strongestRed, type HomeGame } from "@/lib/homeBoard";
@@ -19,7 +20,6 @@ import {
   WEEKLY_BET_CAP,
   CONFIDENCE_LABEL,
   STRONG_GAP_PTS,
-  WATCH_GAP_PTS,
 } from "@/lib/verdict";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
@@ -30,13 +30,16 @@ import ScoreBadge from "@/app/components/ScoreBadge";
 // behind it — Lines, Our number, What is behind it, Injuries and news. The
 // score carries the grade colour (lib/grade.ts); cyan stays chrome.
 
+// The rungs match the score bands (lib/grade.ts): 1.75+ is green, WATCH_GAP_MIN
+// (≈0.44) to 1.75 is amber, anything less is red.
 function bandLabel(gap: number | null): string {
   if (gap === null) return "nothing to measure it against";
   if (gap >= STRONG_GAP_PTS)
     return `${STRONG_GAP_PTS}+ — the biggest gaps of a season`;
   if (gap >= BET_GAP_PTS) return `${BET_GAP_PTS}+ — the band we bet`;
-  if (gap >= WATCH_GAP_PTS) return `a small lean, under the ${BET_GAP_PTS} bar`;
-  if (gap > 0) return "the line sits about on our number";
+  if (gap >= WATCH_GAP_MIN)
+    return `worth watching, under the ${BET_GAP_PTS} bar`;
+  if (gap > 0) return "about on our number";
   return "the line is below our number, so this leans over";
 }
 
@@ -539,10 +542,16 @@ export default function GameCard({
           killPrice: edge.kill.price,
         })
       : null;
+  // Once played: the result at the line it was GRADED against (a real book
+  // line — homeBoard.settledAgainst), or a neutral final when no book ever
+  // posted one, so a reference-only game is never coloured won or lost.
+  const played = row.firstHalfTotal !== null;
   const resultLine =
-    g.settled !== null && row.firstHalfTotal !== null
-      ? `${SETTLED_WORD[g.settled][0].toUpperCase()}${SETTLED_WORD[g.settled].slice(1)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(check?.hrLine ?? line)}`
-      : null;
+    played && g.settled !== null
+      ? `${SETTLED_WORD[g.settled][0].toUpperCase()}${SETTLED_WORD[g.settled].slice(1)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(g.settledLine)}`
+      : played
+        ? `Final · first half ${fmt(row.firstHalfTotal, 0)}. No first-half line was posted, so nothing to grade.`
+        : null;
 
   return (
     <div
@@ -613,7 +622,9 @@ export default function GameCard({
             </span>
           )}
         </span>
-        <span className="mt-2 block text-sm text-[var(--text)]">
+        <span
+          className={`mt-2 block text-sm ${played && g.settled === null ? "text-[var(--text-dim)]" : "text-[var(--text)]"}`}
+        >
           {resultLine ?? edge.action}
         </span>
       </button>

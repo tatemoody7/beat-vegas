@@ -5,7 +5,10 @@
 // The score is a RANKING aid layered on lib/verdict.ts — it never overrides
 // the verdict. Tier BET is exactly verdict BET (docs/BETTING_POLICY.md); the
 // score only decides EDGE vs PASS for the rest, and `blocker` names the first
-// policy gate that keeps an EDGE from being a BET. Pure — no DB — so it is
+// policy gate that keeps an EDGE from being a BET. The score is the GAP ALONE
+// (50 + SCORE_PER_GAP_PT per point, floored): Hard Rock's price, an off-market
+// number and a QB listed out decide whether a game is a bet — they are
+// blockers with tags — but never move the number. Pure — no DB — so it is
 // unit-tested and easy to tune.
 
 import { evUnder } from "@/lib/devig";
@@ -76,12 +79,10 @@ export const FAIR_EV_FLOOR = EV_FLOOR; // single source: verdict.ts
 export const SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS;
 /** The EDGE ("watch") tier starts where the amber band starts. */
 export const EDGE_SCORE_MIN = SCORE_WATCH_MIN;
+/** The smallest gap that scores into the amber band (≈0.44 pts). */
+export const WATCH_GAP_MIN = (SCORE_WATCH_MIN - 50) / SCORE_PER_GAP_PT;
 export const CONTEXT_BASE = 40;
 export const CONTEXT_CAP = 49;
-export const PRICE_ONLY_CAP = 55;
-const PRICE_BONUS_CAP = 8;
-const OFF_MARKET_PENALTY = 10;
-const QB_OUT_PENALTY = 5;
 
 const clamp = (n: number, lo: number, hi: number): number =>
   Math.min(hi, Math.max(lo, n));
@@ -153,7 +154,7 @@ function killText(line: number | null, price: number | null): string {
 
 export function edgeScore(i: EdgeInput): EdgeResult {
   const verdict = verdictFor(i);
-  const hasModel = !i.derived && i.underScore !== null && i.bvLine !== null;
+  const hasModel = i.underScore !== null && i.bvLine !== null;
   const bvLine = hasModel ? i.bvLine! : null;
 
   const offMarket =
@@ -162,10 +163,6 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     i.marketLine - i.hrLine > HR_OFF_MARKET_PTS;
   const pricePos = i.evVerdict === "pos";
   const priceNeg = i.evVerdict === "neg";
-  const priceBonus =
-    i.hrUnderPrice !== null && i.ev !== null
-      ? clamp(Math.round(i.ev * 100), -PRICE_BONUS_CAP, PRICE_BONUS_CAP)
-      : 0;
 
   // Gap basis: the number you can bet, else the market, else the reference.
   const basis = i.hrLine ?? i.marketLine ?? i.fallbackLine;
@@ -189,26 +186,19 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   };
 
   // --- Score --------------------------------------------------------------
-  let score: number;
-  if (hasModel) {
-    score = clamp(Math.round(50 + SCORE_PER_GAP_PT * (gap ?? 0)), 0, 100);
-    score += priceBonus;
-    if (offMarket) score -= OFF_MARKET_PENALTY;
-    if (i.qbOut) score -= QB_OUT_PENALTY;
-    score = clamp(score, 0, 100);
-  } else {
-    score = contextScore(i.context);
-    if (pricePos) {
-      score = Math.min(PRICE_ONLY_CAP, score + Math.max(1, priceBonus));
-    }
-  }
+  // Gap only, floored: a gap of exactly BET_GAP_PTS is exactly SCORE_BET_MIN,
+  // so green always means the gap rule passed. No-model rows score on context
+  // alone and stay under the amber band (CONTEXT_CAP < SCORE_WATCH_MIN).
+  const score = hasModel
+    ? clamp(Math.floor(50 + SCORE_PER_GAP_PT * (gap ?? 0)), 0, 100)
+    : contextScore(i.context);
 
   // --- Tier + blocker -------------------------------------------------------
   let tier: EdgeTier;
   let blocker: EdgeBlocker | null = null;
   if (verdict.verdict === "BET") {
     tier = "BET";
-  } else if (score >= EDGE_SCORE_MIN || (!hasModel && pricePos)) {
+  } else if (score >= EDGE_SCORE_MIN) {
     tier = "EDGE";
     // Gate order (mirrors beatvegas/card.py): no_hr_line, off_market and price
     // are market reads on Hard Rock's number; no_fair_price is the price
@@ -234,7 +224,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     action = `Bet one unit: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (!hasModel) {
     action = pricePos
-      ? `Watch: Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under. No model number behind it.`
+      ? `Pass: no model number yet. Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under, but a price alone is not a bet.`
       : "Pass: no model number yet, and Hard Rock’s price is no better than the market.";
   } else if (blocker === "no_hr_line" || basis === null) {
     if (basis === null) {
@@ -261,8 +251,11 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     }
   } else if (blocker === "qb_out") {
     action = "Starting QB out — recheck. Our number does not know about it.";
+  } else if (tier === "EDGE") {
+    // blocker "gap": the amber band — a model row short of the bar.
+    action = `Not yet — the line is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
   } else {
-    // blocker "gap" (EDGE) or PASS on a model row: the line is short of the bar.
+    // PASS on a model row: the line is short of the bar, or below our number.
     const g = gap ?? 0;
     action =
       g > 0

@@ -9,12 +9,12 @@ import { BLOCKER_SHORT, labelOf, TIER_TEXT } from "@/lib/labels";
 
 // This week's bet list on the home board. Server component: everything it
 // draws comes out of summarizeCard (pure, tested). The tier chip carries the
-// grade colour (bet green, watch amber, pass grey); nothing here has settled.
+// grade colour (bet green, watch amber, pass red); nothing here has settled.
 
 const TIER_CHIP: Record<CardTier, string> = {
   BET: "bv-badge bv-badge--solid bv-badge--good",
   EDGE: "bv-badge bv-badge--warn",
-  PASS: "bv-badge bv-badge--push",
+  PASS: "bv-badge bv-badge--bad",
 };
 
 const MAX_NOTES = 5;
@@ -85,7 +85,7 @@ export default function CardPanel({
           {`This week’s bets`}
         </h2>
         <p className="mt-1 text-sm text-[var(--text-dim)]">
-          {`A preview builds Friday evening; the final card lands Saturday between 8:05 and 8:45am ET off a fresh sweep of Hard Rock’s first-half lines.`}
+          {`The card builds every morning Tuesday to Saturday around 8:05am ET, and again around 4pm ET on Thursday and Friday, off a fresh sweep of Hard Rock’s first-half lines.`}
         </p>
       </div>
     );

@@ -38,56 +38,59 @@ export default function MovementChart({
   const pad = 0.5;
 
   return (
-    <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={points}
-          margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
-        >
-          <CartesianGrid stroke="#1b2336" vertical={false} />
-          <XAxis
-            dataKey="t"
-            tick={{ fill: "#97a3bd", fontSize: 11 }}
-            tickLine={false}
-            axisLine={{ stroke: "#243049" }}
-          />
-          <YAxis
-            domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]}
-            tick={{ fill: "#97a3bd", fontSize: 11 }}
-            tickLine={false}
-            axisLine={{ stroke: "#243049" }}
-            label={{
-              value: "1st-half line",
-              angle: -90,
-              position: "insideLeft",
-              fill: "#97a3bd",
-              fontSize: 11,
-            }}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "#0a0f1e",
-              border: "1px solid #243049",
-              borderRadius: 8,
-              color: "#eef2f9",
-              fontSize: 12,
-            }}
-          />
-          {books.map((b, i) => (
-            <Line
-              key={b}
-              type="monotone"
-              dataKey={b}
-              name={bookLabel(b)}
-              stroke={COLORS[i % COLORS.length]}
-              strokeWidth={2}
-              dot={{ r: 2 }}
-              connectNulls
-              isAnimationActive={false}
+    <div className="flex h-80 w-full flex-col rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
+      {/* The chart takes what the legend below leaves, so neither overflows the box. */}
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={points}
+            margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+          >
+            <CartesianGrid stroke="#1b2336" vertical={false} />
+            <XAxis
+              dataKey="t"
+              tick={{ fill: "#97a3bd", fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: "#243049" }}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]}
+              tick={{ fill: "#97a3bd", fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: "#243049" }}
+              label={{
+                value: "1st-half line",
+                angle: -90,
+                position: "insideLeft",
+                fill: "#97a3bd",
+                fontSize: 11,
+              }}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "#0a0f1e",
+                border: "1px solid #243049",
+                borderRadius: 8,
+                color: "#eef2f9",
+                fontSize: 12,
+              }}
+            />
+            {books.map((b, i) => (
+              <Line
+                key={b}
+                type="monotone"
+                dataKey={b}
+                name={bookLabel(b)}
+                stroke={COLORS[i % COLORS.length]}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
       <div className="mt-2 flex flex-wrap gap-3 px-1 text-xs text-[var(--text-muted)]">
         {books.map((b, i) => (
           <span key={b} className="flex items-center gap-1.5">

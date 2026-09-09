@@ -13,7 +13,7 @@ import {
 } from "@/lib/postmortem";
 import {
   BET_GAP_PTS,
-  EV_FLOOR,
+  EV_FLOOR_PCT,
   MIN_GAMES_FOR_MODEL,
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
@@ -27,8 +27,6 @@ import { BREAKEVEN_PCT } from "@/lib/lineStudy";
 // the page's season selector.
 //
 // Copy rule (spec §23): no `title=` tooltips, no raw enum codes, no repo paths.
-
-const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
 
 // Green/red are OUTCOME colors: signed units only.
 const unitColor = (s: string | undefined | null) =>

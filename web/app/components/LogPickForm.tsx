@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { usd } from "@/lib/format";
-import { REASON_TEXT } from "@/lib/labels";
+import { labelOf, REASON_TEXT, VERDICT_TEXT } from "@/lib/labels";
 import type { PickReason, Verdict } from "@/lib/verdict";
 
 // Everything the board knows at the moment you decide, frozen onto the pick
@@ -26,14 +26,6 @@ export type PickPrefill = {
   gap: number | null;
   ev: number | null;
   hrLine: number | null;
-};
-
-// The amber tier is "Watch" everywhere on screen; "EDGE" is its legacy value.
-const VERDICT_WORD: Record<string, string> = {
-  BET: "Bet",
-  WATCH: "Watch",
-  EDGE: "Watch",
-  PASS: "Pass",
 };
 
 // Real money is first-half unders at one flat unit; the stake is not a field.
@@ -108,7 +100,7 @@ export default function LogPickForm({
   const labelCls =
     "flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]";
   const hintCls = "text-xs text-[var(--text-dim)]";
-  const verdictWord = VERDICT_WORD[prefill.verdict] ?? prefill.verdict;
+  const verdictWord = labelOf(VERDICT_TEXT, prefill.verdict, "Pass");
 
   return (
     <form onSubmit={submit} className="bv-card p-4">

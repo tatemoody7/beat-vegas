@@ -6,7 +6,7 @@ import { bankrollEnv } from "@/lib/homeBoard";
 import { proxyShareText } from "@/lib/proxy";
 import {
   BET_GAP_PTS,
-  EV_FLOOR,
+  EV_FLOOR_PCT,
   MIN_GAMES_FOR_MODEL,
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
@@ -20,7 +20,6 @@ import {
 // which is exactly how the old entry came to claim "2% of vig" when the price
 // floor was 5%.
 
-const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
 // The minimum is 0 today; widen off the literal type so the plural branch
 // below is a real branch rather than a type error.
 const NEED_GAMES: number = MIN_GAMES_FOR_MODEL;

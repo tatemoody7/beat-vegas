@@ -2,25 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { signed } from "@/lib/format";
 import {
   BLOCKER_SHORT,
   labelOf,
+  MARKET_TEXT,
   REASON_TEXT,
   RESULT_COLOR,
   RESULT_PENDING,
   RESULT_TEXT,
+  VERDICT_TEXT,
 } from "@/lib/labels";
 import type { PickFull } from "@/lib/picks";
 import { isOffPolicy } from "@/lib/picks";
-
-// The word frozen onto the pick. "EDGE" is legacy for the amber tier and reads
-// "Watch" like everywhere else on screen.
-const VERDICT_WORD: Record<string, string> = {
-  BET: "Bet",
-  WATCH: "Watch",
-  EDGE: "Watch",
-  PASS: "Pass",
-};
 
 // Every logged pick, with the decision frozen at log time. Nothing here is
 // explained in a `title=` tooltip (a phone never shows one) — the caption under
@@ -31,15 +25,11 @@ const VERDICT_WORD: Record<string, string> = {
 function loggedAs(p: PickFull): string {
   if (!p.verdictAtPick && !p.reason) return "—";
   const parts: (string | null)[] = [
-    p.verdictAtPick
-      ? labelOf(VERDICT_WORD, p.verdictAtPick, p.verdictAtPick)
-      : null,
+    p.verdictAtPick ? labelOf(VERDICT_TEXT, p.verdictAtPick, "Pass") : null,
     p.reason ? REASON_TEXT[p.reason].short : null,
   ];
   if (p.gapAtPick !== null) {
-    parts.push(
-      `${p.gapAtPick > 0 ? "+" : ""}${p.gapAtPick.toFixed(1)} vs our number`,
-    );
+    parts.push(`${signed(p.gapAtPick, 1)} vs our number`);
   }
   if (isOffPolicy(p)) parts.push("real money on a Watch");
   if (p.isPaper && p.blocker && p.blocker !== "none") {
@@ -105,7 +95,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                   {p.home}
                 </td>
                 <td className="text-[var(--text-muted)]">
-                  {p.market === "full" ? "Full game" : "First half"}
+                  {labelOf(MARKET_TEXT, p.market, "First half")}
                   {p.isPaper && (
                     <span className="bv-badge bv-badge--warn ml-1">
                       paper — no money on it

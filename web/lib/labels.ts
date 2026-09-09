@@ -12,7 +12,7 @@ import type { EdgeBlocker, EdgeTier } from "@/lib/edge";
 import type { LineBasis } from "@/lib/edge";
 import type { CardBlocker } from "@/lib/card";
 import type { SlipBlock } from "@/lib/betSlip";
-import type { PickReason } from "@/lib/verdict";
+import type { PickReason, Verdict } from "@/lib/verdict";
 import {
   BET_GAP_PTS,
   MIN_GAMES_FOR_MODEL,
@@ -37,6 +37,19 @@ export const TIER_TEXT: Record<EdgeTier, string> = {
   BET: "Bet",
   EDGE: "Watch",
   PASS: "Pass",
+};
+
+/** The verdict frozen onto a logged pick. */
+export const VERDICT_TEXT: Record<Verdict, string> = {
+  BET: "Bet",
+  WATCH: "Watch",
+  PASS: "Pass",
+};
+
+/** manual_picks.market. */
+export const MARKET_TEXT: Record<string, string> = {
+  "1H": "First half",
+  full: "Full game",
 };
 
 export const TIER_SUB: Record<EdgeTier, string> = {

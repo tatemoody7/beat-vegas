@@ -19,20 +19,24 @@ name: Hard Rock 1H line capture
 #                row; it stamps odds_snapshots.last_seen_at (the close time).
 #                Slots with no game in the window skip before checkout (the
 #                free /events call), spending 0 credits and ~0 minutes.
-# The FULL sweeps live in card.yml (one job = sweep then build): the morning
-# card Tue-Sat sweeps the rolling week, the afternoon card Thu/Fri tonight's
-# games. `market=1h` (full refresh) is workflow_dispatch only.
+# The FULL sweeps live in card.yml (one job = sweep then build): four whole-week
+# decision builds, Tue/Thu/Fri ~4:05pm ET and Sat ~8:05am ET.
+# `market=1h` (full refresh) is workflow_dispatch only.
 #
-# CREDIT BUDGET (paid tier; per-event 1H call = totals_h1 x us,us2 = 2 credits;
-# ~60 Hard Rock-priced FBS games/week):
-#   - card.yml morning sweeps (Tue-Sat, whole week, 5 x ~60 x 2) ~= 600/wk (cap 2,000)
-#   - card.yml full-game refresh (5 x 4)                        ~=  20/wk
-#   - closes: ~2.5 polls/game x 60 x 2                          ~= 300/wk (worst 360)
-#   - sunday.yml full-game openers                              ~=   9/wk
-#   (opener sweeps here retired 2026-09-08: -240/wk)
-#   Expected ~930/wk, worst ~2,400/wk against 100K/month. poll_lines.py prints
-#   credits_spent= and calls_404= on every run; --max-credits-per-run 400 is the
-#   runaway guard and --credit-floor 300 the month-end reserve.
+# CREDIT BUDGET (paid tier). A per-event 1H call is 1 CREDIT since 2026-09-09:
+# `bookmakers=` with <= 10 books is billed as ONE region and overrides
+# `regions` (config odds_api.bookmakers_1h), verified live. Basis: 82 Hard
+# Rock-priced FBS games in a 6-day window, measured — the old ~60 in this
+# comment understated the real spend by ~40%.
+#   - card.yml whole-week sweeps (4 builds x ~82 x 1)  ~= 328/wk (cap 150/run)
+#   - card.yml full-game refresh (4 x 4)               ~=  16/wk
+#   - closes: ~2.5 polls/game x 82 x 1                 ~= 205/wk (worst 246)
+#   - sunday.yml full-game openers (3 runs x 6)        ~=  18/wk
+#   Expected ~567/wk (~2,450/mo), worst ~774/wk. Was ~1,308/wk at 2 credits
+#   with five morning builds. poll_lines.py prints credits_spent=, hr_rows= and
+#   calls_404= on every run and WARNS when spend != events polled (the billing
+#   rule regressed) or when a sweep writes no Hard Rock row (the book key
+#   drifted); --credit-floor 300 is the month-end reserve.
 #
 # DST: kickoff windows below are wide enough for EDT and EST (Saturday kickoffs
 # fall in 16:00Z-03:30Z EDT / 17:00Z-04:30Z EST), so no cron edit at the change.

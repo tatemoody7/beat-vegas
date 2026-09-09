@@ -1,8 +1,11 @@
 """The Odds API v4 client for college-football totals (totals_h1 + full-game).
 
-Paid tier = 100K credits/month (2026-09; free tier was 500). totals_h1 costs credits
-per region, so we surface the credit headers on every call. The normalizers turn
-the nested events->bookmakers->markets->outcomes JSON into flat snapshot rows.
+Paid tier = 100K credits/month (2026-09; free tier was 500). A per-event call is
+billed (markets x regions), but `bookmakers=` (up to 10 keys) counts as ONE region
+and takes priority over `regions` — so the 1H sweep names its ten books and pays
+1 credit per event instead of 2 on us,us2 (verified live 2026-09-09). We surface
+the credit headers on every call. The normalizers turn the nested
+events->bookmakers->markets->outcomes JSON into flat snapshot rows.
 
 The bulk full-game pull asks for BOTH featured markets, `totals,spreads`, so each
 (event, book) row carries that book's home-relative spread next to its total
@@ -25,6 +28,11 @@ import requests
 
 from ..config import load_config, odds_api_key
 from ..hardrock import normalize_book
+
+# The Odds API bills every group of 10 named bookmakers as one region, so a
+# per-event call naming <= 10 books costs the same as a single-region call.
+# Naming an 11th quietly doubles it (see OddsAPIClient.__init__).
+MAX_BOOKMAKERS_ONE_REGION = 10
 
 
 @dataclass
@@ -62,8 +70,30 @@ class OddsAPIClient:
         self.regions = cfg.get("regions", "us")
         self.markets = cfg.get("markets", "totals_h1")
         self.odds_format = cfg.get("odds_format", "american")
+        self.bookmakers: List[str] = list(cfg.get("bookmakers_1h") or [])
+        if len(self.bookmakers) > MAX_BOOKMAKERS_ONE_REGION:
+            # Not a warning: an 11th key silently DOUBLES every per-event call
+            # for the rest of the season, and nothing in the output would say so.
+            raise ValueError(
+                f"odds_api.bookmakers_1h has {len(self.bookmakers)} keys; the Odds API "
+                f"bills one region per {MAX_BOOKMAKERS_ONE_REGION} books, so an extra key "
+                "doubles the cost of every per-event 1H call"
+            )
         self.timeout = timeout
         self.last_credits: Optional[Credits] = None
+
+    def _scope_params(self) -> Dict[str, Any]:
+        """The ONE billing dimension for a per-event call.
+
+        `bookmakers` (<= 10 keys) is billed as a single region and takes
+        priority over `regions` in the API, so we send exactly one of the two,
+        never both: sending both still works today but hides a future billing
+        change behind the API's precedence rule. An empty list falls back to
+        region pricing, which is what `poll_lines.py --regions` forces for the
+        A/B probe."""
+        if self.bookmakers:
+            return {"bookmakers": ",".join(self.bookmakers)}
+        return {"regions": self.regions}
 
     def _get(self, url: str, params: Dict[str, Any]) -> requests.Response:
         """`requests.get` with the key redacted no matter how it fails: a
@@ -110,6 +140,11 @@ class OddsAPIClient:
         the per-event 1H calls. Default `totals,spreads` gives each book's
         total AND its home-relative spread in one call.
 
+        REGIONS, NOT BOOKMAKERS: this is the bulk endpoint, billed
+        (markets x regions) for the WHOLE slate, and it needs `us_ex` for the
+        exchange fair price on Sundays. Naming books here would cap the slate
+        at those ten and buy nothing — tests/test_odds_bookmakers.py pins it.
+
         Hard Rock's LIVE book key is `hardrockbet` (the docs' FL-specific
         `hardrockbet_fl` has not appeared in responses; hardrock.py accepts
         both). It lives in the `us2` region only — verified empirically — so
@@ -140,17 +175,19 @@ class OddsAPIClient:
         return resp.json()
 
     def event_first_half_totals(self, event_id: str) -> Dict[str, Any]:
-        """totals_h1 odds for one event. Costs (markets x regions) credits.
+        """totals_h1 odds for one event. Costs (markets x regions) credits —
+        1 when odds_api.bookmakers_1h is set (<= 10 books bill as one region),
+        2 on us,us2 when it is empty.
 
         Additional markets like totals_h1 are ONLY served on this per-event
         endpoint, not the bulk /odds endpoint."""
         url = f"{self.base_url}/sports/{self.sport}/events/{event_id}/odds"
         params = {
             "apiKey": self.api_key,
-            "regions": self.regions,
             "markets": self.markets,
             "oddsFormat": self.odds_format,
             "dateFormat": "iso",
+            **self._scope_params(),
         }
         resp = self._get(url, params)
         if resp.status_code == 404:
@@ -194,11 +231,11 @@ class OddsAPIClient:
         url = f"{self.base_url}/historical/sports/{self.sport}/events/{event_id}/odds"
         params = {
             "apiKey": self.api_key,
-            "regions": self.regions,
             "markets": self.markets,
             "oddsFormat": self.odds_format,
             "dateFormat": "iso",
             "date": date_iso,
+            **self._scope_params(),
         }
         resp = self._get(url, params)
         if resp.status_code == 404:

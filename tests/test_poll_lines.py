@@ -50,17 +50,22 @@ def _payload(ev, line=24.5, over=-110, under=-110, book="hardrockbet"):
 
 class FakeClient:
     """list_events is free (carries the credit headers); each per-event call
-    costs 2 credits (totals_h1 x us,us2)."""
+    costs 1 credit — totals_h1 x the `bookmakers` list, which the Odds API
+    bills as a single region (config odds_api.bookmakers_1h)."""
 
-    cost = 2
+    cost = 1
 
-    def __init__(self, events, payloads, remaining=60000):
+    def __init__(self, events, payloads, remaining=60000, bookmakers=None):
         self.events = events
         self.payloads = payloads
         self.calls = []
         self.used = 100
         self.remaining = remaining
         self.last_credits = None
+        self.regions = "us,us2"
+        self.bookmakers = list(
+            bookmakers if bookmakers is not None else ["hardrockbet", "draftkings"]
+        )
 
     def list_events(self):
         self.last_credits = Credits(self.remaining, self.used, 0)
@@ -162,7 +167,7 @@ def test_default_is_unlimited_events_and_writes_every_hr_line(env, monkeypatch, 
     assert client.calls == ["e1", "e2", "e3"]  # no --max-events cap by default
     assert sorted(sn.game_id for sn in _snaps(eng)) == [1, 2, 3]
     out = capsys.readouterr().out
-    assert "credits_spent=6" in out and "calls_404=0" in out
+    assert "credits_spent=3" in out and "calls_404=0" in out
 
 
 def test_kickoff_within_min_polls_only_imminent_games(env, monkeypatch):
@@ -223,11 +228,11 @@ def test_max_credits_per_run_stops_the_loop_and_warns(env, monkeypatch, capsys):
         "--days-ahead",
         "6",
         "--max-credits-per-run",
-        "4",
+        "2",
     )
     assert client.calls == ["e1", "e2"]
     out = capsys.readouterr().out
-    assert "::warning::" in out and "credits_spent=4" in out
+    assert "::warning::" in out and "credits_spent=2" in out
 
 
 def test_no_odds_yet_is_counted_not_billed_as_a_snapshot(env, monkeypatch, capsys):
@@ -285,7 +290,7 @@ def test_a_clean_sweep_reports_complete_coverage(env, monkeypatch, tmp_path):
         "reason": None,
         "events_in_window": 3,
         "events_polled": 3,
-        "credits_spent": 6,
+        "credits_spent": 3,
         "unpolled_game_ids": [],
     }
 
@@ -304,7 +309,7 @@ def test_a_credit_cap_truncation_names_the_games_it_never_reached(env, monkeypat
         "--days-ahead",
         "6",
         "--max-credits-per-run",
-        "4",
+        "2",
         "--status-file",
         str(out),
     )
@@ -312,15 +317,15 @@ def test_a_credit_cap_truncation_names_the_games_it_never_reached(env, monkeypat
     assert client.calls == ["e1", "e2"]
     assert st["complete"] is False and st["reason"] == "credit_cap"
     assert (st["events_in_window"], st["events_polled"]) == (3, 2)
-    assert st["credits_spent"] == 4
+    assert st["credits_spent"] == 2
     assert st["unpolled_game_ids"] == [3]  # e3 -> game 3, never paid for
 
 
 def test_a_credit_floor_break_mid_loop_is_recorded(env, monkeypatch, tmp_path):
     mod, eng = env
     _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
-    # 62 remaining: after e1 (2 credits) the client is at 60 == the floor.
-    client = FakeClient(EVENTS, PAYLOADS, remaining=62)
+    # 61 remaining: after e1 (1 credit) the client is at 60 == the floor.
+    client = FakeClient(EVENTS, PAYLOADS, remaining=61)
     out = tmp_path / "sweep.json"
     _run(
         mod,

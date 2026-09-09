@@ -114,6 +114,8 @@ def test_poll_lines_fetch_failure_print_lacks_the_key(monkeypatch, capsys):
     class _Client:
         def __init__(self):
             self.last_credits = None
+            self.regions = "us,us2"
+            self.bookmakers = ["hardrockbet"]
 
         def list_events(self):
             self.last_credits = Credits(60000, 100, 0)

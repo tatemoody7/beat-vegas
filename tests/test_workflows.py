@@ -204,7 +204,11 @@ def test_card_yml_installs_before_resolving_the_slot():
         assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
     assert steps[-1]["if"] == "steps.slot.outputs.slot != 'skip'"
     inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
-    assert inputs["slot"]["description"].startswith("morning | afternoon | manual")
+    assert inputs["slot"]["description"].startswith("tue_pm | thu_pm | fri_pm | sat_am | manual")
+    # `force` is what lets a deliberate rebuild past the built-today probe that
+    # now applies to a named dispatch; the resolve step must actually read it.
+    assert "force" in inputs
+    assert (steps[resolve].get("env") or {}).get("INPUT_FORCE")
 
 
 def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():

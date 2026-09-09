@@ -9,28 +9,33 @@ name: Bet card (cloud)
 # the final when GitHub cron dropped it.
 #
 # SLOTS — one source of truth: beatvegas/ci.py::resolve_slot (tests/test_ci_slots.py
-# + tests/test_workflows.py keep this schedule and that table in lock-step):
-#   morning    Tue-Sat 12:05Z / 12:35Z / 13:05Z / 13:35Z — the DECISION build:
-#              gated on the Eastern clock (runs only 7:45-9:15am ET, once per
-#              day), so it lands 8:05-8:45am ET in EDT and EST alike. Forced
-#              fresh sweep of the whole week's Hard Rock games + research
-#              preview, then build; paper-logs games kicking off within 24 h.
-#              The board is one rolling week: each game locks at its own
-#              kickoff, and the morning card is final for every game that kicks
-#              off before the next build.
-#   afternoon  Thu+Fri 20:00Z / 21:00Z (~4pm ET, gated 3:45-5:15pm ET, once per
-#              day): Hard Rock posts weeknight first-half lines during the day,
-#              after the morning build, so this build sweeps only tonight's
-#              kickoffs (within 10 h), rebuilds the card (newest card wins on
-#              the board) and paper-logs those games with a 10 h window —
-#              Saturday's games stay with Saturday's morning build.
-#   manual     workflow_dispatch (input `slot` may name morning | afternoon;
-#              input `max_credits` caps the sweep so a DEGRADED card can be rehearsed).
+# + tests/test_workflows.py keep this schedule and that table in lock-step).
+# FOUR decision builds a week, every one a whole-week sweep and every one final:
+#   tue_pm  Tue ~4:05pm ET   paper window 48 h (-> Thursday's build)
+#   thu_pm  Thu ~4:05pm ET   paper window 24 h (-> Friday's build)
+#   fri_pm  Fri ~4:05pm ET   paper window 16 h (-> Saturday's build)
+#   sat_am  Sat ~8:05am ET   paper window 80 h (-> Tuesday's build; the only
+#                            build covering Sunday and Monday games)
+#   manual  workflow_dispatch with no slot — status `preview`, never a final.
+# The afternoon times track when Hard Rock actually posts first-half lines
+# (23 of this week's games appeared Tuesday afternoon, the bulk of a Saturday
+# slate on Friday afternoon) instead of sweeping every morning for numbers that
+# have not moved. Each paper window is exactly the gap to the next build, so
+# every qualifying game is logged once, by the last build before its kickoff.
+# Each slot has four crons; the ET gate admits the two that land in the window
+# in the current DST regime, so nothing needs editing twice a year.
+#
+# TRIGGERS: a Vercel cron dispatches the slot by name (independent of both this
+# scheduler and Tate's Mac); these crons are the BACKUP. Inputs: `slot` names
+# one of the four, `force` rebuilds one already built today, `max_credits` caps
+# the sweep so a DEGRADED card can be rehearsed.
 # ONCE PER DAY: the resolve step probes the `cards` table (beatvegas.ci
 # slots_built_today) — a card row for today's ET date is a positive fact that
-# the build happened, so the slot's second cron skips. The old `gh run list
-# --status success` check counted a gate-skip run as a success, which from
-# November (EST) blocked the 13:05Z build behind the 12:35Z skip.
+# the build happened, so later crons skip AND so does a second dispatch of the
+# same slot (that is what stops Vercel and GitHub both building; `force=true`
+# overrides). The old `gh run list --status success` check counted a gate-skip
+# run as a success, which from November (EST) blocked the 13:05Z build behind
+# the 12:35Z skip.
 #
 # DEGRADED INPUTS (PR-7): the sweep and the research preview each write a status
 # file ($RUNNER_TEMP), and the build reads both. A sweep that stopped at the
@@ -45,18 +50,36 @@ name: Bet card (cloud)
 
 on:
   schedule:
-    - cron: '5 12 * * 2-6'    # morning (EDT primary)
-    - cron: '35 12 * * 2-6'   # morning (EDT retry)
-    - cron: '5 13 * * 2-6'    # morning (EST primary / EDT last retry)
-    - cron: '35 13 * * 2-6'   # morning (EST retry)
-    - cron: '0 20 * * 4,5'    # afternoon Thu/Fri (EDT primary / EST too early -> gate skip)
-    - cron: '0 21 * * 4,5'    # afternoon Thu/Fri (EST primary / EDT retry)
+    # Four per slot; the ET gate in beatvegas/ci.py admits the two that land
+    # inside the window in the current DST regime. :05/:35 rather than the top
+    # of the hour, where GitHub's scheduler drops the most runs.
+    - cron: '5 20 * * 2'      # tue_pm (EDT primary)
+    - cron: '35 20 * * 2'     # tue_pm (EDT retry)
+    - cron: '5 21 * * 2'      # tue_pm (EST primary / EDT last retry)
+    - cron: '35 21 * * 2'     # tue_pm (EST retry)
+    - cron: '5 20 * * 4'      # thu_pm (EDT primary)
+    - cron: '35 20 * * 4'     # thu_pm (EDT retry)
+    - cron: '5 21 * * 4'      # thu_pm (EST primary / EDT last retry)
+    - cron: '35 21 * * 4'     # thu_pm (EST retry)
+    - cron: '5 20 * * 5'      # fri_pm (EDT primary)
+    - cron: '35 20 * * 5'     # fri_pm (EDT retry)
+    - cron: '5 21 * * 5'      # fri_pm (EST primary / EDT last retry)
+    - cron: '35 21 * * 5'     # fri_pm (EST retry)
+    - cron: '5 12 * * 6'      # sat_am (EDT primary)
+    - cron: '35 12 * * 6'     # sat_am (EDT retry)
+    - cron: '5 13 * * 6'      # sat_am (EST primary / EDT last retry)
+    - cron: '35 13 * * 6'     # sat_am (EST retry)
   workflow_dispatch:
     inputs:
       slot:
-        description: 'morning | afternoon | manual (default: manual full refresh)'
+        description: 'tue_pm | thu_pm | fri_pm | sat_am | manual (default: manual full refresh)'
         required: false
         default: ''
+      force:
+        description: 'rebuild even if this slot already built today (ET)'
+        type: boolean
+        required: false
+        default: false
       season:
         description: 'season (default: current)'
         required: false
@@ -95,8 +118,11 @@ jobs:
         env:
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_SLOT: ${{ inputs.slot }}
-        # On a cron run beatvegas.ci reads the `cards` table for a build already
-        # on record today (ET) and emits slot=skip; a dispatch never self-skips.
+          INPUT_FORCE: ${{ inputs.force }}
+        # beatvegas.ci reads the `cards` table for a build already on record
+        # today (ET) and emits slot=skip. That now applies to a DISPATCH naming
+        # a scheduled slot too, so the Vercel cron and this backup cron cannot
+        # both build; `force=true` and a bare `manual` dispatch build anyway.
         run: |
           PYTHONPATH=. python -m beatvegas.ci
           echo "resolved slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2) (schedule='$SCHEDULE')"
@@ -150,7 +176,7 @@ jobs:
           print(f"need_preview={'true' if (force_preview or previews == 0) else 'false'}")
           PY
           cat "$GITHUB_OUTPUT"
-      - name: Full-game refresh (every scheduled build; totals+spreads, 4 credits)
+      - name: Full-game refresh (every build; totals+spreads, 4 credits, 4x/wk)
         # Sunday's opener capture is the only other writer of Game.spread /
         # full_game_total; by midweek the market has moved. One bulk call
         # (us,us2 x totals,spreads) over the same 6-day window the morning sweep
@@ -168,8 +194,14 @@ jobs:
         # tells the build which games carry a stale Hard Rock number.
         env:
           MAX_CREDITS: ${{ inputs.max_credits }}
+        # Default cap 150: per-event calls now cost 1 credit, so the CLI's 400
+        # default would be 400 events and could no longer bind - including on
+        # the --hr-universe FALLBACK, which sweeps every event in the window
+        # when the Sunday full-game capture is missing (300+ events). A real
+        # slate is ~82 games, so 150 only trips on a runaway, and a sweep that
+        # stops early ships the card `degraded`, which is the correct outcome.
         run: |
-          extra=""
+          extra="--max-credits-per-run 150"
           if [ -n "$MAX_CREDITS" ]; then extra="--max-credits-per-run $MAX_CREDITS"; fi
           python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }} \
             --status-file "$RUNNER_TEMP/sweep_status.json" $extra
@@ -198,6 +230,7 @@ jobs:
         if: steps.slot.outputs.slot != 'skip'
         env:
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
+          NO_PAPER: ${{ steps.slot.outputs.no_paper }}
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
         run: |
           if [ -z "${{ steps.active.outputs.week }}" ]; then
@@ -207,6 +240,10 @@ jobs:
           fi
           extra=""
           if [ -n "$PAPER_WINDOW" ]; then extra="--paper-log-window-hours $PAPER_WINDOW"; fi
+          # A manual refresh publishes the card but logs NO paper picks: the
+          # first log of a game wins forever, so an ad-hoc build would freeze
+          # the whole week at that moment's lines.
+          if [ "$NO_PAPER" = "true" ]; then extra="$extra --no-paper"; fi
           # A preview step that died before writing its own status (an import
           # error, a timeout) still has to reach the card as a failure: without
           # this the QB-out gate would read a stale file and look clear.

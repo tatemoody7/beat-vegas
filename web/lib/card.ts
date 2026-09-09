@@ -50,9 +50,11 @@ export type CardBlocker =
   | "no_fair_price"
   /** An input the gate needs failed on this build (see Card.degraded). */
   | "degraded";
-/** Which build wrote the card: the morning decision build, the Thu/Fri
- *  afternoon build for that evening's kickoffs, or a manual run. */
-export type CardSlot = "morning" | "afternoon" | "manual";
+/** Which build wrote the card: one of the four scheduled decision builds
+ *  (Tue/Thu/Fri afternoon, Saturday morning) or a manual run. Mirrors
+ *  beatvegas/ci.py SWEEP_ARGS. A row written before 2026-09-09 carries a
+ *  retired name and parses to null, which reads as a legacy card. */
+export type CardSlot = "tue_pm" | "thu_pm" | "fri_pm" | "sat_am" | "manual";
 /** final = bet off it; preview = an earlier build; degraded = an input failed. */
 export type CardStatus = "final" | "preview" | "degraded";
 export type DegradedInput = {
@@ -153,7 +155,13 @@ const BLOCKERS: readonly CardBlocker[] = [
   "no_fair_price",
   "degraded",
 ];
-const SLOTS: readonly CardSlot[] = ["morning", "afternoon", "manual"];
+const SLOTS: readonly CardSlot[] = [
+  "tue_pm",
+  "thu_pm",
+  "fri_pm",
+  "sat_am",
+  "manual",
+];
 const STATUSES: readonly CardStatus[] = ["final", "preview", "degraded"];
 /** The BUILD-WIDE degraded inputs — the only ones that flip the card's status
  *  (and the banner) to "degraded". Mirrors beatvegas/card.py CARD_STATUS_INPUTS:
@@ -395,14 +403,23 @@ function weekdayET(d: Date): string {
   return etParts(d).weekday;
 }
 
-/** Days with no morning build (no college games): a Saturday card is current. */
-const NO_BUILD_DAYS: ReadonlySet<string> = new Set(["Sun", "Mon"]);
-
-/** Minutes after ET midnight when the morning build's gate closes (9:15am =
- *  9 * 60 + 15, kept as a literal so tests/test_gate_parity.py can read it).
- *  Mirrors beatvegas/ci.py SLOT_GATE_ET["morning"][1]: before this, "no card
- *  yet today" is just the build not having run, not a stale card. */
-export const MORNING_GATE_CLOSE_ET_MIN = 555;
+/** Minutes after ET midnight when each build day's gate closes, keyed by the ET
+ *  weekday. Mirrors beatvegas/ci.py SLOT_GATE_ET through SLOT_WEEKDAY_ET
+ *  (tests/test_gate_parity.py reads both): before this time, "no card yet
+ *  today" is just the build not having run, not a stale card.
+ *  Tue/Thu/Fri 5:15pm = 17*60+15; Sat 9:15am = 9*60+15. Literals so the parity
+ *  test can parse them.
+ *  A weekday ABSENT from this map has no scheduled build at all, so the
+ *  previous build's card is current all day — which is why this cannot be a
+ *  single number any more. The only safe scalar would be the 5:15pm one, and
+ *  that would leave a missing SATURDAY build unflagged until after kickoffs,
+ *  on the one morning the card actually gets bet. */
+export const BUILD_GATE_CLOSE_ET_MIN: Readonly<Record<string, number>> = {
+  Tue: 1035,
+  Thu: 1035,
+  Fri: 1035,
+  Sat: 555,
+};
 
 export type CardHealth = {
   level: "ok" | "warn";
@@ -412,14 +429,8 @@ export type CardHealth = {
 
 /**
  * Pure: whether the card on screen is the one to bet off. The card is one
- * rolling week rebuilt every morning Tue–Sat (~8:05–8:45am ET) and again
- * Thu/Fri ~4pm ET for that evening's kickoffs (an afternoon build is a final
- * like any other), so in order: a degraded build warns and lists the failed
- * inputs; a preview or manual build warns any day (it is never the one to bet
- * off); a card not built today (ET) warns that this morning's build has not
- * landed — but only once the morning gate has closed (9:15am ET; before that
- * yesterday's card is simply still current), and never on Sunday/Monday, when
- * nothing builds and Saturday's card stands. Anything else is ok.
+ * rolling week rebuilt Tue/Thu/Fri (~4:05pm ET) and Sat (~8:05am ET), so a
+ * card from a previous build day is current until today's window closes.
  */
 export function cardHealth(card: Card, now: Date): CardHealth {
   if (card.status === "degraded") {
@@ -445,7 +456,7 @@ export function cardHealth(card: Card, now: Date): CardHealth {
         card.builtAt === null ? "" : ` ${builtET(new Date(card.builtAt))} ET`;
       return {
         level: "warn",
-        title: `Built by hand${when}. This morning's automatic update has not replaced it.`,
+        title: `Built by hand${when}. The scheduled build has not replaced it.`,
         details: [
           "Check Hard Rock's live numbers yourself before betting off this.",
         ],
@@ -453,30 +464,32 @@ export function cardHealth(card: Card, now: Date): CardHealth {
     }
     return {
       level: "warn",
-      title:
-        "An earlier build. This morning's 8am ET line sweep is not in it yet.",
+      title: "An earlier build. The latest line sweep is not in it yet.",
       details: [],
     };
   }
   if (card.builtAt === null) {
     return {
       level: "warn",
-      title:
-        "This card has no build time. This morning's update has not landed.",
+      title: "This card has no build time. The latest update has not landed.",
       details: [],
     };
   }
   const built = new Date(card.builtAt);
+  // Only stale if TODAY has a build whose window has closed. On a day with no
+  // scheduled build (Sun/Mon/Wed) the newest card is the current one however
+  // old it reads.
+  const gateClose = BUILD_GATE_CLOSE_ET_MIN[weekdayET(now)];
   if (
-    !NO_BUILD_DAYS.has(weekdayET(now)) &&
+    gateClose !== undefined &&
     etDay(built) !== etDay(now) &&
-    etMinutesOfDay(now) >= MORNING_GATE_CLOSE_ET_MIN
+    etMinutesOfDay(now) >= gateClose
   ) {
     return {
       level: "warn",
       // relativeAge already reads "24h ago", so "was built" carries it —
       // the spec's "is ${age} old" would print "24h ago old".
-      title: `This card was built ${relativeAge(built, now)}. This morning's update has not landed.`,
+      title: `This card was built ${relativeAge(built, now)}. Today's scheduled update has not landed.`,
       details: [],
     };
   }

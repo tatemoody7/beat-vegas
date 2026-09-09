@@ -209,7 +209,9 @@ def test_a_real_ticket_and_the_paper_pick_coexist_on_one_game(env):
 
 
 def test_paper_window_skips_games_kicking_off_later(env):
-    """The Friday preview logs only Friday-night games (--paper-log-window-hours 6)."""
+    """The paper window (--paper-log-window-hours; 24 for the morning card, 10 for
+    the afternoon card) logs only games kicking off inside it, so each game is
+    logged exactly once, by ITS decision build."""
     mod, eng = env
     seed_week(eng)  # everything kicks off ~24h out
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, paper_window_hours=6) == 0

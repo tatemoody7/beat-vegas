@@ -58,7 +58,14 @@ def _weeks_missing_pbp(session, season: int) -> List[int]:
     was aggregated on Friday still comes back on Sunday for its Saturday games.
     The FBS filter uses the git-tracked membership snapshot and is skipped for
     a season the snapshot does not carry (FCS games never get PBP rows, so
-    without the filter they would re-queue their week every day)."""
+    without the filter they would re-queue their week every day).
+
+    Known, accepted: a finished FBS-vs-FBS game for which CFBD never publishes
+    plays (it happens a few times a season) re-queues its week on EVERY run,
+    because "no fh_team_game rows" cannot tell a not-yet-published game from a
+    never-published one. The cost is bounded at one /plays call per such week
+    per run — no Odds credits, and the rows it does return are upserted on
+    (game_id, off_team), so a repeat fetch never duplicates anything."""
     try:
         fbs = load_fbs_teams().get(season)
     except FileNotFoundError:

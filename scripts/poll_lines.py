@@ -15,8 +15,8 @@ modes, driven by lines_watch.yml / card.yml:
     python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
     # per-game close: only games kicking off within the next 75 minutes
     python scripts/poll_lines.py --hr-universe --kickoff-within-min 75 --hours-back 0
-    # full refresh of the weekend slate (Friday preview / Saturday final card)
-    python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3
+    # full refresh of the rolling week (the Tue-Sat morning card, beatvegas/ci.py SWEEP_ARGS)
+    python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 6
 
 Per-event 1H calls cost markets x regions credits (2). --max-credits-per-run is
 the runaway guard; --credit-floor protects the month's reserve for sunday.yml.
@@ -25,7 +25,7 @@ Every run prints credits_spent= and calls_404= so the budget is auditable.
 A run that stops early at either guard still exits 0, so --status-file writes
 this run's COVERAGE (complete / reason / events polled / the game ids it never
 reached) for scripts/build_card.py, which marks a card built on a partial sweep
-degraded instead of shipping it as the Saturday final.
+degraded instead of shipping it as the day's final card.
 """
 
 from __future__ import annotations

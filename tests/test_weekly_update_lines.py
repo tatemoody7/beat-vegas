@@ -214,7 +214,7 @@ def _wire(monkeypatch, wu, engine: str, argv_extra=()):
     monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0: _frame())
     monkeypatch.setattr(wu, "engine_name", lambda: engine)
     monkeypatch.setattr(wu, "_enrich_qb_out", lambda scored: None)
-    monkeypatch.setattr(wu, "store_predictions", lambda scored: len(scored))
+    monkeypatch.setattr(wu, "store_predictions", lambda scored, **kw: len(scored))
     got = {}
 
     def fake_lookup(season, week, basis="opener"):

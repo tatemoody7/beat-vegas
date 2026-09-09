@@ -51,6 +51,15 @@ kick 7:00pm ET). Real money now starts **this weekend, Sep 12** (was Sep 19).
 14. **Score rescaled so gap 1.75 = 70**: score = 50 + gap × (20/1.75) (≈11.43/pt); 3.0 gap → 84;
     green always means the gap rule passed. Replace `EDGE_SCORE_MIN=60`; `CONTEXT_CAP` /
     `PRICE_ONLY_CAP` stay below 55 so no-model rows can never read green.
+    **Amended 2026-09-09 (PR A):** the score is the **gap only, floored** —
+    `floor(50 + gap × 20/1.75)`, clamped 0-100 — with no price bonus and no off-market /
+    QB-out penalty (those are blockers with tags; `PRICE_ONLY_CAP` deleted). No-model rows
+    are always Pass (context score ≤ 49), whatever Hard Rock's price. `hasModel` has one
+    meaning everywhere (`underScore` + `bvLine` present); a model row whose only line is our
+    reference number is still scored. **Settled rule:** a played game is coloured by its
+    result only when the basis was a real book line (Hard Rock, else market); a
+    reference-only game shows a neutral "Final · first half N. No first-half line was
+    posted, so nothing to grade." and `settledLine` carries the line it was graded at.
 15. **Phone order**: graded game list first; slip below with a sticky "Slip · n of 5" bar.
 16. **Week-2 stake stays $10 flat**; early-season tag + 5-bet cap are the protection.
 17. PR #76 (DEGRADED) is the base for all of this; Tate has opened its preview. Merging it is

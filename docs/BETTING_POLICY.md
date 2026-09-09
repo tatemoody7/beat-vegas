@@ -64,18 +64,24 @@ The site is one page: every game on the week in a single ranked list.
 - **Universe** — games Hard Rock has priced a full-game total on. If Hard Rock
   will not take the game, it is not a decision we have to make.
 - **Score (0-100)** — one number per game, and the only thing the list sorts on.
-  With a model read it starts at 50 and moves 10 points per point of gap between
-  the line you can bet and our number, then adjusts for Hard Rock's price (up to
-  8 points either way), minus 10 for an off-market Hard Rock number and minus 5
-  for a starting QB listed out. With no model read (weeks 1-2, derived rows) it
-  is a context-only score: 40 plus/minus pace, wind, dome, spread and last
-  season's first halves, capped at 49 — 55 when Hard Rock's price alone beats the
-  market. The score RANKS; it never overrides the BET rules below.
-- **Tiers** — BET is exactly the verdict rule below, every gate passed. EDGE is
-  score 60+ (or a price-only edge with no model) with one gate still failing, and
-  the card names which one: no Hard Rock line, off-market number, price worse
-  than fair, QB out, or a gap short of 1.75. Everything else is PASS, kept in the
-  same list, dimmer.
+  It is the GAP ALONE: 50 + gap × (20 / 1.75), floored and clamped to 0-100, where
+  the gap is the line you can bet (Hard Rock's, else the market's, else our
+  reference line) minus our number. A gap of exactly 1.75 is exactly 70, so green
+  always means the gap rule passed. Nothing else moves the number: Hard Rock's
+  price, an off-market Hard Rock number and a starting QB listed out are
+  BLOCKERS — they decide whether a game is a bet and the card carries a tag —
+  never score adjustments. 70+ is a bet (green), 55-69 is watch (amber), under 55
+  is a pass (red). With no model read the row gets a context-only score (40
+  plus/minus pace, wind, dome, spread and last season's first halves, capped at
+  49) and is always a Pass; a good Hard Rock price is said in the action line, not
+  a tier. The score RANKS; it never overrides the BET rules below.
+- **Tiers** — BET is exactly the verdict rule below, every gate passed. Watch
+  (EDGE in the payload) is score 55+ with one gate still failing, and the card
+  names which one: no Hard Rock line, off-market number, price worse than fair,
+  no comparable price, QB out, or a gap short of 1.75. Everything else is PASS,
+  kept in the same list, dimmer. Once a game is played it is coloured by its
+  result only when a REAL book line (Hard Rock's, else the market's) was posted;
+  a game whose only line was our reference number shows a neutral final.
 - **Action line** — one sentence per card saying what to do now: bet it at this
   number and price, wait for a specific number, or pass and why.
 - **Kill number** — where the edge is gone: our number plus 1.75 rounded up to

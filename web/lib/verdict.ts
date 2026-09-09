@@ -54,8 +54,6 @@ export const REASONS: readonly PickReason[] = [
 export type VerdictInput = {
   away: string;
   home: string;
-  /** Display-only derived line (line_kind === "derived_fg"): no model read. */
-  derived: boolean;
   underScore: number | null;
   bvLine: number | null;
   /** Live consensus current 1H line, if any book has posted one. */
@@ -154,7 +152,7 @@ function sizeSentence(gap: number): string {
 
 function gapSentence(i: VerdictInput, hrGap: number | null): string {
   const line = i.liveLine ?? i.fallbackLine;
-  if (i.derived || i.underScore === null || i.bvLine === null) {
+  if (i.underScore === null || i.bvLine === null) {
     const share =
       i.fhShare !== null && Number.isFinite(i.fhShare)
         ? `${fmt(i.fhShare * 100)}% of it`
@@ -224,7 +222,7 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
 }
 
 export function verdictFor(i: VerdictInput): VerdictResult {
-  const hasModel = !i.derived && i.underScore !== null && i.bvLine !== null;
+  const hasModel = i.underScore !== null && i.bvLine !== null;
   const consensusGap = i.gap ?? 0;
   const hrGap =
     hasModel && i.hrLine !== null && i.bvLine !== null
@@ -269,11 +267,14 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     strength,
   });
 
-  // --- No model (weeks 1–2, or a derived reference row) ---------------------
+  // --- No model (the week has not been scored yet) ---------------------------
+  // A price alone is never a bet, so this is a PASS either way (edge.ts tiers
+  // these rows PASS and the Log-pick prefill stores this verdict). The
+  // priceEdgeOnly flag + headline survive so the reason still logs price_edge.
   if (!hasModel) {
     if (pricePos) {
       return out(
-        "WATCH",
+        "PASS",
         "low",
         "Price edge only — Hard Rock is paying better than the market on this under, but there is no model read behind it.",
         true,

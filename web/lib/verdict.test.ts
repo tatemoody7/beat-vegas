@@ -13,7 +13,6 @@ import type { BoardFactor } from "./score";
 const base: VerdictInput = {
   away: "Ohio State",
   home: "Michigan",
-  derived: false,
   underScore: 56,
   bvLine: 21.8,
   liveLine: 24.5,
@@ -341,18 +340,17 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
   });
 });
 
-describe("verdictFor — no model (weeks 1–2 / derived lines)", () => {
+describe("verdictFor — no model (the week is not scored yet)", () => {
   const derived: VerdictInput = {
     ...base,
-    derived: true,
     underScore: null,
     bvLine: null,
     gap: null,
   };
 
-  it("can only reach WATCH, and only on a positive Hard Rock price", () => {
+  it("PASSes even on a positive Hard Rock price, but still logs price_edge", () => {
     const v = verdictFor(derived);
-    expect(v.verdict).toBe("WATCH");
+    expect(v.verdict).toBe("PASS");
     expect(v.priceEdgeOnly).toBe(true);
     expect(v.reason).toBe("price_edge");
     expect(v.confidence).toBe("low");

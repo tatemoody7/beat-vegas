@@ -19,6 +19,9 @@ Research only — it never places bets or automates gambling.
   (~930 credits/wk). Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
   caveat line (Tate). Specs: `docs/superpowers/specs/2026-09-08-*.md`. Dev on a network that
   filters Neon:5432: `NEON_HTTP=1` in `web/.env` (Prisma Neon adapter over 443).
+  **Score is gap only (no price bonus, no off-market/QB-out penalty) since 2026-09-09**, floored so
+  70 ⇔ gap ≥ 1.75 exactly; no-model rows are always Pass; the settled colour only grades against a
+  real book line (Hard Rock, else market) — a reference-only played game shows a neutral final.
 - **2026-09-01 (week-1 audit, PRs #23-#26):** verdict logic (BET / WATCH / PASS + why,
   `web/lib/verdict.ts`) behind the board; `/board` redirects to `/` since 2026-09-02. Betting rules live in
   `docs/BETTING_POLICY.md` ($100 roll, $10 flat units, ≤5 bets/wk, 1H unders only).

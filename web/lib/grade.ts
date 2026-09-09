@@ -13,8 +13,8 @@ export type Grade = "bet" | "watch" | "pass";
 export type Settled = "won" | "lost" | "push";
 export type GradeColor = "good" | "warn" | "bad" | "push";
 
-/** Score at and above which a game is a bet. Set so a gap of exactly
- *  BET_GAP_PTS at a fair price lands here (lib/edge.ts scoreForGap). */
+/** Score at and above which a game is a bet. The score is the gap alone, so
+ *  a gap of exactly BET_GAP_PTS lands here (lib/edge.ts SCORE_PER_GAP_PT). */
 export const SCORE_BET_MIN = 70;
 /** Score at and above which a game is worth watching. */
 export const SCORE_WATCH_MIN = 55;

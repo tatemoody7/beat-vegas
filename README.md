@@ -80,14 +80,17 @@ python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
 **Credit budget (Odds API paid tier, 100K/month since 2026-09-06):** `totals_h1` is
-served only per-event, so a 1H poll costs `markets × regions` credits **per game**
-(2 with `us,us2`); listing events is free; full-game totals are one bulk call.
+served only per-event, but naming our ten books (`odds_api.bookmakers_1h`) is billed
+as ONE region and overrides `regions`, so a 1H poll costs **1 credit per game**
+(it was 2 on `us,us2`); listing events is free; full-game totals are one bulk call
+priced per region, which is why the bulk pull still uses `regions`.
 `poll_lines.py` captures EVERY Hard Rock-priced game (`--hr-universe`): opener
 sweeps stop paying for a game once its Hard Rock 1H line is in (`--missing-hr-only`),
 per-game closes poll only games kicking off within 75 minutes
 (`--kickoff-within-min`), `--max-credits-per-run` is the runaway guard and
-`--credit-floor` the month-end reserve. Expected ~800 credits/week, worst ~1,350
-(budget comment in `.github/workflows/lines_watch.yml`).
+`--credit-floor` the month-end reserve. Expected **~567 credits/week (~2,450/month),
+worst ~774** across four whole-week builds and the per-game closes, on a basis of 82
+Hard Rock-priced games (budget comment in `.github/workflows/lines_watch.yml`).
 
 ## How it runs
 

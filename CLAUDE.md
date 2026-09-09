@@ -14,9 +14,12 @@ Research only — it never places bets or automates gambling.
   Score/gap basis = Hard Rock's line → market consensus → our reference line, said in words;
   a real-money BET still needs Hard Rock's own line. **Model minimum is 0 games** (every FBS
   game scored off last season's priors; rows with <2 games carry `h/a_games_played` → "early
-  season" tag). **Morning card Tue-Sat ~8:05am ET** (`ci.py` slot `morning`, status `final`,
-  24 h paper window); `grade.yml` runs daily 6:30am ET; `lines_watch` opener crons retired
-  (~930 credits/wk). Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
+  season" tag). **Four decision builds a week: Tue/Thu/Fri ~4:05pm + Sat ~8:05am ET** (`ci.py` slots
+  `tue_pm`/`thu_pm`/`fri_pm`/`sat_am`, all status `final`, paper windows 48/24/16/80 h =
+  exactly the gap to the next build); per-event 1H calls cost **1 credit** via
+  `odds_api.bookmakers_1h` (10 books = one region, overrides `regions`; the bulk full-game
+  pull still prices by region and needs `us_ex`) — **~567 credits/wk** on a measured basis of
+  82 HR games; `grade.yml` runs daily 6:30am ET; `lines_watch` opener crons retired. Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
   caveat line (Tate). Specs: `docs/superpowers/specs/2026-09-08-*.md`. Dev on a network that
   filters Neon:5432: `NEON_HTTP=1` in `web/.env` (Prisma Neon adapter over 443).
   **Score is gap only (no price bonus, no off-market/QB-out penalty) since 2026-09-09**, floored so
@@ -92,10 +95,12 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
   `cfb-saturday-card` (Sat 8:50am ET: verify/kick the morning card, text the BET list
   with line, price and kill numbers) and `cfb-sunday-ops` (verify/kick `sunday.yml`,
   text the recap). The bet card itself is built in the cloud (`card.yml`; slots in
-  `beatvegas/ci.py::resolve_slot`: `morning` Tue-Sat ET-gated 7:45–9:15am (the decision
-  build, 24 h paper window), `afternoon` Thu+Fri ET-gated 3:45–5:15pm (that evening's
-  kickoffs, 10 h window — Hard Rock posts weeknight 1H lines after the morning build),
-  `manual` on dispatch; once a day per slot via a `cards`-row probe, never `gh run list`).
+  `beatvegas/ci.py::resolve_slot`: `tue_pm`/`thu_pm`/`fri_pm` ET-gated 3:45–5:15pm and
+  `sat_am` ET-gated 7:45–9:15am — four whole-week decision builds timed to when Hard Rock
+  actually posts 1H lines; `manual` on dispatch is always a `preview`. Builds are triggered
+  by a **Vercel cron** dispatching the slot by name, with GitHub cron as the backup; the
+  `cards`-row probe (never `gh run list`) now suppresses a duplicate DISPATCH as well as a
+  duplicate cron, so the two triggers cannot both build — `force=true` overrides.)
   `rescore.yml` (dispatch: season + week) re-scores a past week without snapshots.
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.

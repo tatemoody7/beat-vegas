@@ -146,19 +146,20 @@ bet many small edges rather than one big one. It is not a gate.
 GitHub cron drops some single-slot runs, so every job has retry slots, the card
 job re-sweeps before it builds, and two Claude routines re-dispatch what cron
 dropped (`cfb-saturday-card` for the final card, `cfb-sunday-ops` for the Sunday
-capture). Odds API: paid 100K-credit plan (since 2026-09-06), ~800 credits a
-week expected (`lines_watch.yml` header).
+capture). The builds themselves are triggered by a Vercel cron dispatching the
+slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
+(`lines_watch.yml` header), which fits the 20K plan several times over.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
-| Tue–Sat ~8:05–8:45am         | **Morning card** (the decision build, every day): forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build; paper-logs every qualifying game kicking off within 24 h with its blocker. Gated on the Eastern clock so DST needs no edit. The board is one rolling week — each game locks at its own kickoff | `card.yml` |
-| Thu / Fri ~4pm               | **Afternoon card**: Hard Rock posts weeknight first-half lines during the day, after the morning build, so this build sweeps only that evening's kickoffs, rebuilds the card (newest card wins on the board) and paper-logs those games (10 h window; Saturday's games stay with Saturday's morning build). Gated 3:45–5:15pm ET, once a day | `card.yml` |
-| Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every morning build) | `research_preview.yml` |
+| Tue / Thu / Fri ~4:05pm      | **Decision build**: forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build. Timed to when Hard Rock actually posts first-half lines. Paper-logs every qualifying game kicking off before the NEXT build (48 h Tue, 24 h Thu, 16 h Fri) with its blocker. Gated 3:45–5:15pm ET so DST needs no edit | `card.yml` |
+| Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Its 80 h paper window runs to Tuesday's build, so it is the build that covers Sunday and Monday games | `card.yml` |
+| Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every decision build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
-| Sat 8:50am                   | **Card routine**: verify/kick the morning build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
-| Game days                    | **Tate bets off the Bet Slip** on the Board once that day's morning card is up (one tap logs the ticket); Thu/Fri games the same way, off their own morning card | you |
+| Sat 8:50am                   | **Card routine**: verify/kick the `sat_am` build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
+| Game days                    | **Tate bets off the Bet Slip** on the Board, off the most recent decision build (one tap logs the ticket) | you |
 | Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
 | Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |

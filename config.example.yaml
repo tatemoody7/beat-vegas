@@ -42,13 +42,39 @@ odds_api:
                               # PRODUCTION RELIES ON THIS VALUE: the GitHub Actions
                               # jobs have no config.yaml, so this example file IS the
                               # prod regions config (keys come from GH secrets).
-                              # NB: 1H (totals_h1) is per-event & costs markets x
-                              # regions PER GAME, so us,us2 doubles 1H credit use.
+                              # Since bookmakers_1h below is set, regions governs
+                              # only the BULK full-game pull (list_full_game_odds,
+                              # billed markets x regions for the whole slate, 4
+                              # credits) — the per-event 1H call ignores it.
                               # us_ex (Kalshi/Novig/ProphetX/BetOpenly, ~0-vig
                               # exchanges) is added ONLY on the Sunday full-game
-                              # capture via --regions (sunday.yml) — not here, so
-                              # the per-event 1H sweeps don't pay a third region.
+                              # capture via --regions (sunday.yml).
   markets: "totals_h1"        # first-half totals
   odds_format: "american"
-  # Optional whitelist of bookmaker keys (empty = all available).
+  # The per-event 1H endpoint is billed markets x regions. `bookmakers=` counts
+  # as ONE region and takes priority over `regions`, so totals_h1 x 1 = 1 credit
+  # per event instead of 2 on us,us2 — verified live 2026-09-09
+  # (x-requests-last: 1, response carried hardrockbet plus 7 comparison books).
+  # EXACTLY 10 KEYS: an 11th bills a second region and silently doubles every
+  # sweep, so odds.py refuses to start with more. The non-Hard-Rock books are
+  # NOT optional — card.py market_read and web/lib/lineCheck.ts build the fair
+  # price from the median over them.
+  # This is the list of books actually seen posting NCAAF totals_h1.
+  bookmakers_1h:
+    - hardrockbet       # the only bettable book (us2). Losing this key blinds
+                        # every card: poll_lines.py warns when a sweep writes
+                        # no hardrockbet row.
+    - draftkings
+    - fanduel
+    - betmgm
+    - williamhill_us
+    - betrivers
+    - ballybet
+    - espnbet
+    - bovada
+    - fliff             # excluded from the fair price (card.py
+                        # FAIR_PRICE_EXCLUDED); kept for the Line Check page.
+  # Optional whitelist of bookmaker keys applied to the RESPONSE after it is
+  # paid for (empty = keep all). Not the same thing as bookmakers_1h, which is
+  # the request-side list that sets the price.
   books: []

@@ -18,7 +18,9 @@ modes, driven by lines_watch.yml / card.yml:
     # full refresh of the rolling week (the Tue-Sat morning card, beatvegas/ci.py SWEEP_ARGS)
     python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 6
 
-Per-event 1H calls cost markets x regions credits (2). --max-credits-per-run is
+Per-event 1H calls cost 1 credit: `bookmakers=` with <= 10 books is billed as ONE
+region and overrides `regions` (config odds_api.bookmakers_1h). They cost 2 when
+that list is empty and us,us2 applies. --max-credits-per-run is
 the runaway guard; --credit-floor protects the month's reserve for sunday.yml.
 Every run prints credits_spent= and calls_404= so the budget is auditable.
 
@@ -43,9 +45,19 @@ from beatvegas.config import load_config
 from beatvegas.db.models import Game, OddsSnapshot, TeamTempo, Weather
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import match_event
-from beatvegas.hardrock import games_with_hr_first_half, hr_universe_game_ids, normalize_book
+from beatvegas.hardrock import (
+    HR_BOOK_KEY,
+    games_with_hr_first_half,
+    hr_universe_game_ids,
+    normalize_book,
+)
 from beatvegas.season import current_season
-from beatvegas.sources.odds import OddsAPIClient, normalize_first_half, redact_key
+from beatvegas.sources.odds import (
+    MAX_BOOKMAKERS_ONE_REGION,
+    OddsAPIClient,
+    normalize_first_half,
+    redact_key,
+)
 from beatvegas.sweep import (
     CLOSE_SPREAD,
     build_context,
@@ -194,12 +206,22 @@ def main() -> None:
         "floor (reserves budget for the Sunday opener capture); 0 disables",
     )
     ap.add_argument(
+        "--bookmakers",
+        default=None,
+        help="comma-separated Odds API book keys for the per-event 1H calls "
+        "(default: config odds_api.bookmakers_1h). Up to 10 keys bill as ONE "
+        "region = 1 credit/event and OVERRIDE --regions; pass an empty string "
+        "to fall back to region pricing for an A/B probe",
+    )
+    ap.add_argument(
         "--regions",
         default=None,
-        help="Odds API regions for the per-event 1H calls (default: config odds_api.regions, "
-        "us,us2); each extra region costs one more credit per event. NB: us_ex buys nothing "
-        "here — the exchanges (Kalshi, Novig, ...) post no first-half totals (verified "
-        "2026-09-07 against the live API), so no scheduled sweep passes it",
+        help="Odds API regions for the per-event 1H calls. IGNORED unless the "
+        "bookmakers list is empty — passing it alone clears that list and "
+        "restores 2-credit region pricing (that is the A/B probe). NB: us_ex "
+        "buys nothing here — the exchanges (Kalshi, Novig, ...) post no "
+        "first-half totals (verified 2026-09-07 against the live API), so no "
+        "scheduled sweep passes it",
     )
     ap.add_argument(
         "--status-file",
@@ -226,8 +248,15 @@ def main() -> None:
         return
     cfg = load_config().get("odds_api", {}) or {}
     client = OddsAPIClient()
+    if args.bookmakers is not None:
+        client.bookmakers = [b.strip() for b in args.bookmakers.split(",") if b.strip()]
     if args.regions:
         client.regions = args.regions
+        if args.bookmakers is None:
+            # An explicit --regions with no --bookmakers means "price this run
+            # by region" (the 2-credit path) — otherwise bookmakers would win
+            # and --regions would silently do nothing.
+            client.bookmakers = []
 
     # 1) Free: list events, then keep only those in the window (a days-ahead
     # sweep, or the games kicking off within --kickoff-within-min for a close).
@@ -414,12 +443,33 @@ def main() -> None:
         credits_spent=spent,
         unpolled_game_ids=_unpolled_game_ids(in_window, ctx, polled),
     )
+    hr_rows = sum(1 for r in rows if normalize_book(r.get("book") or "") == HR_BOOK_KEY)
     print(
         f"events_total={len(all_events)} in_window={len(in_window)} "
-        f"odds_rows={len(rows)} matched={matched} unmatched={unmatched} "
+        f"odds_rows={len(rows)} hr_rows={hr_rows} matched={matched} unmatched={unmatched} "
         f"new_snapshots={written} unchanged={skipped} calls_404={calls_404} "
         f"credits_spent={spent if spent is not None else 'unknown'}"
     )
+    # Two invariants that are free to check here and invisible everywhere else.
+    # 1) The billing rule: with the bookmakers list set, every per-event call
+    #    costs exactly 1 credit, so spend must equal the number of events
+    #    polled. A mismatch means the param was dropped or the list grew past
+    #    ten, i.e. every sweep from now on costs double.
+    if client.bookmakers and spent is not None and polled > 0 and spent != polled:
+        warn(
+            f"1H calls billed {spent} credits for {polled} events (expected 1 per event) — "
+            "the bookmakers param may have been dropped, or the list exceeded "
+            f"{MAX_BOOKMAKERS_ONE_REGION} keys. Check odds_api.bookmakers_1h."
+        )
+    # 2) Hard Rock is the only bettable book, and the ten request slots are
+    #    full, so there is no room to also ask for `hardrockbet_fl`. If the key
+    #    ever drifts, every card silently reads "no Hard Rock line" and nothing
+    #    else looks wrong.
+    if polled > 0 and calls_404 < polled and hr_rows == 0:
+        warn(
+            f"no {HR_BOOK_KEY} rows in a sweep of {polled} events — check that the key "
+            "has not changed (hardrockbet_fl?) before trusting any card built on this."
+        )
     if c:
         print(f"credits: remaining={c.remaining} used={c.used} last_cost={c.last_cost}")
     if unmatched_names:

@@ -13,7 +13,7 @@ from typing import Union
 
 import pytest
 
-from beatvegas.ci import SLOT_GATE_ET
+from beatvegas.ci import SLOT_GATE_ET, SLOT_WEEKDAY_ET
 from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.model import score
 
@@ -145,12 +145,34 @@ def test_non_exchange_fair_price_exclusions_match_line_check_ts():
     )
 
 
-def test_morning_gate_close_matches_card_ts():
-    """web/lib/card.ts MORNING_GATE_CLOSE_ET_MIN (minutes after ET midnight when
-    "no card yet today" stops being "the build has not run") mirrors the close
-    of beatvegas/ci.py SLOT_GATE_ET["morning"]. Drift means the banner calls a
-    card stale while the morning cron can still build, or the reverse."""
+def _ts_weekday_map(src: str, name: str):
+    """`export const <name>: Readonly<Record<string, number>> = { Tue: 1035, ... }`
+    parsed into a plain dict."""
+    m = re.search(rf"export\s+const\s+{name}[^=]*=\s*\{{(.*?)\}}\s*;", src, re.S)
+    assert m, f"{name} is not exported as an object literal (it must be, for this parity guard)"
+    return {k: int(v) for k, v in re.findall(r"(\w+)\s*:\s*(-?\d+)", m.group(1))}
+
+
+def test_build_gate_closes_match_card_ts():
+    """web/lib/card.ts BUILD_GATE_CLOSE_ET_MIN (per ET weekday, the minute when
+    "no card yet today" stops being "the build has not run") mirrors the closes
+    of beatvegas/ci.py SLOT_GATE_ET, keyed through SLOT_WEEKDAY_ET. Drift means
+    the banner calls a card stale while that day's cron can still build, or the
+    reverse — and on Saturday that is the morning Tate bets off."""
     assert _CARD_TS.exists(), f"{_CARD_TS} is missing — the guard must not vanish"
-    close = SLOT_GATE_ET["morning"][1]
-    expected = close.hour * 60 + close.minute
-    assert _ts_const(_CARD_TS.read_text(), "MORNING_GATE_CLOSE_ET_MIN") == expected
+    expected = {}
+    for slot, weekday in SLOT_WEEKDAY_ET.items():
+        close = SLOT_GATE_ET[slot][1]
+        expected[weekday] = close.hour * 60 + close.minute
+    assert _ts_weekday_map(_CARD_TS.read_text(), "BUILD_GATE_CLOSE_ET_MIN") == expected
+
+
+def test_card_ts_has_no_build_day_for_every_unscheduled_weekday():
+    """Every weekday WITHOUT a scheduled build must be absent from the TS map:
+    that absence is what tells the banner yesterday's card is still current on
+    Sunday, Monday and Wednesday. A stray key there would warn all day on a day
+    nothing was ever going to build."""
+    built = set(SLOT_WEEKDAY_ET.values())
+    idle = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} - built
+    ts_map = _ts_weekday_map(_CARD_TS.read_text(), "BUILD_GATE_CLOSE_ET_MIN")
+    assert idle.isdisjoint(ts_map), f"{sorted(idle & set(ts_map))} have no build but are gated"

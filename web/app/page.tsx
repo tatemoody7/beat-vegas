@@ -145,7 +145,7 @@ export default async function BoardPage({
 
           {board.games.length === 0 ? (
             <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-              {`Nothing on the board for ${season} yet. The week’s lines are swept every morning from Tuesday, and the model scores the full week on Sunday.`}
+              {`Nothing on the board for ${season} yet. The week’s lines are swept on Tuesday, Thursday and Friday afternoons and Saturday morning, and the model scores the full week on Sunday.`}
             </p>
           ) : (
             <>

@@ -1,18 +1,18 @@
 import Link from "next/link";
 
-import { labelOf, RESULT_PENDING, RESULT_TEXT } from "@/lib/labels";
+import {
+  labelOf,
+  RESULT_COLOR,
+  RESULT_NO_LINE,
+  RESULT_PENDING,
+  RESULT_TEXT,
+} from "@/lib/labels";
 import { getRecordSeasons, getSeasonRecords, RecordRow } from "@/lib/records";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 
 export const dynamic = "force-dynamic";
-
-const RESULT_COLOR: Record<string, string> = {
-  under: "var(--good)",
-  over: "var(--bad)",
-  push: "var(--push)",
-};
 
 // The legend IS the explanation of the columns — a `title=` on a header is
 // invisible on a phone, so the table carries none (spec §25.10).
@@ -48,9 +48,13 @@ export default async function RecordsPage({
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="bv-page-title">Every game we have rated</h1>
-      <p className="bv-page-sub mb-5">
+      <p className="bv-page-sub mb-1">
         Our number, the line, and how the first half actually landed. Download
         it if you want your own copy.
+      </p>
+      <p className="mb-5 text-xs text-[var(--text-dim)]">
+        Games with no first-half line show No line; they are in the table for
+        the score, not the record.
       </p>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -137,7 +141,9 @@ export default async function RecordsPage({
                       ),
                     }}
                   >
-                    {labelOf(RESULT_TEXT, r.outcome, RESULT_PENDING)}
+                    {r.firstHalfTotal !== null && r.line === null
+                      ? RESULT_NO_LINE
+                      : labelOf(RESULT_TEXT, r.outcome, RESULT_PENDING)}
                   </td>
                 </tr>
               ))}

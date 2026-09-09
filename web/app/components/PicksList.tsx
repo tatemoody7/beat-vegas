@@ -6,6 +6,7 @@ import {
   BLOCKER_SHORT,
   labelOf,
   REASON_TEXT,
+  RESULT_COLOR,
   RESULT_PENDING,
   RESULT_TEXT,
 } from "@/lib/labels";
@@ -19,13 +20,6 @@ const VERDICT_WORD: Record<string, string> = {
   WATCH: "Watch",
   EDGE: "Watch",
   PASS: "Pass",
-};
-
-// Outcome colours (never cyan): won green, lost red, push grey.
-const RESULT_COLOR: Record<string, string> = {
-  under: "var(--good)",
-  over: "var(--bad)",
-  push: "var(--push)",
 };
 
 // Every logged pick, with the decision frozen at log time. Nothing here is

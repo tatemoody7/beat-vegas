@@ -273,4 +273,13 @@ export const RESULT_TEXT: Record<string, string> = {
   over: "Over",
   push: "Push",
 };
-export const RESULT_PENDING = "pending";
+export const RESULT_PENDING = "Pending";
+/** A played game whose first half no book ever priced: shown for the score, not the record. */
+export const RESULT_NO_LINE = "No line";
+
+/** Outcome colours (never cyan): under/won green, over/lost red, push grey. */
+export const RESULT_COLOR: Record<string, string> = {
+  under: "var(--good)",
+  over: "var(--bad)",
+  push: "var(--push)",
+};

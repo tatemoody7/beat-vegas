@@ -13,12 +13,7 @@ import type { LineBasis } from "@/lib/edge";
 import type { CardBlocker } from "@/lib/card";
 import type { SlipBlock } from "@/lib/betSlip";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import {
-  BET_GAP_PTS,
-  MIN_GAMES_FOR_MODEL,
-  STRONG_GAP_PTS,
-  WEEKLY_BET_CAP,
-} from "@/lib/verdict";
+import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 
 /** Look a key up; an unknown key gets the fallback, never itself. */
 export function labelOf<K extends string>(
@@ -127,12 +122,8 @@ export function blockerTag(
       return ctx.killLine != null
         ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`
         : "Not yet — the gap is too small";
-    case "no_model": {
-      const need: number = MIN_GAMES_FOR_MODEL;
-      return need > 0
-        ? `No model number yet — needs ${need} game${need === 1 ? "" : "s"} played`
-        : "No model number yet — the week has not been scored";
-    }
+    case "no_model":
+      return "No model number yet — the week has not been scored";
     case "cap":
       return `Past the ${WEEKLY_BET_CAP}-bet week — paper only`;
     case "degraded":

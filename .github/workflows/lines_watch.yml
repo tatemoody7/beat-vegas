@@ -20,7 +20,8 @@ name: Hard Rock 1H line capture
 #                Slots with no game in the window skip before checkout (the
 #                free /events call), spending 0 credits and ~0 minutes.
 # The FULL sweeps live in card.yml (one job = sweep then build): the morning
-# card Tue-Sat sweeps the rolling week, the afternoon card Thu/Fri tonight's games. `market=1h` (full refresh) is workflow_dispatch only.
+# card Tue-Sat sweeps the rolling week, the afternoon card Thu/Fri tonight's
+# games. `market=1h` (full refresh) is workflow_dispatch only.
 #
 # CREDIT BUDGET (paid tier; per-event 1H call = totals_h1 x us,us2 = 2 credits;
 # ~60 Hard Rock-priced FBS games/week):

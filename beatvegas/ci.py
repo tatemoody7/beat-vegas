@@ -12,10 +12,11 @@ Two slots are scheduled, both gated on the EASTERN clock so neither needs a
 cron edit at the DST change: `morning` (Tue-Sat, the decision build for every
 game before the next build, 7:45-9:15am ET) and `afternoon` (Thu+Fri, tonight's
 kickoffs, 3:45-5:15pm ET — Hard Rock posts first-half lines for weeknight games
-during the day, after the morning build). Each slot has two crons an hour
-apart; the ET gate picks the right one, and a build already on record for the
-slot today (`slots_built_today`, a `cards` row for today's ET date) makes the
-other one skip. The DB probe replaced a `gh run list --status success` check
+during the day, after the morning build). The morning slot has four half-hour
+crons and the afternoon slot two hourly crons, all firing year-round, with the
+ET gate picking the ones that land inside the window, and a build already on
+record for the slot today (`slots_built_today`, a `cards` row for today's ET
+date) makes the other one skip. The DB probe replaced a `gh run list --status success` check
 that counted a gate-skip run as a success: from November (EST) the 12:35Z skip
 blocked the 13:05Z build and no morning card ever built from cron.
 """
@@ -225,7 +226,9 @@ def resolve_for_cli(
     """resolve_slot with the DB probe wired in, GATE FIRST: a scheduled tick is
     resolved against an empty probe, and only a tick that lands inside its ET
     window (and a dispatch never) pays for `slots_built_today`. The gate-skip
-    ticks (two of the four morning crons every day) therefore never open Neon —
+    ticks (one or two of the four morning crons a day, depending on the DST
+    regime: EDT skips only 13:35Z, EST skips both 12:05Z and 12:35Z) therefore
+    never open Neon —
     `try_init_db` runs DDL, and inside GHA re-raises on a bad connection, so a
     tick that was going to skip anyway must not be able to fail the run."""
     out = resolve_slot(schedule, now_utc, input_slot)

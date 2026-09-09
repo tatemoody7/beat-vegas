@@ -155,7 +155,7 @@ def _card_steps_by_id():
 def test_card_yml_wires_the_status_files_through_to_the_build():
     """PR-7: the two steps that can degrade write a status file, and the build
     reads both plus the resolved slot — otherwise a card built on a half-swept
-    slate or a blank injury feed ships as the Saturday final."""
+    slate or a blank injury feed ships as the morning card."""
     steps = _card_steps_by_id()
     sweep, preview, build = (
         steps["sweep"],

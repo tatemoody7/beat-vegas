@@ -1110,7 +1110,7 @@ describe("cardHealth", () => {
     expect(h.details.join(" ")).not.toMatch(/rotowire_empty|credit_cap|sweep:/);
   });
 
-  it("does not show the degraded banner for a pace-only Saturday final", () => {
+  it("does not show the degraded banner for a pace-only morning final", () => {
     // The parser leaves a pace-only card's status at "final"; the held game
     // sits under Held on the panel, not in the banner.
     const c = parseCard(

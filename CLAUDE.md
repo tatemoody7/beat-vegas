@@ -214,10 +214,20 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   `ODDS_API_KEY` are the only GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
-  scheduled runs; `research_preview` 10h late; no GitHub incident posted). Anything that must
-  happen at a time is DISPATCHED from the Mac (`gh workflow run <wf> -f market=1h`, then poll
-  `gh run list --limit 1`) or checks its own inputs: `card.yml` runs the 1H sweep / preview
-  itself when today's is missing before it builds. Cron stays as a backup.
+  scheduled runs; 2026-09-09: `card.yml` fired 0 of 5 morning builds on time, the 12:05Z tick
+  running at 16:33Z; no GitHub incident posted either time). So since 2026-09-09 the card and
+  grading builds are **triggered by a VERCEL cron** (`web/vercel.json` -> `/api/cron/[job]`,
+  table in `web/lib/cronJobs.ts`) which dispatches the workflow over the GitHub REST API;
+  GitHub's own crons stay as the backup and the `cards`-row probe stops both from building.
+  **`vercel.json` must live in `web/`** — the Vercel project's root directory — or it is
+  silently ignored, with no build error and no crons in the dashboard. Vercel Hobby fires
+  within the HOUR after the scheduled minute, so each job carries several UTC hours and the
+  route refuses any tick outside its ET window. `/api/cron` is exempted in `middleware.ts`
+  (Vercel sends no session cookie) and authenticates on `CRON_SECRET`; the other new env var
+  is `GITHUB_DISPATCH_TOKEN` (fine-grained PAT, Actions read+write on this repo). Both are
+  production-only and set by Tate in the dashboard. Anything else that must happen at a time
+  is still dispatched by hand (`gh workflow run <wf> -f market=1h`), and `card.yml` checks its
+  own inputs: it runs the 1H sweep / preview itself when today's is missing before it builds.
 - **1H sweeps are RANKED before any cap** (`beatvegas/sweep.py`; the paid tier has no event cap, `--max-credits-per-run` is the runaway guard): close spread
   (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
   first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never

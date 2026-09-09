@@ -374,3 +374,31 @@ def test_main_line_basis_flag_overrides_auto(monkeypatch, wu):
     got = _wire(monkeypatch, wu, "bv_line", argv_extra=("--line-basis", "current"))
     wu.main()
     assert got["basis"] == "current"
+
+
+def _capture_store(monkeypatch, wu):
+    got = {}
+
+    def fake_store(scored, **kw):
+        got.update(kw)
+        return len(scored)
+
+    monkeypatch.setattr(wu, "store_predictions", fake_store)
+    return got
+
+
+def test_main_no_snapshot_flag_reaches_store_predictions(monkeypatch, wu):
+    """rescore.yml re-scores a PLAYED week with --no-snapshot: the flag must
+    arrive at store_predictions as snapshot=False, or the re-score would freeze
+    post-kickoff GameRecords as if they were pre-game."""
+    _wire(monkeypatch, wu, "bv_line", argv_extra=("--no-snapshot",))
+    got = _capture_store(monkeypatch, wu)
+    wu.main()
+    assert got["snapshot"] is False
+
+
+def test_main_snapshots_by_default(monkeypatch, wu):
+    _wire(monkeypatch, wu, "bv_line")
+    got = _capture_store(monkeypatch, wu)
+    wu.main()
+    assert got["snapshot"] is True

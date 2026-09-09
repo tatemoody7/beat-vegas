@@ -52,12 +52,6 @@ export const MARKET_TEXT: Record<string, string> = {
   full: "Full game",
 };
 
-export const TIER_SUB: Record<EdgeTier, string> = {
-  BET: "One unit on the first-half under.",
-  EDGE: "Close, but one thing is missing.",
-  PASS: "Nothing here.",
-};
-
 // --- blockers (why a strong game is not a bet right now) ---------------------
 
 export type AnyBlocker = EdgeBlocker | CardBlocker;
@@ -236,12 +230,6 @@ export function basisPhrase(
       return "";
   }
 }
-
-export const BASIS_NOUN: Record<LineBasis, string> = {
-  hardrock: "Hard Rock's line",
-  market: "the market line",
-  reference: "our reference line",
-};
 
 // --- line study sources --------------------------------------------------------
 

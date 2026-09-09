@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { american, fmt, median, pct, signed } from "./format";
+import { american, capitalize, fmt, median, pct, signed } from "./format";
 
 describe("format helpers", () => {
   it("signed adds + only to positives", () => {
@@ -16,6 +16,11 @@ describe("format helpers", () => {
   it("american odds", () => {
     expect(american(105)).toBe("+105");
     expect(american(-110)).toBe("-110");
+  });
+  it("capitalize upper-cases only the first letter", () => {
+    expect(capitalize("won")).toBe("Won");
+    expect(capitalize("no score")).toBe("No score");
+    expect(capitalize("")).toBe("");
   });
   it("median handles odd/even/empty", () => {
     expect(median([])).toBeNull();

@@ -16,6 +16,9 @@ opener) and is handed the training rows' REAL 1H closes.
     python scripts/weekly_update.py --line-basis current   # force the basis
     python scripts/weekly_update.py --if-engine residual   # card-day re-score:
         # no-op (exit 0, no DB work) unless config model.engine is `residual`
+    python scripts/weekly_update.py --season 2026 --week 1 --no-snapshot
+        # retro score of a played week (rescore.yml): predictions are replaced
+        # per game, but no GameRecord is frozen after kickoff
 
 When the engine hands back a fitted model (score_slate attrs["engine_artifact"],
 residual engine only) the run persists it with its training fingerprint
@@ -297,6 +300,11 @@ def main() -> None:
         help="only run when config model.engine is NAME; otherwise print one line and "
         "exit 0 without touching the database (the card-day re-score step)",
     )
+    ap.add_argument(
+        "--no-snapshot",
+        action="store_true",
+        help="do not freeze GameRecords (a retrospective re-score of a played week)",
+    )
     args = ap.parse_args()
     engine = engine_name()
     if args.if_engine and engine != args.if_engine:
@@ -357,7 +365,7 @@ def main() -> None:
         )
         sys.exit(1)
     _enrich_qb_out(scored)
-    n = store_predictions(scored)
+    n = store_predictions(scored, snapshot=not args.no_snapshot)
     fp_line = persist_engine_artifact(scored, engine=engine, season=args.season, week=week)
     if fp_line:
         print(fp_line)

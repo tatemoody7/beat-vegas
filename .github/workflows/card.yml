@@ -17,19 +17,29 @@ name: Bet card (cloud)
 #              preview, then build; paper-logs games kicking off within 24 h.
 #              The board is one rolling week: each game locks at its own
 #              kickoff, and the morning card is final for every game that kicks
-#              off before the next morning (Thu night, Fri night, Saturday).
-#   weeknight / friday / saturday — legacy slots, workflow_dispatch only.
-#   manual     workflow_dispatch (input `slot` may name one of the above; input
-#              `max_credits` caps the sweep so a DEGRADED card can be rehearsed).
+#              off before the next build.
+#   afternoon  Thu+Fri 20:00Z / 21:00Z (~4pm ET, gated 3:45-5:15pm ET, once per
+#              day): Hard Rock posts weeknight first-half lines during the day,
+#              after the morning build, so this build sweeps only tonight's
+#              kickoffs (within 10 h), rebuilds the card (newest card wins on
+#              the board) and paper-logs those games with a 10 h window —
+#              Saturday's games stay with Saturday's morning build.
+#   manual     workflow_dispatch (input `slot` may name morning | afternoon;
+#              input `max_credits` caps the sweep so a DEGRADED card can be rehearsed).
+# ONCE PER DAY: the resolve step probes the `cards` table (beatvegas.ci
+# slots_built_today) — a card row for today's ET date is a positive fact that
+# the build happened, so the slot's second cron skips. The old `gh run list
+# --status success` check counted a gate-skip run as a success, which from
+# November (EST) blocked the 13:05Z build behind the 12:35Z skip.
 #
 # DEGRADED INPUTS (PR-7): the sweep and the research preview each write a status
 # file ($RUNNER_TEMP), and the build reads both. A sweep that stopped at the
 # credit floor/cap, or an empty injury feed (which makes the QB-out gate pass
 # every game), marks the games it touched paper only and the card "degraded" —
 # visible on the board banner and as line 2 of the build summary.
-# Every morning build ALWAYS re-sweeps (an evening close poll would otherwise
+# Every scheduled build ALWAYS re-sweeps (an evening close poll would otherwise
 # satisfy "a 1H snapshot exists today" and the card would build on yesterday's
-# numbers); legacy weeknight builds sweep only what is missing.
+# numbers).
 #
 # CONCURRENCY: shared `neon-writers` group (see lines_watch.yml header).
 
@@ -39,10 +49,12 @@ on:
     - cron: '35 12 * * 2-6'   # morning (EDT retry)
     - cron: '5 13 * * 2-6'    # morning (EST primary / EDT last retry)
     - cron: '35 13 * * 2-6'   # morning (EST retry)
+    - cron: '0 20 * * 4,5'    # afternoon Thu/Fri (EDT primary / EST too early -> gate skip)
+    - cron: '0 21 * * 4,5'    # afternoon Thu/Fri (EST primary / EDT retry)
   workflow_dispatch:
     inputs:
       slot:
-        description: 'morning | weeknight | friday | saturday | manual (default: manual full refresh)'
+        description: 'morning | afternoon | manual (default: manual full refresh)'
         required: false
         default: ''
       season:
@@ -72,37 +84,22 @@ jobs:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
       - uses: actions/checkout@v5
-      - name: Resolve slot (beatvegas/ci.py; ET-gated Saturday final)
-        id: slot
-        env:
-          SCHEDULE: ${{ github.event.schedule }}
-          INPUT_SLOT: ${{ inputs.slot }}
-          GH_TOKEN: ${{ github.token }}
-        # System python only (no pip yet): beatvegas.ci imports nothing else.
-        run: |
-          PYTHONPATH=. python3 -m beatvegas.ci
-          slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
-          retry_since=$(grep '^retry_since=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)
-          # A retry slot only runs when no SCHEDULED run of this workflow
-          # succeeded since the primary slot's window opened.
-          if [ -n "$retry_since" ] && [ "$slot" != "skip" ]; then
-            done_already=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" \
-              --event schedule --status success --json createdAt \
-              --jq "[.[] | select(.createdAt >= \"$retry_since\")] | length" 2>/dev/null || echo 0)
-            if [ "${done_already:-0}" -gt 0 ]; then
-              echo "a scheduled run already succeeded since $retry_since; skipping"
-              echo "slot=skip" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-          echo "resolved slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2) (schedule='$SCHEDULE')"
       - uses: actions/setup-python@v6
-        if: steps.slot.outputs.slot != 'skip'
         with:
           python-version: '3.11'
           cache: pip
       - name: Install
-        if: steps.slot.outputs.slot != 'skip'
         run: pip install -e .
+      - name: Resolve slot (beatvegas/ci.py; ET gate + once-per-day cards probe)
+        id: slot
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_SLOT: ${{ inputs.slot }}
+        # On a cron run beatvegas.ci reads the `cards` table for a build already
+        # on record today (ET) and emits slot=skip; a dispatch never self-skips.
+        run: |
+          PYTHONPATH=. python -m beatvegas.ci
+          echo "resolved slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2) (schedule='$SCHEDULE')"
       - name: Resolve season / week
         id: active
         if: steps.slot.outputs.slot != 'skip'
@@ -153,16 +150,17 @@ jobs:
           print(f"need_preview={'true' if (force_preview or previews == 0) else 'false'}")
           PY
           cat "$GITHUB_OUTPUT"
-      - name: Full-game refresh (preview / final only; totals+spreads, 4 credits)
+      - name: Full-game refresh (every scheduled build; totals+spreads, 4 credits)
         # Sunday's opener capture is the only other writer of Game.spread /
-        # full_game_total; by Friday the market has moved. One bulk call
-        # (us,us2 x totals,spreads) keeps the spread current for the 1H share
-        # and the HR-vs-market read. Optional: the card still builds on
-        # Sunday's numbers if the Odds API is down.
+        # full_game_total; by midweek the market has moved. One bulk call
+        # (us,us2 x totals,spreads) over the same 6-day window the morning sweep
+        # covers keeps the spread current for the 1H share and the HR-vs-market
+        # read. Optional: the card still builds on Sunday's numbers if the Odds
+        # API is down.
         if: steps.slot.outputs.force_sweep == 'true' && steps.active.outputs.week != ''
         continue-on-error: true
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --days-ahead 3
-      - name: 1H sweep (forced for the preview / final; else only when today's is missing)
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --days-ahead 6
+      - name: 1H sweep (forced on every scheduled build; else only when today's is missing)
         id: sweep
         if: steps.inputs.outputs.need_sweep == 'true'
         # --status-file records the run's COVERAGE: the sweep can stop at the
@@ -183,7 +181,7 @@ jobs:
         # not `residual`, so the incumbent's card day is unchanged.
         if: steps.inputs.outputs.need_sweep == 'true'
         run: python scripts/weekly_update.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --if-engine residual
-      - name: Research preview (forced on the final; else only when today's is missing)
+      - name: Research preview (forced on every scheduled build; else only when today's is missing)
         id: preview
         if: steps.inputs.outputs.need_preview == 'true'
         # Unofficial sources (ESPN / Rotowire) may be down; the card still builds

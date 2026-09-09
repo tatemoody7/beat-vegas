@@ -148,6 +148,7 @@ week expected (`lines_watch.yml` header).
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
 | Tue–Sat ~8:05–8:45am         | **Morning card** (the decision build, every day): forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build; paper-logs every qualifying game kicking off within 24 h with its blocker. Gated on the Eastern clock so DST needs no edit. The board is one rolling week — each game locks at its own kickoff | `card.yml` |
+| Thu / Fri ~4pm               | **Afternoon card**: Hard Rock posts weeknight first-half lines during the day, after the morning build, so this build sweeps only that evening's kickoffs, rebuilds the card (newest card wins on the board) and paper-logs those games (10 h window; Saturday's games stay with Saturday's morning build). Gated 3:45–5:15pm ET, once a day | `card.yml` |
 | Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every morning build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 | Sat 8:50am                   | **Card routine**: verify/kick the morning build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
@@ -186,9 +187,10 @@ week expected (`lines_watch.yml` header).
   dormant until an exchange starts posting the market.
   That measures each gate, not just the survivors. The cloud card
   (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
-  per qualifying game at its decision build — the Thursday/Friday evening
-  card for weeknight games, the Saturday-morning card for the Saturday slate
-  (`--paper-log-window-hours`) — never twice for one game. A paper pick never
+  per qualifying game at its decision build — the morning card for every
+  game kicking off before the next build, the Thursday/Friday afternoon card
+  for that evening's kickoffs (`--paper-log-window-hours`) — never twice for
+  one game. A paper pick never
   blocks your real ticket on the same game, and vice versa (the duplicate
   guard is per ledger). The card ranks BETs by gap (the cap-5 rule the
   backtest measured), so the text order is the cap order. A real ticket this

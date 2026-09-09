@@ -1205,8 +1205,8 @@ def build_card(
             "model_read": model_read,
             "slot": slot,
             # A failed BUILD-WIDE input beats the slot's own status: the site's
-            # banner and the Saturday text both key off this one word. A pace
-            # entry holds its games but leaves the status to the slot.
+            # banner and the Saturday card routine's text both key off this one
+            # word. A pace entry holds its games but leaves the status to the slot.
             "status": (
                 "degraded"
                 if card_status_degraded(deg)

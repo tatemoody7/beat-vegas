@@ -155,7 +155,7 @@ def _card_steps_by_id():
 def test_card_yml_wires_the_status_files_through_to_the_build():
     """PR-7: the two steps that can degrade write a status file, and the build
     reads both plus the resolved slot — otherwise a card built on a half-swept
-    slate or a blank injury feed ships as the Saturday final."""
+    slate or a blank injury feed ships as the morning card."""
     steps = _card_steps_by_id()
     sweep, preview, build = (
         steps["sweep"],
@@ -180,3 +180,79 @@ def test_card_yml_can_rehearse_a_degraded_card_on_demand():
     sweep = _card_steps_by_id()["sweep"]
     assert sweep["env"]["MAX_CREDITS"] == "${{ inputs.max_credits }}"
     assert "--max-credits-per-run $MAX_CREDITS" in sweep["run"]
+
+
+def test_card_yml_installs_before_resolving_the_slot():
+    """The resolve step probes the `cards` table (beatvegas.ci.slots_built_today),
+    so python + the package must be installed BEFORE it runs, and the old
+    `gh run list --status success` retry check — which counted a gate-skip run as
+    a success and blocked the EST build — must be gone."""
+    steps = _card_steps()
+    setup = next(
+        i for i, s in enumerate(steps) if str(s.get("uses", "")).startswith("actions/setup-python@")
+    )
+    install = next(i for i, s in enumerate(steps) if s.get("name") == "Install")
+    resolve = next(i for i, s in enumerate(steps) if s.get("id") == "slot")
+    assert setup < resolve and install < resolve
+    assert "if" not in steps[setup] and "if" not in steps[install]
+    run = steps[resolve]["run"]
+    assert "beatvegas.ci" in run
+    assert "gh run list" not in run and "retry_since" not in run
+    assert "GH_TOKEN" not in (steps[resolve].get("env") or {})
+    # Every step after the resolve is gated on it (directly or via a derived output).
+    for s in steps[resolve + 1 :]:
+        assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
+    assert steps[-1]["if"] == "steps.slot.outputs.slot != 'skip'"
+    inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
+    assert inputs["slot"]["description"].startswith("morning | afternoon | manual")
+
+
+def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
+    """grade.yml runs twice a day with no skip gate, so each run must be cheap:
+    the PBP step fetches only the weeks still missing rows, and the post-mortem
+    regrades only the live season except on Monday ET / a manual dispatch."""
+    data = _load(WF_DIR / "grade.yml")
+    steps = data["jobs"]["grade"]["steps"]
+    runs = [s["run"] for s in steps if isinstance(s.get("run"), str)]
+    pbp = next(r for r in runs if "scripts/backfill_pbp.py" in r)
+    assert "--only-missing" in pbp
+    resolve = next(s for s in steps if s.get("id") == "season")
+    assert "et_dow=$(TZ=America/New_York date +%u)" in resolve["run"]
+    pm = next(s for s in steps if "scripts/post_mortem.py" in (s.get("run") or ""))
+    assert pm["env"]["ET_DOW"] == "${{ steps.season.outputs.et_dow }}"
+    assert "scope=live" in pm["run"]
+    assert '"$ET_DOW" = "1"' in pm["run"]
+    assert '"$GITHUB_EVENT_NAME" = "workflow_dispatch"' in pm["run"]
+    assert '--scope "$scope"' in pm["run"]
+    # Both crons stay; no case-block gate.
+    assert len(_cron_strings(data)) == 2
+    assert not any('case "$SCHEDULE"' in r for r in runs)
+
+
+def test_rescore_yml_is_dispatch_only_and_writes_through_env():
+    """rescore.yml: re-score one past week (2026 week 1 was never scored).
+    Dispatch-only with required season/week inputs that reach bash only via
+    env:, no GameRecord snapshot after kickoff, then the two graders."""
+    data = _load(WF_DIR / "rescore.yml")
+    on = _on(data)
+    assert set(on) == {"workflow_dispatch"}
+    inputs = on["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"season", "week"}
+    assert inputs["season"]["required"] is True and inputs["week"]["required"] is True
+    assert (data.get("concurrency") or {}).get("group") == NEON_GROUP
+    steps = data["jobs"]["rescore"]["steps"]
+    run_steps = [s for s in steps if isinstance(s.get("run"), str)]
+    for s in run_steps:
+        assert "inputs." not in s["run"], "an input is inlined into a run: block"
+    score = next(s for s in run_steps if "scripts/weekly_update.py" in s["run"])
+    assert "--no-snapshot" in score["run"]
+    assert '--season "$IN_SEASON"' in score["run"] and '--week "$IN_WEEK"' in score["run"]
+    assert score["env"] == {"IN_SEASON": "${{ inputs.season }}", "IN_WEEK": "${{ inputs.week }}"}
+    order = [
+        i
+        for i, s in enumerate(run_steps)
+        if any(k in s["run"] for k in ("weekly_update.py", "scripts/grade.py", "pick.py grade"))
+    ]
+    assert len(order) == 3 and order == sorted(order)
+    assert "scripts/grade.py" in run_steps[order[1]]["run"]
+    assert "pick.py grade" in run_steps[order[2]]["run"]

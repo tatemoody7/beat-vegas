@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { etParts, pad2 } from "@/lib/et";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -50,23 +51,13 @@ export type Movement = {
 // "2025-10-13 12:00:00.000000" (stored naive UTC) -> "10-13 08:00" in ET.
 // Without the conversion every point on the movement chart reads 4-5h late
 // for the Florida user actually timing these moves.
-const ET_FMT = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
 export function shortT(s: string): string {
   const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
   if (!m) return s;
   const d = new Date(`${m[1]}T${m[2]}:00Z`);
   if (Number.isNaN(d.getTime())) return s;
-  const p = Object.fromEntries(
-    ET_FMT.formatToParts(d).map((x) => [x.type, x.value]),
-  );
-  return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
+  const p = etParts(d);
+  return `${pad2(p.month)}-${pad2(p.day)} ${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
 export type MoveSnap = {

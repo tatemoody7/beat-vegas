@@ -512,7 +512,13 @@ def score_slate(
     return target
 
 
-def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) -> int:
+def store_predictions(
+    scored: pd.DataFrame, model_version: str = MODEL_VERSION, snapshot: bool = True
+) -> int:
+    """Delete-then-insert the slate's predictions rows per game (so a re-score
+    replaces cleanly) and, unless `snapshot=False`, freeze the pre-kickoff
+    GameRecords. A retrospective re-score of a played week (rescore.yml) passes
+    False: a GameRecord written after kickoff would not be a pre-game record."""
     init_db()
     now = datetime.utcnow()
     # Board references: prefer the historical ones score_slate attached; else
@@ -563,5 +569,6 @@ def store_predictions(scored: pd.DataFrame, model_version: str = MODEL_VERSION) 
             n += 1
         # Freeze immutable per-game snapshots (our own model-shaped record).
         # Idempotent per (game, model): the first pre-kickoff capture stands.
-        snapshot_slate(s, scored, model_version, now)
+        if snapshot:
+            snapshot_slate(s, scored, model_version, now)
     return n

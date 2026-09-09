@@ -85,8 +85,8 @@
 - DB: SQLite locally, **Neon Postgres** in the cloud (`DATABASE_URL`).
 - Product: the **Next.js app on Vercel** (Neon-backed, password-gated).
 - Engine: the Python scripts run in **GitHub Actions** (`.github/workflows/`) — Sunday
-  capture + score, Wed–Fri opener sweeps + per-game 1H closes, weeknight/Friday/
-  Saturday-final cards, Monday grading, Tue/Fri research preview. GitHub emails
+  capture + score, per-game 1H closes, a morning card Tue–Sat (~8:05am ET) plus an
+  afternoon card Thu/Fri (~4pm ET), daily grading, Tue/Fri research preview. GitHub emails
   failed runs; the Claude routines (Saturday card, Sunday ops/recap, Monday coaching)
   check each workflow and text Tate.
 - Repo (private): https://github.com/tatemoody7/beat-vegas

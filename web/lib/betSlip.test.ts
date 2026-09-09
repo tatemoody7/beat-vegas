@@ -54,7 +54,7 @@ const card = (items: CardItem[]): Card => ({
   week: 3,
   builtAt: "2026-09-19T12:45:00Z",
   modelRead: true,
-  slot: "saturday",
+  slot: "morning",
   status: "final",
   degraded: [],
   counts: {

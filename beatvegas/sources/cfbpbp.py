@@ -16,7 +16,7 @@ team names from the games table by game_id. Game ids are the shared ESPN id.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -152,13 +152,24 @@ def normalize_cfbd(plays: List[dict]) -> pd.DataFrame:
     return out
 
 
-def load_plays(season: int, client: Optional[CFBDClient] = None, weeks: int = 20) -> pd.DataFrame:
-    """Normalized plays for a season from whichever free source covers it."""
+def load_plays(
+    season: int,
+    client: Optional[CFBDClient] = None,
+    weeks: int = 20,
+    week_list: Optional[Iterable[int]] = None,
+) -> pd.DataFrame:
+    """Normalized plays for a season from whichever free source covers it.
+
+    CFBD seasons (> PARQUET_MAX_YEAR) fetch one /plays call per week: weeks
+    1..`weeks` by default, or exactly `week_list` when given (the daily grading
+    run passes only the weeks still missing fh_team_game rows). The parquet
+    path is one file per season, so `week_list` does not apply there."""
     if season <= PARQUET_MAX_YEAR:
         return normalize_cfbfastr(load_parquet_season(season))
     client = client or CFBDClient()
     frames = []
-    for wk in range(1, weeks + 1):
+    week_iter = list(week_list) if week_list is not None else range(1, weeks + 1)
+    for wk in week_iter:
         try:
             plays = client.plays(year=season, week=wk)
         except Exception:

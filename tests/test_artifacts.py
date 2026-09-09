@@ -299,7 +299,7 @@ def _wire(monkeypatch, mem, scored: pd.DataFrame, engine: str = "residual"):
     monkeypatch.setattr(wu, "training_real_closes", lambda frame, season: {})
     monkeypatch.setattr(wu, "score_slate", lambda *a, **k: scored)
     monkeypatch.setattr(wu, "_enrich_qb_out", lambda scored: None)
-    monkeypatch.setattr(wu, "store_predictions", lambda scored: len(scored))
+    monkeypatch.setattr(wu, "store_predictions", lambda scored, **kw: len(scored))
     monkeypatch.setattr(wu, "session_scope", scope)
     monkeypatch.setattr(sys, "argv", ["weekly_update.py", "--season", "2026"])
     return wu

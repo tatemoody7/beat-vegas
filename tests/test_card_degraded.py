@@ -211,7 +211,7 @@ def test_incomplete_sweep_whose_unreached_games_are_all_off_card_degrades_nothin
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=d,
     )
     # Owner decision (2026-09-08): a sweep that held no card game does not flip
@@ -267,7 +267,7 @@ def test_an_empty_injury_feed_makes_every_bet_paper_only():
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=d,
     )
     assert c["status"] == "degraded"
@@ -295,7 +295,7 @@ def test_a_healthy_feed_still_holds_a_game_whose_preview_is_missing_or_old():
 
 
 def test_no_preview_status_means_the_step_did_not_run_and_is_not_a_failure():
-    """The weeknight slots skip the preview when today's rows exist; a missing
+    """A dispatch with no forced preview skips it when today's rows exist; a missing
     file must not hold games whose rows happen to be older."""
     d = degraded_inputs(
         [game(1), game(2)],
@@ -517,7 +517,7 @@ def _degraded_card(**kw):
 
 @pytest.mark.parametrize(
     "slot,expected",
-    [("saturday", "final"), ("friday", "preview"), ("manual", "preview"), ("weeknight", "final")],
+    [("morning", "final"), ("afternoon", "final"), ("manual", "preview")],
 )
 def test_status_comes_from_the_slot_on_a_clean_build(slot, expected):
     c = build_card(
@@ -530,8 +530,8 @@ def test_status_comes_from_the_slot_on_a_clean_build(slot, expected):
 
 def test_status_is_degraded_whatever_the_slot_says():
     """A sweep that held a card game is build-wide: the status flips."""
-    c = _degraded_card(slot="saturday")
-    assert c["status"] == "degraded" and c["slot"] == "saturday"
+    c = _degraded_card(slot="morning")
+    assert c["status"] == "degraded" and c["slot"] == "morning"
     assert c["counts"]["degraded"] == 1
     assert c["degraded"] == [
         {"input": "sweep", "detail": "stopped early (credit_cap)", "game_ids": [1]}
@@ -568,7 +568,9 @@ def test_card_status_inputs_are_the_build_wide_ones():
     assert "pace" not in CARD_STATUS_INPUTS
 
 
-@pytest.mark.parametrize("slot,expected", [("saturday", "final"), ("friday", "preview")])
+@pytest.mark.parametrize(
+    "slot,expected", [("morning", "final"), ("afternoon", "final"), ("manual", "preview")]
+)
 def test_a_pace_only_failure_holds_its_game_but_does_not_flip_the_card(slot, expected):
     """Owner decision (2026-09-08): pace is missing on ~5% of games, so a
     per-game pace failure must not turn every Saturday's banner red. The game
@@ -605,7 +607,7 @@ def test_a_failed_preview_flips_the_card_status():
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=deg,
     )
     assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
@@ -621,7 +623,7 @@ def test_an_empty_tempo_table_flips_the_card_status():
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=deg,
     )
     assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
@@ -637,7 +639,7 @@ def test_a_sweep_that_held_a_card_game_flips_the_card_status():
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=deg,
     )
     assert c["status"] == "degraded" and c["counts"]["degraded"] == 1
@@ -650,7 +652,7 @@ def test_a_sweep_that_held_a_card_game_flips_the_card_status():
         season=2026,
         week=3,
         now=NOW,
-        slot="saturday",
+        slot="morning",
         degraded=deg + [{"input": "pace", "detail": "", "game_ids": [1]}],
     )
     assert c2["status"] == "degraded" and c2["counts"]["degraded"] == 2
@@ -664,7 +666,7 @@ def test_a_build_with_no_slot_still_reads_final():
 
 def test_payload_keys_match_the_web_contract():
     """web/lib/card.ts parseCard reads exactly these names."""
-    c = _degraded_card(slot="saturday")
+    c = _degraded_card(slot="morning")
     assert set(c) == {
         "season",
         "week",

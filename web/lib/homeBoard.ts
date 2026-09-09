@@ -1,4 +1,5 @@
 import { bookLabel } from "@/lib/books";
+import { etClock12, etParts } from "@/lib/et";
 import { settledOf, type Settled } from "@/lib/grade";
 import { getBoard, type BoardRow } from "@/lib/board";
 import {
@@ -93,8 +94,6 @@ export function bankrollCurve(
 
 // --- kickoff ----------------------------------------------------------------
 
-const ET = "America/New_York";
-
 function asDate(d: Date | string | null): Date | null {
   if (d === null) return null;
   const t = new Date(d);
@@ -105,16 +104,7 @@ function asDate(d: Date | string | null): Date | null {
 export function kickoffET(d: Date | string | null): string | null {
   const t = asDate(d);
   if (t === null) return null;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: ET,
-    weekday: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).formatToParts(t);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const ampm = get("dayPeriod").toLowerCase().startsWith("p") ? "p" : "a";
-  return `${get("weekday")} ${get("hour")}:${get("minute")}${ampm}`;
+  return etClock12(t, ["a", "p"]);
 }
 
 export const DAYS = ["thu", "fri", "sat", "sun"] as const;
@@ -130,12 +120,7 @@ export const DAY_LABEL: Record<(typeof DAYS)[number], string> = {
 export function dayKey(d: Date | string | null): DayKey | null {
   const t = asDate(d);
   if (t === null) return null;
-  const wd = new Intl.DateTimeFormat("en-US", {
-    timeZone: ET,
-    weekday: "short",
-  })
-    .format(t)
-    .toLowerCase();
+  const wd = etParts(t).weekday.toLowerCase();
   return (DAYS as readonly string[]).includes(wd) ? (wd as DayKey) : "other";
 }
 

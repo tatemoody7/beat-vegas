@@ -104,13 +104,11 @@ slots and the card job runs any missing input itself before it builds.
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
 | Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
 | Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
-| Wed 2pm; Thu 10am/4pm; Fri 8am/noon/4pm | `lines_watch.yml` | Opener sweeps: every Hard Rock-priced game without a Hard Rock 1H line yet |
-| Tue–Thu ~4:05pm                    | `card.yml`             | Weeknight card (tonight's games), paper-logs qualifying games kicking off within 10 h |
-| Fri ~6:05pm (retry 7pm)            | `card.yml`             | Preview card after a full sweep of the weekend slate                   |
+| Tue–Sat ~8:05am (ET-gated 7:45–9:15) | `card.yml` slot `morning` | The decision build for every game before the next build: full 1H sweep of the rolling week + injury refresh → FINAL card → paper-log qualifying games kicking off within 24 h, each with its blocker |
+| Thu / Fri ~4pm (ET-gated 3:45–5:15) | `card.yml` slot `afternoon` | Tonight's kickoffs (within 10 h): Hard Rock posts weeknight 1H lines after the morning build, so this FINAL card is the one that sees them |
 | Every 30 min, evenings + all Saturday | `lines_watch.yml`   | Per-game Hard Rock 1H closes ~30–75 min before each kickoff             |
-| Sat ~8:05–8:45am (ET-gated)        | `card.yml`             | FINAL card: forced sweep + injury refresh → build → paper-log every qualifying game with its blocker |
-| Sat 8:50am                         | routine `cfb-saturday-card` | Verify/kick the final, text the BET list with line, price, kill numbers |
-| Mon 8am / 10am / 1pm               | `grade.yml`            | Finals + 1H play-by-play → grade market / model / picks / records → post-mortem |
+| Sat 8:50am                         | routine `cfb-saturday-card` | Verify/kick the morning card, text the BET list with line, price, kill numbers |
+| Daily 6:30am (retry noon)          | `grade.yml`            | Finals (completed games only) + 1H play-by-play for weeks still missing it → grade market / model / picks / records → post-mortem (2023-25 history only on Monday) |
 | Mon 9am                            | routine `monday-coaching` | Includes a one-line grading check (kicks `grade.yml` if cron dropped it) |
 
 Manual-only workflows: `post-lines.yml` (derived lines for the board),

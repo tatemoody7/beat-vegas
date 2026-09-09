@@ -209,7 +209,9 @@ def test_a_real_ticket_and_the_paper_pick_coexist_on_one_game(env):
 
 
 def test_paper_window_skips_games_kicking_off_later(env):
-    """The Friday preview logs only Friday-night games (--paper-log-window-hours 6)."""
+    """The paper window (--paper-log-window-hours; 24 for the morning card, 10 for
+    the afternoon card) logs only games kicking off inside it, so each game is
+    logged exactly once, by ITS decision build."""
     mod, eng = env
     seed_week(eng)  # everything kicks off ~24h out
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, paper_window_hours=6) == 0
@@ -504,19 +506,19 @@ def _summary(capsys):
 def test_a_final_card_prints_its_status_on_line_two(env, capsys):
     mod, eng = env
     seed_week(eng)
-    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning") == 0
     lines = _summary(capsys)
     assert lines[0].startswith("Card 2026 wk3 built ")
-    assert lines[1] == "CARD STATUS: final slot=saturday held=0 (bets 0)"
+    assert lines[1] == "CARD STATUS: final slot=morning held=0 (bets 0)"
     with Session(eng) as s:
         payload = json.loads(s.query(Card).one().payload)
-    assert payload["slot"] == "saturday" and payload["status"] == "final"
+    assert payload["slot"] == "morning" and payload["status"] == "final"
     assert payload["degraded"] == [] and payload["counts"]["degraded"] == 0
 
 
 def test_missing_status_files_do_not_degrade_a_healthy_card(env, capsys, tmp_path):
-    """The weeknight slots skip the sweep when today's snapshots already exist,
-    so "no file" must never read as "the sweep failed"."""
+    """A dispatch with no forced sweep skips it when today's snapshots already
+    exist, so "no file" must never read as "the sweep failed"."""
     mod, eng = env
     seed_week(eng)
     assert (
@@ -525,13 +527,13 @@ def test_missing_status_files_do_not_degrade_a_healthy_card(env, capsys, tmp_pat
             WEEK,
             dry_run=False,
             now=NOW,
-            slot="friday",
+            slot="manual",
             sweep_status_path=str(tmp_path / "nope.json"),
             preview_status_path=str(tmp_path / "also-nope.json"),
         )
         == 0
     )
-    assert _summary(capsys)[1] == "CARD STATUS: preview slot=friday held=0 (bets 0)"
+    assert _summary(capsys)[1] == "CARD STATUS: preview slot=manual held=0 (bets 0)"
 
 
 def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, capsys, tmp_path):
@@ -549,11 +551,11 @@ def test_a_truncated_sweep_makes_the_card_degraded_and_the_bet_paper_only(env, c
         },
     )
     assert (
-        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=sweep) == 0
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning", sweep_status_path=sweep) == 0
     )
     lines = _summary(capsys)
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday held=1 (bets 1) "
+        "CARD STATUS: degraded slot=morning held=1 (bets 1) "
         "[sweep: stopped early (credit_cap) after 3 of 5 events]"
     )
     # the bet is no longer texted as a bet...
@@ -580,13 +582,12 @@ def test_a_failed_research_preview_holds_every_game_on_the_card(env, capsys, tmp
     seed_week(eng)
     prev = _write(tmp_path, "preview.json", {"ok": False, "reason": "rotowire_empty"})
     assert (
-        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
-        == 0
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning", preview_status_path=prev) == 0
     )
     lines = _summary(capsys)
     assert lines[0].startswith("Card 2026 wk3 built ") and " 0 BET / " in lines[0]
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday held=4 (bets 1) "
+        "CARD STATUS: degraded slot=morning held=4 (bets 1) "
         "[preview: rotowire_empty: the injury read failed, so the quarterback gate "
         "could not run on any of the 4 games]"
     )
@@ -608,8 +609,7 @@ def test_a_healthy_preview_still_holds_the_games_with_no_qb_read_from_today(env,
     seed_week(eng)
     prev = _write(tmp_path, "preview.json", {"ok": True, "reason": None})
     assert (
-        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", preview_status_path=prev)
-        == 0
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning", preview_status_path=prev) == 0
     )
     with Session(eng) as s:
         payload = json.loads(s.query(Card).one().payload)
@@ -639,7 +639,7 @@ def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
         },
     )
     assert (
-        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=sweep) == 0
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning", sweep_status_path=sweep) == 0
     )
     lines = _summary(capsys)
     edge = [ln for ln in lines if ln.startswith("  EDGE Iowa @ Nebraska")]
@@ -665,7 +665,7 @@ def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
         s.query(ManualPick).delete()
         s.query(Card).delete()
         s.commit()
-    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning") == 0
     with Session(eng) as s:
         pick = s.query(ManualPick).filter(ManualPick.game_id == 1).one()
     assert pick.blocker == "none"
@@ -678,12 +678,12 @@ def test_an_unreadable_status_file_is_ignored_not_treated_as_a_failure(env, caps
     bad = tmp_path / "sweep.json"
     bad.write_text("{not json")
     assert (
-        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday", sweep_status_path=str(bad))
+        mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning", sweep_status_path=str(bad))
         == 0
     )
     lines = _summary(capsys)
     assert any("could not read status file" in ln for ln in lines)
-    assert "CARD STATUS: final slot=saturday held=0 (bets 0)" in lines
+    assert "CARD STATUS: final slot=morning held=0 (bets 0)" in lines
 
 
 def test_an_empty_tempo_table_degrades_every_model_game(env, capsys):
@@ -692,10 +692,10 @@ def test_an_empty_tempo_table_degrades_every_model_game(env, capsys):
     with Session(eng) as s:
         s.query(TeamTempo).delete()
         s.commit()
-    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning") == 0
     lines = _summary(capsys)
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
+        "CARD STATUS: degraded slot=morning held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
     )
 
 
@@ -718,10 +718,10 @@ def test_tempo_rows_from_other_seasons_and_weeks_do_not_hide_an_empty_current_we
         s.commit()
         assert mod.tempo_row_count(s, SEASON, WEEK) == 0
         assert mod.tempo_row_count(s, SEASON - 1, WEEK) == 4
-    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="saturday") == 0
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, slot="morning") == 0
     lines = _summary(capsys)
     assert lines[1] == (
-        "CARD STATUS: degraded slot=saturday held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
+        "CARD STATUS: degraded slot=morning held=4 (bets 1) [tempo: the tempo table stored 0 rows]"
     )
     with Session(eng) as s:
         payload = json.loads(s.query(Card).one().payload)

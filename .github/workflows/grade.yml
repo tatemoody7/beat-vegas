@@ -6,6 +6,11 @@ name: Daily grading (results + ledger)
 # Thursday game is graded Friday morning, Friday's on Saturday, Saturday's on
 # Sunday, and Monday's run is the full weekly pass. grade.py is season-wide and
 # delete-then-rewrite idempotent, so a late final simply grades next morning. Off-season every step is a green no-op.
+# Both crons run every step with no skip gate, so each run is kept CHEAP: the
+# finals refresh only writes games CFBD marks completed (a noon-ET Saturday run
+# never freezes a live score), the PBP step fetches only the weeks still missing
+# fh_team_game rows, and the post-mortem regrades only the live season except on
+# Monday (ET) and on a manual dispatch, when it also redoes the 2023-25 history.
 # Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
 # ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
 # (sunday.yml). A red run here means "the ledger or PBP factors are stale";
@@ -44,13 +49,17 @@ jobs:
         id: season
         run: |
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
+          # ISO weekday in Eastern time (1 = Monday): the weekly full pass.
+          echo "et_dow=$(TZ=America/New_York date +%u)" >> "$GITHUB_OUTPUT"
       - name: Refresh final scores (CFBD)
         run: python scripts/backfill.py --season ${{ steps.season.outputs.season }}
       - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
         # fh_team_game feeds the season-to-date FH factors the Sunday scorer
-        # reads; without this the current season never accrues PBP rows. ~20
-        # CFBD calls, upsert by (game_id, off_team), fail-silent per season.
-        run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }}
+        # reads; without this the current season never accrues PBP rows.
+        # --only-missing: one CFBD call per week that still has a finished FBS
+        # game without rows (usually one, often none) instead of all 20 weeks
+        # twice a day; upsert by (game_id, off_team), fail-silent per season.
+        run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }} --only-missing
       - name: Grade market vs model ledger
         run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
       - name: Grade my picks
@@ -60,7 +69,15 @@ jobs:
       - name: Grade factor credibility ledger (real lines only)
         run: python scripts/grade_factor_ledger.py
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
-        # Regrades the stored 2023-25 ratings under the flat and fair proxies and
-        # the season's cards at Hard Rock's numbers; delete-then-rewrite per scope,
-        # no API calls. Feeds the Results page panel and docs/POST_MORTEM.md.
-        run: python scripts/post_mortem.py --write --md ""
+        # Regrades the season's cards at Hard Rock's numbers (scope live) every
+        # run; the stored 2023-25 ratings under the flat and fair proxies (scope
+        # hist, the expensive half) only on Monday ET and on a manual dispatch.
+        # Delete-then-rewrite per scope, no API calls. Feeds the Results page
+        # panel and docs/POST_MORTEM.md.
+        env:
+          ET_DOW: ${{ steps.season.outputs.et_dow }}
+        run: |
+          scope=live
+          if [ "$ET_DOW" = "1" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then scope=both; fi
+          echo "post-mortem scope=$scope (et_dow=$ET_DOW event=$GITHUB_EVENT_NAME)"
+          python scripts/post_mortem.py --write --md "" --scope "$scope"

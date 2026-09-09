@@ -47,13 +47,31 @@ def _parse_dt(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
+_NO_FIRST_HALF: Dict[str, Any] = {
+    "home_first_half_points": None,
+    "away_first_half_points": None,
+    "first_half_total": None,
+    "first_half_source": None,
+}
+
+
+def _is_completed(g: Dict[str, Any]) -> bool:
+    """Is this game FINAL? CFBD's `completed` flag when the row carries one
+    (a live game has points but completed=False, and the noon-ET Saturday
+    grading run must never freeze a partial score into home/away_points or the
+    1H total, where write-once pick grading would keep it). Older exports
+    without the key: final only when BOTH point columns are present."""
+    if g.get("completed") is not None:
+        return bool(g["completed"])
+    return (
+        _get(g, "homePoints", "home_points") is not None
+        and _get(g, "awayPoints", "away_points") is not None
+    )
+
+
 def _needs_pbp(g: Dict[str, Any]) -> bool:
     """A finished game whose line scores can't produce a trusted 1H total."""
-    finished = (
-        _get(g, "homePoints", "home_points") is not None
-        or _get(g, "awayPoints", "away_points") is not None
-    )
-    if not finished:
+    if not _is_completed(g):
         return False
     fh = first_half_from_line_scores(g)
     return fh is None or not line_scores_trustworthy(g, fh)
@@ -93,7 +111,11 @@ def backfill_season(
     n_with_1h = 0
     for g in games:
         gid = _get(g, "id")
-        fh = attach_first_half(g, pbp_lookup or None)
+        # An in-progress game writes NO points and NO first-half columns:
+        # store.upsert never writes None, so the row's existing values (or
+        # NULLs, for an unplayed game) stand until the game is final.
+        completed = _is_completed(g)
+        fh = attach_first_half(g, pbp_lookup or None) if completed else dict(_NO_FIRST_HALF)
         if fh["first_half_total"] is not None:
             n_with_1h += 1
         ou, sp, prov = total_by_game.get(gid, (None, None, None))
@@ -109,8 +131,8 @@ def backfill_season(
             "away_team": _get(g, "awayTeam", "away_team"),
             "home_team_id": _get(g, "homeId", "home_id"),
             "away_team_id": _get(g, "awayId", "away_id"),
-            "home_points": _get(g, "homePoints", "home_points"),
-            "away_points": _get(g, "awayPoints", "away_points"),
+            "home_points": _get(g, "homePoints", "home_points") if completed else None,
+            "away_points": _get(g, "awayPoints", "away_points") if completed else None,
             "full_game_total": ou,
             "full_game_total_book": prov,
             "spread": sp,

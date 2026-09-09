@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Build the week's bet card and publish it to the Board (`cards` table).
 
-Runs in GitHub Actions (`.github/workflows/card.yml`: weeknight + Friday preview
-builds, then the Saturday-morning FINAL ~8:05-8:45am ET; slots in
+Runs in GitHub Actions (`.github/workflows/card.yml`: the morning build Tue-Sat
+~8:05-8:45am ET, the decision build for every game before the next one, plus a
+Thu/Fri ~4pm ET afternoon build for that evening's kickoffs; slots in
 beatvegas/ci.py). Pure rules live in beatvegas/card.py; this script only loads
 the inputs, writes one `cards` row per build (history; the newest row is the
 live card) and logs every QUALIFYING game (Hard Rock's 1H line >= BET_GAP_PTS
@@ -12,7 +13,7 @@ code path as `pick.py add` (beatvegas.picks.add_pick), never twice for one game.
     python scripts/build_card.py                      # active season/week
     python scripts/build_card.py --season 2026 --week 3
     python scripts/build_card.py --dry-run            # print the payload, write nothing
-    python scripts/build_card.py --slot saturday \
+    python scripts/build_card.py --slot morning \
         --sweep-status "$RUNNER_TEMP/sweep_status.json" \
         --preview-status "$RUNNER_TEMP/preview_status.json"
 
@@ -20,7 +21,7 @@ code path as `pick.py add` (beatvegas.picks.add_pick), never twice for one game.
 status files say whether the sweep and the research preview actually covered the
 slate. Any failure marks the games it touched paper only, the card status
 "degraded", and prints it as line 2 of the summary ("CARD STATUS: ...") — the
-Saturday text routine only ever saw a green workflow before.
+Saturday card routine only ever saw a green workflow before.
 
 Exit 1 when the Hard Rock universe has games but the card came out empty (every
 game already kicked off, or the inputs are missing) so the run goes red instead
@@ -160,9 +161,9 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
 def load_status(path: Optional[str]) -> Optional[Dict]:
     """A --status-file written by poll_lines.py / research_preview.py, or None.
 
-    None means "that step did not run" (the weeknight slots skip the sweep when
-    today's snapshots already exist, and the workflow only writes the preview
-    file when the step ran), which is NOT a failure. A file that is missing or
+    None means "that step did not run" (a dispatch with no forced sweep skips it
+    when today's snapshots already exist, and the workflow only writes the
+    preview file when the step ran), which is NOT a failure. A file that is missing or
     unreadable is treated the same way rather than degrading a healthy card."""
     if not path or not os.path.exists(path):
         return None
@@ -205,8 +206,8 @@ def log_paper_picks(
     no_fair_price, qb_out, cap, degraded). Tate's real ticket on the same game never blocks it and is
     never blocked by it (per-ledger guard). `window_hours` restricts logging to
     games kicking off within that many hours (the DECISION build for that game:
-    Thursday/Friday evening for weeknight games, Saturday morning for the
-    Saturday slate). Marks `paper_logged`. Returns the number inserted."""
+    the morning build for everything kicking off before the next one, the
+    Thu/Fri afternoon build for that evening's kickoffs). Marks `paper_logged`. Returns the number inserted."""
     inserted = 0
     for it in card["items"]:
         if not it.get("qualifies"):
@@ -481,7 +482,7 @@ def main() -> None:
     ap.add_argument(
         "--slot",
         default=None,
-        help="which build this is (weeknight|friday|saturday|manual, "
+        help="which build this is (morning|afternoon|manual, "
         "beatvegas.ci.CARD_STATUS_BY_SLOT); sets the card's clean status",
     )
     ap.add_argument(

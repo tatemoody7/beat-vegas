@@ -1,0 +1,61 @@
+name: Re-score a past week (retro)
+
+# Scores (or re-scores) ONE season/week and regrades the ledgers, writing to
+# Neon. Dispatch-only: the weekly Sunday scoring (sunday.yml) and the card-day
+# re-score (card.yml) cover the live week; this exists for a week that was never
+# scored (2026 week 1) or that needs re-scoring after a data repair.
+#
+# What it writes: `predictions` rows are delete-then-insert PER GAME
+# (beatvegas/model/score.py store_predictions), so a retro score replaces the
+# week's rows cleanly. `--no-snapshot` skips the GameRecord freeze: a record
+# written after kickoff would not be a pre-game record, and snapshot_slate is
+# write-once per (game, model) anyway. Played pushes are dropped from the feature
+# frame, so a re-scored played week comes back with slightly fewer rows than the
+# week had games. Then grade.py (season-wide, delete-then-rewrite) and
+# `pick.py grade` fill the market / model / pick ledgers for the newly scored
+# rows. No Odds API credits: it reads the snapshots already in Neon.
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season, e.g. 2026"
+        required: true
+      week:
+        description: "Week to (re-)score, e.g. 1"
+        required: true
+
+# Shares the Neon writers' group: predictions and the ledgers are
+# delete-then-insert, so this must never overlap sunday.yml / card.yml / grade.yml.
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  rescore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Score the week (no GameRecord snapshots)
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_SEASON: ${{ inputs.season }}
+          IN_WEEK: ${{ inputs.week }}
+        run: python scripts/weekly_update.py --season "$IN_SEASON" --week "$IN_WEEK" --no-snapshot
+      - name: Grade market vs model ledger
+        env:
+          IN_SEASON: ${{ inputs.season }}
+        run: python scripts/grade.py --season "$IN_SEASON"
+      - name: Grade my picks
+        env:
+          IN_SEASON: ${{ inputs.season }}
+        run: python scripts/pick.py grade --season "$IN_SEASON"

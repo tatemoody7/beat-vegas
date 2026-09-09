@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/grade", "schedule": "0 10 * * *" },
+
+    { "path": "/api/cron/card-tue-pm", "schedule": "0 19 * * 2" },
+    { "path": "/api/cron/card-tue-pm", "schedule": "0 20 * * 2" },
+    { "path": "/api/cron/card-tue-pm", "schedule": "0 21 * * 2" },
+
+    { "path": "/api/cron/card-thu-pm", "schedule": "0 19 * * 4" },
+    { "path": "/api/cron/card-thu-pm", "schedule": "0 20 * * 4" },
+    { "path": "/api/cron/card-thu-pm", "schedule": "0 21 * * 4" },
+
+    { "path": "/api/cron/card-fri-pm", "schedule": "0 19 * * 5" },
+    { "path": "/api/cron/card-fri-pm", "schedule": "0 20 * * 5" },
+    { "path": "/api/cron/card-fri-pm", "schedule": "0 21 * * 5" },
+
+    { "path": "/api/cron/card-sat-am", "schedule": "0 11 * * 6" },
+    { "path": "/api/cron/card-sat-am", "schedule": "0 12 * * 6" },
+    { "path": "/api/cron/card-sat-am", "schedule": "0 13 * * 6" }
+  ]
+}

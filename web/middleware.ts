@@ -8,7 +8,11 @@ import {
 
 // Locks the whole app when APP_PASSWORD is set: browser requests redirect to
 // /login, API requests get 401. /login + /api/login + static assets are exempt
-// via the matcher below.
+// via the matcher below — and so is /api/cron, which Vercel's scheduler calls
+// with no session cookie. Without that exemption every cron invocation would
+// get a 401, Vercel would record it as completed, and no build would ever be
+// dispatched while the dashboard looked healthy. That route authenticates
+// itself against CRON_SECRET instead, and fails closed when it is unset.
 export async function middleware(req: NextRequest) {
   if (gateMisconfigured()) {
     // Deployed without APP_PASSWORD: fail closed, never serve the board open.
@@ -32,6 +36,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/login|api/health|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/login|api/health|api/cron|login|_next/static|_next/image|favicon.ico).*)",
   ],
 };

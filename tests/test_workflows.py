@@ -180,3 +180,28 @@ def test_card_yml_can_rehearse_a_degraded_card_on_demand():
     sweep = _card_steps_by_id()["sweep"]
     assert sweep["env"]["MAX_CREDITS"] == "${{ inputs.max_credits }}"
     assert "--max-credits-per-run $MAX_CREDITS" in sweep["run"]
+
+
+def test_card_yml_installs_before_resolving_the_slot():
+    """The resolve step probes the `cards` table (beatvegas.ci.slots_built_today),
+    so python + the package must be installed BEFORE it runs, and the old
+    `gh run list --status success` retry check — which counted a gate-skip run as
+    a success and blocked the EST build — must be gone."""
+    steps = _card_steps()
+    setup = next(
+        i for i, s in enumerate(steps) if str(s.get("uses", "")).startswith("actions/setup-python@")
+    )
+    install = next(i for i, s in enumerate(steps) if s.get("name") == "Install")
+    resolve = next(i for i, s in enumerate(steps) if s.get("id") == "slot")
+    assert setup < resolve and install < resolve
+    assert "if" not in steps[setup] and "if" not in steps[install]
+    run = steps[resolve]["run"]
+    assert "beatvegas.ci" in run
+    assert "gh run list" not in run and "retry_since" not in run
+    assert "GH_TOKEN" not in (steps[resolve].get("env") or {})
+    # Every step after the resolve is gated on it (directly or via a derived output).
+    for s in steps[resolve + 1 :]:
+        assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
+    assert steps[-1]["if"] == "steps.slot.outputs.slot != 'skip'"
+    inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
+    assert inputs["slot"]["description"].startswith("morning | afternoon | manual")

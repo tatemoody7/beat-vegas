@@ -89,7 +89,11 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
   `cfb-saturday-card` (Sat 8:50am ET: verify/kick the morning card, text the BET list
   with line, price and kill numbers) and `cfb-sunday-ops` (verify/kick `sunday.yml`,
   text the recap). The bet card itself is built in the cloud (`card.yml`; slots in
-  `beatvegas/ci.py::resolve_slot`, morning slot Tue-Sat ET-gated ~8:05–8:45am).
+  `beatvegas/ci.py::resolve_slot`: `morning` Tue-Sat ET-gated 7:45–9:15am (the decision
+  build, 24 h paper window), `afternoon` Thu+Fri ET-gated 3:45–5:15pm (that evening's
+  kickoffs, 10 h window — Hard Rock posts weeknight 1H lines after the morning build),
+  `manual` on dispatch; once a day per slot via a `cards`-row probe, never `gh run list`).
+  `rescore.yml` (dispatch: season + week) re-scores a past week without snapshots.
 - **DB**: SQLAlchemy. `DATABASE_URL` env → Postgres (Neon); else local SQLite
   (`data/beatvegas.db`). See `beatvegas/config.py::database_url` + `db/store.py`.
 - **Dashboard**: Next.js app in `web/` on Vercel, reading/writing Neon, is the

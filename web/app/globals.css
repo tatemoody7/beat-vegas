@@ -44,6 +44,32 @@
     0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --shadow-card-hover:
     0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -16px rgba(2, 132, 199, 0.35);
+
+  /* Height of the sticky site header (app/layout.tsx: `sticky top-0` with
+     py-3 around MainNav's 2.75rem-min-height links). ONE source of truth:
+     the sticky day heading hangs off it and `html` reserves it as scroll
+     padding, so a `#game-<id>` jump from the bet card lands the target BELOW
+     the chrome instead of under it. Measured in the browser, not guessed.
+     Below `sm` MainNav's `w-full` wraps onto its own second row, so the
+     header is taller — hence the media query.
+     Measured in-browser: 97px wrapped, 69px single-row. Each value sits a
+     hair UNDER its measurement so the day heading tucks against the header
+     with no gap for content to show through. */
+  --header-h: 6rem;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --header-h: 4.25rem;
+  }
+}
+
+/* Anchor jumps (the bet card's "Show on board" links) must clear the sticky
+   header AND the sticky day heading that parks right under it, or the target
+   card's score, teams and kickoff sit hidden behind the chrome and the link
+   looks broken. */
+html {
+  scroll-padding-top: calc(var(--header-h) + 2.75rem);
 }
 
 @theme inline {
@@ -159,10 +185,12 @@ body {
     background: var(--push);
   }
 
-  /* Sticky day header on the rolling board (Thu / Fri / Sat) */
+  /* Sticky day header on the rolling board (Thu / Fri / Sat). Parks directly
+     under the site header — `--header-h`, never a second hard-coded number
+     that drifts from it. */
   .bv-day-head {
     position: sticky;
-    top: 3.5rem;
+    top: var(--header-h);
     z-index: 5;
     margin: 1.25rem 0 0.5rem;
     padding: 0.35rem 0;

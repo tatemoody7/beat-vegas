@@ -113,7 +113,10 @@ export default async function BoardPage({
           )}
         </div>
         <div className="order-4 md:order-3">
-          <CardPanel card={card} />
+          <CardPanel
+            card={card}
+            onBoard={new Set(games.map((g) => g.row.gameId))}
+          />
         </div>
 
         <div className="order-1 md:order-4">

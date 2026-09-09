@@ -714,7 +714,7 @@ describe("parseCard (2026-09 contract)", () => {
   it("parses slot, status, degraded and the per-item provenance fields", () => {
     const c = parseCard(
       rawCard({
-        slot: "saturday",
+        slot: "morning",
         status: "final",
         degraded: [],
         counts: { bet: 1, edge: 2, pass: 1, over_cap: 0, degraded: 0 },
@@ -743,7 +743,7 @@ describe("parseCard (2026-09 contract)", () => {
       }),
     );
     expect(c).not.toBeNull();
-    expect(c!.slot).toBe("saturday");
+    expect(c!.slot).toBe("morning");
     expect(c!.status).toBe("final");
     expect(c!.degraded).toEqual([]);
     expect(c!.items[0]).toMatchObject({
@@ -802,8 +802,12 @@ describe("parseCard (2026-09 contract)", () => {
       reason: null,
       degradedInputs: ["pace"],
     });
-    expect(parseCard(rawCard({ slot: "friday" }))!.slot).toBe("friday");
-    expect(parseCard(rawCard({ slot: "weeknight" }))!.slot).toBe("weeknight");
+    // The legacy slots (weeknight / friday / saturday) are gone: an old row
+    // parses to null and the health check treats it like any unknown build.
+    expect(parseCard(rawCard({ slot: "friday" }))!.slot).toBeNull();
+    expect(parseCard(rawCard({ slot: "weeknight" }))!.slot).toBeNull();
+    expect(parseCard(rawCard({ slot: "saturday" }))!.slot).toBeNull();
+    expect(parseCard(rawCard({ slot: "afternoon" }))!.slot).toBe("afternoon");
     expect(parseCard(rawCard({ slot: "manual" }))!.slot).toBe("manual");
     expect(parseCard(rawCard({ status: "preview" }))!.status).toBe("preview");
   });
@@ -926,8 +930,10 @@ describe("parseCard (2026-09 contract)", () => {
 });
 
 describe("cardHealth", () => {
-  const SAT_9AM = new Date("2026-09-19T13:00:00Z"); // Sat 9:00am ET
-  const TUE_9AM = new Date("2026-09-15T13:00:00Z"); // Tue 9:00am ET
+  // Read AFTER the morning gate closes (9:15am ET): before that, "no card
+  // yet today" is just the build not having run yet.
+  const SAT_9AM = new Date("2026-09-19T14:00:00Z"); // Sat 10:00am ET
+  const TUE_9AM = new Date("2026-09-15T14:00:00Z"); // Tue 10:00am ET
 
   it("is ok for a morning card built minutes before it is read", () => {
     const h = cardHealth(
@@ -964,7 +970,46 @@ describe("cardHealth", () => {
     );
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "This card was built 24h ago. This morning's update has not landed.",
+      "This card was built 25h ago. This morning's update has not landed.",
+    );
+  });
+
+  it("yesterday's card is quiet before 9:15am ET, warns from 9:15 (EDT)", () => {
+    const c = card({
+      slot: "morning",
+      status: "final",
+      builtAt: "2026-09-14T12:10:00Z", // Mon 8:10am EDT
+    });
+    expect(cardHealth(c, new Date("2026-09-15T13:14:00Z")).level).toBe("ok"); // Tue 9:14am
+    const h = cardHealth(c, new Date("2026-09-15T13:15:00Z")); // Tue 9:15am
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe(
+      "This card was built 25h ago. This morning's update has not landed.",
+    );
+  });
+
+  it("the 9:15am ET gate follows the clock into EST", () => {
+    const c = card({
+      slot: "morning",
+      status: "final",
+      builtAt: "2026-11-16T13:10:00Z", // Mon 8:10am EST
+    });
+    expect(cardHealth(c, new Date("2026-11-17T14:14:00Z")).level).toBe("ok"); // Tue 9:14am EST
+    expect(cardHealth(c, new Date("2026-11-17T14:15:00Z")).level).toBe("warn"); // Tue 9:15am EST
+  });
+
+  it("an afternoon final is current that evening and until the next morning gate closes", () => {
+    const c = card({
+      slot: "afternoon",
+      status: "final",
+      builtAt: "2026-09-10T20:10:00Z", // Thu 4:10pm EDT
+    });
+    expect(cardHealth(c, new Date("2026-09-10T23:30:00Z")).level).toBe("ok"); // Thu 7:30pm
+    expect(cardHealth(c, new Date("2026-09-11T12:30:00Z")).level).toBe("ok"); // Fri 8:30am
+    const h = cardHealth(c, new Date("2026-09-11T14:00:00Z")); // Fri 10:00am
+    expect(h.level).toBe("warn");
+    expect(h.title).toBe(
+      "This card was built 17h ago. This morning's update has not landed.",
     );
   });
 
@@ -982,14 +1027,14 @@ describe("cardHealth", () => {
     const h = cardHealth(card({ builtAt: "2026-09-18T22:00:00Z" }), SAT_9AM);
     expect(h.level).toBe("warn");
     expect(h.title).toBe(
-      "This card was built 15h ago. This morning's update has not landed.",
+      "This card was built 16h ago. This morning's update has not landed.",
     );
   });
 
   it("warns on a preview build any day, without naming the slot", () => {
     const h = cardHealth(
       card({
-        slot: "friday",
+        slot: "morning",
         status: "preview",
         builtAt: "2026-09-15T12:07:00Z",
       }),
@@ -1040,7 +1085,7 @@ describe("cardHealth", () => {
   it("names each failed input in words, never the key or the raw detail", () => {
     const h = cardHealth(
       card({
-        slot: "saturday",
+        slot: "afternoon",
         status: "degraded",
         degraded: [
           { input: "preview", detail: "rotowire_empty", gameIds: [1, 2] },
@@ -1061,7 +1106,7 @@ describe("cardHealth", () => {
       "the morning line sweep did not finish",
     ]);
     // No input key, no Python detail string, and never the slot.
-    expect(h.title).not.toMatch(/saturday/);
+    expect(h.title).not.toMatch(/afternoon/);
     expect(h.details.join(" ")).not.toMatch(/rotowire_empty|credit_cap|sweep:/);
   });
 
@@ -1070,7 +1115,7 @@ describe("cardHealth", () => {
     // sits under Held on the panel, not in the banner.
     const c = parseCard(
       rawCard({
-        slot: "saturday",
+        slot: "morning",
         status: "final",
         built_at: "2026-09-19T12:45:00Z",
         degraded: [

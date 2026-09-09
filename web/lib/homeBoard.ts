@@ -439,7 +439,7 @@ export async function getHomeBoard(
   const games: HomeGame[] = rows.map((row) => {
     const check = checkById.get(row.gameId) ?? null;
     const fallbackLine = row.factors.line ?? null;
-    const state = lineState(row);
+    const { hasModel } = lineState(row);
     const input: EdgeInput = {
       away: row.away,
       home: row.home,
@@ -464,20 +464,18 @@ export async function getHomeBoard(
       context: edgeContext(row.factors),
     };
     const edge = edgeScore(input);
-    // Same basis edge.ts scores on: the number you can bet, else the market,
-    // else the reference line baked in at scoring time.
+    // edge.ts names the basis (`edge.lineBasis`: Hard Rock, else the market,
+    // else the reference line) and measures the gap against it; the value of
+    // that line is the same lookup, in the same order. `edge.lineBasis` is set
+    // whenever any line exists — settling needs no model — while the board's
+    // own `gapBasis` is null without one (no gap without our number).
     const basisLine = check?.hrLine ?? row.curLine ?? fallbackLine;
-    const gapBasis: LineBasis | null =
-      check?.hrLine != null
-        ? "hardrock"
-        : row.curLine !== null
-          ? "market"
-          : fallbackLine !== null
-            ? "reference"
-            : null;
-    const hasModel = state.hasModel;
     const start = asDate(row.startDate);
-    const settled = settledAgainst(gapBasis, row.firstHalfTotal, basisLine);
+    const settled = settledAgainst(
+      edge.lineBasis,
+      row.firstHalfTotal,
+      basisLine,
+    );
     return {
       row,
       check,
@@ -489,11 +487,8 @@ export async function getHomeBoard(
       kickedOff: start !== null && start.getTime() <= now.getTime(),
       kickoff: kickoffET(row.startDate),
       day: dayKey(row.startDate),
-      gap:
-        hasModel && basisLine !== null && row.bvLine !== null
-          ? round2(basisLine - row.bvLine)
-          : null,
-      gapBasis: hasModel ? gapBasis : null,
+      gap: edge.gap,
+      gapBasis: hasModel ? edge.lineBasis : null,
       basisBooks: basisBooksFrom(check),
       earlySeason: earlySeasonFrom(row.factors),
       settled,

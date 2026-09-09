@@ -235,6 +235,39 @@ def test_max_credits_per_run_stops_the_loop_and_warns(env, monkeypatch, capsys):
     assert "::warning::" in out and "credits_spent=2" in out
 
 
+def test_billing_warning_fires_only_when_a_call_costs_MORE_than_one(env, monkeypatch, capsys):
+    """The bookmakers list makes a per-event call cost at most 1 credit. Paying
+    MORE means the param was dropped or the list grew past ten, and every sweep
+    from then on costs double with nothing else to show for it.
+
+    Paying LESS is normal and must stay silent: the API bills 0 for an event
+    with no totals_h1 from any of our books, which is most of the FCS and D2
+    games sharing the window. A live sweep on 2026-09-09 spent 33 credits on 49
+    events, and an earlier `!=` version of this check cried wolf on it — a
+    warning that fires every run is one nobody reads."""
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
+
+    # Cheaper than 1 per event (some had no odds): silent.
+    cheap = FakeClient(EVENTS, {"e1": PAYLOADS["e1"]})
+    _run(mod, monkeypatch, cheap, "--hours-back", "0", "--days-ahead", "6")
+    out = capsys.readouterr().out
+    assert "expected at most 1 each" not in out
+
+    # Billed 2 per event — the regression this guard exists for.
+    pricey = FakeClient(EVENTS, PAYLOADS)
+    pricey.cost = 2
+    _run(mod, monkeypatch, pricey, "--hours-back", "0", "--days-ahead", "6")
+    out = capsys.readouterr().out
+    assert "expected at most 1 each" in out and "bookmakers_1h" in out
+
+    # No bookmakers configured = region pricing, so the rule does not apply.
+    regional = FakeClient(EVENTS, PAYLOADS, bookmakers=[])
+    regional.cost = 2
+    _run(mod, monkeypatch, regional, "--hours-back", "0", "--days-ahead", "6")
+    assert "expected at most 1 each" not in capsys.readouterr().out
+
+
 def test_no_odds_yet_is_counted_not_billed_as_a_snapshot(env, monkeypatch, capsys):
     mod, eng = env
     _seed(eng, GAMES, hr_fg_for=(1, 2, 3))

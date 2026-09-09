@@ -451,13 +451,17 @@ def main() -> None:
         f"credits_spent={spent if spent is not None else 'unknown'}"
     )
     # Two invariants that are free to check here and invisible everywhere else.
-    # 1) The billing rule: with the bookmakers list set, every per-event call
-    #    costs exactly 1 credit, so spend must equal the number of events
-    #    polled. A mismatch means the param was dropped or the list grew past
-    #    ten, i.e. every sweep from now on costs double.
-    if client.bookmakers and spent is not None and polled > 0 and spent != polled:
+    # 1) The billing rule: with the bookmakers list set, a per-event call costs
+    #    AT MOST 1 credit. Spending MORE than one per event means the param was
+    #    dropped or the list grew past ten — every sweep from then on costs
+    #    double, and nothing else in the output would say so.
+    #    Spending LESS is normal and must not warn: the API bills 0 for an event
+    #    with no totals_h1 from any of our books, which is most of the FCS and
+    #    D2 games that share the window (measured live 2026-09-09: 33 credits
+    #    for 49 events, and the earlier `!=` version cried wolf on it).
+    if client.bookmakers and spent is not None and polled > 0 and spent > polled:
         warn(
-            f"1H calls billed {spent} credits for {polled} events (expected 1 per event) — "
+            f"1H calls billed {spent} credits for {polled} events (expected at most 1 each) — "
             "the bookmakers param may have been dropped, or the list exceeded "
             f"{MAX_BOOKMAKERS_ONE_REGION} keys. Check odds_api.bookmakers_1h."
         )

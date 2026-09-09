@@ -252,6 +252,27 @@ def test_bh_qvalues_step_up():
     assert all(0 <= v <= 1 for v in q)
 
 
+def test_contrast_labels_cover_every_contrast_feature():
+    assert set(pm.CONTRAST_LABELS) == set(pm.CONTRAST_FEATURES)
+    assert all(v.strip() for v in pm.CONTRAST_LABELS.values())
+
+
+def test_contrast_flag_reads_the_plain_label_and_keeps_the_machine_code():
+    contrast = {
+        "bucket": "fh_pf_sum",
+        "q_value": 0.02,
+        "effect": 0.35,
+        "stat_win": 40.1,
+        "stat_loss": 44.8,
+        "unders": 120,
+        "overs": 110,
+    }
+    flags = pm.derive_flags([], contrasts=[contrast], n_tests=10)
+    flag = next(f for f in flags if f["code"] == "contrast_fh_pf_sum")
+    assert "Wins and losses differ on combined first-half points scored:" in flag["text"]
+    assert "fh_pf_sum" not in flag["text"]
+
+
 def test_contrast_rows_sign_and_counts():
     # wins carry a higher `x` than losses
     df = pd.DataFrame(

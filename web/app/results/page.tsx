@@ -8,7 +8,7 @@ import { loadPicks } from "@/lib/picks";
 import { loadPostMortem } from "@/lib/postmortem";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
-import { BET_GAP_PTS, MIN_GAMES_FOR_MODEL } from "@/lib/verdict";
+import { BET_GAP_PTS } from "@/lib/verdict";
 import { getWeeklyReview } from "@/lib/weeklyReview";
 import BankrollCurve from "@/app/components/BankrollCurve";
 import PicksList from "@/app/components/PicksList";
@@ -160,13 +160,7 @@ export default async function ResultsPage({
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
   const curve = bankrollCurve(allPicks, startUsd, unitUsd);
-  // Widen off the literal type: the constant is 0 today, so `=== 1` would be
-  // a type error against a literal-0 type even though it is a real branch.
-  const needGames: number = MIN_GAMES_FOR_MODEL;
-  const modelEmpty =
-    needGames > 0
-      ? `Fills in once a week is scored and graded. The model needs ${needGames} game${needGames === 1 ? "" : "s"} played by both teams.`
-      : "Fills in once a week is scored and graded.";
+  const modelEmpty = "Fills in once a week is scored and graded.";
 
   return (
     <div className="mx-auto max-w-5xl">

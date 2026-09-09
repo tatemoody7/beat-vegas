@@ -38,18 +38,6 @@ export function settledOf(
   return "push";
 }
 
-export const GRADE_WORD: Record<Grade, string> = {
-  bet: "bet",
-  watch: "watch",
-  pass: "pass",
-};
-
-export const SETTLED_WORD: Record<Settled, string> = {
-  won: "won",
-  lost: "lost",
-  push: "push",
-};
-
 const GRADE_COLOR: Record<Grade, GradeColor> = {
   bet: "good",
   watch: "warn",
@@ -72,12 +60,12 @@ export function gradeColor(
   return g === null ? "push" : GRADE_COLOR[g];
 }
 
-/** The word beside the number: "won" / "lost" / "push" once settled, else the grade. */
+/** The word beside the number: "won" / "lost" / "push" once settled, else the
+ *  grade. Both enums already read as plain lower-case words, so the key is the word. */
 export function gradeWord(
   score: number | null,
   settled: Settled | null = null,
 ): string {
-  if (settled !== null) return SETTLED_WORD[settled];
-  const g = gradeOf(score);
-  return g === null ? "no score" : GRADE_WORD[g];
+  if (settled !== null) return settled;
+  return gradeOf(score) ?? "no score";
 }

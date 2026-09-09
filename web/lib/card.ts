@@ -1,7 +1,8 @@
 import { american, fmt } from "@/lib/format";
 import { CARD_INPUT_FALLBACK, CARD_INPUT_TEXT, labelOf } from "@/lib/labels";
 import { etClock12, etDay, etMinutesOfDay, etParts } from "@/lib/et";
-import { kickoffET, type GapBasis } from "@/lib/homeBoard";
+import type { LineBasis } from "@/lib/edge";
+import { kickoffET } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
 import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 
@@ -63,7 +64,7 @@ export type DegradedInput = {
 /** Where the fair price came from: a no-vig exchange, or the books' consensus. */
 export type FairSource = "exchange" | "books";
 
-const GAP_BASES: ReadonlySet<GapBasis> = new Set<GapBasis>([
+const GAP_BASES: ReadonlySet<LineBasis> = new Set<LineBasis>([
   "hardrock",
   "market",
   "reference",
@@ -86,7 +87,7 @@ export type CardItem = {
   bvLine: number | null;
   gap: number | null;
   /** Which line the gap is measured against; null when there is no gap. */
-  gapBasis: GapBasis | null;
+  gapBasis: LineBasis | null;
   killLine: number | null;
   killPrice: number | null;
   action: string;
@@ -212,8 +213,8 @@ function parseItem(raw: unknown): CardItem | null {
     ev: num(raw.ev),
     bvLine: num(raw.bv_line),
     gap: num(raw.gap),
-    gapBasis: GAP_BASES.has(raw.gap_basis as GapBasis)
-      ? (raw.gap_basis as GapBasis)
+    gapBasis: GAP_BASES.has(raw.gap_basis as LineBasis)
+      ? (raw.gap_basis as LineBasis)
       : null,
     killLine: num(raw.kill_line),
     killPrice: int(raw.kill_price),

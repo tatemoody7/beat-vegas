@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import Link from "next/link";
 import { gateEnabled } from "@/lib/auth";
-import LogoutButton from "@/app/components/LogoutButton";
-import MainNav from "@/app/components/MainNav";
+import HeaderChrome from "@/app/components/HeaderChrome";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -37,7 +36,8 @@ export default function RootLayout({
             {/* Below `sm`, order puts the wordmark + Lock button on row 1
                 (justify-between via ml-auto) and forces MainNav's own
                 `w-full` onto row 2 by itself. At `sm`+ the orders collapse
-                back to today's single row: wordmark, nav, Lock. */}
+                back to today's single row: wordmark, nav, Lock. Nav and Lock
+                come from HeaderChrome, which renders neither on /login. */}
             <Link
               href="/"
               className="order-1 shrink-0 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight"
@@ -48,12 +48,7 @@ export default function RootLayout({
                 First-half unders
               </span>
             </Link>
-            <MainNav />
-            {gateEnabled() && (
-              <div className="order-2 ml-auto shrink-0 sm:order-4">
-                <LogoutButton />
-              </div>
-            )}
+            <HeaderChrome gateEnabled={gateEnabled()} />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">

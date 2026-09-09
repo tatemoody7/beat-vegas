@@ -6,8 +6,7 @@ import { bankrollEnv } from "@/lib/homeBoard";
 import { proxyShareText } from "@/lib/proxy";
 import {
   BET_GAP_PTS,
-  EV_FLOOR,
-  MIN_GAMES_FOR_MODEL,
+  EV_FLOOR_PCT,
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
 } from "@/lib/verdict";
@@ -19,11 +18,6 @@ import {
 // the constant that enforces it, so the page cannot drift from the rules —
 // which is exactly how the old entry came to claim "2% of vig" when the price
 // floor was 5%.
-
-const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
-// The minimum is 0 today; widen off the literal type so the plural branch
-// below is a real branch rather than a type error.
-const NEED_GAMES: number = MIN_GAMES_FOR_MODEL;
 
 function terms(unitUsd: number): { term: string; body: string }[] {
   return [
@@ -81,10 +75,7 @@ function terms(unitUsd: number): { term: string; body: string }[] {
     },
     {
       term: "Early season",
-      body:
-        NEED_GAMES > 0
-          ? `A tag on games where a team has only played one game. Our number is built from very little, so read the score loosely. The model needs ${NEED_GAMES} game${NEED_GAMES === 1 ? "" : "s"} played by both teams before it has a number at all.`
-          : "A tag on games where a team has only played one game. Our number is built from very little, so read the score loosely. The model scores every game — it does not sit weeks out — so an early-season score is a real score with thin evidence behind it.",
+      body: "A tag on games where a team has only played one game. Our number is built from very little, so read the score loosely. The model scores every game — it does not sit weeks out — so an early-season score is a real score with thin evidence behind it.",
     },
     {
       term: "Graded and pending",

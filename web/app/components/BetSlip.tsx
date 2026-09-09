@@ -10,7 +10,7 @@ import {
   type BetSlipRow,
 } from "@/lib/betSlip";
 import { lineLabel } from "@/lib/card";
-import { american, fmt } from "@/lib/format";
+import { american, fmt, usd } from "@/lib/format";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 
 // The Saturday-morning bet slip, used on a phone: this week's BETs from the
@@ -33,14 +33,6 @@ const FAIR_TITLE = {
     "Kill numbers come off the card’s fair price from the books’ consensus.",
   none: "Do not bet below this number or at a worse price — the edge is gone.",
 } as const;
-
-const usd = (n: number) =>
-  n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
 
 /** Entered text -> number for the kill check; null when blank/unparseable. */
 const numOrNull = (s: string): number | null => {

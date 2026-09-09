@@ -36,7 +36,6 @@ from .model.score import (
     BET_GAP_PTS,
     EV_FLOOR,
     HR_OFF_MARKET_PTS,
-    MIN_GAMES_FOR_MODEL,
     MODEL_VERSION,
     SCORE_BET_MIN,
     SCORE_WATCH_MIN,
@@ -512,13 +511,7 @@ def _gap_sentence(has_model, bv_line, hr_line, market_line, reference, gap) -> s
             if line is not None
             else "No first-half line has been posted yet."
         )
-        need = (
-            f" — the model needs both teams to have played {MIN_GAMES_FOR_MODEL} "
-            f"game{'' if MIN_GAMES_FOR_MODEL == 1 else 's'} this season"
-            if MIN_GAMES_FOR_MODEL > 0
-            else ""
-        )
-        return f"No model number yet{need}. {ref}"
+        return f"No model number yet. {ref}"
     if hr_line is not None:
         hr_gap = round2(hr_line - bv_line)
         direction = (

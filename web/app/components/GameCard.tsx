@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { bookLabel } from "@/lib/books";
 import { WATCH_GAP_MIN } from "@/lib/edge";
-import { american, fmt, signed } from "@/lib/format";
-import { SETTLED_WORD } from "@/lib/grade";
+import { american, capitalize, fmt, signed } from "@/lib/format";
 import { strongestRed, type HomeGame } from "@/lib/homeBoard";
 import { basisPhrase, blockerTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
@@ -548,7 +547,7 @@ export default function GameCard({
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null
-      ? `${SETTLED_WORD[g.settled][0].toUpperCase()}${SETTLED_WORD[g.settled].slice(1)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(g.settledLine)}`
+      ? `${capitalize(g.settled)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(g.settledLine)}`
       : played
         ? `Final · first half ${fmt(row.firstHalfTotal, 0)}. No first-half line was posted, so nothing to grade.`
         : null;

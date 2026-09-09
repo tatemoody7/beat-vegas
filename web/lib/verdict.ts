@@ -35,6 +35,8 @@ export const HR_OFF_MARKET_PTS = 0.5;
 // market's no-vig fair price. -0.05 lets standard -110 juice on a balanced market
 // through and rejects -115 or worse unless the market itself leans under.
 export const EV_FLOOR = -0.05;
+/** EV_FLOOR as a positive whole percent for prose ("up to 5% worse than fair"). */
+export const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
 // weekly_update.py --min-games: the model needs this many FBS-vs-FBS games
 // played by both teams this season (0 since 2026-09-08: every game gets a
 // number off last season's priors; rows with under 2 games are tagged "early

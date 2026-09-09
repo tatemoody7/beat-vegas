@@ -177,6 +177,32 @@ CONTRAST_FEATURES = (
     "kick_hour_et",
     "line_frac_half",
 )
+# Plain-English name for each contrast feature; the flag text reads
+# "Wins and losses differ on <label>" while `contrast_<feature>` stays the code.
+CONTRAST_LABELS: Dict[str, str] = {
+    "spread_abs": "spread size",
+    "full_game_total": "full-game total",
+    "line": "first-half line",
+    "bv_line": "our number",
+    "gap": "gap",
+    "under_score": "the old classifier score",
+    "pace_spp": "seconds per play",
+    "pace_plays": "plays per game",
+    "wx_temp": "temperature",
+    "wx_wind": "wind",
+    "dome": "dome",
+    "off_ppa": "combined offensive efficiency",
+    "def_ppa": "combined defensive efficiency",
+    "fh_pf_sum": "combined first-half points scored",
+    "fh_pa_sum": "combined first-half points allowed",
+    "fh_off_epa_mean": "first-half offensive EPA",
+    "fh_off_success_mean": "first-half success rate",
+    "returning_pct": "returning production",
+    "neutral_site": "neutral site",
+    "week": "week of the season",
+    "kick_hour_et": "kickoff hour (ET)",
+    "line_frac_half": "line ending in .5",
+}
 
 
 # ---------------------------------------------------------------- small helpers
@@ -1290,7 +1316,7 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
                 _flag(
                     f"contrast_{c['bucket']}",
                     "watch",
-                    f"Wins and losses differ on {c['bucket']}: wins average {c['stat_win']:.2f}, losses {c['stat_loss']:.2f} (d={d:+.2f}, q={q:.2f}, n {c['unders']}/{c['overs']}). A hypothesis to test on real 2026 lines, not a rule.",
+                    f"Wins and losses differ on {CONTRAST_LABELS.get(c['bucket'], c['bucket'])}: wins average {c['stat_win']:.2f}, losses {c['stat_loss']:.2f} (d={d:+.2f}, q={q:.2f}, n {c['unders']}/{c['overs']}). A hypothesis to test on real 2026 lines, not a rule.",
                     feature=c["bucket"],
                     effect=d,
                     q=q,

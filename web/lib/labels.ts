@@ -12,13 +12,8 @@ import type { EdgeBlocker, EdgeTier } from "@/lib/edge";
 import type { LineBasis } from "@/lib/edge";
 import type { CardBlocker } from "@/lib/card";
 import type { SlipBlock } from "@/lib/betSlip";
-import type { PickReason } from "@/lib/verdict";
-import {
-  BET_GAP_PTS,
-  MIN_GAMES_FOR_MODEL,
-  STRONG_GAP_PTS,
-  WEEKLY_BET_CAP,
-} from "@/lib/verdict";
+import type { PickReason, Verdict } from "@/lib/verdict";
+import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 
 /** Look a key up; an unknown key gets the fallback, never itself. */
 export function labelOf<K extends string>(
@@ -39,10 +34,17 @@ export const TIER_TEXT: Record<EdgeTier, string> = {
   PASS: "Pass",
 };
 
-export const TIER_SUB: Record<EdgeTier, string> = {
-  BET: "One unit on the first-half under.",
-  EDGE: "Close, but one thing is missing.",
-  PASS: "Nothing here.",
+/** The verdict frozen onto a logged pick. */
+export const VERDICT_TEXT: Record<Verdict, string> = {
+  BET: "Bet",
+  WATCH: "Watch",
+  PASS: "Pass",
+};
+
+/** manual_picks.market. */
+export const MARKET_TEXT: Record<string, string> = {
+  "1H": "First half",
+  full: "Full game",
 };
 
 // --- blockers (why a strong game is not a bet right now) ---------------------
@@ -120,12 +122,8 @@ export function blockerTag(
       return ctx.killLine != null
         ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`
         : "Not yet — the gap is too small";
-    case "no_model": {
-      const need: number = MIN_GAMES_FOR_MODEL;
-      return need > 0
-        ? `No model number yet — needs ${need} game${need === 1 ? "" : "s"} played`
-        : "No model number yet — the week has not been scored";
-    }
+    case "no_model":
+      return "No model number yet — the week has not been scored";
     case "cap":
       return `Past the ${WEEKLY_BET_CAP}-bet week — paper only`;
     case "degraded":
@@ -224,12 +222,6 @@ export function basisPhrase(
   }
 }
 
-export const BASIS_NOUN: Record<LineBasis, string> = {
-  hardrock: "Hard Rock's line",
-  market: "the market line",
-  reference: "our reference line",
-};
-
 // --- line study sources --------------------------------------------------------
 
 export const LINE_SOURCE_TEXT: Record<string, string> = {
@@ -273,4 +265,13 @@ export const RESULT_TEXT: Record<string, string> = {
   over: "Over",
   push: "Push",
 };
-export const RESULT_PENDING = "pending";
+export const RESULT_PENDING = "Pending";
+/** A played game whose first half no book ever priced: shown for the score, not the record. */
+export const RESULT_NO_LINE = "No line";
+
+/** Outcome colours (never cyan): under/won green, over/lost red, push grey. */
+export const RESULT_COLOR: Record<string, string> = {
+  under: "var(--good)",
+  over: "var(--bad)",
+  push: "var(--push)",
+};

@@ -13,8 +13,7 @@ import {
 } from "@/lib/postmortem";
 import {
   BET_GAP_PTS,
-  EV_FLOOR,
-  MIN_GAMES_FOR_MODEL,
+  EV_FLOOR_PCT,
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
 } from "@/lib/verdict";
@@ -27,8 +26,6 @@ import { BREAKEVEN_PCT } from "@/lib/lineStudy";
 // the page's season selector.
 //
 // Copy rule (spec §23): no `title=` tooltips, no raw enum codes, no repo paths.
-
-const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
 
 // Green/red are OUTCOME colors: signed units only.
 const unitColor = (s: string | undefined | null) =>
@@ -247,7 +244,6 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
     (f) => f.code !== "multiple_comparisons",
   );
   const mc = flagsFrom(hist).find((f) => f.code === "multiple_comparisons");
-  const needGames: number = MIN_GAMES_FOR_MODEL;
 
   const gapFair = bandTable(
     buckets,
@@ -302,11 +298,7 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
           rec={
             liveScope ? headline(buckets, liveScope, "live", "hr", "bet") : null
           }
-          emptyHint={
-            needGames > 0
-              ? `No bets yet. The model needs ${needGames} game${needGames === 1 ? "" : "s"} played by both teams.`
-              : "No bets yet."
-          }
+          emptyHint="No bets yet."
           hint="Games we rated Bet, graded at Hard Rock’s own line and price."
         />
         <PmCard

@@ -100,6 +100,7 @@ PAPER_WINDOW_HOURS: Dict[str, Optional[float]] = {
     # kickoff) — the honest cost of a four-build week, and still better than
     # the old schedule, which logged them never. The true close is still
     # captured for CLV by lines_watch.yml.
+    # `manual` never logs: see no_paper in resolve_slot.
     "manual": None,
 }
 
@@ -182,6 +183,7 @@ def _skip(reason: str) -> Dict[str, object]:
         "force_sweep": False,
         "force_preview": False,
         "paper_window": "",
+        "no_paper": False,
         "sweep_args": "",
         "reason": reason,
     }
@@ -203,7 +205,7 @@ def resolve_slot(
     force:       workflow_dispatch input; rebuild even if already built today
 
     Returns {slot, force_sweep, force_preview, paper_window ('' or hours),
-    sweep_args, reason}. slot == 'skip' when a slot fired outside its ET window
+    no_paper, sweep_args, reason}. slot == 'skip' when a slot fired outside its ET window
     or already built today.
 
     A DISPATCH naming a scheduled slot also respects the built-today probe:
@@ -247,6 +249,13 @@ def resolve_slot(
         # Fresh QB news on every scheduled card (0 Odds credits).
         "force_preview": slot in SCHEDULED_SLOTS,
         "paper_window": "" if window is None else f"{window:g}",
+        # A `manual` build is a PREVIEW — explicitly never the one to bet off —
+        # so it must not create the permanent paper record either. Without this
+        # an ad-hoc refresh logs every qualifying game in the week at that
+        # moment's line, and no later build can replace it (picks.py
+        # existing_pick guards on game_id), so Saturday's picks would sit frozen
+        # at whenever someone happened to hit refresh.
+        "no_paper": slot not in SCHEDULED_SLOTS,
         "sweep_args": SWEEP_ARGS[slot],
         "reason": reason,
     }

@@ -230,6 +230,7 @@ jobs:
         if: steps.slot.outputs.slot != 'skip'
         env:
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
+          NO_PAPER: ${{ steps.slot.outputs.no_paper }}
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
         run: |
           if [ -z "${{ steps.active.outputs.week }}" ]; then
@@ -239,6 +240,10 @@ jobs:
           fi
           extra=""
           if [ -n "$PAPER_WINDOW" ]; then extra="--paper-log-window-hours $PAPER_WINDOW"; fi
+          # A manual refresh publishes the card but logs NO paper picks: the
+          # first log of a game wins forever, so an ad-hoc build would freeze
+          # the whole week at that moment's lines.
+          if [ "$NO_PAPER" = "true" ]; then extra="$extra --no-paper"; fi
           # A preview step that died before writing its own status (an import
           # error, a timeout) still has to reach the card as a failure: without
           # this the QB-out gate would read a stale file and look clear.

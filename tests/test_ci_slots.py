@@ -187,6 +187,21 @@ def test_a_named_dispatch_respects_the_probe_unless_forced():
     assert r["slot"] == "manual"
 
 
+def test_only_a_manual_build_skips_paper_logging():
+    """A manual build is a PREVIEW, never the one to bet off, so it must not
+    create the permanent paper record either. The first log of a game wins
+    forever (picks.py existing_pick guards on game_id), so an ad-hoc refresh
+    that logged would freeze the whole week's picks at whatever the lines said
+    the moment someone hit refresh — and no later build could replace them."""
+    at = utc(2026, 9, 15, 20, 5)
+    assert resolve_slot("", at)["no_paper"] is True  # manual
+    for slot in SCHEDULED:
+        assert resolve_slot("", at, input_slot=slot)["no_paper"] is False, slot
+    assert resolve_slot("5 20 * * 2", at)["no_paper"] is False
+    # A skip carries the key too, so the workflow never reads an empty string.
+    assert resolve_slot("35 21 * * 2", utc(2026, 9, 15, 21, 35))["no_paper"] is False
+
+
 def test_et_midnight_as_naive_utc_follows_dst():
     # EDT: midnight ET = 04:00Z; EST: 05:00Z. Built_at is naive UTC.
     assert et_midnight_as_naive_utc(utc(2026, 9, 10, 12, 9)) == datetime(2026, 9, 10, 4, 0)

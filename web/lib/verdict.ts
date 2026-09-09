@@ -268,10 +268,13 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   });
 
   // --- No model (the week has not been scored yet) ---------------------------
+  // A price alone is never a bet, so this is a PASS either way (edge.ts tiers
+  // these rows PASS and the Log-pick prefill stores this verdict). The
+  // priceEdgeOnly flag + headline survive so the reason still logs price_edge.
   if (!hasModel) {
     if (pricePos) {
       return out(
-        "WATCH",
+        "PASS",
         "low",
         "Price edge only — Hard Rock is paying better than the market on this under, but there is no model read behind it.",
         true,

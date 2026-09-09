@@ -45,9 +45,11 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   // The board settles the week first; the card is then read FOR that week, so
-  // a stale card never sits above a different week's games.
+  // a stale card never sits above a different week's games. No week (a season
+  // with no board rows) means no card either, not the season's newest one.
   const board = await getHomeBoard(season, weekArg);
-  const card = await getLatestCard(season, board.week ?? undefined);
+  const card =
+    board.week === null ? null : await getLatestCard(season, board.week);
   // The slip reconciles the frozen card against the live Hard Rock numbers
   // this same render loaded, so a moved line or a kill breach shows before
   // the tap, not after the server says no.

@@ -69,7 +69,9 @@ def test_score_is_gap_only_on_both_sides():
     for path in (_EDGE_TS, _CARD_PY):
         assert path.exists(), f"{path} is missing — this parity guard must not vanish"
         src = path.read_text()
-        assert "SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS" in src, path.name
+        assert re.search(
+            r"SCORE_PER_GAP_PT\s*=\s*\(\s*SCORE_BET_MIN\s*-\s*50\s*\)\s*/\s*BET_GAP_PTS", src
+        ), path.name
         assert "PRICE_BONUS_CAP" not in src, f"{path.name} still carries a price bonus"
 
 

@@ -348,9 +348,9 @@ describe("verdictFor — no model (the week is not scored yet)", () => {
     gap: null,
   };
 
-  it("can only reach WATCH, and only on a positive Hard Rock price", () => {
+  it("PASSes even on a positive Hard Rock price, but still logs price_edge", () => {
     const v = verdictFor(derived);
-    expect(v.verdict).toBe("WATCH");
+    expect(v.verdict).toBe("PASS");
     expect(v.priceEdgeOnly).toBe(true);
     expect(v.reason).toBe("price_edge");
     expect(v.confidence).toBe("low");

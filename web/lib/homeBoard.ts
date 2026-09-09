@@ -308,7 +308,8 @@ export type HomeGame = {
   /** "Sat 7:30p" ET, or null when the kickoff time is unknown. */
   kickoff: string | null;
   day: DayKey | null;
-  /** The line the gap is measured against, and which line that is. */
+  /** Our gap and the line it is measured against. Both null on no-model rows
+   *  (no gap without our number), even when a book or reference line exists. */
   gap: number | null;
   gapBasis: GapBasis | null;
   /** Books behind the market line when that is the basis (max 2), for the basis phrase. */
@@ -316,7 +317,8 @@ export type HomeGame = {
   /** A team on this row has played fewer than 2 games this season. */
   earlySeason: boolean;
   /** How the first-half under settled at a REAL book line (Hard Rock, else the
-   *  market); null until played, and null when no book ever posted one. */
+   *  market); null until played, and null when no book ever posted one. Needs
+   *  no model: a played game grades the under at the book line it had. */
   settled: Settled | null;
   /** The line `settled` was graded against; null whenever `settled` is null. */
   settledLine: number | null;

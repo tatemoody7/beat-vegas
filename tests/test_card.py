@@ -25,6 +25,7 @@ from beatvegas.card import (
     hold_note,
     kill_line,
     market_read,
+    round2,
     round_half_up,
 )
 from beatvegas.devig import devig_two_way, ev_under
@@ -169,6 +170,28 @@ def test_score_is_the_gap_alone_and_floors_at_the_bar():
     assert only(card([game()], priced, [model(1, 22.75)]))["blocker"] == "price"
     prev = [{"game_id": 1, "qb_out": True}]
     assert only(card([game()], snaps, [model(1, 22.75)], prev))["blocker"] == "qb_out"
+
+
+def test_round2_is_half_up_like_format_ts():
+    """card.py round2 must land where JS Math.round(x*100)/100 does: half UP.
+    Python's banker's round() gives 1.74 / 0.12 on the first two."""
+    assert round2(1.745) == 1.75 and round2(0.125) == 0.13
+    assert round2(0.375) == 0.38 and round2(2.5) == 2.5 and round2(4.375) == 4.38
+    assert round2(-1.745) == -1.74 and round2(-0.005) == 0.0  # Math.round(-174.5) is -174
+
+
+def test_gap_score_parity_at_the_rounding_edges():
+    """edge.test.ts twin: a reference-only gap of 1.745 (0.4975 * 50 = 24.875 vs
+    our 23.13) is 1.75 -> 70 on both sides; 4.375 is 4.38 -> 100 (4.37 -> 99)."""
+    assert gap_score(round2(1.745)) == 70
+    assert gap_score(round2(4.375)) == 100 and gap_score(4.37) == 99
+    preds = [
+        model(1, 23.13),
+        {"game_id": 1, "model_version": "derived_lines", "bv_line": None, "line_used": 0.4975 * 50},
+    ]
+    it = only(card([game()], [], preds))
+    assert it["gap"] == 1.75 and gap_score(it["gap"]) == 70
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
 
 
 def test_no_model_price_only_is_a_pass():

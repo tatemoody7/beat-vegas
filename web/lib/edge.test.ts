@@ -8,6 +8,7 @@ import {
   roundHalfUp,
   type EdgeInput,
 } from "./edge";
+import { round2 } from "./format";
 import { evVerdictFor } from "./lineCheck";
 
 // Same real-2025 shape as verdict.test.ts: our 21.8 vs Hard Rock 24.5 is a
@@ -243,6 +244,45 @@ describe("edgeScore — model rows", () => {
     expect(short.score).toBe(69);
     expect(short.tier).toBe("EDGE");
     expect(short.blocker).toBe("gap");
+  });
+  it("rounding parity with card.py: a reference-only 1.745 gap is 1.75 → 70; 4.375 is 4.38 → 100", () => {
+    // Both sides round half UP (card.py round2 = floor(x*100+0.5)/100, matching
+    // Math.round). Python's banker's round would read 1.745 → 1.74 → 69.
+    expect(round2(1.745)).toBe(1.75);
+    expect(round2(0.125)).toBe(0.13);
+    expect(round2(0.375)).toBe(0.38);
+    expect(round2(4.375)).toBe(4.38);
+    expect(round2(-1.745)).toBe(-1.74);
+    expect(round2(-0.005) === 0).toBe(true); // -0 here, 0.0 in Python: equal
+    // Derived reference only (0.4975 × 50 = 24.875) vs our 23.13.
+    const ref = edgeScore({
+      ...base,
+      bvLine: 23.13,
+      hrLine: null,
+      hrUnderPrice: null,
+      liveLine: null,
+      marketLine: null,
+      bestLine: null,
+      fallbackLine: 0.4975 * 50,
+      gap: null,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(ref.gap).toBe(1.75);
+    expect(ref.score).toBe(70);
+    // 4.38 clears 100; 4.37 would floor to 99.
+    const wide = edgeScore({
+      ...base,
+      bvLine: 20.5,
+      hrLine: 24.875,
+      liveLine: 24.875,
+      marketLine: 24.875,
+      bestLine: 24.875,
+      gap: 4.375,
+    });
+    expect(wide.gap).toBe(4.38);
+    expect(wide.score).toBe(100);
   });
   it("no comparable price (ev null) → EDGE / no_fair_price, paper-only action", () => {
     // Hard Rock alone at its number: gap 2.7 clears, nothing prices 24.5.
@@ -602,7 +642,10 @@ describe("edgeScore — no model read", () => {
     expect(e.score).toBe(40); // context only; the price adds nothing
     expect(e.tier).toBe("PASS");
     expect(e.blocker).toBeNull();
-    expect(e.verdict.priceEdgeOnly).toBe(true); // verdict.ts is untouched; nothing renders it
+    // verdict.ts agrees: a logged pick off this row stores PASS, not WATCH.
+    expect(e.verdict.verdict).toBe("PASS");
+    expect(e.verdict.priceEdgeOnly).toBe(true);
+    expect(e.verdict.reason).toBe("price_edge");
     expect(e.action).toBe(
       "Pass: no model number yet. Hard Rock pays about 3.0% more than the market on this under, but a price alone is not a bet.",
     );

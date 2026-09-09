@@ -203,7 +203,11 @@ def _int(v: Any) -> Optional[int]:
 
 
 def round2(x: float) -> float:
-    return round(x * 100) / 100
+    """Two decimals, rounded half UP — the same result as JS Math.round(x * 100) / 100
+    (format.ts round2), negatives included (-1.745 -> -1.74, -0.005 -> 0.0).
+    Python's round() is banker's: a reference-only gap of 1.745 (0.4975 * 50 =
+    24.875 vs our 23.13) would read 1.74 -> 69 here and 1.75 -> 70 on the site."""
+    return math.floor(x * 100 + 0.5) / 100
 
 
 def fmt(n: Optional[float], dp: int = 1) -> str:

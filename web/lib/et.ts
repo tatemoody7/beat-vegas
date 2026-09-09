@@ -43,7 +43,8 @@ export function etParts(d: Date): EtParts {
   };
 }
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
+/** Two-digit zero-padded field ("07"). */
+export const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /** Calendar day in ET, "2026-09-12". */
 export function etDay(d: Date): string {
@@ -55,4 +56,17 @@ export function etDay(d: Date): string {
 export function etMinutesOfDay(d: Date): number {
   const p = etParts(d);
   return p.hour * 60 + p.minute;
+}
+
+/**
+ * Weekday + 12-hour ET clock: "Fri 6:07pm" with the default suffixes, or
+ * "Sat 7:30p" with ["a", "p"]. Midnight and noon read 12, never 0.
+ */
+export function etClock12(
+  d: Date,
+  suffix: readonly [am: string, pm: string] = ["am", "pm"],
+): string {
+  const p = etParts(d);
+  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  return `${p.weekday} ${hour12}:${pad2(p.minute)}${p.hour >= 12 ? suffix[1] : suffix[0]}`;
 }

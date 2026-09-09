@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ET_ZONE, etDay, etMinutesOfDay, etParts } from "./et";
+import { ET_ZONE, etClock12, etDay, etMinutesOfDay, etParts, pad2 } from "./et";
 
 describe("etParts", () => {
   it("names the zone the whole site runs on", () => {
@@ -56,5 +56,36 @@ describe("etDay / etMinutesOfDay", () => {
     expect(etMinutesOfDay(new Date("2026-11-17T14:15:00Z"))).toBe(9 * 60 + 15);
     expect(etMinutesOfDay(new Date("2026-09-11T04:00:00Z"))).toBe(0);
     expect(etMinutesOfDay(new Date("2026-09-11T03:59:00Z"))).toBe(23 * 60 + 59);
+  });
+});
+
+describe("etClock12", () => {
+  it("renders the card's built time: Fri Sep 11 2026 22:07Z is Fri 6:07pm ET", () => {
+    expect(etClock12(new Date("2026-09-11T22:07:00Z"))).toBe("Fri 6:07pm");
+  });
+
+  it("renders a kickoff with the short suffixes: Sat 7:30p", () => {
+    expect(etClock12(new Date("2026-09-12T23:30:00Z"), ["a", "p"])).toBe(
+      "Sat 7:30p",
+    );
+  });
+
+  it("reads 12, never 0, at midnight and noon ET", () => {
+    // EDT: 04:00Z = 12:00am ET, 16:00Z = 12:00pm ET
+    expect(etClock12(new Date("2026-09-12T04:00:00Z"))).toBe("Sat 12:00am");
+    expect(etClock12(new Date("2026-09-12T16:05:00Z"))).toBe("Sat 12:05pm");
+  });
+
+  it("follows the DST change: Sat Nov 21 2026 00:30Z is Fri 7:30pm EST", () => {
+    expect(etClock12(new Date("2026-11-21T00:30:00Z"), ["a", "p"])).toBe(
+      "Fri 7:30p",
+    );
+  });
+});
+
+describe("pad2", () => {
+  it("zero-pads a single digit and leaves two digits alone", () => {
+    expect(pad2(7)).toBe("07");
+    expect(pad2(12)).toBe("12");
   });
 });

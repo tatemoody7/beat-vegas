@@ -12,12 +12,14 @@ from pathlib import Path
 
 import pytest
 
+from beatvegas.ci import SLOT_GATE_ET
 from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.model import score
 
 _TS = Path(__file__).resolve().parent.parent / "web" / "lib" / "verdict.ts"
 _BOOKS_TS = _TS.parent / "books.ts"
 _LINE_CHECK_TS = _TS.parent / "lineCheck.ts"
+_CARD_TS = _TS.parent / "card.ts"
 
 PARITY = {
     "BET_GAP_PTS": score.BET_GAP_PTS,
@@ -114,3 +116,14 @@ def test_non_exchange_fair_price_exclusions_match_line_check_ts():
         - set(card.SYNTHETIC_BOOKS)
         - {HR_BOOK_KEY}
     )
+
+
+def test_morning_gate_close_matches_card_ts():
+    """web/lib/card.ts MORNING_GATE_CLOSE_ET_MIN (minutes after ET midnight when
+    "no card yet today" stops being "the build has not run") mirrors the close
+    of beatvegas/ci.py SLOT_GATE_ET["morning"]. Drift means the banner calls a
+    card stale while the morning cron can still build, or the reverse."""
+    assert _CARD_TS.exists(), f"{_CARD_TS} is missing — the guard must not vanish"
+    close = SLOT_GATE_ET["morning"][1]
+    expected = close.hour * 60 + close.minute
+    assert _ts_const(_CARD_TS.read_text(), "MORNING_GATE_CLOSE_ET_MIN") == expected

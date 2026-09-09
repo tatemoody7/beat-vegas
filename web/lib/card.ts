@@ -1,6 +1,6 @@
 import { american, fmt } from "@/lib/format";
 import { CARD_INPUT_FALLBACK, CARD_INPUT_TEXT, labelOf } from "@/lib/labels";
-import { etDay, etMinutesOfDay, etParts } from "@/lib/et";
+import { etClock12, etDay, etMinutesOfDay, etParts } from "@/lib/et";
 import { kickoffET, type GapBasis } from "@/lib/homeBoard";
 import { prisma } from "@/lib/prisma";
 import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
@@ -359,10 +359,7 @@ export function asIso(v: unknown): string | null {
 
 /** "Fri 6:07pm" in ET. */
 function builtET(d: Date): string {
-  const p = etParts(d);
-  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
-  const ampm = p.hour >= 12 ? "pm" : "am";
-  return `${p.weekday} ${hour12}:${String(p.minute).padStart(2, "0")}${ampm}`;
+  return etClock12(d);
 }
 
 /** "just now" / "12m ago" / "3h ago" / "2d ago". */
@@ -400,10 +397,11 @@ function weekdayET(d: Date): string {
 /** Days with no morning build (no college games): a Saturday card is current. */
 const NO_BUILD_DAYS: ReadonlySet<string> = new Set(["Sun", "Mon"]);
 
-/** Minutes after ET midnight when the morning build's gate closes (9:15am).
+/** Minutes after ET midnight when the morning build's gate closes (9:15am =
+ *  9 * 60 + 15, kept as a literal so tests/test_gate_parity.py can read it).
  *  Mirrors beatvegas/ci.py SLOT_GATE_ET["morning"][1]: before this, "no card
  *  yet today" is just the build not having run, not a stale card. */
-export const MORNING_GATE_CLOSE_ET_MIN = 9 * 60 + 15;
+export const MORNING_GATE_CLOSE_ET_MIN = 555;
 
 export type CardHealth = {
   level: "ok" | "warn";

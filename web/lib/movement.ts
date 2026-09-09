@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { etParts } from "@/lib/et";
+import { etParts, pad2 } from "@/lib/et";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -51,7 +51,6 @@ export type Movement = {
 // "2025-10-13 12:00:00.000000" (stored naive UTC) -> "10-13 08:00" in ET.
 // Without the conversion every point on the movement chart reads 4-5h late
 // for the Florida user actually timing these moves.
-const pad2 = (n: number) => String(n).padStart(2, "0");
 export function shortT(s: string): string {
   const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
   if (!m) return s;

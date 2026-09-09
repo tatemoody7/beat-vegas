@@ -1,5 +1,5 @@
 import { bookLabel } from "@/lib/books";
-import { etParts } from "@/lib/et";
+import { etClock12, etParts } from "@/lib/et";
 import { settledOf, type Settled } from "@/lib/grade";
 import { getBoard, type BoardRow } from "@/lib/board";
 import {
@@ -104,10 +104,7 @@ function asDate(d: Date | string | null): Date | null {
 export function kickoffET(d: Date | string | null): string | null {
   const t = asDate(d);
   if (t === null) return null;
-  const p = etParts(t);
-  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
-  const ampm = p.hour >= 12 ? "p" : "a";
-  return `${p.weekday} ${hour12}:${String(p.minute).padStart(2, "0")}${ampm}`;
+  return etClock12(t, ["a", "p"]);
 }
 
 export const DAYS = ["thu", "fri", "sat", "sun"] as const;

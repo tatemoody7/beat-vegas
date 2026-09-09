@@ -2,31 +2,15 @@
 /plays only for the weeks that still hold a FINISHED FBS-vs-FBS game with no
 fh_team_game rows, instead of all 20 weeks on every grade.yml run."""
 
-from contextlib import contextmanager
-
-from conftest import _load_script
-from sqlalchemy import create_engine
+from conftest import _load_script, _sqlite_scope
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import Base, FhTeamGame, Game
+from beatvegas.db.models import FhTeamGame, Game
 from beatvegas.sources import cfbpbp
 
 mod = _load_script("backfill_pbp")
 SEASON = 2026
 FBS = {"Kansas State", "Kansas", "Missouri", "Florida", "LSU", "Clemson"}
-
-
-def _sqlite_scope():
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-
-    @contextmanager
-    def scope():
-        with Session(eng) as s:
-            yield s
-            s.commit()
-
-    return eng, scope
 
 
 def _game(gid, week, home, away, finished=True):

@@ -5,13 +5,10 @@ a partial score. backfill.py now keys finality off CFBD's `completed` flag
 (both points present, for older exports without the key) and writes no points
 and no first-half columns until the game is final."""
 
-from contextlib import contextmanager
-
-from conftest import _load_script
-from sqlalchemy import create_engine
+from conftest import _load_script, _sqlite_scope
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import Base, Game
+from beatvegas.db.models import Game
 
 mod = _load_script("backfill")
 
@@ -83,19 +80,6 @@ class _CFBD:
 
     def plays(self, **kw):  # pragma: no cover - a live game never reaches PBP
         raise AssertionError("plays() must not be called for an in-progress game")
-
-
-def _sqlite_scope():
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-
-    @contextmanager
-    def scope():
-        with Session(eng) as s:
-            yield s
-            s.commit()
-
-    return eng, scope
 
 
 def test_backfill_season_writes_no_points_or_first_half_for_a_live_game(monkeypatch):

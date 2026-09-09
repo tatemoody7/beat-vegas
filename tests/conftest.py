@@ -22,6 +22,31 @@ def _load_script(name: str):
     return mod
 
 
+def _sqlite_scope():
+    """An in-memory SQLite with the full schema, plus a `session_scope`-shaped
+    context manager to monkeypatch over a module's `session_scope`. Returns
+    (engine, scope): seed rows through Session(engine), run the code under test
+    through scope(). Shared by the offline script tests so the pattern is not
+    re-typed per file."""
+    from contextlib import contextmanager
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import Base
+
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    return eng, scope
+
+
 @pytest.fixture(scope="session")
 def pg_sandbox():
     """Start the local PG sandbox once, point the store engine at it."""

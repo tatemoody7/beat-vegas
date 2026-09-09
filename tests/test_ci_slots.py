@@ -10,8 +10,15 @@ date) skips on cron but never on dispatch."""
 from datetime import datetime, timezone
 
 import pytest
+from conftest import _sqlite_scope
 
-from beatvegas.ci import CRON_SLOTS, SLOT_GATE_ET, et_midnight_as_naive_utc, resolve_slot
+from beatvegas.ci import (
+    CRON_SLOTS,
+    SLOT_GATE_ET,
+    et_midnight_as_naive_utc,
+    resolve_for_cli,
+    resolve_slot,
+)
 
 
 def utc(y, m, d, hh, mm):
@@ -170,24 +177,14 @@ def test_slots_built_today_reads_todays_card_rows(monkeypatch):
     """The probe: cards rows for the active week since today's ET midnight,
     by payload slot. Exercised on an in-memory SQLite so no network."""
     import json
-    from contextlib import contextmanager
 
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
     from beatvegas import ci
     from beatvegas.db import store
-    from beatvegas.db.models import Base, Card
+    from beatvegas.db.models import Card
 
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-
-    @contextmanager
-    def scope():
-        with Session(eng) as s:
-            yield s
-            s.commit()
-
+    eng, scope = _sqlite_scope()
     monkeypatch.setattr(store, "try_init_db", lambda: True)
     monkeypatch.setattr(store, "session_scope", scope)
     monkeypatch.setattr("beatvegas.season.active", lambda: (2026, 3))
@@ -216,3 +213,75 @@ def test_slots_built_today_reads_todays_card_rows(monkeypatch):
     monkeypatch.setattr(store, "try_init_db", lambda: True)
     monkeypatch.setattr("beatvegas.season.active", lambda: (2026, None))
     assert ci.slots_built_today(utc(2026, 9, 10, 20, 5)) == set()
+
+
+def test_the_probe_runs_only_for_an_in_gate_scheduled_tick(monkeypatch):
+    """Gate BEFORE probe: two of the four morning crons are gate-skips every
+    day, and they used to open Neon (try_init_db runs DDL and, inside GHA,
+    re-raises) just to learn what the ET clock already said. The probe is paid
+    for only by a tick that is going to build unless a card is on record."""
+    from beatvegas import ci
+
+    calls = []
+
+    def probe(now):
+        calls.append(now)
+        return set()
+
+    monkeypatch.setattr(ci, "slots_built_today", probe)
+    # EST Tue Nov 17: 12:35Z = 7:35am ET is a gate-skip -> no probe.
+    r = resolve_for_cli("35 12 * * 2-6", utc(2026, 11, 17, 12, 35))
+    assert r["slot"] == "skip" and "outside" in r["reason"]
+    assert calls == []
+    # 13:05Z = 8:05am ET is inside the gate -> exactly one probe, then a build.
+    r = resolve_for_cli("5 13 * * 2-6", utc(2026, 11, 17, 13, 5))
+    assert r["slot"] == "morning"
+    assert calls == [utc(2026, 11, 17, 13, 5)]
+    # The probe's answer is what decides the second in-gate cron.
+    r = resolve_for_cli("35 13 * * 2-6", utc(2026, 11, 17, 13, 35), probe=lambda now: {"morning"})
+    assert r["slot"] == "skip" and "already built today" in r["reason"]
+    assert len(calls) == 1  # the explicit probe was used, not the module one
+    # A dispatch never probes (it never self-skips, so the answer is unused).
+    r = resolve_for_cli("", utc(2026, 11, 17, 14, 0), input_slot="morning")
+    assert r["slot"] == "morning"
+    r = resolve_for_cli("", utc(2026, 11, 17, 14, 0))
+    assert r["slot"] == "manual"
+    assert len(calls) == 1
+    # An afternoon gate-skip (EST 20:05Z = 3:05pm ET) is just as silent.
+    assert resolve_for_cli("0 20 * * 4,5", utc(2026, 11, 20, 20, 5))["slot"] == "skip"
+    assert len(calls) == 1
+
+
+def test_resolve_slot_cli_gate_skips_without_touching_the_db(monkeypatch, capsys):
+    """The card.yml entry point end to end: SCHEDULE/INPUT_SLOT from the env,
+    the wall clock frozen, JSON on stdout (no $GITHUB_OUTPUT locally)."""
+    import json
+
+    from beatvegas import ci
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return utc(2026, 11, 17, 12, 35)
+
+    monkeypatch.setattr(ci, "datetime", FrozenDatetime)
+    monkeypatch.setenv("SCHEDULE", "35 12 * * 2-6")
+    monkeypatch.setenv("INPUT_SLOT", "")
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+
+    def boom(now):
+        raise AssertionError("slots_built_today must not run for a gate-skip tick")
+
+    monkeypatch.setattr(ci, "slots_built_today", boom)
+    ci.resolve_slot_cli()
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["slot"] == "skip" and "outside" in out["reason"]
+
+    # The same entry point, one cron later (13:05Z = 8:05am ET): the probe runs.
+    FrozenDatetime.now = classmethod(lambda cls, tz=None: utc(2026, 11, 17, 13, 5))
+    seen = []
+    monkeypatch.setattr(ci, "slots_built_today", lambda now: seen.append(now) or set())
+    monkeypatch.setenv("SCHEDULE", "5 13 * * 2-6")
+    ci.resolve_slot_cli()
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["slot"] == "morning" and seen == [utc(2026, 11, 17, 13, 5)]

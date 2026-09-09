@@ -26,7 +26,7 @@ import json
 import os
 import sys
 from datetime import datetime, time, timezone
-from typing import Dict, Optional, Set, Tuple
+from typing import Callable, Dict, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
@@ -181,9 +181,13 @@ def slots_built_today(now_utc: datetime) -> Set[str]:
     """Slots with a `cards` row for the active season/week built since today's
     ET midnight. A card row is a positive fact that the build happened (a
     gate-skip run writes none), which is what the second cron of a slot needs
-    to know. Empty when there is no active week, or when the DB is unreachable
-    outside GitHub Actions (inside GHA `try_init_db` re-raises, so a bad secret
-    fails the run instead of building twice)."""
+    to know. The season/week filter is deliberate, not just a narrowing: a
+    dispatched rehearsal build for ANOTHER week (`gh workflow run card.yml -f
+    week=...`) also writes a card row today, and it must not suppress today's
+    real build for the active week. Empty when there is no active week, or when
+    the DB is unreachable outside GitHub Actions (inside GHA `try_init_db`
+    re-raises, so a bad secret fails the run instead of building twice). Only
+    called for an in-gate scheduled tick (resolve_for_cli)."""
     from .db.models import Card
     from .db.store import session_scope, try_init_db
     from .season import active
@@ -212,14 +216,32 @@ def slots_built_today(now_utc: datetime) -> Set[str]:
     return slots
 
 
+def resolve_for_cli(
+    schedule: str,
+    now_utc: datetime,
+    input_slot: str = "",
+    probe: Optional[Callable[[datetime], Set[str]]] = None,
+) -> Dict[str, object]:
+    """resolve_slot with the DB probe wired in, GATE FIRST: a scheduled tick is
+    resolved against an empty probe, and only a tick that lands inside its ET
+    window (and a dispatch never) pays for `slots_built_today`. The gate-skip
+    ticks (two of the four morning crons every day) therefore never open Neon —
+    `try_init_db` runs DDL, and inside GHA re-raises on a bad connection, so a
+    tick that was going to skip anyway must not be able to fail the run."""
+    out = resolve_slot(schedule, now_utc, input_slot)
+    if schedule == "" or out["slot"] == "skip":
+        return out
+    probe_fn = probe if probe is not None else slots_built_today
+    return resolve_slot(schedule, now_utc, input_slot, probe_fn(now_utc))
+
+
 def resolve_slot_cli() -> None:
     """Entry point for card.yml: reads SCHEDULE / INPUT_SLOT, probes the cards
-    table on a scheduled run, appends the slot fields to $GITHUB_OUTPUT (or
-    prints JSON locally)."""
+    table only for an in-gate scheduled run (resolve_for_cli), appends the slot
+    fields to $GITHUB_OUTPUT (or prints JSON locally)."""
     schedule = os.environ.get("SCHEDULE", "")
     now = datetime.now(timezone.utc)
-    built_today: Set[str] = slots_built_today(now) if schedule != "" else set()
-    out = resolve_slot(schedule, now, os.environ.get("INPUT_SLOT", ""), built_today)
+    out = resolve_for_cli(schedule, now, os.environ.get("INPUT_SLOT", ""))
     path = os.environ.get("GITHUB_OUTPUT")
     if path:
         with open(path, "a", encoding="utf-8") as fh:

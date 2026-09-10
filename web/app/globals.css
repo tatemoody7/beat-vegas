@@ -147,6 +147,14 @@ body {
 
   /* One badge component for every chip on the site (tier word, status tags,
      logged, paper, filters). Colour modifiers carry the grade language. */
+  /* A team's mark before its name. No backplate and no ring: colour here is the
+     grade language, and a chrome frame around a logo would read as one. */
+  .bv-team-logo {
+    display: inline-block;
+    vertical-align: -0.15em;
+    margin-right: 0.3rem;
+  }
+
   .bv-badge {
     display: inline-flex;
     align-items: center;

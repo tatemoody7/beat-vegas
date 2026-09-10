@@ -3,6 +3,7 @@ import { american, capitalize, fmt } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import ScoreBadge from "@/app/components/ScoreBadge";
+import TeamLogo from "@/app/components/TeamLogo";
 
 // One game on the board: rank badge, matchup, kickoff, Hard Rock's number and
 // price, and one line saying what to do. Nothing else.
@@ -54,7 +55,9 @@ export default function GameRow({ g }: { g: HomeGame }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-base font-semibold leading-snug text-[var(--text)]">
+              <TeamLogo teamId={row.awayTeamId} />
               {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+              <TeamLogo teamId={row.homeTeamId} />
               {row.home}
             </span>
             <span className="text-xs text-[var(--text-dim)]">

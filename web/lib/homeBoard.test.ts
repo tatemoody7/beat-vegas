@@ -30,6 +30,8 @@ const row = (o: Partial<BoardRow> = {}): BoardRow => ({
   startDate: new Date("2025-10-11T23:30:00Z"),
   away: "Iowa State",
   home: "Kansas State",
+  awayTeamId: 66,
+  homeTeamId: 2306,
   underScore: 55,
   underProb: 0.55,
   rank: 1,

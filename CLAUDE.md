@@ -5,6 +5,37 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-10 (site restructure, branch `board-and-game-page`, NOT merged):** the site
+  goes to **three tabs — Board / Results / Track record — plus `/game/[id]`**. A board row
+  is now a **LINK**, never a disclosure: `GameCard` is deleted, `GameRow` carries only the
+  rank badge, matchup, kickoff, Hard Rock's number and price, one action line, and the two
+  chips that change whether to bet (`bet logged`, past the cap). The badge is **rank plus
+  colour with no tier word** ("Watch" was true of 35 of 49 games, so it discriminated
+  nothing; `ScoreBadge` takes `label={null}`, and still names the tier to screen readers).
+  Everything analytical lives on the game page: the decision block with a **gap bar**
+  (`GapBar.tsx` — our number against the line on one axis, split at `BET_GAP_PTS`, kill
+  number ticked), Lines, What is behind it, Injuries and news. **There is no "Our number"
+  section** — Tate cut it as a repeat of the decision block, which also took the 0-100
+  score, the confidence meter and the 7-35 range off the page (the score still sets the
+  tier and the ranking). An **answer bar** (`AnswerBar.tsx` + pure `lib/answerBar.ts`)
+  replaces `BankrollStrip`/`BetSlip`/`CardPanel` at the top of the board and carries the
+  live bets, the three closest with the action trimmed to its "needs …" clause, and the
+  next build window from `lib/nextBuild.ts` (derived from `CRON_JOBS`, stated as a WINDOW
+  because Vercel Hobby fires within the hour). **Nothing renders below the last game row.**
+  The slip, card panel, card status banner and bankroll strip now sit at the **TOP of
+  `/results`** — `/slip` was built and deleted the same day. `lib/labels.ts::distinctTag`
+  drops a blocker tag the action line already says (they share a blocker, so most Watch
+  games printed the sentence twice). `CardPanel` rows link to `/game/[id]`, so its
+  `onBoard` prop and the "Not on the board" fallback are gone. Week 2: 11,608px → 7,329px,
+  839KB → 198KB HTML; web tests 336 → 351.
+  **Still to do:** team logos (chosen by Tate, but NO logo data exists anywhere — `teams`
+  holds only id/school/conference and `data/fbs_teams.json` is a season→names map, so it
+  needs a CFBD `/teams` fetch into a cached lookup plus a text fallback), the Results
+  reorganisation (bankroll/curve hero, trimmed picks table, collapse the eight empty
+  sections, post-mortem out), `/proof` absorbing Research + `/research/records` + the
+  Glossary, and deleting the eight legacy redirect files.
+  Audit, per-page layouts and every decision: `~/.claude/plans/i-like-a-lot-cuddly-dusk.md`.
+  **Screenshot with headless Chrome, never the Browser pane** (it caps captures at 800x500).
 - **2026-09-09 night (PR #94, merged):** the board **ranks** instead of scoring. Each card's
   badge is its place on the week (`#1` = best), assigned in `homeBoard.ts::assignBoardRanks`
   over the whole board inside `getHomeBoard` — before `page.tsx` filters, so a day or team

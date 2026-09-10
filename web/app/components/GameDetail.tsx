@@ -1,15 +1,8 @@
 import Link from "next/link";
 import { bookLabel } from "@/lib/books";
-import { WATCH_GAP_MIN } from "@/lib/edge";
 import { american, capitalize, fmt, signed } from "@/lib/format";
-import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
-import { strongestRed, type HomeGame } from "@/lib/homeBoard";
-import {
-  basisPhrase,
-  blockerTag,
-  distinctTag,
-  TIER_TEXT,
-} from "@/lib/labels";
+import type { HomeGame } from "@/lib/homeBoard";
+import { basisPhrase, blockerTag, distinctTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
@@ -18,42 +11,21 @@ import {
   type TeamForm,
   type TeamSplit,
 } from "@/lib/score";
-import {
-  BET_GAP_PTS,
-  CONFIDENCE_LABEL,
-  STRONG_GAP_PTS,
-  WEEKLY_BET_CAP,
-  type Confidence,
-} from "@/lib/verdict";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
 
 // One game, in full. This is where every number the board used to hide behind a
 // disclosure now lives: the decision up top (the gap drawn, the price, the kill
-// number, the log button), then Lines, Our number, What is behind it, and
-// Injuries and news. The board row is a link to here and carries none of it.
+// number, the log button), then Lines, What is behind it, and Injuries and news.
+// The board row is a link to here and carries none of it.
+//
+// There is no "Our number" section: the decision block already states the
+// number, the gap and the kill line, so it only repeated them (Tate, 2026-09-10).
 //
 // Colour is the grade language (globals.css): --good bet, --warn watch,
 // --bad pass. Cyan stays chrome — links and buttons only.
-
-const CONFIDENCE_STEPS: Record<Confidence, number> = {
-  high: 3,
-  medium: 2,
-  low: 1,
-  none: 0,
-};
-
-function bandLabel(gap: number | null): string {
-  if (gap === null) return "nothing to measure it against";
-  if (gap >= STRONG_GAP_PTS)
-    return `${STRONG_GAP_PTS}+ — the biggest gaps of a season`;
-  if (gap >= BET_GAP_PTS) return `${BET_GAP_PTS}+ — the band we bet`;
-  if (gap >= WATCH_GAP_MIN)
-    return `worth watching, under the ${BET_GAP_PTS} bar`;
-  if (gap > 0) return "about on our number";
-  return "the line is below our number, so this leans over";
-}
 
 function Section({
   title,
@@ -78,28 +50,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="min-w-32 text-[var(--text-dim)]">{label}</span>
       <span className="text-[var(--text-muted)]">{value}</span>
     </div>
-  );
-}
-
-function ConfidenceMeter({ level }: { level: Confidence }) {
-  const on = CONFIDENCE_STEPS[level];
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className="inline-flex gap-1" aria-hidden>
-        {[1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className="h-2 w-5 rounded-sm"
-            style={{
-              background: i <= on ? "var(--text-muted)" : "var(--bg-2)",
-            }}
-          />
-        ))}
-      </span>
-      <span className="text-[var(--text-muted)]">
-        {CONFIDENCE_LABEL[level]}
-      </span>
-    </span>
   );
 }
 
@@ -233,93 +183,6 @@ function LinesSection({ g }: { g: HomeGame }) {
           {`We never bet the full game. It is here because the first-half line is priced off it.`}
         </p>
       </div>
-    </Section>
-  );
-}
-
-// --- Our number -------------------------------------------------------------
-
-function ModelSection({ g }: { g: HomeGame }) {
-  const { row, edge } = g;
-  const red = strongestRed(row.factors.factor_board);
-  return (
-    <Section title="Our number">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-        <span>
-          <span className="block text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
-            our number
-          </span>
-          <span className="font-mono text-3xl text-[var(--text)]">
-            {row.bvLine === null ? "—" : fmt(row.bvLine)}
-          </span>
-          {row.bvLo !== null && row.bvHi !== null && (
-            <span className="ml-2 text-xs text-[var(--text-dim)]">
-              {`range ${fmt(row.bvLo, 0)}–${fmt(row.bvHi, 0)}`}
-            </span>
-          )}
-        </span>
-        <span>
-          <span className="block text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
-            score
-          </span>
-          <span className="font-mono text-3xl text-[var(--text)]">
-            {edge.score}
-          </span>
-          <span className="ml-1 text-xs text-[var(--text-dim)]">out of 100</span>
-        </span>
-        <span>
-          <span className="mb-1 block text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
-            how sure
-          </span>
-          <ConfidenceMeter level={edge.verdict.confidence} />
-        </span>
-      </div>
-
-      <div className="space-y-1">
-        <Row
-          label="What the score means"
-          value={`${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching. It is what the board ranks on.`}
-        />
-        {row.bvAdjust !== null && row.bvAdjust !== 0 && (
-          <Row
-            label="Manual nudge"
-            value={`${signed(row.bvAdjust, 1)}${row.bvAdjustReason ? ` (${row.bvAdjustReason})` : ""}`}
-          />
-        )}
-        <Row
-          label="Gap"
-          value={
-            g.gap === null ? (
-              "—"
-            ) : (
-              <>
-                <span className="font-mono text-[var(--text)]">
-                  {signed(g.gap, 1)}
-                </span>
-                {` ${basisPhrase(g.gapBasis, g.basisBooks)} — ${bandLabel(g.gap)}`}
-              </>
-            )
-          }
-        />
-        <Row label="Stops being a bet at" value={edge.kill.text} />
-        <Row
-          label="What argues against it"
-          value={red ?? "Nothing here argues against the under."}
-        />
-      </div>
-
-      {edge.verdict.flags.length > 0 && (
-        <ul className="mt-3 space-y-1">
-          {edge.verdict.flags.map((fl, i) => (
-            <li
-              key={i}
-              className="rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]"
-            >
-              {fl}
-            </li>
-          ))}
-        </ul>
-      )}
     </Section>
   );
 }
@@ -634,7 +497,9 @@ export default function GameDetail({
         </h2>
 
         <div className="mb-4 flex flex-wrap gap-1.5">
-          {g.picked && <span className="bv-badge bv-badge--accent">bet logged</span>}
+          {g.picked && (
+            <span className="bv-badge bv-badge--accent">bet logged</span>
+          )}
           {g.overCap && (
             <span className="bv-badge bv-badge--push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</span>
           )}
@@ -707,7 +572,6 @@ export default function GameDetail({
       </section>
 
       <LinesSection g={g} />
-      <ModelSection g={g} />
       <WhySection g={g} />
       <NewsSection g={g} />
     </div>

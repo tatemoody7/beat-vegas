@@ -12,7 +12,7 @@ import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import { getWeeklyReview } from "@/lib/weeklyReview";
-import BankrollCurve from "@/app/components/BankrollCurve";
+import BankrollHero from "@/app/components/BankrollHero";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BetSlip from "@/app/components/BetSlip";
 import CardPanel from "@/app/components/CardPanel";
@@ -174,6 +174,8 @@ export default async function ResultsPage({
         <BankrollStrip b={board.bankroll} />
       </section>
 
+      <BankrollHero b={board.bankroll} points={curve} />
+
       {/* Season summary. Only records with something in them render: five
           near-empty cards in week 2 is the placeholder problem in card form
           (Tate 2026-09-10). */}
@@ -218,20 +220,6 @@ export default async function ResultsPage({
             hint="Context only. We do not bet the full game."
           />
         </div>
-      </Section>
-
-      <Section
-        title="Bankroll, week by week"
-        empty={
-          curve.length < 2
-            ? `this starts once a week is graded. Starting bankroll ${usd(startUsd)}, one unit ${usd(unitUsd)}.`
-            : null
-        }
-      >
-        <BankrollCurve points={curve} startUsd={startUsd} />
-        <p className="mt-1 text-xs text-[var(--text-dim)]">
-          {`Settled real-money bets only, at ${usd(unitUsd)} a unit. The dashed line is the ${usd(startUsd)} you started with. Pending bets do not move it.`}
-        </p>
       </Section>
 
       <Section

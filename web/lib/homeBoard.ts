@@ -1,4 +1,5 @@
 import { bookLabel } from "@/lib/books";
+import { prisma } from "@/lib/prisma";
 import { etClock12, etParts } from "@/lib/et";
 import { settledOf, type Settled } from "@/lib/grade";
 import { getBoard, type BoardRow } from "@/lib/board";
@@ -435,6 +436,35 @@ export function tierCounts(games: HomeGame[]): {
     edge: games.filter((g) => g.edge.tier === "EDGE").length,
     pass: games.filter((g) => g.edge.tier === "PASS").length,
   };
+}
+
+/** The season and week one game sits in, so a game page can rebuild the same
+ *  board context the board itself uses. Null when the id is not a game. */
+export async function gameSeasonWeek(
+  gameId: number,
+): Promise<{ season: number; week: number } | null> {
+  const rows = await prisma.$queryRaw<
+    { season: number | bigint; week: number | bigint }[]
+  >`SELECT season, week FROM games WHERE id = ${gameId} LIMIT 1`;
+  if (rows.length === 0) return null;
+  return { season: Number(rows[0].season), week: Number(rows[0].week) };
+}
+
+/**
+ * One game, with the whole week's context behind it. It loads the full board on
+ * purpose: rank, cap slot and the tier counts are all assigned across every
+ * game, so a game page that queried its own row alone would show a different
+ * rank from the board that linked to it.
+ */
+export async function getHomeGame(
+  gameId: number,
+  now: Date = new Date(),
+): Promise<{ game: HomeGame; board: HomeBoard } | null> {
+  const sw = await gameSeasonWeek(gameId);
+  if (sw === null) return null;
+  const board = await getHomeBoard(sw.season, sw.week, now);
+  const game = board.games.find((g) => g.row.gameId === gameId);
+  return game === undefined ? null : { game, board };
 }
 
 export async function getHomeBoard(

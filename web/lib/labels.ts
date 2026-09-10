@@ -275,3 +275,29 @@ export const RESULT_COLOR: Record<string, string> = {
   over: "var(--bad)",
   push: "var(--push)",
 };
+
+/** Punctuation- and case-insensitive form, so a comparison is not defeated by a
+ *  curly apostrophe or a trailing full stop. */
+function loose(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[‘’′']/g, "'")
+    .replace(/[^a-z0-9'+-]+/g, " ")
+    .trim();
+}
+
+/**
+ * The blocker tag, but only when it says something the action line does not.
+ * `blockerTag` and `edge.action` are built from the same blocker, so on most
+ * Watch games they render the identical sentence twice — the tag is meant to be
+ * a summary beside a different message, not an echo of it.
+ */
+export function distinctTag(
+  tag: string | null,
+  action: string | null,
+): string | null {
+  if (tag === null) return null;
+  const t = loose(tag);
+  if (t === "") return null;
+  return action !== null && loose(action).includes(t) ? null : tag;
+}

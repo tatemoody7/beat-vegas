@@ -201,7 +201,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 <td className="bv-num font-mono text-[var(--text-muted)]">
                   {num(p.clv)}
                 </td>
-                <td className="max-w-xs text-[var(--text-dim)]">
+                <td className="min-w-[16rem] max-w-md text-[var(--text-dim)]">
                   {p.note ?? "—"}
                 </td>
                 <td className="whitespace-nowrap">

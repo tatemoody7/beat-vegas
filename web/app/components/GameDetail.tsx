@@ -1,12 +1,8 @@
-"use client";
-
-import { useState } from "react";
+import Link from "next/link";
 import { bookLabel } from "@/lib/books";
-import { WATCH_GAP_MIN } from "@/lib/edge";
 import { american, capitalize, fmt, signed } from "@/lib/format";
-import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
-import { strongestRed, type HomeGame } from "@/lib/homeBoard";
-import { basisPhrase, blockerTag, TIER_TEXT } from "@/lib/labels";
+import type { HomeGame } from "@/lib/homeBoard";
+import { basisPhrase, blockerTag, distinctTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
@@ -15,46 +11,21 @@ import {
   type TeamForm,
   type TeamSplit,
 } from "@/lib/score";
-import {
-  BET_GAP_PTS,
-  WEEKLY_BET_CAP,
-  CONFIDENCE_LABEL,
-  STRONG_GAP_PTS,
-} from "@/lib/verdict";
+import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
-import ScoreBadge from "@/app/components/ScoreBadge";
 
-// One game on the rolling week board: a scannable collapsed row (its place on
-// the week, the matchup, the numbers, what to do) that expands into everything
-// behind it — Lines, Our number, What is behind it, Injuries and news. The
-// badge carries the grade colour (lib/grade.ts) and a Bet card is lit green;
-// cyan stays chrome.
-
-// The rungs match the score bands (lib/grade.ts): 1.75+ is green, WATCH_GAP_MIN
-// (≈0.44) to 1.75 is amber, anything less is red.
-function bandLabel(gap: number | null): string {
-  if (gap === null) return "nothing to measure it against";
-  if (gap >= STRONG_GAP_PTS)
-    return `${STRONG_GAP_PTS}+ — the biggest gaps of a season`;
-  if (gap >= BET_GAP_PTS) return `${BET_GAP_PTS}+ — the band we bet`;
-  if (gap >= WATCH_GAP_MIN)
-    return `worth watching, under the ${BET_GAP_PTS} bar`;
-  if (gap > 0) return "about on our number";
-  return "the line is below our number, so this leans over";
-}
-
-/** One chip on the collapsed row. */
-function Tag({
-  tone,
-  children,
-}: {
-  tone: "good" | "warn" | "bad" | "push" | "accent" | "plain";
-  children: React.ReactNode;
-}) {
-  const mod = tone === "plain" ? "" : `bv-badge--${tone}`;
-  return <span className={`bv-badge ${mod}`}>{children}</span>;
-}
+// One game, in full. This is where every number the board used to hide behind a
+// disclosure now lives: the decision up top (the gap drawn, the price, the kill
+// number, the log button), then Lines, What is behind it, and Injuries and news.
+// The board row is a link to here and carries none of it.
+//
+// There is no "Our number" section: the decision block already states the
+// number, the gap and the kill line, so it only repeated them (Tate, 2026-09-10).
+//
+// Colour is the grade language (globals.css): --good bet, --warn watch,
+// --bad pass. Cyan stays chrome — links and buttons only.
 
 function Section({
   title,
@@ -64,10 +35,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-t border-[var(--border)] px-4 py-3">
-      <h4 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
+    <section className="bv-card p-4">
+      <h2 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
         {title}
-      </h4>
+      </h2>
       {children}
     </section>
   );
@@ -90,8 +61,6 @@ function move(open: number | null, cur: number | null): string {
   return d === 0 ? "no move" : signed(d, 1);
 }
 
-// Odds API totals rows carry no spread by design, so fall back to the spread
-// stored on the card at scoring time rather than showing two dashes.
 function spreadText(
   fg: MarketMovement | null,
   stored: number | null | undefined,
@@ -190,7 +159,8 @@ function LinesSection({ g }: { g: HomeGame }) {
             }
           />
           <BookTable m={fh} />
-          <p className="text-xs text-[var(--text-muted)]">{g.priceLine}</p>
+          {/* The price sentence belongs to the decision, and it is printed
+              there. Repeating it under the book table said it twice. */}
           {g.movement !== null && g.movement.points.length > 1 && (
             <MovementChart
               points={g.movement.points}
@@ -217,85 +187,7 @@ function LinesSection({ g }: { g: HomeGame }) {
   );
 }
 
-// --- Model ------------------------------------------------------------------
-
-function ModelSection({ g }: { g: HomeGame }) {
-  const { row, edge } = g;
-  const red = strongestRed(row.factors.factor_board);
-  return (
-    <Section title="Our number">
-      <div className="space-y-1">
-        <Row
-          label="Our number"
-          value={
-            row.bvLine === null ? (
-              "no model number yet"
-            ) : (
-              <>
-                <span className="font-mono text-[var(--text)]">
-                  {fmt(row.bvLine)}
-                </span>
-                {row.bvLo !== null && row.bvHi !== null
-                  ? ` (range ${fmt(row.bvLo, 0)}–${fmt(row.bvHi, 0)})`
-                  : ""}
-                {row.bvAdjust !== null && row.bvAdjust !== 0
-                  ? ` · includes a manual ${signed(row.bvAdjust, 1)} nudge${row.bvAdjustReason ? ` (${row.bvAdjustReason})` : ""}`
-                  : ""}
-              </>
-            )
-          }
-        />
-        <Row
-          label="Score"
-          value={
-            <>
-              <span className="font-mono text-[var(--text)]">{edge.score}</span>
-              {` out of 100 — ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching. It is what the board ranks on.`}
-            </>
-          }
-        />
-        <Row
-          label="How sure"
-          value={CONFIDENCE_LABEL[edge.verdict.confidence]}
-        />
-        <Row
-          label="Gap"
-          value={
-            g.gap === null ? (
-              "—"
-            ) : (
-              <>
-                <span className="font-mono text-[var(--text)]">
-                  {signed(g.gap, 1)}
-                </span>
-                {` ${basisPhrase(g.gapBasis, g.basisBooks)} — ${bandLabel(g.gap)}`}
-              </>
-            )
-          }
-        />
-        <Row label="Stops being a bet at" value={edge.kill.text} />
-        <Row
-          label="What argues against it"
-          value={red ?? "Nothing here argues against the under."}
-        />
-      </div>
-      {edge.verdict.flags.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {edge.verdict.flags.map((fl, i) => (
-            <li
-              key={i}
-              className="rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]"
-            >
-              {fl}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
-// --- Why --------------------------------------------------------------------
+// --- What is behind it ------------------------------------------------------
 
 function FactorRow({ f }: { f: BoardFactor }) {
   const tint = factorTint(f);
@@ -339,10 +231,9 @@ function splitText(s: TeamSplit | null | undefined): string {
 
 function WhySection({ g }: { g: HomeGame }) {
   const f = g.row.factors;
-  const factors = (f.factor_board ?? []).filter((x) => x && x.key);
-  const anyUnproven = factors.some((x) => x.hypothesis);
-  // Each piece only appears when the context job actually wrote it, so the row
-  // reads as prose instead of a line of dashes.
+  const factors: BoardFactor[] = (f.factor_board ?? []).filter(
+    (x) => x && x.key,
+  );
   const bits: string[] = [];
   if (f.home_rest_days != null || f.away_rest_days != null) {
     bits.push(
@@ -380,7 +271,7 @@ function WhySection({ g }: { g: HomeGame }) {
           {factors.map((fac) => (
             <FactorRow key={fac.key} f={fac} />
           ))}
-          {anyUnproven && (
+          {factors.some((x) => x.hypothesis) && (
             <p className="mt-1 text-xs text-[var(--text-dim)]">
               {`Rows marked unproven have not been checked against real lines yet.`}
             </p>
@@ -417,10 +308,8 @@ function WhySection({ g }: { g: HomeGame }) {
   );
 }
 
-// --- News -------------------------------------------------------------------
+// --- Injuries and news ------------------------------------------------------
 
-// An injury string is "POS Name — Status". Only an actual absence warrants the
-// alert color; available players stay neutral.
 const ALERT_STATUS =
   /\b(out|doubtful|questionable|suspended|injured reserve|ir)\b/i;
 
@@ -523,38 +412,44 @@ function NewsSection({ g }: { g: HomeGame }) {
   );
 }
 
-// --- the card ---------------------------------------------------------------
+// --- the page ---------------------------------------------------------------
 
-export default function GameCard({
+/** Tier colour, the same language the board badge speaks. */
+function tierTone(g: HomeGame): string {
+  if (g.settled !== null) return "var(--push)";
+  if (g.edge.tier === "BET") return "var(--good)";
+  if (g.edge.tier === "PASS") return "var(--bad)";
+  return "var(--warn)";
+}
+
+export default function GameDetail({
   g,
   unitUsd,
+  backHref,
 }: {
   g: HomeGame;
-  /** The flat stake, read from the environment server-side and passed in —
-   *  a client component cannot read a non-public env var. */
+  /** The flat stake, read server-side — a client component cannot read it. */
   unitUsd: number;
+  backHref: string;
 }) {
-  const [open, setOpen] = useState(false);
   const { row, edge, check } = g;
-  const hr =
-    check?.hrLine == null
-      ? "no line yet"
-      : `u${fmt(check.hrLine)}${check.hrUnderPrice == null ? "" : ` ${american(check.hrUnderPrice)}`}`;
-  const line = row.curLine ?? row.factors.line ?? null;
-  const basis = g.gapBasis;
+  const line = check?.hrLine ?? row.curLine ?? row.factors.line ?? null;
+  const tone = tierTone(g);
+  // The tag and the action line come from the same blocker, so it only earns a
+  // place when it is not an echo of the sentence right above it.
   const tag =
     edge.tier === "EDGE"
-      ? blockerTag(edge.blocker, {
-          hrLine: check?.hrLine ?? null,
-          hrPrice: check?.hrUnderPrice ?? null,
-          marketLine: row.curLine,
-          killLine: edge.kill.line,
-          killPrice: edge.kill.price,
-        })
+      ? distinctTag(
+          blockerTag(edge.blocker, {
+            hrLine: check?.hrLine ?? null,
+            hrPrice: check?.hrUnderPrice ?? null,
+            marketLine: row.curLine,
+            killLine: edge.kill.line,
+            killPrice: edge.kill.price,
+          }),
+          edge.action,
+        )
       : null;
-  // Once played: the result at the line it was GRADED against (a real book
-  // line — homeBoard.settledAgainst), or a neutral final when no book ever
-  // posted one, so a reference-only game is never coloured won or lost.
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null
@@ -564,111 +459,132 @@ export default function GameCard({
         : null;
 
   return (
-    <div
-      id={`game-${row.gameId}`}
-      data-interactive="true"
-      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "BET" && !g.kickedOff ? "bv-card--lit" : ""} ${edge.tier === "PASS" && g.settled === null ? "opacity-85" : ""}`}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="flex w-full flex-col items-stretch p-4 text-left"
-      >
-        <span className="flex items-start gap-3">
-          <ScoreBadge
-            score={edge.score}
-            rank={g.boardRank}
-            kickedOff={g.kickedOff}
-            inPlay={g.inPlay}
-            settled={g.settled}
-            label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-semibold leading-snug text-[var(--text)]">
-              {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
-              {row.home}
-            </span>
-            <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
-              {g.kickoff ?? "kickoff time TBD"}
-            </span>
-          </span>
-          <span
-            aria-hidden
-            className="shrink-0 pt-1 text-xs text-[var(--text-dim)]"
-          >
-            {open ? "▲ less" : "▼ more"}
-          </span>
-        </span>
-        {(g.picked ||
-          g.overCap ||
-          g.earlySeason ||
-          tag !== null ||
-          (g.kickedOff && g.settled === null)) && (
-          <span className="mt-2 flex flex-wrap gap-1.5">
-            {g.picked && <Tag tone="accent">bet logged</Tag>}
-            {g.overCap && (
-              <Tag tone="push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</Tag>
-            )}
-            {g.kickedOff && g.settled === null && (
-              <Tag tone="push">already kicked off</Tag>
-            )}
-            {g.earlySeason && <Tag tone="warn">early season</Tag>}
-            {tag !== null && (
-              <span className="bv-badge bv-badge--warn bv-badge--wrap">
-                {tag}
-              </span>
-            )}
-          </span>
-        )}
-        <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-[var(--text-muted)]">
-          <span>{`Hard Rock ${hr}`}</span>
-          <span>{`our number ${fmt(row.bvLine)}`}</span>
-          <span>
-            {g.gap === null
-              ? "gap —"
-              : `gap ${signed(g.gap, 1)} ${basisPhrase(basis, g.basisBooks)}`}
-          </span>
-          {check?.hrLine == null && line !== null && (
-            <span>
-              {`${row.curLine !== null ? "market line" : "our reference line"} ${fmt(line)}`}
+    <div className="space-y-4">
+      <div className="sticky top-[var(--header-h)] z-10 -mx-4 border-b border-[var(--border)] bg-[var(--bg)]/95 px-4 py-3 backdrop-blur">
+        <Link
+          href={backHref}
+          className="text-xs text-[var(--accent)] hover:underline"
+        >
+          ← Back to the board
+        </Link>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {g.boardRank !== null && (
+            <span
+              className="rounded-[var(--r-sm)] px-2 py-0.5 font-mono text-lg font-semibold"
+              style={{ background: tone, color: "var(--badge-ink)" }}
+            >
+              {`#${g.boardRank}`}
             </span>
           )}
-        </span>
-        <span
-          className={`mt-2 block text-sm ${played && g.settled === null ? "text-[var(--text-dim)]" : "text-[var(--text)]"}`}
+          <h1 className="text-2xl font-semibold text-[var(--text)]">
+            {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+            {row.home}
+          </h1>
+          <span className="text-sm text-[var(--text-dim)]">
+            {g.kickoff ?? "kickoff time TBD"}
+          </span>
+          {g.settled === null && (
+            <span className="text-sm font-semibold" style={{ color: tone }}>
+              {TIER_TEXT[edge.tier]}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <section className="bv-card p-4">
+        <h2 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
+          The decision
+        </h2>
+
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {g.picked && (
+            <span className="bv-badge bv-badge--accent">bet logged</span>
+          )}
+          {g.overCap && (
+            <span className="bv-badge bv-badge--push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</span>
+          )}
+          {g.capRank !== null && !g.overCap && (
+            <span className="bv-badge bv-badge--push">{`cap slot ${g.capRank}`}</span>
+          )}
+          {g.kickedOff && g.settled === null && (
+            <span className="bv-badge bv-badge--push">already kicked off</span>
+          )}
+          {g.earlySeason && (
+            <span className="bv-badge bv-badge--warn">early season</span>
+          )}
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <Stat
+            label="Hard Rock"
+            value={
+              check?.hrLine == null
+                ? "no line yet"
+                : `u${fmt(check.hrLine)}${check.hrUnderPrice == null ? "" : ` ${american(check.hrUnderPrice)}`}`
+            }
+          />
+          <Stat
+            label="Market"
+            value={row.curLine === null ? "—" : `u${fmt(row.curLine)}`}
+          />
+          <Stat
+            label="Our number"
+            value={row.bvLine === null ? "—" : fmt(row.bvLine)}
+          />
+        </div>
+
+        <GapBar
+          ourNumber={row.bvLine}
+          line={line}
+          killLine={edge.kill.line}
+          lineLabel={basisPhrase(g.gapBasis, g.basisBooks)}
+        />
+
+        <p
+          className={`mt-4 text-base ${played && g.settled === null ? "text-[var(--text-dim)]" : "text-[var(--text)]"}`}
         >
           {resultLine ?? edge.action}
-        </span>
-      </button>
+        </p>
+        {tag !== null && (
+          <p className="mt-2 text-xs text-[var(--warn)]">{tag}</p>
+        )}
+        <p className="mt-2 text-xs text-[var(--text-muted)]">{g.priceLine}</p>
 
-      {open && (
-        <div>
-          <LinesSection g={g} />
-          <ModelSection g={g} />
-          <WhySection g={g} />
-          <NewsSection g={g} />
-          <div className="border-t border-[var(--border)] px-4 py-3">
-            <LogPickButton
-              unitUsd={unitUsd}
-              prefill={{
-                gameId: row.gameId,
-                away: row.away,
-                home: row.home,
-                line: check?.hrLine ?? line,
-                price: check?.hrUnderPrice ?? null,
-                verdict: edge.verdict.verdict,
-                reason: edge.verdict.reason,
-                gap: edge.verdict.hrGap,
-                ev: check?.ev ?? null,
-                hrLine: check?.hrLine ?? null,
-              }}
-              picked={g.picked}
-              kickedOff={g.kickedOff}
-            />
-          </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-3">
+          <LogPickButton
+            unitUsd={unitUsd}
+            prefill={{
+              gameId: row.gameId,
+              away: row.away,
+              home: row.home,
+              line: check?.hrLine ?? line,
+              price: check?.hrUnderPrice ?? null,
+              verdict: edge.verdict.verdict,
+              reason: edge.verdict.reason,
+              gap: edge.verdict.hrGap,
+              ev: check?.ev ?? null,
+              hrLine: check?.hrLine ?? null,
+            }}
+            picked={g.picked}
+            kickedOff={g.kickedOff}
+          />
         </div>
-      )}
+      </section>
+
+      <LinesSection g={g} />
+      <WhySection g={g} />
+      <NewsSection g={g} />
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--r-sm)] bg-[var(--bg-2)] px-3 py-2">
+      <div className="text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
+        {label}
+      </div>
+      <div className="font-mono text-lg text-[var(--text)]">{value}</div>
     </div>
   );
 }

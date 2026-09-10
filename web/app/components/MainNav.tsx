@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Four tabs. The board is the home page; the retired routes (/board, /preview,
-// /line-check, /line-study, /movement, /ledger, /weekly-review, /picks)
-// redirect into these.
+// Three tabs, one job each: scan the week, see the money, check the evidence.
+// The retired routes (/board, /preview, /line-check, /line-study, /movement,
+// /ledger, /weekly-review, /picks, /research, /glossary) redirect into these.
+//
+// `startsWith` is what makes /proof/records light up Track record.
 const LINKS = [
   { href: "/", label: "Board" },
   { href: "/results", label: "Results" },
-  { href: "/research", label: "Research" },
-  { href: "/glossary", label: "Glossary" },
+  { href: "/proof", label: "Track record" },
 ];
 
 export default function MainNav() {

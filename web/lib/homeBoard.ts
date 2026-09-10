@@ -1,4 +1,5 @@
 import { bookLabel } from "@/lib/books";
+import { prisma } from "@/lib/prisma";
 import { etClock12, etParts } from "@/lib/et";
 import { settledOf, type Settled } from "@/lib/grade";
 import { getBoard, type BoardRow } from "@/lib/board";
@@ -14,6 +15,7 @@ import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
 import { getMovements, type Movement } from "@/lib/movement";
 import {
   getPicks,
+  countsAgainstCap,
   isRealFirstHalf,
   type PickFull,
   type WeekPick,
@@ -437,6 +439,35 @@ export function tierCounts(games: HomeGame[]): {
   };
 }
 
+/** The season and week one game sits in, so a game page can rebuild the same
+ *  board context the board itself uses. Null when the id is not a game. */
+export async function gameSeasonWeek(
+  gameId: number,
+): Promise<{ season: number; week: number } | null> {
+  const rows = await prisma.$queryRaw<
+    { season: number | bigint; week: number | bigint }[]
+  >`SELECT season, week FROM games WHERE id = ${gameId} LIMIT 1`;
+  if (rows.length === 0) return null;
+  return { season: Number(rows[0].season), week: Number(rows[0].week) };
+}
+
+/**
+ * One game, with the whole week's context behind it. It loads the full board on
+ * purpose: rank, cap slot and the tier counts are all assigned across every
+ * game, so a game page that queried its own row alone would show a different
+ * rank from the board that linked to it.
+ */
+export async function getHomeGame(
+  gameId: number,
+  now: Date = new Date(),
+): Promise<{ game: HomeGame; board: HomeBoard } | null> {
+  const sw = await gameSeasonWeek(gameId);
+  if (sw === null) return null;
+  const board = await getHomeBoard(sw.season, sw.week, now);
+  const game = board.games.find((g) => g.row.gameId === gameId);
+  return game === undefined ? null : { game, board };
+}
+
 export async function getHomeBoard(
   season: number,
   requestedWeek?: number,
@@ -550,6 +581,7 @@ export async function getHomeBoard(
       home: p.home,
       line: p.line,
       price: p.price,
+      isBonus: p.isBonus,
     }));
   const { startUsd, unitUsd } = bankrollEnv();
   const realUnits = round2(
@@ -569,7 +601,11 @@ export async function getHomeBoard(
       unitUsd,
       realUnits,
       currentUsd: Math.round((startUsd + realUnits * unitUsd) * 100) / 100,
-      weekBets: real1H.filter((p) => p.week === week).length,
+      // Bonus bets are excluded: they risk none of the roll, so POST
+      // /api/picks does not count them either. Displaying them here told you
+      // a slot was gone when the server would still take the bet.
+      weekBets: picks.filter((p) => countsAgainstCap(p) && p.week === week)
+        .length,
       cap: WEEKLY_BET_CAP,
       real: record,
       paper: paperRecord,

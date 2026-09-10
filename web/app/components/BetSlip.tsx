@@ -314,6 +314,8 @@ export default function BetSlip({
   unitUsd,
 }: {
   slip: Slip;
+  /** Labels the slip with the week it is FOR — always the week you are about
+   *  to bet, which need not be the week the page is reviewing. */
   week: number | null;
   unitUsd: number;
 }) {

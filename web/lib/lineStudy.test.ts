@@ -4,6 +4,7 @@ import {
   bucketUnderRates,
   DEFAULT_MIN_GAMES,
   type StudyGame,
+  type TaggedGame,
 } from "./lineStudy";
 
 const g = (
@@ -63,5 +64,31 @@ describe("line study (mirrors analysis/line_study.py)", () => {
       },
     ]);
     expect(bucketUnderRates(rows, 16)).toEqual([]);
+  });
+});
+
+describe("line study across seasons", () => {
+  it("buckets the union, so a total under the minimum in every single season still counts", () => {
+    // This is why /proof buckets once over every season instead of calling
+    // getLineStudy per season and merging the LineBucket[] it returns:
+    // ten games at 27.5 in each of two seasons is twenty at 27.5, but
+    // neither season alone reaches minGames=15, so a merge would show
+    // nothing at all.
+    const season = (unders: number, total: number): TaggedGame[] =>
+      Array.from({ length: total }, (_, i) => ({
+        fh: i < unders ? 20 : 34,
+        line: 27.5,
+        source: "proxy" as const,
+      }));
+    const a = season(6, 10);
+    const b = season(6, 10);
+
+    expect(bucketUnderRates(a, 15)).toEqual([]);
+    expect(bucketUnderRates(b, 15)).toEqual([]);
+
+    const union = bucketUnderRates([...a, ...b], 15);
+    expect(union).toHaveLength(1);
+    expect(union[0].games).toBe(20);
+    expect(union[0].under).toBe(12);
   });
 });

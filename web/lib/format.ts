@@ -38,3 +38,20 @@ export const usd = (n: number): string =>
     currency: "USD",
     maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
   });
+
+/**
+ * CSS colour for a signed-units string ("+1.20" / "-0.55" / "—").
+ *
+ * Green and red are the OUTCOME colours, so only signed units get them —
+ * never a win rate, never an ROI on its own. `null`/"—" is dim.
+ *
+ * Note flat zero: "0.00" does not start with "-", so it reads as good. That
+ * is the long-standing behaviour on both the Results cards and the
+ * post-mortem, kept deliberately here rather than changed in passing.
+ */
+export const unitColor = (s: string | undefined | null): string =>
+  !s || s === "—"
+    ? "var(--text-dim)"
+    : s.startsWith("-")
+      ? "var(--bad)"
+      : "var(--good)";

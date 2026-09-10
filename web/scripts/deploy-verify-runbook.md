@@ -27,12 +27,13 @@ skill's logic here.**
 
 - Browser pages: list `web/app/**/page.tsx`; map dir → URL path
   (`web/app/results/page.tsx` → `/results`, `web/app/page.tsx` → `/`). Current
-  set (5 tabs + records + login): `/` (This Week), `/board`, `/results`,
-  `/research`, `/research/records`, `/glossary`, `/login`. The retired pages
-  `/preview`, `/line-check`, `/line-study`, `/movement`, `/ledger`,
-  `/weekly-review`, `/picks` are `redirect()` stubs — check each returns a 307
-  to its new home (`/`, `/`, `/research`, `/board`, `/results`, `/results`,
-  `/results`) and nothing else. If you cap the list, say so.
+  set (3 tabs + a game page + records + login): `/` (Board), `/results`,
+  `/proof`, `/proof/records`, `/game/[id]`, `/login`. The retired pages
+  `/board`, `/preview`, `/line-check`, `/movement`, `/ledger`,
+  `/weekly-review`, `/picks`, `/line-study`, `/research`, `/research/records`,
+  `/glossary` are `redirect()` stubs — check each returns a 307 to its new
+  home (`/` ×4, `/results` ×3, then `/proof`, `/proof`, `/proof/records`,
+  `/proof#glossary`) and nothing else. If you cap the list, say so.
 - `web/app/api/**/route.ts` for context: `POST /api/picks`,
   `DELETE /api/picks/[id]`, `GET /api/records?season=` (CSV), `GET /api/health`
   (public), `POST /api/login`, `POST /api/logout`. There are no GET data APIs
@@ -74,11 +75,10 @@ number against Neon via the **`postgres`** MCP (HTTPS — per memory). Map:
 | Page                | lib                                                                               | Cross-check against Neon                                                                                                                                                                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/` (This Week)     | `lib/thisWeek.ts` → `board.ts`, `lineCheck.ts`, `preview.ts`, `picks.ts`          | card count = `predictions` rows for the default week (latest week with a game still to kick off); Hard Rock line/price per card matches the latest `odds_snapshots` row for `hardrockbet*` + `1H_total`; bankroll strip = `manual_picks` where `is_paper=false` and `market='1H'` |
-| `/board`            | `lib/board.ts`, `lib/movement.ts`                                                 | row count for the selected week matches `predictions` × `games`; a card's movement row matches that game's `odds_snapshots` (`1H_total`) history                                                                                                                                  |
+| `/game/[id]`        | `lib/homeBoard.ts`, `lib/movement.ts`, `lib/lineCheck.ts`, `lib/preview.ts`      | the gap bar's line and our number match the board row; the movement chart matches that game's `odds_snapshots` (`1H_total`) history                                                                                                                                              |
 | `/results`          | `lib/ledger.ts`, `lib/weeklyReview.ts`, `lib/decision-quality.ts`, `lib/picks.ts` | Market/Model cards = `results` rows by `model_version` ('market', 'market_fg', `lib/model.ts::MODEL_VERSION`); You = graded `manual_picks` (real 1H vs paper); week-by-week + by-reason totals sum to the pick count                                                              |
-| `/research`         | `lib/research.ts`, `lib/lineStudy.ts`, `lib/trends.ts`                            | games analyzed = FBS-vs-FBS `games` with `first_half_total` for the season; gap-vs-CLV n = `results` ('market') joined to `predictions` with CLV                                                                                                                                  |
-| `/research/records` | `lib/records.ts` (`GET /api/records` CSV)                                         | row count = `games` for the season; CSV downloads and row count matches the grid                                                                                                                                                                                                  |
-| `/glossary`         | static                                                                            | renders; copy carries no "54%" / "+3.0% ROI" / "52% of the total" claims                                                                                                                                                                                                          |
+| `/proof`            | `lib/postmortem.ts`, `lib/proof.ts`, `lib/lineStudy.ts`, `lib/glossary.ts`       | headline = `postmortem_buckets` (`hist_2023_25`/`fbs_only`/`real`/`cap5`); **no green or red number anywhere below the "estimated line" heading**; the line-study chart draws BARS, not an empty plot; the glossary `<details>` opens                                            |
+| `/proof/records`    | `lib/records.ts` (`GET /api/records` CSV)                                         | row count = `games` for the season; CSV downloads and row count matches the grid                                                                                                                                                                                                  |
 
 Tables (from `web/prisma/schema.prisma`): `games`, `predictions`, `results`,
 `manual_picks` (incl. the tracking columns `verdict_at_pick`, `reason`,

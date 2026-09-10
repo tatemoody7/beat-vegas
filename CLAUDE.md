@@ -5,6 +5,72 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-10 (site restructure, branch `board-and-game-page`, NOT merged):** the site
+  goes to **three tabs — Board / Results / Track record — plus `/game/[id]`**. A board row
+  is now a **LINK**, never a disclosure: `GameCard` is deleted, `GameRow` carries only the
+  rank badge, matchup, kickoff, Hard Rock's number and price, one action line, and the two
+  chips that change whether to bet (`bet logged`, past the cap). The badge is **rank plus
+  colour with no tier word** ("Watch" was true of 35 of 49 games, so it discriminated
+  nothing; `ScoreBadge` takes `label={null}`, and still names the tier to screen readers).
+  Everything analytical lives on the game page: the decision block with a **gap bar**
+  (`GapBar.tsx` — our number against the line on one axis, split at `BET_GAP_PTS`, kill
+  number ticked), Lines, What is behind it, Injuries and news. **There is no "Our number"
+  section** — Tate cut it as a repeat of the decision block, which also took the 0-100
+  score, the confidence meter and the 7-35 range off the page (the score still sets the
+  tier and the ranking). An **answer bar** (`AnswerBar.tsx` + pure `lib/answerBar.ts`)
+  replaces `BankrollStrip`/`BetSlip`/`CardPanel` at the top of the board and carries the
+  live bets, the three closest with the action trimmed to its "needs …" clause, and the
+  next build window from `lib/nextBuild.ts` (derived from `CRON_JOBS`, stated as a WINDOW
+  because Vercel Hobby fires within the hour). **Nothing renders below the last game row.**
+  The slip, card panel, card status banner and bankroll strip now sit at the **TOP of
+  `/results`** — `/slip` was built and deleted the same day. `lib/labels.ts::distinctTag`
+  drops a blocker tag the action line already says (they share a blocker, so most Watch
+  games printed the sentence twice). `CardPanel` rows link to `/game/[id]`, so its
+  `onBoard` prop and the "Not on the board" fallback are gone. Week 2: 11,608px → 7,329px,
+  839KB → 198KB HTML; web tests 336 → 351.
+  **Results + `/proof` shipped the same day (see the next bullet).**
+  **Still to do:** team logos (chosen by Tate, but NO logo data exists anywhere — `teams`
+  holds only id/school/conference and `data/fbs_teams.json` is a season→names map, so it
+  needs a CFBD `/teams` fetch into a cached lookup plus a text fallback), and deleting the
+  eleven legacy redirect files.
+  Audit, per-page layouts and every decision: `~/.claude/plans/i-like-a-lot-cuddly-dusk.md`
+  and `~/.claude/plans/session-handoff-beat-staged-sutton.md`.
+  **Screenshot with headless Chrome, never the Browser pane** (it caps captures at 800x500).
+- **2026-09-10 later (Results reorganised + `/proof` built, same branch):** the nav is now
+  **three tabs — Board / Results / Track record — plus `/game/[id]` and `/proof/records`**.
+  `/research`, `/research/records` and `/glossary` are redirect stubs; `lib/research.ts` is
+  now `lib/proof.ts` (the gap-vs-line-value table died — n=1 buckets).
+  **Results** (5,000px → ~2,300px) is the money page: slip block, then a **bankroll hero**
+  (`BankrollHero.tsx` — bankroll at display size, units, ROI, curve beneath; `BankrollStrip`
+  gave those numbers up and keeps the cap + the rules), then only the record cards that have
+  data, then the review tables and the 9-column picks table (three frozen fields behind a
+  per-row expand that composes with, and does not fight, the edit form). **An empty section
+  is ONE LINE, never a card** (`Section` / `EmptyLine` / `.bv-empty`) — week 2 had eight
+  placeholder boxes. The per-week scorecard is deleted; "closest to a bet" is gone from
+  `CardPanel` (the board's answer bar already names them, off LIVE lines rather than the
+  frozen card).
+  **`/proof`** is organised **by grading basis, not by era** — the same cap-5 rule returns
+  +15.9% at the real close and +5.4% at the estimate, so real closes lead (Hard Rock's own
+  number counts as real) and the estimated block sits under a divider with every number
+  **NEUTRAL**: green and red only ever appear on a real closing line, and `RecordCard` /
+  `BandTable` take `basis="estimated"` to enforce it. 60.8% leads with three caveats —
+  169 bets, a cap applied to the history afterwards rather than lived, and no Hard Rock in
+  those seasons. **The coverage caveat is WRONG for this cut** and was dropped: within
+  `fbs_only`, 1,902 of 1,934 games carry a real close (98%); the unpriced games the gotcha
+  below warns about are almost all non-FBS and are already excluded (`postmortem.ts::coverage`
+  reads those counts from the data). The **real-close gap ladder** (48.4 / 44.5 / 53.9 /
+  54.9 / 58.8) is on the site for the first time — only the estimated one was ever shown.
+  `PostMortemPanel` is broken into `BandTable` / `PmFlags` / `PmLiveNotes` + the shared
+  `RecordCard`. `--header-h` is UNCHANGED and was measured, not assumed (97px at 375, 69px
+  at 640/1440): the nav takes its own full-width row below `sm` whatever the label count.
+  Three fixes rode along: **a bonus bet no longer spends a cap slot on screen**
+  (`picks.ts::countsAgainstCap`; the server already excluded them, the display did not, so
+  the site said 2 of 5 when four slots were free); **the line study buckets over the UNION
+  of seasons** and defaults to all of them (per-season bucketing then merging drops any
+  total under `minGames` in every single year, and 2026 has none that clear it); and
+  **`LineStudyView`'s bars were invisible** — under Recharts 3.8 they animate up from
+  height 0, the animation never completes, and a zero-height rectangle renders as an empty
+  group, so `isAnimationActive={false}` is load-bearing there. Web tests 351 → 368.
 - **2026-09-09 night (PR #94, merged):** the board **ranks** instead of scoring. Each card's
   badge is its place on the week (`#1` = best), assigned in `homeBoard.ts::assignBoardRanks`
   over the whole board inside `getHomeBoard` — before `page.tsx` filters, so a day or team
@@ -200,7 +266,9 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 ## Web app (`web/`) — shipped + redesigned
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
 Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
-- **Views (4 tabs)**: Board (`/`, THE home page — the week grouped by day, every game with a
+- **Views (3 tabs)** — Board / Results / Track record, plus `/game/[id]` and
+  `/proof/records`. Historical description of the old four-tab shape follows; see the
+  2026-09-10 bullets above for what ships now. Board (`/`, THE home page — the week grouped by day, every game with a
   Hard Rock total, coloured **rank badge** (`#1` = best game of the week, assigned over the
   whole board before filters so a filter never renumbers; no rank once a game kicks off —
   it reads LIVE for 5 h then FINAL, then the result) + Bet/Watch/Pass word + action line from

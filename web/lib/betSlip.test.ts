@@ -70,10 +70,49 @@ const card = (items: CardItem[]): Card => ({
 });
 
 describe("buildBetSlip", () => {
+  it("does not spend a cap slot on a bonus bet", () => {
+    // POST /api/picks and build_card.py both exclude bonus bets from the cap
+    // (they risk none of the roll). The slip has to agree, or it says a slot
+    // is gone when the server would still take the bet.
+    const s = buildBetSlip(
+      null,
+      [
+        {
+          gameId: 9,
+          away: "A",
+          home: "B",
+          line: 24,
+          price: -110,
+          isBonus: false,
+        },
+        {
+          gameId: 8,
+          away: "C",
+          home: "D",
+          line: 27,
+          price: -105,
+          isBonus: true,
+        },
+      ],
+      5,
+      NOW,
+    );
+    expect(s.used).toBe(1);
+  });
+
   it("is empty without a card, but still reports the cap usage", () => {
     const s = buildBetSlip(
       null,
-      [{ gameId: 9, away: "A", home: "B", line: 24, price: -110 }],
+      [
+        {
+          gameId: 9,
+          away: "A",
+          home: "B",
+          line: 24,
+          price: -110,
+          isBonus: false,
+        },
+      ],
       5,
       NOW,
     );
@@ -113,7 +152,14 @@ describe("buildBetSlip", () => {
       }),
     ]);
     const picks = [
-      { gameId: 2, away: "Toledo", home: "Akron", line: 24, price: -115 },
+      {
+        gameId: 2,
+        away: "Toledo",
+        home: "Akron",
+        line: 24,
+        price: -115,
+        isBonus: false,
+      },
     ];
     const s = buildBetSlip(c, picks, 5, NOW);
     expect(s.rows.map((r) => [r.gameId, r.capRank, r.status])).toEqual([
@@ -144,6 +190,7 @@ describe("buildBetSlip", () => {
           home: "Missouri",
           line: 24.5,
           price: null,
+          isBonus: false,
         },
       ],
       5,
@@ -170,6 +217,7 @@ describe("buildBetSlip", () => {
           home: "Missouri",
           line: 24.5,
           price: -110,
+          isBonus: false,
         },
       ],
       5,
@@ -399,8 +447,22 @@ describe("buildBetSlip with live lines", () => {
     const capped = buildBetSlip(
       c,
       [
-        { gameId: 91, away: "a", home: "b", line: 24, price: -110 },
-        { gameId: 92, away: "c", home: "d", line: 24, price: -110 },
+        {
+          gameId: 91,
+          away: "a",
+          home: "b",
+          line: 24,
+          price: -110,
+          isBonus: false,
+        },
+        {
+          gameId: 92,
+          away: "c",
+          home: "d",
+          line: 24,
+          price: -110,
+          isBonus: false,
+        },
       ],
       2,
       NOW,
@@ -443,6 +505,7 @@ describe("buildBetSlip with live lines", () => {
           home: "Missouri",
           line: 24.5,
           price: -110,
+          isBonus: false,
         },
       ],
       1,

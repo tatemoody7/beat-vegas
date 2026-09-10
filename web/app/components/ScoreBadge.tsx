@@ -20,7 +20,9 @@ type Props = {
   inPlay: boolean;
   /** Once known, the result colours the badge and replaces the rank. */
   settled?: Settled | null;
-  /** Optional word under the rank (the tier); defaults to the grade word. */
+  /** Word under the rank. Omit for the grade word; pass null for no word at
+   *  all — the board row carries rank and colour only, since the tier word was
+   *  true of 35 of 49 games and the action line already says what to do. */
   label?: string | null;
   className?: string;
 };
@@ -80,17 +82,20 @@ export default function ScoreBadge({
       </Box>
     );
   }
-  const tier = label ?? gradeWord(score, null);
+  const tier = label === null ? null : (label ?? gradeWord(score, null));
+  // Screen readers still get the tier even when it is not drawn — the colour
+  // carries it visually and nothing carries it otherwise.
+  const word = gradeWord(score, null);
   return (
     <Box
       color={gradeColor(score, null)}
-      aria={rank === null ? `Unranked, ${tier}` : `Rank ${rank}, ${tier}`}
+      aria={rank === null ? `Unranked, ${word}` : `Rank ${rank}, ${word}`}
       className={className}
     >
       <span className="font-[family-name:var(--font-display)] text-2xl font-extrabold leading-none tabular-nums">
         {rank === null ? "—" : `#${rank}`}
       </span>
-      <span className={`mt-0.5 ${WORD}`}>{tier}</span>
+      {tier !== null && <span className={`mt-0.5 ${WORD}`}>{tier}</span>}
     </Box>
   );
 }

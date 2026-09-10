@@ -2,15 +2,17 @@ import { usd } from "@/lib/format";
 import type { Bankroll } from "@/lib/homeBoard";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 
-// Bankroll + discipline strip on the home board. On a phone it folds into one
-// summary line (the slip sits above it on Saturday morning); md+ shows the
-// full grid. Cyan is the brand accent; amber marks a used-up cap. Green/red
-// never appear here — outcomes are graded on Results, not the strip.
+// The discipline strip under the slip on Results: how much of the weekly cap
+// is gone, the paper record, and the standing rules. On a phone it folds into
+// one summary line; md+ shows the full grid. Amber marks a used-up cap.
+// Green/red never appear here — outcomes are graded above, in the hero.
+//
+// The bankroll, unit size and season units used to sit here too. They are the
+// hero now (BankrollHero), and saying them twice on one page made the money
+// answer look like a footnote (Tate 2026-09-10).
 //
 // Copy rule (spec §10): every `title=` became a visible line under its value.
 // A tooltip is unreachable on the phone this strip is mostly read on.
-
-const signedUnits = (u: number) => `${u > 0 ? "+" : ""}${u.toFixed(2)}u`;
 
 const NOTE = "max-w-56 text-xs leading-snug text-[var(--text-dim)]";
 
@@ -19,36 +21,6 @@ function Grid({ b }: { b: Bankroll }) {
   return (
     <>
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-        <div className="bv-stat">
-          <span className="bv-stat-label">Bankroll</span>
-          <span className="bv-stat-value text-xl">{usd(b.currentUsd)}</span>
-          <span className="text-xs text-[var(--text-dim)]">{`started ${usd(b.startUsd)}`}</span>
-          <span className={NOTE}>
-            {`Starting ${usd(b.startUsd)} plus what settled bets have won or lost.`}
-          </span>
-        </div>
-        <div className="bv-stat">
-          <span className="bv-stat-label">One unit</span>
-          <span className="bv-stat-value text-xl">{usd(b.unitUsd)}</span>
-          <span className="text-xs text-[var(--text-dim)]">{`${usd(b.unitUsd)}, every bet`}</span>
-          <span className={NOTE}>
-            Every bet is the same size. It keeps the record readable.
-          </span>
-        </div>
-        <div className="bv-stat">
-          <span className="bv-stat-label">Season</span>
-          <span className="bv-stat-value text-xl text-[var(--text)]">
-            {signedUnits(b.realUnits)}
-          </span>
-          <span className="text-xs text-[var(--text-dim)]">
-            {b.real
-              ? `${b.real.record} · ${b.real.hit} under · ROI ${b.real.roi}`
-              : "nothing settled yet"}
-          </span>
-          <span className={NOTE}>
-            Units won or lost on settled real-money first-half bets this season.
-          </span>
-        </div>
         <div className="bv-stat">
           <span className="bv-stat-label">This week</span>
           <span
@@ -97,7 +69,11 @@ function Grid({ b }: { b: Bankroll }) {
 }
 
 export default function BankrollStrip({ b }: { b: Bankroll }) {
-  const summary = `${usd(b.currentUsd)} · ${signedUnits(b.realUnits)} · ${b.weekBets}/${b.cap} this week`;
+  // Leads with the cap: it is the one number on this strip that changes what
+  // you are allowed to do next, and the bankroll is already large above it.
+  const summary = `${b.weekBets} / ${b.cap} bets this week${
+    b.weekBets >= b.cap ? " · cap reached" : ""
+  }`;
   return (
     <div className="bv-card mb-6 p-4">
       <details className="md:hidden">

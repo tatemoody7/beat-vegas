@@ -12,6 +12,9 @@ export type BoardRow = {
   startDate: Date | null;
   away: string;
   home: string;
+  /** CFBD team ids (= the logo ids in web/data/team_logos.json); null if unknown. */
+  awayTeamId: number | null;
+  homeTeamId: number | null;
   underScore: number | null;
   underProb: number | null;
   rank: number | null;
@@ -49,6 +52,8 @@ type PredRow = {
   start_date: Date | null;
   away_team: string | null;
   home_team: string | null;
+  away_team_id: number | bigint | null;
+  home_team_id: number | bigint | null;
 };
 
 type SnapRow = {
@@ -144,7 +149,8 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
   const preds = await prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
-           g.week, g.start_date, g.away_team, g.home_team, g.first_half_total
+           g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
+           g.away_team_id, g.home_team_id
     FROM predictions p JOIN games g ON g.id = p.game_id
     WHERE g.season = ${season}
       -- The site's game universe: games Hard Rock has posted a full-game total
@@ -192,6 +198,8 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       startDate: p.start_date ?? null,
       away: p.away_team ?? "?",
       home: p.home_team ?? "?",
+      awayTeamId: num(p.away_team_id),
+      homeTeamId: num(p.home_team_id),
       underScore: num(p.under_score),
       underProb: p.under_probability ?? null,
       rank: num(p.rank),

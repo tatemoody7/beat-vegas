@@ -90,6 +90,14 @@ class CFBDClient:
         """Teams classified FBS for `year` (each row has `school`, `conference`)."""
         return self._get("/teams/fbs", {"year": year})
 
+    def teams(self, year: int) -> List[Dict]:
+        """Every team CFBD knows for `year`, all divisions.
+
+        Wider than `/teams/fbs`: rows carry `id`, `classification` (fbs/fcs/ii/iii)
+        and `logos` (CDN URLs). Used by scripts/fetch_team_logos.py.
+        """
+        return self._get("/teams", {"year": year})
+
     def plays(self, year: int, week: int, season_type: str = "regular") -> List[Dict]:
         """Play-by-play (fallback path for 1H points; has `period` + scoring)."""
         return self._get(

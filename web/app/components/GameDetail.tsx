@@ -15,6 +15,7 @@ import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
+import TeamLogo from "@/app/components/TeamLogo";
 
 // One game, in full. This is where every number the board used to hide behind a
 // disclosure now lives: the decision up top (the gap drawn, the price, the kill
@@ -477,7 +478,9 @@ export default function GameDetail({
             </span>
           )}
           <h1 className="text-2xl font-semibold text-[var(--text)]">
+            <TeamLogo teamId={row.awayTeamId} />
             {row.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+            <TeamLogo teamId={row.homeTeamId} />
             {row.home}
           </h1>
           <span className="text-sm text-[var(--text-dim)]">

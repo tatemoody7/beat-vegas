@@ -147,6 +147,35 @@ body {
 
   /* One badge component for every chip on the site (tier word, status tags,
      logged, paper, filters). Colour modifiers carry the grade language. */
+  /* A team's mark before its name. No backplate and no ring: colour here is the
+     grade language, and a chrome frame around a logo would read as one.
+
+     Centred on the CAP BAND of the text, not sat on the baseline. Archivo's cap
+     height is 0.71em, so half of it is 0.355em; subtracting half the mark's own
+     height puts its centre on the middle of the letters. One rule covers both
+     the 16px board row and the 24px game-page header, where a single em value
+     could not: the mark is a fixed size, cap height is not (measured -3.32px
+     and -0.48px respectively, which is exactly what this calc yields). */
+  .bv-team-logo {
+    --bv-logo-size: 18px;
+    display: inline-block;
+    width: var(--bv-logo-size);
+    height: var(--bv-logo-size);
+    vertical-align: calc(0.355em - var(--bv-logo-size) / 2);
+    /* Even air on both sides of the mark: the left gap is the preceding word
+       space (0.2356em in this font) topped up by the margin to match the right
+       one, so the mark sits in the middle of its own breathing room. The @ keeps
+       the natural word gap, which binds each mark to the name it belongs to. */
+    margin-right: 0.375em;
+    margin-left: 0.1394em;
+  }
+
+  /* First on the line, so there is no word space to top up and nothing to
+     indent against: the mark hugs the card edge like the rows beneath it. */
+  .bv-team-logo:first-child {
+    margin-left: 0;
+  }
+
   .bv-badge {
     display: inline-flex;
     align-items: center;

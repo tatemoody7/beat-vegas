@@ -73,18 +73,28 @@ Research only — it never places bets or automates gambling.
   and the `/game/[id]` header — nowhere else, and **no fallback**: a team with no artwork
   renders NOTHING (no circle, no initials, no reserved box). The marks are **vendored**,
   not hotlinked: `scripts/fetch_team_logos.py` pulls CFBD `/teams` and writes 264 FBS+FCS
-  PNGs into `web/public/logos/<cfbd id>.png` (1.4 MB) plus the index `web/data/team_logos.json`,
+  PNGs into `web/public/logos/<cfbd id>.png` (929 KB of actual bytes; `du` reports 1.4M because
+  264 tiny files each take a 4 KB block) plus the index `web/data/team_logos.json`,
   refreshed each August alongside `fetch_fbs_teams.py`. **Use the `logos-dark/` variant** —
   it is the dark-background artwork (Iowa's black Hawkeye renders gold), which is what the
   navy canvas needs. The ids are the ones `games.home_team_id` already stored and never
   selected; `board.ts` now carries `awayTeamId`/`homeTeamId`. The script composites every
   mark over `--bg-2` and PRINTS the low-contrast ones rather than shipping a navy blob
-  (only Montana, 1.86, on the 2026 set — legible, kept). `web/data/team_logos.json` is
+  (only Montana, 1.86, on the 2026 set — legible, kept). **The mark is centred on the text's
+  CAP BAND, not sat on the baseline** — `vertical-align: calc(0.355em - var(--bv-logo-size)/2)`,
+  because Archivo's cap height is 0.71em; one rule covers both the 16px row and the 24px header,
+  where a single em value could not (the mark is a fixed size, cap height is not). Measured
+  centring error: 0.01px on the board, 0.00px in the header. Spacing is an even **6px each side
+  of the mark** (9px in the header) via `margin-right: 0.375em` plus a `margin-left: 0.1394em`
+  that tops the preceding word space up to match; the `@` keeps the natural word gap, which binds
+  each mark to its own name. **Do not use `word-spacing` for this** — it also loosens the space
+  INSIDE a name ("Southern Miss", "Oklahoma State"), and the literal text spaces must stay because
+  they are the matchup's only line-break opportunities on a phone. `web/data/team_logos.json` is
   web-only and deliberately NOT in `dataMirror.test.ts`; `lib/teamLogos.test.ts` guards the
   index against the vendored files in both directions. `TeamLogo` uses `next/image` with
   `unoptimized` — a bare `<img>` would be the repo's first lint warning, and the files are
   already the size they render at. **Measured cost:** desktop is free (page height identical
-  at 1440); at 375 the board grows 498px (+5.3%) and matchups on two lines go 18 → 37 of 49.
+  at 1440); at 375 the board grows 520px (+5.5%) and matchups on two lines go 18 → 38 of 49.
   Tate accepted that rather than shrinking or hiding the mark on phones. Web tests 368 → 372.
 - **2026-09-09 night (PR #94, merged):** the board **ranks** instead of scoring. Each card's
   badge is its place on the week (`#1` = best), assigned in `homeBoard.ts::assignBoardRanks`

@@ -93,10 +93,12 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_MARKET: ${{ inputs.market }}
         run: |
+          # The three 1h_open branches were removed on 2026-09-10: their crons
+          # were retired when the card build took over the midweek sweep, but
+          # the branches stayed behind for months because the workflow test only
+          # ever checked crons -> branches, never the reverse. Only 1h_close
+          # runs on a schedule now; 1h_open survives as a dispatch input.
           case "$SCHEDULE" in
-            '0 18 * * 3')                       market=1h_open ;;
-            '0 14,20 * * 4')                    market=1h_open ;;
-            '0 12,16,20 * * 5')                 market=1h_open ;;
             '*/30 15-23 * * 6')                 market=1h_close ;;
             '0,30 0-4 * * 0')                   market=1h_close ;;
             '*/30 22-23 * * 2,3,4,5,0,1')       market=1h_close ;;

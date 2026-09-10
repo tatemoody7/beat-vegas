@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
 import { median } from "@/lib/format";
@@ -182,7 +183,22 @@ export async function boardGames(season: number): Promise<PredRow[]> {
   `;
 }
 
-export async function getBoard(season: number): Promise<BoardRow[]> {
+/**
+ * The board for a season, ONCE per request.
+ *
+ * This is the most expensive query path in the app — consensusLines() alone
+ * scans every pre-kickoff snapshot for the season across every book. /game/[id]
+ * ran the whole thing TWICE per page view, because generateMetadata and the
+ * page body both call getHomeGame and Next dedupes fetch(), not Prisma.
+ *
+ * cache() is keyed on `season` only, which is why the caching lives here rather
+ * than on getHomeBoard: that takes a `now` defaulting to new Date(), so every
+ * call would be a fresh key and dedupe nothing. `now` only affects pure
+ * derivation downstream, never the query.
+ */
+export const getBoard = cache(async function getBoard(
+  season: number,
+): Promise<BoardRow[]> {
   const [preds, lines, adjustments] = await Promise.all([
     boardGames(season),
     consensusLines(season),
@@ -230,7 +246,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       bvAdjustReason: adj?.reason ?? null,
     };
   });
-}
+});
 
 export async function getSeasons(): Promise<number[]> {
   // Only seasons that actually have a board (predictions) — so the app lands on

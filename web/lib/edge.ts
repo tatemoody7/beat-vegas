@@ -79,8 +79,6 @@ export const FAIR_EV_FLOOR = EV_FLOOR; // single source: verdict.ts
 export const SCORE_PER_GAP_PT = (SCORE_BET_MIN - 50) / BET_GAP_PTS;
 /** The EDGE ("watch") tier starts where the amber band starts. */
 export const EDGE_SCORE_MIN = SCORE_WATCH_MIN;
-/** The smallest gap that scores into the amber band (≈0.44 pts). */
-export const WATCH_GAP_MIN = (SCORE_WATCH_MIN - 50) / SCORE_PER_GAP_PT;
 export const CONTEXT_BASE = 40;
 export const CONTEXT_CAP = 49;
 

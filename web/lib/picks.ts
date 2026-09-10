@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { boardGames } from "@/lib/board";
@@ -182,7 +183,7 @@ const asReason = (v: string | null | undefined): PickReason | null =>
   v === "model_gap" || v === "price_edge" || v === "manual" ? v : null;
 
 /** Every pick for the season, pending first then newest first. */
-export async function loadPicks(season: number): Promise<PickFull[]> {
+async function loadPicksUncached(season: number): Promise<PickFull[]> {
   const rows = await selectPicks(season);
   const picks: PickFull[] = rows.map((r) => ({
     id: Number(r.id),
@@ -241,6 +242,22 @@ export type PickRecords = {
   /** Paper first-half picks, kept apart so they never flatter the real ledger. */
   paperRecord: Record3 | null;
 };
+
+/**
+ * The season's picks, ONCE per request.
+ *
+ * picks.ts already said "ONE picks query feeds the ledger, the weekly review
+ * and the board" — but /results had drifted to four independent callers
+ * (getLedger, getWeeklyReview, getPicks via getHomeBoard, and the page itself),
+ * each running the full manual_picks season scan, on a force-dynamic page with
+ * no caching. React's cache() dedupes within a single render pass, so the
+ * comment becomes true again without any caller having to know about the others
+ * or thread a value through.
+ *
+ * Per-request, NOT across requests: a freshly logged pick still shows up on the
+ * next render.
+ */
+export const loadPicks = cache(loadPicksUncached);
 
 export async function getPicks(season: number): Promise<PickRecords> {
   const picks = await loadPicks(season);

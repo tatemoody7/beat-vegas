@@ -52,3 +52,65 @@ def test_an_unpriced_bonus_bet_still_grades_the_result_without_units():
 def test_the_floor_is_off_by_default():
     """A plain ticket must keep losing money — the flag has to be explicit."""
     assert graded_pick_fields(40.0, LINE, PRICE, 1.0, None, None)["units"] == pytest.approx(-1.0)
+
+
+# --- the cap side, which had no test at all ---------------------------------
+#
+# The "bonus bets do not spend a cap slot" rule lives in THREE places that must
+# agree: build_card.real_bets_this_week (the card), the web POST cap query, and
+# picks.countsAgainstCap (the display). Only the grading floor above was tested.
+# A bonus bet quietly consuming a slot means a real bet Tate wanted gets
+# blocked, which is a silent loss of an opportunity rather than a visible error.
+
+
+def _pick(session, gid, **kw):
+    """A pick plus the game row its foreign key needs."""
+    from beatvegas.db.models import Game, ManualPick
+
+    if session.get(Game, gid) is None:
+        session.add(Game(id=gid, season=2026, week=2, home_team="H", away_team="A"))
+        session.flush()
+    defaults = dict(
+        game_id=gid,
+        season=2026,
+        week=2,
+        side="under",
+        market="1H",
+        line=27.5,
+        price=-110,
+        stake=1.0,
+        is_paper=False,
+        graded=False,
+    )
+    defaults.update(kw)
+    session.add(ManualPick(**defaults))
+
+
+def test_a_bonus_bet_does_not_consume_a_weekly_cap_slot(db):
+    from conftest import _load_script
+
+    build_card = _load_script("build_card")
+    store = db
+    with store.session_scope() as s:
+        _pick(s, 101)  # a real bankroll bet -> holds a slot
+        _pick(s, 102, is_bonus=True)  # a bonus bet         -> must not
+        _pick(s, 103, is_paper=True)  # paper               -> must not
+        _pick(s, 104, market="full")  # full game           -> must not
+    with store.session_scope() as s:
+        held = build_card.real_bets_this_week(s, 2026, 2)
+    assert held == {101}
+
+
+def test_a_legacy_null_is_bonus_row_still_holds_its_slot(db):
+    """Rows predating the is_bonus column carry NULL, and NULL is not false in
+    SQL. If the filter missed them, every pre-migration real bet would stop
+    counting against the cap and the sixth bet of a week would go through."""
+    from conftest import _load_script
+
+    build_card = _load_script("build_card")
+    store = db
+    with store.session_scope() as s:
+        _pick(s, 201, is_bonus=None)
+        _pick(s, 202, is_paper=None)
+    with store.session_scope() as s:
+        assert build_card.real_bets_this_week(s, 2026, 2) == {201, 202}

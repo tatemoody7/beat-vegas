@@ -280,6 +280,24 @@ def _resync_sequence(session, model) -> None:
 
 
 def write_run(session, out: Dict[str, Any], computed_at: datetime, params: Dict[str, Any]) -> None:
+    """Replace one scope's post-mortem: delete, then insert.
+
+    KNOWN NOT ATOMIC, deliberately. The delete commits before the inserts do,
+    and the inserts commit per chunk, so a crash in between leaves the scope
+    empty or half-filled until the next run — and grade.yml runs this twice a
+    day, which widens the window.
+
+    The obvious fix (one transaction around the lot) is the one thing that must
+    NOT be done here: a single large bulk_insert_mappings STALLS the Neon pooler
+    indefinitely, which is why _chunked_insert exists at all (see
+    deploy_neon.py::_chunked_insert and the CLAUDE.md gotcha). Trading a rare
+    empty /proof section for a hung daily grading job is the wrong way round.
+
+    What makes it tolerable: the only consumer is /proof, a read-only page, and
+    web/lib/postmortem.ts already degrades to "Not computed yet" rather than
+    erroring. The real fix is to write under a new run_id and flip a pointer,
+    which is a schema change — raised, not smuggled in here.
+    """
     scope = out["scope"]
     for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
         session.query(model).filter(model.scope == scope).delete(synchronize_session=False)

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { MARKET_LEDGER_1H, MARKET_LEDGER_FG, MODEL_VERSION } from "@/lib/model";
 import {
@@ -55,14 +56,21 @@ export function recordFromResults(rows: ResRow[]): Record3 | null {
   );
 }
 
-export async function loadResults(season: number): Promise<ResRow[]> {
+/**
+ * The season's graded results, ONCE per request — getLedger and
+ * getWeeklyReview both want them and /results renders both. Same reasoning as
+ * loadPicks in picks.ts.
+ */
+export const loadResults = cache(async function loadResults(
+  season: number,
+): Promise<ResRow[]> {
   return prisma.$queryRaw<ResRow[]>`
     SELECT r.model_version, r.under_hit, r.units, r.clv, g.week,
            r.actual_first_half_total, r.line_used
     FROM results r JOIN games g ON g.id = r.game_id
     WHERE g.season = ${season}
   `;
-}
+});
 
 export async function getLedger(season: number): Promise<Ledger> {
   const [res, picks] = await Promise.all([

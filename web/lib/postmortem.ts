@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { recordFromCounts, type Record3 } from "@/lib/record";
 import { signed } from "@/lib/format";
@@ -97,7 +98,7 @@ const numOrNull = (v: unknown): number | null =>
   v === null || v === undefined ? null : Number(v);
 
 /** Both post-mortem tables; null when they do not exist yet (Monday fills them). */
-export async function loadPostMortem(): Promise<PostMortem | null> {
+async function loadPostMortemUncached(): Promise<PostMortem | null> {
   try {
     const runs = await prisma.$queryRaw<RawRun[]>`
       SELECT scope, run_id, computed_at, n_games, notes_json
@@ -154,6 +155,24 @@ export async function loadPostMortem(): Promise<PostMortem | null> {
     return null;
   }
 }
+
+/**
+ * Cached for an hour, like every other loader on /proof (proof.ts's
+ * getBvCalibration and getEdgeStats, records.ts, lineStudy.ts). This was the
+ * one that was not, and it is the heaviest: postmortem_buckets carries every
+ * scope, segment, proxy kind and selection with no filter — 4,065 rows today,
+ * pulled in full and narrowed in JS on EVERY render, growing with each scope
+ * that gets added.
+ *
+ * An hour of staleness costs nothing here: post_mortem.py --write runs at most
+ * twice a day from grade.yml, so the underlying numbers change far less often
+ * than the cache expires.
+ */
+export const loadPostMortem = unstable_cache(
+  loadPostMortemUncached,
+  ["post-mortem"],
+  { revalidate: 3600 },
+);
 
 // ---------------------------------------------------------------- pure selectors
 

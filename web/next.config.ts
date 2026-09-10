@@ -31,7 +31,43 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * The eleven routes the 2026-09-10 restructure moved.
+ *
+ * Each was a page.tsx whose whole body was a redirect() — eleven files, and
+ * eleven serverless functions in every deploy, to forward a URL. Next resolves
+ * these at the edge before any function runs, and `has`-free rules forward the
+ * query string automatically, so ?season=/?week= still survive the hop.
+ *
+ * They are 308s (permanent). The moves are settled and browsers may cache them;
+ * if one is ever moved again, change the destination here rather than adding
+ * another hop.
+ */
+const movedRoutes: { source: string; destination: string }[] = [
+  // -> the board
+  { source: "/board", destination: "/" },
+  { source: "/preview", destination: "/" },
+  { source: "/line-check", destination: "/" },
+  // /movement carried a ?game=. The old stub stripped it; a config redirect
+  // always forwards the query, so it arrives at the board and is ignored there.
+  // Not worth a `has` rule to strip: movement lives on the game page now, and
+  // an unread parameter costs nothing.
+  { source: "/movement", destination: "/" },
+  // -> the money page
+  { source: "/ledger", destination: "/results" },
+  { source: "/picks", destination: "/results" },
+  { source: "/weekly-review", destination: "/results" },
+  // -> the track record
+  { source: "/line-study", destination: "/proof" },
+  { source: "/research", destination: "/proof" },
+  { source: "/research/records", destination: "/proof/records" },
+  { source: "/glossary", destination: "/proof#glossary" },
+];
+
 const nextConfig: NextConfig = {
+  async redirects() {
+    return movedRoutes.map((r) => ({ ...r, permanent: true }));
+  },
   // Next 16.3 writes its own AGENTS.md and CLAUDE.md into this directory on
   // every dev start. The project's brief is the root CLAUDE.md; a second one
   // under web/ would be auto-loaded alongside it and quietly compete with it,

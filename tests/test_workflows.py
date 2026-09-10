@@ -7,6 +7,7 @@
    catches the edit before it ships.
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -300,3 +301,57 @@ def test_sunday_capture_is_gated_so_three_crons_spend_one_slates_credits():
 
     # The free, idempotent work stays ungated.
     assert by_name["Score + rank the board"].get("if") is None
+
+
+def test_card_yml_crons_and_ci_CRON_SLOTS_are_the_same_set():
+    """The gap this closes: NOTHING asserted these two agreed.
+
+    test_workflows only validated workflows whose run block contains a
+    `case "$SCHEDULE"` ladder, and card.yml resolves through
+    `python -m beatvegas.ci` instead — so it was skipped entirely here.
+    test_ci_slots checks CRON_SLOTS on its own and never opens the YAML. Adding
+    a cron to card.yml without adding it to ci.py therefore passed CI in full
+    and then failed at 4:05pm ET with `::error:: unmapped cron`, on a day the
+    card is what Tate bets off.
+
+    Both directions matter: an unmapped cron fails the run loudly, and a mapping
+    with no cron behind it is a slot that silently never fires.
+    """
+    from beatvegas.ci import CRON_SLOTS
+
+    yml = _on(_load(WF_DIR / "card.yml"))["schedule"]
+    in_yaml = {c["cron"] for c in yml}
+    in_py = set(CRON_SLOTS)
+
+    assert in_yaml - in_py == set(), (
+        f"card.yml crons with no beatvegas.ci mapping (these would fail the run "
+        f"at fire time): {sorted(in_yaml - in_py)}"
+    )
+    assert in_py - in_yaml == set(), (
+        f"beatvegas.ci mappings with no cron in card.yml (these slots never "
+        f"fire): {sorted(in_py - in_yaml)}"
+    )
+    # Four crons per slot is the DST design: two land inside the ET gate in each
+    # regime. Fewer than four means a regime lost its retry.
+    from collections import Counter
+
+    per_slot = Counter(CRON_SLOTS.values())
+    assert set(per_slot.values()) == {4}, f"expected 4 crons per slot, got {dict(per_slot)}"
+
+
+def test_lines_watch_has_no_mapping_for_a_cron_it_no_longer_runs():
+    """The reverse of the check above, for the workflow that DOES use a case
+    ladder. test_workflows only ever checked crons -> mappings, so the retired
+    `1h_open` branches sat in the script as dead code long after their crons
+    were removed, and nothing said so."""
+    data = _load(WF_DIR / "lines_watch.yml")
+    crons = {c["cron"] for c in _on(data)["schedule"]}
+    run = next(
+        s["run"]
+        for s in data["jobs"][next(iter(data["jobs"]))]["steps"]
+        if 'case "$SCHEDULE"' in str(s.get("run", ""))
+    )
+    # Every cron string the case ladder names must still be scheduled.
+    mapped = set(re.findall(r"^\s*'([-\d,* /]+)'\)", run, re.M))
+    orphans = mapped - crons
+    assert not orphans, f"case branches for crons that no longer exist: {sorted(orphans)}"

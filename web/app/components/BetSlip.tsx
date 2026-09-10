@@ -310,9 +310,13 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
 
 export default function BetSlip({
   slip,
+  week,
   unitUsd,
 }: {
   slip: Slip;
+  /** Labels the slip with the week it is FOR — always the week you are about
+   *  to bet, which need not be the week the page is reviewing. */
+  week: number | null;
   unitUsd: number;
 }) {
   const capUsed = slip.used >= slip.cap;
@@ -322,9 +326,10 @@ export default function BetSlip({
       className="bv-card mb-4 scroll-mt-4 p-4"
       aria-label="Bet slip"
     >
-      {/* No heading of its own any more: the /slip page's h1 already says
-          "Bet slip · Week N", and the component printed it a second time. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-sm font-semibold text-[var(--text)]">
+          {week === null ? "Bet slip" : `Bet slip · Week ${week}`}
+        </h2>
         <span
           className={`font-mono text-xs ${capUsed ? "text-[var(--warn)]" : "text-[var(--text-dim)]"}`}
           title="Real-money first-half bets logged this week against the weekly cap."

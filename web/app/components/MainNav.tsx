@@ -8,7 +8,6 @@ import { usePathname } from "next/navigation";
 // redirect into these.
 const LINKS = [
   { href: "/", label: "Board" },
-  { href: "/slip", label: "Bet slip" },
   { href: "/results", label: "Results" },
   { href: "/research", label: "Research" },
   { href: "/glossary", label: "Glossary" },

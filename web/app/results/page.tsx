@@ -1,7 +1,9 @@
 import { getSeasons } from "@/lib/board";
+import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
+import { getLatestCard } from "@/lib/card";
 import { getDecisionQuality } from "@/lib/decision-quality";
 import { usd } from "@/lib/format";
-import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
+import { bankrollCurve, bankrollEnv, getHomeBoard } from "@/lib/homeBoard";
 import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
@@ -11,6 +13,10 @@ import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import { getWeeklyReview } from "@/lib/weeklyReview";
 import BankrollCurve from "@/app/components/BankrollCurve";
+import BankrollStrip from "@/app/components/BankrollStrip";
+import BetSlip from "@/app/components/BetSlip";
+import CardPanel from "@/app/components/CardPanel";
+import CardStatusBanner from "@/app/components/CardStatusBanner";
 import PicksList from "@/app/components/PicksList";
 import PostMortemPanel from "@/app/components/PostMortemPanel";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -19,10 +25,12 @@ import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic";
 
-// Results: how the market, the model and you did — season summary, one week's
-// scorecard, week by week, by the reason each pick was logged, the decision
-// lens, and every pick (delete while ungraded). Replaces the old /ledger,
-// /weekly-review and /picks pages.
+// Results is the money page: the bet slip first (the only thing here you act
+// on), then the bankroll, then how the market, the model and you did — season
+// summary, one week's scorecard, week by week, by the reason each pick was
+// logged, the decision lens, and every pick (delete while ungraded). Replaces
+// the old /ledger, /weekly-review and /picks pages, and the short-lived /slip
+// (Tate 2026-09-10: a dedicated slip page was not worth a tab).
 //
 // Copy rule (docs/superpowers/specs/2026-09-08-site-copy.md §21-§23): nothing
 // this page explains lives in a `title=` tooltip — a phone never shows one —
@@ -149,13 +157,28 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq, allPicks, pm] = await Promise.all([
+  const [ledger, review, dq, allPicks, pm, board] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
     getDecisionQuality(season),
     loadPicks(season),
     loadPostMortem(),
+    // The slip is an ACTION panel, not a review panel, so it always shows the
+    // week you are about to bet — never the week ?week= is reviewing. It is
+    // labelled with its own week number, so the two cannot be confused.
+    getHomeBoard(season),
   ]);
+  const card =
+    board.week === null ? null : await getLatestCard(season, board.week);
+  // Reconciled against the live Hard Rock numbers this render just read, so a
+  // moved line or a breached kill number shows before the tap.
+  const slip = buildBetSlip(
+    card,
+    board.weekPicks,
+    board.bankroll.cap,
+    new Date(),
+    liveLinesFrom(board.games),
+  );
   const settled = review.lines.filter((l) => l.rec);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
@@ -191,6 +214,27 @@ export default async function ResultsPage({
       </div>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
+      {/* The slip sits first: it is the only thing on this page you act on.
+          Everything below it is review. */}
+      <section aria-label="Bet slip">
+        {card === null ? (
+          <p className="bv-card mb-4 p-4 text-sm text-[var(--text-muted)]">
+            {`No card has been built for this week yet. Builds land Tuesday, Thursday and Friday afternoons and Saturday morning.`}
+          </p>
+        ) : (
+          <>
+            <CardStatusBanner card={card} />
+            <BetSlip
+              slip={slip}
+              week={board.week}
+              unitUsd={board.bankroll.unitUsd}
+            />
+            <CardPanel card={card} />
+          </>
+        )}
+        <BankrollStrip b={board.bankroll} />
+      </section>
 
       {/* Season summary */}
       <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">

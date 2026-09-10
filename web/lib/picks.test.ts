@@ -20,6 +20,7 @@ const pick = (o: Partial<PickFull>): PickFull => ({
   clv: null,
   graded: true,
   isPaper: false,
+  isBonus: false,
   verdictAtPick: null,
   reason: null,
   gapAtPick: null,

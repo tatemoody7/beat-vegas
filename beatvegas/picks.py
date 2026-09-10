@@ -72,6 +72,7 @@ def add_pick(
     price: Optional[int] = -110,
     stake: float = 1.0,
     is_paper: bool = False,
+    is_bonus: bool = False,
     market: str = "1H",
     book: Optional[str] = None,
     note: Optional[str] = None,
@@ -100,6 +101,7 @@ def add_pick(
         price=price,
         stake=PAPER_STAKE if is_paper else stake,
         is_paper=bool(is_paper),
+        is_bonus=bool(is_bonus),
         book=book,
         placed_at=placed_at or datetime.utcnow(),
         note=note,
@@ -118,14 +120,32 @@ def add_pick(
 
 
 def graded_pick_fields(
-    actual_first_half, line, price, stake, opening, closing, fair_open=None, fair_close=None
+    actual_first_half,
+    line,
+    price,
+    stake,
+    opening,
+    closing,
+    fair_open=None,
+    fair_close=None,
+    is_bonus: bool = False,
 ) -> dict:
     """Pure: the graded ManualPick fields for one pick + its line snapshots.
-    `price` None (an unpriced line) grades the result and CLV but no units."""
+    `price` None (an unpriced line) grades the result and CLV but no units.
+
+    A BONUS bet is floored at zero units: the book funded the stake, so a loss
+    costs nothing. The win side needs no adjustment - `units_won` already
+    returns profit only, which is exactly what a bonus bet pays (the stake is
+    not returned). Without the floor a losing $20 bonus would book -2 units
+    against a bankroll that never lost them, and the whole point of this ledger
+    is that the bankroll curve is true."""
+    units = None if price is None else stake * units_won(actual_first_half, line, price)
+    if units is not None and is_bonus:
+        units = max(0.0, units)
     return {
         "actual_first_half_total": actual_first_half,
         "result": under_result(actual_first_half, line),
-        "units": None if price is None else stake * units_won(actual_first_half, line, price),
+        "units": units,
         "opening_line": opening,
         "closing_line": closing,
         "clv": clv_under(line, closing) if closing is not None else None,
@@ -176,7 +196,15 @@ def grade_pick(session, pick: ManualPick, game) -> bool:
             pick.price = book_closing_price_before_kickoff(snaps, game.start_date, HR_BOOK_KEY)
     fair_open, fair_close = fair_under_before_kickoff(snaps, game.start_date)
     for k, v in graded_pick_fields(
-        actual, pick.line, pick.price, pick.stake, opening, closing, fair_open, fair_close
+        actual,
+        pick.line,
+        pick.price,
+        pick.stake,
+        opening,
+        closing,
+        fair_open,
+        fair_close,
+        is_bonus=bool(getattr(pick, "is_bonus", False)),
     ).items():
         setattr(pick, k, v)
     pick.graded = True

@@ -66,6 +66,10 @@ _MIGRATIONS = {
         "ev_at_pick": "FLOAT",
         "hr_line_at_pick": "FLOAT",
         "blocker": "VARCHAR(16)",
+        # Bonus/free bet (2026-09-09): the book funded the stake, so a loss
+        # books 0 units. MUST exist before the web app deploys — its cap query
+        # reads COALESCE(is_bonus, false).
+        "is_bonus": "BOOLEAN",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},

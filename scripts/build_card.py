@@ -92,16 +92,22 @@ def bet_slots_this_week(session, season: int, week: int) -> Set[int]:
 
 
 def real_bets_this_week(session, season: int, week: int) -> Set[int]:
-    """Game ids with a REAL (is_paper False, or legacy NULL) 1H pick this week.
+    """Game ids with a REAL, BANKROLL-FUNDED 1H pick this week (is_paper False
+    or legacy NULL, and not a bonus bet).
     Passed to build_card as prior_bet_game_ids: a real ticket on a game NOT on
     this card (a Thursday game already played) consumes a weekly-cap slot;
-    apply_weekly_cap ignores ids that are on the card (they rank via `held`)."""
+    apply_weekly_cap ignores ids that are on the card (they rank via `held`).
+
+    A BONUS bet is excluded: the cap exists to limit how much of the $100 roll
+    is at risk in a week, and the book funded that stake, so a free bet must not
+    crowd out a real one."""
     rows = (
         session.query(ManualPick.game_id)
         .filter(
             ManualPick.season == season,
             ManualPick.week == week,
             (ManualPick.is_paper.is_(False)) | (ManualPick.is_paper.is_(None)),
+            (ManualPick.is_bonus.is_(False)) | (ManualPick.is_bonus.is_(None)),
             (ManualPick.market == "1H") | (ManualPick.market.is_(None)),
             ManualPick.game_id.isnot(None),
         )

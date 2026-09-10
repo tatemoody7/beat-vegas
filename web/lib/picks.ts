@@ -3,7 +3,7 @@ import { getBoard } from "@/lib/board";
 import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import { DEFAULT_STAKE, PAPER_STAKE } from "@/lib/pickRules";
+import { DEFAULT_STAKE, PAPER_STAKE, type PickEdit } from "@/lib/pickRules";
 
 // My Picks data layer: the current slate (for API validation), the user's
 // logged picks with the model + verdict snapshot frozen at log time, and the
@@ -35,6 +35,10 @@ export type PickFull = {
   clv: number | null;
   graded: boolean;
   isPaper: boolean; // tracked with nothing at risk
+  /** Bonus/free bet: the book funded the stake, so a loss books 0 units and a
+   *  win books the profit only. A real ticket, but it risks no bankroll, so it
+   *  does not use one of the week's five cap slots. */
+  isBonus: boolean;
   // Decision snapshot (null on picks logged before the tracking columns existed).
   verdictAtPick: Verdict | null;
   reason: PickReason | null;
@@ -90,6 +94,7 @@ type RawPick = {
   clv: number | null;
   graded: number | boolean | null;
   is_paper: number | boolean | null;
+  is_bonus?: number | boolean | null;
   verdict_at_pick?: string | null;
   reason?: string | null;
   gap_at_pick?: number | null;
@@ -111,8 +116,8 @@ async function selectPicks(season: number): Promise<RawPick[]> {
     return await prisma.$queryRaw<RawPick[]>`
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
              note, model_score_at_pick, model_line_at_pick, result, units, clv,
-             graded, is_paper, verdict_at_pick, reason, gap_at_pick, ev_at_pick,
-             hr_line_at_pick, blocker
+             graded, is_paper, is_bonus, verdict_at_pick, reason, gap_at_pick,
+             ev_at_pick, hr_line_at_pick, blocker
       FROM manual_picks WHERE season = ${season}
     `;
   } catch (e) {
@@ -166,6 +171,7 @@ export async function loadPicks(season: number): Promise<PickFull[]> {
     clv: r.clv,
     graded: truthy(r.graded),
     isPaper: truthy(r.is_paper),
+    isBonus: truthy(r.is_bonus),
     verdictAtPick: asVerdict(r.verdict_at_pick),
     reason: asReason(r.reason),
     gapAtPick: r.gap_at_pick ?? null,
@@ -312,6 +318,35 @@ export async function createPick(
     `;
     return { tracked: false };
   }
+}
+
+/**
+ * Apply an edit to a PENDING pick. Returns false when the pick is missing or
+ * already graded — a graded row is immutable, because a ledger you can rewrite
+ * after the result is known is not evidence of anything.
+ *
+ * Only the fields present in `edit` are written. `note` replaces rather than
+ * appends; the caller composes the text it wants kept.
+ */
+export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
+  const rows = await prisma.$queryRaw<{ graded: number | boolean | null }[]>`
+    SELECT graded FROM manual_picks WHERE id = ${id}
+  `;
+  if (rows.length === 0 || truthy(rows[0].graded)) return false;
+
+  if (edit.price !== undefined) {
+    await prisma.$executeRaw`UPDATE manual_picks SET price = ${edit.price} WHERE id = ${id}`;
+  }
+  if (edit.stake !== undefined) {
+    await prisma.$executeRaw`UPDATE manual_picks SET stake = ${edit.stake} WHERE id = ${id}`;
+  }
+  if (edit.note !== undefined) {
+    await prisma.$executeRaw`UPDATE manual_picks SET note = ${edit.note} WHERE id = ${id}`;
+  }
+  if (edit.isBonus !== undefined) {
+    await prisma.$executeRaw`UPDATE manual_picks SET is_bonus = ${edit.isBonus} WHERE id = ${id}`;
+  }
+  return true;
 }
 
 // Returns false if the pick is already graded (immutable) or missing.

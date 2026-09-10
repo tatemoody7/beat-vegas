@@ -259,6 +259,12 @@ class ManualPick(Base):
     # Paper pick: nothing at risk, staked ONE flat unit so it grades as +/-1u
     # on its own record. Every ledger consumer must split on is_paper.
     is_paper = Column(Boolean, default=False)
+    # Bonus/free bet: the book funded the stake, so a LOSS costs nothing and a
+    # WIN pays the profit only (the stake is not returned). Graded by
+    # picks.graded_pick_fields, which floors units at 0 for these. It is a real
+    # ticket, so is_paper stays False - but it risks no bankroll, so it does
+    # not consume one of the week's five real-money cap slots.
+    is_bonus = Column(Boolean, default=False)
     book = Column(String)
     placed_at = Column(DateTime)
     note = Column(String)  # your reason — for later review

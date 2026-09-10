@@ -202,3 +202,76 @@ export function checkPolicy(
   }
   return { ok: true };
 }
+
+// --- editing a logged pick ---------------------------------------------------
+
+/** The most a stake may be edited to, in units. A guard against a typo turning
+ *  a $20 ticket into a $2,000 one in a ledger meant to measure a $100 roll. */
+export const MAX_EDIT_STAKE = 10;
+
+export type PickEdit = {
+  price?: number | null;
+  stake?: number;
+  note?: string | null;
+  isBonus?: boolean;
+};
+
+export type ParsedEdit = { ok: true; edit: PickEdit };
+
+/**
+ * Shape checks for PATCH /api/picks/<id>. No DB.
+ *
+ * Only price, stake, note and the bonus flag are editable, and only before the
+ * pick is graded (the route enforces that). Line, side, market and game are
+ * NOT editable: those identify the bet, and letting them change after the fact
+ * would turn the ledger into something that cannot be evidence of anything.
+ */
+export function parsePickEdit(body: unknown): ParsedEdit | Rejection {
+  if (!body || typeof body !== "object") {
+    return reject("Could not read the request.");
+  }
+  const b = body as Record<string, unknown>;
+  const edit: PickEdit = {};
+
+  if ("price" in b) {
+    const p = optNumber(b.price, "price");
+    if ("ok" in p && p.ok === false) return p;
+    const v = (p as { value: number | null | undefined }).value;
+    if (v !== undefined) {
+      if (v !== null && (!Number.isInteger(v) || Math.abs(v) < 100)) {
+        return reject("Price must be American odds, like -125 or +100.");
+      }
+      edit.price = v;
+    }
+  }
+
+  if ("stake" in b) {
+    const n = Number(b.stake);
+    if (!Number.isFinite(n) || n <= 0) {
+      return reject("Stake must be a positive number of units.");
+    }
+    if (n > MAX_EDIT_STAKE) {
+      return reject(`Stake above ${MAX_EDIT_STAKE} units looks like a typo.`);
+    }
+    edit.stake = n;
+  }
+
+  if ("note" in b) {
+    if (b.note !== null && typeof b.note !== "string") {
+      return reject("Note must be text.");
+    }
+    edit.note = b.note as string | null;
+  }
+
+  if ("isBonus" in b) {
+    if (typeof b.isBonus !== "boolean") {
+      return reject("isBonus must be true or false.");
+    }
+    edit.isBonus = b.isBonus;
+  }
+
+  if (Object.keys(edit).length === 0) {
+    return reject("Nothing to change.");
+  }
+  return { ok: true, edit };
+}

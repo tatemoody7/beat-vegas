@@ -22,8 +22,12 @@ import {
 function terms(unitUsd: number): { term: string; body: string }[] {
   return [
     {
+      term: "Rank",
+      body: `Where a game sits on this week’s board, best to worst. #1 is the strongest game of the week. It is ranked on the score, over every game on the board at once, so a day or team filter never changes a game’s number. A game that has kicked off has no rank — it shows Live, then its result.`,
+    },
+    {
       term: "Score",
-      body: `The 0–100 number on every game, and the only thing the board sorts on. ${SCORE_BET_MIN} or higher is green and means bet. ${SCORE_WATCH_MIN} to ${SCORE_BET_MIN - 1} is amber and means watch. Under ${SCORE_WATCH_MIN} is red and means pass. The number is the gap alone: 50 at no gap, ${SCORE_BET_MIN} at a gap of ${BET_GAP_PTS}. Hard Rock’s price and anything flagged on the game decide whether it is a bet, not the number.`,
+      body: `The 0–100 number the rank is built from. It sits inside each card under Our number, and on the Results and Research pages. ${SCORE_BET_MIN} or higher is green and means bet. ${SCORE_WATCH_MIN} to ${SCORE_BET_MIN - 1} is amber and means watch. Under ${SCORE_WATCH_MIN} is red and means pass. The number is the gap alone: 50 at no gap, ${SCORE_BET_MIN} at a gap of ${BET_GAP_PTS}. Hard Rock’s price and anything flagged on the game decide whether it is a bet, not the number.`,
     },
     {
       term: "Gap",

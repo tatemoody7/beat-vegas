@@ -1,69 +1,96 @@
+import type { ReactNode } from "react";
 import { gradeColor, gradeWord, type Settled } from "@/lib/grade";
 
-// The grade, as one coloured number. Colour = the result once the game has
-// settled (won green / lost red / push grey), else the score band (70+ green,
-// 55–69 amber, under 55 red). The word beside it carries the same meaning for
-// readers who cannot see the colour. Never cyan: cyan is chrome.
+// The card's headline block, in one of three states. Before kickoff it is the
+// game's place on the board (#1 = best game of the week) over the tier word,
+// coloured by the score band (70+ green, 55–69 amber, under 55 red). Once the
+// game starts there is no decision left, so it reads LIVE in grey — FINAL once
+// it must be over — and once it settles it reads the result in the result's
+// colour. Never cyan: cyan is
+// chrome. The 0–100 score itself lives inside the card, under "Our number".
 
 type Props = {
-  /** 0–100; null renders a dash. */
+  /** 0–100; sets the colour before kickoff. */
   score: number | null;
-  /** Once known, the result colours the badge instead of the score. */
+  /** Place on the board this week; null once the game has kicked off. */
+  rank: number | null;
+  /** The game has started. */
+  kickedOff: boolean;
+  /** Started recently enough to still be in progress. */
+  inPlay: boolean;
+  /** Once known, the result colours the badge and replaces the rank. */
   settled?: Settled | null;
-  /** lg = the card headline; sm = a table row or chip. */
-  size?: "lg" | "sm";
-  /** Optional secondary word (e.g. the tier); defaults to the grade/result word. */
+  /** Optional word under the rank (the tier); defaults to the grade word. */
   label?: string | null;
   className?: string;
 };
 
-const COLOR_CLASS = {
-  good: "bv-badge--good",
-  warn: "bv-badge--warn",
-  bad: "bv-badge--bad",
-  push: "bv-badge--push",
-} as const;
+/** Every state is the same box, so a column of badges never goes ragged. */
+function Box({
+  color,
+  aria,
+  className,
+  children,
+}: {
+  color: string;
+  aria: string;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={`inline-flex min-h-[2.9rem] w-14 shrink-0 flex-col items-center justify-center rounded-[var(--r-sm)] px-1 py-1 ${className}`}
+      style={{ background: `var(--${color})`, color: "var(--badge-ink)" }}
+      aria-label={aria}
+    >
+      {children}
+    </span>
+  );
+}
+
+const WORD = "text-[0.6rem] font-bold uppercase tracking-wide";
 
 export default function ScoreBadge({
   score,
+  rank,
+  kickedOff,
+  inPlay,
   settled = null,
-  size = "lg",
   label,
   className = "",
 }: Props) {
-  const color = gradeColor(score, settled);
-  const word = label ?? gradeWord(score, settled);
-  const text = score === null ? "—" : String(Math.round(score));
-  const aria =
-    score === null
-      ? `No score, ${word}`
-      : `Score ${Math.round(score)}, ${word}`;
-  if (size === "sm") {
+  if (settled !== null) {
+    const result = gradeWord(score, settled);
     return (
-      <span
-        className={`bv-badge ${COLOR_CLASS[color]} ${className}`}
-        aria-label={aria}
+      <Box
+        color={gradeColor(score, settled)}
+        aria={result}
+        className={className}
       >
-        <span className="font-mono font-bold tabular-nums">{text}</span>
-        <span className="opacity-90">{word}</span>
-      </span>
+        <span className={WORD}>{result}</span>
+      </Box>
     );
   }
+  if (kickedOff) {
+    // No result and the game must be over: it was never graded, not still live.
+    const state = inPlay ? "Live" : "Final";
+    return (
+      <Box color="push" aria={state} className={className}>
+        <span className={WORD}>{state}</span>
+      </Box>
+    );
+  }
+  const tier = label ?? gradeWord(score, null);
   return (
-    <span
-      className={`inline-flex w-14 shrink-0 flex-col items-center justify-center rounded-[var(--r-sm)] px-1 py-1 ${className}`}
-      style={{
-        background: `var(--${color})`,
-        color: "var(--badge-ink)",
-      }}
-      aria-label={aria}
+    <Box
+      color={gradeColor(score, null)}
+      aria={rank === null ? `Unranked, ${tier}` : `Rank ${rank}, ${tier}`}
+      className={className}
     >
       <span className="font-[family-name:var(--font-display)] text-2xl font-extrabold leading-none tabular-nums">
-        {text}
+        {rank === null ? "—" : `#${rank}`}
       </span>
-      <span className="mt-0.5 text-[0.6rem] font-bold uppercase tracking-wide">
-        {word}
-      </span>
-    </span>
+      <span className={`mt-0.5 ${WORD}`}>{tier}</span>
+    </Box>
   );
 }

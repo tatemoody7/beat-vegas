@@ -4,6 +4,7 @@ import { useState } from "react";
 import { bookLabel } from "@/lib/books";
 import { WATCH_GAP_MIN } from "@/lib/edge";
 import { american, capitalize, fmt, signed } from "@/lib/format";
+import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import { strongestRed, type HomeGame } from "@/lib/homeBoard";
 import { basisPhrase, blockerTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
@@ -24,10 +25,11 @@ import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
 import ScoreBadge from "@/app/components/ScoreBadge";
 
-// One game on the rolling week board: a scannable collapsed row (the coloured
-// score, the matchup, the numbers, what to do) that expands into everything
+// One game on the rolling week board: a scannable collapsed row (its place on
+// the week, the matchup, the numbers, what to do) that expands into everything
 // behind it — Lines, Our number, What is behind it, Injuries and news. The
-// score carries the grade colour (lib/grade.ts); cyan stays chrome.
+// badge carries the grade colour (lib/grade.ts) and a Bet card is lit green;
+// cyan stays chrome.
 
 // The rungs match the score bands (lib/grade.ts): 1.75+ is green, WATCH_GAP_MIN
 // (≈0.44) to 1.75 is amber, anything less is red.
@@ -241,6 +243,15 @@ function ModelSection({ g }: { g: HomeGame }) {
                   : ""}
               </>
             )
+          }
+        />
+        <Row
+          label="Score"
+          value={
+            <>
+              <span className="font-mono text-[var(--text)]">{edge.score}</span>
+              {` out of 100 — ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching. It is what the board ranks on.`}
+            </>
           }
         />
         <Row
@@ -556,7 +567,7 @@ export default function GameCard({
     <div
       id={`game-${row.gameId}`}
       data-interactive="true"
-      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "PASS" && g.settled === null ? "opacity-85" : ""}`}
+      className={`bv-card scroll-mt-4 overflow-hidden ${edge.tier === "BET" && !g.kickedOff ? "bv-card--lit" : ""} ${edge.tier === "PASS" && g.settled === null ? "opacity-85" : ""}`}
     >
       <button
         type="button"
@@ -567,6 +578,9 @@ export default function GameCard({
         <span className="flex items-start gap-3">
           <ScoreBadge
             score={edge.score}
+            rank={g.boardRank}
+            kickedOff={g.kickedOff}
+            inPlay={g.inPlay}
             settled={g.settled}
             label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
           />

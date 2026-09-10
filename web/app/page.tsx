@@ -1,7 +1,6 @@
 import { getSeasons } from "@/lib/board";
 import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
-import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import {
   getHomeBoard,
   groupByDay,
@@ -88,7 +87,7 @@ export default async function BoardPage({
       </div>
 
       <p className="bv-page-sub mb-4 mt-1">
-        {`Every game this week, highest score first. ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching, under ${SCORE_WATCH_MIN} is a pass.`}
+        {`Every game this week, ranked best to worst. #1 is the strongest game on the board; the bets are the ones lit up green.`}
       </p>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
@@ -130,7 +129,7 @@ export default async function BoardPage({
                 No model number this week.
               </p>
               <p className="mt-1">
-                {`The week has not been scored yet. Until it is, each score comes from pace, weather, the spread and last season’s first halves. Anything you bet this week is a price bet, not a model bet.`}
+                {`The week has not been scored yet. Until it is, the ranking comes from pace, weather, the spread and last season’s first halves. Anything you bet this week is a price bet, not a model bet.`}
               </p>
             </div>
           )}
@@ -170,7 +169,7 @@ export default async function BoardPage({
                   : ""}
               </p>
               <p className="mb-3 text-xs text-[var(--text-dim)]">
-                {`Bet = score ${SCORE_BET_MIN}+. Watch = ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1}. Pass = under ${SCORE_WATCH_MIN}.`}
+                {`Ranked over the whole week, so a filter never renumbers them. A game that has kicked off drops its rank. Open a card for the score behind it.`}
               </p>
 
               {games.length === 0 ? (

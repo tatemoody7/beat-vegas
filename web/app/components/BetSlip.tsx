@@ -151,8 +151,11 @@ function SlipRow({ r, unitUsd }: { r: BetSlipRow; unitUsd: number }) {
     <li className="border-t border-[var(--border-soft)] py-3 text-sm">
       {/* 1 — who, when */}
       <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-[var(--text-dim)]">
-        <span className="font-mono">
-          {r.capRank === null ? "—" : `#${r.capRank}`}
+        <span
+          className="font-mono"
+          title="Cap slot: the order this week's five real bets fill, by gap. Not the board rank."
+        >
+          {r.capRank === null ? "—" : `slot ${r.capRank}`}
         </span>
         <span className="text-[var(--text-dim)]">·</span>
         <span

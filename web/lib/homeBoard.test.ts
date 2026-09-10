@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { BoardRow } from "./board";
 import type { EdgeResult, EdgeTier } from "./edge";
 import {
+  assignBoardRanks,
   assignCapRanks,
   bankrollCurve,
   dayKey,
   edgeContext,
+  inPlayAt,
   kickoffET,
   lineState,
   matchesFilters,
@@ -71,6 +73,8 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     settled: null,
     settledLine: null,
     priceLine: "",
+    inPlay: false,
+    boardRank: null,
     capRank: null,
     overCap: false,
     ...o,
@@ -161,6 +165,23 @@ describe("sortGames", () => {
     const done = game({ edge: edge(95, "EDGE"), kickedOff: true });
     const live = game({ edge: edge(41, "PASS"), kickedOff: false });
     expect(sortGames([done, live]).map((g) => g.edge.score)).toEqual([41, 95]);
+  });
+
+  it("breaks a score tie on the bigger gap — the score clamps at 100", () => {
+    const games = [
+      game({ row: row({ gameId: 1 }), edge: edge(100, "BET"), gap: 4.6 }),
+      game({ row: row({ gameId: 2 }), edge: edge(100, "BET"), gap: 9.9 }),
+      game({ row: row({ gameId: 3 }), edge: edge(100, "BET"), gap: 8.2 }),
+    ];
+    expect(sortGames(games).map((g) => g.row.gameId)).toEqual([2, 3, 1]);
+  });
+
+  it("a row with no gap sorts below a tied row that has one", () => {
+    const games = [
+      game({ row: row({ gameId: 1 }), edge: edge(45, "PASS"), gap: null }),
+      game({ row: row({ gameId: 2 }), edge: edge(45, "PASS"), gap: 0.4 }),
+    ];
+    expect(sortGames(games).map((g) => g.row.gameId)).toEqual([2, 1]);
   });
 
   it("breaks a tie on the earlier kickoff, then the away team", () => {
@@ -433,6 +454,75 @@ describe("assignCapRanks", () => {
       5,
     );
     expect(out.map((g) => g.capRank)).toEqual([null, 1]);
+  });
+});
+
+describe("inPlayAt", () => {
+  const kick = new Date("2025-10-11T16:00:00Z");
+  const at = (h: number) => new Date(kick.getTime() + h * 3_600_000);
+
+  it("is false before kickoff", () => {
+    expect(inPlayAt(kick, at(-0.5))).toBe(false);
+  });
+
+  it("is true from kickoff until the window closes", () => {
+    expect(inPlayAt(kick, kick)).toBe(true);
+    expect(inPlayAt(kick, at(3))).toBe(true);
+    expect(inPlayAt(kick, at(4.99))).toBe(true);
+  });
+
+  it("is false once the game must be over — that game is FINAL, not live", () => {
+    expect(inPlayAt(kick, at(5))).toBe(false);
+    expect(inPlayAt(kick, at(72))).toBe(false);
+  });
+
+  it("is false without a kickoff time", () => {
+    expect(inPlayAt(null, kick)).toBe(false);
+  });
+});
+
+describe("assignBoardRanks", () => {
+  const g = (gameId: number, o: Partial<HomeGame> = {}) =>
+    game({ row: row({ gameId }), ...o });
+
+  it("numbers an already-sorted list 1..N in order", () => {
+    const out = assignBoardRanks([g(1), g(2), g(3)]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, 2, 3]);
+  });
+
+  it("a kicked-off game gets no rank and does not consume a number", () => {
+    const out = assignBoardRanks([
+      g(1),
+      g(2),
+      g(3, { kickedOff: true }),
+      g(4, { kickedOff: true }),
+    ]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, 2, null, null]);
+  });
+
+  it("a kicked-off game mid-list does not shift the numbers after it", () => {
+    // sortGames sinks kicked-off games, but the function must not depend on it.
+    const out = assignBoardRanks([g(1), g(2, { kickedOff: true }), g(3)]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, null, 2]);
+  });
+
+  it("a fully played week is all nulls", () => {
+    const out = assignBoardRanks([
+      g(1, { kickedOff: true }),
+      g(2, { kickedOff: true }),
+    ]);
+    expect(out.map((x) => x.boardRank)).toEqual([null, null]);
+  });
+
+  it("keeps the input order and does not mutate it", () => {
+    const games = [g(9), g(8), g(7)];
+    const out = assignBoardRanks(games);
+    expect(out.map((x) => x.row.gameId)).toEqual([9, 8, 7]);
+    expect(games.every((x) => x.boardRank === null)).toBe(true);
+  });
+
+  it("an empty board is an empty list", () => {
+    expect(assignBoardRanks([])).toEqual([]);
   });
 });
 

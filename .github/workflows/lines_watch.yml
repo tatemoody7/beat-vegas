@@ -51,6 +51,14 @@ name: Hard Rock 1H line capture
 # GHA cron routinely fires 5-20+ min late and drops some slots (accepted, not
 # fixable); the overlapping close slots absorb the drift.
 
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
 on:
   schedule:
     # --- 1h_open: retired 2026-09-08 — card.yml's morning build sweeps the
@@ -115,9 +123,9 @@ jobs:
                  '[.[] | select(.commence_time >= $lo and .commence_time <= $hi)] | length' 2>/dev/null || echo unknown)
           echo "events kicking off in the next 75 min: $n"
           if [ "$n" = "0" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         if: steps.precheck.outputs.skip != 'true'
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         if: steps.precheck.outputs.skip != 'true'
         with:
           python-version: '3.11'

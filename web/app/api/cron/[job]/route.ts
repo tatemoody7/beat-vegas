@@ -10,6 +10,7 @@ import {
   type CronJob,
   type RunSummary,
 } from "@/lib/cronJobs";
+import { safeEqual } from "@/lib/auth";
 import { etClock12 } from "@/lib/et";
 
 export const dynamic = "force-dynamic";
@@ -47,14 +48,6 @@ function ghHeaders(token: string): Record<string, string> {
     // GitHub rejects a request with no User-Agent (403); Node's fetch sets none.
     "User-Agent": "beat-vegas-vercel-cron",
   };
-}
-
-/** Constant-time-ish compare so the secret is not learnable byte by byte. */
-function secretsMatch(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
 }
 
 async function recentRuns(
@@ -118,7 +111,13 @@ export async function GET(
     );
   }
   const header = req.headers.get("authorization") ?? "";
-  if (!header.startsWith("Bearer ") || !secretsMatch(header.slice(7), secret)) {
+  // lib/auth.ts::safeEqual, not a second hand-rolled compare. The local one
+  // returned early on a length mismatch, which leaked the secret's length;
+  // safeEqual hashes both sides to a fixed width first, so it does not.
+  if (
+    !header.startsWith("Bearer ") ||
+    !(await safeEqual(header.slice(7), secret))
+  ) {
     return json(401, { ...named, reason: "unauthorized" }, req, id);
   }
 
@@ -156,17 +155,31 @@ export async function GET(
     }
   }
 
-  // 5. Dispatch.
-  const resp = await fetch(
-    `${GITHUB_API}/repos/${GITHUB_REPO}/actions/workflows/${job.workflow}/dispatches`,
-    {
-      method: "POST",
-      headers: { ...ghHeaders(token), "Content-Type": "application/json" },
-      body: JSON.stringify(dispatchBody(job)),
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    },
-  );
+  // 5. Dispatch. Wrapped: the 8s AbortSignal.timeout throws rather than
+  //    returning, so an unresponsive GitHub used to produce a framework 500
+  //    that never reached the structured logger below — the one record of what
+  //    this route did.
+  let resp: Response;
+  try {
+    resp = await fetch(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/actions/workflows/${job.workflow}/dispatches`,
+      {
+        method: "POST",
+        headers: { ...ghHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify(dispatchBody(job)),
+        cache: "no-store",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return json(
+      502,
+      { ...named, reason: `dispatch request failed: ${msg}` },
+      req,
+      id,
+    );
+  }
   if (resp.status !== 204 && resp.status !== 200) {
     // A 404 here means bad token permissions or a missing workflow on `main`,
     // NOT a wrong URL: GitHub hides private repos from under-scoped tokens.

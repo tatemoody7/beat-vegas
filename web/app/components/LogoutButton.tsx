@@ -3,6 +3,10 @@
 export default function LogoutButton() {
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
+    // Full load, deliberately — see app/login/page.tsx. A client navigation
+    // would leave the signed-in board sitting in the router cache after the
+    // cookie that authorised it has been cleared.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/login";
   }
   return (

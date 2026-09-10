@@ -15,6 +15,7 @@ import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
 import { getMovements, type Movement } from "@/lib/movement";
 import {
   getPicks,
+  countsAgainstCap,
   isRealFirstHalf,
   type PickFull,
   type WeekPick,
@@ -580,6 +581,7 @@ export async function getHomeBoard(
       home: p.home,
       line: p.line,
       price: p.price,
+      isBonus: p.isBonus,
     }));
   const { startUsd, unitUsd } = bankrollEnv();
   const realUnits = round2(
@@ -599,7 +601,11 @@ export async function getHomeBoard(
       unitUsd,
       realUnits,
       currentUsd: Math.round((startUsd + realUnits * unitUsd) * 100) / 100,
-      weekBets: real1H.filter((p) => p.week === week).length,
+      // Bonus bets are excluded: they risk none of the roll, so POST
+      // /api/picks does not count them either. Displaying them here told you
+      // a slot was gone when the server would still take the bet.
+      weekBets: picks.filter((p) => countsAgainstCap(p) && p.week === week)
+        .length,
       cap: WEEKLY_BET_CAP,
       real: record,
       paper: paperRecord,

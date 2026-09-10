@@ -211,6 +211,14 @@ export function timeToKick(kickIso: string | null, now: Date): string | null {
 }
 
 /** Pure: the slip from the latest card, this week's real 1H picks, and the board's live lines. */
+/**
+ * Cap slots used this week. A bonus bet is logged and deduped like any other
+ * pick, but risks none of the bankroll, so it does not spend a slot — the
+ * same rule POST /api/picks enforces.
+ */
+const capUsedBy = (weekPicks: WeekPick[]): number =>
+  weekPicks.filter((p) => !p.isBonus).length;
+
 export function buildBetSlip(
   card: Card | null,
   weekPicks: WeekPick[],
@@ -221,7 +229,7 @@ export function buildBetSlip(
   if (card === null) {
     return {
       rows: [],
-      used: weekPicks.length,
+      used: capUsedBy(weekPicks),
       cap,
       builtAt: null,
       cardStatus: null,
@@ -234,7 +242,7 @@ export function buildBetSlip(
     const k = pickKey(p.away, p.home);
     if (!byKey.has(k)) byKey.set(k, p);
   }
-  const used = weekPicks.length;
+  const used = capUsedBy(weekPicks);
   const rows = card.items
     .filter((i) => i.tier === "BET")
     .sort(

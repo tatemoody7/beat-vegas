@@ -56,6 +56,8 @@ export type WeekPick = {
   home: string | null;
   line: number | null;
   price: number | null;
+  /** A bonus bet still marks the game as logged, but does not use a cap slot. */
+  isBonus: boolean;
 };
 
 // Games on the current week (the week you are about to bet — see lib/week.ts).
@@ -186,6 +188,16 @@ export async function loadPicks(season: number): Promise<PickFull[]> {
 /** Real-money picks that count: first-half only (the only market we bet). */
 export const isRealFirstHalf = (p: PickFull): boolean =>
   !p.isPaper && p.market === "1H";
+/**
+ * Uses one of the week's cap slots.
+ *
+ * A bonus bet risks none of the bankroll, so POST /api/picks and
+ * build_card.py::real_bets_this_week both leave it out of the count. The
+ * display has to agree, or the site tells you fewer slots are left than the
+ * server will actually accept.
+ */
+export const countsAgainstCap = (p: PickFull): boolean =>
+  isRealFirstHalf(p) && !p.isBonus;
 export const isPaperFirstHalf = (p: PickFull): boolean =>
   p.isPaper && p.market === "1H";
 /** Real money placed where the site graded WATCH/PASS (or a legacy pick with no

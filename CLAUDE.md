@@ -5,6 +5,45 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-10 (full system review, PR #98, MERGED):** a code + security pass over the
+  engine, the workflows and the site. **Two things were actually broken.**
+  (1) `grade_records` was the ONLY one of eight grading paths that skipped
+  `grading.trusted_first_half_total`, so a line-score false zero would have booked a
+  fabricated UNDER win into the records grid, the credibility ledger and bv_line
+  recalibration. Nothing live was corrupted (no graded rows yet, no false zeros on file);
+  the fix is preventive and its test fails against the old code.
+  (2) A mid-sweep Odds API 5xx/429 produced **NO card at all** — `poll_lines` exits 1 after
+  writing its status file and `card.yml`'s sweep step had no `continue-on-error`, so the job
+  died before `build_card`. The sweep now continues on error and a final `always()` step
+  fails the run: the card ships DEGRADED **and** the failed-run email still goes out.
+  `sources/odds.py` gained the retries `cfbd.py` always had (the free API retried; the paid
+  one did not).
+  **Security:** `next` 16.2.7 → **16.3.4** (1 critical + 3 high; prod `npm audit` is now 0).
+  The auth cookie was literally `sha256(APP_PASSWORD)` — unsalted, so a leaked cookie was
+  permanent access *and* a fast offline crack of the password; it is now
+  `v1.<issuedAt>.<hmac>` under a **PBKDF2-derived key memoised per instance** (100k
+  iterations would otherwise be paid on every request the middleware sees), with the
+  issued-at inside the MAC so a stolen cookie ages out server-side. `POST /api/login` has a
+  per-instance throttle (10 per IP per 15 min). **The middleware matcher's exemptions were
+  unanchored prefixes** — `/api/healthz`, `/api/cronjobs`, `/loginhelper` would all have
+  been public the moment anyone added them; anchored and verified in prod. `next.config.ts`
+  gained security headers (the board was framable). Actions pinned to SHAs +
+  `permissions: contents: read` on all twelve, with `.github/dependabot.yml` as the other
+  half of that trade.
+  **Money path:** `uq_manual_pick_per_ledger` — a partial unique index on
+  `(game_id, COALESCE(market,'1H'), COALESCE(is_paper,false))`, because Postgres treats
+  NULLs as distinct and legacy rows carry NULL in both. The cap + duplicate check were three
+  round-trips with no transaction; a double-click could log twice or reach six bets.
+  `updatePick`/`deletePick` are one guarded statement now. None of the pick endpoints had
+  any try/catch, so a Neon blip showed `failed (500)`.
+  **Measured** (raw queries per render, counted against a live server): `/results` 34 → 26,
+  `/game/[id]` 36 → 26, via React `cache()` on `loadPicks`/`loadResults`/`getBoard`/
+  `getLineCheck`. Routes 25 → 14. `app/error.tsx` + `not-found.tsx` added — there was no
+  error boundary anywhere, so one bad table took down all of `/results`.
+  `sunday.yml`'s three crons each spent 6 Odds credits; the capture is gated on a
+  full-game snapshot already written today (ET), `force` to override.
+  Tests: Python 837 → 856, web 372 → 389. Plan:
+  `~/.claude/plans/run-a-complete-code-review-glistening-hippo.md`.
 - **2026-09-10 (site restructure, branch `board-and-game-page`, NOT merged):** the site
   goes to **three tabs — Board / Results / Track record — plus `/game/[id]`**. A board row
   is now a **LINK**, never a disclosure: `GameCard` is deleted, `GameRow` carries only the
@@ -29,8 +68,9 @@ Research only — it never places bets or automates gambling.
   `onBoard` prop and the "Not on the board" fallback are gone. Week 2: 11,608px → 7,329px,
   839KB → 198KB HTML; web tests 336 → 351.
   **Results + `/proof` shipped the same day (see the next bullet).**
-  **Team logos shipped 2026-09-10** (see the bullet below). **Still to do:** deleting the
-  eleven legacy redirect files.
+  **Team logos shipped 2026-09-10** (see the bullet below). The eleven legacy redirect
+  files are gone as of the system review below — as `next.config` redirects, not deletions,
+  so every old bookmark still resolves.
   Audit, per-page layouts and every decision: `~/.claude/plans/i-like-a-lot-cuddly-dusk.md`
   and `~/.claude/plans/session-handoff-beat-staged-sutton.md`.
   **Screenshot with headless Chrome, never the Browser pane** (it caps captures at 800x500).
@@ -321,6 +361,28 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas
+- **A `web/lib/` export with no TypeScript caller may still be LOAD-BEARING.**
+  `tests/test_gate_parity.py` reads constants OUT of `verdict.ts`, `grade.ts`, `edge.ts`,
+  `lineCheck.ts`, `books.ts` and `card.ts` **by regex** and compares them to
+  `model/score.py` / `card.py` — that guard is what stops the Friday card and the live site
+  disagreeing about what counts as a bet. `MODEL_BET_THRESHOLD` and `MIN_GAMES_FOR_MODEL`
+  look dead in the web app and are not. Grep `tests/` before deleting any `export const`.
+  (`CONFIDENCE_LABEL` and `WATCH_GAP_MIN` were genuinely dead and were removed.)
+- **React `cache()` is a NO-OP outside a render/request scope**, so the per-request query
+  dedupe cannot be unit-tested with a mocked prisma — a test asserting one call fails
+  against correct code. Measure it instead: wrap `$queryRaw` in `lib/prisma.ts` with a
+  `console.log` counter, hit the route twice (the first compiles), diff the dev-log lines,
+  revert. Also key the cache on the loader with STABLE args: `getHomeBoard` takes
+  `now = new Date()`, so caching that dedupes nothing.
+- **Chrome headless does not emulate a mobile device from `--window-size` alone.** A 375-wide
+  capture lays out at desktop assumptions and looks exactly like horizontal overflow. Confirm
+  with the Browser pane's `javascript_tool` (its screenshots are useless, its JS works):
+  `document.documentElement.scrollWidth - clientWidth`. Measured 0 on the board.
+- `npm run format` reformats `web/data/*.json` (written by the Python lane) into a 1,600-line
+  diff on every run. They are in `web/.prettierignore` now — keep them there.
+- **Next 16.3 writes its own `AGENTS.md` and `CLAUDE.md` into `web/` on every dev start**,
+  which would compete with this file. `agentRules: false` in `web/next.config.ts` turns it
+  off; do not remove it.
 - Features must stay **leak-free** (only pre-kickoff info; season-to-date shifted).
 - Numeric model columns must be clean floats (NaN, never `pd.NA`/None/bool) — see
   `features.build_feature_frame` coercion; `bool(NaN)` is `True` (bit us on dome).

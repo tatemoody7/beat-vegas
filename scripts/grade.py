@@ -162,18 +162,24 @@ def grade_model(session, season: int, closings) -> int:
     )
     n = 0
     for p in preds:
-        if not is_model_bet(p.under_score) or p.line_used is None:
-            continue
         entry = closings.get(p.game_id)
         if entry is None:
             continue
-        g, (_open, closing), closing_at, (fair_open, fair_close) = entry
-        bet_line = p.line_used
+        # Delete BEFORE any skip check, exactly as grade_market does. This used
+        # to sit below the is_model_bet / line_used guards, so a re-score that
+        # dropped a game under the threshold left its old graded row in the
+        # ledger forever -- the row stopped being a model bet but never stopped
+        # counting as one. Delete-then-rewrite is only idempotent if the delete
+        # is unconditional.
         (
             session.query(Result)
             .filter(Result.game_id == p.game_id, Result.model_version == MODEL_VERSION)
             .delete()
         )
+        if not is_model_bet(p.under_score) or p.line_used is None:
+            continue
+        g, (_open, closing), closing_at, (fair_open, fair_close) = entry
+        bet_line = p.line_used
         actual = trusted_first_half_total(
             g.first_half_total, g.home_points, g.away_points, g.first_half_source
         )

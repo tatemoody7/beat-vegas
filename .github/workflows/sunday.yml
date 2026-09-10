@@ -21,7 +21,13 @@ on:
     # 4:45pm ET routine (cfb-sunday-ops) also re-kicks this workflow if none
     # ran today.
     - cron: '30 20 * * 0'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 're-capture even if a full-game capture is already on record today (ET)'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: neon-writers
@@ -48,8 +54,47 @@ jobs:
           read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
           echo "season=$SEASON" >> "$GITHUB_OUTPUT"
           echo "week=$WEEK" >> "$GITHUB_OUTPUT"
-      - name: Capture full-game openers (multi-book incl. Hard Rock + no-vig exchanges)
+      - name: Already captured today? (ET; the credit guard)
+        id: captured
         if: steps.active.outputs.week != ''
+        env:
+          FORCE: ${{ inputs.force }}
+        # Three crons fire every Sunday and each capture costs 6 credits
+        # (2 markets x 3 regions), so a good week spent 18 credits to get one
+        # useful capture. card.yml solved the same problem with a positive fact
+        # from the database -- a `cards` row for today -- rather than a run-list
+        # probe; this is the same idea, keyed on a full_game_total snapshot
+        # written today (ET). The rest of the job is idempotent and free, so
+        # only this step is gated: a second cron still re-scores, which is what
+        # you want if the first run half-failed.
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from beatvegas.db.models import OddsSnapshot
+          from beatvegas.db.store import init_db, session_scope
+          init_db()
+          et = ZoneInfo("America/New_York")
+          midnight_et = datetime.now(et).replace(hour=0, minute=0, second=0, microsecond=0)
+          # captured_at is stored naive UTC.
+          since = midnight_et.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+          with session_scope() as s:
+              n = (
+                  s.query(OddsSnapshot.id)
+                  .filter(
+                      OddsSnapshot.market == "full_game_total",
+                      OddsSnapshot.captured_at >= since,
+                  )
+                  .count()
+              )
+          force = os.environ.get("FORCE") == "true"
+          print(f"need_capture={'true' if (force or n == 0) else 'false'}")
+          print(f"rows_today={n}")
+          PY
+          cat "$GITHUB_OUTPUT"
+      - name: Capture full-game openers (multi-book incl. Hard Rock + no-vig exchanges)
+        if: steps.captured.outputs.need_capture == 'true'
         # us_ex adds Kalshi / Novig / ProphetX / BetOpenly (CFTC exchanges, ~0 vig):
         # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
         # only — they sharpen the market fair price Hard Rock is judged against.

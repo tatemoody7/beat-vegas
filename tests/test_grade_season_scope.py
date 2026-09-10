@@ -105,3 +105,41 @@ def test_grade_model_only_touches_the_seasons_predictions():
         assert n == 1
         rows = s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).all()
         assert [r.game_id for r in rows] == [2]
+
+
+def test_a_rescore_below_threshold_removes_the_old_graded_row():
+    """Delete-then-rewrite is only idempotent if the delete is unconditional.
+
+    grade_model used to skip on `not is_model_bet(...)` BEFORE it deleted, so a
+    re-score that dropped a game under the threshold left its previously-graded
+    row in the ledger forever: the game stopped being a model bet but never
+    stopped counting as one. grade_market always had the ordering right; this
+    pins that grade_model matches it.
+    """
+    grade = _load_script("grade")
+    eng = _db()
+    with Session(eng) as s:
+        s.add(
+            Prediction(
+                game_id=2,
+                model_version=grade.MODEL_VERSION,
+                under_score=60,  # a bet
+                line_used=24.5,
+                created_at=datetime(2026, 9, 1),
+            )
+        )
+        s.commit()
+        closings = {2: (s.get(Game, 2), (25.0, 24.0), datetime(2026, 9, 30), (None, None))}
+        assert grade.grade_model(s, 2026, closings) == 1
+        s.commit()
+        assert s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).count() == 1
+
+        # The re-score drops it under the threshold.
+        pred = s.query(Prediction).filter(Prediction.game_id == 2).one()
+        pred.under_score = 10
+        s.commit()
+
+        assert grade.grade_model(s, 2026, closings) == 0
+        s.commit()
+        rows = s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).all()
+        assert rows == [], "the stale graded row survived the re-score"

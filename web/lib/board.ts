@@ -145,8 +145,17 @@ async function bvAdjustments(
   return out; // later rows overwrite earlier → latest wins
 }
 
-export async function getBoard(season: number): Promise<BoardRow[]> {
-  const preds = await prisma.$queryRaw<PredRow[]>`
+/**
+ * The board's GAME UNIVERSE for a season — the predictions rows and their game
+ * facts, without the two expensive joins getBoard adds on top (the full-season
+ * consensus-line scan and the adjustment lookup).
+ *
+ * Split out so a caller that only needs "which games are on the board" does not
+ * pay for line medians it will not read. getBoard still composes on top of it,
+ * so there is exactly ONE definition of the universe and the two cannot drift.
+ */
+export async function boardGames(season: number): Promise<PredRow[]> {
+  return prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
            g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
@@ -171,7 +180,11 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
         LIMIT 1)
     ORDER BY p.rank
   `;
-  const [lines, adjustments] = await Promise.all([
+}
+
+export async function getBoard(season: number): Promise<BoardRow[]> {
+  const [preds, lines, adjustments] = await Promise.all([
+    boardGames(season),
     consensusLines(season),
     bvAdjustments(season),
   ]);

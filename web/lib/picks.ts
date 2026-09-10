@@ -1,5 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getBoard } from "@/lib/board";
+import { boardGames } from "@/lib/board";
 import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
@@ -62,16 +63,23 @@ export type WeekPick = {
 
 // Games on the current week (the week you are about to bet — see lib/week.ts).
 export async function getSlate(season: number): Promise<SlateOption[]> {
-  const board = await getBoard(season);
-  const week = defaultWeek(board);
-  return board
-    .filter((b) => b.week === week)
-    .map((b) => ({
-      gameId: b.gameId,
-      week: b.week,
-      away: b.away,
-      home: b.home,
-    }));
+  // boardGames, not getBoard: the slate needs the universe and the weeks, not
+  // the line medians. getBoard also runs consensusLines(), a full-season scan
+  // of odds_snapshots across every book — the most expensive query in the app —
+  // and POST /api/picks was paying for it on every single logged pick just to
+  // answer "is this game on the board".
+  const rows = await boardGames(season);
+  const games = rows.map((r) => ({
+    gameId: Number(r.game_id),
+    week: Number(r.week),
+    startDate: r.start_date ?? null,
+    away: r.away_team ?? "?",
+    home: r.home_team ?? "?",
+  }));
+  const week = defaultWeek(games);
+  return games
+    .filter((g) => g.week === week)
+    .map(({ gameId, week, away, home }) => ({ gameId, week, away, home }));
 }
 
 const truthy = (v: unknown) => v === true || Number(v) === 1;
@@ -109,6 +117,27 @@ const isMissingColumn = (e: unknown): boolean =>
   /column .* does not exist|no such column/i.test(
     String((e as Error)?.message ?? e),
   );
+
+/**
+ * The `uq_manual_pick_per_ledger` backstop fired: one pick per (game, market)
+ * per ledger. The route already checks for a duplicate before inserting, so
+ * this only ever fires on the RACE the check cannot close — a double-click, or
+ * a retry of a request that actually succeeded. It is a 409, not a 500.
+ * Matches Postgres ("duplicate key value violates unique constraint") and the
+ * SQLite dev/test path ("UNIQUE constraint failed") alike.
+ */
+export const isDuplicatePick = (e: unknown): boolean =>
+  /uq_manual_pick_per_ledger|duplicate key value|unique constraint/i.test(
+    String((e as Error)?.message ?? e),
+  );
+
+/** Thrown by createPick when the constraint refused a same-instant duplicate. */
+export class DuplicatePickError extends Error {
+  constructor() {
+    super("a pick on this game and market is already logged in this ledger");
+    this.name = "DuplicatePickError";
+  }
+}
 
 // The tracking columns arrive with the Python lane's migration; until it has
 // run on a database, fall back to the legacy column list (snapshot fields null)
@@ -313,11 +342,13 @@ export async function createPick(
     `;
     return { tracked: true };
   } catch (e) {
+    if (isDuplicatePick(e)) throw new DuplicatePickError();
     if (!isMissingColumn(e)) throw e;
     console.warn(
       "manual_picks tracking columns missing — pick stored without snapshot",
     );
-    await prisma.$executeRaw`
+    try {
+      await prisma.$executeRaw`
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
          stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
@@ -328,7 +359,11 @@ export async function createPick(
          ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
          ${factorsAtPick}, false)
     `;
-    return { tracked: false };
+      return { tracked: false };
+    } catch (e2) {
+      if (isDuplicatePick(e2)) throw new DuplicatePickError();
+      throw e2;
+    }
   }
 }
 
@@ -341,32 +376,33 @@ export async function createPick(
  * appends; the caller composes the text it wants kept.
  */
 export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
-  const rows = await prisma.$queryRaw<{ graded: number | boolean | null }[]>`
-    SELECT graded FROM manual_picks WHERE id = ${id}
-  `;
-  if (rows.length === 0 || truthy(rows[0].graded)) return false;
-
-  if (edit.price !== undefined) {
-    await prisma.$executeRaw`UPDATE manual_picks SET price = ${edit.price} WHERE id = ${id}`;
-  }
-  if (edit.stake !== undefined) {
-    await prisma.$executeRaw`UPDATE manual_picks SET stake = ${edit.stake} WHERE id = ${id}`;
-  }
-  if (edit.note !== undefined) {
-    await prisma.$executeRaw`UPDATE manual_picks SET note = ${edit.note} WHERE id = ${id}`;
-  }
+  const sets: Prisma.Sql[] = [];
+  if (edit.price !== undefined) sets.push(Prisma.sql`price = ${edit.price}`);
+  if (edit.stake !== undefined) sets.push(Prisma.sql`stake = ${edit.stake}`);
+  if (edit.note !== undefined) sets.push(Prisma.sql`note = ${edit.note}`);
   if (edit.isBonus !== undefined) {
-    await prisma.$executeRaw`UPDATE manual_picks SET is_bonus = ${edit.isBonus} WHERE id = ${id}`;
+    sets.push(Prisma.sql`is_bonus = ${edit.isBonus}`);
   }
-  return true;
+  if (sets.length === 0) return false;
+
+  // ONE statement, with the immutability rule in its WHERE clause. It used to
+  // be a SELECT graded followed by up to four separate UPDATEs: the daily
+  // grading job landing in that window would have let an edit through onto a
+  // row that had just been graded — precisely what the rule exists to stop.
+  // The rowcount is the answer: 0 means missing or already graded.
+  const changed = await prisma.$executeRaw`
+    UPDATE manual_picks SET ${Prisma.join(sets, ", ")}
+    WHERE id = ${id} AND COALESCE(graded, false) = false
+  `;
+  return changed > 0;
 }
 
-// Returns false if the pick is already graded (immutable) or missing.
+// Returns false if the pick is already graded (immutable) or missing. Same
+// single-statement reasoning as updatePick.
 export async function deletePick(id: number): Promise<boolean> {
-  const rows = await prisma.$queryRaw<{ graded: number | boolean | null }[]>`
-    SELECT graded FROM manual_picks WHERE id = ${id}
+  const changed = await prisma.$executeRaw`
+    DELETE FROM manual_picks
+    WHERE id = ${id} AND COALESCE(graded, false) = false
   `;
-  if (rows.length === 0 || truthy(rows[0].graded)) return false;
-  await prisma.$executeRaw`DELETE FROM manual_picks WHERE id = ${id}`;
-  return true;
+  return changed > 0;
 }

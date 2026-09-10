@@ -15,8 +15,16 @@ export async function GET(req: NextRequest) {
       status: 400,
     });
   }
-  const rows = await getSeasonRecords(season);
-  const csv = recordsToCsv(rows);
+  let csv: string;
+  try {
+    csv = recordsToCsv(await getSeasonRecords(season));
+  } catch (e) {
+    // A download link that 500s with no body reads as a broken button.
+    console.error("[api/records] getSeasonRecords failed:", e);
+    return new Response("could not build the export — try again", {
+      status: 503,
+    });
+  }
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

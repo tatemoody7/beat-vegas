@@ -275,3 +275,28 @@ def test_rescore_yml_is_dispatch_only_and_writes_through_env():
     assert len(order) == 3 and order == sorted(order)
     assert "scripts/grade.py" in run_steps[order[1]]["run"]
     assert "pick.py grade" in run_steps[order[2]]["run"]
+
+
+def test_sunday_capture_is_gated_so_three_crons_spend_one_slates_credits():
+    """Three Sunday crons each spent 6 credits (2 markets x 3 regions), so a
+    week where all three fired paid 18 to capture one slate. The expensive step
+    is now gated on a positive fact -- a full_game_total snapshot written today
+    (ET) -- the same shape as card.yml's built-today probe, with `force` for a
+    deliberate re-capture. Only the capture is gated: the rest of the job costs
+    nothing and re-running it is what you want if the first run half-failed."""
+    data = _load(WF_DIR / "sunday.yml")
+    steps = data["jobs"]["capture-and-score"]["steps"]
+    by_name = {s.get("name"): s for s in steps}
+
+    gate = next(s for s in steps if s.get("id") == "captured")
+    assert "full_game_total" in gate["run"]
+    assert "America/New_York" in gate["run"], "the guard must key on the ET day"
+    assert gate["env"]["FORCE"] == "${{ inputs.force }}"
+    assert "force" in _on(data)["workflow_dispatch"]["inputs"]
+
+    capture = next(s for s in steps if s.get("name", "").startswith("Capture full-game openers"))
+    assert capture["if"] == "steps.captured.outputs.need_capture == 'true'"
+    assert "poll_full_game.py" in capture["run"]
+
+    # The free, idempotent work stays ungated.
+    assert by_name["Score + rank the board"].get("if") is None

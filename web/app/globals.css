@@ -120,6 +120,16 @@ body {
     border-color: rgba(56, 189, 248, 0.45);
     box-shadow: var(--shadow-card-hover);
   }
+  /* A game that clears every gate. Green already means bet and won, and nothing
+     else on the board is lit, so the eye lands here first. The hover rule above
+     hard-codes cyan, so a lit card has to hold its own border back. */
+  .bv-card--lit {
+    border-color: var(--good);
+    background: linear-gradient(180deg, var(--good-bg), var(--bg-2));
+  }
+  .bv-card--lit[data-interactive="true"]:hover {
+    border-color: var(--good);
+  }
 
   /* One badge component for every chip on the site (tier word, status tags,
      logged, paper, filters). Colour modifiers carry the grade language. */

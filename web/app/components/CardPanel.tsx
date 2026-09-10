@@ -40,9 +40,9 @@ function Row({
         {r.capRank !== null && (
           <span
             className="font-mono text-xs text-[var(--text-dim)]"
-            title="Rank among this week's BETs by gap — the order the weekly cap fills."
+            title="Cap slot: the order this week's five real bets fill, by gap. Not the board rank."
           >
-            {`#${r.capRank}`}
+            {`slot ${r.capRank}`}
           </span>
         )}
         <span className="font-semibold text-[var(--text)]">{r.matchup}</span>

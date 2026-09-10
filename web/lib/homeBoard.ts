@@ -316,6 +316,9 @@ export type HomeGame = {
   settledLine: number | null;
   /** One sentence on Hard Rock's price vs the market's no-vig fair price. */
   priceLine: string;
+  /** Place on the board this week (1 = best), over every game, before filters.
+   *  null once the game has kicked off: it is no longer a decision. */
+  boardRank: number | null;
   /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
   capRank: number | null;
   /** BET beyond the weekly cap: every gate passed, paper only (docs/BETTING_POLICY.md). */
@@ -352,6 +355,19 @@ export function sortGames(games: HomeGame[]): HomeGame[] {
       b.edge.score - a.edge.score ||
       ms(a) - ms(b) ||
       a.row.away.localeCompare(b.row.away),
+  );
+}
+
+/**
+ * Pure: number the week best to worst over an ALREADY-SORTED list (sortGames).
+ * Only a game you can still bet gets a number; one that has kicked off is not a
+ * decision any more, so it carries null and shows its result instead. Ranks are
+ * assigned over the whole board, so a day or team filter never renumbers them.
+ */
+export function assignBoardRanks(games: HomeGame[]): HomeGame[] {
+  let n = 0;
+  return games.map((g) =>
+    g.kickedOff ? { ...g, boardRank: null } : { ...g, boardRank: ++n },
   );
 }
 
@@ -494,6 +510,7 @@ export async function getHomeBoard(
       settled,
       settledLine: settled === null ? null : basisLine,
       priceLine: priceSentence(input),
+      boardRank: null,
       capRank: null,
       overCap: false,
     };
@@ -502,7 +519,9 @@ export async function getHomeBoard(
   const heldIds = new Set(
     [...pickedGames].filter((g): g is number => g !== null),
   );
-  const sorted = assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP);
+  const sorted = assignBoardRanks(
+    assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP),
+  );
   const weekPicks: WeekPick[] = real1H
     .filter((p) => p.week === week)
     .map((p) => ({

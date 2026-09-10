@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BoardRow } from "./board";
 import type { EdgeResult, EdgeTier } from "./edge";
 import {
+  assignBoardRanks,
   assignCapRanks,
   bankrollCurve,
   dayKey,
@@ -71,6 +72,7 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     settled: null,
     settledLine: null,
     priceLine: "",
+    boardRank: null,
     capRank: null,
     overCap: false,
     ...o,
@@ -433,6 +435,51 @@ describe("assignCapRanks", () => {
       5,
     );
     expect(out.map((g) => g.capRank)).toEqual([null, 1]);
+  });
+});
+
+describe("assignBoardRanks", () => {
+  const g = (gameId: number, o: Partial<HomeGame> = {}) =>
+    game({ row: row({ gameId }), ...o });
+
+  it("numbers an already-sorted list 1..N in order", () => {
+    const out = assignBoardRanks([g(1), g(2), g(3)]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, 2, 3]);
+  });
+
+  it("a kicked-off game gets no rank and does not consume a number", () => {
+    const out = assignBoardRanks([
+      g(1),
+      g(2),
+      g(3, { kickedOff: true }),
+      g(4, { kickedOff: true }),
+    ]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, 2, null, null]);
+  });
+
+  it("a kicked-off game mid-list does not shift the numbers after it", () => {
+    // sortGames sinks kicked-off games, but the function must not depend on it.
+    const out = assignBoardRanks([g(1), g(2, { kickedOff: true }), g(3)]);
+    expect(out.map((x) => x.boardRank)).toEqual([1, null, 2]);
+  });
+
+  it("a fully played week is all nulls", () => {
+    const out = assignBoardRanks([
+      g(1, { kickedOff: true }),
+      g(2, { kickedOff: true }),
+    ]);
+    expect(out.map((x) => x.boardRank)).toEqual([null, null]);
+  });
+
+  it("keeps the input order and does not mutate it", () => {
+    const games = [g(9), g(8), g(7)];
+    const out = assignBoardRanks(games);
+    expect(out.map((x) => x.row.gameId)).toEqual([9, 8, 7]);
+    expect(games.every((x) => x.boardRank === null)).toBe(true);
+  });
+
+  it("an empty board is an empty list", () => {
+    expect(assignBoardRanks([])).toEqual([]);
   });
 });
 

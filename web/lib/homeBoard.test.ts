@@ -7,6 +7,7 @@ import {
   bankrollCurve,
   dayKey,
   edgeContext,
+  inPlayAt,
   kickoffET,
   lineState,
   matchesFilters,
@@ -72,6 +73,7 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     settled: null,
     settledLine: null,
     priceLine: "",
+    inPlay: false,
     boardRank: null,
     capRank: null,
     overCap: false,
@@ -163,6 +165,23 @@ describe("sortGames", () => {
     const done = game({ edge: edge(95, "EDGE"), kickedOff: true });
     const live = game({ edge: edge(41, "PASS"), kickedOff: false });
     expect(sortGames([done, live]).map((g) => g.edge.score)).toEqual([41, 95]);
+  });
+
+  it("breaks a score tie on the bigger gap — the score clamps at 100", () => {
+    const games = [
+      game({ row: row({ gameId: 1 }), edge: edge(100, "BET"), gap: 4.6 }),
+      game({ row: row({ gameId: 2 }), edge: edge(100, "BET"), gap: 9.9 }),
+      game({ row: row({ gameId: 3 }), edge: edge(100, "BET"), gap: 8.2 }),
+    ];
+    expect(sortGames(games).map((g) => g.row.gameId)).toEqual([2, 3, 1]);
+  });
+
+  it("a row with no gap sorts below a tied row that has one", () => {
+    const games = [
+      game({ row: row({ gameId: 1 }), edge: edge(45, "PASS"), gap: null }),
+      game({ row: row({ gameId: 2 }), edge: edge(45, "PASS"), gap: 0.4 }),
+    ];
+    expect(sortGames(games).map((g) => g.row.gameId)).toEqual([2, 1]);
   });
 
   it("breaks a tie on the earlier kickoff, then the away team", () => {
@@ -435,6 +454,30 @@ describe("assignCapRanks", () => {
       5,
     );
     expect(out.map((g) => g.capRank)).toEqual([null, 1]);
+  });
+});
+
+describe("inPlayAt", () => {
+  const kick = new Date("2025-10-11T16:00:00Z");
+  const at = (h: number) => new Date(kick.getTime() + h * 3_600_000);
+
+  it("is false before kickoff", () => {
+    expect(inPlayAt(kick, at(-0.5))).toBe(false);
+  });
+
+  it("is true from kickoff until the window closes", () => {
+    expect(inPlayAt(kick, kick)).toBe(true);
+    expect(inPlayAt(kick, at(3))).toBe(true);
+    expect(inPlayAt(kick, at(4.99))).toBe(true);
+  });
+
+  it("is false once the game must be over — that game is FINAL, not live", () => {
+    expect(inPlayAt(kick, at(5))).toBe(false);
+    expect(inPlayAt(kick, at(72))).toBe(false);
+  });
+
+  it("is false without a kickoff time", () => {
+    expect(inPlayAt(null, kick)).toBe(false);
   });
 });
 

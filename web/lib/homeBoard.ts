@@ -316,6 +316,8 @@ export type HomeGame = {
   settledLine: number | null;
   /** One sentence on Hard Rock's price vs the market's no-vig fair price. */
   priceLine: string;
+  /** Kicked off recently enough that it could still be in progress. */
+  inPlay: boolean;
   /** Place on the board this week (1 = best), over every game, before filters.
    *  null once the game has kicked off: it is no longer a decision. */
   boardRank: number | null;
@@ -341,7 +343,22 @@ export type HomeBoard = {
   weekPicks: WeekPick[];
 };
 
-/** Pure: upcoming before kicked-off, then score desc, earliest kickoff, away team. */
+/** Hours after kickoff a game could still be in progress. Past it, a game with
+ *  no result is over — it was simply never graded (no real book line to grade
+ *  against), so the board says FINAL rather than claiming it is still live. */
+export const LIVE_WINDOW_H = 5;
+
+/** Pure: has this game kicked off recently enough to still be in progress? */
+export function inPlayAt(start: Date | null, now: Date): boolean {
+  if (start === null) return false;
+  const since = now.getTime() - start.getTime();
+  return since >= 0 && since < LIVE_WINDOW_H * 3_600_000;
+}
+
+/** Pure: upcoming before kicked-off, then score desc, gap desc, earliest
+ *  kickoff, away team. The gap breaks the tie because the score clamps at 100
+ *  — a slate can pin a dozen games there, and without it the board would call
+ *  the earliest kickoff the best game of the week. */
 export function sortGames(games: HomeGame[]): HomeGame[] {
   const ms = (g: HomeGame): number => {
     const t = asDate(g.row.startDate);
@@ -353,6 +370,8 @@ export function sortGames(games: HomeGame[]): HomeGame[] {
     (a, b) =>
       Number(a.kickedOff) - Number(b.kickedOff) ||
       b.edge.score - a.edge.score ||
+      (b.gap ?? Number.NEGATIVE_INFINITY) -
+        (a.gap ?? Number.NEGATIVE_INFINITY) ||
       ms(a) - ms(b) ||
       a.row.away.localeCompare(b.row.away),
   );
@@ -501,6 +520,7 @@ export async function getHomeBoard(
       picked:
         pickedGames.has(row.gameId) || pickedKey.has(`${row.away}@${row.home}`),
       kickedOff: start !== null && start.getTime() <= now.getTime(),
+      inPlay: inPlayAt(start, now),
       kickoff: kickoffET(row.startDate),
       day: dayKey(row.startDate),
       gap: edge.gap,

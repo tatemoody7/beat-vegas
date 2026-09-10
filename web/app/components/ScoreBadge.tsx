@@ -4,8 +4,9 @@ import { gradeColor, gradeWord, type Settled } from "@/lib/grade";
 // The card's headline block, in one of three states. Before kickoff it is the
 // game's place on the board (#1 = best game of the week) over the tier word,
 // coloured by the score band (70+ green, 55–69 amber, under 55 red). Once the
-// game starts there is no decision left, so it reads LIVE in grey; once it
-// settles it reads the result in the result's colour. Never cyan: cyan is
+// game starts there is no decision left, so it reads LIVE in grey — FINAL once
+// it must be over — and once it settles it reads the result in the result's
+// colour. Never cyan: cyan is
 // chrome. The 0–100 score itself lives inside the card, under "Our number".
 
 type Props = {
@@ -15,6 +16,8 @@ type Props = {
   rank: number | null;
   /** The game has started. */
   kickedOff: boolean;
+  /** Started recently enough to still be in progress. */
+  inPlay: boolean;
   /** Once known, the result colours the badge and replaces the rank. */
   settled?: Settled | null;
   /** Optional word under the rank (the tier); defaults to the grade word. */
@@ -51,6 +54,7 @@ export default function ScoreBadge({
   score,
   rank,
   kickedOff,
+  inPlay,
   settled = null,
   label,
   className = "",
@@ -68,9 +72,11 @@ export default function ScoreBadge({
     );
   }
   if (kickedOff) {
+    // No result and the game must be over: it was never graded, not still live.
+    const state = inPlay ? "Live" : "Final";
     return (
-      <Box color="push" aria="Kicked off" className={className}>
-        <span className={WORD}>Live</span>
+      <Box color="push" aria={state} className={className}>
+        <span className={WORD}>{state}</span>
       </Box>
     );
   }

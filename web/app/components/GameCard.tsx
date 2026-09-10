@@ -249,9 +249,7 @@ function ModelSection({ g }: { g: HomeGame }) {
           label="Score"
           value={
             <>
-              <span className="font-mono text-[var(--text)]">
-                {edge.score}
-              </span>
+              <span className="font-mono text-[var(--text)]">{edge.score}</span>
               {` out of 100 — ${SCORE_BET_MIN}+ is a bet, ${SCORE_WATCH_MIN}–${SCORE_BET_MIN - 1} is worth watching. It is what the board ranks on.`}
             </>
           }
@@ -582,6 +580,7 @@ export default function GameCard({
             score={edge.score}
             rank={g.boardRank}
             kickedOff={g.kickedOff}
+            inPlay={g.inPlay}
             settled={g.settled}
             label={g.settled === null ? TIER_TEXT[edge.tier] : undefined}
           />

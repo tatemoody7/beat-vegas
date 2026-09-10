@@ -171,14 +171,46 @@ depends on what the two sections end up called — fixing it alone would mean
 writing the copy twice and touching the first block on the board two days before
 real money.
 
-## 7. What is still open
+## 7. The card holds a game; the board lets you bet it
+
+Found live on 2026-09-10 when a real bankroll bet was logged on a game the card
+had held.
+
+`build_card` marked Old Dominion @ Virginia Tech `paper_blocker: "degraded"`,
+`degraded_inputs: ["pace"]` — paper only. The board rated the same game a clean
+BET with no blocker and the API accepted a real-money log.
+
+The cause: **`degraded` exists only on the card.** `homeBoard.ts`, `edge.ts` and
+`verdict.ts` contain zero references to it, and `pickRules.checkPolicy` gates on
+slate / kickoff / duplicate / kill line / kill price / weekly cap — never the
+card's blocker. So the two halves of the system disagreed and the half the owner
+acted through said nothing.
+
+The bet itself was defensible (gap 3.36, -105, implied share 0.458 well inside
+the model's normal range, and the missing pace was the benign FCS-opponent gap
+of §--). That is the point: it needed a human to reason it out afterwards, which
+is what the flag exists to avoid. On a week where an input genuinely broke, the
+board would be equally silent.
+
+Worth recording alongside it: the kill-price gate DID fire correctly the same
+evening. Alabama @ Kentucky was carded at kill price -115, Hard Rock moved to
+-120, and the API refused the log. The gates are not decorative — this one just
+does not see the card's blocker.
+
+**Owner decision (2026-09-10): note it, decide after the first real-money
+weekend.** The options considered were (a) warn on the board but still allow,
+(b) make the card's hold binding on the API like the kill price, (c) stop
+holding on a missing pace read at all since the model still produces a number.
+
+## 8. What is still open
 
 - Build the two-section board (§1).
 - Decide on the share sanity check and its threshold (§3).
 - Whether the weeks 9-12 concentration (§4) is a real seasonal effect or noise.
   It cannot be settled on 295 bets; 2026 adds to the sample.
 - The answer bar wording (§6) — highest priority of these, it is read first and
-  it is read wrong.
+  it is read wrong. Ships with the board rebuild, not before it.
+- The card/board split on `degraded` (§7) — pick one of the three options.
 - `game_records` still has no graded rows. Until it does, the Track record grid
   and the factor ledger have no 2026 input. `rescore.yml` deliberately does not
   backfill them, because those snapshots are meant to be frozen pre-kickoff.

@@ -7,7 +7,6 @@ import { bankrollCurve, bankrollEnv, getHomeBoard } from "@/lib/homeBoard";
 import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
-import { loadPostMortem } from "@/lib/postmortem";
 import type { Record3 } from "@/lib/record";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
@@ -18,7 +17,6 @@ import BetSlip from "@/app/components/BetSlip";
 import CardPanel from "@/app/components/CardPanel";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import PicksList from "@/app/components/PicksList";
-import PostMortemPanel from "@/app/components/PostMortemPanel";
 import RecordCard from "@/app/components/RecordCard";
 import Section, { EmptyLine } from "@/app/components/Section";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -91,12 +89,11 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq, allPicks, pm, board] = await Promise.all([
+  const [ledger, review, dq, allPicks, board] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
     getDecisionQuality(season),
     loadPicks(season),
-    loadPostMortem(),
     // The slip is an ACTION panel, not a review panel, so it always shows the
     // week you are about to bet — never the week ?week= is reviewing. It is
     // labelled with its own week number, so the two cannot be confused.
@@ -480,9 +477,6 @@ export default async function ResultsPage({
           )}
         </>
       </Section>
-
-      {/* Post-mortem */}
-      <PostMortemPanel pm={pm} />
 
       {/* Pick history */}
       <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">

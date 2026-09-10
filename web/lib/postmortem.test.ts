@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { PROXY_TEXT, RULE_TEXT } from "./labels";
 import {
   bandTable,
+  coverage,
+  dedupeByCode,
   flagsFrom,
   headline,
   liveNotesFrom,
   type PmBucket,
+  type PmFlag,
   type PmRun,
 } from "./postmortem";
 
@@ -276,5 +279,49 @@ describe("RULE_TEXT / PROXY_TEXT", () => {
     ]) {
       expect(PROXY_TEXT[k]).toBeTruthy();
     }
+  });
+});
+
+describe("dedupeByCode", () => {
+  const f = (code: string, text: string): PmFlag => ({
+    code,
+    severity: "watch",
+    text,
+    evidence: {},
+  });
+  it("keeps the first of a repeated code and preserves order", () => {
+    // The historical run is concatenated first because it has the sample
+    // size, so it wins a tie; a live-only code still survives.
+    const out = dedupeByCode([
+      f("gap_bands", "from history"),
+      f("weeks", "from history"),
+      f("gap_bands", "from the live season"),
+      f("hr_off_market", "live only"),
+    ]);
+    expect(out.map((x) => x.code)).toEqual([
+      "gap_bands",
+      "weeks",
+      "hr_off_market",
+    ]);
+    expect(out[0].text).toBe("from history");
+  });
+});
+
+describe("coverage", () => {
+  const all = (proxy: string, n: number) =>
+    b({ proxy_kind: proxy, selection: "all", dimension: "all", n });
+  it("counts real closes against every graded game", () => {
+    expect(
+      coverage(
+        [all("real", 1902), all("step", 1934)],
+        "hist_2023_25",
+        "fbs_only",
+      ),
+    ).toEqual({ real: 1902, total: 1934 });
+  });
+  it("is null when a season has no real-close run at all", () => {
+    // A 2026-only database has no `real` proxy, and the caveat has to say
+    // nothing rather than claim zero coverage.
+    expect(coverage([all("step", 100)], "hist_2023_25", "fbs_only")).toBeNull();
   });
 });

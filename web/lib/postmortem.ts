@@ -187,6 +187,46 @@ export function headline(
   return recordFromCounts(b.unders, b.overs, b.pushes, b.units);
 }
 
+/**
+ * One entry per flag code. The historical and the live run each derive the
+ * same statements from their own numbers, so concatenating them printed every
+ * flag twice; the historical run has the sample size, so it wins a tie and a
+ * live-only flag still shows.
+ */
+export function dedupeByCode(flags: PmFlag[]): PmFlag[] {
+  const seen = new Set<string>();
+  return flags.filter((f) => (seen.has(f.code) ? false : seen.add(f.code)));
+}
+
+/**
+ * How many of a segment's games carry a REAL captured close, out of the games
+ * the post-mortem graded at all.
+ *
+ * Read from the data rather than typed into the copy: the coverage caveat is
+ * exactly the kind of number that goes stale silently. Within `fbs_only` it is
+ * currently near-total (1,902 of 1,934) — the unpriced games CLAUDE.md warns
+ * about are almost all non-FBS, and this cut already excludes them.
+ */
+export function coverage(
+  buckets: PmBucket[],
+  scope: string,
+  segment: string,
+): { real: number; total: number } | null {
+  const at = (proxy: string) =>
+    buckets.find(
+      (b) =>
+        b.scope === scope &&
+        b.segment === segment &&
+        b.proxy_kind === proxy &&
+        b.selection === "all" &&
+        b.dimension === "all",
+    )?.n ?? null;
+  const real = at("real");
+  const total = at("step");
+  if (real === null || total === null) return null;
+  return { real, total };
+}
+
 export type BandRow = {
   bucket: string;
   n: number;

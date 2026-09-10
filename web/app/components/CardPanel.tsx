@@ -116,7 +116,12 @@ export default function CardPanel({
         )}
       </p>
 
-      {s.hasBets ? (
+      {/* No "closest to a bet" list here. The board's answer bar already
+          names the near misses, off the LIVE Hard Rock lines rather than the
+          frozen card, so the two headings disagreed about which games they
+          were (Tate 2026-09-10). `summarizeCard` still computes `closest`
+          for the card itself; this panel just does not render it. */}
+      {s.hasBets && (
         <>
           <ul className="mt-2">
             {s.bets.map((r) => (
@@ -139,19 +144,6 @@ export default function CardPanel({
             </>
           )}
         </>
-      ) : (
-        s.closest.length > 0 && (
-          <>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
-              Closest to a bet
-            </p>
-            <ul className="mt-1">
-              {s.closest.map((r) => (
-                <Row key={r.gameId} r={r} />
-              ))}
-            </ul>
-          </>
-        )
       )}
 
       {s.degraded.length > 0 && (

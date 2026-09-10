@@ -97,10 +97,10 @@ type GameRow = {
   spread: number | null;
 };
 
-async function getLineStudyUncached(
+/** One season's played games, tagged with the line each was priced at. */
+async function taggedForSeason(
   season: number,
-  minGames = DEFAULT_MIN_GAMES,
-): Promise<{ buckets: LineBucket[]; anyReal: boolean; fbsFiltered: boolean }> {
+): Promise<{ tagged: TaggedGame[]; fbsFiltered: boolean }> {
   const rows = await prisma.$queryRaw<GameRow[]>`
     SELECT id, season, home_team, away_team, first_half_total, full_game_total,
            spread
@@ -128,14 +128,44 @@ async function getLineStudyUncached(
   const opens = new Map<number, number>();
   for (const [gid, c] of consensus) if (c.open !== null) opens.set(gid, c.open);
 
-  const buckets = bucketUnderRates(assignOpeningLine(games, opens), minGames);
-  const anyReal = buckets.some((b) => b.line_source === "real_open");
-  return { buckets, anyReal, fbsFiltered };
+  return { tagged: assignOpeningLine(games, opens), fbsFiltered };
 }
 
-// History view — slow-changing, so cache the per-(season,minGames) computation.
+/**
+ * Under rates by first-half total, over one season or several.
+ *
+ * The bucketing runs ONCE over the union of every season asked for. Bucketing
+ * each season separately and merging the results would drop any total that
+ * missed `minGames` within a single year — a line with 12 games in each of
+ * four seasons would vanish despite having 48 — which is exactly the case
+ * /proof exists to show, since no single 2026 total reaches the minimum.
+ */
+async function getLineStudyUncached(
+  seasons: number | number[],
+  minGames = DEFAULT_MIN_GAMES,
+): Promise<{
+  buckets: LineBucket[];
+  anyReal: boolean;
+  fbsFiltered: boolean;
+  fbsPartial: boolean;
+}> {
+  const list = Array.isArray(seasons) ? seasons : [seasons];
+  const parts = await Promise.all(list.map(taggedForSeason));
+  const tagged = parts.flatMap((p) => p.tagged);
+  const buckets = bucketUnderRates(tagged, minGames);
+  return {
+    buckets,
+    anyReal: buckets.some((b) => b.line_source === "real_open"),
+    fbsFiltered: parts.every((p) => p.fbsFiltered),
+    fbsPartial:
+      parts.some((p) => p.fbsFiltered) && parts.some((p) => !p.fbsFiltered),
+  };
+}
+
+// History view — slow-changing, so cache the per-(seasons,minGames)
+// computation. Key bumped to v3 with the multi-season signature.
 export const getLineStudy = unstable_cache(
   getLineStudyUncached,
-  ["line-study-v2"],
+  ["line-study-v3"],
   { revalidate: 3600 },
 );

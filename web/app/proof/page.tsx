@@ -10,13 +10,22 @@ import {
   liveScopeOf,
   loadPostMortem,
 } from "@/lib/postmortem";
-import { BREAKEVEN_PCT } from "@/lib/lineStudy";
+import {
+  BREAKEVEN_PCT,
+  DEFAULT_MIN_GAMES,
+  getLineStudy,
+} from "@/lib/lineStudy";
+import { getBvCalibration, getEdgeStats } from "@/lib/proof";
+import { proxyShareText } from "@/lib/proxy";
+import { getRecordSeasons } from "@/lib/records";
 import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 import BandTable from "@/app/components/BandTable";
 import PmFlags from "@/app/components/PmFlags";
 import PmLiveNotes from "@/app/components/PmLiveNotes";
+import LineStudyView from "@/app/components/LineStudyView";
+import MinGamesSelect from "@/app/components/MinGamesSelect";
 import RecordCard from "@/app/components/RecordCard";
-import { EmptyLine } from "@/app/components/Section";
+import Section, { EmptyLine } from "@/app/components/Section";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +42,40 @@ export const dynamic = "force-dynamic";
 //
 // Copy rule (spec §21-§23): no `title=` tooltips, no raw enum codes.
 
-export default async function ProofPage() {
-  const pm = await loadPostMortem();
+export default async function ProofPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string; minGames?: string }>;
+}) {
+  const sp = await searchParams;
+  const minGames =
+    sp.minGames && Number(sp.minGames) > 0
+      ? Number(sp.minGames)
+      : DEFAULT_MIN_GAMES;
+
+  // Season lists still disagree with board.getSeasons (which has no
+  // model_version guard). Unifying them changes which season the BOARD
+  // resolves to, so it is deliberately deferred — do not "fix" this in
+  // passing (Tate 2026-09-10).
+  const seasons = await getRecordSeasons();
+  // No ?season= means ALL seasons here, inverting the old Research default:
+  // 2026 has no total with enough graded games to reach the minimum, so a
+  // single-season default would show an empty study every time.
+  const one =
+    sp.season && sp.season !== "all" && Number.isFinite(Number(sp.season))
+      ? Number(sp.season)
+      : null;
+  const studySeasons = one !== null ? [one] : seasons;
+  const scopeLabel = one !== null ? `${one}` : "all seasons";
+
+  const [pm, edge, calib, study] = await Promise.all([
+    loadPostMortem(),
+    getEdgeStats(one ?? undefined),
+    getBvCalibration(),
+    studySeasons.length > 0
+      ? getLineStudy(studySeasons, minGames)
+      : Promise.resolve(null),
+  ]);
 
   if (!pm || pm.runs.length === 0) {
     return (
@@ -247,6 +288,143 @@ export default async function ProofPage() {
 
       <p className="mt-3 text-xs leading-relaxed text-[var(--text-dim)]">
         {`Computed ${(hist?.computed_at ?? live?.computed_at ?? "").slice(0, 16).replace("T", " ")} UTC, after each morning’s grading.`}
+      </p>
+
+      {/* 5-7 — how the number is built. Below the conclusion on purpose:
+          methodology is what you go looking for, not what you lead with. */}
+      <hr className="mt-10 border-[var(--border)]" />
+
+      <Section
+        title="How the number is built"
+        empty={edge ? null : `no finished games for ${scopeLabel} yet.`}
+        caption={`Every finished game in ${scopeLabel}, FBS teams playing FBS teams only.`}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Stat
+            label="Games looked at"
+            value={edge ? edge.games.toLocaleString() : "—"}
+            note="FBS teams playing FBS teams only."
+          />
+          <Stat
+            label="First half’s share of the full game"
+            value={edge ? `${(100 * edge.mean).toFixed(1)}%` : "—"}
+            note="On average, how much of the full-game total the first half was worth."
+          />
+          <Stat
+            label="Middle value"
+            value={edge ? `${(100 * edge.median).toFixed(1)}%` : "—"}
+            note="Half the games were above this, half below."
+          />
+        </div>
+        {edge && (
+          <>
+            <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
+              {`First halves come out around ${(100 * edge.mean).toFixed(1)}% of the full-game total, which is about where books set the first-half line. Where no real first-half line exists we estimate one: ${proxyShareText()}.`}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+              {`Graded against that estimate, nothing here beat the ${BREAKEVEN_PCT}% you need at -110.`}
+            </p>
+          </>
+        )}
+      </Section>
+
+      <Section
+        title="How accurate our number is"
+        empty={
+          calib
+            ? null
+            : "no model run has recorded its out-of-sample misses yet."
+        }
+        caption={
+          calib
+            ? `Average miss = actual first-half points minus our number, over ${calib.n.toLocaleString()} games it never trained on. Near zero is on target. A steady positive miss means our number runs low, which would wrongly lean it under.`
+            : undefined
+        }
+      >
+        {calib && (
+          <div className="bv-table-wrap">
+            <table className="bv-table">
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th className="bv-num">Games</th>
+                  <th className="bv-num">Average miss</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="font-medium text-[var(--text)]">Overall</td>
+                  <td className="bv-num text-[var(--text-muted)]">{calib.n}</td>
+                  <td className="bv-num font-mono text-[var(--text-muted)]">
+                    {calib.overall ?? "—"}
+                  </td>
+                </tr>
+                {calib.segments.map((sg) => (
+                  <tr key={sg.label}>
+                    <td className="text-[var(--text-muted)]">{sg.label}</td>
+                    <td className="bv-num text-[var(--text-muted)]">{sg.n}</td>
+                    <td
+                      className="bv-num font-mono"
+                      style={{
+                        color:
+                          sg.meanResidual === null
+                            ? "var(--text-dim)"
+                            : Math.abs(sg.meanResidual) <= 0.5
+                              ? "var(--text)"
+                              : "var(--warn)",
+                      }}
+                    >
+                      {sg.meanResidual ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--text)]">
+            {`Which first-half totals go under most often (${scopeLabel})`}
+          </h2>
+          {study && (
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]">
+              {`Grouped by the ${study.anyReal ? "first-half total each book opened at" : `estimated opening line (${proxyShareText()})`}${study.fbsPartial ? " — no FBS list for some of these seasons, so their games are all included" : study.fbsFiltered ? ", FBS teams only" : " — no FBS list for this season, so every game is included"}. You need ${BREAKEVEN_PCT}% to break even at -110.${study.anyReal ? "" : " On estimated lines this ordering partly reflects which games were high-scoring, so read it as a hint."}`}
+            </p>
+          )}
+        </div>
+        <MinGamesSelect current={minGames} />
+      </div>
+      {!study || study.buckets.length === 0 ? (
+        <EmptyLine>
+          {`No total has ${minGames}+ graded games in ${scopeLabel} yet. Lower the minimum, or check back later in the season.`}
+        </EmptyLine>
+      ) : (
+        <LineStudyView buckets={study.buckets} breakeven={BREAKEVEN_PCT} />
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="bv-card p-4">
+      <p className="bv-stat-label">{label}</p>
+      <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-[var(--text)]">
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
+        {note}
       </p>
     </div>
   );

@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Bar,
   BarChart,
-  Cell,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -34,8 +33,12 @@ export default function LineStudyView({
 }) {
   const [highlight, setHighlight] = useState(24.5);
 
-  // Chart wants ascending line order; table stays ranked by under_pct (as given).
-  const chartData = [...buckets].sort((a, b) => a.line - b.line);
+  // Chart wants ascending line order; table stays ranked by under_pct (as
+  // given). Colour rides on the datum as `fill`, which <Bar> picks up per
+  // rectangle — one fewer child component than a <Cell> per bar.
+  const chartData = [...buckets]
+    .sort((a, b) => a.line - b.line)
+    .map((b) => ({ ...b, fill: b.under_pct >= breakeven ? GOOD : BAD }));
   const maxPct = buckets.reduce((m, b) => Math.max(m, b.under_pct), 0);
   const yMax = Math.max(70, Math.ceil(maxPct + 5));
 
@@ -121,14 +124,19 @@ export default function LineStudyView({
                 position: "right",
               }}
             />
-            <Bar dataKey="under_pct" radius={[2, 2, 0, 0]}>
-              {chartData.map((b) => (
-                <Cell
-                  key={b.line}
-                  fill={b.under_pct >= breakeven ? GOOD : BAD}
-                />
-              ))}
-            </Bar>
+            {/* isAnimationActive={false} is load-bearing, not a preference.
+                Under Recharts 3.8 the bars animate up from height 0 and the
+                animation never completes here, so every rectangle stays at 0
+                and Recharts renders an EMPTY recharts-inactive-bar group —
+                a blank plot area beside a full table. It went unnoticed
+                because the only page that mounted this chart scoped it to
+                the current season, which never has a total with enough
+                graded games to draw. */}
+            <Bar
+              dataKey="under_pct"
+              isAnimationActive={false}
+              radius={[2, 2, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

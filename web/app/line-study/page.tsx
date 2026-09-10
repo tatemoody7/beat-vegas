@@ -12,5 +12,5 @@ export default async function Moved({
   if (sp.week) q.set("week", sp.week);
   if (sp.minGames) q.set("minGames", sp.minGames);
   const qs = q.toString();
-  redirect(`/research${qs ? `?${qs}` : ""}`);
+  redirect(`/proof${qs ? `?${qs}` : ""}`);
 }

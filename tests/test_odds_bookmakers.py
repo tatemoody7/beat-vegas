@@ -117,3 +117,28 @@ def test_an_eleventh_book_is_refused_at_construction(monkeypatch):
         _client(monkeypatch, TEN + ["betonlineag"])
     # Exactly at the limit is fine.
     assert len(_client(monkeypatch, TEN).bookmakers) == MAX_BOOKMAKERS_ONE_REGION
+
+
+def test_an_eleventh_book_is_refused_when_ASSIGNED_after_construction(monkeypatch):
+    """The construction-time check was not the only way in.
+
+    `poll_lines.py --bookmakers` sets `client.bookmakers` AFTER the client is
+    built, which walked straight past the __init__ guard and would have doubled
+    the cost of every per-event call for the whole run with nothing in the
+    output to say so. The guard is on the attribute itself now."""
+    c = _client(monkeypatch, TEN)
+    with pytest.raises(ValueError, match="doubles"):
+        c.bookmakers = TEN + ["fanatics"]
+    # and the client is left on the ten it had, not half-updated
+    assert c.bookmakers == TEN
+
+
+def test_ten_or_fewer_still_assign_freely(monkeypatch):
+    """The A/B probe clears the list and poll_lines narrows it; both must work."""
+    c = _client(monkeypatch, TEN)
+    c.bookmakers = ["hardrockbet", "draftkings"]
+    assert c.bookmakers == ["hardrockbet", "draftkings"]
+    c.bookmakers = []
+    assert c.bookmakers == []
+    c.bookmakers = TEN
+    assert len(c.bookmakers) == MAX_BOOKMAKERS_ONE_REGION

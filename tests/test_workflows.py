@@ -157,20 +157,32 @@ def test_card_yml_wires_the_status_files_through_to_the_build():
     reads both plus the resolved slot — otherwise a card built on a half-swept
     slate or a blank injury feed ships as the morning card."""
     steps = _card_steps_by_id()
-    sweep, preview, build = (
-        steps["sweep"],
-        steps["preview"],
-        _load(WF_DIR / "card.yml")["jobs"]["card"]["steps"][-1],
-    )
+    sweep, preview, build = steps["sweep"], steps["preview"], steps["build"]
     assert '--status-file "$RUNNER_TEMP/sweep_status.json"' in sweep["run"]
     assert '--status-file "$RUNNER_TEMP/preview_status.json"' in preview["run"]
     assert "--slot" in build["run"] and "steps.slot.outputs.slot" in build["run"]
-    assert '--sweep-status "$RUNNER_TEMP/sweep_status.json"' in build["run"]
+    assert '--sweep-status "$SWEEP_STATUS"' in build["run"]
     assert '--preview-status "$PREVIEW_STATUS"' in build["run"]
-    # A preview step that died before writing its own file still reaches the
-    # card as a failure.
+    # Either step dying before it wrote its own file still reaches the card as
+    # a failure, rather than as "the step did not run".
     assert '{"ok": false, "reason": "step_failed"}' in build["run"]
+    assert '"complete": false, "reason": "step_failed"' in build["run"]
     assert build["env"]["PREVIEW_OUTCOME"] == "${{ steps.preview.outcome }}"
+    assert build["env"]["SWEEP_OUTCOME"] == "${{ steps.sweep.outcome }}"
+
+
+def test_a_failed_sweep_still_publishes_a_card_and_still_reddens_the_run():
+    """A mid-sweep Odds API error used to kill the job before build_card ran, so
+    the most likely degraded-card trigger produced NO card at all. The sweep now
+    continues on error and a final step fails the run, so both signals survive:
+    the card ships degraded AND GitHub sends the failed-run email."""
+    steps = _card_steps_by_id()
+    assert steps["sweep"]["continue-on-error"] is True
+    # The build is NOT gated on the sweep succeeding.
+    assert "sweep" not in steps["build"]["if"]
+    guard = _card_steps()[-1]
+    assert guard["if"] == "always() && steps.sweep.outcome == 'failure'"
+    assert "exit 1" in guard["run"] and "::error::" in guard["run"]
 
 
 def test_card_yml_can_rehearse_a_degraded_card_on_demand():
@@ -202,7 +214,10 @@ def test_card_yml_installs_before_resolving_the_slot():
     # Every step after the resolve is gated on it (directly or via a derived output).
     for s in steps[resolve + 1 :]:
         assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
-    assert steps[-1]["if"] == "steps.slot.outputs.slot != 'skip'"
+    # The build is the last SLOT-GATED step; only the sweep-failure guard, which
+    # runs on always(), may follow it.
+    assert _card_steps_by_id()["build"]["if"] == "steps.slot.outputs.slot != 'skip'"
+    assert steps[-1]["if"].startswith("always()")
     inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
     assert inputs["slot"]["description"].startswith("tue_pm | thu_pm | fri_pm | sat_am | manual")
     # `force` is what lets a deliberate rebuild past the built-today probe that

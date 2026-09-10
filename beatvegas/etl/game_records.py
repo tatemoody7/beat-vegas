@@ -19,6 +19,7 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 from ..db.models import Game, GameRecord
+from ..grading import trusted_first_half_total
 from .features import FEATURE_COLS
 
 
@@ -87,15 +88,30 @@ def snapshot_slate(
 
 
 def grade_records(session, now) -> int:
-    """Fill the real 1H result + outcome for ungraded records whose game is final."""
+    """Fill the real 1H result + outcome for ungraded records whose game is final.
+
+    Grades through `grading.trusted_first_half_total`, exactly as every other
+    grader does (picks.grade_pick, grade.grade_market/grade_model, the two
+    post-mortem frames, model.residual). A LINE-SCORE 0 against a non-zero final
+    is the known false-zero corruption, and booking it here would fabricate an
+    UNDER win into the records grid, the credibility ledger and bv_line
+    recalibration. An untrusted row stays ungraded so a later PBP repair can
+    still grade it.
+    """
     recs = session.query(GameRecord).filter(GameRecord.graded_at.is_(None)).all()
     n = 0
     for rec in recs:
         g = session.get(Game, rec.game_id)
-        if g is None or g.first_half_total is None:
+        if g is None:
             continue
-        hit, oc = outcome_of(g.first_half_total, rec.line)
-        rec.first_half_total = int(g.first_half_total)
+        actual = trusted_first_half_total(
+            g.first_half_total, g.home_points, g.away_points, g.first_half_source
+        )
+        if actual is None:
+            continue
+        hit, oc = outcome_of(actual, rec.line)
+        # round, not truncate: 13.6 is 14 points, not 13.
+        rec.first_half_total = int(round(actual))
         rec.under_hit = hit
         rec.outcome = oc
         rec.graded_at = now

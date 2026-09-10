@@ -6,6 +6,7 @@ import {
   type CardRow,
   type CardTier,
 } from "@/lib/card";
+import { EmptyLine } from "@/app/components/Section";
 import { BLOCKER_SHORT, labelOf, TIER_TEXT } from "@/lib/labels";
 
 // This week's bet list on the home board. Server component: everything it
@@ -97,6 +98,21 @@ export default function CardPanel({
   const s = summarizeCard(card);
   const age = cardAge(card.builtAt, now);
   const notes = s.notes.slice(0, MAX_NOTES);
+
+  // A week with nothing to act on collapses to one line. The slip directly
+  // above already says "no bets this week" at length, and two empty cards
+  // saying it is the placeholder problem again (Tate 2026-09-10). A held row
+  // keeps the full card — a failed input is worth a box.
+  if (!s.hasBets && s.degraded.length === 0) {
+    return (
+      <EmptyLine title="This week’s bets" className="mb-4">
+        {[s.headline, s.reason, age]
+          .filter(Boolean)
+          .map((t) => (t as string).replace(/\.$/, ""))
+          .join(" · ")}
+      </EmptyLine>
+    );
+  }
 
   return (
     <section className="bv-card mb-4 p-4" aria-label="This week's bets">

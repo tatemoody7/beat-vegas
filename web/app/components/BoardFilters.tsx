@@ -1,17 +1,13 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  DAY_LABEL,
-  DAYS,
-  MY_TEAMS,
-  type BoardFilters as Filters,
-} from "@/lib/homeBoard";
+import { MY_TEAMS, type BoardFilters as Filters } from "@/lib/homeBoard";
 
-// Day / my-teams / Hard Rock filters for the board. Everything lives in the URL
-// (?days=sat,sun&mine=1&hr=1) so a filtered board is a shareable link and the
-// server does the filtering. What each toggle does is said in a visible line,
-// not a `title=` a phone cannot show (spec §12).
+// My-teams / Hard Rock filters for the board. The DAY filter moved to
+// WeekStrip, which shows the counts as well — two controls for one job was one
+// too many. Everything still lives in the URL (?mine=1&hr=1) so a filtered
+// board is a shareable link and the server does the filtering. What each toggle
+// does is said in a visible line, not a `title=` a phone cannot show (spec §12).
 export default function BoardFilters({ current }: { current: Filters }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -22,17 +18,6 @@ export default function BoardFilters({ current }: { current: Filters }) {
     mut(next);
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
-  }
-
-  function toggleDay(day: string) {
-    const on = current.days.includes(day);
-    const days = on
-      ? current.days.filter((d) => d !== day)
-      : [...current.days, day];
-    push((p) => {
-      if (days.length === 0) p.delete("days");
-      else p.set("days", days.join(","));
-    });
   }
 
   function toggleFlag(key: "mine" | "hr", on: boolean) {
@@ -52,20 +37,6 @@ export default function BoardFilters({ current }: { current: Filters }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]">
-          Day
-        </span>
-        {DAYS.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => toggleDay(d)}
-            aria-pressed={current.days.includes(d)}
-            className={chip(current.days.includes(d))}
-          >
-            {DAY_LABEL[d]}
-          </button>
-        ))}
         <button
           type="button"
           onClick={() => toggleFlag("mine", current.myTeams)}

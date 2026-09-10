@@ -264,6 +264,31 @@ export function basisBooksFrom(check: LineCheckRow | null): string[] {
     .map((b) => bookLabel(b.book));
 }
 
+export type DaySummary = {
+  day: (typeof DAYS)[number];
+  label: string;
+  games: number;
+  bets: number;
+};
+
+/**
+ * Pure: how the week is loaded, day by day, for the strip at the top of the
+ * board. Counted over the WHOLE board rather than the filtered view, for the
+ * same reason ranks are: a filter should not silently rewrite the summary you
+ * are using to decide what to filter to.
+ */
+export function daySummary(games: HomeGame[]): DaySummary[] {
+  return DAYS.map((d) => {
+    const on = games.filter((g) => g.day === d);
+    return {
+      day: d,
+      label: DAY_LABEL[d],
+      games: on.length,
+      bets: on.filter((g) => g.edge.tier === "BET" && !g.kickedOff).length,
+    };
+  }).filter((s) => s.games > 0);
+}
+
 export type DayGroup = { day: DayKey | null; label: string; games: HomeGame[] };
 
 /**

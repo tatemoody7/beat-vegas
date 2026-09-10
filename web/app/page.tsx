@@ -1,30 +1,40 @@
 import { getSeasons } from "@/lib/board";
+import { buildAnswer } from "@/lib/answerBar";
 import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
 import {
+  daySummary,
   getHomeBoard,
   groupByDay,
   matchesFilters,
   parseFilters,
   tierCounts,
 } from "@/lib/homeBoard";
+import { nextBuild } from "@/lib/nextBuild";
 import { resolveSeason } from "@/lib/season";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import AnswerBar from "@/app/components/AnswerBar";
 import BankrollStrip from "@/app/components/BankrollStrip";
 import BetSlip from "@/app/components/BetSlip";
 import BoardFilters from "@/app/components/BoardFilters";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import CardPanel from "@/app/components/CardPanel";
-import GameCard from "@/app/components/GameCard";
+import GameRow from "@/app/components/GameRow";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
+import WeekStrip from "@/app/components/WeekStrip";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
 // The board IS the home page: one rolling week, grouped by day, every game
-// with a coloured 0–100 score and one line saying what to do. Open a card for
-// the lines, our number, what is behind it, and the news.
+// ranked best to worst with one line saying what to do. Each row is a LINK to
+// /game/[id] — nothing expands in place any more, which is what took a week
+// from 11,600px down to a list you can scan.
+//
+// The answer bar is the only thing above the games: it replaced the bankroll
+// strip, the slip header and the card panel headline, all three of which said
+// "no bets this week" in three different ways before the first game appeared.
 export default async function BoardPage({
   searchParams,
 }: {
@@ -68,7 +78,18 @@ export default async function BoardPage({
   const games = board.games.filter((g) => matchesFilters(g, filters));
   const counts = tierCounts(games);
   const filtered = games.length !== board.games.length;
-  const days = groupByDay(games);
+  // A game that has kicked off is not a decision: it drops out of the ranked
+  // list into its own group at the end, instead of sitting among the week's
+  // bets with no rank.
+  const upcoming = games.filter((g) => !g.kickedOff);
+  const played = games.filter((g) => g.kickedOff);
+  const days = groupByDay(upcoming);
+  const answer = buildAnswer(
+    board.games,
+    board.bankroll.weekBets,
+    board.bankroll.cap,
+  );
+  const build = nextBuild(new Date());
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -87,41 +108,20 @@ export default async function BoardPage({
       </div>
 
       <p className="bv-page-sub mb-4 mt-1">
-        {`Every game this week, ranked best to worst. #1 is the strongest game on the board; the bets are the ones lit up green.`}
+        {`Every game this week, ranked best to worst. #1 is the strongest game on the board; the bets are the ones lit up green. Open a game for the numbers behind it.`}
       </p>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      {/* Phone: the graded game list comes first (that is what the site is
-          for); the slip and bankroll follow, with a sticky jump to the slip
-          when a bet is live. md+: bankroll, slip, card, then the board. */}
-      <div className="flex flex-col">
-        <div className="order-3 md:order-1">
-          <BankrollStrip b={board.bankroll} />
-        </div>
-        <div className="order-2 md:order-2">
-          {card !== null && (
-            <>
-              <CardStatusBanner card={card} />
-              <BetSlip
-                slip={slip}
-                week={board.week}
-                unitUsd={board.bankroll.unitUsd}
-              />
-            </>
-          )}
-        </div>
-        <div className="order-4 md:order-3">
-          <CardPanel
-            card={card}
-            onBoard={new Set(games.map((g) => g.row.gameId))}
-          />
-        </div>
+      <AnswerBar answer={answer} nextBuild={build?.label ?? null} />
 
-        <div className="order-1 md:order-4">
-          <div className="mb-3">
-            <BoardFilters current={filters} />
-          </div>
+      {/* The slip, the card and the bankroll strip are on their way to /slip
+          (the Saturday screen). They stay here, BELOW the games, until that
+          page exists — moving them out first would leave no bet slip at all
+          two days before real money. */}
+      <div className="flex flex-col">
+        <div className="order-1">
+          <WeekStrip days={daySummary(board.games)} current={filters.days} />
 
           {board.noModel && (
             <div className="bv-card mb-4 border-l-2 border-[var(--warn)] p-4 text-sm text-[var(--text-muted)]">
@@ -169,7 +169,7 @@ export default async function BoardPage({
                   : ""}
               </p>
               <p className="mb-3 text-xs text-[var(--text-dim)]">
-                {`Ranked over the whole week, so a filter never renumbers them. A game that has kicked off drops its rank. Open a card for the score behind it.`}
+                {`Ranked over the whole week, so a filter never renumbers them. A game that has kicked off drops its rank and moves to Played.`}
               </p>
 
               {games.length === 0 ? (
@@ -188,19 +188,46 @@ export default async function BoardPage({
                       <h2 className="bv-day-head">{grp.label}</h2>
                       <div className="flex flex-col gap-3">
                         {grp.games.map((g) => (
-                          <GameCard
-                            key={g.row.gameId}
-                            g={g}
-                            unitUsd={board.bankroll.unitUsd}
-                          />
+                          <GameRow key={g.row.gameId} g={g} />
                         ))}
                       </div>
                     </section>
                   ))}
+
+                  {played.length > 0 && (
+                    <section aria-label="Played">
+                      <h2 className="bv-day-head">
+                        {`Played · ${played.length}`}
+                      </h2>
+                      <div className="flex flex-col gap-3">
+                        {played.map((g) => (
+                          <GameRow key={g.row.gameId} g={g} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
                 </>
               )}
             </>
           )}
+        </div>
+
+        <div className="order-2 mt-6 border-t border-[var(--border)] pt-6">
+          {card !== null && (
+            <>
+              <CardStatusBanner card={card} />
+              <BetSlip
+                slip={slip}
+                week={board.week}
+                unitUsd={board.bankroll.unitUsd}
+              />
+            </>
+          )}
+          <CardPanel
+            card={card}
+            onBoard={new Set(games.map((g) => g.row.gameId))}
+          />
+          <BankrollStrip b={board.bankroll} />
         </div>
       </div>
 

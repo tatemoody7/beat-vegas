@@ -28,7 +28,11 @@ export type RecordRow = {
 const num = (v: number | bigint | null | undefined): number | null =>
   v === null || v === undefined ? null : Number(v);
 
-function outcome(fh: number | null, line: number | null): RecordRow["outcome"] {
+/** Exported for its test: this is what the CSV's last column means. */
+export function outcome(
+  fh: number | null,
+  line: number | null,
+): RecordRow["outcome"] {
   if (fh === null || line === null) return null;
   if (fh < line) return "under";
   if (fh > line) return "over";

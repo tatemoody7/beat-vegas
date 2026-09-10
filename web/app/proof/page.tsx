@@ -22,6 +22,7 @@ import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 import BandTable from "@/app/components/BandTable";
 import PmFlags from "@/app/components/PmFlags";
 import PmLiveNotes from "@/app/components/PmLiveNotes";
+import Glossary from "@/app/components/Glossary";
 import LineStudyView from "@/app/components/LineStudyView";
 import MinGamesSelect from "@/app/components/MinGamesSelect";
 import RecordCard from "@/app/components/RecordCard";
@@ -404,6 +405,8 @@ export default async function ProofPage({
       ) : (
         <LineStudyView buckets={study.buckets} breakeven={BREAKEVEN_PCT} />
       )}
+
+      <Glossary />
     </div>
   );
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { american, capitalize, fmt, median, pct, signed } from "./format";
+import {
+  american,
+  capitalize,
+  fmt,
+  median,
+  pct,
+  signed,
+  unitColor,
+} from "./format";
 
 describe("format helpers", () => {
   it("signed adds + only to positives", () => {
@@ -26,5 +34,23 @@ describe("format helpers", () => {
     expect(median([])).toBeNull();
     expect(median([3, 1, 2])).toBe(2);
     expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+});
+
+describe("unitColor", () => {
+  it("dims a missing record", () => {
+    expect(unitColor(null)).toBe("var(--text-dim)");
+    expect(unitColor(undefined)).toBe("var(--text-dim)");
+    expect(unitColor("—")).toBe("var(--text-dim)");
+  });
+  it("reds a loss and greens a win", () => {
+    expect(unitColor("-0.55")).toBe("var(--bad)");
+    expect(unitColor("+1.20")).toBe("var(--good)");
+  });
+  it("treats flat zero as good, not a push", () => {
+    // "0.00" does not start with "-", so it reads green. Long-standing
+    // behaviour on both the Results cards and the post-mortem; pinned here so
+    // a change to it is a deliberate one.
+    expect(unitColor("0.00")).toBe("var(--good)");
   });
 });

@@ -2,7 +2,7 @@ import { getSeasons } from "@/lib/board";
 import { buildBetSlip, liveLinesFrom } from "@/lib/betSlip";
 import { getLatestCard } from "@/lib/card";
 import { getDecisionQuality } from "@/lib/decision-quality";
-import { usd } from "@/lib/format";
+import { unitColor, usd } from "@/lib/format";
 import { bankrollCurve, bankrollEnv, getHomeBoard } from "@/lib/homeBoard";
 import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
@@ -19,6 +19,8 @@ import CardPanel from "@/app/components/CardPanel";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import PicksList from "@/app/components/PicksList";
 import PostMortemPanel from "@/app/components/PostMortemPanel";
+import RecordCard from "@/app/components/RecordCard";
+import Section, { EmptyLine } from "@/app/components/Section";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
@@ -27,8 +29,8 @@ export const dynamic = "force-dynamic";
 
 // Results is the money page: the bet slip first (the only thing here you act
 // on), then the bankroll, then how the market, the model and you did — season
-// summary, one week's scorecard, week by week, by the reason each pick was
-// logged, the decision lens, and every pick (delete while ungraded). Replaces
+// summary, week by week, by the reason each pick was logged, the decision
+// lens, and every pick (delete while ungraded). Replaces
 // the old /ledger, /weekly-review and /picks pages, and the short-lived /slip
 // (Tate 2026-09-10: a dedicated slip page was not worth a tab).
 //
@@ -39,72 +41,6 @@ export const dynamic = "force-dynamic";
 
 const pct = (v: number | null | undefined) =>
   v == null ? "—" : `${v.toFixed(1)}%`;
-
-// Green/red are OUTCOME colors: signed units only.
-const unitColor = (s: string | undefined | null) =>
-  !s || s === "—"
-    ? "var(--text-dim)"
-    : s.startsWith("-")
-      ? "var(--bad)"
-      : "var(--good)";
-
-function RecordCard({
-  title,
-  rec,
-  emptyHint,
-  hint,
-}: {
-  title: string;
-  rec: Record3 | null;
-  emptyHint: string;
-  /** Shown as a visible line, never a tooltip: what this record counts. */
-  hint: string;
-}) {
-  return (
-    <div className="bv-card p-4">
-      <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
-      <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">{hint}</p>
-      {rec === null ? (
-        <p className="text-xs text-[var(--text-dim)]">{emptyHint}</p>
-      ) : (
-        <dl className="space-y-3">
-          <div>
-            <dt className="bv-stat-label">Win rate</dt>
-            <dd className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-[var(--text)]">
-              {rec.hit}
-              <span className="ml-2 font-sans text-sm font-normal text-[var(--text-dim)]">
-                {rec.record}
-              </span>
-            </dd>
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
-            <div>
-              <dt className="bv-stat-label">Units</dt>
-              <dd
-                className="mt-0.5 font-mono text-lg font-semibold tabular-nums"
-                style={{ color: unitColor(rec.units) }}
-              >
-                {rec.units}
-              </dd>
-            </div>
-            <div>
-              <dt className="bv-stat-label">ROI</dt>
-              <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
-                {rec.roi}
-              </dd>
-            </div>
-            <div>
-              <dt className="bv-stat-label">Line value</dt>
-              <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
-                {rec.clv}
-              </dd>
-            </div>
-          </div>
-        </dl>
-      )}
-    </div>
-  );
-}
 
 function RecCells({ rec }: { rec: Record3 | null }) {
   if (!rec) {
@@ -139,8 +75,6 @@ function RecHead() {
     </>
   );
 }
-
-const CAPTION = "mb-2 text-xs leading-relaxed text-[var(--text-dim)]";
 
 export default async function ResultsPage({
   searchParams,
@@ -179,11 +113,15 @@ export default async function ResultsPage({
     new Date(),
     liveLinesFrom(board.games),
   );
-  const settled = review.lines.filter((l) => l.rec);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
   const curve = bankrollCurve(allPicks, startUsd, unitUsd);
-  const modelEmpty = "Fills in once a week is scored and graded.";
+  const hasRecord =
+    ledger.market !== null ||
+    ledger.model !== null ||
+    ledger.you !== null ||
+    ledger.paper !== null ||
+    ledger.marketFull !== null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -236,122 +174,75 @@ export default async function ResultsPage({
         <BankrollStrip b={board.bankroll} />
       </section>
 
-      {/* Season summary */}
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-        {`Season summary · ${season}`}
-      </h2>
-      <p className={CAPTION}>
-        {`Win rate is the share of settled bets that won — pushes do not count either way. Units are what was won or lost, at one unit = ${usd(unitUsd)}. ROI is units won divided by units risked. Line value is how far the line moved our way after the bet, on average; positive is good.`}
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <RecordCard
-          title="Market — first half"
-          rec={ledger.market}
-          emptyHint="Fills in once first-half lines are captured and games are graded."
-          hint="Every game’s first-half under at the closing line. The baseline to beat."
-        />
-        <RecordCard
-          title="Model — first half"
-          rec={ledger.model}
-          emptyHint={modelEmpty}
-          hint="The model’s own under picks, graded at the closing line."
-        />
-        <RecordCard
-          title="You — real money"
-          rec={ledger.you}
-          emptyHint="Nothing settled yet. Log bets from the board."
-          hint="Your real-money first-half bets. This is the record the bankroll follows."
-        />
-        <RecordCard
-          title="You — paper"
-          rec={ledger.paper}
-          emptyHint="No settled paper picks yet."
-          hint="Tracked with no money on them. Never mixed into the real record."
-        />
-        <RecordCard
-          title="Market — full game"
-          rec={ledger.marketFull}
-          emptyHint="Fills in once full-game lines settle."
-          hint="Context only. We do not bet the full game."
-        />
-      </div>
+      {/* Season summary. Only records with something in them render: five
+          near-empty cards in week 2 is the placeholder problem in card form
+          (Tate 2026-09-10). */}
+      <Section
+        title={`Season summary · ${season}`}
+        empty={
+          hasRecord
+            ? null
+            : "nothing has settled yet. The market and model records fill in as games are graded, your own once a bet settles."
+        }
+        caption={`Win rate is the share of settled bets that won — pushes do not count either way. Units are what was won or lost, at one unit = ${usd(unitUsd)}. ROI is units won divided by units risked. Line value is how far the line moved our way after the bet, on average; positive is good.`}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <RecordCard
+            title="Market — first half"
+            rec={ledger.market}
+            showClv
+            hint="Every game’s first-half under at the closing line. The baseline to beat."
+          />
+          <RecordCard
+            title="Model — first half"
+            rec={ledger.model}
+            showClv
+            hint="The model’s own under picks, graded at the closing line."
+          />
+          <RecordCard
+            title="You — real money"
+            rec={ledger.you}
+            showClv
+            hint="Your real-money first-half bets. This is the record the bankroll follows."
+          />
+          <RecordCard
+            title="You — paper"
+            rec={ledger.paper}
+            showClv
+            hint="Tracked with no money on them. Never mixed into the real record."
+          />
+          <RecordCard
+            title="Market — full game"
+            rec={ledger.marketFull}
+            showClv
+            hint="Context only. We do not bet the full game."
+          />
+        </div>
+      </Section>
 
-      {/* Bankroll curve */}
-      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-        Bankroll, week by week
-      </h2>
-      {curve.length < 2 ? (
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          {`Nothing settled yet. This starts once a week is graded. Starting bankroll ${usd(startUsd)}, one unit ${usd(unitUsd)}.`}
+      <Section
+        title="Bankroll, week by week"
+        empty={
+          curve.length < 2
+            ? `this starts once a week is graded. Starting bankroll ${usd(startUsd)}, one unit ${usd(unitUsd)}.`
+            : null
+        }
+      >
+        <BankrollCurve points={curve} startUsd={startUsd} />
+        <p className="mt-1 text-xs text-[var(--text-dim)]">
+          {`Settled real-money bets only, at ${usd(unitUsd)} a unit. The dashed line is the ${usd(startUsd)} you started with. Pending bets do not move it.`}
         </p>
-      ) : (
-        <>
-          <BankrollCurve points={curve} startUsd={startUsd} />
-          <p className="mt-1 text-xs text-[var(--text-dim)]">
-            {`Settled real-money bets only, at ${usd(unitUsd)} a unit. The dashed line is the ${usd(startUsd)} you started with. Pending bets do not move it.`}
-          </p>
-        </>
-      )}
+      </Section>
 
-      {/* One week's scorecard */}
-      {review.week !== null && (
-        <>
-          <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-            {`Week ${review.week} scorecard`}
-          </h2>
-          <p className={CAPTION}>
-            Same games, three ways: the market, the model, and you. W-L-P is
-            wins-losses-pushes. Under % is the share of settled bets the under
-            won. Line value positive means the line moved our way after the bet.
-          </p>
-          <div className="bv-table-wrap">
-            <table className="bv-table">
-              <thead>
-                <tr>
-                  <th>Who</th>
-                  <th>Market</th>
-                  <th className="bv-num">Under %</th>
-                  <RecHead />
-                </tr>
-              </thead>
-              <tbody>
-                {settled.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-[var(--text-muted)]">
-                      {`Nothing graded for week ${review.week} yet. Games are graded the morning after they are played.`}
-                    </td>
-                  </tr>
-                ) : (
-                  settled.map((l, i) => (
-                    <tr key={i}>
-                      <td className="text-[var(--text)]">{l.entity}</td>
-                      <td className="text-[var(--text-muted)]">{l.market}</td>
-                      <td className="bv-num font-mono text-[var(--text-muted)]">
-                        {l.rec!.hit}
-                      </td>
-                      <RecCells rec={l.rec} />
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* Week by week */}
-      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-        Week by week
-      </h2>
-      <p className={CAPTION}>
-        Your own picks only, real money and paper side by side. Bets and Picks
-        count everything logged, including bets not yet graded.
-      </p>
-      {review.byWeek.length === 0 ? (
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          {`No picks logged for ${season} yet. Log bets from the board.`}
-        </p>
-      ) : (
+      <Section
+        title="Week by week"
+        empty={
+          review.byWeek.length === 0
+            ? `no picks logged for ${season} yet. Log bets from the board.`
+            : null
+        }
+        caption="Your own picks only, real money and paper side by side. Bets and Picks count everything logged, including bets not yet graded."
+      >
         <div className="bv-table-wrap">
           <table className="bv-table">
             <thead>
@@ -388,21 +279,13 @@ export default async function ResultsPage({
             </tbody>
           </table>
         </div>
-      )}
+      </Section>
 
-      {/* By reason */}
-      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-        By reason
-      </h2>
-      <p className={CAPTION}>
-        Which kind of bet is paying. The reason is frozen onto the pick when you
-        log it, so it cannot be rewritten later.
-      </p>
-      {review.byReason.length === 0 ? (
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          No picks logged yet.
-        </p>
-      ) : (
+      <Section
+        title="By reason"
+        empty={review.byReason.length === 0 ? "no picks logged yet." : null}
+        caption="Which kind of bet is paying. The reason is frozen onto the pick when you log it, so it cannot be rewritten later."
+      >
         <div className="bv-table-wrap">
           <table className="bv-table">
             <thead>
@@ -437,20 +320,14 @@ export default async function ResultsPage({
             </tbody>
           </table>
         </div>
-      )}
+      </Section>
 
       {/* Paper ledger by what blocked a real bet */}
-      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-        Paper record by what blocked it
-      </h2>
-      <p className={CAPTION}>
-        {`Every game whose Hard Rock line sat ${BET_GAP_PTS}+ above our number is logged as a paper pick, tagged with the one thing that stopped a real bet. Counts, not conclusions, until a row has 30 graded picks.`}
-      </p>
-      {review.byBlocker.length === 0 ? (
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          Nothing logged yet.
-        </p>
-      ) : (
+      <Section
+        title="Paper record by what blocked it"
+        empty={review.byBlocker.length === 0 ? "nothing logged yet." : null}
+        caption={`Every game whose Hard Rock line sat ${BET_GAP_PTS}+ above our number is logged as a paper pick, tagged with the one thing that stopped a real bet. Counts, not conclusions, until a row has 30 graded picks.`}
+      >
         <div className="bv-table-wrap">
           <table className="bv-table">
             <thead>
@@ -475,21 +352,17 @@ export default async function ResultsPage({
             </tbody>
           </table>
         </div>
-      )}
+      </Section>
 
-      {/* Your decisions */}
-      <h2 className="mb-1 mt-8 text-sm font-semibold text-[var(--text)]">
-        Your decisions
-      </h2>
-      <p className={CAPTION}>
-        Every graded pick of yours: whether your calls beat our number, beat the
-        closing line, and which factors you read well.
-      </p>
-      {dq.n === 0 ? (
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          Nothing graded yet.
-        </p>
-      ) : (
+      <Section
+        title="Your decisions"
+        empty={
+          dq.n === 0
+            ? "nothing graded yet. This opens up once your own bets settle."
+            : null
+        }
+        caption="Every graded pick of yours: whether your calls beat our number, beat the closing line, and which factors you read well."
+      >
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="bv-card p-4">
@@ -618,7 +491,7 @@ export default async function ResultsPage({
             </>
           )}
         </>
-      )}
+      </Section>
 
       {/* Post-mortem */}
       <PostMortemPanel pm={pm} />

@@ -1,5 +1,7 @@
 import { labelOf, SEVERITY_TEXT } from "@/lib/labels";
 import type { Record3 } from "@/lib/record";
+import RecordCard from "@/app/components/RecordCard";
+import { EmptyLine } from "@/app/components/Section";
 import {
   bandTable,
   flagsFrom,
@@ -17,6 +19,7 @@ import {
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
 } from "@/lib/verdict";
+import { unitColor } from "@/lib/format";
 import { BREAKEVEN_PCT } from "@/lib/lineStudy";
 
 // Post-mortem panel on Results: what the record would have been had every
@@ -26,68 +29,6 @@ import { BREAKEVEN_PCT } from "@/lib/lineStudy";
 // the page's season selector.
 //
 // Copy rule (spec §23): no `title=` tooltips, no raw enum codes, no repo paths.
-
-// Green/red are OUTCOME colors: signed units only.
-const unitColor = (s: string | undefined | null) =>
-  !s || s === "—"
-    ? "var(--text-dim)"
-    : s.startsWith("-")
-      ? "var(--bad)"
-      : "var(--good)";
-
-function PmCard({
-  title,
-  rec,
-  emptyHint,
-  hint,
-}: {
-  title: string;
-  rec: Record3 | null;
-  emptyHint: string;
-  /** Visible line, never a tooltip: what this record counts. */
-  hint: string;
-}) {
-  return (
-    <div className="bv-card p-4">
-      <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
-      <p className="mb-2 mt-0.5 text-xs leading-relaxed text-[var(--text-dim)]">
-        {hint}
-      </p>
-      {rec === null ? (
-        <p className="text-xs text-[var(--text-dim)]">{emptyHint}</p>
-      ) : (
-        <dl className="space-y-3">
-          <div>
-            <dt className="bv-stat-label">Win rate</dt>
-            <dd className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-[var(--text)]">
-              {rec.hit}
-              <span className="ml-2 font-sans text-sm font-normal text-[var(--text-dim)]">
-                {rec.record}
-              </span>
-            </dd>
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
-            <div>
-              <dt className="bv-stat-label">Units</dt>
-              <dd
-                className="mt-0.5 font-mono text-lg font-semibold tabular-nums"
-                style={{ color: unitColor(rec.units) }}
-              >
-                {rec.units}
-              </dd>
-            </div>
-            <div>
-              <dt className="bv-stat-label">ROI</dt>
-              <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-[var(--text-muted)]">
-                {rec.roi}
-              </dd>
-            </div>
-          </div>
-        </dl>
-      )}
-    </div>
-  );
-}
 
 function BandTable({
   title,
@@ -177,11 +118,7 @@ function BandTable({
 
 function Flags({ flags }: { flags: PmFlag[] }) {
   if (flags.length === 0) {
-    return (
-      <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-        Nothing flagged yet.
-      </p>
-    );
+    return <EmptyLine>Nothing flagged yet.</EmptyLine>;
   }
   return (
     <ul className="space-y-2">
@@ -227,9 +164,7 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
     return (
       <>
         {heading}
-        <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-          Not computed yet. It runs after grading.
-        </p>
+        <EmptyLine>Not computed yet. It runs after grading.</EmptyLine>
       </>
     );
   }
@@ -275,25 +210,25 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
         bet. ROI counts pushes as risked.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <PmCard
+        <RecordCard
           title="2023–25, at the real closing line"
           rec={headline(buckets, HIST_SCOPE, "fbs_only", "real", "cap5")}
           emptyHint="No real first-half closes captured for 2023–25 yet."
           hint="Our picks graded at the first-half line other books actually closed at, about half an hour before kickoff. Hard Rock did not exist then. The only column that is not an estimate."
         />
-        <PmCard
+        <RecordCard
           title="2023–25, at an estimated line"
           rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "cap5")}
           emptyHint="No historical scores graded."
           hint={`Up to ${WEEKLY_BET_CAP} bets a week by gap, gap ${BET_GAP_PTS}+, FBS teams only, graded against an estimated first-half line. The honest headline.`}
         />
-        <PmCard
+        <RecordCard
           title={`2023–25, every gap ${BET_GAP_PTS}+`}
           rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "gap175")}
           emptyHint="No historical scores graded."
           hint="No weekly cap: every game that cleared the gap bar."
         />
-        <PmCard
+        <RecordCard
           title={`${liveSeason} bets, at Hard Rock’s line`}
           rec={
             liveScope ? headline(buckets, liveScope, "live", "hr", "bet") : null
@@ -301,7 +236,7 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
           emptyHint="No bets yet."
           hint="Games we rated Bet, graded at Hard Rock’s own line and price."
         />
-        <PmCard
+        <RecordCard
           title={`${liveSeason} good prices, at Hard Rock’s line`}
           rec={
             liveScope
@@ -311,7 +246,7 @@ export default function PostMortemPanel({ pm }: { pm: PostMortem | null }) {
           emptyHint="No Hard Rock under has beaten the fair price yet."
           hint="Games where Hard Rock’s under paid at least the fair price."
         />
-        <PmCard
+        <RecordCard
           title={`${liveSeason} every Hard Rock number`}
           rec={
             liveScope

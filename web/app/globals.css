@@ -131,6 +131,20 @@ body {
     border-color: var(--good);
   }
 
+  /* A review section with nothing in it yet. Deliberately NOT a card: eight
+     empty boxes read as a broken page, one dim line reads as "not yet".
+     Heading and message sit on the same physical line (Tate 2026-09-10). */
+  .bv-empty {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .bv-empty > strong {
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
   /* One badge component for every chip on the site (tier word, status tags,
      logged, paper, filters). Colour modifiers carry the grade language. */
   .bv-badge {

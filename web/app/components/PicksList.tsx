@@ -15,6 +15,7 @@ import {
 } from "@/lib/labels";
 import type { PickFull } from "@/lib/picks";
 import { isOffPolicy } from "@/lib/picks";
+import { EmptyLine } from "@/app/components/Section";
 
 // Every logged pick, with the decision frozen at log time. Nothing here is
 // explained in a `title=` tooltip (a phone never shows one) — the caption under
@@ -102,11 +103,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
   }
 
   if (picks.length === 0) {
-    return (
-      <p className="bv-card p-4 text-sm text-[var(--text-muted)]">
-        No picks here. Log bets from the board.
-      </p>
-    );
+    return <EmptyLine>No picks here. Log bets from the board.</EmptyLine>;
   }
 
   const num = (n: number | null, dp = 2) =>

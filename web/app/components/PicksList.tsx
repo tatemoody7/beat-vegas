@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { signed } from "@/lib/format";
+import React, { useState } from "react";
+import { american, signed } from "@/lib/format";
 import {
   BLOCKER_SHORT,
   labelOf,
@@ -43,6 +43,53 @@ function loggedAs(p: PickFull): string {
 export default function PicksList({ picks }: { picks: PickFull[] }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState<{
+    price: string;
+    stake: string;
+    isBonus: boolean;
+    note: string;
+  }>({ price: "", stake: "", isBonus: false, note: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEdit(p: PickFull) {
+    setError(null);
+    setEditing(p.id);
+    setDraft({
+      price: p.price === null ? "" : String(p.price),
+      stake: p.stake === null ? "" : String(p.stake),
+      isBonus: p.isBonus,
+      note: p.note ?? "",
+    });
+  }
+
+  async function save(id: number) {
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        price: draft.price.trim() === "" ? null : Number(draft.price),
+        stake: Number(draft.stake),
+        isBonus: draft.isBonus,
+        note: draft.note.trim() === "" ? null : draft.note,
+      };
+      const res = await fetch(`/api/picks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setEditing(null);
+        router.refresh();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? "Could not save that.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function del(id: number) {
     setDeleting(id);
@@ -75,6 +122,8 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
               <th>Matchup</th>
               <th>Market</th>
               <th className="bv-num">Your line</th>
+              <th className="bv-num">Price</th>
+              <th className="bv-num">Stake</th>
               <th className="bv-num">Our number then</th>
               <th>Why you logged it</th>
               <th>Result</th>
@@ -86,7 +135,8 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
           </thead>
           <tbody>
             {picks.map((p) => (
-              <tr key={p.id} className="align-top">
+              <React.Fragment key={p.id}>
+              <tr className="align-top">
                 <td className="bv-num text-[var(--text-muted)]">
                   {p.week ?? "—"}
                 </td>
@@ -101,9 +151,20 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                       paper — no money on it
                     </span>
                   )}
+                  {p.isBonus && (
+                    <span className="bv-badge ml-1">
+                      bonus — a loss costs nothing
+                    </span>
+                  )}
                 </td>
                 <td className="bv-num text-[var(--text-muted)]">
                   {p.line !== null ? `under ${p.line}` : "—"}
+                </td>
+                <td className="bv-num font-mono text-[var(--text-muted)]">
+                  {p.price === null ? "—" : american(p.price)}
+                </td>
+                <td className="bv-num font-mono text-[var(--text-muted)]">
+                  {p.stake === null ? "—" : `${p.stake}u`}
                 </td>
                 <td className="bv-num text-[var(--text-muted)]">
                   {p.modelLine ?? "—"}
@@ -143,18 +204,100 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 <td className="max-w-xs text-[var(--text-dim)]">
                   {p.note ?? "—"}
                 </td>
-                <td>
+                <td className="whitespace-nowrap">
                   {!p.graded && (
-                    <button
-                      onClick={() => del(p.id)}
-                      disabled={deleting === p.id}
-                      className="text-xs text-[var(--text-dim)] hover:text-[var(--bad)] disabled:opacity-50"
-                    >
-                      {deleting === p.id ? "…" : "delete"}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => startEdit(p)}
+                        className="text-xs text-[var(--text-dim)] hover:text-[var(--accent)]"
+                      >
+                        edit
+                      </button>
+                      <button
+                        onClick={() => del(p.id)}
+                        disabled={deleting === p.id}
+                        className="ml-2 text-xs text-[var(--text-dim)] hover:text-[var(--bad)] disabled:opacity-50"
+                      >
+                        {deleting === p.id ? "…" : "delete"}
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>
+              {editing === p.id && (
+                <tr>
+                  <td colSpan={13} className="bg-[var(--surface-2)] px-3 py-3">
+                    <div className="flex flex-wrap items-end gap-3 text-xs">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[var(--text-dim)]">
+                          Price (American)
+                        </span>
+                        <input
+                          value={draft.price}
+                          onChange={(e) =>
+                            setDraft({ ...draft, price: e.target.value })
+                          }
+                          placeholder="-125"
+                          className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[var(--text-dim)]">
+                          Stake (units)
+                        </span>
+                        <input
+                          value={draft.stake}
+                          onChange={(e) =>
+                            setDraft({ ...draft, stake: e.target.value })
+                          }
+                          placeholder="1"
+                          className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 pb-1">
+                        <input
+                          type="checkbox"
+                          checked={draft.isBonus}
+                          onChange={(e) =>
+                            setDraft({ ...draft, isBonus: e.target.checked })
+                          }
+                        />
+                        <span>Bonus bet (a loss books nothing)</span>
+                      </label>
+                      <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+                        <span className="text-[var(--text-dim)]">Note</span>
+                        <input
+                          value={draft.note}
+                          onChange={(e) =>
+                            setDraft({ ...draft, note: e.target.value })
+                          }
+                          className="rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1"
+                        />
+                      </label>
+                      <button
+                        onClick={() => save(p.id)}
+                        disabled={saving}
+                        className="bv-btn disabled:opacity-50"
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => setEditing(null)}
+                        className="text-[var(--text-dim)] hover:text-[var(--text)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {error && (
+                      <p className="mt-2 text-xs text-[var(--bad)]">{error}</p>
+                    )}
+                    <p className="mt-2 text-xs text-[var(--text-dim)]">
+                      {`One unit is $10. A bonus bet pays profit only, so a $20 bonus at -125 wins $16 and loses nothing — tick the box and set the stake to 2. Editing stops once the game is graded.`}
+                    </p>
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

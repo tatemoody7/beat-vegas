@@ -42,12 +42,15 @@ export async function POST(req: NextRequest) {
         LIMIT 1
       `
     : Promise.resolve([]);
-  // Real-money first-half bets already logged this week (the cap).
+  // Bankroll-funded first-half bets already logged this week (the cap). A
+  // bonus bet is excluded: the cap limits how much of the roll is at risk, and
+  // the book funded that stake, so a free bet must not crowd out a real one.
   const capQ = game
     ? prisma.$queryRaw<{ n: number | bigint }[]>`
         SELECT COUNT(*) AS n FROM manual_picks
         WHERE season = ${game.season} AND week = ${game.week}
           AND COALESCE(is_paper, false) = false
+          AND COALESCE(is_bonus, false) = false
           AND COALESCE(market, '1H') = '1H'
       `
     : Promise.resolve([]);

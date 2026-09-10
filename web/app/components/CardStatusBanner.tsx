@@ -3,7 +3,7 @@ import { cardHealth, type Card } from "@/lib/card";
 // Sits directly above the bet slip. Silent on a healthy card; otherwise one
 // amber notice (the same shape as the board's no-model banner) saying why the
 // card should not be bet off as-is: a degraded input, a preview or manual
-// build, or a card this morning's build has not replaced yet. Server component —
+// build, or a card today's build has not replaced yet. Server component —
 // everything comes out of cardHealth (pure, tested).
 export default function CardStatusBanner({
   card,

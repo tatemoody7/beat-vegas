@@ -127,7 +127,7 @@ export function blockerTag(
     case "cap":
       return `Past the ${WEEKLY_BET_CAP}-bet week — paper only`;
     case "degraded":
-      return "An input failed this morning — paper only";
+      return "Paper only — an input is missing";
   }
 }
 
@@ -152,7 +152,7 @@ export function slipBlockText(
   const kp = ctx.killPrice != null ? american(ctx.killPrice) : "the kill price";
   switch (block) {
     case "degraded":
-      return "An input failed this morning, so this is paper only.";
+      return "An input is missing, so this is paper only.";
     case "cap":
       return `${WEEKLY_BET_CAP} real-money bets are already logged this week.`;
     case "kill_line":
@@ -193,11 +193,13 @@ export const REASON_TEXT: Record<ReasonKey, { long: string; short: string }> = {
 
 // --- degraded card inputs -----------------------------------------------------
 
+// Mirrors beatvegas/card.py DEGRADED_INPUT_TEXT — see the reasoning there for
+// why "morning" is gone and why `pace` no longer claims a failure.
 export const CARD_INPUT_TEXT: Record<string, string> = {
-  sweep: "the morning line sweep did not finish",
+  sweep: "the line sweep did not finish",
   preview: "the injury and news pull did not finish",
   tempo: "the pace numbers did not load",
-  pace: "the pace read is missing on some games",
+  pace: "these teams have only played FCS opponents, so there is no season-to-date pace on them yet",
 };
 export const CARD_INPUT_FALLBACK = "an input did not load";
 

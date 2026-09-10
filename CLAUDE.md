@@ -5,6 +5,20 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-09 night (PR #94, merged):** the board **ranks** instead of scoring. Each card's
+  badge is its place on the week (`#1` = best), assigned in `homeBoard.ts::assignBoardRanks`
+  over the whole board inside `getHomeBoard` — before `page.tsx` filters, so a day or team
+  filter never renumbers. A kicked-off game has no rank: `inPlayAt` (5 h) gives it LIVE,
+  then FINAL, then the result word. **A live BET card is lit green** (`.bv-card--lit`:
+  `--good` border + `--good-bg` wash, plus a hover companion because `.bv-card:hover`
+  hard-codes cyan); Watch and Pass are untouched, so lit means act. The 0-100 score still
+  sets the colour, still decides the tier, and still drives Results/Research — it moved
+  inside the card under "Our number", and the glossary gained a Rank entry. `capRank` is
+  unchanged but renders as "cap slot" so it can't be read as the board rank. Two fixes rode
+  along: `sortGames` now breaks a score tie on **gap** (the score clamps at 100 and a slate
+  can pin a dozen games there — kickoff order was silently deciding "best game of the
+  week"), and a played-but-ungraded game says FINAL rather than claiming to be live.
+  Spec: `docs/superpowers/specs/2026-09-09-ranked-board-design.md`.
 - **2026-09-09 evening (PRs #87-#92, all merged; real money Sat Sep 12):** four changes
   landed together. (1) **Per-event 1H calls cost 1 credit**, not 2: `odds_api.bookmakers_1h`
   names ten books, which the Odds API bills as ONE region and which overrides `regions`
@@ -170,6 +184,16 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
   `validate_engine.py`: 9.22 full vs 9.18 without) — base features already capture
   it. PBP factors confirmed the thesis + exposed the artifact; they stay as display
   chips and could be trimmed from the predictor.
+- **ALWAYS split the post-mortem on `line_real` before concluding anything.** Only 1,902
+  of the 3,601 `hist_2023_25` rows carry a real captured 1H close; the other 1,699 are
+  proxy-graded, and they are not a random sample — they are the games no book priced.
+  Measured 2026-09-09: model bias by spread reads −0.70 / +0.37 / +0.53 / +2.00 over all
+  3,601 rows, but the whole effect sits in the unpriced games (+3.36 at 28+) while the
+  book-priced ones are flat (−0.47 at 28+), and wide-spread bets swing from −20.8 units
+  at the proxy to +1.3 at the real close. This is the same artifact as the flat-0.52
+  bullet above, one level up: it bites analysis of the model, not just of factors. State
+  which grading basis every number came from, and the n for the real-line cut (thin at
+  width — 72 games above a 28-pt spread).
 - The edge is real but **small and unconfirmed**. The system's job is to *measure* it
   honestly vs real lines, not to promise profit.
 
@@ -177,7 +201,9 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
 Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
 - **Views (4 tabs)**: Board (`/`, THE home page — the week grouped by day, every game with a
-  Hard Rock total, coloured score 0-100 + Bet/Watch/Pass word + action line from
+  Hard Rock total, coloured **rank badge** (`#1` = best game of the week, assigned over the
+  whole board before filters so a filter never renumbers; no rank once a game kicks off —
+  it reads LIVE for 5 h then FINAL, then the result) + Bet/Watch/Pass word + action line from
   `web/lib/edge.ts` + `web/lib/grade.ts`, composed by `web/lib/homeBoard.ts`; bankroll strip,
   day/my-teams/Hard-Rock filters, expandable cards with Lines / Our number / What is behind it /
   Injuries and news, writable picks via `POST /api/picks`), Results (market/model/you ledgers with
@@ -239,13 +265,36 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   via `migrate.yml` BEFORE the web deploy — the cap query reads `COALESCE(is_bonus, false)`
   and would throw on a missing column. The READ path degrades gracefully (`isMissingColumn`
   fallback in `web/lib/picks.ts`); the write path does not.
-- **The model has a BLOWOUT BLIND SPOT (found 2026-09-09, unfixed).** On the week-2 slate
-  it ran 2.5 pts below Hard Rock on average, but split by spread: in blowouts (|spread|
-  >= 21) HR's implied 1H share was 0.541 against our fitted fair 0.5375 — HR is right —
-  while ours was 0.443, so **every single blowout cleared the 1.75 gate automatically**.
-  In close games the same comparison is 0.507 vs 0.4975 vs 0.476. The top of the board is
-  therefore an artifact: the biggest "gaps" are the games the model understands least. The
-  price floor was the only thing blocking them. Do not read a 9-pt gap as a 9-pt edge.
+- **The model DISAGREES WITH HARD ROCK ON BLOWOUTS, and who is right is UNMEASURED**
+  (found 2026-09-09; re-examined the same day — the earlier "HR is right" reading did not
+  survive). On week-2 Hard-Rock-priced games the model's implied 1H share is 0.469 close /
+  0.482 at 14-21 / **0.450 at 21+**, against HR's 0.504 / 0.524 / 0.541; average gaps +2.0
+  / +2.2 / **+5.0**. HR prices these (5 of 5 at 21-28, 4 of 7 above 28), so `no_hr_line`
+  does not filter them, and the top of the board is mostly wide-spread games.
+  **But do not treat that as a known model error.** Against the 1,902 rows in
+  `postmortem_games` (`hist_2023_25`) carrying a REAL captured close (`line_real`), the
+  model has NO spread bias — mean miss −0.01 / −0.02 / +0.41 / −0.47 across
+  <14 / 14-21 / 21-28 / 28+ — and wide-spread bets at `gap_real >= 1.75` returned +1.1%
+  ROI over 120 bets, positive in 2 of 3 seasons. In 2023-25 weeks 1-4 the model ran a
+  0.556 share on book-priced blowouts vs the book's 0.540, with gaps averaging −0.84: the
+  2026 sign is FLIPPED. And `game_records` has **zero graded rows** — no 2026 prediction
+  has ever been checked against a result (week 1 played but never scored, week 2 scored
+  but not played), so nothing yet says which side is wrong.
+  **Two traps here.** (1) The big blowout bias (+2.00 at 28+ over all 3,601 rows) is
+  concentrated entirely in the 1,699 games NO BOOK PRICED (+3.36 at 28+); always cut
+  `where line_real is not null` before concluding anything, and state the n — it is thin
+  at width (72 games above a 28-pt spread). (2) Gating 21+ spreads on the proxy numbers
+  was proposed and rejected: it drops a third of the board and the drag it targets
+  disappears at real lines. Decision (Tate, 2026-09-09): **track it live, do not gate or
+  retrain.** `grade.yml` runs `grade_records.py` + `post_mortem.py --write` daily, so each
+  week's predictions grade themselves; watch model-vs-HR share by spread week over week.
+  If it is an early-season priors effect the gap should shrink as season-to-date features
+  fill in. If it persists, options are mismatch features from talent/SP+ (stays
+  market-blind), a spread-keyed residual correction (precedent: `data/multiplier.json`,
+  `residual_gate.py`), or adding spread outright — note `spread` is NOT in `MARKET_COLS`
+  (only `full_game_total` and `proj_1h_ratio`); it was simply never added to
+  `FEATURE_COLS`. `rescore.yml` would score 2026 week 1 for ~60 graded results at zero
+  Odds credits. Meanwhile: do not read a 9-pt gap as a 9-pt edge.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
   scheduled runs; 2026-09-09: `card.yml` fired 0 of 5 morning builds on time, the 12:05Z tick
   running at 16:33Z; no GitHub incident posted either time). So since 2026-09-09 the card and

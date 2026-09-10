@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   cardAge,
   summarizeCard,
@@ -19,20 +20,7 @@ const TIER_CHIP: Record<CardTier, string> = {
 
 const MAX_NOTES = 5;
 
-function Row({
-  r,
-  onBoard,
-}: {
-  r: CardRow;
-  onBoard: ReadonlySet<number> | null;
-}) {
-  // The card and the board are built from different universes (the card off
-  // the Hard Rock universe, the board off `predictions` pinned to one model
-  // version) and a day / my-teams / Hard-Rock filter can hide a row that IS on
-  // the board. Either way `#game-<id>` would jump nowhere, so when the target
-  // is not rendered this becomes plain text instead of a link that does
-  // nothing. `null` means "caller did not say", so keep the link.
-  const jumpable = onBoard === null || onBoard.has(r.gameId);
+function Row({ r }: { r: CardRow }) {
   return (
     <li className="border-t border-[var(--border-soft)] py-2 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -64,22 +52,15 @@ function Row({
             logged as paper
           </span>
         )}
-        {jumpable ? (
-          <a
-            href={`#game-${r.gameId}`}
-            className="bv-nav-link ml-auto text-xs"
-            title="Jump to this game on the board below."
-          >
-            Show on board
-          </a>
-        ) : (
-          <span
-            className="ml-auto text-xs text-[var(--text-dim)]"
-            title="This game is not in the board below right now — a filter may be hiding it."
-          >
-            Not on the board
-          </span>
-        )}
+        {/* A game page exists for every game id, so this link can no longer
+            point at nothing — the old `#game-<id>` anchor missed whenever a
+            filter hid the row, or the card and the board disagreed. */}
+        <Link
+          href={`/game/${r.gameId}`}
+          className="bv-nav-link ml-auto text-xs"
+        >
+          Open game
+        </Link>
       </div>
       {r.action !== "" && (
         <p className="mt-1 text-[var(--text-muted)]">{r.action}</p>
@@ -96,13 +77,9 @@ function Row({
 export default function CardPanel({
   card,
   now = new Date(),
-  onBoard = null,
 }: {
   card: Card | null;
   now?: Date;
-  /** Game ids actually RENDERED on the board below (post-filter). Rows whose
-   *  game is missing lose their jump link — see Row. Null = don't check. */
-  onBoard?: ReadonlySet<number> | null;
 }) {
   if (card === null) {
     return (
@@ -143,7 +120,7 @@ export default function CardPanel({
         <>
           <ul className="mt-2">
             {s.bets.map((r) => (
-              <Row key={r.gameId} r={r} onBoard={onBoard} />
+              <Row key={r.gameId} r={r} />
             ))}
           </ul>
           {s.overCap.length > 0 && (
@@ -156,7 +133,7 @@ export default function CardPanel({
               </p>
               <ul className="mt-1">
                 {s.overCap.map((r) => (
-                  <Row key={r.gameId} r={r} onBoard={onBoard} />
+                  <Row key={r.gameId} r={r} />
                 ))}
               </ul>
             </>
@@ -170,7 +147,7 @@ export default function CardPanel({
             </p>
             <ul className="mt-1">
               {s.closest.map((r) => (
-                <Row key={r.gameId} r={r} onBoard={onBoard} />
+                <Row key={r.gameId} r={r} />
               ))}
             </ul>
           </>
@@ -187,7 +164,7 @@ export default function CardPanel({
           </p>
           <ul className="mt-1">
             {s.degraded.map((r) => (
-              <Row key={r.gameId} r={r} onBoard={onBoard} />
+              <Row key={r.gameId} r={r} />
             ))}
           </ul>
         </>

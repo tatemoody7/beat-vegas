@@ -17,13 +17,37 @@ export type AnswerBet = {
   numbers: string;
 };
 
+export type AnswerNear = {
+  gameId: number;
+  matchup: string;
+  numbers: string;
+  /** What would have to change, trimmed to the clause that says it. */
+  needs: string;
+};
+
 export type Answer = {
   bets: AnswerBet[];
-  /** The best game that is not a bet, and what it needs. Null when none. */
-  closest: { gameId: number; matchup: string; action: string } | null;
+  /** The best games that are not bets yet, best first. */
+  closest: AnswerNear[];
   used: number;
   cap: number;
 };
+
+/** How many near-misses the bar lists. Three is what fits without the block
+ *  turning into a second board. */
+export const NEAR_COUNT = 3;
+
+/**
+ * Pure: the "needs …" clause of an action line, or the whole line when it does
+ * not have one. `edge.action` reads "Not yet — Hard Rock's price is -125; needs
+ * -120 or better." and the bar already prints the price beside it, so the first
+ * half would be said twice.
+ */
+export function shortNeed(action: string): string {
+  const i = action.toLowerCase().lastIndexOf("needs ");
+  if (i < 0) return action;
+  return action.slice(i).replace(/\.\s*$/, "");
+}
 
 function matchupOf(g: HomeGame): string {
   return `${g.row.away} @ ${g.row.home}`;
@@ -63,18 +87,16 @@ export function buildAnswer(
       numbers: numbersOf(g),
     }));
 
-  const next = live.filter((g) => g.edge.tier !== "BET").sort(byRank)[0];
-  return {
-    bets,
-    closest:
-      next === undefined
-        ? null
-        : {
-            gameId: next.row.gameId,
-            matchup: matchupOf(next),
-            action: next.edge.action,
-          },
-    used,
-    cap,
-  };
+  const closest = live
+    .filter((g) => g.edge.tier !== "BET")
+    .sort(byRank)
+    .slice(0, NEAR_COUNT)
+    .map((g) => ({
+      gameId: g.row.gameId,
+      matchup: matchupOf(g),
+      numbers: numbersOf(g),
+      needs: shortNeed(g.edge.action),
+    }));
+
+  return { bets, closest, used, cap };
 }

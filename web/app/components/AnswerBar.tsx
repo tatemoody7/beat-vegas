@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { Answer } from "@/lib/answerBar";
 
-// The first thing on the board, and the only thing above the games. One row:
-// what is bettable right now, how many cap slots are gone, and when the next
-// decision build lands. When nothing is bettable — which is most weeks — it
-// names the best game and what it needs instead of just saying "no bets".
+// The first thing on the board, and the only thing above the games. It answers
+// both questions at once: what is bettable right now, and what is nearly there.
+//
+// It replaced three panels that each said "no bets this week" in different
+// words before the first game appeared (the bankroll strip, the slip header and
+// the card panel headline). Most weeks nothing is bettable, so the near-misses
+// are what makes the block worth its space.
 
 export default function AnswerBar({
   answer,
@@ -35,39 +38,55 @@ export default function AnswerBar({
         </span>
       </div>
 
-      {live ? (
+      {live && (
         <ul className="mt-2 space-y-1">
           {bets.map((b) => (
-            <li key={b.gameId} className="text-sm">
+            <li
+              key={b.gameId}
+              className="flex flex-wrap items-baseline gap-x-2"
+            >
               <Link
                 href={`/game/${b.gameId}`}
-                className="text-[var(--accent)] hover:underline"
+                className="text-sm font-semibold text-[var(--accent)] hover:underline"
               >
                 {b.matchup}
               </Link>
-              <span className="ml-2 font-mono text-[var(--text-muted)]">
+              <span className="font-mono text-sm text-[var(--text)]">
                 {b.numbers}
               </span>
             </li>
           ))}
         </ul>
-      ) : (
-        closest !== null && (
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            <span className="text-[var(--text-dim)]">Closest · </span>
-            <Link
-              href={`/game/${closest.gameId}`}
-              className="text-[var(--accent)] hover:underline"
-            >
-              {closest.matchup}
-            </Link>
-            <span className="ml-2">{closest.action}</span>
-          </p>
-        )
+      )}
+
+      {closest.length > 0 && (
+        <div className="mt-3 border-t border-[var(--border)] pt-2">
+          <h2 className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
+            Closest to a bet
+          </h2>
+          <ul className="space-y-1.5">
+            {closest.map((c) => (
+              <li key={c.gameId}>
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <Link
+                    href={`/game/${c.gameId}`}
+                    className="text-sm text-[var(--accent)] hover:underline"
+                  >
+                    {c.matchup}
+                  </Link>
+                  <span className="font-mono text-xs text-[var(--text-muted)]">
+                    {c.numbers}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--warn)]">{c.needs}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {nextBuild !== null && (
-        <p className="mt-2 text-xs text-[var(--text-dim)]">
+        <p className="mt-3 text-xs text-[var(--text-dim)]">
           {`Next build ${nextBuild}`}
         </p>
       )}

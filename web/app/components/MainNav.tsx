@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Four tabs. The board is the home page; the retired routes (/board, /preview,
+// The board is the home page; the retired routes (/board, /preview,
 // /line-check, /line-study, /movement, /ledger, /weekly-review, /picks)
 // redirect into these.
 const LINKS = [
   { href: "/", label: "Board" },
+  { href: "/slip", label: "Bet slip" },
   { href: "/results", label: "Results" },
   { href: "/research", label: "Research" },
   { href: "/glossary", label: "Glossary" },

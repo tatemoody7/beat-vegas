@@ -162,7 +162,14 @@ day, one of them after a full day inside this codebase. It is the highest-risk
 wording on the site because it is the first thing read on a Saturday morning.
 
 **Fix**: say what it is — "2 games qualify" / "you have 1 of 5 slots used", and
-ideally mark the ones already logged. Not yet built.
+ideally mark the ones already logged.
+
+**Owner decision (2026-09-10): do NOT fix this in isolation.** It ships as part
+of the two-section board rebuild in §1, after the first real-money weekend.
+Nothing on the bar is factually wrong, only badly labelled, and the wording
+depends on what the two sections end up called — fixing it alone would mean
+writing the copy twice and touching the first block on the board two days before
+real money.
 
 ## 7. What is still open
 

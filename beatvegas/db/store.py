@@ -258,6 +258,33 @@ def _apply_migrations(engine) -> None:
         except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
             print(f"[db] WARNING: could not add uq_odds_snapshot index: {e}")
 
+    # One pick per (game, market) PER LEDGER. The web POST checks for a
+    # duplicate and counts the weekly cap, then inserts -- three round-trips
+    # with no transaction, so a double-click could log the same bet twice or
+    # push the week to a sixth real bet. The app guard stays (it gives the nicer
+    # message); this makes the race impossible regardless of it.
+    #
+    # COALESCE, not the bare columns: Postgres treats NULLs as distinct in a
+    # unique index, and legacy rows carry NULL market / is_paper -- so indexing
+    # the raw columns would let exactly the rows we care about slip through. The
+    # expression matches the route's own predicate
+    # (COALESCE(market,'1H'), COALESCE(is_paper,false)) exactly.
+    #
+    # Fail-soft like the one above: an existing DB holding duplicates keeps
+    # running, it just does not gain the backstop.
+    if "manual_picks" in existing:
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_manual_pick_per_ledger "
+                        "ON manual_picks "
+                        "(game_id, COALESCE(market, '1H'), COALESCE(is_paper, false))"
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
+            print(f"[db] WARNING: could not add uq_manual_pick_per_ledger index: {e}")
+
 
 @contextmanager
 def session_scope() -> Iterator[Session]:

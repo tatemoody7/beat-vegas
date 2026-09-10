@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
 import { median } from "@/lib/format";
@@ -145,8 +146,17 @@ async function bvAdjustments(
   return out; // later rows overwrite earlier → latest wins
 }
 
-export async function getBoard(season: number): Promise<BoardRow[]> {
-  const preds = await prisma.$queryRaw<PredRow[]>`
+/**
+ * The board's GAME UNIVERSE for a season — the predictions rows and their game
+ * facts, without the two expensive joins getBoard adds on top (the full-season
+ * consensus-line scan and the adjustment lookup).
+ *
+ * Split out so a caller that only needs "which games are on the board" does not
+ * pay for line medians it will not read. getBoard still composes on top of it,
+ * so there is exactly ONE definition of the universe and the two cannot drift.
+ */
+export async function boardGames(season: number): Promise<PredRow[]> {
+  return prisma.$queryRaw<PredRow[]>`
     SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
            g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
@@ -171,7 +181,26 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
         LIMIT 1)
     ORDER BY p.rank
   `;
-  const [lines, adjustments] = await Promise.all([
+}
+
+/**
+ * The board for a season, ONCE per request.
+ *
+ * This is the most expensive query path in the app — consensusLines() alone
+ * scans every pre-kickoff snapshot for the season across every book. /game/[id]
+ * ran the whole thing TWICE per page view, because generateMetadata and the
+ * page body both call getHomeGame and Next dedupes fetch(), not Prisma.
+ *
+ * cache() is keyed on `season` only, which is why the caching lives here rather
+ * than on getHomeBoard: that takes a `now` defaulting to new Date(), so every
+ * call would be a fresh key and dedupe nothing. `now` only affects pure
+ * derivation downstream, never the query.
+ */
+export const getBoard = cache(async function getBoard(
+  season: number,
+): Promise<BoardRow[]> {
+  const [preds, lines, adjustments] = await Promise.all([
+    boardGames(season),
     consensusLines(season),
     bvAdjustments(season),
   ]);
@@ -217,7 +246,7 @@ export async function getBoard(season: number): Promise<BoardRow[]> {
       bvAdjustReason: adj?.reason ?? null,
     };
   });
-}
+});
 
 export async function getSeasons(): Promise<number[]> {
   // Only seasons that actually have a board (predictions) — so the app lands on

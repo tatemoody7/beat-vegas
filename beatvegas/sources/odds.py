@@ -21,6 +21,7 @@ CI logs.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -33,6 +34,16 @@ from ..hardrock import normalize_book
 # per-event call naming <= 10 books costs the same as a single-region call.
 # Naming an 11th quietly doubles it (see OddsAPIClient.__init__).
 MAX_BOOKMAKERS_ONE_REGION = 10
+
+# Retries, mirroring sources/cfbd.py. The FREE data source retried and the PAID
+# one did not, so a single transient 429/5xx mid-sweep failed the whole card
+# build. Only transport errors, 429 and 5xx are retried: a 404 is meaningful
+# here (event_first_half_totals returns {} for an unpriced event) and any other
+# 4xx is a bad key or bad params that a retry cannot fix. The Odds API does not
+# bill 429s or 5xx, so a retry does not re-spend a credit.
+_RETRY_EXC = (requests.Timeout, requests.ConnectionError)
+_BACKOFF_SECONDS = (2, 4)  # between attempts 1->2 and 2->3
+DEFAULT_MAX_RETRIES = 3
 
 
 @dataclass
@@ -62,7 +73,12 @@ def _raise_for_status(resp: requests.Response) -> None:
 
 
 class OddsAPIClient:
-    def __init__(self, api_key: Optional[str] = None, timeout: int = 30):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        timeout: int = 30,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+    ):
         cfg = load_config().get("odds_api", {}) or {}
         self.api_key = api_key or odds_api_key()
         self.base_url = (cfg.get("base_url") or "https://api.the-odds-api.com/v4").rstrip("/")
@@ -70,16 +86,9 @@ class OddsAPIClient:
         self.regions = cfg.get("regions", "us")
         self.markets = cfg.get("markets", "totals_h1")
         self.odds_format = cfg.get("odds_format", "american")
-        self.bookmakers: List[str] = list(cfg.get("bookmakers_1h") or [])
-        if len(self.bookmakers) > MAX_BOOKMAKERS_ONE_REGION:
-            # Not a warning: an 11th key silently DOUBLES every per-event call
-            # for the rest of the season, and nothing in the output would say so.
-            raise ValueError(
-                f"odds_api.bookmakers_1h has {len(self.bookmakers)} keys; the Odds API "
-                f"bills one region per {MAX_BOOKMAKERS_ONE_REGION} books, so an extra key "
-                "doubles the cost of every per-event 1H call"
-            )
+        self.bookmakers = list(cfg.get("bookmakers_1h") or [])
         self.timeout = timeout
+        self.max_retries = max(1, int(max_retries))
         self.last_credits: Optional[Credits] = None
 
     def _scope_params(self) -> Dict[str, Any]:
@@ -95,19 +104,71 @@ class OddsAPIClient:
             return {"bookmakers": ",".join(self.bookmakers)}
         return {"regions": self.regions}
 
+    # `bookmakers` is a guarded PROPERTY, not a plain attribute. The check used
+    # to live in __init__ only, so `client.bookmakers = [...]` after
+    # construction — which is exactly what poll_lines.py --bookmakers does —
+    # walked straight past it and would have silently doubled the cost of every
+    # per-event call for the whole run. Validating on assignment closes every
+    # path at once, including __init__, which now assigns through this setter.
+    @property
+    def bookmakers(self) -> List[str]:
+        return self._bookmakers
+
+    @bookmakers.setter
+    def bookmakers(self, keys) -> None:
+        keys = list(keys or [])
+        if len(keys) > MAX_BOOKMAKERS_ONE_REGION:
+            # Not a warning: an 11th key silently DOUBLES every per-event call
+            # for the rest of the season, and nothing in the output would say so.
+            raise ValueError(
+                f"{len(keys)} bookmaker keys given; the Odds API bills one region "
+                f"per {MAX_BOOKMAKERS_ONE_REGION} books, so an extra key doubles "
+                "the cost of every per-event 1H call"
+            )
+        self._bookmakers = keys
+
     def _get(self, url: str, params: Dict[str, Any]) -> requests.Response:
-        """`requests.get` with the key redacted no matter how it fails: a
-        transport error (ConnectionError, ReadTimeout, ...) raised by `get`
-        itself never reaches `_raise_for_status` (there's no Response yet),
-        but requests still stuffs the full request URL — apiKey included —
-        into the exception message. Re-raise the same exception type with
-        that message redacted."""
-        try:
-            resp = requests.get(url, params=params, timeout=self.timeout)
-        except requests.RequestException as e:
-            raise type(e)(redact_key(str(e))) from None
-        self._credits(resp)
-        return resp
+        """`requests.get` with retries, and with the key redacted no matter how
+        it fails.
+
+        Retries: up to `max_retries` attempts on a timeout / connection error /
+        429 / 5xx, sleeping 2s then 4s between them. A 4xx that is not 429 is
+        returned to the caller untouched — `event_first_half_totals` reads a 404
+        as "this event has no first-half market", and a 401 is a bad key that no
+        retry fixes.
+
+        Redaction: a transport error raised by `get` itself never reaches
+        `_raise_for_status` (there is no Response yet), but requests still
+        stuffs the full request URL — apiKey included — into the exception
+        message. Re-raise the same exception type with that message redacted.
+        """
+        last_exc: Optional[BaseException] = None
+        for attempt in range(self.max_retries):
+            try:
+                resp = requests.get(url, params=params, timeout=self.timeout)
+            except _RETRY_EXC as e:
+                last_exc = type(e)(redact_key(str(e)))
+            except requests.RequestException as e:
+                # Not retryable (a malformed URL, too many redirects, ...).
+                raise type(e)(redact_key(str(e))) from None
+            else:
+                # Read the credit headers from every response we get back, so a
+                # retried call still reports the API's latest counters.
+                self._credits(resp)
+                if resp.status_code != 429 and resp.status_code < 500:
+                    return resp
+                last_exc = requests.HTTPError(
+                    redact_key(f"Odds API {resp.status_code} for {url}"), response=resp
+                )
+            if attempt < self.max_retries - 1:
+                nap = _BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)]
+                print(
+                    f"[odds] attempt {attempt + 1}/{self.max_retries} failed "
+                    f"({last_exc}); retrying in {nap}s"
+                )
+                time.sleep(nap)
+        assert last_exc is not None
+        raise last_exc
 
     def _credits(self, resp: requests.Response) -> Credits:
         def _int(h):

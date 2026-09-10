@@ -7,6 +7,7 @@
    catches the edit before it ships.
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -157,20 +158,32 @@ def test_card_yml_wires_the_status_files_through_to_the_build():
     reads both plus the resolved slot — otherwise a card built on a half-swept
     slate or a blank injury feed ships as the morning card."""
     steps = _card_steps_by_id()
-    sweep, preview, build = (
-        steps["sweep"],
-        steps["preview"],
-        _load(WF_DIR / "card.yml")["jobs"]["card"]["steps"][-1],
-    )
+    sweep, preview, build = steps["sweep"], steps["preview"], steps["build"]
     assert '--status-file "$RUNNER_TEMP/sweep_status.json"' in sweep["run"]
     assert '--status-file "$RUNNER_TEMP/preview_status.json"' in preview["run"]
     assert "--slot" in build["run"] and "steps.slot.outputs.slot" in build["run"]
-    assert '--sweep-status "$RUNNER_TEMP/sweep_status.json"' in build["run"]
+    assert '--sweep-status "$SWEEP_STATUS"' in build["run"]
     assert '--preview-status "$PREVIEW_STATUS"' in build["run"]
-    # A preview step that died before writing its own file still reaches the
-    # card as a failure.
+    # Either step dying before it wrote its own file still reaches the card as
+    # a failure, rather than as "the step did not run".
     assert '{"ok": false, "reason": "step_failed"}' in build["run"]
+    assert '"complete": false, "reason": "step_failed"' in build["run"]
     assert build["env"]["PREVIEW_OUTCOME"] == "${{ steps.preview.outcome }}"
+    assert build["env"]["SWEEP_OUTCOME"] == "${{ steps.sweep.outcome }}"
+
+
+def test_a_failed_sweep_still_publishes_a_card_and_still_reddens_the_run():
+    """A mid-sweep Odds API error used to kill the job before build_card ran, so
+    the most likely degraded-card trigger produced NO card at all. The sweep now
+    continues on error and a final step fails the run, so both signals survive:
+    the card ships degraded AND GitHub sends the failed-run email."""
+    steps = _card_steps_by_id()
+    assert steps["sweep"]["continue-on-error"] is True
+    # The build is NOT gated on the sweep succeeding.
+    assert "sweep" not in steps["build"]["if"]
+    guard = _card_steps()[-1]
+    assert guard["if"] == "always() && steps.sweep.outcome == 'failure'"
+    assert "exit 1" in guard["run"] and "::error::" in guard["run"]
 
 
 def test_card_yml_can_rehearse_a_degraded_card_on_demand():
@@ -202,7 +215,10 @@ def test_card_yml_installs_before_resolving_the_slot():
     # Every step after the resolve is gated on it (directly or via a derived output).
     for s in steps[resolve + 1 :]:
         assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
-    assert steps[-1]["if"] == "steps.slot.outputs.slot != 'skip'"
+    # The build is the last SLOT-GATED step; only the sweep-failure guard, which
+    # runs on always(), may follow it.
+    assert _card_steps_by_id()["build"]["if"] == "steps.slot.outputs.slot != 'skip'"
+    assert steps[-1]["if"].startswith("always()")
     inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
     assert inputs["slot"]["description"].startswith("tue_pm | thu_pm | fri_pm | sat_am | manual")
     # `force` is what lets a deliberate rebuild past the built-today probe that
@@ -260,3 +276,82 @@ def test_rescore_yml_is_dispatch_only_and_writes_through_env():
     assert len(order) == 3 and order == sorted(order)
     assert "scripts/grade.py" in run_steps[order[1]]["run"]
     assert "pick.py grade" in run_steps[order[2]]["run"]
+
+
+def test_sunday_capture_is_gated_so_three_crons_spend_one_slates_credits():
+    """Three Sunday crons each spent 6 credits (2 markets x 3 regions), so a
+    week where all three fired paid 18 to capture one slate. The expensive step
+    is now gated on a positive fact -- a full_game_total snapshot written today
+    (ET) -- the same shape as card.yml's built-today probe, with `force` for a
+    deliberate re-capture. Only the capture is gated: the rest of the job costs
+    nothing and re-running it is what you want if the first run half-failed."""
+    data = _load(WF_DIR / "sunday.yml")
+    steps = data["jobs"]["capture-and-score"]["steps"]
+    by_name = {s.get("name"): s for s in steps}
+
+    gate = next(s for s in steps if s.get("id") == "captured")
+    assert "full_game_total" in gate["run"]
+    assert "America/New_York" in gate["run"], "the guard must key on the ET day"
+    assert gate["env"]["FORCE"] == "${{ inputs.force }}"
+    assert "force" in _on(data)["workflow_dispatch"]["inputs"]
+
+    capture = next(s for s in steps if s.get("name", "").startswith("Capture full-game openers"))
+    assert capture["if"] == "steps.captured.outputs.need_capture == 'true'"
+    assert "poll_full_game.py" in capture["run"]
+
+    # The free, idempotent work stays ungated.
+    assert by_name["Score + rank the board"].get("if") is None
+
+
+def test_card_yml_crons_and_ci_CRON_SLOTS_are_the_same_set():
+    """The gap this closes: NOTHING asserted these two agreed.
+
+    test_workflows only validated workflows whose run block contains a
+    `case "$SCHEDULE"` ladder, and card.yml resolves through
+    `python -m beatvegas.ci` instead — so it was skipped entirely here.
+    test_ci_slots checks CRON_SLOTS on its own and never opens the YAML. Adding
+    a cron to card.yml without adding it to ci.py therefore passed CI in full
+    and then failed at 4:05pm ET with `::error:: unmapped cron`, on a day the
+    card is what Tate bets off.
+
+    Both directions matter: an unmapped cron fails the run loudly, and a mapping
+    with no cron behind it is a slot that silently never fires.
+    """
+    from beatvegas.ci import CRON_SLOTS
+
+    yml = _on(_load(WF_DIR / "card.yml"))["schedule"]
+    in_yaml = {c["cron"] for c in yml}
+    in_py = set(CRON_SLOTS)
+
+    assert in_yaml - in_py == set(), (
+        f"card.yml crons with no beatvegas.ci mapping (these would fail the run "
+        f"at fire time): {sorted(in_yaml - in_py)}"
+    )
+    assert in_py - in_yaml == set(), (
+        f"beatvegas.ci mappings with no cron in card.yml (these slots never "
+        f"fire): {sorted(in_py - in_yaml)}"
+    )
+    # Four crons per slot is the DST design: two land inside the ET gate in each
+    # regime. Fewer than four means a regime lost its retry.
+    from collections import Counter
+
+    per_slot = Counter(CRON_SLOTS.values())
+    assert set(per_slot.values()) == {4}, f"expected 4 crons per slot, got {dict(per_slot)}"
+
+
+def test_lines_watch_has_no_mapping_for_a_cron_it_no_longer_runs():
+    """The reverse of the check above, for the workflow that DOES use a case
+    ladder. test_workflows only ever checked crons -> mappings, so the retired
+    `1h_open` branches sat in the script as dead code long after their crons
+    were removed, and nothing said so."""
+    data = _load(WF_DIR / "lines_watch.yml")
+    crons = {c["cron"] for c in _on(data)["schedule"]}
+    run = next(
+        s["run"]
+        for s in data["jobs"][next(iter(data["jobs"]))]["steps"]
+        if 'case "$SCHEDULE"' in str(s.get("run", ""))
+    )
+    # Every cron string the case ladder names must still be scheduled.
+    mapped = set(re.findall(r"^\s*'([-\d,* /]+)'\)", run, re.M))
+    orphans = mapped - crons
+    assert not orphans, f"case branches for crons that no longer exist: {sorted(orphans)}"

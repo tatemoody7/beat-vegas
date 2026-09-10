@@ -34,8 +34,13 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
+// The exemptions are ANCHORED — `api/login$` and `api/login/`, not a bare
+// `api/login` prefix. Unanchored, a future `/api/loginhelper`, `/api/healthz`
+// or `/api/cronjobs` would be public the moment it was added, with nothing in
+// the diff to say so. Nothing matches those today; this is about the next route
+// someone writes.
 export const config = {
   matcher: [
-    "/((?!api/login|api/health|api/cron|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/login(?:/|$)|api/health(?:/|$)|api/cron(?:/|$)|login(?:/|$)|_next/static/|_next/image(?:/|\\?|$)|favicon.ico$).*)",
   ],
 };

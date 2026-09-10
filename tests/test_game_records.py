@@ -167,3 +167,85 @@ def test_migration_adds_the_engine_column_to_a_legacy_records_table():
         c.execute(text("CREATE TABLE game_records (id INTEGER PRIMARY KEY, game_id INTEGER)"))
     _apply_migrations(eng)
     assert "engine" in {col["name"] for col in inspect(eng).get_columns("game_records")}
+
+
+# --- the false-zero guard --------------------------------------------------
+#
+# A LINE-SCORE 0 against a non-zero final is the known corruption (placeholder
+# all-zero quarters); 44 such rows were repaired in Neon in 2026-07. Grading one
+# books a fabricated UNDER win into the records grid, the credibility ledger and
+# bv_line recalibration, so grade_records must route through
+# grading.trusted_first_half_total like every other grader.
+
+
+def _game_and_record(store, **game_kw):
+    """One snapshotted record on a game, ready to grade."""
+    from beatvegas.db.models import Game
+
+    now = dt.datetime(2026, 10, 1)
+    with store.session_scope() as s:
+        s.add(Game(id=1, season=2026, week=8, home_team="A", away_team="B", **game_kw))
+    scored = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "season": 2026,
+                "week": 8,
+                "line": 24.5,
+                "line_kind": "observed_1h",
+                "bv_line": 22.0,
+                "bv_gap": 2.5,
+                "bv_gap_z": 0.8,
+                "under_score": 58,
+            }
+        ]
+    )
+    with store.session_scope() as s:
+        assert snapshot_slate(s, scored, "gbm_v1", now) == 1
+    return now
+
+
+def test_a_linescore_false_zero_is_not_graded_as_an_under_win(db):
+    """0 at the half with a 45-point final is corruption, not a shutout."""
+    from beatvegas.db.models import GameRecord
+
+    store = db
+    now = _game_and_record(
+        store,
+        first_half_total=0,
+        first_half_source="linescores",
+        home_points=24,
+        away_points=21,
+    )
+    with store.session_scope() as s:
+        assert grade_records(s, now) == 0  # skipped, not booked
+    with store.session_scope() as s:
+        rec = s.query(GameRecord).filter_by(game_id=1).one()
+        assert rec.graded_at is None
+        assert rec.under_hit is None and rec.outcome is None
+
+
+def test_a_genuine_scoreless_half_from_pbp_still_grades(db):
+    """A PBP zero is verified against the running score — grade it normally."""
+    from beatvegas.db.models import GameRecord
+
+    store = db
+    now = _game_and_record(
+        store, first_half_total=0, first_half_source="pbp", home_points=24, away_points=21
+    )
+    with store.session_scope() as s:
+        assert grade_records(s, now) == 1
+    with store.session_scope() as s:
+        rec = s.query(GameRecord).filter_by(game_id=1).one()
+        assert rec.under_hit is True and rec.outcome == "under"
+        assert rec.first_half_total == 0
+
+
+def test_a_zero_zero_final_grades_from_linescores_too(db):
+    """0 at the half in a 0-0 final is consistent, so it is trustworthy."""
+    store = db
+    now = _game_and_record(
+        store, first_half_total=0, first_half_source="linescores", home_points=0, away_points=0
+    )
+    with store.session_scope() as s:
+        assert grade_records(s, now) == 1

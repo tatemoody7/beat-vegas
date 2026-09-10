@@ -24,7 +24,13 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      window.location.href = "/"; // full load so middleware sees the new cookie
+      // A FULL load, deliberately. router.push() is a client navigation that
+      // reuses the router cache and never re-runs middleware, so the board
+      // would render from the pre-login cache — or bounce straight back here.
+      // The lint rule is right in general and wrong for the two places that
+      // change the auth cookie.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/";
     } catch {
       setErr("Could not reach the server. Try again.");
       setBusy(false);

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { EV_FLOOR } from "@/lib/verdict";
 import { isExchange, isSynthetic } from "@/lib/books";
 import { devigTwoWay, evUnder } from "@/lib/devig";
@@ -205,7 +206,11 @@ export function evVerdictFor(ev: number | null): EvVerdict {
   return "fair";
 }
 
-export async function getLineCheck(
+/**
+ * Once per request, for the same reason as getBoard — /game/[id] builds the
+ * whole board twice per view (generateMetadata, then the page).
+ */
+export const getLineCheck = cache(async function getLineCheck(
   season: number,
   market: Market,
 ): Promise<LineCheckRow[]> {
@@ -337,4 +342,4 @@ export async function getLineCheck(
     return ah - bh || a.week - b.week || a.matchup.localeCompare(b.matchup);
   });
   return out;
-}
+});

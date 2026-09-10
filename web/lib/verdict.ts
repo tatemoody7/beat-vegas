@@ -407,10 +407,3 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     effGap,
   );
 }
-
-export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-  none: "No read",
-};

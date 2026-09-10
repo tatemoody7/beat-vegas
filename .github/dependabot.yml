@@ -1,0 +1,33 @@
+# Pinning the actions to commit SHAs (see any workflow's `uses:`) removes the
+# tag-move supply-chain risk but replaces it with a staleness one: a pinned SHA
+# never picks up a security fix on its own. This is the other half of that
+# trade. Dependabot rewrites the SHA and its `# v5` comment together, so the
+# pins stay both exact and current.
+#
+# npm is here for the reason this file exists at all: the review found next
+# 16.2.7 carrying a critical advisory that had been out for a while, with
+# nothing in the repo watching for it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "web"
+    # One PR for the routine bumps; anything with an advisory still comes
+    # through on its own so it is not buried in a group.
+    groups:
+      dev-tooling:
+        dependency-type: development
+        patterns: ["*"]

@@ -1,5 +1,4 @@
-import { loadResults, recordFromResults } from "@/lib/ledger";
-import { MARKET_LEDGER_1H, MARKET_LEDGER_FG, MODEL_VERSION } from "@/lib/model";
+import { loadResults } from "@/lib/ledger";
 import {
   isPaperFirstHalf,
   isRealFirstHalf,
@@ -10,18 +9,13 @@ import {
 import { recordFrom, type Record3 } from "@/lib/record";
 import type { PickReason } from "@/lib/verdict";
 
-// Results data: how the MARKET, the MODEL and YOU did — for one week (the
-// scorecard), week by week, and by the reason each pick was logged.
-//   Market 1H   = results.model_version='market'
-//   Market full = results.model_version='market_fg'
-//   Model 1H    = results.model_version=MODEL_VERSION (no full-game model)
-//   You         = graded manual_picks (real 1H vs paper 1H; full game shown as context)
-
-export type ReviewLine = {
-  entity: "Market" | "Model" | "You" | "You (paper)";
-  market: "Full game" | "First half";
-  rec: Record3 | null;
-};
+// Results data: your picks week by week, by the reason each was logged, and by
+// the gate that blocked a real bet.
+//
+// This used to also build a six-row per-week scorecard (Market/Model/You across
+// both markets). The scorecard was deleted from /results on 2026-09-10 but the
+// computation stayed behind it — six record passes over the season on every
+// render, feeding nothing, and duplicating what getLedger already renders.
 
 export type WeekRow = {
   week: number;
@@ -63,7 +57,6 @@ export type WeeklyReview = {
   week: number | null;
   /** Weeks with a graded result or a logged pick. */
   weeks: number[];
-  lines: ReviewLine[];
   byWeek: WeekRow[];
   byReason: ReasonRow[];
   /** Paper first-half picks by the gate that blocked a real bet. */
@@ -184,54 +177,11 @@ export async function getWeeklyReview(
 
   const inWeek = <T extends { week: number | bigint | null }>(rows: T[]) =>
     wk === null ? rows : rows.filter((x) => Number(x.week) === wk);
-  const r = inWeek(res);
   const mine = inWeek(picks);
-  const gradedMine = graded(mine);
-  const isFull = (p: PickFull) => p.market === "full";
-
-  const lines: ReviewLine[] = [
-    {
-      entity: "Market",
-      market: "Full game",
-      rec: recordFromResults(
-        r.filter((x) => x.model_version === MARKET_LEDGER_FG),
-      ),
-    },
-    {
-      entity: "Market",
-      market: "First half",
-      rec: recordFromResults(
-        r.filter((x) => x.model_version === MARKET_LEDGER_1H),
-      ),
-    },
-    {
-      entity: "Model",
-      market: "First half",
-      rec: recordFromResults(
-        r.filter((x) => x.model_version === MODEL_VERSION),
-      ),
-    },
-    {
-      entity: "You",
-      market: "First half",
-      rec: recordFrom(gradedMine.filter(isRealFirstHalf)),
-    },
-    {
-      entity: "You (paper)",
-      market: "First half",
-      rec: recordFrom(gradedMine.filter(isPaperFirstHalf)),
-    },
-    {
-      entity: "You (paper)",
-      market: "Full game",
-      rec: recordFrom(gradedMine.filter((p) => isFull(p) && p.isPaper)),
-    },
-  ];
 
   return {
     week: wk,
     weeks,
-    lines,
     byWeek: weekRows(picks),
     byReason: reasonRows(picks),
     byBlocker: blockerRows(picks),

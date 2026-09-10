@@ -24,6 +24,11 @@ config.yaml
 
 # Local agent tooling (not part of the project)
 .claude/
+# ...except the shared dev-server config, which is deliberately tracked so a
+# fresh clone can start the app. gitignore does not apply to already-tracked
+# files, so without this negation the file's tracked state and this rule said
+# opposite things and only `git ls-files` revealed which one was true.
+!.claude/launch.json
 .superpowers/
 
 # Deploy-and-verify poller state (local, per-machine)
@@ -33,3 +38,9 @@ config.yaml
 
 # Residual-gate reports (timestamped; the workflow uploads them as an artifact)
 reports/residual_gate_*
+
+# Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
+# It was untracked AND unignored, so a `git add -A` would have swept several MB
+# of it into a commit. `reports/residual_gate_*` above covers the sibling path
+# but never this one.
+/research/

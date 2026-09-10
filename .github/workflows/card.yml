@@ -48,6 +48,14 @@ name: Bet card (cloud)
 #
 # CONCURRENCY: shared `neon-writers` group (see lines_watch.yml header).
 
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
 on:
   schedule:
     # Four per slot; the ET gate in beatvegas/ci.py admits the two that land
@@ -106,8 +114,8 @@ jobs:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11'
           cache: pip
@@ -192,6 +200,15 @@ jobs:
         # --status-file records the run's COVERAGE: the sweep can stop at the
         # credit floor or the per-run cap and still exit 0, and only that file
         # tells the build which games carry a stale Hard Rock number.
+        #
+        # continue-on-error: a mid-sweep Odds API 5xx/429 makes poll_lines exit 1
+        # AFTER writing its partial batch and its status file. Without this the
+        # job stopped there and NO card was built at all -- the exact outcome the
+        # degraded-card design exists to prevent, on its most likely trigger. Now
+        # the build runs on the lines the sweep did reach and marks the rest
+        # degraded, and the final step below still fails the run so GitHub's
+        # failed-run email goes out.
+        continue-on-error: true
         env:
           MAX_CREDITS: ${{ inputs.max_credits }}
         # Default cap 150: per-event calls now cost 1 credit, so the CLI's 400
@@ -227,11 +244,13 @@ jobs:
             --week "${{ steps.active.outputs.week }}" \
             --status-file "$RUNNER_TEMP/preview_status.json"
       - name: Build + publish the card (+ paper-log qualifying games in the slot's window)
+        id: build
         if: steps.slot.outputs.slot != 'skip'
         env:
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
           NO_PAPER: ${{ steps.slot.outputs.no_paper }}
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
+          SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |
           if [ -z "${{ steps.active.outputs.week }}" ]; then
             echo "no active week — nothing to build"
@@ -251,7 +270,26 @@ jobs:
           if [ "$PREVIEW_OUTCOME" = "failure" ] && [ ! -f "$PREVIEW_STATUS" ]; then
             echo '{"ok": false, "reason": "step_failed"}' > "$PREVIEW_STATUS"
           fi
+          # Same for the sweep. poll_lines writes its status on every exit path
+          # it controls, but a step that died before that (an import error, the
+          # runner being killed) would leave no file -- and a MISSING file means
+          # "the step did not run", which is not a failure. Omitting
+          # unpolled_game_ids holds EVERY game on the card as degraded, which is
+          # the correct read when coverage is unknown.
+          SWEEP_STATUS="$RUNNER_TEMP/sweep_status.json"
+          if [ "$SWEEP_OUTCOME" = "failure" ] && [ ! -f "$SWEEP_STATUS" ]; then
+            echo '{"complete": false, "reason": "step_failed", "events_in_window": 0, "events_polled": 0, "credits_spent": null}' > "$SWEEP_STATUS"
+          fi
           python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" $extra \
             --slot "${{ steps.slot.outputs.slot }}" \
-            --sweep-status "$RUNNER_TEMP/sweep_status.json" \
+            --sweep-status "$SWEEP_STATUS" \
             --preview-status "$PREVIEW_STATUS"
+      - name: Fail the run if the sweep did not complete
+        # The card is published either way (see continue-on-error above); this
+        # is what still turns the run red, so GitHub's failed-workflow email --
+        # the only failure channel this project has -- goes out.
+        if: always() && steps.sweep.outcome == 'failure'
+        run: |
+          echo "::error::1H sweep failed. The card was published DEGRADED off the lines the sweep did reach; check the sweep step for the Odds API error."
+          echo "1H sweep FAILED -- card published degraded." >> "$GITHUB_STEP_SUMMARY"
+          exit 1

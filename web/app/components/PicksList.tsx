@@ -91,6 +91,8 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
         const j = await res.json().catch(() => ({}));
         setError(j.error ?? "Could not save that.");
       }
+    } catch {
+      setError("Could not reach the server. Nothing was saved.");
     } finally {
       setSaving(false);
     }
@@ -98,9 +100,20 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
 
   async function del(id: number) {
     setDeleting(id);
+    setError(null);
     try {
       const res = await fetch(`/api/picks/${id}`, { method: "DELETE" });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        // Silence here meant a refused delete (409 already graded) and a failed
+        // one (503) both looked exactly like a delete that worked: the row was
+        // still on screen and nothing said why. `save` already did this.
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? "Could not delete that.");
+      }
+    } catch {
+      setError("Could not reach the server. The pick was not deleted.");
     } finally {
       setDeleting(null);
     }

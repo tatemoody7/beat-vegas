@@ -73,7 +73,12 @@ describe("parsePickEdit", () => {
     // line/market/gameId are deliberately not editable: they are what the bet
     // WAS. Sending them changes nothing rather than erroring, so a stale client
     // cannot quietly rewrite history.
-    const r = parsePickEdit({ price: -120, line: 99, market: "full", gameId: 7 });
+    const r = parsePickEdit({
+      price: -120,
+      line: 99,
+      market: "full",
+      gameId: 7,
+    });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.edit).toEqual({ price: -120 });

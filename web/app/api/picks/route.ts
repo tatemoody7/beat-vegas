@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLatestCard } from "@/lib/card";
-import { createPick, getSlate } from "@/lib/picks";
+import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
 import { checkPolicy, parsePickBody } from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
 
@@ -8,6 +8,14 @@ import { prisma } from "@/lib/prisma";
 // betting policy (1H-only real money, flat 1 unit, 5-bet weekly cap, the
 // card's kill numbers) live in lib/pickRules.ts so they are unit-tested; this
 // route only gathers DB facts.
+function dbError(where: string, e: unknown) {
+  console.error(`[api/picks] ${where} failed:`, e);
+  return NextResponse.json(
+    { error: "could not reach the database — the pick was NOT logged" },
+    { status: 503 },
+  );
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -24,12 +32,21 @@ export async function POST(req: NextRequest) {
   }
   const { pick } = parsed;
 
-  const game = await prisma.games.findUnique({
-    where: { id: pick.gameId },
-    select: { season: true, week: true, start_date: true },
-  });
-  const slate = game ? await getSlate(game.season) : [];
-  const inSlate = !!game && slate.some((g) => g.gameId === pick.gameId);
+  // Everything from here down touches the database. A Neon blip used to return
+  // a bare framework 500 with no JSON body, which the client rendered as
+  // "failed (500)" on the one screen where money is logged.
+  let game: { season: number; week: number; start_date: Date | null } | null;
+  let inSlate = false;
+  try {
+    game = await prisma.games.findUnique({
+      where: { id: pick.gameId },
+      select: { season: true, week: true, start_date: true },
+    });
+    const slate = game ? await getSlate(game.season) : [];
+    inSlate = !!game && slate.some((g) => g.gameId === pick.gameId);
+  } catch (e) {
+    return dbError("slate lookup", e);
+  }
 
   // One pick per game/market PER LEDGER: a double-click must not double the
   // record, but the card's paper pick on a game (the paper ledger now logs
@@ -58,7 +75,14 @@ export async function POST(req: NextRequest) {
   const cardQ = game
     ? getLatestCard(game.season, game.week)
     : Promise.resolve(null);
-  const [dup, cap, card] = await Promise.all([dupQ, capQ, cardQ]);
+  let dup: { id: number }[];
+  let cap: { n: number | bigint }[];
+  let card: Awaited<ReturnType<typeof getLatestCard>>;
+  try {
+    [dup, cap, card] = await Promise.all([dupQ, capQ, cardQ]);
+  } catch (e) {
+    return dbError("policy checks", e);
+  }
   const item = card?.items.find((i) => i.gameId === pick.gameId) ?? null;
 
   const policy = checkPolicy(pick, {
@@ -78,7 +102,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { tracked } = await createPick(pick);
+  let tracked: boolean;
+  try {
+    ({ tracked } = await createPick(pick));
+  } catch (e) {
+    // The uq_manual_pick_per_ledger backstop fired. The duplicate check above
+    // already passed, so this is the race it cannot close — a double-click, or
+    // a retry of a request that had in fact succeeded. Either way the pick the
+    // caller wanted is on file, so 409 (the same status the check itself
+    // returns) is the honest answer, not a 500.
+    if (e instanceof DuplicatePickError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
+    return dbError("createPick", e);
+  }
   return NextResponse.json(
     {
       ok: true,

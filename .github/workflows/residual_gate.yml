@@ -9,6 +9,14 @@ name: Residual engine gate (walk-forward report)
 # writes a model_runs row only when write_model_run is "true" (hence the shared
 # neon-writers group). Spends no Odds API credits.
 
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -35,8 +43,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11'
       - name: Install
@@ -56,7 +64,7 @@ jobs:
           python scripts/residual_gate.py "${ARGS[@]}"
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: residual-gate-report
           path: reports/residual_gate_*

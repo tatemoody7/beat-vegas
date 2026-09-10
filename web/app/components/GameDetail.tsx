@@ -12,6 +12,7 @@ import {
 } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
 import {
+  factorTint,
   type BoardFactor,
   type SplitLeg,
   type TeamForm,
@@ -24,7 +25,6 @@ import {
   WEEKLY_BET_CAP,
   type Confidence,
 } from "@/lib/verdict";
-import FactorBars from "@/app/components/FactorBars";
 import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
 import MovementChart from "@/app/components/MovementChart";
@@ -326,6 +326,20 @@ function ModelSection({ g }: { g: HomeGame }) {
 
 // --- What is behind it ------------------------------------------------------
 
+function FactorRow({ f }: { f: BoardFactor }) {
+  const tint = factorTint(f);
+  return (
+    <div className="bv-fac-row" style={{ background: tint.bg }}>
+      <span className="bv-fac-text">
+        {f.sentence || `${f.label} — ${f.value}`}
+      </span>
+      {f.hypothesis && (
+        <span className="bv-fac-badge bv-fac-badge-amber">unproven</span>
+      )}
+    </div>
+  );
+}
+
 function formText(t: TeamForm | null | undefined): string {
   if (!t || !Array.isArray(t.pf) || t.pf.length === 0) return "—";
   const last = <T,>(xs: T[]) => xs.slice(-3);
@@ -390,15 +404,22 @@ function WhySection({ g }: { g: HomeGame }) {
   return (
     <Section title="What is behind it">
       {factors.length > 0 ? (
-        <div className="mb-4">
-          <FactorBars factors={factors} />
+        <div className="mb-3">
+          {factors.map((fac) => (
+            <FactorRow key={fac.key} f={fac} />
+          ))}
+          {factors.some((x) => x.hypothesis) && (
+            <p className="mt-1 text-xs text-[var(--text-dim)]">
+              {`Rows marked unproven have not been checked against real lines yet.`}
+            </p>
+          )}
         </div>
       ) : (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
           {`Nothing here yet. It fills in when the week is scored on Sunday.`}
         </p>
       )}
-      <div className="space-y-1 border-t border-[var(--border)] pt-3">
+      <div className="space-y-1">
         <Row
           label={`Last 3 first halves · ${g.row.away}`}
           value={formText(f.form_away)}

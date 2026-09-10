@@ -407,9 +407,8 @@ def test_apply_degraded_keeps_the_tier_and_writes_a_paper_only_action():
     assert out["paper_blocker"] == "degraded"  # it qualifies, so the ledger tags it
     # The input KEY never reaches a reader: it is named in words.
     assert out["action"] == (
-        "An input failed this morning — paper only. This morning the morning line sweep "
-        "did not finish, so check Hard Rock’s number and the injury list yourself before "
-        "betting."
+        "Paper only — the line sweep did not finish. Check Hard Rock’s number and the "
+        "injury list yourself before betting."
     )
 
 
@@ -423,16 +422,17 @@ def test_apply_degraded_lists_every_input_that_touched_the_game():
         ],
     )
     assert items[0]["degraded_inputs"] == ["sweep", "tempo"]  # DEGRADED_INPUTS order
-    assert items[0]["action"].startswith("An input failed this morning — paper only.")
-    assert (
-        "the morning line sweep did not finish, the pace numbers did not load" in items[0]["action"]
-    )
+    assert items[0]["action"].startswith("Paper only — ")
+    # Joined on "; ", not ", ": the pace phrase carries its own comma, so a
+    # comma join ran two reasons together into one unreadable clause.
+    assert "the line sweep did not finish; the pace numbers did not load" in items[0]["action"]
     # A second pass with a different list MERGES into the first, never replaces it.
     apply_degraded(items, [{"input": "pace", "detail": "", "game_ids": [1]}])
     assert items[0]["degraded_inputs"] == ["sweep", "pace", "tempo"]
     assert (
-        "the morning line sweep did not finish, the pace read is missing on some games, "
-        "the pace numbers did not load" in items[0]["action"]
+        "the line sweep did not finish; these teams have only played FCS opponents, so "
+        "there is no season-to-date pace on them yet; the pace numbers did not load"
+        in items[0]["action"]
     )
     # No raw key, ever ("line sweep" is prose; "(sweep" / "tempo" are keys).
     assert "(sweep" not in items[0]["action"]

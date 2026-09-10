@@ -1110,11 +1110,11 @@ describe("cardHealth", () => {
       SAT_10AM,
     );
     expect(h.level).toBe("warn");
-    expect(h.title).toBe("Some inputs failed this morning — paper only");
+    expect(h.title).toBe("Paper only — some inputs are missing");
     expect(h.details).toEqual([
       "The rules behind these games could not be checked, so nothing here is a real bet today.",
       "the injury and news pull did not finish",
-      "the morning line sweep did not finish",
+      "the line sweep did not finish",
     ]);
     // No input key, no Python detail string, and never the slot.
     expect(h.title).not.toMatch(/afternoon/);

@@ -127,11 +127,24 @@ DEGRADED_INPUTS = ("sweep", "preview", "pace", "tempo")
 DEGRADED_BLOCKER = "degraded"
 # What each failed input is called on screen. Mirrors web/lib/labels.ts
 # CARD_INPUT_TEXT — the key itself is never shown to a reader.
+# "morning" is gone from these on purpose: since 2026-09-09 three of the four
+# builds run in the AFTERNOON (tue_pm/thu_pm/fri_pm), so a card telling you
+# something failed "this morning" at 4pm was simply wrong.
+#
+# `pace` also stopped claiming a FAILURE, because it is not one. TeamRankings
+# leaves non-FBS games out of its season-to-date rate stats, so a team whose
+# only opponents so far were FCS has no pace to read — "--" in the source, NULL
+# in team_tempo. It is ~30% of teams in week 2 and reliably ZERO by week 3, in
+# every season 2023-2026. Calling that "an input failed" sends the reader
+# hunting for a broken job at 8am on a Saturday.
 DEGRADED_INPUT_TEXT = {
-    "sweep": "the morning line sweep did not finish",
+    "sweep": "the line sweep did not finish",
     "preview": "the injury and news pull did not finish",
+    # tempo IS a real failure: the whole pace table did not load.
     "tempo": "the pace numbers did not load",
-    "pace": "the pace read is missing on some games",
+    "pace": (
+        "these teams have only played FCS opponents, so there is no season-to-date pace on them yet"
+    ),
 }
 DEGRADED_INPUT_FALLBACK = "an input did not load"
 # Which of those flip the CARD's status to "degraded" (and so the site banner
@@ -1046,10 +1059,12 @@ def apply_degraded(items: Sequence[Dict], degraded: Sequence[Dict]) -> List[Dict
             it["paper_blocker"] = DEGRADED_BLOCKER
         # Input keys never reach a reader: DEGRADED_INPUT_TEXT is the same
         # wording web/lib/labels.ts CARD_INPUT_TEXT renders.
-        words = ", ".join(DEGRADED_INPUT_TEXT.get(n, DEGRADED_INPUT_FALLBACK) for n in uniq)
+        # "; " not ", ": these phrases carry their own commas now, so a
+        # comma join ran two reasons together into one unreadable clause.
+        words = "; ".join(DEGRADED_INPUT_TEXT.get(n, DEGRADED_INPUT_FALLBACK) for n in uniq)
         it["action"] = (
-            f"An input failed this morning — paper only. This morning {words}, so check "
-            "Hard Rock’s number and the injury list yourself before betting."
+            f"Paper only — {words}. Check Hard Rock’s number and the injury "
+            "list yourself before betting."
         )
     return list(items)
 

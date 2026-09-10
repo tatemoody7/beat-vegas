@@ -291,10 +291,10 @@ describe("blockReason", () => {
 
   it("reads the same for degraded/cap regardless of source", () => {
     expect(blockReason("degraded", true)).toBe(
-      "An input failed this morning, so this is paper only.",
+      "An input is missing, so this is paper only.",
     );
     expect(blockReason("degraded", false)).toBe(
-      "An input failed this morning, so this is paper only.",
+      "An input is missing, so this is paper only.",
     );
     expect(blockReason("cap", false)).toMatch(/already logged this week/);
   });

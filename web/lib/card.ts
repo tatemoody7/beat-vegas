@@ -443,7 +443,7 @@ export function cardHealth(card: Card, now: Date): CardHealth {
     }
     return {
       level: "warn",
-      title: "Some inputs failed this morning — paper only",
+      title: "Paper only — some inputs are missing",
       details: [
         "The rules behind these games could not be checked, so nothing here is a real bet today.",
         ...failed,

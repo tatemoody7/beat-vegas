@@ -20,9 +20,18 @@ the bet card follows. Change it here first, then in code.
 
 - **Edge-driven, capped at 5 real-money bets per week.** The cap is a
   ceiling, not a target. Zero bets is a valid, normal week.
-- Only games whose verdict on the This Week page is **BET** are bettable. Real bets are placed off that day's morning card (Tue–Sat ~8:05am ET) via the Bet Slip; Thursday and Friday games are bet off their own morning card and count toward the same weekly cap. BETs are ranked by gap — the 6th+ by gap is paper only (`blocker: cap`).
+- Only games whose verdict on the This Week page is **BET** are bettable. Real bets are
+  placed off the most recent decision build (Tue/Thu/Fri ~4:05pm ET, Sat ~8:05am ET) via
+  the Bet Slip, and all of them count toward the same weekly cap. BETs are ranked by gap
+  — the 6th+ by gap is paper only (`blocker: cap`).
   A BET whose blocker is `degraded` is **held**: paper only, no cap slot (see
   "Degraded card" below). WATCH is not a bet. Passing costs nothing.
+- **A bonus (free) bet does NOT use a cap slot** (`manual_picks.is_bonus`, 2026-09-09).
+  The cap limits how much of the $100 roll is at risk in a week and the book funded that
+  stake, so a free bet must not crowd out a real one. It is still a real ticket
+  (`is_paper` stays false) and still appears in the "you" ledger — but a LOSS books zero
+  units instead of the stake, because it cost nothing. A win is unchanged: a bonus bet
+  pays profit only, which is what the units maths already computed.
 - A bet placed anyway on a WATCH or PASS game is still logged as real money,
   flagged **off-policy** on Results and broken out separately, so the record
   is complete and the overrides can be judged against the system.
@@ -172,6 +181,10 @@ slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
   (docs/POST_MORTEM.md) found the 1H market barely moves between open and
   close (mean |move| 0.42 pts, 45% unchanged), so CLV alone cannot resolve the
   edge in one season — volume of graded gated games can.
+- **Correcting a pick:** price, stake, note and the bonus flag can be edited from the
+  Results table while the pick is PENDING (`PATCH /api/picks/<id>`). The line, market and
+  game are not editable — they are what the bet *was* — and a graded pick is refused. A
+  ledger that can be rewritten once the result is known is not evidence of anything.
 - Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
   **every game whose Hard Rock first-half line sits ≥ 1.75 above our number**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a

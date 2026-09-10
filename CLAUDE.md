@@ -5,6 +5,23 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-09 evening (PRs #87-#92, all merged; real money Sat Sep 12):** four changes
+  landed together. (1) **Per-event 1H calls cost 1 credit**, not 2: `odds_api.bookmakers_1h`
+  names ten books, which the Odds API bills as ONE region and which overrides `regions`
+  (verified live — same event, same eight books incl. `hardrockbet`, half the credits).
+  The BULK full-game pull still prices by region and needs `us_ex`; an 11th book key
+  doubles every sweep, so `sources/odds.py` refuses to start with one. (2) **Four decision
+  builds a week** replace the daily morning card: `tue_pm`/`thu_pm`/`fri_pm` (~4:05pm ET)
+  and `sat_am` (~8:05am ET), all status `final`, paper windows 48/24/16/80 h = exactly the
+  gap to the next build. `manual` builds publish but paper-log NOTHING. Expected spend
+  ~567 credits/wk (was ~1,308) on a measured basis of **82** HR games, not the 60 the old
+  comments assumed. (3) **A Vercel cron is the primary trigger** (`web/vercel.json` ->
+  `/api/cron/[job]`, table in `web/lib/cronJobs.ts`); GitHub cron is the backup and the
+  `cards`-row probe now suppresses a duplicate DISPATCH too (`force=true` overrides).
+  (4) **Bonus bets + pick editing** — see the gotchas.
+- **Board:** anchor jumps from the bet card now clear the sticky header (one `--header-h`
+  property drives `scroll-padding-top` and the day heading); a card row whose game is not
+  on the board reads "Not on the board" instead of a dead link.
 - **2026-09-08 (site rebuild + rolling week, PRs #76-#81; real money from week 2, Sep 12):**
   the board (`/`) is ONE rolling week grouped by ET day; each game locks at its own kickoff.
   Grade = a coloured 0-100 **score** (`web/lib/grade.ts`: 70+ green/bet, 55-69 amber/watch,
@@ -14,12 +31,9 @@ Research only — it never places bets or automates gambling.
   Score/gap basis = Hard Rock's line → market consensus → our reference line, said in words;
   a real-money BET still needs Hard Rock's own line. **Model minimum is 0 games** (every FBS
   game scored off last season's priors; rows with <2 games carry `h/a_games_played` → "early
-  season" tag). **Four decision builds a week: Tue/Thu/Fri ~4:05pm + Sat ~8:05am ET** (`ci.py` slots
-  `tue_pm`/`thu_pm`/`fri_pm`/`sat_am`, all status `final`, paper windows 48/24/16/80 h =
-  exactly the gap to the next build); per-event 1H calls cost **1 credit** via
-  `odds_api.bookmakers_1h` (10 books = one region, overrides `regions`; the bulk full-game
-  pull still prices by region and needs `us_ex`) — **~567 credits/wk** on a measured basis of
-  82 HR games; `grade.yml` runs daily 6:30am ET; `lines_watch` opener crons retired. Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
+  season" tag). Schedule, credits and triggers: see the 2026-09-09 bullet above.
+  `grade.yml` runs daily 6:30am ET; `lines_watch` opener crons retired.
+  Every raw enum goes through `lib/labels.ts`; no Trust page, no honesty
   caveat line (Tate). Specs: `docs/superpowers/specs/2026-09-08-*.md`. Dev on a network that
   filters Neon:5432: `NEON_HTTP=1` in `web/.env` (Prisma Neon adapter over 443).
   **Score is gap only (no price bonus, no off-market/QB-out penalty) since 2026-09-09**, floored so
@@ -213,6 +227,25 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   reads `GET /api/health` over HTTPS to confirm capture. Secrets `DATABASE_URL`/`CFBD_API_KEY`/
   `ODDS_API_KEY` are the only GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
+- **Bonus bets book NO loss** (`manual_picks.is_bonus`, 2026-09-09). Grading is
+  `stake x units_won` and a loss returns -1/unit, so a $20 bonus logged as 2 units would
+  show -$20 on a loss that cost nothing. `picks.graded_pick_fields` floors units at 0 when
+  `is_bonus`; the WIN side is untouched because `units_won` already returns profit only,
+  which is exactly what a bonus bet pays. Bonus bets are also excluded from the 5-bet
+  weekly cap in BOTH `build_card.py::real_bets_this_week` and the web POST cap query.
+  A pending pick's price/stake/note/bonus flag are editable (`PATCH /api/picks/<id>`,
+  rules in `web/lib/pickRules.ts::parsePickEdit`); line/market/game never are, and a
+  graded pick is refused. **Schema ordering:** a new `manual_picks` column must reach Neon
+  via `migrate.yml` BEFORE the web deploy — the cap query reads `COALESCE(is_bonus, false)`
+  and would throw on a missing column. The READ path degrades gracefully (`isMissingColumn`
+  fallback in `web/lib/picks.ts`); the write path does not.
+- **The model has a BLOWOUT BLIND SPOT (found 2026-09-09, unfixed).** On the week-2 slate
+  it ran 2.5 pts below Hard Rock on average, but split by spread: in blowouts (|spread|
+  >= 21) HR's implied 1H share was 0.541 against our fitted fair 0.5375 — HR is right —
+  while ours was 0.443, so **every single blowout cleared the 1.75 gate automatically**.
+  In close games the same comparison is 0.507 vs 0.4975 vs 0.476. The top of the board is
+  therefore an artifact: the biggest "gaps" are the games the model understands least. The
+  price floor was the only thing blocking them. Do not read a 9-pt gap as a 9-pt edge.
 - **GHA cron is UNRELIABLE, not just late** (Aug 28-30 2026: `lines_watch.yml` fired 2 of 19
   scheduled runs; 2026-09-09: `card.yml` fired 0 of 5 morning builds on time, the 12:05Z tick
   running at 16:33Z; no GitHub incident posted either time). So since 2026-09-09 the card and

@@ -361,6 +361,25 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas
+- **BetMGM's `totals_h1` is NOT a centred main line** (confirmed live 2026-09-12).
+  It serves an off-centre rung: 4.86 pts from the market median on average, 61 of 63
+  games 2+ pts off, with two-way prices ~235 points from -110 where every normal book
+  is 15-47 (Western Kentucky @ Georgia: BetMGM 36.5 over +195 / under -275 while six
+  books sat 30.5-32.5). **Not our parser and not staleness** — a live call returns 2
+  outcomes at ONE point per book, and BetMGM's `last_update` was the freshest of the
+  seven. The fair price is already safe (`fairPriceWindow` admits only books within
+  0.5 pts of Hard Rock), but the consensus MEDIAN moves on 13 of 63 games by up to
+  **0.5 pts** — exactly `HR_OFF_MARKET_PTS`, so it can flip the off-market gate on a
+  borderline game. Details + options: `docs/RANKING_AND_TRUST.md` §9.
+- **Two price gates that disagree**: the board's colour uses `EV_FLOOR` (-5%, normal
+  juice passes) while logging uses `killPrice` (break-even vs the market fair). Between
+  them is a band where **the board shows GREEN and `POST /api/picks` refuses the log** —
+  hit live on Alabama @ Kentucky at -120 (EV -2.7%, kill -113). `docs/RANKING_AND_TRUST.md` §8.
+- `sources/odds.py::_normalize_totals` takes the **LAST** outcome in a market
+  (`for oc in outcomes: ... over_price, line = ...`). Every book returns one point pair
+  today so it is currently harmless, but a book returning alternate rungs would silently
+  yield an arbitrary line — and could mix an over price from one rung with an under from
+  another. Fix it before trusting any new book.
 - **A `web/lib/` export with no TypeScript caller may still be LOAD-BEARING.**
   `tests/test_gate_parity.py` reads constants OUT of `verdict.ts`, `grade.ts`, `edge.ts`,
   `lineCheck.ts`, `books.ts` and `card.ts` **by regex** and compares them to

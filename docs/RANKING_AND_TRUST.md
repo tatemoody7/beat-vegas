@@ -202,7 +202,87 @@ weekend.** The options considered were (a) warn on the board but still allow,
 (b) make the card's hold binding on the API like the kill price, (c) stop
 holding on a missing pace read at all since the model still produces a number.
 
-## 8. What is still open
+## 8. Two price tests that disagree: green board, refused log
+
+Hit live on 2026-09-11 on Alabama @ Kentucky at -120, and it is the same shape
+as §6 and §7 — two halves computing one question differently.
+
+There are TWO price gates, and they are not the same test:
+
+| | Where | Rule | On Alabama @ Kentucky at -120 |
+|---|---|---|---|
+| Tier / board colour | `edge.ts` via `evVerdict` | EV >= `EV_FLOOR` (-5%) | EV -2.7% -> **passes, shows GREEN** |
+| Logging | `pickRules.checkPolicy` | price >= `killPrice` | kill -113 -> **refused** |
+
+`killPrice = breakEvenPrice(marketFairUnder)` — the price at which the bet is
+exactly break-even against the market's fair value. `EV_FLOOR` deliberately
+allows normal juice (a -110 coin flip is -4.5%). Between the two there is a
+band — roughly -114 to -125 on a 53% fair — where **the board says bet and the
+API says no**.
+
+Measured on that game: market fair for the under 53.1% across five books, so
+kill price -113. At -115 EV is -0.8% (green) and the log is refused; at -120 EV
+is -2.7% (green) and the log is refused.
+
+This is not obviously a bug — an owner could want the board to show "close" and
+the ledger to hold a hard line. But it is undocumented, and it reads as the
+system contradicting itself at the moment money is being placed. Whatever is
+decided, the board should say which of the two numbers it is showing.
+
+**Owner decision (2026-09-12): record for a future build.**
+
+## 9. BetMGM is not quoting a centred main line
+
+Raised by the owner from the Lines table, where BetMGM sat 5 points below the
+field. Confirmed against the live API on 2026-09-12.
+
+| Book | Avg abs distance from market median | Games 2+ pts off | Avg price skew from -110 |
+|---|---|---|---|
+| **betmgm** | **4.86 pts** | **61 of 63** | **235** |
+| hardrockbet | 1.72 | 31 of 80 | 101 |
+| draftkings | 0.27 | 1 of 81 | 37 |
+| fanduel | 0.19 | 1 of 82 | 18 |
+
+The price-skew column is the tell. A centred main total prices both sides near
+-110; every normal book sits 15-47 points away from that, BetMGM sits 235.
+
+**It is NOT our parser and NOT staleness** — both were checked:
+
+- A live `totals_h1` call returns exactly **2 outcomes at a single point** for
+  every book including BetMGM, so the last-wins loop in
+  `sources/odds.py::_normalize_totals` has nothing to pick wrongly here. (That
+  loop IS still fragile — it takes the last outcome and would mix rungs if a
+  book ever returned several — but it is not the cause of this.)
+- BetMGM's `last_update` was the FRESHEST of the seven books on the probe.
+
+BetMGM simply serves an off-centre rung as its main first-half total. On
+Western Kentucky @ Georgia it posted **36.5 over +195 / under -275** (fair under
+68.4%) while six books sat at 30.5-32.5 (fair under 47-54%). That is internally
+coherent — 36.5 at -275 is roughly 31.5 at -110 — it is just not a comparable
+number.
+
+**How much damage:**
+
+- **Fair price: none.** `fairPriceWindow` only admits books within 0.5 pts of
+  Hard Rock's line (1.5 below when HR is above market), so a book 5 points away
+  is already excluded.
+- **Market median: bounded but real.** Taking the MEDIAN rather than the mean
+  absorbs most of it — across 63 games the median moved on **13**, by at most
+  **0.5 points** (avg 0.087). The thinnest game still had 5 books.
+- **That 0.5 matters.** `HR_OFF_MARKET_PTS` is exactly 0.5 and the gate is
+  `market - hr > 0.5`, so a half-point shift in the median can flip the
+  off-market gate on a borderline game — in either direction.
+- **Trust: the visible cost is the real one.** A Lines table showing 28.5 beside
+  six books at 33.5 reads as a broken system, which is how this was found.
+
+**Options, not yet built:** exclude betmgm from the consensus median; or better,
+exclude ANY book whose two-way prices are skewed beyond some threshold from
+-110, which generalises to whichever book does this next rather than naming one.
+Either way the Lines table should label or drop it rather than showing it plain.
+
+**Owner decision (2026-09-12): record for a future build.**
+
+## 10. What is still open
 
 - Build the two-section board (§1).
 - Decide on the share sanity check and its threshold (§3).
@@ -211,6 +291,9 @@ holding on a missing pace read at all since the model still produces a number.
 - The answer bar wording (§6) — highest priority of these, it is read first and
   it is read wrong. Ships with the board rebuild, not before it.
 - The card/board split on `degraded` (§7) — pick one of the three options.
+- The two disagreeing price gates (§8) — green board vs refused log.
+- BetMGM polluting the consensus median (§9), and the fragile last-wins outcome
+  loop in `sources/odds.py` that would bite if any book ever returns rungs.
 - `game_records` still has no graded rows. Until it does, the Track record grid
   and the factor ledger have no 2026 input. `rescore.yml` deliberately does not
   backfill them, because those snapshots are meant to be frozen pre-kickoff.

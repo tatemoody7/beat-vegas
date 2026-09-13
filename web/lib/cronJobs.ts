@@ -21,11 +21,13 @@ import { etMinutesOfDay, etParts } from "@/lib/et";
  *  2. One UTC hour cannot serve both regimes, so each job carries several and
  *     the window here decides which of them is allowed to act.
  *
- * The Saturday window opens at 7:00 and closes at 8:15 for a specific reason:
- * the card must be on the board before the 8:50am Mac routine texts it, and
- * closing at ci.py's 9:15 gate instead would leave the primary entry able to
- * land after the text. The cost is that Saturday's card may build as early as
- * 7:00am; minute-accurate timing needs Vercel's paid tier.
+ * The Saturday window opens at 7:00 and closes at 8:15. That was originally so
+ * the card landed before an 8:50am Mac routine texted it; that routine was
+ * retired 2026-09-13 (every scheduled text was), so the window could now widen
+ * to ci.py's 9:15 gate and let more entries act. Left as-is deliberately: it
+ * works, and a wider window is a behaviour change worth making on purpose
+ * rather than as a side effect. The cost is that Saturday's card may build as
+ * early as 7:00am; minute-accurate timing needs Vercel's paid tier.
  */
 
 export type CronJob = {
@@ -83,6 +85,27 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     dispatchCloseMin: 8 * 60 + 15,
     gateOpenMin: 7 * 60 + 45,
     gateCloseMin: 9 * 60 + 15,
+  },
+  sunday: {
+    workflow: "sunday.yml",
+    // sunday.yml declares ONE optional input (`force`), so an empty object is
+    // accepted -- unlike grade.yml below, which declares none and 422s on any.
+    inputs: {},
+    days: ["Sun"],
+    // The last workflow whose only trigger was GitHub's best-effort cron, which
+    // dropped 17 of 19 scheduled runs over 2026-08-28/30. It is not a small one
+    // to lose: the Sunday capture is the ONLY full-game opener poll, and the
+    // same run refreshes pace, weather, scoring and the derived 1H lines that
+    // the board falls back to before Hard Rock posts. Its previous watchdog was
+    // a Mac routine that ran once ever, three days late.
+    //
+    // Wide window because nothing downstream has a deadline: capture is gated
+    // to one per ET day inside the workflow (sunday.yml), so several ticks
+    // landing in the same afternoon cannot double-spend the 6 credits.
+    dispatchOpenMin: 13 * 60,
+    dispatchCloseMin: 17 * 60,
+    gateOpenMin: null,
+    gateCloseMin: null,
   },
   grade: {
     workflow: "grade.yml",

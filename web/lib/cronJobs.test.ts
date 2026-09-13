@@ -91,6 +91,31 @@ describe("dispatchDecision", () => {
     ); // 7:20am EST
   });
 
+  it("admits the Sunday capture across both DST regimes", () => {
+    const job = CRON_JOBS["sunday"];
+    // 18:00Z is 2pm EDT and 1pm EST; 20:00Z is 4pm EDT and 3pm EST. All four,
+    // plus the full hour Hobby may drift into, sit inside 1pm-5pm ET.
+    expect(dispatchDecision(job, at("2026-07-12T18:00:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-07-12T20:59:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-13T18:00:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-13T20:59:00Z")).allowed).toBe(
+      true,
+    );
+  });
+
+  it("refuses the Sunday capture on any other weekday", () => {
+    // 2026-07-13 is the Monday after.
+    expect(
+      dispatchDecision(CRON_JOBS["sunday"], at("2026-07-13T18:00:00Z")).allowed,
+    ).toBe(false);
+  });
+
   it("lets grading run at any hour on any day", () => {
     const job = CRON_JOBS["grade"];
     expect(dispatchDecision(job, at("2026-12-25T10:59:00Z")).allowed).toBe(
@@ -261,6 +286,7 @@ describe("vercel.json stays in lock-step with the table", () => {
     const december = "2026-12";
     const dayOf: Record<string, Record<string, string>> = {
       // A date in each month matching the cron's weekday.
+      "0": { [july]: "2026-07-12", [december]: "2026-12-13" },
       "2": { [july]: "2026-07-14", [december]: "2026-12-15" },
       "4": { [july]: "2026-07-16", [december]: "2026-12-17" },
       "5": { [july]: "2026-07-17", [december]: "2026-12-18" },

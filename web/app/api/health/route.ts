@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getGradeHealth, staleness } from "@/lib/gradeHealth";
+import {
+  buildStatus,
+  getBuildHealth,
+  getGradeHealth,
+  staleness,
+} from "@/lib/boardHealth";
 import { currentCfbSeason } from "@/lib/season";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +35,15 @@ export async function GET() {
       WHERE market = 'full_game_total'`;
     const r = rows[0];
     const grading = staleness(await getGradeHealth(currentCfbSeason()));
+    const build = buildStatus(await getBuildHealth());
     return NextResponse.json({
       ok: true,
       lastFullGameCapture: r?.last_fg_capture?.toISOString() ?? null,
       resultsStale: grading.stale,
+      buildMissed: build.missed,
+      lastBuiltAt: build.missed
+        ? (build.lastBuiltAt?.toISOString() ?? null)
+        : undefined,
       resultsBehindHours: grading.stale ? grading.behindHours : 0,
       unscoredPlayedGames: grading.stale ? grading.unscored : 0,
       lastGradedAt: grading.stale

@@ -151,6 +151,20 @@ export type PolicyContext = {
   /** The card's kill numbers for this game (lib/card.ts CardItem); null = no card item. */
   killLine: number | null;
   killPrice: number | null;
+  /**
+   * Whether the LIVE price could be verified at log time, and the kill price it
+   * implies. The route recomputes this from the same loaders the board renders
+   * from (lib/lineCheck.ts), rather than reading the card payload, so the screen
+   * and the gate cannot be looking at different numbers — the card is built on a
+   * Tuesday and the bet is placed on a Saturday.
+   *
+   * `ok: false` FAILS THE REAL-MONEY BET CLOSED. A cached card price may be
+   * displayed for context; it may never authorize money. Stale data that looks
+   * like a price is worse than no price, because it reads as verified.
+   */
+  livePrice:
+    | { ok: true; killPrice: number | null }
+    | { ok: false; reason: string };
 };
 
 /** Betting-policy checks that need DB facts (passed in). */
@@ -172,6 +186,17 @@ export function checkPolicy(
   // bet the card rated: the edge is gone. Paper and WATCH/PASS (an owner
   // override, already off-policy) are exempt.
   if (!pick.isPaper && pick.market === "1H" && pick.verdict === "BET") {
+    // FAIL CLOSED. No verified live price, no real-money BET. This is a
+    // distinct rejection from the kill-price one below on purpose: "we could
+    // not check" and "we checked and it is too expensive" are different
+    // failures, and a post-mortem that cannot tell them apart will read an
+    // outage as a run of discipline.
+    if (!ctx.livePrice.ok) {
+      return reject(
+        `PRICE UNAVAILABLE — ${ctx.livePrice.reason}. A real bet needs a price we can check against the market right now; the card's number is from the last build, not from this moment. Log it as paper, or re-try once the line is back.`,
+        409,
+      );
+    }
     if (ctx.killLine !== null && pick.line < ctx.killLine) {
       return reject(
         `u${fmt(pick.line)} is below the kill line. We rated this at u${fmt(ctx.killLine)} or higher — at a lower total it is a different bet. Pass on it.`,
@@ -179,9 +204,16 @@ export function checkPolicy(
       );
     }
     // American odds: the larger signed value pays better (-105 beats -120).
-    if (ctx.killPrice !== null && pick.price < ctx.killPrice) {
+    //
+    // The LIVE kill price wins over the card's whenever it exists. Both are
+    // breakEvenPrice(marketFairUnder) at the same bar; they differ only because
+    // the market moved since the build, and the number the bettor is being
+    // offered right now is the one that decides whether this is still the bet
+    // the card rated.
+    const killPrice = ctx.livePrice.killPrice ?? ctx.killPrice;
+    if (killPrice !== null && pick.price < killPrice) {
       return reject(
-        `${american(pick.price)} is worse than the kill price. We rated this at ${american(ctx.killPrice)} or better — at a worse price it is a different bet. Pass on it.`,
+        `${american(pick.price)} is worse than the kill price. We rated this at ${american(killPrice)} or better — at a worse price it is a different bet. Pass on it.`,
         409,
       );
     }

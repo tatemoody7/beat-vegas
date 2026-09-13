@@ -165,3 +165,67 @@ def test_book_closing_price_skips_unpriced_rows_and_is_none_when_all_unpriced():
     assert book_closing_price_before_kickoff(snaps, kickoff, "hardrockbet") == -105
     assert book_closing_price_before_kickoff([snaps[1]], kickoff, "hardrockbet") is None
     assert book_closing_price_before_kickoff([], kickoff, "hardrockbet") is None
+
+
+# --- Off-centre rungs: strict for one book, lenient for a consensus -----------
+#
+# The Hard Rock close-poll window is the whole reason centred_snaps exists, and
+# it was exactly where the lenient `ok or list(snaps)` fallback defeated it: HR
+# serves an off-centre ladder rung on 26 of 28 quotes inside 3 h of kickoff, so
+# "nothing centred" is the NORMAL case for a single-book close, not an edge one.
+
+
+def test_centred_snaps_strict_returns_empty_when_nothing_is_centred():
+    from beatvegas.lines import centred_snaps
+
+    rungs = [
+        snap("hardrockbet", 22.5, 2, over=-275, under=220),
+        snap("hardrockbet", 22.5, 4, over=-260, under=210),
+    ]
+    assert centred_snaps(rungs) == rungs  # lenient: a consensus still gets a number
+    assert centred_snaps(rungs, strict=True) == []
+
+
+def test_book_closing_refuses_a_rung_rather_than_returning_it():
+    """The real Oregon State / Texas Tech shape: every HR quote inside the close
+    window is a rung at 22.5 priced -275/+220, while the centred close was 28.5.
+    Before the strict flag this returned 22.5 and every caller believed it."""
+    from beatvegas.lines import book_closing_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    rungs = [
+        snap("hardrockbet", 22.5, 2, over=-275, under=220),
+        snap("hardrockbet", 22.5, 4, over=-260, under=210),
+    ]
+    assert book_closing_before_kickoff(rungs, kickoff, "hardrockbet") == (None, None, None)
+
+
+def test_book_closing_still_finds_the_last_centred_quote():
+    """Strict drops the rungs, not the book: a book that went off-centre late
+    still closes at its last real number."""
+    from beatvegas.lines import book_closing_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("hardrockbet", 28.5, 1, under=-115),
+        snap("hardrockbet", 28.0, 2, under=-110),
+        snap("hardrockbet", 22.5, 4, over=-275, under=220),  # rung, dropped
+    ]
+    opening, closing, _at = book_closing_before_kickoff(snaps, kickoff, "hardrockbet")
+    assert (opening, closing) == (28.5, 28.0)
+
+
+def test_book_closing_price_refuses_a_rungs_lopsided_price():
+    """A rung's price is the one number that was never on offer at the main
+    total, and this helper's whole job is to record what the bettor was charged."""
+    from beatvegas.lines import book_closing_price_before_kickoff
+
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    rung_only = [snap("hardrockbet", 22.5, 4, over=-275, under=220)]
+    assert book_closing_price_before_kickoff(rung_only, kickoff, "hardrockbet") is None
+
+    mixed = [
+        snap("hardrockbet", 28.0, 2, under=-110),
+        snap("hardrockbet", 22.5, 4, over=-275, under=220),
+    ]
+    assert book_closing_price_before_kickoff(mixed, kickoff, "hardrockbet") == -110

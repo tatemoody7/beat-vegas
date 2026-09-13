@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BET_GAP_PTS,
+  BET_MIN_EV,
+  BREAK_EVEN_EV,
   STRONG_GAP_PTS,
   deriveReason,
   verdictFor,
@@ -395,5 +397,76 @@ describe("deriveReason", () => {
   it("manual otherwise", () => {
     expect(deriveReason(true, 1.0, false)).toBe("manual");
     expect(deriveReason(false, null, false)).toBe("manual");
+  });
+});
+
+// --- the money gate is one named bar, and it fails closed --------------------
+//
+// Two separate guarantees, both load-bearing for lib/pickRules.checkPolicy:
+//   1. BET is unreachable without a judgeable price, BY CONSTRUCTION rather
+//      than by accident of branch order. The API refuses a real-money BET on
+//      exactly this state (PRICE UNAVAILABLE) instead of reading the card's
+//      cached price, so the board and the logger must agree about it.
+//   2. The bar has ONE name. BET_MIN_EV equals EV_FLOOR today; when evidence
+//      raises it, the BET branch must move with it and these tests must fail
+//      rather than quietly keep betting at the old bar.
+describe("verdictFor — the price gate", () => {
+  it("a gap that clears with no judgeable price is never a BET", () => {
+    for (const hrUnderPrice of [-105, null]) {
+      const v = verdictFor({
+        ...base,
+        gap: 4.2,
+        hrLine: 26.0,
+        liveLine: 26.0,
+        hrUnderPrice,
+        ev: null,
+        evVerdict: "na",
+      });
+      expect(v.hrGap).toBeGreaterThanOrEqual(BET_GAP_PTS);
+      expect(v.verdict).toBe("WATCH");
+      expect(v.headline).toMatch(/price can’t be judged/);
+    }
+  });
+
+  it("BET exactly at the bar, WATCH one step below it", () => {
+    const at = verdictFor({ ...base, ev: BET_MIN_EV, evVerdict: "fair" });
+    expect(at.verdict).toBe("BET");
+
+    const below = verdictFor({
+      ...base,
+      ev: BET_MIN_EV - 0.001,
+      evVerdict: "fair",
+    });
+    expect(below.verdict).toBe("WATCH");
+  });
+
+  it("says the price does not cover the edge, not that it beats the market", () => {
+    // The band this PR named: ordinary juice that still loses money, which
+    // used to colour green because EV_FLOOR tolerated it. It is not the same
+    // failure as a materially bad price, and must not read as one.
+    const ordinaryJuice = verdictFor({
+      ...base,
+      ev: BET_MIN_EV - 0.01,
+      evVerdict: "fair",
+    });
+    const materiallyBad = verdictFor({ ...base, ev: -0.2, evVerdict: "neg" });
+    expect(ordinaryJuice.verdict).toBe("WATCH");
+    expect(materiallyBad.verdict).toBe("WATCH");
+    expect(ordinaryJuice.headline).not.toEqual(materiallyBad.headline);
+    expect(materiallyBad.headline).toMatch(/worse than the market/);
+  });
+
+  it("BREAK_EVEN_EV is not the live bar (see model/score.py for why)", () => {
+    // Pins the finding rather than the number: `ev` measures Hard Rock's price
+    // against the MARKET's fair price, not the EV of the wager, and 0 of 42
+    // priced rows on the live 2026 week-2 card cleared zero. Wiring the bar to
+    // BREAK_EVEN_EV makes the system bet nothing, for the wrong reason.
+    expect(BET_MIN_EV).toBeLessThan(BREAK_EVEN_EV);
+    const atTrueBreakEven = verdictFor({
+      ...base,
+      ev: BREAK_EVEN_EV,
+      evVerdict: "fair",
+    });
+    expect(atTrueBreakEven.verdict).toBe("BET");
   });
 });

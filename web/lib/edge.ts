@@ -16,6 +16,7 @@ import { american, fmt, round2 } from "@/lib/format";
 import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import {
   BET_GAP_PTS,
+  BET_MIN_EV,
   HR_OFF_MARKET_PTS,
   verdictFor,
   type VerdictInput,
@@ -100,11 +101,26 @@ function* americanSteps(): Generator<number> {
 
 /**
  * The worst American price (5-cent steps) at which the under still clears
- * `FAIR_EV_FLOOR` against `fairUnder`; null if nothing in ±1000 does.
+ * `floor` against `fairUnder`; null if nothing in ±1000 does.
+ *
+ * DISPLAY ONLY — the money gate compares `ev >= BET_MIN_EV` on the live price
+ * directly (verdict.ts, pickRules.checkPolicy). The 5-cent grid cannot express
+ * the true break-even, which at a 53.1% fair under is −113.2, and a gate built
+ * on the grid manufactures a disagreement band all by itself.
+ *
+ * The rounding direction is load-bearing and it is why americanSteps walks
+ * worst-payout to best: the first rung to clear the floor is always at least as
+ * strict as the true break-even, so "needs −110 or better" can never invite a
+ * price that loses money. Stating −115 there would be optimistic and wrong.
+ *
+ * The floor is BET_MIN_EV — the SAME bar verdictFor's BET branch uses — so the
+ * kill price is by construction the price at which the verdict flips. It is
+ * EV_FLOOR today, NOT zero: see the note in verdict.ts for why `ev` cannot
+ * express a true break-even yet. Mirrors beatvegas/card.py::break_even_price.
  */
 export function breakEvenPrice(
   fairUnder: number,
-  floor: number = FAIR_EV_FLOOR,
+  floor: number = BET_MIN_EV,
 ): number | null {
   for (const p of americanSteps()) {
     if (evUnder(fairUnder, p) >= floor) return p;
@@ -160,6 +176,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     i.marketLine !== null &&
     i.marketLine - i.hrLine > HR_OFF_MARKET_PTS;
   const pricePos = i.evVerdict === "pos";
+  // Display chip only — the price BLOCKER and the BET gate both read BET_MIN_EV.
   const priceNeg = i.evVerdict === "neg";
 
   // Gap basis: the number you can bet, else the market, else the reference.
@@ -198,14 +215,21 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     tier = "BET";
   } else if (score >= EDGE_SCORE_MIN) {
     tier = "EDGE";
-    // Gate order (mirrors beatvegas/card.py): no_hr_line, off_market and price
-    // are market reads on Hard Rock's number; no_fair_price is the price
-    // gate's "cannot judge" branch, so it follows price; qb_out is transient
-    // news resolved by kickoff; gap is the residual.
+    // Gate order (mirrors beatvegas/card.py): no_hr_line and off_market are
+    // market reads on Hard Rock's number; no_fair_price is "cannot judge the
+    // price at all" and so precedes "judged it and it is too dear"; qb_out is
+    // transient news resolved by kickoff; gap is the residual.
+    //
+    // The price blocker tests BET_MIN_EV -- the bar the BET gate itself uses --
+    // and NOT priceNeg. They are the same today because BET_MIN_EV is EV_FLOOR,
+    // but priceNeg is a display chip ("this price is materially bad") while the
+    // bar is a policy number meant to be raised by evidence. Reading the chip
+    // here would make a raised bar report the blocker as "gap", i.e. blame the
+    // model for a price problem.
     if (i.hrLine === null) blocker = "no_hr_line";
     else if (offMarket) blocker = "off_market";
-    else if (priceNeg) blocker = "price";
     else if (i.ev === null) blocker = "no_fair_price";
+    else if (i.ev < BET_MIN_EV) blocker = "price";
     else if (i.qbOut) blocker = "qb_out";
     else blocker = "gap";
   } else {

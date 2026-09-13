@@ -72,6 +72,43 @@ SCORE_WATCH_MIN = 55
 # treated as a fair price: the unavoidable ~2 cents of vig. Below it the price
 # gate fails (web/lib/edge.ts FAIR_EV_FLOOR / lineCheck.ts "neg").
 EV_FLOOR = -0.05  # standard -110 juice on a balanced market passes; -115+ fails
+# --- the money gate, and what `ev` actually measures ------------------------
+#
+# READ THIS BEFORE CHANGING EITHER NUMBER. `ev` is NOT the expected value of the
+# wager. It is ev_under(fair_under, hr_price) where `fair_under` is the MARKET's
+# no-vig fair probability at Hard Rock's number (card.py::market_read) -- so it
+# answers "is Hard Rock's price better or worse than the rest of the market's?",
+# a price-shopping question. The model's edge is not in it at all; that lives in
+# hr_gap, measured in POINTS, on a different scale entirely.
+#
+# The consequence is easy to get wrong, so it was measured (2026-09-13, the live
+# week-2 card in Neon): NO game clears ev >= 0. Not the five BETs, not the 28
+# EDGEs, not the 46 PASSes -- 0 of 42 priced rows, mean ev -0.04 on the BET tier
+# and -0.07 on EDGE. All six real week-2 tickets were negative (-0.0086 to
+# -0.0530). That is not a strict gate, it is an unsatisfiable one: ev >= 0 asks
+# Hard Rock to price better than the no-vig consensus, which is a free arb.
+#
+# Nor can the other direction be taken: implying P(under) from the gap and
+# bv_sigma (a constant 11.26 on all 156 of 2026's rows) makes a 5.32-point gap
+# worth +30% EV at -110, while the same season's grading says the model is LESS
+# accurate than Hard Rock in every spread bucket. That gate would bet everything.
+#
+# So a TRUE EV gate is not available yet. It needs a calibrated P(under), which
+# is what the two-team hurdle engine is for. Until then the bar stays where it
+# has been, on the price-shopping metric, and it is named so it can be raised by
+# evidence rather than edited in place.
+#
+# BET_MIN_EV is that bar: the worst price-vs-market-fair a real bet may take.
+# Equal to EV_FLOOR today, so behaviour is unchanged -- but it is now one named
+# number shared by the board (verdict.ts), the card (card.py::is_bet), the kill
+# price and the logger (pickRules.checkPolicy), where those used to disagree.
+BET_MIN_EV = EV_FLOOR
+# BREAK_EVEN_EV is the arithmetic reference: the EV below which a wager loses
+# against a genuinely fair price. NOTHING GATES ON IT YET, deliberately -- see
+# above, today's `ev` cannot express it. It is here so the eventual form,
+# `estimated EV - uncertainty buffer > 0`, has a name to be written against, and
+# so both languages stay in step before it is wired (test_gate_parity.py).
+BREAK_EVEN_EV = 0.0
 
 
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:

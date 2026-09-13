@@ -1,17 +1,22 @@
 import { cardHealth, type Card } from "@/lib/card";
 
-// Sits directly above the bet slip. Silent on a healthy card; otherwise one
-// amber notice (the same shape as the board's no-model banner) saying why the
-// card should not be bet off as-is: a degraded input, a preview or manual
-// build, or a card today's build has not replaced yet. Server component —
-// everything comes out of cardHealth (pure, tested).
+// Sits on the BOARD, with the missed-build and stale-results banners (moved
+// there from /results 2026-09-13 — it warns about the numbers you are about to
+// bet off, so it belongs where you bet). Silent on a healthy card; otherwise
+// one amber notice saying why the card should not be bet off as-is: a degraded
+// input, a preview or manual build, or a card today's build has not replaced.
+// Server component — everything comes out of cardHealth (pure, tested).
+//
+// `card` is nullable so the caller never has to guard: no card is not a
+// warning about the card, and the board says "no card built yet" elsewhere.
 export default function CardStatusBanner({
   card,
   now = new Date(),
 }: {
-  card: Card;
+  card: Card | null;
   now?: Date;
 }) {
+  if (card === null) return null;
   const health = cardHealth(card, now);
   if (health.level === "ok") return null;
   return (

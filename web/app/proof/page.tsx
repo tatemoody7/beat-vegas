@@ -15,11 +15,14 @@ import {
   DEFAULT_MIN_GAMES,
   getLineStudy,
 } from "@/lib/lineStudy";
+import { CALIB_SEGMENT_TEXT, labelOf } from "@/lib/labels";
 import { getBvCalibration, getEdgeStats } from "@/lib/proof";
 import { proxyShareText } from "@/lib/proxy";
 import { getRecordSeasons } from "@/lib/records";
 import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 import BandTable from "@/app/components/BandTable";
+import Fold from "@/app/components/Fold";
+import GapLadderChart from "@/app/components/GapLadderChart";
 import PmFlags from "@/app/components/PmFlags";
 import PmLiveNotes from "@/app/components/PmLiveNotes";
 import Glossary from "@/app/components/Glossary";
@@ -229,8 +232,19 @@ export default async function ProofPage({
         />
       </div>
 
+      {/* The page's one real finding, as a picture first and a table second.
+          It used to be the table alone, under a 60-word caption, while the
+          line study (a tangent) had the only chart on the page. */}
+      <h3 className="mb-1 mt-6 text-sm font-semibold text-[var(--text)]">
+        The wider the gap, the more often the under wins
+      </h3>
+      <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
+        {`Each bar is every rated game whose Hard Rock first-half line sat that far above our number, 2023–25, graded at the line another book actually closed at. Green bars made money; red lost. Our ${BET_GAP_PTS}-point bar sits inside the third group.`}
+      </p>
+      <GapLadderChart rows={gapReal} breakeven={BREAKEVEN_PCT} />
+
       <BandTable
-        title="Win rate by gap size, at the real close"
+        title="The same five bands, in full"
         rows={gapReal}
         caption={BAND_CAPTION}
       />
@@ -244,39 +258,43 @@ export default async function ProofPage({
         />
       )}
 
-      {/* 3 — the proxy. Demoted, and colourless on purpose. */}
-      <hr className="mt-10 border-[var(--border)]" />
-      <h2 className="mb-1 mt-6 text-sm font-semibold text-[var(--text-muted)]">
-        Measured against an estimated line
-      </h2>
-      <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
-        No book posted a first-half number on these games, so they are graded
-        against one we worked out. Nothing here is coloured: an estimated grade
-        is not a grade. Read it as a sanity check on the block above, never as a
-        result — the same rule returns a different answer on each basis.
-      </p>
+      {/* 3 — the proxy. Demoted, colourless, and now folded away: its own
+          caption calls it a sanity check, so it should not cost the same
+          screen space as the result (Tate 2026-09-13). */}
+      <Fold
+        title="Measured against an estimated line"
+        hint="a sanity check, not a result"
+      >
+        <p className="mb-3 text-xs leading-relaxed text-[var(--text-dim)]">
+          No book posted a first-half number on these games, so they are graded
+          against one we worked out. Nothing here is coloured: an estimated
+          grade is not a grade. Read it as a sanity check on the block above,
+          never as a result — the same rule returns a different answer on each
+          basis.
+        </p>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <RecordCard
-          title="2023–25, the same cap-5 rule"
-          rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "cap5")}
-          basis="estimated"
-          hint={`Up to ${WEEKLY_BET_CAP} bets a week by gap, gap ${BET_GAP_PTS}+, FBS teams only — the headline rule, against the estimate instead of the close.`}
-        />
-        <RecordCard
-          title={`2023–25, every gap ${BET_GAP_PTS}+`}
-          rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "gap175")}
-          basis="estimated"
-          hint="No weekly cap, against the estimate."
-        />
-      </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <RecordCard
+            title="2023–25, the same cap-5 rule"
+            rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "cap5")}
+            basis="estimated"
+            hint={`Up to ${WEEKLY_BET_CAP} bets a week by gap, gap ${BET_GAP_PTS}+, FBS teams only — the headline rule, against the estimate instead of the close.`}
+          />
+          <RecordCard
+            title={`2023–25, every gap ${BET_GAP_PTS}+`}
+            rec={headline(buckets, HIST_SCOPE, "fbs_only", "step", "gap175")}
+            basis="estimated"
+            hint="No weekly cap, against the estimate."
+          />
+        </div>
 
-      <BandTable
-        title="Win rate by gap size, at an estimated line"
-        rows={gapEstimated}
-        caption={BAND_CAPTION}
-        basis="estimated"
-      />
+        <BandTable
+          title="Win rate by gap size, at an estimated line"
+          rows={gapEstimated}
+          caption={BAND_CAPTION}
+          basis="estimated"
+        />
+      </Fold>
 
       {/* 4 — the actionable conclusion, above the methodology. */}
       <h2 className="mb-1 mt-10 text-sm font-semibold text-[var(--text)]">
@@ -291,120 +309,131 @@ export default async function ProofPage({
         {`Computed ${(hist?.computed_at ?? live?.computed_at ?? "").slice(0, 16).replace("T", " ")} UTC, after each morning’s grading.`}
       </p>
 
-      {/* 5-7 — how the number is built. Below the conclusion on purpose:
-          methodology is what you go looking for, not what you lead with. */}
-      <hr className="mt-10 border-[var(--border)]" />
-
-      <Section
-        title="How the number is built"
-        empty={edge ? null : `no finished games for ${scopeLabel} yet.`}
-        caption={`Every finished game in ${scopeLabel}, FBS teams playing FBS teams only.`}
+      {/* 5-7 — methodology, folded: what you go looking for, not what you
+          lead with, and it changes about once a season. */}
+      <Fold
+        title="How the number is built, and how accurate it is"
+        hint="method, and our out-of-sample miss"
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Stat
-            label="Games looked at"
-            value={edge ? edge.games.toLocaleString() : "—"}
-            note="FBS teams playing FBS teams only."
-          />
-          <Stat
-            label="First half’s share of the full game"
-            value={edge ? `${(100 * edge.mean).toFixed(1)}%` : "—"}
-            note="On average, how much of the full-game total the first half was worth."
-          />
-          <Stat
-            label="Middle value"
-            value={edge ? `${(100 * edge.median).toFixed(1)}%` : "—"}
-            note="Half the games were above this, half below."
-          />
-        </div>
-        {edge && (
-          <>
-            <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
-              {`First halves come out around ${(100 * edge.mean).toFixed(1)}% of the full-game total, which is about where books set the first-half line. Where no real first-half line exists we estimate one: ${proxyShareText()}.`}
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-              {`Graded against that estimate, nothing here beat the ${BREAKEVEN_PCT}% you need at -110.`}
-            </p>
-          </>
-        )}
-      </Section>
+        <Section
+          title="How the number is built"
+          empty={edge ? null : `no finished games for ${scopeLabel} yet.`}
+          caption={`Every finished game in ${scopeLabel}, FBS teams playing FBS teams only.`}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Stat
+              label="Games looked at"
+              value={edge ? edge.games.toLocaleString() : "—"}
+              note="FBS teams playing FBS teams only."
+            />
+            <Stat
+              label="First half’s share of the full game"
+              value={edge ? `${(100 * edge.mean).toFixed(1)}%` : "—"}
+              note="On average, how much of the full-game total the first half was worth."
+            />
+            <Stat
+              label="Middle value"
+              value={edge ? `${(100 * edge.median).toFixed(1)}%` : "—"}
+              note="Half the games were above this, half below."
+            />
+          </div>
+          {edge && (
+            <>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
+                {`First halves come out around ${(100 * edge.mean).toFixed(1)}% of the full-game total, which is about where books set the first-half line. Where no real first-half line exists we estimate one: ${proxyShareText()}.`}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                {`Graded against that estimate, nothing here beat the ${BREAKEVEN_PCT}% you need at -110.`}
+              </p>
+            </>
+          )}
+        </Section>
 
-      <Section
-        title="How accurate our number is"
-        empty={
-          calib
-            ? null
-            : "no model run has recorded its out-of-sample misses yet."
-        }
-        caption={
-          calib
-            ? `Average miss = actual first-half points minus our number, over ${calib.n.toLocaleString()} games it never trained on. Near zero is on target. A steady positive miss means our number runs low, which would wrongly lean it under.`
-            : undefined
-        }
-      >
-        {calib && (
-          <div className="bv-table-wrap">
-            <table className="bv-table">
-              <thead>
-                <tr>
-                  <th>Group</th>
-                  <th className="bv-num">Games</th>
-                  <th className="bv-num">Average miss</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="font-medium text-[var(--text)]">Overall</td>
-                  <td className="bv-num text-[var(--text-muted)]">{calib.n}</td>
-                  <td className="bv-num font-mono text-[var(--text-muted)]">
-                    {calib.overall ?? "—"}
-                  </td>
-                </tr>
-                {calib.segments.map((sg) => (
-                  <tr key={sg.label}>
-                    <td className="text-[var(--text-muted)]">{sg.label}</td>
-                    <td className="bv-num text-[var(--text-muted)]">{sg.n}</td>
-                    <td
-                      className="bv-num font-mono"
-                      style={{
-                        color:
-                          sg.meanResidual === null
-                            ? "var(--text-dim)"
-                            : Math.abs(sg.meanResidual) <= 0.5
-                              ? "var(--text)"
-                              : "var(--warn)",
-                      }}
-                    >
-                      {sg.meanResidual ?? "—"}
+        <Section
+          title="How accurate our number is"
+          empty={
+            calib
+              ? null
+              : "no model run has recorded its out-of-sample misses yet."
+          }
+          caption={
+            calib
+              ? `Average miss = actual first-half points minus our number, over ${calib.n.toLocaleString()} games it never trained on. Near zero is on target. A steady positive miss means our number runs low, which would wrongly lean it under.`
+              : undefined
+          }
+        >
+          {calib && (
+            <div className="bv-table-wrap">
+              <table className="bv-table">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th className="bv-num">Games</th>
+                    <th className="bv-num">Average miss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="font-medium text-[var(--text)]">Overall</td>
+                    <td className="bv-num text-[var(--text-muted)]">
+                      {calib.n}
+                    </td>
+                    <td className="bv-num font-mono text-[var(--text-muted)]">
+                      {calib.overall ?? "—"}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
-
-      <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text)]">
-            {`Which first-half totals go under most often (${scopeLabel})`}
-          </h2>
-          {study && (
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]">
-              {`Grouped by the ${study.anyReal ? "first-half total each book opened at" : `estimated opening line (${proxyShareText()})`}${study.fbsPartial ? " — no FBS list for some of these seasons, so their games are all included" : study.fbsFiltered ? ", FBS teams only" : " — no FBS list for this season, so every game is included"}. You need ${BREAKEVEN_PCT}% to break even at -110.${study.anyReal ? "" : " On estimated lines this ordering partly reflects which games were high-scoring, so read it as a hint."}`}
-            </p>
+                  {calib.segments.map((sg) => (
+                    <tr key={sg.label}>
+                      <td className="text-[var(--text-muted)]">
+                        {labelOf(CALIB_SEGMENT_TEXT, sg.label, sg.label)}
+                      </td>
+                      <td className="bv-num text-[var(--text-muted)]">
+                        {sg.n}
+                      </td>
+                      <td
+                        className="bv-num font-mono"
+                        style={{
+                          color:
+                            sg.meanResidual === null
+                              ? "var(--text-dim)"
+                              : Math.abs(sg.meanResidual) <= 0.5
+                                ? "var(--text)"
+                                : "var(--warn)",
+                        }}
+                      >
+                        {sg.meanResidual ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
+        </Section>
+      </Fold>
+
+      <Fold
+        title={`Which first-half totals go under most often (${scopeLabel})`}
+        hint="by the total the book opened at"
+      >
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            {study && (
+              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]">
+                {`Grouped by the ${study.anyReal ? "first-half total each book opened at" : `estimated opening line — ${proxyShareText()}`}${study.fbsPartial ? " — no FBS list for some of these seasons, so their games are all included" : study.fbsFiltered ? ", FBS teams only" : " — no FBS list for this season, so every game is included"}. You need ${BREAKEVEN_PCT}% to break even at -110.${study.anyReal ? "" : " On estimated lines this ordering partly reflects which games were high-scoring, so read it as a hint."}`}
+              </p>
+            )}
+          </div>
+          <MinGamesSelect current={minGames} />
         </div>
-        <MinGamesSelect current={minGames} />
-      </div>
-      {!study || study.buckets.length === 0 ? (
-        <EmptyLine>
-          {`No total has ${minGames}+ graded games in ${scopeLabel} yet. Lower the minimum, or check back later in the season.`}
-        </EmptyLine>
-      ) : (
-        <LineStudyView buckets={study.buckets} breakeven={BREAKEVEN_PCT} />
-      )}
+        {!study || study.buckets.length === 0 ? (
+          <EmptyLine>
+            {`No total has ${minGames}+ graded games in ${scopeLabel} yet. Lower the minimum, or check back later in the season.`}
+          </EmptyLine>
+        ) : (
+          <LineStudyView buckets={study.buckets} breakeven={BREAKEVEN_PCT} />
+        )}
+      </Fold>
 
       <Glossary />
     </div>

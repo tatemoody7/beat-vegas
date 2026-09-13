@@ -303,3 +303,20 @@ export function distinctTag(
   if (t === "") return null;
   return action !== null && loose(action).includes(t) ? null : tag;
 }
+
+/**
+ * Calibration segment codes -> English. These come straight out of
+ * `metrics_json.bv_residual`, whose group keys are written by
+ * beatvegas/model/bv_line.py, and the Track record page was rendering them RAW
+ * (`post2023`, `fast`, `dome`) — the one place on the site that broke its own
+ * rule that no enum value ever reaches the screen (spec §24.18).
+ */
+export const CALIB_SEGMENT_TEXT: Record<string, string> = {
+  pre2023: "Before 2023",
+  post2023: "2023 onwards",
+  fast: "Fast-paced games",
+  mid: "Average pace",
+  slow: "Slow-paced games",
+  dome: "Indoors",
+  outdoor: "Outdoors",
+};

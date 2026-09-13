@@ -15,9 +15,11 @@ import {
   tierCounts,
 } from "@/lib/homeBoard";
 import { nextBuild } from "@/lib/nextBuild";
+import { getLatestCard } from "@/lib/card";
 import { resolveSeason } from "@/lib/season";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import AnswerBar from "@/app/components/AnswerBar";
+import CardStatusBanner from "@/app/components/CardStatusBanner";
 import BoardFilters from "@/app/components/BoardFilters";
 import GameRow from "@/app/components/GameRow";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -57,6 +59,12 @@ export default async function BoardPage({
   const board = await getHomeBoard(season, weekArg);
   const results = staleness(await getGradeHealth(season));
   const buildHealth = buildStatus(await getBuildHealth());
+  // The card's own health — "paper only, some inputs are missing", "built by
+  // hand", "an earlier build". It used to head /results; it belongs here, with
+  // the other two banners, because it is a warning about the numbers you are
+  // about to bet off, not about a bet already placed (Tate 2026-09-13).
+  const card =
+    board.week === null ? null : await getLatestCard(season, board.week);
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -102,6 +110,8 @@ export default async function BoardPage({
       <div className="mb-3">
         <BoardFilters current={filters} />
       </div>
+
+      <CardStatusBanner card={card} />
 
       {buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">

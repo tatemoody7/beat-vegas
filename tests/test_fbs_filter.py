@@ -68,6 +68,10 @@ class _FakeResp:
 
     def __init__(self, payload):
         self._payload = payload
+        # A real requests.Response always has these; _get reads headers for
+        # CFBD's monthly-call budget and text to spot an exhausted quota.
+        self.headers = {}
+        self.text = ""
 
     def raise_for_status(self):
         pass

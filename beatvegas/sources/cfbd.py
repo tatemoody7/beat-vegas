@@ -27,6 +27,55 @@ _RETRY_EXC = (requests.Timeout, requests.ConnectionError)
 _BACKOFF_SECONDS = (5, 20, 60)
 _MAX_RETRY_AFTER = 120  # honour the server's Retry-After, but never stall a job on it
 
+# CFBD reports the calls left in the MONTHLY budget on every response, including
+# the 429 that says the budget is gone. Nothing read it until 2026-09-13, which
+# is why the quota ran out mid-season with no warning and grading was dead for
+# two days before anyone noticed. `CFBDClient.calls_remaining` now carries the
+# last value seen, every run prints it once, and dropping under the threshold
+# raises a GitHub annotation while there is still time to act.
+_CALLS_REMAINING_HEADER = "x-calllimit-remaining"
+_LOW_CALLS_WARN = 200  # on any tier this is days, not weeks, of headroom
+
+
+class CFBDQuotaExceeded(requests.HTTPError):
+    """The MONTHLY call budget is spent — not a rate limit, and not transient.
+
+    An HTTPError subclass so every existing `except requests.HTTPError` /
+    `except Exception` path keeps working; the distinct type is there so a
+    caller that wants to degrade (rather than fail) can tell "we are out of
+    budget until the month rolls over" from "CFBD hiccuped"."""
+
+
+def _calls_remaining(resp: requests.Response) -> Optional[int]:
+    """Calls left in the monthly budget per CFBD's own header, or None."""
+    raw = resp.headers.get(_CALLS_REMAINING_HEADER)
+    if raw is None:
+        return None
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        return None
+
+
+def _is_quota_exhausted(resp: requests.Response) -> bool:
+    """True when a 429 means the MONTHLY budget is gone rather than "slow down".
+
+    Two independent tells, either of which is enough. CFBD sends
+    `x-calllimit-remaining: 0` on the refusal itself, and the body reads
+    "Monthly call quota exceeded." — verified live against an exhausted key on
+    2026-09-13, which also sent NO Retry-After, so the caller would otherwise
+    spend the whole 5/20/60s ladder and three more calls waiting for a month to
+    end."""
+    if resp.status_code != 429:
+        return False
+    if _calls_remaining(resp) == 0:
+        return True
+    try:
+        body = resp.text[:200].lower()
+    except Exception:  # noqa: BLE001 - a body we cannot read is not proof of anything
+        return False
+    return "quota" in body
+
 
 def _retry_after(resp: requests.Response) -> Optional[float]:
     """Seconds the server asked us to wait, or None if it did not say.
@@ -61,6 +110,10 @@ class CFBDClient:
         ).rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
+        # Calls left in CFBD's monthly budget as of the last response (None
+        # until the first one). Read it after a run to see the tank draining.
+        self.calls_remaining: Optional[int] = None
+        self._reported_calls = False  # print the budget once per client, not per call
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -69,13 +122,42 @@ class CFBDClient:
             }
         )
 
+    def _note_budget(self, resp: requests.Response) -> None:
+        """Record CFBD's monthly-budget header, print it once, and annotate the
+        run when it gets low. This is the only warning the system gets before
+        every endpoint starts refusing."""
+        remaining = _calls_remaining(resp)
+        if remaining is None:
+            return
+        self.calls_remaining = remaining
+        if self._reported_calls:
+            return
+        self._reported_calls = True
+        print(f"[cfbd] {remaining} calls left in this month's budget")
+        if remaining <= _LOW_CALLS_WARN:
+            from ..ci import warn
+
+            warn(
+                f"CFBD monthly budget down to {remaining} calls. When it reaches zero every "
+                "endpoint 429s until the month rolls over — scores fall back to ESPN "
+                "(sources/espn_scores.py) but talent, SP+ and returning production do not. "
+                "Raise the tier at https://collegefootballdata.com/api-tiers"
+            )
+
     def _get(self, path: str, params: Dict[str, Any]) -> Any:
         """GET with retries: up to `max_retries` attempts (default 4) on a
         timeout / connection error / 429 / 5xx, sleeping 5s, 20s then 60s
         between them. A 429 carrying `Retry-After` waits that long instead,
         capped at `_MAX_RETRY_AFTER`. Other 4xx (bad key, bad params) raise
         immediately. The final failure is re-raised as-is so the caller sees
-        the real cause."""
+        the real cause.
+
+        An EXHAUSTED MONTHLY BUDGET is the exception: it raises
+        `CFBDQuotaExceeded` on the spot. Retrying it cannot succeed — the wait
+        is the rest of the calendar month — and CFBD sends no Retry-After with
+        it, so the old path spent the full 85-second ladder and three more
+        calls against a budget that was already gone, on every single call of
+        every job."""
         params = {k: v for k, v in params.items() if v is not None}
         url = f"{self.base_url}{path}"
         last_exc: Optional[Exception] = None
@@ -86,6 +168,14 @@ class CFBDClient:
             except _RETRY_EXC as e:
                 last_exc = e
             else:
+                self._note_budget(resp)
+                if _is_quota_exhausted(resp):
+                    raise CFBDQuotaExceeded(
+                        f"CFBD monthly call quota exhausted (429 for {path}); it resets at the "
+                        "start of next month. Raise the tier at "
+                        "https://collegefootballdata.com/api-tiers",
+                        response=resp,
+                    )
                 if resp.status_code != 429 and resp.status_code < 500:
                     resp.raise_for_status()
                     return resp.json()

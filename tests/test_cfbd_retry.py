@@ -6,19 +6,30 @@ The ladder was (2, 4) until 2026-09-13, which gave a rate limit six seconds to
 clear. CFBD 429'd four consecutive grading runs over two days, so a 429 is a
 quota window rather than a blip and now waits in minutes-adjacent steps -- or
 for exactly as long as the server's Retry-After header asks.
+
+An EXHAUSTED MONTHLY BUDGET is the one 429 that is never retried: the wait is
+the rest of the calendar month. CFBD marks it with `x-calllimit-remaining: 0`
+and a "Monthly call quota exceeded." body, and sends NO Retry-After -- verified
+live against an exhausted key on 2026-09-13.
 """
 
 import pytest
 import requests
 
-from beatvegas.sources.cfbd import _MAX_RETRY_AFTER, CFBDClient
+from beatvegas.sources.cfbd import (
+    _LOW_CALLS_WARN,
+    _MAX_RETRY_AFTER,
+    CFBDClient,
+    CFBDQuotaExceeded,
+)
 
 
 class _Resp:
-    def __init__(self, status, payload=None, headers=None):
+    def __init__(self, status, payload=None, headers=None, text=""):
         self.status_code = status
         self._payload = payload if payload is not None else []
         self.headers = headers or {}
+        self.text = text
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -117,3 +128,87 @@ def test_unparseable_retry_after_falls_back_to_the_ladder(monkeypatch):
     )
     assert c.games(2026) == [1]
     assert sleeps == [5]
+
+
+# --- the monthly budget (2026-09-13) ----------------------------------------
+
+_QUOTA_BODY = '{"message":"Monthly call quota exceeded."}'
+
+
+def test_an_exhausted_monthly_budget_raises_at_once_and_spends_nothing(monkeypatch):
+    """The failure that killed grading for two days. Retrying cannot clear it,
+    and each retry is another call charged against a budget already at zero."""
+    c, sleeps = _client(
+        [_Resp(429, headers={"x-calllimit-remaining": "0"}, text=_QUOTA_BODY)] * 4,
+        monkeypatch,
+    )
+    with pytest.raises(CFBDQuotaExceeded) as e:
+        c.games(2026)
+    assert c._session.calls == 1, "a spent budget must not be retried"
+    assert sleeps == []
+    assert "resets at the start of next month" in str(e.value)
+    assert c.calls_remaining == 0
+    # Still an HTTPError, so every existing handler keeps working.
+    assert isinstance(e.value, requests.HTTPError)
+
+
+def test_the_quota_body_alone_is_enough_without_the_header(monkeypatch):
+    c, sleeps = _client([_Resp(429, text=_QUOTA_BODY)] * 4, monkeypatch)
+    with pytest.raises(CFBDQuotaExceeded):
+        c.games(2026)
+    assert c._session.calls == 1 and sleeps == []
+
+
+def test_a_plain_rate_limit_is_still_retried(monkeypatch):
+    """A 429 with calls left is "slow down", not "come back next month"."""
+    c, sleeps = _client(
+        [
+            _Resp(429, headers={"x-calllimit-remaining": "812"}),
+            _Resp(200, [7], headers={"x-calllimit-remaining": "811"}),
+        ],
+        monkeypatch,
+    )
+    assert c.games(2026) == [7]
+    assert c._session.calls == 2 and sleeps == [5]
+    assert c.calls_remaining == 811
+
+
+def test_the_budget_is_read_from_every_response_and_printed_once(monkeypatch, capsys):
+    c, _ = _client(
+        [
+            _Resp(200, [1], headers={"x-calllimit-remaining": "900"}),
+            _Resp(200, [2], headers={"x-calllimit-remaining": "899"}),
+        ],
+        monkeypatch,
+    )
+    c.games(2026)
+    c.games(2026)
+    assert c.calls_remaining == 899, "the latest value, not the first"
+    assert capsys.readouterr().out.count("calls left in this month's budget") == 1
+
+
+def test_a_low_budget_annotates_the_run(monkeypatch, capsys):
+    """The only warning the system gets before every endpoint starts refusing."""
+    c, _ = _client(
+        [_Resp(200, [1], headers={"x-calllimit-remaining": str(_LOW_CALLS_WARN)})],
+        monkeypatch,
+    )
+    c.games(2026)
+    out = capsys.readouterr().out
+    assert "::warning::" in out and "collegefootballdata.com/api-tiers" in out
+    # One call above the line says nothing.
+    c2, _ = _client(
+        [_Resp(200, [1], headers={"x-calllimit-remaining": str(_LOW_CALLS_WARN + 1)})],
+        monkeypatch,
+    )
+    c2.games(2026)
+    assert "::warning::" not in capsys.readouterr().out
+
+
+def test_a_missing_or_junk_budget_header_changes_nothing(monkeypatch):
+    c, _ = _client(
+        [_Resp(200, [1]), _Resp(200, [2], headers={"x-calllimit-remaining": "n/a"})],
+        monkeypatch,
+    )
+    assert c.games(2026) == [1] and c.calls_remaining is None
+    assert c.games(2026) == [2] and c.calls_remaining is None

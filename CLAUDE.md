@@ -45,7 +45,21 @@ Research only — it never places bets or automates gambling.
   fatal; and the board carries a **stale-results banner** (`lib/gradeHealth.ts`,
   also on `/api/health`) so this can never again be invisible.
 - **CFBD IS OUT OF MONTHLY QUOTA** (`{"message":"Monthly call quota exceeded."}`, every
-  endpoint, resets ~Oct 1). No retry clears it. **Scores now have a second source:**
+  endpoint, resets ~Oct 1). No retry clears it — the wait is the rest of the calendar
+  month, and CFBD sends **no `Retry-After`** with it, so until 2026-09-13 every call of
+  every job spent the full 5/20/60s ladder and three extra calls against a budget already
+  at zero. `cfbd.py` now raises **`CFBDQuotaExceeded`** on the spot (an `HTTPError`
+  subclass, so existing handlers are unaffected), recognised by
+  `x-calllimit-remaining: 0` or a "quota" body. Measured against the live exhausted key:
+  1 call, 0.68s, was 4 calls + 85s.
+  **The budget is now visible before it runs out:** CFBD reports
+  `x-calllimit-remaining` on EVERY response (including the 429) and nothing read it,
+  which is why this went unnoticed until grading had been dead two days.
+  `CFBDClient.calls_remaining` holds the last value, every run prints it once, and under
+  `_LOW_CALLS_WARN` (200) it raises a `::warning::` annotation. Tiers:
+  https://collegefootballdata.com/api-tiers — free 1,000, Academic 3,000 (.edu), Tier 1
+  $1/mo 5,000, Tier 2 $5/mo 30,000.
+  **Scores now have a second source:**
   `sources/espn_scores.py` + `scripts/backfill_scores_espn.py` read ESPN's public
   scoreboard — no key, no quota — and ESPN's event ids ARE `games.id`, so it UPDATES
   scores on existing rows and never inserts a game, touches a team name or a line. It

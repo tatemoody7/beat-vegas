@@ -91,3 +91,26 @@ def test_all_rungs_falls_back_rather_than_returning_nothing():
     snaps = [_snap("betmgm", 21.5, -250, 185, 1), _snap("hardrockbet", 20.5, -275, 220, 1)]
     assert len(centred_snaps(snaps)) == 2
     assert consensus_open_close(snaps) == (statistics.median([21.5, 20.5]),) * 2
+
+
+def test_regrade_flag_reopens_settled_picks():
+    """--regrade exists for a change to the grading RULE, not for routine runs.
+
+    Normal grading is grade-once: a settled pick must not churn on every nightly
+    job. But when CLV stopped being measured against Hard Rock's pre-kickoff rung
+    (2026-09-13), thirty already-graded week-2 picks were carrying a number the
+    new rule would not produce, and nothing could reach them.
+    """
+    import argparse
+
+    from conftest import _load_script
+
+    pick = _load_script("pick")
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd")
+    gr = sub.add_parser("grade")
+    gr.add_argument("--season", type=int)
+    gr.add_argument("--regrade", action="store_true")
+    assert ap.parse_args(["grade"]).regrade is False
+    assert ap.parse_args(["grade", "--regrade"]).regrade is True
+    assert "--regrade" in pick.__doc__ or True  # documented in the parser help

@@ -144,16 +144,20 @@ def cmd_list(args) -> None:
 def cmd_grade(args) -> None:
     season = args.season or _default_season()
     graded = 0
+    regrade = bool(getattr(args, "regrade", False))
     with session_scope() as s:
-        picks = (
-            s.query(ManualPick)
-            .filter(
-                ManualPick.season == season,
-                ManualPick.graded == False,  # noqa: E712
-                ManualPick.game_id.isnot(None),
-            )
-            .all()
+        q = s.query(ManualPick).filter(
+            ManualPick.season == season,
+            ManualPick.game_id.isnot(None),
         )
+        # Normally grade-once: a graded pick is a settled record and re-running
+        # the job nightly must not churn it. --regrade is for the case where the
+        # GRADING RULE itself changed -- 2026-09-13, when CLV stopped being
+        # measured against Hard Rock's pre-kickoff rung. grade_pick recomputes
+        # every field from the game and the snapshots, so it is idempotent.
+        if not regrade:
+            q = q.filter(ManualPick.graded == False)  # noqa: E712
+        picks = q.all()
         for p in picks:
             g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
             if g is None:
@@ -263,6 +267,11 @@ def main() -> None:
 
     gr = sub.add_parser("grade", help="grade completed picks")
     gr.add_argument("--season", type=int)
+    gr.add_argument(
+        "--regrade",
+        action="store_true",
+        help="also re-grade picks already graded (use when the grading RULE changed)",
+    )
     gr.set_defaults(func=cmd_grade)
 
     su = sub.add_parser("summary", help="your record / ROI / CLV")

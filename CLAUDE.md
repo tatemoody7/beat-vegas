@@ -5,6 +5,61 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-13 (week-2 review; PRs #111-#115, all merged): THE SYSTEM DID NOT MEASURE ITS
+  OWN WEEK.** `grade.yml` failed four consecutive runs from Sat 2026-09-12 morning and
+  nobody knew for two days — the only failure channel is GitHub's failed-run email. Root
+  cause: `backfill.py`'s FIRST action was an unguarded `backfill_venues()`, and CFBD
+  returned 429. Week 2 finished with finals for **14 of 303** games, **0 of 31** picks
+  graded, no CLV anywhere. Fixed in four layers: scores load BEFORE reference data and a
+  venue failure warns instead of raising (a season failure is still fatal); the CFBD retry
+  ladder is (5, 20, 60) over 4 attempts and honours `Retry-After`; `grade.yml` marks the
+  two *enrichment* steps `continue-on-error` (PBP, factor ledger) while grading stays
+  fatal; and the board carries a **stale-results banner** (`lib/gradeHealth.ts`,
+  also on `/api/health`) so this can never again be invisible.
+- **CFBD IS OUT OF MONTHLY QUOTA** (`{"message":"Monthly call quota exceeded."}`, every
+  endpoint, resets ~Oct 1). No retry clears it. **Scores now have a second source:**
+  `sources/espn_scores.py` + `scripts/backfill_scores_espn.py` read ESPN's public
+  scoreboard — no key, no quota — and ESPN's event ids ARE `games.id`, so it UPDATES
+  scores on existing rows and never inserts a game, touches a team name or a line. It
+  emits CFBD's key names so `etl/first_half.py` (incl. `line_scores_trustworthy`) applies
+  unchanged. **ESPN cannot replace CFBD for SCORING**: no 247 talent composite, no SP+,
+  no returning production — 8 feature columns are CFBD-only. Week 2 went 14 → 94 finals
+  and all six real tickets graded exactly as the Hard Rock slips read.
+  **The quota went on reference data**: `season_stats.py::_cached` writes to `data/cache/`,
+  a GHA runner starts cold, and a feature build re-fetches sp/talent/roster/returning for
+  every season (~17 calls) on all 26 card builds + 17 Sunday runs + 10 previews.
+  `.github/actions/cfbd-cache` now shares that across each week's runs — keyed by ISO week
+  with **no restore-keys on purpose**, since `_cached` has no expiry and a longer key would
+  silently freeze SP+ at week 1. Tate is registering the **free Academic tier** (3,000
+  calls, .edu) — if that is not enough, Tier 2 is $5/mo for 30,000.
+- **2026-09-13 (LINE VALUE WAS REPORTED WITH THE SIGN INVERTED, PR #115).**
+  `grading.py::clv_under` = `closing - bet`. Every bet is an UNDER and a HIGHER number is
+  easier, so a line that **FALLS** after the bet is the GOOD one — **negative clv is
+  favourable**. The glossary always said so; `decision-quality.ts` counted `clv > 0` as
+  "moved your way" and `record.ts` fed the raw mean to every RecordCard's "Line value", so
+  the site reported the share that moved AGAINST us. Stored values are UNCHANGED (the raw
+  difference is the fact); the direction now lives in exactly two named places —
+  `decision-quality.ts::favourable` and `record.ts` — and `lib/clvDirection.test.ts` pins
+  it against Tate's real six week-2 tickets, so a "fix" to the sign fails CI. Displayed
+  figures are negated: **+1.45 means the market came 1.45 pts toward us.**
+- **2026-09-13 (week 2 graded — the first real measurement).** Real money **2-3, −1.18u
+  (−$11.78)**; the bonus won, so **+0.36u (+$3.60)** all in. Paper **13-11, −0.57u**.
+  **CLV is the good news: of 30 graded picks, 11 lines moved toward us, 18 flat, 1
+  against** (+1.45 pts mean). **Model accuracy is the bad news.** Over 98 graded games
+  (weeks 1+2) the model is LESS accurate than Hard Rock's number in every spread bucket,
+  and on 21+ spreads it runs **−5.23** (book −1.79) while the 1.75-pt gate fires on **27
+  of 36** of them. Realized 1H share rises with the spread (0.51 → 0.57 over 4,392
+  historical games, again in 2026) and the model's is flat ~0.46 — `spread` is not in
+  `FEATURE_COLS`. **Tate's call 2026-09-13: no model or gate change for week 3; fix the
+  measurement, keep tracking.** Full review + every decision:
+  `~/.claude/plans/here-are-all-the-hashed-lantern.md`.
+- **Decided, NOT yet built (next session):** delete `MovementChart.tsx` + its
+  `GameDetail.tsx:165-170` call site and the now-dead `movement.ts::pivot` — keep
+  `BookTable` (Tate: the graph "looks like scribbles"; the per-book list stays); mark
+  already-placed bets in `AnswerBar` (muted + a marker, sorted below open ones — the data
+  is already on `HomeGame.picked`, `answerBar.ts::buildAnswer` just never sees it); and
+  rework **Results / Track record** (the first ~1,500px of `/results` is a bet slip for a
+  week that already kicked off, then the same games again, before any result).
 - **2026-09-10 (full system review, PR #98, MERGED):** a code + security pass over the
   engine, the workflows and the site. **Two things were actually broken.**
   (1) `grade_records` was the ONLY one of eight grading paths that skipped
@@ -489,6 +544,12 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
   first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never
   reached the evening games the card wants.
+- **ESPN line scores are not always right.** `sources/espn_scores.py` is the no-quota
+  scores fallback, but ESPN's quarter data can be corrupt: SDSU @ UCLA (2026 wk 2) came
+  back `[0,0,0,0]` against a 38-point final, and the `summary` endpoint returned nulls.
+  `line_scores_trustworthy` caught it and left the game NULL rather than writing a false
+  0-0 first half, which is exactly right — that one game stays ungraded until CFBD PBP is
+  reachable. Never relax that guard to "fill in" a missing 1H.
 - **ESPN: send NO custom headers.** Akamai 403s a bare spoofed UA (`Mozilla/5.0`, or a Chrome UA
   without client hints); requests' default UA is served. The spoof blanked every preview until
   2026-09-02. `research_preview.py` now exits 3 when the team list is empty instead of writing

@@ -25,9 +25,16 @@ on:
     - cron: '0 19 * * 0'
     # Third slot: GitHub cron is best-effort (17 of 19 scheduled runs were
     # dropped Aug 28-30 2026). Costs 6 credits when it fires (2 markets
-    # totals,spreads x 3 regions us,us2,us_ex); the Sunday
-    # 4:45pm ET routine (cfb-sunday-ops) also re-kicks this workflow if none
-    # ran today.
+    # totals,spreads x 3 regions us,us2,us_ex).
+    #
+    # These three are now the BACKUP. Since 2026-09-13 a Vercel cron dispatches
+    # this workflow (web/vercel.json -> /api/cron/sunday, table in
+    # web/lib/cronJobs.ts), the same arrangement the card builds and grading
+    # already had. It replaced a Mac routine (cfb-sunday-ops) that was meant to
+    # re-kick this and in practice ran once, three days late -- so until now
+    # this workflow's only real trigger was the cron above, on a workflow that
+    # is the ONLY full-game opener capture and that also refreshes pace,
+    # weather, scoring and the derived 1H lines.
     - cron: '30 20 * * 0'
   workflow_dispatch:
     inputs:

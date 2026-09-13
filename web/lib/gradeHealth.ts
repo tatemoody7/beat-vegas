@@ -8,9 +8,15 @@ import { prisma } from "@/lib/prisma";
 // completely normal. The board is where Tate looks, so the board is where the
 // alarm belongs.
 //
-// The tell is a game a book priced that kicked off long enough ago to be over
-// and still has no final score. Restricting to priced games keeps the D2/D3
-// rows CFBD scores late (and that nothing here reads) from crying wolf.
+// The tell is a game THE MODEL RATED that kicked off long enough ago to be over
+// and still has no final score. The rated set is exactly the board: a
+// game_records row is written when the week is scored, before kickoff.
+//
+// "A game a book priced" was the first cut and it was too loose -- books price
+// FCS-vs-FCS games, ESPN's FBS feed does not cover them and nothing here reads
+// them, so 15 of those sat unscored after the 2026-09-13 backfill and would
+// have kept the banner lit forever. A banner that is always on is a banner
+// nobody reads.
 
 // A game is done ~4h after kickoff and grade.yml runs twice a day (6:30am and
 // noon ET). 18h means at least one grading window came and went.
@@ -71,7 +77,7 @@ export async function getGradeHealth(season: number): Promise<GradeHealth> {
       FROM games g
      WHERE g.season = ${season}
        AND g.home_points IS NULL
-       AND g.full_game_total IS NOT NULL
+       AND EXISTS (SELECT 1 FROM game_records gr WHERE gr.game_id = g.id)
        AND g.start_date < (NOW() AT TIME ZONE 'utc')
              - (${STALE_AFTER_HOURS} * INTERVAL '1 hour')`;
   const r = rows[0];

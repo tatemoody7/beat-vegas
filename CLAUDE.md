@@ -153,6 +153,34 @@ Research only — it never places bets or automates gambling.
   `FEATURE_COLS`. **Tate's call 2026-09-13: no model or gate change for week 3; fix the
   measurement, keep tracking.** Full review + every decision:
   `~/.claude/plans/here-are-all-the-hashed-lantern.md`.
+- **2026-09-13 (THE LEVEL ANCHOR WAS TESTED AND REJECTED, PR #124).** Seeding
+  `_season_to_date`'s expanding window with `k` synthetic games of prior-season form
+  was the fix for weeks 1-2 being scored with 68 of 115 features NaN. **It does not
+  work, and `etl/features.PRIOR_SEASON_WEIGHT` stays 0** (the seeded code ships inert;
+  `k=0` reproduces the unseeded frame exactly, so the incumbent is an ARM of the gate).
+  Weeks 1-2 showed nothing (pooled n=180, gains −0.019 to +0.131, every 95% CI spanning
+  zero, not monotone in k); weeks 3+, which nobody was testing, improved monotonically
+  (+0.038 to +0.117, CI excluding zero at k≥1) — the seed is ordinary shrinkage and helps
+  where a team already has SOME data.
+  **The NaNs were never the problem: `HistGradientBoostingRegressor` handles missing
+  values natively**, learning a routing direction for them, so "no games played yet" is a
+  usable SIGNAL to the tree rather than an absence. Counting NaN cells and concluding the
+  model is starved conflates *missing* with *harmful*.
+  **And MAE is close to blind to what the change does.** The seed genuinely lifts
+  bv_line's level (2026 wks 1-2: 24.26 → 25.20 at k=3 against a realized 26.90, about a
+  third of the bias) while MAE barely moves — ~1 pt of bias is nothing against ~11 pts of
+  per-game spread. But the system spends `gap = line − bv_line` against `BET_GAP_PTS`, so
+  a level shift moves SELECTION even when accuracy is flat: on the 23 of those games with
+  a real close, the count clearing the bar fell 14 → 11. The gate now reports **bias and
+  gate-crossings**, fixed before that question is put to the **still-untouched 2025**
+  season. Do not rebuild this: read `docs/LEVEL_ANCHOR.md` and re-run
+  `scripts/level_anchor_gate.py` (or the `level_anchor_gate` workflow).
+  Two real defects shipped alongside: **`season_stats._cached` served an empty payload as
+  a permanent hit** (the 2026 sp/adv/talent/roster/returning caches were all 2 bytes,
+  written 2026-06-03, so any LOCAL 2026 feature build silently NaN'd eight more columns —
+  GHA starts cold and refetches, which is why it hid for three months), and **a season
+  whose priors cannot be fetched now warns instead of killing the build** (`_cached_soft`,
+  the same trade `backfill.py` makes for venues).
 - **Decided, NOT yet built (next session):** delete `MovementChart.tsx` + its
   `GameDetail.tsx:165-170` call site and the now-dead `movement.ts::pivot` — keep
   `BookTable` (Tate: the graph "looks like scribbles"; the per-book list stays); and mark

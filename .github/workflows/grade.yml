@@ -78,6 +78,9 @@ jobs:
         # --only-missing: one CFBD call per week that still has a finished FBS
         # game without rows (usually one, often none) instead of all 20 weeks
         # twice a day; upsert by (game_id, off_team), fail-silent per season.
+        # Enrichment, not grading: PBP aggregates feed next week's SCORING, so a
+        # flaky CFBD call here must never stop this week's grades from landing.
+        continue-on-error: true
         run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }} --only-missing
       - name: Grade market vs model ledger
         run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
@@ -86,6 +89,10 @@ jobs:
       - name: Grade frozen game records
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)
+        # Display chips only -- nothing downstream reads this to decide a bet,
+        # and it calls CFBD /ratings/sp, which 429'd and skipped the post-mortem
+        # on 2026-09-13 after this guard was reverted by mistake.
+        continue-on-error: true
         run: python scripts/grade_factor_ledger.py
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
         # Regrades the season's cards at Hard Rock's numbers (scope live) every

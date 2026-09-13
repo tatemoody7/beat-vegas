@@ -1,5 +1,7 @@
 import { getSeasons } from "@/lib/board";
 import { buildAnswer } from "@/lib/answerBar";
+import { etClock12 } from "@/lib/et";
+import { getGradeHealth, staleness } from "@/lib/gradeHealth";
 import {
   getHomeBoard,
   groupByDay,
@@ -48,6 +50,7 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
+  const results = staleness(await getGradeHealth(season));
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -93,6 +96,21 @@ export default async function BoardPage({
       <div className="mb-3">
         <BoardFilters current={filters} />
       </div>
+
+      {results.stale && (
+        <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--text)]">
+            {`Results are ${results.behindHours} hours behind.`}
+          </p>
+          <p className="mt-1">
+            {`${results.unscored} ${results.unscored === 1 ? "game has" : "games have"} finished without a score landing, so nothing since then is graded`}
+            {results.lastGradedAt
+              ? ` — the last one was ${etClock12(results.lastGradedAt)}.`
+              : `.`}
+            {` Anything on this page that depends on results is out of date until the grading job runs clean.`}
+          </p>
+        </div>
+      )}
 
       {board.noModel && (
         <div className="bv-card mb-4 border-l-2 border-[var(--warn)] p-4 text-sm text-[var(--text-muted)]">

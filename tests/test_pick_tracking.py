@@ -289,9 +289,16 @@ def test_second_paper_pick_is_refused(capsys):
     assert "REFUSED: paper pick" in capsys.readouterr().out
 
 
-def test_grade_uses_hard_rocks_own_close_for_a_hard_rock_ticket():
-    """The per-game close polls capture Hard Rock's pre-kick number; a Hard
-    Rock ticket's CLV is against THAT, not the consensus close."""
+def test_grade_uses_the_consensus_close_even_for_a_hard_rock_ticket():
+    """CLV grades against the MARKET consensus, never one book's close.
+
+    Grading a Hard Rock ticket at Hard Rock's own close reads like the right
+    idea -- it is the only book Tate can bet. It is not: Hard Rock posts an
+    off-centre rung as its main 1H total on 26 of 28 quotes inside 3 h of
+    kickoff, which is the window the close polls run in. In 2026 week 2 that put
+    a rung in closing_line for every paper pick and reported +1.67 points of
+    line value where the market had moved +0.43.
+    """
     from datetime import datetime, timedelta
 
     from beatvegas.db.models import Game, OddsSnapshot
@@ -374,8 +381,10 @@ def test_grade_uses_hard_rocks_own_close_for_a_hard_rock_ticket():
             s.query(ManualPick).filter(ManualPick.game_id == 2).order_by(ManualPick.id).all()
         )
     assert hr.graded and hr.result == "under"
-    assert hr.closing_line == 23.5 and hr.clv == -1.0  # Hard Rock's own pre-kick close
-    assert other.closing_line == 25.0 and other.clv == 0.5  # consensus close (median of 26.5, 23.5)
+    # Both grade at the consensus close: median of each book's last PRE-kick
+    # line (draftkings 26.5, hardrockbet 23.5) = 25.0. `book` no longer changes it.
+    assert hr.closing_line == 25.0 and hr.clv == 0.5
+    assert other.closing_line == 25.0 and other.clv == 0.5
 
 
 def test_graded_pick_fields_leave_units_none_when_unpriced():

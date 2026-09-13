@@ -19,7 +19,7 @@ regressor. Used only for CLV, line-check EV, staking, and backtest grading.
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 from .grading import american_to_decimal
 
@@ -115,3 +115,44 @@ def ev_under(fair_under_prob: float, offered_under_price: int) -> float:
     """
     payout = american_to_decimal(offered_under_price) - 1.0
     return fair_under_prob * payout - (1.0 - fair_under_prob)
+
+
+# --- is this quote a centred line at all? ---------------------------------
+#
+# A book's MAIN total prices both sides near -110. When a feed serves an
+# off-centre rung of the alternate ladder instead, the line moves several points
+# and the price goes lopsided to compensate -- and the PRICE is the honest tell,
+# because it needs no reference: you can judge one quote on its own, without a
+# field to compare it against.
+#
+# Measured on 1,504 pre-kickoff 1H quotes from 2026 week 2, split by whether the
+# line sat >= 1.5 points off the field median:
+#
+#   centred (n=1301)      worst side -150 .. -110, median -120
+#   off-centre (n=203)    worst side -375 .. -110, median -250
+#
+# NO centred quote was worse than -150, so -160 clears the observed range with a
+# margin and still rejects 172 of the 203 rungs. The 31 it lets through are books
+# genuinely ~2 points off the field at normal juice -- a real opinion, which is
+# exactly what must NOT be filtered.
+#
+# Why this matters: Hard Rock is centred 100% of the time more than 24h out and
+# off-centre on 26 of 28 quotes inside 3h -- the window lines_watch polls for the
+# CLOSING line. Grading CLV against that was measuring us against a number nobody
+# could bet. BetMGM is off-centre ~90% of the time at any hour.
+SKEW_REJECT_PRICE = -160
+
+
+def is_centred_quote(over_price: Optional[int], under_price: Optional[int]) -> bool:
+    """True when both sides are priced like a book's main number.
+
+    A quote missing either side cannot be judged, so it is treated as centred:
+    this filter exists to reject a specific, positively-identified pathology,
+    never to discard data it simply cannot assess.
+    """
+    for price in (over_price, under_price):
+        if price is None:
+            continue
+        if price < SKEW_REJECT_PRICE:
+            return False
+    return True

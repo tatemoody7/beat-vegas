@@ -25,7 +25,6 @@ from .grading import (
 )
 from .hardrock import HR_BOOK_KEY, normalize_book
 from .lines import (
-    book_closing_before_kickoff,
     book_closing_price_before_kickoff,
     closing_before_kickoff,
     fair_under_before_kickoff,
@@ -187,13 +186,23 @@ def grade_pick(session, pick: ManualPick, game) -> bool:
         .filter(OddsSnapshot.game_id == pick.game_id, OddsSnapshot.market == snap_market)
         .all()
     )
+    # CLV is graded against the MARKET consensus, never a single book's close.
+    #
+    # A Hard Rock ticket used to grade at Hard Rock's own close, which reads like
+    # the right idea -- you can only bet there, so that is your benchmark. It is
+    # not: Hard Rock posts an off-centre rung as its main 1H total on 26 of 28
+    # quotes inside 3 h of kickoff, and the close polls run inside 75 minutes. In
+    # 2026 week 2 that put a rung in closing_line for every paper pick and
+    # reported an average +1.67 points of line value where the market had
+    # actually moved +0.43. Seven of eight sat at exactly -6.0: a constant rung
+    # offset, not a line move. The six real tickets escaped only because their
+    # `book` was NULL.
+    #
+    # consensus_open_close already drops non-centred quotes (lines.centred_snaps),
+    # so a book still contributes its last real number.
     opening, closing, _closing_at = closing_before_kickoff(snaps, game.start_date)
-    if normalize_book(pick.book) == HR_BOOK_KEY:
-        hr_open, hr_close, _ = book_closing_before_kickoff(snaps, game.start_date, HR_BOOK_KEY)
-        if hr_close is not None:
-            opening, closing = hr_open, hr_close
-        if pick.price is None:
-            pick.price = book_closing_price_before_kickoff(snaps, game.start_date, HR_BOOK_KEY)
+    if pick.price is None and normalize_book(pick.book) == HR_BOOK_KEY:
+        pick.price = book_closing_price_before_kickoff(snaps, game.start_date, HR_BOOK_KEY)
     fair_open, fair_close = fair_under_before_kickoff(snaps, game.start_date)
     for k, v in graded_pick_fields(
         actual,

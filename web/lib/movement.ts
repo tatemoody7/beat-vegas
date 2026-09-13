@@ -1,3 +1,4 @@
+import { isCentredQuote } from "@/lib/devig";
 import { Prisma } from "@prisma/client";
 import { etParts, pad2 } from "@/lib/et";
 import { median } from "@/lib/format";
@@ -65,6 +66,8 @@ export type MoveSnap = {
   captured_at: string | null;
   book: string | null;
   line: number | null;
+  over_price?: number | null;
+  under_price?: number | null;
   spread?: number | null;
   market?: string | null;
 };
@@ -95,6 +98,9 @@ export function summarizeMarket(snaps: MoveSnap[]): MarketMovement | null {
   const byBook = new Map<string, MoveSnap[]>();
   for (const s of snaps) {
     if (s.line === null || s.line === undefined) continue;
+    // Drop off-centre rungs so the market open/cur is the real market. The
+    // per-book table below still shows every book its own quote.
+    if (!isCentredQuote(s.over_price, s.under_price)) continue;
     const book = (s.book ?? "?").toLowerCase();
     if (book === "consensus") continue;
     if (!byBook.has(book)) byBook.set(book, []);
@@ -155,7 +161,7 @@ export async function getMovements(
   if (gameIds.length === 0) return out;
   const snaps = await prisma.$queryRaw<MoveSnap[]>`
     SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line,
-           spread, market
+           over_price, under_price, spread, market
     FROM odds_snapshots o
     WHERE o.game_id IN (${Prisma.join(gameIds)})
       AND o.market IN ('1H_total', 'full_game_total')

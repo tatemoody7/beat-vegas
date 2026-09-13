@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { EV_FLOOR } from "@/lib/verdict";
 import { isExchange, isSynthetic } from "@/lib/books";
-import { devigTwoWay, evUnder } from "@/lib/devig";
+import { devigTwoWay, evUnder, SKEW_REJECT_PRICE } from "@/lib/devig";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -241,6 +241,15 @@ export const getLineCheck = cache(async function getLineCheck(
       -- pre-kickoff only: a poll that ran after kickoff captures an in-game
       -- number (e.g. u31.5 -275 at halftime) that must never read as the line
       AND (g.start_date IS NULL OR o.captured_at <= g.start_date)
+      -- Off-centre rungs of the alternate ladder are not this book's main
+      -- number, so they must not become the market it is compared against.
+      -- Hard Rock is EXEMPT on purpose: this row is what Tate matches against a
+      -- real ticket, and quietly showing him a number the app is not offering
+      -- would be worse than showing him an odd one. The price and off-market
+      -- gates are what refuse a rung. See lib/devig.ts::isCentredQuote.
+      AND (LOWER(o.book) = 'hardrockbet'
+           OR ((o.over_price IS NULL OR o.over_price >= ${SKEW_REJECT_PRICE})
+           AND (o.under_price IS NULL OR o.under_price >= ${SKEW_REJECT_PRICE})))
     ORDER BY o.game_id, LOWER(o.book), o.captured_at DESC
   `;
 

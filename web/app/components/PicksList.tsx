@@ -175,7 +175,7 @@ export default function PicksList({
                     )}
                     {p.isPaper && (
                       <span className="bv-badge bv-badge--warn ml-1">
-                        paper — no money on it
+                        paper
                       </span>
                     )}
                     {p.isBonus && (
@@ -365,8 +365,10 @@ export default function PicksList({
         </table>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
-        Line value positive means the line moved your way after the bet. Open a
-        row for our number at the time, why it was logged, and the note.
+        Rows marked <span className="bv-badge bv-badge--warn">paper</span> had
+        no money on them. Line value positive means the line moved your way
+        after the bet. Open a row for our number at the time, why it was logged,
+        and the note.
       </p>
     </>
   );

@@ -196,7 +196,9 @@ export default async function ProofPage({
           : "Games another book actually priced, plus this season at Hard Rock’s own number. These are the numbers to believe."}
       </p>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Four cards: 2-up, never 3-up. A 3-column grid leaves the fourth
+          stranded alone on its own row. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <RecordCard
           title={`2023–25, every gap ${BET_GAP_PTS}+`}
           rec={headline(buckets, HIST_SCOPE, "fbs_only", "real", "gap175")}

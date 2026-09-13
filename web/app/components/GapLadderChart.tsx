@@ -61,13 +61,20 @@ export default function GapLadderChart({
 
   const maxPct = data.reduce((m, d) => Math.max(m, d.hitPct), 0);
   const minPct = data.reduce((m, d) => Math.min(m, d.hitPct), 100);
+  // Round the axis out to whole 5s and tick it by hand. Recharts' own choice
+  // inside a tight domain came out 40/47/54/61/65, which reads like an
+  // accident rather than a scale.
+  const lo = Math.max(0, Math.floor((minPct - 4) / 5) * 5);
+  const hi = Math.ceil((maxPct + 4) / 5) * 5;
+  const ticks: number[] = [];
+  for (let t = lo; t <= hi; t += 5) ticks.push(t);
 
   return (
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 12, right: 16, bottom: 28, left: 4 }}
+          margin={{ top: 12, right: 16, bottom: 28, left: 0 }}
         >
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
           <XAxis
@@ -82,21 +89,18 @@ export default function GapLadderChart({
               fontSize: 11,
             }}
           />
+          {/* No y-axis label. A rotated one clipped against the 288px plot
+              ("How often the under wo"), and it only repeated the heading
+              above the chart. The % on the ticks carries it. Domain is
+              rounded out to multiples of 5 so the ticks read 40/45/50 rather
+              than 39/46/53. */}
           <YAxis
-            domain={[
-              Math.max(0, Math.floor(minPct - 5)),
-              Math.ceil(maxPct + 5),
-            ]}
+            domain={[lo, hi]}
+            ticks={ticks}
             tick={{ fill: AXIS, fontSize: 11 }}
             stroke={GRID}
             tickFormatter={(v) => `${v}%`}
-            label={{
-              value: "How often the under won",
-              angle: -90,
-              position: "insideLeft",
-              fill: AXIS,
-              fontSize: 11,
-            }}
+            width={46}
           />
           <Tooltip
             cursor={{ fill: GRID, opacity: 0.4 }}
@@ -122,8 +126,12 @@ export default function GapLadderChart({
             label={{
               value: `${breakeven}% — you break even here`,
               fill: AXIS,
-              fontSize: 10,
-              position: "insideTopRight",
+              fontSize: 11,
+              // insideTopLeft, not Right: the right-hand bars are the tall
+              // green ones, and the label rendered dark-on-green there and was
+              // unreadable. The space just above the line on the LEFT is empty
+              // by definition — those bars are the ones below break-even.
+              position: "insideTopLeft",
             }}
           />
           {/* isAnimationActive={false} is load-bearing, not a preference: under

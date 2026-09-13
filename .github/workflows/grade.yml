@@ -59,17 +59,25 @@ jobs:
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
           # ISO weekday in Eastern time (1 = Monday): the weekly full pass.
           echo "et_dow=$(TZ=America/New_York date +%u)" >> "$GITHUB_OUTPUT"
-      - name: Refresh final scores (CFBD)
+      - name: Refresh schedule, lines and scores (CFBD)
+        # Primary source: this is also what creates new games and refreshes
+        # lines, so it runs first. continue-on-error because ESPN below covers
+        # the part grading actually needs -- on 2026-09-12 CFBD hit its monthly
+        # call quota and 429'd for two days, taking every grade with it.
+        continue-on-error: true
         run: python scripts/backfill.py --season ${{ steps.season.outputs.season }}
+      - name: Backfill any missing final scores (ESPN, no key, no quota)
+        # Scores only, onto games the step above already created, keyed by id
+        # (ESPN's event ids are the ids we store). Second source for the one
+        # input grading cannot do without.
+        continue-on-error: true
+        run: python scripts/backfill_scores_espn.py --days-back 10
       - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
         # fh_team_game feeds the season-to-date FH factors the Sunday scorer
         # reads; without this the current season never accrues PBP rows.
         # --only-missing: one CFBD call per week that still has a finished FBS
         # game without rows (usually one, often none) instead of all 20 weeks
         # twice a day; upsert by (game_id, off_team), fail-silent per season.
-        # Enrichment, not grading: PBP aggregates feed next week's SCORING, so a
-        # flaky CFBD call here must never stop this week's grades from landing.
-        continue-on-error: true
         run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }} --only-missing
       - name: Grade market vs model ledger
         run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
@@ -78,8 +86,6 @@ jobs:
       - name: Grade frozen game records
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)
-        # Display chips only -- nothing downstream reads this to decide a bet.
-        continue-on-error: true
         run: python scripts/grade_factor_ledger.py
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
         # Regrades the season's cards at Hard Rock's numbers (scope live) every

@@ -56,7 +56,7 @@ export default async function BoardPage({
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
   const results = staleness(await getGradeHealth(season));
-  const build = buildStatus(await getBuildHealth());
+  const buildHealth = buildStatus(await getBuildHealth());
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -103,15 +103,15 @@ export default async function BoardPage({
         <BoardFilters current={filters} />
       </div>
 
-      {build.missed && (
+      {buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
-            {`${build.day}'s build did not run.`}
+            {`${buildHealth.day}'s build did not run.`}
           </p>
           <p className="mt-1">
             {`A build is also the week's line sweep, so the numbers below are older than they should be`}
-            {build.lastBuiltAt
-              ? ` — the last card was built ${etClock12(build.lastBuiltAt)}.`
+            {buildHealth.lastBuiltAt
+              ? ` — the last card was built ${etClock12(buildHealth.lastBuiltAt)}.`
               : `.`}
           </p>
         </div>

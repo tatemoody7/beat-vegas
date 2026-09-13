@@ -18,7 +18,7 @@ describe("recordFrom", () => {
       hit: "50.0%",
       units: "-0.09",
       roi: "-3.0%",
-      clv: "+0.25",
+      clv: "-0.25", // stored +1.0 and -0.5 mean the line rose on balance: bad for an under
     });
   });
 
@@ -42,7 +42,7 @@ describe("recordFrom", () => {
       hit: "66.7%",
       units: "-0.09",
       roi: "-4.5%", // -0.09 over the 2 units actually staked
-      clv: "+0.75",
+      clv: "-0.75", // stored +1.0 / +0.5: the market moved away from the under
     });
   });
 
@@ -56,7 +56,9 @@ describe("recordFrom", () => {
       hit: "100.0%",
       units: "+0.00",
       roi: "—",
-      clv: "+1.00",
+      // Stored +1.5 / +0.5: the total ROSE after both bets, which is the wrong
+      // way for an under, so the displayed line value is negative.
+      clv: "-1.00",
     });
   });
 });
@@ -77,5 +79,18 @@ describe("recordFromCounts", () => {
 
   it("is null with nothing graded", () => {
     expect(recordFromCounts(0, 0, 0, 0)).toBeNull();
+  });
+});
+
+describe("recordFrom line value", () => {
+  it("counts points the market came TOWARD the under", () => {
+    // Stored clv is closing - bet. Bet u28.5 and it closes 27.5 -> clv -1.0,
+    // and we hold the better ticket, so the card must read +0.75 here.
+    // Reported backwards until 2026-09-13; see lib/clvDirection.test.ts.
+    const r = recordFrom([
+      { result: "under", units: 0.87, clv: -1.0, stake: 1 },
+      { result: "over", units: -1, clv: -0.5, stake: 1 },
+    ]);
+    expect(r!.clv).toBe("+0.75");
   });
 });

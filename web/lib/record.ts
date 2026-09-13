@@ -12,7 +12,8 @@ export type Record3 = {
   units: string; // signed, "+0.91" / "-0.55"
   /** Units won ÷ units staked over graded rows, as a signed percent; "—" when nothing was staked. */
   roi: string;
-  clv: string; // signed mean CLV, or "—"
+  /** Mean points the line came TOWARD us, signed; "+0.58" is good. "—" when no bet has a close. */
+  clv: string;
   unitsNum: number;
   roiNum: number | null;
 };
@@ -43,7 +44,15 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
     (a, r) => a + (r.stake === undefined ? 1 : (r.stake ?? 0)),
     0,
   );
-  const clvs = rows.filter((r) => r.clv !== null).map((r) => r.clv as number);
+  // Stored clv is closing - bet. Every bet is an UNDER, so a line that FELL
+  // after the bet is the good one, and the raw mean therefore reads backwards
+  // to anyone looking at a stat called "Line value". Negate it here so the
+  // displayed figure is points the market came TOWARD us: +0.6 is good.
+  // See web/lib/decision-quality.ts for the full note; lib/record.test.ts pins
+  // the direction.
+  const clvs = rows
+    .filter((r) => r.clv !== null)
+    .map((r) => -(r.clv as number));
   const roiNum = staked > 0 ? (100 * unitsSum) / staked : null;
   return {
     n: rows.length,

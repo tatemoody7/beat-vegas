@@ -49,13 +49,37 @@ export function beatMyModel(picks: DqPickRow[]): {
   return { agreed: tally(agreed), against: tally(against) };
 }
 
+// WHICH SIGN IS GOOD, because it is the opposite of the obvious guess.
+//
+// manual_picks.clv is grading.py::clv_under = closing - bet, a plain factual
+// difference. Every bet here is an UNDER, and for an under a HIGHER number is
+// easier to win. So a line that FALLS after you bet leaves you holding the
+// better ticket: bet u28.5, close 27.5, clv = -1, and you have a point of
+// cushion the closing bettor does not. The glossary has always said it --
+// "for an under, the total going down afterwards is good" -- but this file
+// counted clv > 0 as "moved your way" and the Results page printed that under
+// exactly that label, so it reported the share that moved AGAINST you.
+//
+// Measured on week 2: three of Tate's six tickets moved his way and none moved
+// against him; the page said 0%.
+//
+// Stored values are unchanged. `favourable` is the one place the direction
+// lives, and clvDirection.test.ts pins it so it cannot quietly flip back.
+const favourable = (clv: number): boolean => clv < 0;
+
 export function clvSummary(picks: DqPickRow[]): {
   n: number;
   avg: number | null;
-  pctPositive: number | null;
-  posClvHitPct: number | null;
-  negClvHitPct: number | null;
+  /** Share whose line moved TOWARD the under after the bet. */
+  pctFavourable: number | null;
+  /** Hit rate of the bets whose line moved toward them, and away from them. */
+  favClvHitPct: number | null;
+  advClvHitPct: number | null;
+  /** Mean points the line moved toward the under; positive reads as good. */
+  avgPointsGained: number | null;
   // No-vig PRICE CLV (juice dimension only): avg in percentage points, share +.
+  // This one IS positive-is-good already -- a rising no-vig under price means
+  // the market moved toward the under, so an early under got the cheaper side.
   nPrice: number;
   avgPricePp: number | null;
   pctPricePositive: number | null;
@@ -63,18 +87,21 @@ export function clvSummary(picks: DqPickRow[]): {
   const withClv = picks.filter((p) => p.clv != null);
   const n = withClv.length;
   const avg = n ? withClv.reduce((a, p) => a + (p.clv as number), 0) / n : null;
-  const positive = withClv.filter((p) => (p.clv as number) > 0);
+  const positive = withClv.filter((p) => favourable(p.clv as number));
   const pos = tally(positive);
-  const neg = tally(withClv.filter((p) => (p.clv as number) <= 0));
+  const neg = tally(withClv.filter((p) => !favourable(p.clv as number)));
   const withPrice = picks.filter((p) => p.clv_prob != null);
   const nPrice = withPrice.length;
   const pricePos = withPrice.filter((p) => (p.clv_prob as number) > 0).length;
   return {
     n,
     avg,
-    pctPositive: n ? (100 * positive.length) / n : null,
-    posClvHitPct: pos.hitPct,
-    negClvHitPct: neg.hitPct,
+    pctFavourable: n ? (100 * positive.length) / n : null,
+    favClvHitPct: pos.hitPct,
+    advClvHitPct: neg.hitPct,
+    // Sign-flipped so the number on the page reads the way a reader expects:
+    // +1.7 means the market came 1.7 points toward the under after we bet.
+    avgPointsGained: avg === null ? null : -avg,
     nPrice,
     avgPricePp: nPrice
       ? (100 * withPrice.reduce((a, p) => a + (p.clv_prob as number), 0)) /

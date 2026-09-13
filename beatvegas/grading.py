@@ -56,8 +56,17 @@ def trusted_first_half_total(
 
 
 def clv_under(bet_line: float, closing_line: float) -> Optional[float]:
-    """Closing line value for an UNDER, in points. Positive = the line CLOSED
-    HIGHER than where you bet it, i.e. you got the under at a softer number."""
+    """Closing line value for an UNDER, in points: simply closing - bet.
+
+    MIND THE SIGN -- it is the opposite of the obvious guess, and the reporting
+    layer had it backwards until 2026-09-13. For an under a HIGHER number is
+    easier to win, so a line that FALLS after you bet leaves you holding the
+    better ticket: bet u28.5, close 27.5, this returns -1.0, and you have a
+    point of cushion the closing bettor does not.
+
+    So NEGATIVE is the good direction here. Kept as closing - bet because that
+    is the plain factual difference; web/lib/decision-quality.ts::favourable
+    owns the interpretation, and flips it for display."""
     if bet_line is None or closing_line is None:
         return None
     return closing_line - bet_line

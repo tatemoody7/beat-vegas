@@ -41,9 +41,11 @@ test("clvSummary: avg, positive share, and hit% by clv sign", () => {
   const r = clvSummary(picks);
   expect(r.n).toBe(3); // non-null clv only
   expect(r.avg).toBeCloseTo((1.0 + 0.5 - 1.0) / 3);
-  expect(r.pctPositive).toBeCloseTo((100 * 2) / 3);
-  expect(r.posClvHitPct).toBe(50); // 2 decided +clv, 1 win
-  expect(r.negClvHitPct).toBe(100); // 1 decided -clv, 1 win
+  // Every bet is an UNDER, so a line that FELL after the bet is the good one:
+  // one of the three (clv -1.0) moved toward us.
+  expect(r.pctFavourable).toBeCloseTo((100 * 1) / 3);
+  expect(r.favClvHitPct).toBe(100); // 1 decided favourable, 1 win
+  expect(r.advClvHitPct).toBe(50); // 2 decided adverse, 1 win
 });
 
 test("clvSummary: no-vig price CLV avg (pp) and positive share", () => {

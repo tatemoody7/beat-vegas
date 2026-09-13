@@ -58,7 +58,7 @@ export function glossaryTerms(unitUsd: number): GlossaryTerm[] {
     },
     {
       term: "Line value",
-      body: "Whether the line moved your way after you bet. For an under, the total going down afterwards is good. Positive line value over many bets shows up long before a win rate does.",
+      body: "Whether the line moved your way after you bet, in points. For an under, the total going down afterwards is good, so that shows here as a positive number: +1.0 means the market came a point toward you. Positive line value over many bets shows up long before a win rate does.",
     },
     {
       term: "Unit",

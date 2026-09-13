@@ -378,21 +378,19 @@ export default async function ResultsPage({
                 Vs the closing line
               </h3>
               <p className="mb-2 mt-0.5 text-xs text-[var(--text-dim)]">
-                Whether the line moved your way after you bet. Price movement is
-                the same idea for the odds instead of the total, in percentage
-                points.
+                {`Whether the line moved your way after you bet. Every bet here is an under, so the total dropping is good: +1.0 means the market came a point toward you. Price movement is the same idea for the odds instead of the total, in percentage points.`}
               </p>
               <dl className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <dt className="bv-stat-label">Line value</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
-                    {`${dq.clv.avg == null ? "—" : dq.clv.avg.toFixed(2)} (${dq.clv.n})`}
+                    {`${dq.clv.avgPointsGained == null ? "—" : `${dq.clv.avgPointsGained >= 0 ? "+" : ""}${dq.clv.avgPointsGained.toFixed(2)}`} (${dq.clv.n})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="bv-stat-label">Share that moved your way</dt>
                   <dd className="font-mono text-[var(--text-muted)]">
-                    {`${pct(dq.clv.pctPositive)} (${dq.clv.n})`}
+                    {`${pct(dq.clv.pctFavourable)} (${dq.clv.n})`}
                   </dd>
                 </div>
                 <div className="flex justify-between">

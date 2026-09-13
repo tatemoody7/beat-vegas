@@ -5,6 +5,29 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-13 (THE PAPER LEDGER WAS MEASURING ONE BUILD OUT OF FOUR).** Every one of
+  week 2's 25 paper picks was placed Sat 12:00 UTC — the `sat_am` build. Across the week's
+  six builds **33 distinct games qualified**; the ledger holds 25, and the FRIDAY card's
+  **three clean BETs were never logged at all** against the one Saturday recorded (8 games
+  that qualified Thursday never qualified again). Cause: `PAPER_WINDOW_HOURS` gave each slot
+  the gap to the next build, and college football kicks off on **Saturday** — `thu_pm`'s 24 h
+  reached 6 games on the whole slate, `fri_pm`'s 16 h reached 8, neither of them a priced
+  Hard Rock game, and `sat_am`'s 80 h swept up the rest. The design was doing exactly what its
+  comment said. **Tate's call: Friday anchors the weekend** — `fri_pm` and `sat_am` are now
+  `None` (the rest of the week), `tue_pm`/`thu_pm` keep their gaps so they can never claim a
+  Saturday game before Friday prices it. Replayed against the REAL week-2 payloads: Friday
+  logs 26, Saturday adds 1, nothing double-logged.
+  **Second, independent bug: `add_pick` never wrote `model_line_at_pick` /
+  `model_score_at_pick`.** The Next.js `createPick` was the only writer in the repo, so every
+  card paper pick and every `pick.py add` left OUR NUMBER NULL — which prints "—" in the picks
+  table and, because `decision-quality.ts::beatMyModel` filters on `model_line_at_pick != null`,
+  dropped the whole paper ledger out of the agreed/against split. `add_pick` now takes both;
+  the card reads them off the item (`card.py` exports `under_score` beside `bv_line`, same
+  prediction row) and `pick.py add` reads them through the new `picks.py::model_read`, which
+  mirrors the web's rule (model row over the display-only `derived_lines` row). Week 2 is
+  backfilled by two `_DATA_MIGRATIONS` entries: our number reconstructs EXACTLY as
+  `hr_line_at_pick - gap_at_pick` (a card item only qualifies when Hard Rock priced it, so the
+  gap basis is always `hardrock`) — verified to 0.000 on all 25.
 - **2026-09-13 (every scheduled text retired; PR #118).** The Mac routines were **local**
   Claude sessions, and on battery this Mac sleeps after ONE MINUTE with no `pmset` wake
   events — so they fired only if the laptop happened to be awake. Measured:
@@ -240,8 +263,9 @@ Research only — it never places bets or automates gambling.
   The BULK full-game pull still prices by region and needs `us_ex`; an 11th book key
   doubles every sweep, so `sources/odds.py` refuses to start with one. (2) **Four decision
   builds a week** replace the daily morning card: `tue_pm`/`thu_pm`/`fri_pm` (~4:05pm ET)
-  and `sat_am` (~8:05am ET), all status `final`, paper windows 48/24/16/80 h = exactly the
-  gap to the next build. `manual` builds publish but paper-log NOTHING. Expected spend
+  and `sat_am` (~8:05am ET), all status `final`, paper windows 48/24 h midweek and the
+  REST OF THE WEEK on Friday and Saturday (they were 48/24/16/80 h = the gap to the next
+  build until 2026-09-13; see the top bullet). `manual` builds publish but paper-log NOTHING. Expected spend
   ~567 credits/wk (was ~1,308) on a measured basis of **82** HR games, not the 60 the old
   comments assumed. (3) **A Vercel cron is the primary trigger** (`web/vercel.json` ->
   `/api/cron/[job]`, table in `web/lib/cronJobs.ts`); GitHub cron is the backup and the

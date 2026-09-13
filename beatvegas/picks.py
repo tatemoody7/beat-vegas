@@ -59,6 +59,37 @@ def existing_pick(
     return q.order_by(ManualPick.id).first()
 
 
+def model_read(session, game_id: Optional[int], market: str = "1H"):
+    """(bv_line, under_score) to freeze onto a pick — OUR number and the model's
+    score right now. Mirrors web/lib/picks.ts createPick so a terminal pick and a
+    website pick carry the same snapshot.
+
+    The model is 1H-only, so a full-game ticket gets (None, None). Prefers the
+    MODEL row over the display-only `derived_lines` row (the same rule board.ts
+    uses: post_derived_lines writes seconds after scoring, so ordering on
+    recency alone picks the reference row), newest first, with `line_used` as the
+    bv_line fallback for legacy rows predating the calibrated line."""
+    if game_id is None or (market or "1H") != "1H":
+        return None, None
+    from .card import REFERENCE_MODEL_VERSION  # local: picks.py must not depend on the card
+    from .db.models import Prediction
+
+    row = (
+        session.query(Prediction.bv_line, Prediction.under_score, Prediction.line_used)
+        .filter(Prediction.game_id == game_id)
+        .order_by(
+            (Prediction.model_version == REFERENCE_MODEL_VERSION).asc(),
+            Prediction.created_at.desc(),
+        )
+        .first()
+    )
+    if row is None:
+        return None, None
+    bv_line, under_score, line_used = row
+    line = bv_line if bv_line is not None else line_used
+    return line, None if under_score is None else int(under_score)
+
+
 def add_pick(
     session,
     *,
@@ -83,11 +114,21 @@ def add_pick(
     placed_at: Optional[datetime] = None,
     blocker: Optional[str] = None,
     factors_json: Optional[str] = None,
+    model_line: Optional[float] = None,
+    model_score: Optional[int] = None,
 ) -> ManualPick:
     """Insert (and flush) one under pick. A paper pick always stakes
     `PAPER_STAKE` regardless of `stake` — nothing is at risk, and a flat unit
     keeps its record comparable. Does NOT check for duplicates: callers decide
-    (see `existing_pick`)."""
+    (see `existing_pick`).
+
+    `model_line` / `model_score` freeze OUR number and the model's 0-100 score at
+    log time. They were the one part of the snapshot only the website wrote
+    (web/lib/picks.ts createPick), so until 2026-09-13 every card paper pick and
+    every `pick.py add` left them NULL — which prints "—" in the picks table and
+    drops the whole paper ledger out of decision-quality's agreed/against split,
+    since that filters on `model_line_at_pick != null`. Callers get them from
+    `model_read` (terminal) or off the card item (build_card)."""
     pick = ManualPick(
         game_id=game_id,
         season=season,
@@ -112,6 +153,8 @@ def add_pick(
         hr_line_at_pick=hr_line,
         blocker=blocker,
         factors_json_at_pick=factors_json,
+        model_line_at_pick=model_line,
+        model_score_at_pick=model_score,
     )
     session.add(pick)
     session.flush()

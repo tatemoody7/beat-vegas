@@ -97,22 +97,21 @@ Hard Rock-priced games (budget comment in `.github/workflows/lines_watch.yml`).
 Nothing runs on the Mac on a schedule. The engine runs in **GitHub Actions**
 (`.github/workflows/`, secrets `DATABASE_URL` / `CFBD_API_KEY` / `ODDS_API_KEY`)
 because the campus network cannot reach Neon:5432. Failures: GitHub emails every
-failed run; the Saturday card routine checks the final card and the Sunday routine
-checks the Sunday capture before each is needed.
-GitHub cron is best-effort (it drops most single-slot runs), so each job has retry
-slots and the card job runs any missing input itself before it builds.
+failed run, and the board itself carries the stale-results and missed-build banners
+(`web/lib/boardHealth.ts`) — since 2026-09-13 nothing texts.
+GitHub cron is best-effort (it drops most single-slot runs), so a Vercel cron is the
+primary trigger, each job has retry slots, and the card job runs any missing input
+itself before it builds.
 
 | When (ET)                          | Workflow / routine     | What                                                                 |
 | ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
-| Sun 4:45pm                         | routine `cfb-sunday-ops` | Verify/kick `sunday.yml`, then text the weekend recap               |
 | Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
-| Tue–Sat ~8:05am (ET-gated 7:45–9:15) | `card.yml` slot `morning` | The decision build for every game before the next build: full 1H sweep of the rolling week + injury refresh → FINAL card → paper-log qualifying games kicking off within 24 h, each with its blocker |
-| Thu / Fri ~4pm (ET-gated 3:45–5:15) | `card.yml` slot `afternoon` | Tonight's kickoffs (within 10 h): Hard Rock posts weeknight 1H lines after the morning build, so this FINAL card is the one that sees them |
+| Tue / Thu ~4:05pm (ET-gated 3:45–5:15) | `card.yml` slots `tue_pm` / `thu_pm` | Full 1H sweep of the rolling week + injury refresh → FINAL card → paper-log the qualifying games kicking off before the next build (48 h / 24 h), each with its blocker |
+| Fri ~4:05pm (ET-gated 3:45–5:15)   | `card.yml` slot `fri_pm` | The decision build for the weekend: same sweep, and it paper-logs the REST OF THE WEEK — 78% of Hard Rock's 1H lines are up by Friday afternoon and they barely move afterwards |
+| Sat ~8:05am (ET-gated 7:45–9:15)   | `card.yml` slot `sat_am` | Same whole-week sweep before the morning sitting; also on the rest of the week, but Friday has priced most of it, so it logs only what newly qualifies |
 | Every 30 min, evenings + all Saturday | `lines_watch.yml`   | Per-game Hard Rock 1H closes ~30–75 min before each kickoff             |
-| Sat 8:50am                         | routine `cfb-saturday-card` | Verify/kick the morning card, text the BET list with line, price, kill numbers |
 | Daily 6:30am (retry noon)          | `grade.yml`            | Finals (completed games only) + 1H play-by-play for weeks still missing it → grade market / model / picks / records → post-mortem (2023-25 history only on Monday) |
-| Mon 9am                            | routine `monday-coaching` | Includes a one-line grading check (kicks `grade.yml` if cron dropped it) |
 
 Manual-only workflows: `post-lines.yml` (derived lines for the board),
 `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),

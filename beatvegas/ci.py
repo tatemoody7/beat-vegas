@@ -74,39 +74,50 @@ CARD_STATUS_BY_SLOT: Dict[str, str] = {
     "manual": "preview",  # an ad-hoc refresh is never the final
 }
 
-# Paper-log only games kicking off within N hours of the build (the DECISION
-# build for those games — docs/BETTING_POLICY.md). None = every upcoming game.
 # Paper-log only games kicking off within N hours of the build — the games this
 # build is the DECISION build for (docs/BETTING_POLICY.md). None = every
-# upcoming game.
+# upcoming game on the card, i.e. the rest of the week.
 #
-# Each window is EXACTLY the gap to the next build, and that is load-bearing.
-# picks.py::existing_pick guards on game_id, so a game is logged at most once no
-# matter what; the window does not control duplication, it controls WHICH
-# build's line gets frozen onto the pick. A window wider than the gap would let
-# an earlier build claim a game that a later, fresher build should have priced
-# (Thursday freezing Saturday's games at Thursday's line); a narrower one leaves
-# games logged by nobody — which is a live bug on the old flat 24 h morning
-# window, under which no Sunday or Monday game was ever paper-logged.
-# SLOT_BUILD_ET below encodes the build times these gaps come from, and
-# tests/test_ci_slots.py recomputes each gap from it, so moving a slot without
-# moving its window fails CI.
+# FRIDAY ANCHORS THE WEEKEND (2026-09-13). picks.py::existing_pick guards on
+# game_id, so a game is logged at most once no matter what; the window does not
+# control duplication, it controls WHICH build's line gets frozen onto the pick.
+#
+# The windows used to be the gap to the next build, which reads right and is
+# wrong: college football kicks off on Saturday. Measured on week 2 — thu_pm's
+# 24 h reached only Thu-night and Fri-early games (6 on the whole slate),
+# fri_pm's 16 h reached Fri-night and Sat-early (8), neither had a qualifying
+# Hard Rock game, and sat_am's 80 h swept up everything else. All 25 paper picks
+# came from one build. Across the week 33 distinct games qualified; the ledger
+# recorded 25 of them, and the FRIDAY card's three clean BETs (plus a fourth
+# held by a degraded input) were never logged at all, against the one the
+# Saturday build recorded.
+#
+# So the midweek builds keep the gap to the next look — they claim only the
+# games that kick off before anyone looks again, and must never claim a Saturday
+# game before Friday can price it — while fri_pm takes the REST OF THE WEEK and
+# sat_am mops up whatever newly qualifies on Saturday morning. That matches
+# where the information is: Hard Rock has 78% of its 1H lines posted by Friday
+# afternoon against 31% on Tuesday, and the lines barely move afterwards (48 of
+# 71 week-2 games never moved at all, mean drift -0.18 pts). The cost is that a
+# Sunday or Monday game is frozen from Friday, ~3 days out; the true close is
+# still captured for CLV by lines_watch.yml.
+#
+# SLOT_BUILD_ET below encodes the build times the midweek gaps come from, and
+# tests/test_ci_slots.py recomputes each of those from it, so moving a slot
+# without moving its window fails CI.
 PAPER_WINDOW_HOURS: Dict[str, Optional[float]] = {
-    "tue_pm": 48.0,  # Tue 4:05pm -> Thu 4:05pm
-    "thu_pm": 24.0,  # Thu 4:05pm -> Fri 4:05pm
-    "fri_pm": 16.0,  # Fri 4:05pm -> Sat 8:05am
-    "sat_am": 80.0,  # Sat 8:05am -> Tue 4:05pm; the only build that covers
-    # Sunday and Monday games. They are frozen early (up to ~60 h before
-    # kickoff) — the honest cost of a four-build week, and still better than
-    # the old schedule, which logged them never. The true close is still
-    # captured for CLV by lines_watch.yml.
-    # `manual` never logs: see no_paper in resolve_slot.
+    "tue_pm": 48.0,  # Tue 4:05pm -> Thu 4:05pm: Wednesday and Thursday-afternoon games
+    "thu_pm": 24.0,  # Thu 4:05pm -> Fri 4:05pm: Thursday-night and Friday-afternoon games
+    "fri_pm": None,  # the rest of the week — the decision build for the weekend
+    "sat_am": None,  # the rest of the week, but Friday has already claimed most of it
+    # `manual` never logs at all: see no_paper in resolve_slot.
     "manual": None,
 }
 
 # Nominal build weekday (ISO: Mon=1) and ET wall-clock time per scheduled slot.
-# Documentation in code: the paper windows above are the gaps between these, and
-# a test asserts exactly that.
+# Documentation in code: the two MIDWEEK paper windows above are the gaps between
+# these, and a test asserts exactly that (fri_pm and sat_am take the rest of the
+# week instead, so they have no gap to recompute).
 SLOT_BUILD_ET: Dict[str, Tuple[int, time]] = {
     "tue_pm": (2, time(16, 5)),
     "thu_pm": (4, time(16, 5)),

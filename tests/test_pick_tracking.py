@@ -1,7 +1,12 @@
 """ManualPick decision-tracking columns (shared contract with the web lane —
 names are exact): verdict_at_pick, reason, gap_at_pick, ev_at_pick,
-hr_line_at_pick. pick.py add takes them as flags; --paper now stakes one flat
-unit so paper picks grade as +/-1 (is_paper keeps them out of the real ledger)."""
+hr_line_at_pick, model_line_at_pick, model_score_at_pick. pick.py add takes them
+as flags; --paper now stakes one flat unit so paper picks grade as +/-1
+(is_paper keeps them out of the real ledger).
+
+The two model_* columns were written ONLY by the website until 2026-09-13, so
+every terminal and card pick left them NULL and fell out of decision-quality's
+agreed/against split, which filters on model_line_at_pick != null."""
 
 from argparse import Namespace
 from contextlib import contextmanager
@@ -11,7 +16,7 @@ from conftest import _load_script
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import Base, Game, ManualPick
+from beatvegas.db.models import Base, Game, ManualPick, Prediction
 from beatvegas.db.store import _MIGRATIONS, _apply_migrations
 
 TRACKING_COLS = {
@@ -20,6 +25,8 @@ TRACKING_COLS = {
     "gap_at_pick": "FLOAT",
     "ev_at_pick": "FLOAT",
     "hr_line_at_pick": "FLOAT",
+    "model_line_at_pick": "FLOAT",
+    "model_score_at_pick": "INTEGER",
 }
 
 
@@ -40,6 +47,81 @@ def test_migration_adds_columns_to_a_legacy_table():
     _apply_migrations(eng)
     have = {col["name"] for col in inspect(eng).get_columns("manual_picks")}
     assert set(TRACKING_COLS) <= have
+
+
+def test_data_migration_backfills_our_number_on_legacy_card_picks():
+    """Week 2's 25 paper picks predate add_pick writing the model snapshot. Our
+    number reconstructs EXACTLY from fields frozen at the pick: a card item only
+    qualifies when Hard Rock priced it, and card.py then measures the gap against
+    Hard Rock's own line, so bv_line = hr_line_at_pick - gap_at_pick. The score
+    has no such reconstruction and comes from the prediction the pick was logged
+    against. Both are scoped to reason='model_gap' and guarded on IS NULL, so a
+    row the website (or the new writer) already filled is never touched."""
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Prediction(game_id=1, model_version="gbm_v1", bv_line=22.15, under_score=91))
+        s.add_all(
+            [
+                # a card paper pick: both NULL, both recoverable
+                ManualPick(
+                    id=1,
+                    game_id=1,
+                    season=2026,
+                    week=2,
+                    home_team="H",
+                    away_team="A",
+                    side="under",
+                    market="1H",
+                    line=28.5,
+                    reason="model_gap",
+                    hr_line_at_pick=28.5,
+                    gap_at_pick=6.35,
+                ),
+                # already filled by the website — must survive untouched
+                ManualPick(
+                    id=2,
+                    game_id=1,
+                    season=2026,
+                    week=2,
+                    home_team="H",
+                    away_team="A",
+                    side="under",
+                    market="1H",
+                    line=28.5,
+                    reason="model_gap",
+                    hr_line_at_pick=28.5,
+                    gap_at_pick=6.35,
+                    model_line_at_pick=99.0,
+                    model_score_at_pick=7,
+                ),
+                # a hand-logged pick with no model read behind it
+                ManualPick(
+                    id=3,
+                    game_id=1,
+                    season=2026,
+                    week=2,
+                    home_team="H",
+                    away_team="A",
+                    side="under",
+                    market="1H",
+                    line=28.5,
+                    reason="manual",
+                    hr_line_at_pick=28.5,
+                    gap_at_pick=6.35,
+                ),
+            ]
+        )
+        s.commit()
+
+    _apply_migrations(eng)
+    _apply_migrations(eng)  # idempotent: a second pass must change nothing
+
+    with Session(eng) as s:
+        rows = {r.id: r for r in s.query(ManualPick).all()}
+    assert (rows[1].model_line_at_pick, rows[1].model_score_at_pick) == (22.15, 91)
+    assert (rows[2].model_line_at_pick, rows[2].model_score_at_pick) == (99.0, 7)
+    assert rows[3].model_line_at_pick is None and rows[3].model_score_at_pick is None
 
 
 def _args(**kw) -> Namespace:
@@ -232,6 +314,90 @@ def test_add_pick_stores_blocker_and_chips():
         s.commit()
         (row,) = s.query(ManualPick).all()
     assert row.blocker == "price" and row.factors_json_at_pick == '{"total_band": "52–60"}'
+
+
+def test_add_pick_freezes_our_number_and_leaves_it_null_when_unknown():
+    from beatvegas.picks import add_pick
+
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        add_pick(
+            s,
+            game_id=1,
+            season=2026,
+            week=3,
+            home_team="H",
+            away_team="A",
+            line=24.5,
+            model_line=22.4,
+            model_score=78,
+        )
+        add_pick(
+            s,
+            game_id=2,
+            season=2026,
+            week=3,
+            home_team="H2",
+            away_team="A2",
+            line=24.5,
+        )
+        s.commit()
+        first, second = s.query(ManualPick).order_by(ManualPick.id).all()
+    assert (first.model_line_at_pick, first.model_score_at_pick) == (22.4, 78)
+    assert second.model_line_at_pick is None and second.model_score_at_pick is None
+
+
+def test_model_read_prefers_the_model_row_over_derived_lines():
+    """The same rule web/lib/picks.ts createPick uses: post_derived_lines writes
+    seconds after scoring, so ordering on recency alone would freeze the
+    display-only reference line as OUR number."""
+    from beatvegas.picks import model_read
+
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        s.add_all(
+            [
+                Prediction(
+                    game_id=1,
+                    model_version="gbm_v1",
+                    bv_line=22.4,
+                    under_score=78,
+                    created_at=datetime(2026, 9, 11, 20, 0),
+                ),
+                Prediction(
+                    game_id=1,
+                    model_version="derived_lines",
+                    line_used=24.5,
+                    under_score=12,
+                    created_at=datetime(2026, 9, 11, 20, 1),  # newer
+                ),
+            ]
+        )
+        s.commit()
+        assert model_read(s, 1) == (22.4, 78)
+        # The model is 1H-only, and an unmatched pick has no game to read.
+        assert model_read(s, 1, "full") == (None, None)
+        assert model_read(s, None) == (None, None)
+        assert model_read(s, 999) == (None, None)
+
+
+def test_pick_add_freezes_the_model_read_on_the_ticket():
+    pick, eng = _pick_module()
+    with Session(eng) as s:
+        s.add(
+            Prediction(
+                game_id=1,
+                model_version="gbm_v1",
+                bv_line=22.4,
+                under_score=78,
+                created_at=datetime(2026, 9, 11, 20, 0),
+            )
+        )
+        s.commit()
+    pick.cmd_add(_args())
+    with Session(eng) as s:
+        (row,) = s.query(ManualPick).all()
+    assert row.model_line_at_pick == 22.4 and row.model_score_at_pick == 78
 
 
 def test_existing_pick_is_scoped_per_ledger():

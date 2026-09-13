@@ -97,6 +97,39 @@ _DATA_MIGRATIONS = [
         "UPDATE weather SET temperature_f = NULL, wind_mph = NULL, precipitation = NULL "
         "WHERE dome AND temperature_f = 72 AND wind_mph = 0",
     ),
+    # Until 2026-09-13 only the website wrote model_line_at_pick /
+    # model_score_at_pick (web/lib/picks.ts createPick); beatvegas.picks.add_pick
+    # had no parameter for them, so every card paper pick and every `pick.py add`
+    # left both NULL — which prints "-" in the picks table and drops the whole
+    # paper ledger out of decision-quality's agreed/against split, since that
+    # filters on `model_line_at_pick != null`.
+    #
+    # Our number reconstructs EXACTLY from fields frozen at the pick: a card item
+    # only `qualifies` when Hard Rock has priced it, and card.py then measures the
+    # gap against Hard Rock's own line, so bv_line = hr_line_at_pick - gap_at_pick.
+    # Verified to 0.000 on all 25 of 2026 week 2. `reason = 'model_gap'` scopes
+    # this to picks the model produced, and the IS NULL guard makes it a no-op
+    # once applied and keeps it off any row the new writer filled.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET model_line_at_pick = hr_line_at_pick - gap_at_pick "
+        "WHERE model_line_at_pick IS NULL AND reason = 'model_gap' "
+        "AND hr_line_at_pick IS NOT NULL AND gap_at_pick IS NOT NULL",
+    ),
+    # The score has no such reconstruction, so it comes from the prediction the
+    # pick was logged against. Safe for the backfilled rows because 2026 week 2
+    # was never re-scored: exactly one gbm_v1 row per game, still matching the
+    # frozen bv_line above. MAX() keeps the subquery single-valued without
+    # ORDER BY/LIMIT, which SQL-92 does not allow in a scalar subquery.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET model_score_at_pick = ("
+        "  SELECT MAX(p.under_score) FROM predictions p"
+        "  WHERE p.game_id = manual_picks.game_id AND p.model_version = 'gbm_v1') "
+        "WHERE model_score_at_pick IS NULL AND reason = 'model_gap' AND game_id IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM predictions p2 WHERE p2.game_id = manual_picks.game_id "
+        "AND p2.model_version = 'gbm_v1' AND p2.under_score IS NOT NULL)",
+    ),
 ]
 
 _engine = None

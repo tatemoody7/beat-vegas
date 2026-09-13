@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 """Build the week's bet card and publish it to the Board (`cards` table).
 
-Runs in GitHub Actions (`.github/workflows/card.yml`: the morning build Tue-Sat
-~8:05-8:45am ET, the decision build for every game before the next one, plus a
-Thu/Fri ~4pm ET afternoon build for that evening's kickoffs; slots in
-beatvegas/ci.py). Pure rules live in beatvegas/card.py; this script only loads
+Runs in GitHub Actions (`.github/workflows/card.yml`: four decision builds a
+week — tue_pm/thu_pm/fri_pm ~4:05pm ET and sat_am ~8:05am ET; slots and paper
+windows in beatvegas/ci.py). Pure rules live in beatvegas/card.py; this script only loads
 the inputs, writes one `cards` row per build (history; the newest row is the
 live card) and logs every QUALIFYING game (Hard Rock's 1H line >= BET_GAP_PTS
 above ours, any tier) as a PAPER pick tagged with its blocker, through the same
@@ -13,15 +12,14 @@ code path as `pick.py add` (beatvegas.picks.add_pick), never twice for one game.
     python scripts/build_card.py                      # active season/week
     python scripts/build_card.py --season 2026 --week 3
     python scripts/build_card.py --dry-run            # print the payload, write nothing
-    python scripts/build_card.py --slot morning \
+    python scripts/build_card.py --slot fri_pm \
         --sweep-status "$RUNNER_TEMP/sweep_status.json" \
         --preview-status "$RUNNER_TEMP/preview_status.json"
 
 --slot sets the card's clean status (beatvegas.ci.CARD_STATUS_BY_SLOT); the two
 status files say whether the sweep and the research preview actually covered the
 slate. Any failure marks the games it touched paper only, the card status
-"degraded", and prints it as line 2 of the summary ("CARD STATUS: ...") — the
-Saturday card routine only ever saw a green workflow before.
+"degraded", and prints it as line 2 of the summary ("CARD STATUS: ...").
 
 Exit 1 when the Hard Rock universe has games but the card came out empty (every
 game already kicked off, or the inputs are missing) so the run goes red instead
@@ -211,9 +209,12 @@ def log_paper_picks(
     the gate that blocked a real bet (`blocker`: none = BET, price, off_market,
     no_fair_price, qb_out, cap, degraded). Tate's real ticket on the same game never blocks it and is
     never blocked by it (per-ledger guard). `window_hours` restricts logging to
-    games kicking off within that many hours (the DECISION build for that game:
-    the morning build for everything kicking off before the next one, the
-    Thu/Fri afternoon build for that evening's kickoffs). Marks `paper_logged`. Returns the number inserted."""
+    games kicking off within that many hours — the games this build is the
+    DECISION build for (beatvegas.ci.PAPER_WINDOW_HOURS: the midweek builds take
+    the gap to the next look, fri_pm and sat_am take the rest of the week).
+    None = every qualifying game still on the card. Freezes OUR number
+    (`model_line`/`model_score`) alongside Hard Rock's, marks `paper_logged`, and
+    returns the number inserted."""
     inserted = 0
     for it in card["items"]:
         if not it.get("qualifies"):
@@ -273,6 +274,12 @@ def log_paper_picks(
             placed_at=now,
             blocker=blocker,
             factors_json=json.dumps(chips, ensure_ascii=False, allow_nan=False),
+            # OUR number and the model's score, off the same card item the gap
+            # was computed from. Until 2026-09-13 nothing in the Python lane
+            # wrote these, so the whole paper ledger sat outside
+            # decision-quality's agreed/against split.
+            model_line=it["bv_line"],
+            model_score=it.get("under_score"),
         )
         it["paper_logged"] = True
         inserted += 1
@@ -488,7 +495,7 @@ def main() -> None:
     ap.add_argument(
         "--slot",
         default=None,
-        help="which build this is (morning|afternoon|manual, "
+        help="which build this is (tue_pm|thu_pm|fri_pm|sat_am|manual, "
         "beatvegas.ci.CARD_STATUS_BY_SLOT); sets the card's clean status",
     )
     ap.add_argument(

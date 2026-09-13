@@ -121,6 +121,8 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -e .
+      - name: Cache CFBD reference data (weekly)
+        uses: ./.github/actions/cfbd-cache
       - name: Resolve slot (beatvegas/ci.py; ET gate + once-per-day cards probe)
         id: slot
         env:

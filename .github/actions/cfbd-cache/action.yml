@@ -1,0 +1,31 @@
+name: CFBD reference cache
+description: >
+  Share CFBD reference downloads (SP+, talent, roster, returning production)
+  across the week's workflow runs instead of re-fetching them on every one.
+
+# Why this exists: CFBD's monthly call quota ran out on 2026-09-12 and 429'd
+# every endpoint for two days, which stopped grading dead. The cause was not one
+# greedy job -- it was ~76 workflow runs a month each re-downloading the same
+# unchanged reference tables, because beatvegas/sources/season_stats.py::_cached
+# writes to data/cache/ and a GitHub runner starts with an empty one.
+#
+# A feature build fetches sp/talent/roster/returning for every season in the
+# frame: roughly 17 calls, on all 26 card builds, 17 Sunday runs and 10 research
+# previews. That is most of a 1,000-call month spent on rows that do not change.
+#
+# The key carries the ISO week, so every run inside one week shares a single
+# download and each new week re-fetches once. That is deliberate: SP+ ratings
+# update weekly in season, and _cached has no expiry -- a season-long key would
+# silently freeze the model's SP+ features at week 1. There are NO restore-keys
+# for the same reason.
+
+runs:
+  using: composite
+  steps:
+    - id: week
+      shell: bash
+      run: echo "key=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      with:
+        path: data/cache
+        key: cfbd-ref-${{ steps.week.outputs.key }}

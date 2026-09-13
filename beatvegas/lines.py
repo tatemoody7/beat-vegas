@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from .db.models import OddsSnapshot
-from .devig import devig_two_way
+from .devig import devig_two_way, is_centred_quote
 
 # A "real" close is a snapshot captured this close to kickoff. The 48-hour
 # Sunday opener alone must never grade as a close: the 1H market posts on game
@@ -16,12 +16,39 @@ REAL_1H_CLOSE_WINDOW_H = 2.0
 REAL_FG_CLOSE_WINDOW_H = 3.0
 
 
+def centred_snaps(snaps: Sequence) -> list:
+    """Snapshots whose prices look like a book's MAIN number.
+
+    A feed sometimes serves an off-centre rung of the alternate ladder as if it
+    were the main total, and the price skew is the tell (devig.is_centred_quote).
+    This matters most exactly where it hurts most: Hard Rock is centred on 100%
+    of quotes more than 24 h from kickoff and off-centre on 26 of 28 inside 3 h
+    -- the window the close polls run in. Grading CLV against that was measuring
+    us against a number nobody could bet.
+
+    Dropping the rungs rather than the book means a book still contributes its
+    last CENTRED quote. Falls back to all of them when nothing qualifies, so a
+    caller always gets a consensus rather than nothing.
+    """
+    # getattr, not attribute access: several callers pass snapshot-like objects
+    # that carry only book/line/captured_at, and a quote with no prices cannot
+    # be judged -- which this treats as centred, per is_centred_quote.
+    ok = [
+        s
+        for s in snaps
+        if is_centred_quote(getattr(s, "over_price", None), getattr(s, "under_price", None))
+    ]
+    return ok or list(snaps)
+
+
 def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[float]]:
     """Median across books of each book's first / last observed 1H line.
 
-    `snaps`: objects with .book, .line, .captured_at (e.g. OddsSnapshot)."""
+    `snaps`: objects with .book, .line, .captured_at (e.g. OddsSnapshot).
+
+    Off-centre rungs are dropped first -- see centred_snaps."""
     by_book = {}
-    for sn in snaps:
+    for sn in centred_snaps(snaps):
         by_book.setdefault(sn.book, []).append(sn)
     opens: List[float] = []
     closes: List[float] = []
@@ -44,7 +71,7 @@ def consensus_fair_under_open_close(
     measures the price asymmetry, NOT line movement (see consensus_open_close
     for the line)."""
     by_book = {}
-    for sn in snaps:
+    for sn in centred_snaps(snaps):
         if sn.over_price is None or sn.under_price is None:
             continue
         by_book.setdefault(sn.book, []).append(sn)

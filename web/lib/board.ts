@@ -1,3 +1,4 @@
+import { isCentredQuote } from "@/lib/devig";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
@@ -61,6 +62,8 @@ type SnapRow = {
   game_id: number | bigint;
   book: string | null;
   line: number | null;
+  over_price: number | null;
+  under_price: number | null;
   captured_at: string | null; // CAST to TEXT — Prisma can't coerce SQLite DateTime via raw select
 };
 
@@ -79,7 +82,7 @@ export async function consensusLines(
   market = "1H_total",
 ): Promise<Map<number, ConsensusLine>> {
   const snaps = await prisma.$queryRaw<SnapRow[]>`
-    SELECT s.game_id, LOWER(s.book) AS book, s.line,
+    SELECT s.game_id, LOWER(s.book) AS book, s.line, s.over_price, s.under_price,
            CAST(s.captured_at AS TEXT) AS captured_at
     FROM odds_snapshots s JOIN games g ON g.id = s.game_id
     WHERE s.market = ${market} AND g.season = ${season}
@@ -91,6 +94,9 @@ export async function consensusLines(
   const byGame = new Map<number, Map<string, SnapRow[]>>();
   for (const s of snaps) {
     if (s.line === null || s.line === undefined) continue;
+    // A rung of the alternate ladder served as the main total is not a line;
+    // it must never drag the consensus median. See lib/devig.ts::isCentredQuote.
+    if (!isCentredQuote(s.over_price, s.under_price)) continue;
     const gid = Number(s.game_id);
     const book = s.book ?? "?";
     if (!byGame.has(gid)) byGame.set(gid, new Map());

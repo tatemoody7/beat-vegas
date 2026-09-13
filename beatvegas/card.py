@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from .ci import CARD_STATUS_BY_SLOT
-from .devig import devig_two_way, ev_under
+from .devig import devig_two_way, ev_under, is_centred_quote
 from .hardrock import HR_BOOK_KEY, normalize_book
 from .model.score import (
     BET_GAP_PTS,
@@ -411,12 +411,22 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     ref_now = _reference_now(snaps, now)
     hr = by_book.get(HR_BOOK_KEY)
     hr_line = hr["line"] if hr else None
-    lines = [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS]
+    # Every MARKET aggregate below is built from centred quotes only: a feed that
+    # serves an off-centre rung of the alternate ladder as the main total drags
+    # the median (BetMGM alone moved it on 13 of 63 week-2 games by up to 0.5,
+    # which is exactly HR_OFF_MARKET_PTS and enough to flip the off-market gate).
+    # `hr` is deliberately NOT filtered -- Hard Rock's posted number is the one
+    # Tate would actually bet, and the price and no_fair_price gates are what
+    # should refuse a rung, not a silent substitution.
+    centred = {
+        b: o for b, o in by_book.items() if is_centred_quote(o["over_price"], o["under_price"])
+    }
+    lines = [o["line"] for b, o in centred.items() if b not in SYNTHETIC_BOOKS]
     # Hard Rock vs the OTHER books' median (a display chip + why sentence, and
     # the reason the comparable window widens below). `market_line` keeps Hard
     # Rock in its median so off_market and the web's liveLine are untouched.
     others = _median(
-        [o["line"] for b, o in by_book.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
+        [o["line"] for b, o in centred.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
     )
     hr_vs_market = round2(hr_line - others) if hr_line is not None and others is not None else None
     # Exchanges at the SAME line (exact equality — a half point off is another
@@ -431,7 +441,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     lo, hi = fair_price_window(hr_vs_market)
     comparable = [
         _fair_under_of(o)
-        for b, o in by_book.items()
+        for b, o in centred.items()
         if b not in FAIR_PRICE_EXCLUDED
         and hr_line is not None
         and -lo <= (o["line"] - hr_line) <= hi
@@ -450,7 +460,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     ev = ev_under(fair_under, hr_price) if fair_under is not None and hr_price is not None else None
     market_holds = [
         h
-        for b, o in by_book.items()
+        for b, o in centred.items()
         if b not in FAIR_PRICE_EXCLUDED
         for h in [_hold_of(o)]
         if h is not None

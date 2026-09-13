@@ -82,3 +82,33 @@ export function evUnder(
   const payout = americanToDecimal(offeredUnderPrice) - 1;
   return fairUnderProb * payout - (1 - fairUnderProb);
 }
+
+// --- is this quote a centred line at all? ---------------------------------
+//
+// Mirrors beatvegas/devig.py::is_centred_quote -- see there for the full note
+// and the measurement it came from.
+//
+// A book's MAIN total prices both sides near -110. An off-centre rung of the
+// alternate ladder moves the line several points and goes lopsided to
+// compensate, and the PRICE is the honest tell because it needs no reference.
+//
+// 2026 week 2, 1,504 pre-kickoff 1H quotes: no centred quote was worse than
+// -150; off-centre rungs ran to -375 with a -250 median. -160 clears the
+// observed centred range and still rejects 172 of 203 rungs.
+export const SKEW_REJECT_PRICE = -160;
+
+/**
+ * True when both sides are priced like a book's main number. A quote missing
+ * either side is treated as centred: this rejects a positively-identified
+ * pathology, never data it cannot assess.
+ */
+export function isCentredQuote(
+  overPrice: number | null | undefined,
+  underPrice: number | null | undefined,
+): boolean {
+  for (const price of [overPrice, underPrice]) {
+    if (price == null) continue;
+    if (price < SKEW_REJECT_PRICE) return false;
+  }
+  return true;
+}

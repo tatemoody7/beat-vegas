@@ -11,6 +11,7 @@ import { getRecordSeasons, getSeasonRecords, RecordRow } from "@/lib/records";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
+import { EmptyLine } from "@/app/components/Section";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +37,27 @@ function fmt(v: number | null, digits = 1): string {
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; week?: string }>;
 }) {
   const seasons = await getRecordSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
-  const rows: RecordRow[] = seasons.length
-    ? await getSeasonRecords(season)
-    : [];
+  const all: RecordRow[] = seasons.length ? await getSeasonRecords(season) : [];
+
+  // ONE WEEK AT A TIME. A whole season is 3,681 rows and 255,000px of page --
+  // six megabytes of HTML behind the header's primary button, which no phone
+  // is going to render and nobody is going to scroll (Tate 2026-09-13). The
+  // spreadsheet link beside the filter still hands over the entire season in
+  // one file, which is what "every game we have rated" is actually for.
+  const weeks = [...new Set(all.map((r) => r.week))]
+    .filter((w): w is number => typeof w === "number")
+    .sort((a, b) => a - b);
+  const reqWeek = Number(sp.week);
+  const week =
+    Number.isInteger(reqWeek) && weeks.includes(reqWeek)
+      ? reqWeek
+      : (weeks[weeks.length - 1] ?? null);
+  const rows = week === null ? all : all.filter((r) => r.week === week);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -72,9 +86,27 @@ export default async function RecordsPage({
           className="bv-btn ml-auto"
           download
         >
-          Download spreadsheet
+          {`Download all of ${season}`}
         </a>
       </div>
+
+      {weeks.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-[var(--text-dim)]">Week</span>
+          {weeks.map((w) => (
+            <Link
+              key={w}
+              href={`/proof/records?season=${season}&week=${w}`}
+              className={`bv-pill ${w === week ? "ring-1 ring-[var(--accent)]" : ""}`}
+            >
+              <span className="bv-pill-value">{w}</span>
+            </Link>
+          ))}
+          <span className="text-xs text-[var(--text-dim)]">
+            {`${rows.length} of ${all.length} games`}
+          </span>
+        </div>
+      )}
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
@@ -88,9 +120,7 @@ export default async function RecordsPage({
       </dl>
 
       {rows.length === 0 ? (
-        <p className="bv-card p-6 text-sm text-[var(--text-muted)]">
-          {`No games recorded for ${season} yet.`}
-        </p>
+        <EmptyLine>{`No games recorded for ${season} yet.`}</EmptyLine>
       ) : (
         <div className="bv-table-wrap">
           <table className="bv-table">

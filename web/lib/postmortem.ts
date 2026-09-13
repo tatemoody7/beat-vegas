@@ -255,6 +255,13 @@ export type BandRow = {
   pBeat: string;
   units: string;
   roi: string;
+  /**
+   * The under rate as a NUMBER (percentage points), or null. `hit` is the same
+   * value already formatted for a table cell; GapLadderChart needs to plot it,
+   * and parsing a display string back into a number is how a "%" ends up in a
+   * bar height.
+   */
+  hitPct: number | null;
   /** small: n < 30 (no rate shown), medium: n < 100 (no ROI), full otherwise. */
   size: "small" | "medium" | "full";
 };
@@ -285,6 +292,7 @@ export function bandTable(
         n: b.n,
         record: `${b.unders}-${b.overs}${b.pushes ? `-${b.pushes}P` : ""}`,
         hit: pctText(b.under_pct),
+        hitPct: b.under_pct === null ? null : 100 * b.under_pct,
         ci:
           b.ci_lo === null || b.ci_hi === null
             ? "—"

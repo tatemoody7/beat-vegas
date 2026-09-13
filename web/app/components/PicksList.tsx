@@ -41,7 +41,20 @@ function loggedAs(p: PickFull): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-export default function PicksList({ picks }: { picks: PickFull[] }) {
+// `showWeek` is false when the page is already filtered to one week — the
+// column then prints the same number on every row. The Market column is gone
+// for the same reason (the whole product is first halves; a full-game ticket
+// now says so as a badge), and the paper / bonus badges moved under the matchup
+// where they read as a property of the bet rather than of the market (Tate
+// 2026-09-13). Stake STAYS: it looks constant but a bonus bet is staked
+// differently, and it is what the units are computed from.
+export default function PicksList({
+  picks,
+  showWeek = true,
+}: {
+  picks: PickFull[];
+  showWeek?: boolean;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -132,9 +145,8 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
         <table className="bv-table">
           <thead>
             <tr>
-              <th className="bv-num">Week</th>
+              {showWeek && <th className="bv-num">Week</th>}
               <th>Matchup</th>
-              <th>Market</th>
               <th className="bv-num">Your line</th>
               <th className="bv-num">Price</th>
               <th className="bv-num">Stake</th>
@@ -148,18 +160,22 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
             {picks.map((p) => (
               <React.Fragment key={p.id}>
                 <tr className="align-top">
-                  <td className="bv-num text-[var(--text-muted)]">
-                    {p.week ?? "—"}
-                  </td>
+                  {showWeek && (
+                    <td className="bv-num text-[var(--text-muted)]">
+                      {p.week ?? "—"}
+                    </td>
+                  )}
                   <td className="text-[var(--text)]">
                     {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
                     {p.home}
-                  </td>
-                  <td className="text-[var(--text-muted)]">
-                    {labelOf(MARKET_TEXT, p.market, "First half")}
+                    {p.market === "full" && (
+                      <span className="bv-badge ml-1">
+                        {labelOf(MARKET_TEXT, p.market, "Full game")}
+                      </span>
+                    )}
                     {p.isPaper && (
                       <span className="bv-badge bv-badge--warn ml-1">
-                        paper — no money on it
+                        paper
                       </span>
                     )}
                     {p.isBonus && (
@@ -237,7 +253,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 {open === p.id && (
                   <tr id={`pick-detail-${p.id}`}>
                     <td
-                      colSpan={10}
+                      colSpan={showWeek ? 9 : 8}
                       className="bg-[var(--surface-2)] px-3 py-3"
                     >
                       <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-xs sm:grid-cols-[auto_1fr]">
@@ -268,7 +284,7 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
                 {editing === p.id && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={showWeek ? 9 : 8}
                       className="bg-[var(--surface-2)] px-3 py-3"
                     >
                       <div className="flex flex-wrap items-end gap-3 text-xs">
@@ -349,8 +365,10 @@ export default function PicksList({ picks }: { picks: PickFull[] }) {
         </table>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
-        Line value positive means the line moved your way after the bet. Open a
-        row for our number at the time, why it was logged, and the note.
+        Rows marked <span className="bv-badge bv-badge--warn">paper</span> had
+        no money on them. Line value positive means the line moved your way
+        after the bet. Open a row for our number at the time, why it was logged,
+        and the note.
       </p>
     </>
   );

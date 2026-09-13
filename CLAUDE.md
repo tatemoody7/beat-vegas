@@ -5,6 +5,41 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-13 (RESULTS + TRACK RECORD REBUILT, PR #122).** The Board is not SHORTER than
+  the other two pages — 6,877px against 7,753 and 9,159. It works because it is **one
+  element repeated 34 times under 5 headings**, and because it never makes you read a
+  visual. Results had **16 headings**, Track record **19**, each block its own shape with
+  its own paragraph. So the fix was consolidation, not deletion.
+  **Results is READ-ONLY** (Tate: "all the logging should happen on the board page. The
+  results is just to see what I picked and how it turned out"). `BetSlip`, `CardPanel` and
+  `BankrollStrip` are DELETED — all three are about a bet not yet placed. Logging is
+  `/game/[id]` only (`LogPickButton`/`LogPickForm`, already linked from every board row).
+  **Nothing was lost on safety: the kill line/price is enforced SERVER-SIDE for every path
+  by `pickRules.ts::checkPolicy`**, not by the slip — check there before ever "porting" it
+  again. `CardStatusBanner` moved to the BOARD, beside the missed-build and stale-results
+  banners. Three tables became one (`Breakdown.tsx`, a By week / By reason / By blocker
+  toggle); the blocker view drops the real-money columns rather than dashing them.
+  **"Vs our number" is gone** — a game is only logged when Hard Rock's line sits ABOVE our
+  number, so "went against it" was `— (0)` by construction. The picks table lost `Market`
+  and hides `Week` when filtered to one; **`Stake` STAYS** — it looks constant but a bonus
+  bet is staked differently.
+  **Track record leads with the finding.** The gap ladder (48.4/44.5/53.9/54.9/58.8) was an
+  8-column table under a 60-word caption while a tangent had the only chart;
+  `GapLadderChart.tsx` draws it (same Recharts pattern as `LineStudyView`, and
+  **`isAnimationActive={false}` is load-bearing there too**). Everything secondary folds
+  away (`Fold.tsx`, a native `<details>`): the estimated block, methodology, calibration,
+  the line study, and the WATCH tier of "What to change" (7 cards, 6 of them the same
+  sentence). `/proof/records` paginates by week — it was **3,681 rows and 255,202px**.
+  **Measured:** Results 7,753 → **3,327px** at 1440 (16 → 12 headings, 5 → 3 tables) and
+  7,811 → 5,662 at 375; Track record 9,159 → **2,840px** and 9,199 → 4,529. No horizontal
+  overflow at either width. Web tests 414, Python 890.
+  **The design rule that came out of it (Tate): "if it isn't obvious I don't want it."** He
+  rejected three proposed Results charts as unreadable — a chart that needs a paragraph
+  under it has already failed, and the plain big numbers ($103.60, +5.1%) are the right
+  form there. Only the gap ladder earned one. **Screenshots caught four defects the DOM
+  checks could not**: the break-even label rendered dark-on-green ON the tallest bar, the
+  y-axis label clipped to "How often the under wo", auto-ticks came out 40/47/54/61/65, and
+  the 4-card grid stranded one alone. **Look at the picture, not just `scrollHeight`.**
 - **2026-09-13 (THE PAPER LEDGER WAS MEASURING ONE BUILD OUT OF FOUR).** Every one of
   week 2's 25 paper picks was placed Sat 12:00 UTC — the `sat_am` build. Across the week's
   six builds **33 distinct games qualified**; the ledger holds 25, and the FRIDAY card's
@@ -120,11 +155,10 @@ Research only — it never places bets or automates gambling.
   `~/.claude/plans/here-are-all-the-hashed-lantern.md`.
 - **Decided, NOT yet built (next session):** delete `MovementChart.tsx` + its
   `GameDetail.tsx:165-170` call site and the now-dead `movement.ts::pivot` — keep
-  `BookTable` (Tate: the graph "looks like scribbles"; the per-book list stays); mark
+  `BookTable` (Tate: the graph "looks like scribbles"; the per-book list stays); and mark
   already-placed bets in `AnswerBar` (muted + a marker, sorted below open ones — the data
-  is already on `HomeGame.picked`, `answerBar.ts::buildAnswer` just never sees it); and
-  rework **Results / Track record** (the first ~1,500px of `/results` is a bet slip for a
-  week that already kicked off, then the same games again, before any result).
+  is already on `HomeGame.picked`, `answerBar.ts::buildAnswer` just never sees it).
+  (The Results / Track record rework SHIPPED — see the PR #122 bullet above.)
 - **2026-09-10 (full system review, PR #98, MERGED):** a code + security pass over the
   engine, the workflows and the site. **Two things were actually broken.**
   (1) `grade_records` was the ONLY one of eight grading paths that skipped

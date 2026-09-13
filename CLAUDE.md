@@ -5,6 +5,34 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-13 (every scheduled text retired; PR #118).** The Mac routines were **local**
+  Claude sessions, and on battery this Mac sleeps after ONE MINUTE with no `pmset` wake
+  events — so they fired only if the laptop happened to be awake. Measured:
+  `cfb-saturday-card` ran **twice all season** (once two days late, once 6:45pm instead of
+  8:50am, on the first real-money Saturday); `cfb-weeknight-card` **never fired on a Tue,
+  Thu or Fri**; `cfb-sunday-ops` ran once, three days late. iMessage cannot move to the
+  cloud (it needs the Messages app and `send-verified`'s local `chat.db` read-back).
+  **Tate's call: no scheduled texts at all, and no fixed decision rhythm** — which dissolves
+  the problem rather than fixing it. Deleted `cfb-saturday-card`, `cfb-weeknight-card` and
+  two long-dead tasks; `ainhub-ai-daily-brief` is KEPT; `cfb-sunday-ops` is PAUSED until the
+  new cron below is seen to fire on a real Sunday, then delete it. A deleted task leaves its
+  SKILL.md on disk.
+- **`sunday.yml` finally has a Vercel cron** (`/api/cron/sunday`, three Sunday entries,
+  1pm–5pm ET window). It was the LAST workflow whose only trigger was GitHub's cron, and its
+  last SCHEDULED run was **2026-09-06** — a week of nothing, on the only full-game opener
+  capture, which also refreshes pace, weather, scoring and the derived 1H lines. Empty
+  `inputs` (it declares one OPTIONAL `force`, unlike `grade.yml` which declares none and
+  422s on any). `cronJobs.test.ts` already checks every entry lands whole in both DST regimes.
+- **The board is now the ONLY failure signal**, so `web/lib/boardHealth.ts` (was
+  `gradeHealth.ts`) reports stale RESULTS and a MISSED BUILD. A missed build means no card
+  *and no line sweep*, which otherwise looks completely normal. The build check asks whether
+  a `cards` row exists since the most recent build window OPENED — not a fixed threshold,
+  which would have to tolerate the ~72h Sat→Tue gap and would then never fire.
+- **When to look at the board** (measured on week 2): Hard Rock posts 1H lines Tue 31%,
+  Wed 59% cumulative, Fri 78%, Sat morning 97% — and then they barely move (**48 of 71
+  games never changed**, mean drift −0.18 pts). So waiting costs nothing on price; what
+  improves is selection (BET-qualified by build: Tue 1, Wed 0, Thu 1, **Fri 3**, Sat 1).
+  Best single look: **Friday after 5:30pm ET**, second: Saturday after 8:30am ET.
 - **2026-09-13 (week-2 review; PRs #111-#115, all merged): THE SYSTEM DID NOT MEASURE ITS
   OWN WEEK.** `grade.yml` failed four consecutive runs from Sat 2026-09-12 morning and
   nobody knew for two days — the only failure channel is GitHub's failed-run email. Root
@@ -306,10 +334,9 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade,
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
   `card.yml`, `grade.yml`, `research_preview.yml`). No notification code: GitHub emails
-  failed runs. Nothing runs the engine on the Mac; two Mac routines text Tate:
-  `cfb-saturday-card` (Sat 8:50am ET: verify/kick the morning card, text the BET list
-  with line, price and kill numbers) and `cfb-sunday-ops` (verify/kick `sunday.yml`,
-  text the recap). The bet card itself is built in the cloud (`card.yml`; slots in
+  failed runs. Nothing runs the engine on the Mac, and **since 2026-09-13 nothing texts
+  Tate either** — every scheduled routine was retired (see the bullet below). The bet
+  card is built in the cloud (`card.yml`; slots in
   `beatvegas/ci.py::resolve_slot`: `tue_pm`/`thu_pm`/`fri_pm` ET-gated 3:45–5:15pm and
   `sat_am` ET-gated 7:45–9:15am — four whole-week decision builds timed to when Hard Rock
   actually posts 1H lines; `manual` on dispatch is always a `preview`. Builds are triggered
@@ -479,8 +506,9 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   **DK's API 403s GHA datacenter IPs** (confirmed), so prod captures full-game lines with
   `poll_full_game --source oddsapi` (`auto` falls back to **CFBD /lines**, `sources/cfbd_lines.py`;
   DK only works from the Mac, which can't write Neon). Local jobs degrade gracefully via
-  `store.try_init_db` (logs "unreachable", exits 0). The Sunday ops routine (`cfb-sunday-ops`)
-  reads `GET /api/health` over HTTPS to confirm capture. Secrets `DATABASE_URL`/`CFBD_API_KEY`/
+  `store.try_init_db` (logs "unreachable", exits 0). `GET /api/health` reports capture AND
+  grading/build freshness over HTTPS (it used to be read by the retired Sunday routine).
+  Secrets `DATABASE_URL`/`CFBD_API_KEY`/
   `ODDS_API_KEY` are the only GH secrets. Pushing `.github/workflows/` needs the gh
   `workflow` token scope.
 - **Bonus bets book NO loss** (`manual_picks.is_bonus`, 2026-09-09). Grading is

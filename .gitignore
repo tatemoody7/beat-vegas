@@ -36,8 +36,10 @@ config.yaml
 .vercel
 .env*
 
-# Residual-gate reports (timestamped; the workflow uploads them as an artifact)
+# Gate reports (timestamped; the workflows upload them as artifacts). The
+# FINDING is committed to docs/ -- see docs/LEVEL_ANCHOR.md -- never the file.
 reports/residual_gate_*
+reports/level_anchor_*
 
 # Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
 # It was untracked AND unignored, so a `git add -A` would have swept several MB

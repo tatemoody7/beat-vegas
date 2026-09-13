@@ -18,13 +18,55 @@ from .cfbd import CFBDClient
 CACHE = REPO_ROOT / "data" / "cache"
 
 
+def _cached_soft(name: str, fetch, what: str):
+    """_cached, but a season whose stats cannot be fetched WARNS instead of
+    killing the build.
+
+    These are prior-season quality priors, and build_feature_frame asks for one
+    per season in the games table -- which includes the CURRENT season, whose
+    full-year aggregate does not exist yet and never will until it ends. Before
+    the empty-payload guard above, that hole was papered over by a cached `[]`.
+    With the guard, an unfetchable season would take down every feature build
+    instead, which trades a silent wrong answer for a loud useless one.
+
+    So: the rows for that season are simply absent, the merge leaves NaN, and the
+    reason is printed once. Same trade backfill.py makes for venues (a reference
+    failure warns; a season failure is fatal). An auth or quota problem shows up
+    here as a warning per season rather than a stack trace, which is the honest
+    shape -- the features are degraded, not broken."""
+    try:
+        return _cached(name, fetch)
+    except Exception as e:  # noqa: BLE001 - reference data is best-effort
+        print(f"::warning::{what}: {type(e).__name__}: {e} (features degraded for this season)")
+        return []
+
+
 def _cached(name: str, fetch):
+    """Read-through cache with NO expiry -- these are finished-season aggregates,
+    so a hit is permanently correct.
+
+    Except when it is empty. A cache written for a season CFBD has not finished
+    (or had not started) publishing stores `[]`, and `[]` is a hit forever: the
+    file is 2 bytes, the fetch never runs again, and every column it feeds goes
+    silently NaN. Measured 2026-09-13: data/cache/{sp,adv,talent,roster,
+    returning}_2026.json were all 2 bytes, written 2026-06-03 before 2026 data
+    existed, so a LOCAL 2026 feature build NaN'd out eight columns with no error
+    and no log line. (GHA runners start cold and refetch, so this never reached
+    production -- which is exactly why it went unnoticed for three months.)
+
+    An empty payload is therefore treated as a MISS and refetched. If the fetch
+    returns empty again nothing is written, so the next caller retries rather
+    than inheriting the hole. The cost of being wrong in this direction is one
+    repeated API call; in the other it is a season of quietly missing features."""
     CACHE.mkdir(parents=True, exist_ok=True)
     fp = CACHE / name
     if fp.exists():
-        return json.loads(fp.read_text())
+        cached = json.loads(fp.read_text())
+        if cached:
+            return cached
     data = fetch()
-    fp.write_text(json.dumps(data))
+    if data:
+        fp.write_text(json.dumps(data))
     return data
 
 
@@ -38,7 +80,7 @@ def _g(d: Dict, *names):
 def sp_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     rows = []
     for yr in seasons:
-        data = _cached(f"sp_{yr}.json", lambda yr=yr: client.sp_ratings(year=yr))
+        data = _cached_soft(f"sp_{yr}.json", lambda yr=yr: client.sp_ratings(year=yr), f"SP+ {yr}")
         for r in data:
             team = _g(r, "team")
             if not team:
@@ -64,8 +106,10 @@ def returning_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     (transfers in/out + departures). Known preseason, so joined on SAME season."""
     rows = []
     for yr in seasons:
-        data = _cached(
-            f"returning_{yr}.json", lambda yr=yr: client._get("/player/returning", {"year": yr})
+        data = _cached_soft(
+            f"returning_{yr}.json",
+            lambda yr=yr: client._get("/player/returning", {"year": yr}),
+            f"returning production {yr}",
         )
         for r in data:
             team = _g(r, "team")
@@ -90,7 +134,9 @@ def talent_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     """Team talent composite per (season, team). Preseason-known -> SAME season."""
     rows = []
     for yr in seasons:
-        data = _cached(f"talent_{yr}.json", lambda yr=yr: client.talent(year=yr))
+        data = _cached_soft(
+            f"talent_{yr}.json", lambda yr=yr: client.talent(year=yr), f"talent {yr}"
+        )
         for r in data:
             team = _g(r, "team")
             if not team:
@@ -108,7 +154,9 @@ def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFr
     """
     rows = []
     for yr in seasons:
-        data = _cached(f"roster_{yr}.json", lambda yr=yr: client.roster(year=yr))
+        data = _cached_soft(
+            f"roster_{yr}.json", lambda yr=yr: client.roster(year=yr), f"roster {yr}"
+        )
         df = pd.DataFrame(
             [
                 {"team": _g(r, "team"), "yr": pd.to_numeric(_g(r, "year"), errors="coerce")}
@@ -138,7 +186,11 @@ def roster_experience_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFr
 def advanced_frame(client: CFBDClient, seasons: List[int]) -> pd.DataFrame:
     rows = []
     for yr in seasons:
-        data = _cached(f"adv_{yr}.json", lambda yr=yr: client.advanced_season_stats(year=yr))
+        data = _cached_soft(
+            f"adv_{yr}.json",
+            lambda yr=yr: client.advanced_season_stats(year=yr),
+            f"advanced stats {yr}",
+        )
         for r in data:
             team = _g(r, "team")
             if not team:

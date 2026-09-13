@@ -53,6 +53,8 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
+      - name: Cache CFBD reference data (weekly)
+        uses: ./.github/actions/cfbd-cache
       - name: Score the week (no GameRecord snapshots)
         # Inputs go through env, never inlined into bash (script-injection hygiene).
         env:

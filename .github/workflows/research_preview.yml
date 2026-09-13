@@ -39,5 +39,7 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
+      - name: Cache CFBD reference data (weekly)
+        uses: ./.github/actions/cfbd-cache
       - name: Build week preview (slate + ESPN news/injuries)
         run: python scripts/research_preview.py

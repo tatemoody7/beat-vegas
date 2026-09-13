@@ -18,7 +18,32 @@ from ..config import cfbd_api_key, load_config
 # ConnectTimeout and ReadTimeout (the Aug 30 2026 Sunday run died on ONE
 # ReadTimeout); ConnectionError covers resets and DNS blips.
 _RETRY_EXC = (requests.Timeout, requests.ConnectionError)
-_BACKOFF_SECONDS = (2, 4)  # between attempts 1->2 and 2->3
+# Between attempts 1->2, 2->3, 3->4. The old (2, 4) ladder gave a rate limit six
+# seconds to clear, which it never does: CFBD 429'd every grading run on
+# 2026-09-12/13 across four attempts spread over two days. A 429 is a quota
+# window, not a blip, so wait in minutes-adjacent steps. Timeouts and connection
+# errors ride the same ladder -- they are rare enough that the extra wait costs
+# nothing, and the job has no deadline.
+_BACKOFF_SECONDS = (5, 20, 60)
+_MAX_RETRY_AFTER = 120  # honour the server's Retry-After, but never stall a job on it
+
+
+def _retry_after(resp: requests.Response) -> Optional[float]:
+    """Seconds the server asked us to wait, or None if it did not say.
+
+    Only the delta-seconds form is honoured; the HTTP-date form is rare here and
+    a bad parse should fall back to our own ladder rather than raise.
+    """
+    raw = resp.headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        secs = float(raw.strip())
+    except ValueError:
+        return None
+    if secs <= 0:
+        return None
+    return min(secs, _MAX_RETRY_AFTER)
 
 
 class CFBDClient:
@@ -27,7 +52,7 @@ class CFBDClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: int = 30,
-        max_retries: int = 3,
+        max_retries: int = 4,
     ):
         cfg = load_config().get("cfbd", {}) or {}
         self.api_key = api_key or cfbd_api_key()
@@ -45,14 +70,17 @@ class CFBDClient:
         )
 
     def _get(self, path: str, params: Dict[str, Any]) -> Any:
-        """GET with retries: up to `max_retries` attempts (default 3) on a
-        timeout / connection error / 429 / 5xx, sleeping 2s then 4s between
-        them. Other 4xx (bad key, bad params) raise immediately. The final
-        failure is re-raised as-is so the caller sees the real cause."""
+        """GET with retries: up to `max_retries` attempts (default 4) on a
+        timeout / connection error / 429 / 5xx, sleeping 5s, 20s then 60s
+        between them. A 429 carrying `Retry-After` waits that long instead,
+        capped at `_MAX_RETRY_AFTER`. Other 4xx (bad key, bad params) raise
+        immediately. The final failure is re-raised as-is so the caller sees
+        the real cause."""
         params = {k: v for k, v in params.items() if v is not None}
         url = f"{self.base_url}{path}"
         last_exc: Optional[Exception] = None
         for attempt in range(self.max_retries):
+            wait: Optional[float] = None
             try:
                 resp = self._session.get(url, params=params, timeout=self.timeout)
             except _RETRY_EXC as e:
@@ -62,8 +90,11 @@ class CFBDClient:
                     resp.raise_for_status()
                     return resp.json()
                 last_exc = requests.HTTPError(f"CFBD {resp.status_code} for {path}", response=resp)
+                wait = _retry_after(resp)
             if attempt < self.max_retries - 1:
-                time.sleep(_BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)])
+                if wait is None:
+                    wait = _BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)]
+                time.sleep(wait)
         assert last_exc is not None
         raise last_exc
 

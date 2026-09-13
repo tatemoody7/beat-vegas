@@ -206,7 +206,10 @@ def main() -> None:
     init_db()
     client = CFBDClient()
 
-    print(f"venues: {backfill_venues(client)} loaded")
+    # Scores first. This script is the first step of grade.yml, so anything that
+    # raises here takes the whole results pipeline down with it -- and on
+    # 2026-09-12/13 that is exactly what happened: CFBD 429'd /venues and four
+    # consecutive grading runs died before fetching a single final score.
     seasons = [args.season] if args.season else range(args.start, args.end + 1)
     # "both" iterates the two types separately: postseason week numbers restart
     # at 1, so the per-week /plays fetches must never mix types in one pass.
@@ -218,6 +221,14 @@ def main() -> None:
                 f"{season} {st}: {stats['games']} games, {stats['with_1h']} with 1H, "
                 f"{stats['cfbd_with_total']} with a CFBD-supplied full-game total"
             )
+
+    # Venues are a reference table that changes about once a year and is already
+    # populated. Refresh it last and best-effort: a stale venue row costs nothing,
+    # an ungraded week costs the whole point of the system.
+    try:
+        print(f"venues: {backfill_venues(client)} loaded")
+    except Exception as e:  # noqa: BLE001 - reference data must never be fatal
+        print(f"venues: SKIPPED ({type(e).__name__}: {e}) - scores above are unaffected")
 
 
 if __name__ == "__main__":

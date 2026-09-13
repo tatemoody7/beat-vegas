@@ -13,15 +13,18 @@ name: Bet card (cloud)
 # FOUR decision builds a week, every one a whole-week sweep and every one final:
 #   tue_pm  Tue ~4:05pm ET   paper window 48 h (-> Thursday's build)
 #   thu_pm  Thu ~4:05pm ET   paper window 24 h (-> Friday's build)
-#   fri_pm  Fri ~4:05pm ET   paper window 16 h (-> Saturday's build)
-#   sat_am  Sat ~8:05am ET   paper window 80 h (-> Tuesday's build; the only
-#                            build covering Sunday and Monday games)
+#   fri_pm  Fri ~4:05pm ET   paper window: the REST OF THE WEEK
+#   sat_am  Sat ~8:05am ET   paper window: the rest of the week (mop-up)
 #   manual  workflow_dispatch with no slot — status `preview`, never a final.
 # The afternoon times track when Hard Rock actually posts first-half lines
 # (23 of this week's games appeared Tuesday afternoon, the bulk of a Saturday
 # slate on Friday afternoon) instead of sweeping every morning for numbers that
-# have not moved. Each paper window is exactly the gap to the next build, so
-# every qualifying game is logged once, by the last build before its kickoff.
+# have not moved. FRIDAY ANCHORS THE WEEKEND (2026-09-13): the midweek windows
+# are still the gap to the next build, so they claim only the games kicking off
+# before anyone looks again, but Friday takes the rest of the week and Saturday
+# logs whatever newly qualifies. Every window used to be that gap, and on a
+# Saturday sport that handed the whole slate to sat_am — all 25 of week 2's
+# paper picks came from one build. beatvegas/ci.py::PAPER_WINDOW_HOURS.
 # Each slot has four crons; the ET gate admits the two that land in the window
 # in the current DST regime, so nothing needs editing twice a year.
 #

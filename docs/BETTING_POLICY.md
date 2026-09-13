@@ -163,8 +163,8 @@ slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
 | Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
-| Tue / Thu / Fri ~4:05pm      | **Decision build**: forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build. Timed to when Hard Rock actually posts first-half lines. Paper-logs every qualifying game kicking off before the NEXT build (48 h Tue, 24 h Thu, 16 h Fri) with its blocker. Gated 3:45–5:15pm ET so DST needs no edit | `card.yml` |
-| Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Its 80 h paper window runs to Tuesday's build, so it is the build that covers Sunday and Monday games | `card.yml` |
+| Tue / Thu / Fri ~4:05pm      | **Decision build**: forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build. Timed to when Hard Rock actually posts first-half lines. Tuesday and Thursday paper-log only the games kicking off before the NEXT build (48 h / 24 h); **Friday paper-logs the rest of the week** — it is the decision build for the weekend. Gated 3:45–5:15pm ET so DST needs no edit | `card.yml` |
+| Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
 | Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every decision build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 | Sat 8:50am                   | **Card routine**: verify/kick the `sat_am` build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
@@ -207,10 +207,17 @@ slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
   dormant until an exchange starts posting the market.
   That measures each gate, not just the survivors. The cloud card
   (`scripts/build_card.py`, rules in `beatvegas/card.py`) logs one paper pick
-  per qualifying game at its decision build — the morning card for every
-  game kicking off before the next build, the Thursday/Friday afternoon card
-  for that evening's kickoffs (`--paper-log-window-hours`) — never twice for
-  one game. A paper pick never
+  per qualifying game at its decision build (`--paper-log-window-hours`, per
+  slot in `beatvegas/ci.py` `PAPER_WINDOW_HOURS`) — never twice for one game.
+  **Friday anchors the weekend** (2026-09-13): Tuesday and Thursday claim only
+  the games that kick off before anyone looks again, Friday claims the rest of
+  the week, and Saturday mops up what newly qualifies. Every window used to be
+  the gap to the next build, which on a Saturday sport handed the whole slate to
+  the Saturday build — all 25 of week 2's paper picks came from it, and the
+  Friday card's three clean BETs were never logged. Each pick also freezes
+  **our own number** (`model_line_at_pick`) and the model's score beside Hard
+  Rock's line, which is what the agreed/against split on Results reads.
+  A paper pick never
   blocks your real ticket on the same game, and vice versa (the duplicate
   guard is per ledger). The card ranks BETs by gap (the cap-5 rule the
   backtest measured), so the text order is the cap order. A real ticket this

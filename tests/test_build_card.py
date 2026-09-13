@@ -148,6 +148,10 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.line == 24.5 and p.price == -110
     assert p.reason == "model_gap" and p.verdict_at_pick == "BET" and p.blocker == "none"
     assert p.gap_at_pick == 2.1 and p.hr_line_at_pick == 24.5 and p.ev_at_pick is not None
+    # OUR number and the model's score, frozen beside Hard Rock's. Until
+    # 2026-09-13 both were NULL on every card pick, which kept the whole paper
+    # ledger out of decision-quality's agreed/against split.
+    assert p.model_line_at_pick == 22.4 and p.model_score_at_pick == 55
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
     assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
@@ -160,6 +164,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
 
     assert q.game_id == 5 and q.is_paper is True and q.blocker == "price"
     assert q.verdict_at_pick == "WATCH" and q.price == -125 and q.gap_at_pick == 2.0
+    assert q.model_line_at_pick == 22.5 and q.model_score_at_pick == 55
     assert q.note.startswith("card 2026-09-18 [price]: Not yet — Hard Rock’s price is -125")
 
 
@@ -209,9 +214,9 @@ def test_a_real_ticket_and_the_paper_pick_coexist_on_one_game(env):
 
 
 def test_paper_window_skips_games_kicking_off_later(env):
-    """The paper window (--paper-log-window-hours; 24 for the morning card, 10 for
-    the afternoon card) logs only games kicking off inside it, so each game is
-    logged exactly once, by ITS decision build."""
+    """The paper window (--paper-log-window-hours) logs only games kicking off
+    inside it, so each game is logged exactly once, by ITS decision build.
+    beatvegas.ci.PAPER_WINDOW_HOURS sets it per slot."""
     mod, eng = env
     seed_week(eng)  # everything kicks off ~24h out
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, paper_window_hours=6) == 0
@@ -220,6 +225,43 @@ def test_paper_window_skips_games_kicking_off_later(env):
     assert mod.run(SEASON, WEEK, dry_run=False, now=NOW, paper_window_hours=30) == 0
     with Session(eng) as s:
         assert s.query(ManualPick).count() == 2
+
+
+def test_friday_prices_the_weekend_and_saturday_only_mops_up(env):
+    """Friday anchors the weekend (2026-09-13). Week 2 shipped with every window
+    set to the gap to the next build, which on a Saturday sport handed the whole
+    slate to sat_am: all 25 paper picks came from one build and the Friday card's
+    three clean BETs were never logged at all. With fri_pm and sat_am both
+    on the rest of the week, Friday freezes the Saturday-evening games and
+    Saturday adds only what newly qualifies (existing_pick guards on game_id)."""
+    from beatvegas.ci import PAPER_WINDOW_HOURS
+
+    mod, eng = env
+    fri = datetime(2026, 9, 18, 20, 5)  # Fri 4:05pm ET
+    sat = datetime(2026, 9, 19, 12, 5)  # Sat 8:05am ET
+    # Kickoffs ~27 h out from Friday: Saturday evening, exactly where the slate is.
+    seed_week(eng, kick_offset=timedelta(hours=27))
+
+    assert (
+        mod.run(
+            SEASON, WEEK, dry_run=False, now=fri, paper_window_hours=PAPER_WINDOW_HOURS["fri_pm"]
+        )
+        == 0
+    )
+    with Session(eng) as s:
+        logged_friday = {p.game_id for p in s.query(ManualPick).all()}
+    assert logged_friday == {1, 5}, "Friday must price the Saturday-evening games"
+
+    assert (
+        mod.run(
+            SEASON, WEEK, dry_run=False, now=sat, paper_window_hours=PAPER_WINDOW_HOURS["sat_am"]
+        )
+        == 0
+    )
+    with Session(eng) as s:
+        picks = s.query(ManualPick).order_by(ManualPick.id).all()
+    assert [p.game_id for p in picks] == [1, 5], "Saturday must not re-log a game"
+    assert all(p.placed_at == fri for p in picks), "the FRIDAY line is the frozen one"
 
 
 def test_no_paper_publishes_the_card_without_picks(env):

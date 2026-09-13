@@ -3,8 +3,9 @@ schedule. Since 2026-09-09 there are FOUR decision builds a week, each a
 whole-week sweep and each `final`: tue_pm / thu_pm / fri_pm (4:05pm ET) and
 sat_am (8:05am ET), timed to when Hard Rock actually posts first-half lines.
 Each must land inside its ET gate in EDT and EST without touching a cron
-string. Each paper window is exactly the gap to the next build, so every
-qualifying game is logged once, by the last build before its kickoff.
+string. The midweek paper windows are the gap to the next build; fri_pm and
+sat_am take the rest of the week, because college football kicks off on
+Saturday and Friday is the build that should price it.
 
 An unmapped cron fails loudly, and so does every retired slot name. A slot
 already built today (a `cards` row for today's ET date) skips on cron AND on a
@@ -49,19 +50,37 @@ def test_four_slots_each_with_four_crons_on_its_own_weekday():
     assert all(c.split()[0] in {"5", "35"} for c in CRON_SLOTS), sorted(CRON_SLOTS)
 
 
-def test_each_paper_window_is_the_gap_to_the_next_build():
+def test_the_midweek_windows_are_the_gap_to_the_next_build():
     """The window controls WHICH build freezes a game's line, not whether it is
-    logged (picks.py::existing_pick guards on game_id). Too wide and an earlier
-    build claims a game a fresher one should price; too narrow and nobody logs
-    it — the old flat 24 h morning window logged no Sunday or Monday game at
-    all. So each window must equal the gap to the next build, exactly."""
-    for i, slot in enumerate(SCHEDULED):
-        nxt = SCHEDULED[(i + 1) % len(SCHEDULED)]
+    logged (picks.py::existing_pick guards on game_id). A midweek build must
+    claim only the games that kick off before anyone looks again — any wider and
+    Tuesday or Thursday would claim a Saturday game before Friday can price it.
+    So those two windows must equal the gap to the next build, exactly."""
+    for slot, nxt in (("tue_pm", "thu_pm"), ("thu_pm", "fri_pm")):
         d1, t1 = SLOT_BUILD_ET[slot]
         d2, t2 = SLOT_BUILD_ET[nxt]
         days = (d2 - d1) % 7 or 7
         gap = days * 24 + ((t2.hour * 60 + t2.minute) - (t1.hour * 60 + t1.minute)) / 60
         assert PAPER_WINDOW_HOURS[slot] == gap, f"{slot} -> {nxt}"
+
+
+def test_friday_and_saturday_take_the_rest_of_the_week():
+    """Friday anchors the weekend (2026-09-13). The old rule gave every slot the
+    gap to the next build, and on a Saturday sport that handed the entire slate
+    to sat_am: all 25 of week 2's paper picks came from one build, and the three
+    clean BETs on the FRIDAY card were never logged. A `None` window logs every
+    qualifying game still on the card, so fri_pm prices the weekend and sat_am
+    only picks up what newly qualifies on Saturday morning."""
+    assert PAPER_WINDOW_HOURS["fri_pm"] is None
+    assert PAPER_WINDOW_HOURS["sat_am"] is None
+    # An empty paper_window no longer means "log nothing" — that is no_paper,
+    # and only `manual` sets it. This pairing IS the change.
+    fri = resolve_slot("5 20 * * 5", utc(2026, 9, 11, 20, 18))
+    assert fri["slot"] == "fri_pm"
+    assert fri["paper_window"] == "" and fri["no_paper"] is False
+    sat = resolve_slot("5 12 * * 6", utc(2026, 9, 12, 12, 6))
+    assert sat["slot"] == "sat_am"
+    assert sat["paper_window"] == "" and sat["no_paper"] is False
 
 
 def test_every_slot_sweeps_the_whole_week_and_forces_the_preview():
@@ -77,10 +96,10 @@ def test_every_slot_sweeps_the_whole_week_and_forces_the_preview():
     # EST (Nov 17 2026, a Tuesday): 21:05Z = 4:05pm ET
     r = resolve_slot("5 21 * * 2", utc(2026, 11, 17, 21, 9))
     assert r["slot"] == "tue_pm"
-    # Saturday morning is the same whole-week sweep, with the window that
-    # reaches Tuesday so Sunday and Monday games are logged by somebody.
+    # Saturday morning is the same whole-week sweep; its paper window is the
+    # rest of the week (see test_friday_and_saturday_take_the_rest_of_the_week).
     r = resolve_slot("5 12 * * 6", utc(2026, 9, 12, 12, 6))
-    assert r["slot"] == "sat_am" and r["paper_window"] == "80"
+    assert r["slot"] == "sat_am" and r["paper_window"] == ""
     assert "--days-ahead 6" in r["sweep_args"]
 
 
@@ -217,9 +236,12 @@ def test_legacy_slot_inputs_are_rejected():
     for legacy in ("weeknight", "friday", "saturday", "morning", "afternoon"):
         with pytest.raises(ValueError):
             resolve_slot("", utc(2026, 9, 17, 15, 0), input_slot=legacy)
-    for slot, window in (("tue_pm", "48"), ("thu_pm", "24"), ("fri_pm", "16"), ("sat_am", "80")):
+    for slot, window in (("tue_pm", "48"), ("thu_pm", "24"), ("fri_pm", ""), ("sat_am", "")):
         r = resolve_slot("", utc(2026, 9, 15, 20, 5), input_slot=slot)
         assert r["slot"] == slot and r["paper_window"] == window
+        # A scheduled slot always paper-logs, whatever its window (no_paper is
+        # what stops a build logging, and only `manual` sets it).
+        assert r["no_paper"] is False, slot
     for retired in ("5 20 * * 2,3,4", "5 12 * * 2-6", "0 20 * * 4,5"):
         with pytest.raises(ValueError):
             resolve_slot(retired, utc(2026, 9, 8, 20, 9))
@@ -230,6 +252,7 @@ def test_legacy_slot_inputs_are_rejected():
 def test_dispatch_inputs_and_unknowns():
     r = resolve_slot("", utc(2026, 9, 17, 15, 0))
     assert r["slot"] == "manual" and r["force_sweep"] is True and r["paper_window"] == ""
+    assert r["no_paper"] is True  # the empty window is not what stops it logging
     assert r["force_preview"] is False
     with pytest.raises(ValueError):
         resolve_slot("", utc(2026, 9, 19, 14, 0), input_slot="sunday")

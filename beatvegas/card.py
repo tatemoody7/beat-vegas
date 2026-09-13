@@ -596,6 +596,11 @@ def build_item(
 
     bv_line = _num((prediction or {}).get("bv_line"))
     has_model = bv_line is not None
+    # The model's own 0-100 classifier score, off the SAME prediction row as
+    # bv_line — frozen onto the paper pick (build_card.log_paper_picks) so the
+    # ledger keeps the read it was logged against. Never gates anything here.
+    under_score = (prediction or {}).get("under_score")
+    under_score = None if under_score is None else int(under_score)
     qb_out = bool((preview or {}).get("qb_out"))
     qb_detail = (preview or {}).get("qb_out_detail")
 
@@ -789,6 +794,7 @@ def build_item(
         "hr_vs_market": m["hr_vs_market"],
         "ev": None if ev is None else round(ev, 4),
         "bv_line": None if bv_line is None else round2(bv_line),
+        "under_score": under_score,
         "gap": gap,
         "gap_basis": gap_basis,
         "kill_line": k_line,
@@ -1127,7 +1133,7 @@ def build_card(
     games:       {game_id, away, home, kick: datetime (UTC), total?, spread?}
     snapshots:   every 1H_total odds row for those games:
                  {game_id, book, line, over_price, under_price, captured_at}
-    predictions: {game_id, model_version, bv_line, line_used} — the gbm_v1 row
+    predictions: {game_id, model_version, bv_line, under_score, line_used} — the gbm_v1 row
                  (with bv_line) is the model read; a derived_lines row (or the
                  gbm_v1 line_used) is the reference line when no book has posted.
     previews:    {game_id, qb_out, qb_out_detail}

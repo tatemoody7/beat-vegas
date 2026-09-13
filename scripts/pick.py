@@ -23,7 +23,13 @@ from typing import List, Optional
 from beatvegas.db.models import Game, ManualPick
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import resolve_game
-from beatvegas.picks import add_pick, existing_pick, grade_pick, graded_pick_fields
+from beatvegas.picks import (
+    add_pick,
+    existing_pick,
+    grade_pick,
+    graded_pick_fields,
+    model_read,
+)
 
 __all__ = ["graded_pick_fields"]  # re-exported from beatvegas.picks for existing importers
 
@@ -88,6 +94,10 @@ def cmd_add(args) -> None:
                 )
                 return
 
+        # Freeze OUR number and the model's score onto the ticket, the same read
+        # the website's own log takes (web/lib/picks.ts createPick) — without it
+        # a terminal pick sits outside decision-quality's agreed/against split.
+        model_line, model_score = model_read(s, gid, market)
         # Paper pick: one flat unit so it grades as +/-1u on its own record
         # (is_paper keeps it out of the real ledger); CLV/result grade normally.
         # The insert itself is beatvegas.picks.add_pick, shared with the cloud card.
@@ -110,6 +120,8 @@ def cmd_add(args) -> None:
             gap=args.gap,
             ev=args.ev,
             hr_line=args.hr_line,
+            model_line=model_line,
+            model_score=model_score,
         )
         why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
         print(

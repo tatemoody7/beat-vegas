@@ -33,8 +33,9 @@
   gap + live 1H line + Hard Rock price not worse than market. WATCH = a smaller
   lean, a good price alone ("price edge only"), or a bettable gap against an
   *estimated* line. PASS = nothing to act on.
-- **Paper pick** — a pick logged with stake 0 (`manual_picks.is_paper`): graded
-  for record and CLV but kept out of the real-money ledger.
+- **Paper pick** — a pick logged at a flat 1 unit (`manual_picks.is_paper`,
+  `picks.py::PAPER_STAKE`) so its record reads in the same units as the real
+  one. Graded for record and CLV, but kept out of the bankroll.
 - **Unit** — one standard bet. 2026: **$10 flat**, every bet, on a $100 roll (see
   `BETTING_POLICY.md` for the acknowledged risk).
 - **Prediction market / exchange** — a CFTC-regulated venue (Kalshi, Polymarket,

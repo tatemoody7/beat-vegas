@@ -574,6 +574,7 @@ ITEM_KEYS = {
     "hr_vs_market",
     "ev",
     "bv_line",
+    "under_score",
     "gap",
     "gap_basis",
     "kill_line",
@@ -630,6 +631,22 @@ def test_payload_contract_and_strict_json_round_trip():
 
 from beatvegas.card import apply_weekly_cap, hook_side, key_dist, total_band  # noqa: E402
 from beatvegas.model.score import WEEKLY_BET_CAP  # noqa: E402
+
+
+def test_under_score_rides_the_same_prediction_row_as_bv_line():
+    """The item carries the model's 0-100 score so build_card can freeze it onto
+    the paper pick beside our number, and it must come off the SAME prediction
+    row bv_line did — the model row, never the display-only derived_lines row."""
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    preds = [
+        {"game_id": 1, "model_version": "gbm_v1", "bv_line": 22.4, "under_score": 78},
+        {"game_id": 1, "model_version": "derived_lines", "line_used": 24.0, "under_score": 12},
+    ]
+    it = only(card([game()], snaps, preds))
+    assert it["bv_line"] == 22.4 and it["under_score"] == 78
+    # A prediction with no score leaves it None rather than inventing one.
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["bv_line"] == 22.4 and it["under_score"] is None
 
 
 def test_bet_item_qualifies_with_no_paper_blocker():

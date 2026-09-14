@@ -218,6 +218,22 @@ Research only — it never places bets or automates gambling.
   GeoJSON `x`/`y` fallback); `etl/venues.py::coord_problems` is the standing guard and
   the backfill refuses to start on a bad pair. `backfill_enrichment.py`'s weather path
   is DELETED. Read `docs/WEATHER.md` before touching any of this.
+  **Backfilled and promoted 2026-09-14: `weather_obs` holds 24,714 rows and the
+  modelled set went 38.3% -> 95.8% coverage** (95.4/95.9/96.2 by season), 14,365 of them
+  decision-safe. Measured cost of the bug, against the 2,567 overlapping legacy rows:
+  mean |Δtemp| **6.79°F**, p90 13.6, max 34.9, and **55.8% of games off by more than 5°F**.
+  **Open-Meteo's free tier weights a request by variables x days and caps per UTC DAY** —
+  5,711 requests exhausted it in ~2.3h at 86% of the work; the rest resumes after 00:00 UTC.
+  **ACTIVATION IS DEFERRED.** `scripts/weather_gate.py` run two ways (train 2023-24 and
+  2024-only, test 2025): **31-62 of 622 priced games change side of `BET_GAP_PTS`** against
+  a pre-registered eyeball limit of 5, so the rule says wait until after the next card.
+  **Do not repeat two readings that did NOT replicate**: MAE improved 9.120 -> 9.024 on the
+  first split and was flat (9.313/9.315/9.318/9.341) on the second; and the selection shift
+  looked uniformly conservative on the first split (133 -> 121/114/120 clearing) but FLIPPED
+  for lead72 on the second (97 -> 103). Only the blast radius is stable. Running it twice
+  also exposed that leads 24/72 hold nothing before 2024, so a 2023-24 train window starves
+  the two decision-safe arms while their OVERALL coverage still reads 60% — the gate now
+  reports coverage per training season and calls such an arm handicapped, not null.
 - **2026-09-14 (THE CENSORING PREMISE WAS TESTED AND THE MARKET WINS).**
   The two-team probabilistic engine was to exploit the fact that an underdog's 1H
   score is censored at zero and the censoring grows with the spread. **It is not

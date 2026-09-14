@@ -32,7 +32,7 @@ from typing import Dict, List, Optional
 
 from beatvegas.db.models import Weather, WeatherObs
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.sources.weather import SOURCE_ACTUAL, fetch_weather
+from beatvegas.sources.weather import SOURCE_ACTUAL, WeatherUnavailable, fetch_weather
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STAGING = REPO_ROOT / "data" / "cache" / "weather_staging.jsonl"
@@ -105,9 +105,19 @@ def check_ground_truth(rows: List[dict]) -> bool:
         if r is None:
             print(f"   {name}: NOT STAGED (cannot check)")
             continue
-        actual = fetch_weather(
-            lat, lon, datetime.strptime(kick, "%Y-%m-%dT%H"), source=SOURCE_ACTUAL
-        )
+        try:
+            actual = fetch_weather(
+                lat, lon, datetime.strptime(kick, "%Y-%m-%dT%H"), source=SOURCE_ACTUAL
+            )
+        except WeatherUnavailable as e:
+            # Being rate-limited is not a verdict on the data. Say so and let the
+            # rest of the report stand rather than losing five checks to one 429.
+            print(f"   {name}: could not reach the archive to verify ({e})")
+            print(
+                f"      stored={idx[(gid, 0)]['temperature_f'] if (gid, 0) in idx else '-'} "
+                f"old(wrong)={old_wrong} -- re-run when the quota resets"
+            )
+            continue
         truth = actual["temperature_f"] if actual else None
         got = r["temperature_f"]
         near_old = got is not None and abs(got - old_wrong) < 1.0

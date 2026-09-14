@@ -11,6 +11,7 @@ import {
   type LineBasis,
 } from "@/lib/edge";
 import { round2 } from "@/lib/format";
+import { MIN_GAMES_FOR_REAL_MONEY } from "@/lib/verdict";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
 import { getMovements, type Movement } from "@/lib/movement";
 import {
@@ -250,10 +251,24 @@ export function settledAgainst(
   return settledOf(actualFirstHalf, line);
 }
 
+/**
+ * Fewest current-season games played by either team, or null when unknown.
+ *
+ * One definition, used by the display tag below AND by the real-money gate in
+ * pickRules.checkPolicy, so the chip on the board and the rule that refuses the
+ * bet can never disagree about what "early season" means.
+ */
+export function minGamesPlayedFrom(f: Factors): number | null {
+  const gp = [f.h_games_played, f.a_games_played].filter(
+    (v): v is number => typeof v === "number" && Number.isFinite(v),
+  );
+  return gp.length ? Math.min(...gp) : null;
+}
+
 /** Early season: a team on this row has fewer than 2 prior games this season. */
 export function earlySeasonFrom(f: Factors): boolean {
-  const gp = [f.h_games_played, f.a_games_played];
-  return gp.some((v) => typeof v === "number" && Number.isFinite(v) && v < 2);
+  const n = minGamesPlayedFrom(f);
+  return n !== null && n < MIN_GAMES_FOR_REAL_MONEY;
 }
 
 /** The non-Hard-Rock, non-exchange books behind the market line, best first (max 2). */

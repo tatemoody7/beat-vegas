@@ -71,6 +71,22 @@ export const BREAK_EVEN_EV = 0;
 // season" on the board).
 export const MIN_GAMES_FOR_MODEL = 0;
 
+/**
+ * Real money needs both teams to have played this many games THIS season.
+ *
+ * Separate from MIN_GAMES_FOR_MODEL on purpose. The model can score a week-1
+ * game -- HistGradientBoosting handles missing season-to-date features natively,
+ * and static/prior-season features still carry signal -- but being able to
+ * produce a number is not the same as that regime being validated for money.
+ * The blowout blind spot was traced to exactly this regime (weeks 1-2, ~59% of
+ * features NaN), and the backtest behind the gap rule is weeks 3+.
+ *
+ * So under-2-games games are PAPER ONLY (Tate, 2026-09-14): they still get
+ * scored, ranked and paper-logged so the cohort accrues evidence, and
+ * pickRules.checkPolicy refuses the real-money BET.
+ */
+export const MIN_GAMES_FOR_REAL_MONEY = 2;
+
 export type Verdict = "BET" | "WATCH" | "PASS";
 export type Confidence = "high" | "medium" | "low" | "none";
 /** Why a pick was made — stored on manual_picks.reason (shared with pick.py). */

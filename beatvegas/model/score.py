@@ -61,6 +61,16 @@ HR_OFF_MARKET_PTS = 0.5
 # last season's priors until 2026 data exists; a week-1 game vs an FCS school
 # does not count because the frame is FBS-only). Rows carry h/a_games_played so
 # the web tags anything under 2 games "early season" instead of hiding it.
+MIN_GAMES_FOR_REAL_MONEY = 2
+# Real money needs both teams to have played this many games THIS season.
+# Separate from MIN_GAMES_FOR_MODEL above on purpose: the model can score a week-1
+# game, but being able to produce a number is not the same as that regime being
+# validated for money -- the blowout blind spot sits in weeks 1-2 (~59% of
+# features NaN) and the backtest behind the gap rule is weeks 3+. Under-2-games
+# games are PAPER ONLY (Tate, 2026-09-14): still scored, ranked and paper-logged
+# so the cohort accrues evidence; web/lib/pickRules.checkPolicy refuses the
+# real-money BET. Mirrored in verdict.ts and pinned by tests/test_gate_parity.py.
+
 MIN_GAMES_FOR_MODEL = 0
 # The coloured 0-100 score (web/lib/grade.ts): >= SCORE_BET_MIN is green/bet,
 # >= SCORE_WATCH_MIN amber/watch, else red/pass. Scaled so a gap of exactly

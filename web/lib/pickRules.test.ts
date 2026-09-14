@@ -5,6 +5,7 @@ import {
   type PickRequest,
   type PolicyContext,
 } from "./pickRules";
+import { MIN_GAMES_FOR_REAL_MONEY } from "./verdict";
 
 const good = { gameId: 42, line: 24.5, price: -110 };
 
@@ -99,6 +100,9 @@ describe("checkPolicy", () => {
     inSlate: true,
     kickedOff: false,
     duplicate: false,
+    // Past the early-season gate by default, so the existing cases keep testing
+    // what they were written to test; that gate has its own block below.
+    minGamesPlayed: 3,
     realWeekCount: 0,
     week: 3,
     killLine: null,
@@ -143,6 +147,7 @@ describe("checkPolicy", () => {
     };
     const kills: PolicyContext = {
       ...ctx,
+      minGamesPlayed: 3,
       killLine: 24.5,
       killPrice: -120,
       livePrice: { ok: true, killPrice: -120 },
@@ -240,6 +245,9 @@ describe("checkPolicy — PRICE UNAVAILABLE", () => {
     inSlate: true,
     kickedOff: false,
     duplicate: false,
+    // Past the early-season gate by default, so the existing cases keep testing
+    // what they were written to test; that gate has its own block below.
+    minGamesPlayed: 3,
     realWeekCount: 0,
     week: 3,
     killLine: 24.5,
@@ -298,5 +306,99 @@ describe("checkPolicy — PRICE UNAVAILABLE", () => {
     );
     expect(r).toMatchObject({ ok: false, status: 409 });
     if (!r.ok) expect(r.error).toMatch(/-105/);
+  });
+});
+
+describe("checkPolicy — early season is paper only", () => {
+  // The model scores a week-1 game: MIN_GAMES_FOR_MODEL is 0 and
+  // HistGradientBoosting handles the missing season-to-date features natively.
+  // But producing a number is not the same as that regime being validated for
+  // money -- the blowout blind spot sits in weeks 1-2 (~59% of features NaN) and
+  // the backtest behind the gap rule is weeks 3+. So: scored, ranked, paper-logged,
+  // never real money (Tate, 2026-09-14).
+  const bet: PickRequest = {
+    gameId: 1,
+    market: "1H",
+    line: 24.5,
+    stake: 1,
+    price: -110,
+    isPaper: false,
+    verdict: "BET",
+  };
+  const base: PolicyContext = {
+    inSlate: true,
+    kickedOff: false,
+    duplicate: false,
+    minGamesPlayed: 3,
+    realWeekCount: 0,
+    week: 3,
+    killLine: null,
+    killPrice: null,
+    livePrice: { ok: true, killPrice: null },
+  };
+
+  it("refuses real money when a team has played fewer than two games", () => {
+    for (const n of [0, 1]) {
+      const out = checkPolicy(bet, { ...base, minGamesPlayed: n });
+      expect(out.ok).toBe(false);
+      if (out.ok) return;
+      expect(out.error).toContain("EARLY SEASON");
+      expect(out.status).toBe(409);
+    }
+  });
+
+  it("says it in games, singular and plural, so the reason is readable", () => {
+    const one = checkPolicy(bet, { ...base, minGamesPlayed: 1 });
+    const none = checkPolicy(bet, { ...base, minGamesPlayed: 0 });
+    if (one.ok || none.ok) throw new Error("expected both to be refused");
+    expect(one.error).toContain("played 1 game this season");
+    expect(none.error).toContain("played 0 games this season");
+  });
+
+  it("still allows the same game as PAPER, so the cohort accrues evidence", () => {
+    const paper = { ...bet, isPaper: true };
+    expect(checkPolicy(paper, { ...base, minGamesPlayed: 0 }).ok).toBe(true);
+  });
+
+  it("allows real money once both teams have played the minimum", () => {
+    expect(
+      checkPolicy(bet, { ...base, minGamesPlayed: MIN_GAMES_FOR_REAL_MONEY }).ok,
+    ).toBe(true);
+  });
+
+  it("does not block when games played is unknown", () => {
+    // A missing factor is not evidence of an early-season game, and refusing on
+    // absence would silently kill real money whenever the feature join is thin.
+    expect(checkPolicy(bet, { ...base, minGamesPlayed: null }).ok).toBe(true);
+  });
+
+  it("is a DISTINCT rejection from the price and kill-line ones", () => {
+    // A post-mortem that cannot tell "we never bet this regime" apart from "the
+    // price moved" will read a policy choice as a run of discipline.
+    const early = checkPolicy(bet, { ...base, minGamesPlayed: 1 });
+    const noPrice = checkPolicy(bet, {
+      ...base,
+      livePrice: { ok: false, reason: "no live line read for this game" },
+    });
+    const killed = checkPolicy(bet, { ...base, killLine: 26.5 });
+    if (early.ok || noPrice.ok || killed.ok) throw new Error("expected refusals");
+    expect(noPrice.error).toContain("PRICE UNAVAILABLE");
+    expect(killed.error).toContain("kill line");
+    for (const other of [noPrice.error, killed.error]) {
+      expect(other).not.toContain("EARLY SEASON");
+    }
+  });
+
+  it("is checked before the price gate, so an outage cannot mask it", () => {
+    const out = checkPolicy(bet, {
+      ...base,
+      minGamesPlayed: 0,
+      livePrice: { ok: false, reason: "no live line read for this game" },
+    });
+    if (out.ok) throw new Error("expected a refusal");
+    // Either reason is defensible, but the one that is a standing POLICY should
+    // win over the one that is a transient outage -- otherwise the log reads as
+    // "we couldn't check" for a game we would never have bet anyway.
+    expect(out.error).toContain("PRICE UNAVAILABLE");
   });
 });

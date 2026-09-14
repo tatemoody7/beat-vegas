@@ -1,5 +1,6 @@
 import { american, fmt } from "@/lib/format";
 import {
+  MIN_GAMES_FOR_REAL_MONEY,
   REASONS,
   WEEKLY_BET_CAP,
   type PickReason,
@@ -148,6 +149,11 @@ export type PolicyContext = {
   /** Real-money 1H picks already logged for this season + week. */
   realWeekCount: number;
   week: number | null;
+  /**
+   * Fewest current-season games played by either team, or null when unknown.
+   * Under MIN_GAMES_FOR_REAL_MONEY this game is PAPER ONLY -- see checkPolicy.
+   */
+  minGamesPlayed: number | null;
   /** The card's kill numbers for this game (lib/card.ts CardItem); null = no card item. */
   killLine: number | null;
   killPrice: number | null;
@@ -194,6 +200,21 @@ export function checkPolicy(
     if (!ctx.livePrice.ok) {
       return reject(
         `PRICE UNAVAILABLE — ${ctx.livePrice.reason}. A real bet needs a price we can check against the market right now; the card's number is from the last build, not from this moment. Log it as paper, or re-try once the line is back.`,
+        409,
+      );
+    }
+    // EARLY SEASON IS PAPER ONLY. The model can score a week-1 game, but being
+    // able to produce a number is not the same as that regime being validated
+    // for money: the blowout blind spot sits in weeks 1-2 (~59% of features
+    // NaN) and the backtest behind the gap rule is weeks 3+. Its own rejection,
+    // distinct from the kill-line and price ones, so a post-mortem can tell
+    // "we never bet this regime" apart from "the price moved".
+    if (
+      ctx.minGamesPlayed !== null &&
+      ctx.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY
+    ) {
+      return reject(
+        `EARLY SEASON — a team here has played ${ctx.minGamesPlayed} game${ctx.minGamesPlayed === 1 ? "" : "s"} this season, and real money needs ${MIN_GAMES_FOR_REAL_MONEY}. The model scores it, but that regime has never been validated for money. Log it as paper; it still counts toward the record.`,
         409,
       );
     }

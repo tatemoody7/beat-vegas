@@ -40,13 +40,16 @@ export async function POST(req: NextRequest) {
   // "failed (500)" on the one screen where money is logged.
   let game: { season: number; week: number; start_date: Date | null } | null;
   let inSlate = false;
+  let minGamesPlayed: number | null = null;
   try {
     game = await prisma.games.findUnique({
       where: { id: pick.gameId },
       select: { season: true, week: true, start_date: true },
     });
     const slate = game ? await getSlate(game.season) : [];
-    inSlate = !!game && slate.some((g) => g.gameId === pick.gameId);
+    const row = slate.find((g) => g.gameId === pick.gameId);
+    inSlate = !!game && !!row;
+    minGamesPlayed = row?.minGamesPlayed ?? null;
   } catch (e) {
     return dbError("slate lookup", e);
   }
@@ -122,6 +125,7 @@ export async function POST(req: NextRequest) {
     duplicate: dup.length > 0,
     realWeekCount: Number(cap[0]?.n ?? 0),
     week: game?.week ?? null,
+    minGamesPlayed,
     killLine: item?.killLine ?? null,
     killPrice: item?.killPrice ?? null,
     livePrice,

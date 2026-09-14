@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import statistics
-from datetime import datetime
-from typing import Dict, List, Optional, Sequence, Tuple
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .db.models import OddsSnapshot
 from .devig import devig_two_way, is_centred_quote
@@ -137,6 +137,98 @@ def pre_kickoff(snaps: Sequence, kickoff) -> list:
     """
     pre = [s for s in snaps if kickoff is None or s.captured_at is None or s.captured_at <= kickoff]
     return pre or list(snaps)
+
+
+# --- as-of reads: what the market showed at a decision time -------------------
+#
+# Everything above answers "what was the closing number?". A model that claims to
+# price a game on Tuesday has to answer a different question -- "what could I
+# have seen by Tuesday?" -- and the difference is not cosmetic. `Game.spread` and
+# `Game.full_game_total` are single MUTABLE columns holding the last capture that
+# touched them, so reading either in a backtest puts Saturday's number into a
+# Tuesday feature. Measured on 2026: a game's spread moves a median 1.5 points
+# over its snapshot history (p90 3.0), and spread is the primary driver of the
+# first-half share. A backtest that reads those columns will look excellent.
+#
+# So an as-of read goes through the snapshot table, and these helpers are the
+# only sanctioned way to do it.
+
+# Hours before kickoff at which a decision is simulated. Reported SEPARATELY,
+# never blended: averaging them describes an information environment that never
+# existed, and it hides the question the research says matters most -- when is
+# the best time to bet? These bracket the production build slots (ci.resolve_slot:
+# tue_pm / thu_pm / fri_pm / sat_am) for a Saturday kickoff.
+DECISION_OFFSETS_H = {"t_minus_72": 72.0, "t_minus_24": 24.0, "t_minus_3": 3.0}
+
+
+def as_of(snaps: Sequence, t) -> list:
+    """Snapshots captured at or before `t`. STRICT -- there is no fallback.
+
+    Deliberately unlike pre_kickoff, which returns every snapshot when none
+    qualifies so a consensus caller still gets a number. That fallback is
+    harmless for a close and FATAL here: it would hand back quotes from after
+    the decision time, which is the exact leak this function exists to prevent.
+    An empty result means "the market had not spoken yet", and the caller must
+    be able to say so.
+
+    A snapshot with no `captured_at` is EXCLUDED. It cannot be proven to precede
+    `t`, and an unprovable timestamp is not evidence.
+    """
+    if t is None:
+        raise ValueError("as_of needs a decision time; None would silently admit everything")
+    out = []
+    for sn in snaps:
+        stamp = getattr(sn, "captured_at", None)
+        if stamp is not None and stamp <= t:
+            out.append(sn)
+    return out
+
+
+def decision_times(kickoff, offsets: Optional[Dict[str, float]] = None) -> Dict[str, datetime]:
+    """{label: timestamp} for each simulated decision point before `kickoff`."""
+    offs = DECISION_OFFSETS_H if offsets is None else offsets
+    return {k: kickoff - timedelta(hours=h) for k, h in offs.items()}
+
+
+def consensus_as_of(snaps: Sequence, t) -> Tuple[Optional[float], Optional[float]]:
+    """(median line, median spread) across books as of `t`.
+
+    Each book contributes its LAST quote at or before `t` -- the number it was
+    actually showing then -- and off-centre ladder rungs are dropped first
+    (centred_snaps). The spread median is taken over whichever books carry one,
+    which before 2026 is none of them: `odds_snapshots.spread` is NULL for every
+    earlier row, so the spread here is None for historical seasons and
+    Game.spread_open is the only honest alternative.
+    """
+    usable = centred_snaps(as_of(snaps, t))
+    by_book: Dict[str, Any] = {}
+    for sn in usable:
+        book = getattr(sn, "book", None)
+        prev = by_book.get(book)
+        if prev is None or sn.captured_at > prev.captured_at:
+            by_book[book] = sn
+    lines = [s.line for s in by_book.values() if getattr(s, "line", None) is not None]
+    spreads = [s.spread for s in by_book.values() if getattr(s, "spread", None) is not None]
+    return (
+        statistics.median(lines) if lines else None,
+        statistics.median(spreads) if spreads else None,
+    )
+
+
+def opening_as_of(snaps: Sequence) -> Tuple[Optional[float], Optional[float], Optional[object]]:
+    """(line, spread, captured_at) of the EARLIEST centred quote on file.
+
+    The "opening" decision point. It is the earliest thing we can prove was
+    visible, which is not the same as the true market open -- capture began
+    mid-September in 2023-25, so for those seasons this is the earliest number
+    WE saw, not the earliest number that existed. Report it as such."""
+    usable = [s for s in centred_snaps(snaps) if getattr(s, "captured_at", None) is not None]
+    if not usable:
+        return None, None, None
+    first = min(usable, key=lambda s: s.captured_at)
+    t = first.captured_at
+    line, spread = consensus_as_of(usable, t)
+    return line, spread, t
 
 
 def fair_under_before_kickoff(

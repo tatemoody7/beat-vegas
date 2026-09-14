@@ -7,6 +7,10 @@ data/*.db-journal
 data/*.bak-*
 data/*.log
 data/cache/
+# also the bare name: a dev SYMLINK to the main checkout's cache is not a
+# directory, so the trailing-slash pattern above does not match it and it
+# shows up as an untracked entry a `git add -A` would sweep in.
+data/cache
 data/pbp_cache/
 data/pg_sim/
 # Friday bet-card reasoning (local, per-week)
@@ -40,6 +44,7 @@ config.yaml
 # FINDING is committed to docs/ -- see docs/LEVEL_ANCHOR.md -- never the file.
 reports/residual_gate_*
 reports/level_anchor_*
+reports/censoring_*
 
 # Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
 # It was untracked AND unignored, so a `git add -A` would have swept several MB

@@ -181,6 +181,42 @@ Research only — it never places bets or automates gambling.
   GHA starts cold and refetches, which is why it hid for three months), and **a season
   whose priors cannot be fetched now warns instead of killing the build** (`_cached_soft`,
   the same trade `backfill.py` makes for venues).
+- **2026-09-14 (THE CENSORING PREMISE WAS TESTED AND THE MARKET WINS).**
+  The two-team probabilistic engine was to exploit the fact that an underdog's 1H
+  score is censored at zero and the censoring grows with the spread. **It is not
+  being built.** `scripts/censoring_study.py` (report: `docs/CENSORING_STUDY.md`)
+  asked the only question that matters — *does censoring leave information the
+  PRICE has not already absorbed?* — by controlling for the book's own de-vigged
+  probability and testing whether spread still predicts the Under. On 1,873
+  decided games with a real 1H close: **spread coef +0.00369/pt, bootstrap 95% CI
+  [−0.0083, +0.0157], includes zero.** The sign FLIPS by season (+0.0057 / −0.0038
+  / +0.0093); out of sample it improves Brier in the fourth decimal (0.25040 →
+  0.25029); and taken at face value it is worth **+1.94 pp across the whole 7-to-28
+  spread range against a 2.38 pp vig hurdle**. Bucket diffs are non-monotone
+  (−1.4 / −0.1 / +2.7 / **−6.2** / **+6.7**) with every Wilson interval spanning
+  the implied value.
+  **The mechanism is real — that is the useful part.** Dog 1H shutout rate runs
+  8.6% → 12.0% → 16.3% → 17.0% → **23.1%** by spread bucket while the favourite's
+  falls to **0.0%**. So the finding is not "no censoring", it is "the censoring is
+  real, strong and monotone, and the market prices it correctly."
+  **Correction to an earlier figure:** the 37.6% dog-shutout rate at 28+ quoted in
+  planning is from the full 3,601-row population; on the real-close cut it is
+  **23.1%**. The unpriced games are not a random sample. Split on `line_real`.
+  **PUSHES ARE NOT OPTIONAL when comparing a de-vigged price to a hit rate.** A
+  two-way de-vig gives `fair_over + fair_under = 1` and so carries NO push mass.
+  27% of 1H closes are integer totals and those push **5.66%**; the Under rate is
+  48.74% counting pushes and **49.49% among decided games**, a 0.75 pp gap — the
+  same order as the effect being hunted. On an integer line a push VOIDS the bet,
+  so the book's two prices already price `{under|decided}` vs `{over|decided}`:
+  compare against the DECIDED rate and report push rate separately.
+  **New, and reusable:** `beatvegas/backtest/censoring.py` carries the repo's first
+  `brier`, `log_loss`, `brier_multi`, `wilson` and `reliability` — there was no
+  proper scoring rule anywhere before (the only model probability, `score.py`'s
+  `predict_proba`, is uncalibrated and squashed into `under_score` without ever
+  being scored). Written THREE-OUTCOME-aware so a future engine emitting
+  P(under)/P(push)/P(over) is graded by the same functions and its numbers stay
+  comparable. Also validated for later: the dog's 1H score is extremely lumpy
+  (7/10/0/14/3 = 63% of games), so any future scoring model must be **discrete**.
 - **Decided, NOT yet built (next session):** delete `MovementChart.tsx` + its
   `GameDetail.tsx:165-170` call site and the now-dead `movement.ts::pivot` — keep
   `BookTable` (Tate: the graph "looks like scribbles"; the per-book list stays); and mark

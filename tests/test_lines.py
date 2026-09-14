@@ -1,6 +1,8 @@
 from datetime import datetime
 from types import SimpleNamespace as S
 
+import pytest
+
 from beatvegas.lines import (
     closing_before_kickoff,
     consensus_fair_under_open_close,
@@ -229,3 +231,143 @@ def test_book_closing_price_refuses_a_rungs_lopsided_price():
         snap("hardrockbet", 22.5, 4, over=-275, under=220),
     ]
     assert book_closing_price_before_kickoff(mixed, kickoff, "hardrockbet") == -110
+
+
+# --- as-of reads: what could have been seen at a decision time ---------------
+#
+# The leak this guards against is the one that makes a backtest look excellent:
+# Game.spread and Game.full_game_total are MUTABLE single columns holding the
+# last capture that touched them, so reading either while claiming to price a
+# game on Tuesday puts Saturday's number in a Tuesday feature. Measured on 2026,
+# a game's spread moves a median 1.5 pts over its snapshot history.
+
+
+def snap_at(book, line, day, hour=12, spread=None, over=-110, under=-110):
+    return S(
+        book=book,
+        line=line,
+        spread=spread,
+        captured_at=datetime(2024, 11, day, hour, 0),
+        over_price=over,
+        under_price=under,
+    )
+
+
+def test_as_of_is_strict_and_never_falls_back():
+    """pre_kickoff returns everything when nothing qualifies, so a consensus
+    caller still gets a number. Here that would hand back quotes from AFTER the
+    decision time -- the exact leak. Empty must mean empty."""
+    from beatvegas.lines import as_of, pre_kickoff
+
+    snaps = [snap_at("dk", 24.5, 4), snap_at("fd", 25.0, 5)]
+    t = datetime(2024, 11, 1, 12, 0)  # before every snapshot
+    assert as_of(snaps, t) == []
+    assert pre_kickoff(snaps, t) == snaps  # the contrast, pinned on purpose
+
+
+def test_as_of_admits_the_boundary_and_excludes_the_future():
+    from beatvegas.lines import as_of
+
+    snaps = [snap_at("dk", 24.5, 4), snap_at("dk", 23.5, 5), snap_at("dk", 30.0, 6)]
+    got = as_of(snaps, datetime(2024, 11, 5, 12, 0))
+    assert [s.line for s in got] == [24.5, 23.5]  # inclusive at t, nothing after
+
+
+def test_as_of_excludes_an_unstamped_snapshot():
+    """A row with no captured_at cannot be PROVEN to precede t, and an
+    unprovable timestamp is not evidence."""
+    from beatvegas.lines import as_of
+
+    unstamped = S(
+        book="dk", line=24.5, spread=None, captured_at=None, over_price=-110, under_price=-110
+    )
+    assert as_of([unstamped], datetime(2024, 11, 5, 12, 0)) == []
+
+
+def test_as_of_refuses_a_null_decision_time():
+    """None would silently admit every snapshot -- a leak that looks like a
+    successful call."""
+    from beatvegas.lines import as_of
+
+    with pytest.raises(ValueError):
+        as_of([snap_at("dk", 24.5, 4)], None)
+
+
+def test_consensus_as_of_takes_each_books_latest_quote_at_that_moment():
+    from beatvegas.lines import consensus_as_of
+
+    snaps = [
+        snap_at("dk", 24.5, 1),
+        snap_at("dk", 26.5, 4),  # dk moved up
+        snap_at("fd", 25.0, 1),
+        snap_at("fd", 27.0, 6),  # fd's move is AFTER t
+        snap_at("mgm", 26.0, 2),
+    ]
+    line, _ = consensus_as_of(snaps, datetime(2024, 11, 5, 12, 0))
+    assert line == 26.0  # median(26.5, 25.0, 26.0) — fd still on its opener
+
+    later, _ = consensus_as_of(snaps, datetime(2024, 11, 7, 12, 0))
+    assert later == 26.5  # median(26.5, 27.0, 26.0)
+
+
+def test_consensus_as_of_drops_off_centre_rungs():
+    from beatvegas.lines import consensus_as_of
+
+    snaps = [
+        snap_at("dk", 26.5, 4),
+        snap_at("fd", 26.0, 4),
+        snap_at("hardrockbet", 20.5, 4, over=-275, under=220),  # a rung
+    ]
+    line, _ = consensus_as_of(snaps, datetime(2024, 11, 5, 12, 0))
+    assert line == 26.25  # median of the two real numbers, not 26.0
+
+
+def test_consensus_as_of_spread_is_none_when_no_book_carries_one():
+    """odds_snapshots.spread is NULL for every row before 2026, so a historical
+    as-of read has no spread at all -- which is exactly why Game.spread_open
+    exists. Returning 0.0 or silently borrowing Game.spread would be the bug."""
+    from beatvegas.lines import consensus_as_of
+
+    line, spread = consensus_as_of([snap_at("dk", 26.5, 4)], datetime(2024, 11, 5, 12, 0))
+    assert line == 26.5 and spread is None
+
+    priced = [snap_at("dk", 26.5, 4, spread=-7.0), snap_at("fd", 26.0, 4, spread=-7.5)]
+    _, spread = consensus_as_of(priced, datetime(2024, 11, 5, 12, 0))
+    assert spread == -7.25
+
+
+def test_decision_times_bracket_the_production_build_slots():
+    from beatvegas.lines import DECISION_OFFSETS_H, decision_times
+
+    kick = datetime(2024, 11, 9, 19, 0)  # Saturday 7pm
+    ts = decision_times(kick)
+    assert set(ts) == set(DECISION_OFFSETS_H)
+    assert ts["t_minus_72"] == datetime(2024, 11, 6, 19, 0)  # Wednesday
+    assert ts["t_minus_3"] == datetime(2024, 11, 9, 16, 0)
+    assert all(t < kick for t in ts.values())
+
+
+def test_opening_as_of_is_the_earliest_centred_quote():
+    from beatvegas.lines import opening_as_of
+
+    snaps = [
+        snap_at("hardrockbet", 20.5, 1, over=-275, under=220),  # a rung, earliest
+        snap_at("dk", 24.5, 2),
+        snap_at("fd", 27.0, 6),
+    ]
+    line, _spread, at = opening_as_of(snaps)
+    assert at == datetime(2024, 11, 2, 12, 0), "the rung must not set the opening time"
+    assert line == 24.5
+    assert opening_as_of([]) == (None, None, None)
+
+
+def test_an_as_of_read_never_sees_a_snapshot_from_after_the_decision_time():
+    """The leak test itself, as a property over the whole grid. If this ever
+    fails, every backtest number downstream is fiction."""
+    from beatvegas.lines import as_of, decision_times
+
+    kick = datetime(2024, 11, 9, 19, 0)
+    snaps = [snap_at("dk", 20.0 + d, d, hour=h) for d in range(1, 10) for h in (3, 15)]
+    for label, t in decision_times(kick).items():
+        for sn in as_of(snaps, t):
+            assert sn.captured_at <= t, label

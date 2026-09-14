@@ -617,6 +617,13 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas
+- **Open-Meteo's free tier weights a request by variables x days, and the cap is per
+  UTC DAY.** A full weather backfill does not fit in one day: measured 2026-09-14,
+  **5,711 requests exhausted the daily quota in ~2.3 hours** (86% of 6,636
+  venue-season-leads), and `"Daily API request limit exceeded"` resets at 00:00 UTC
+  rather than on a rolling window — waiting an hour does nothing. Plan for two days or
+  split by lead. `backfill_weather.py` resumes from `data/cache/weather_staging.done`
+  and halts after 10 consecutive failures instead of grinding through doomed calls.
 - **Never ask Open-Meteo for `timezone=auto`.** A local-time series cannot be keyed by
   a UTC timestamp, and `Game.start_date` is naive UTC. That mismatch silently wrecked
   every weather row for three years (see the 2026-09-14 bullet). `timezone=UTC` makes

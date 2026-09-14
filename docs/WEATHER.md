@@ -145,9 +145,20 @@ PYTHONPATH=. python scripts/backfill_weather.py --promote
 ```
 
 Staging goes to `data/cache/weather_staging.jsonl` with a `.done` sidecar, so a
-re-run resumes rather than refetching. ~53 venue-seasons/min locally; the full
-2023-2026 range at three leads is about two hours. Wrap it in `caffeinate -i -s`
-— this Mac sleeps after one minute on battery. `.github/workflows/weather_backfill.yml`
+re-run resumes rather than refetching. ~55 venue-seasons/min locally. Wrap it in
+`caffeinate -i -s` — this Mac sleeps after one minute on battery.
+
+**The full 2023-2026 range at three leads does NOT fit in one day.** Open-Meteo's
+free tier weights a request by variables × days, so a season-range call with four
+variables counts as far more than one: measured 2026-09-14, **5,711 requests
+exhausted the DAILY quota in about 2.3 hours**, at 86% of the 6,636 venue-season-
+leads. The limit is per UTC day (`"Daily API request limit exceeded"`), so it
+resets at 00:00 UTC, not on a rolling window — waiting an hour does nothing.
+
+Plan for two days, or split the run by lead. Nothing is lost when it stops: the
+`.done` sidecar means a re-run picks up where it left off, and
+`MAX_CONSECUTIVE_FAILURES` (10) halts the run rather than grinding through
+thousands of doomed calls. The remaining 925 units took ~16 minutes the next day. `.github/workflows/weather_backfill.yml`
 is the cloud path, but `sunday.yml` records Open-Meteo rate-limiting GitHub's
 shared runners, so the Mac is usually faster.
 

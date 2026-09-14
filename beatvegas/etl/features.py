@@ -247,15 +247,80 @@ def _team_long(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([home, away], ignore_index=True)
 
 
-def _season_to_date(long: pd.DataFrame) -> pd.DataFrame:
-    """Expanding mean of each metric over the team's prior games this season."""
+_STD_COLS = ["fh_pf", "fh_pa", "full_pf", "full_pa"]
+
+# How many synthetic "games" of prior-season form seed the season-to-date window.
+#
+# 0.0 reproduces the unseeded expanding mean EXACTLY, so it is the incumbent and
+# the honest default: the seed does not go live until a walk-forward report says
+# it should (scripts/level_anchor_gate.py). See _season_to_date for the problem
+# it addresses.
+PRIOR_SEASON_WEIGHT = 0.0
+
+
+def _prior_season_means(long: pd.DataFrame) -> pd.DataFrame:
+    """Each team's PRIOR-season mean of every _STD_COLS metric, keyed to the
+    season it may be used in.
+
+    Same zero-leak construction as quality_prior_frame: a season's finished
+    aggregate is stamped with `season + 1`, so it can only ever join to the
+    FOLLOWING season's games. Unplayed rows carry NaN and mean() skips them."""
+    g = long.groupby(["season", "team"], sort=False)[_STD_COLS].mean().reset_index()
+    g["season"] = g["season"] + 1  # usable from the next season on
+    return g.rename(columns={c: c + "_prior" for c in _STD_COLS})
+
+
+def _season_to_date(long: pd.DataFrame, prior_weight: float = 0.0) -> pd.DataFrame:
+    """Expanding mean of each metric over the team's prior games this season,
+    optionally seeded with `prior_weight` synthetic games of prior-season form.
+
+    THE PROBLEM. `shift(1)` is what keeps this leak-free and it is not negotiable
+    -- but it also makes game 1 of every season NaN and game 2 a one-game mean.
+    That propagates into h/a_fh_pf_std, and from there into proj_1h_total and
+    proj_1h_ratio, so 68 of the regressor's 115 features are NaN at zero games
+    played. Measured cost: about 1 point of bv_line per game of season-to-date
+    data, and 2.84 of the 3.40-point live-vs-backtest gap swing in 2026.
+
+    THE SEED. A team's prior-season mean enters as `prior_weight` synthetic
+    observations, so game 1 reads the prior-season mean, game 2 reads a weighted
+    blend, and the prior's share decays as k/(n+k) with no discontinuity at any
+    seam. Deliberately NOT a special case for weeks 1-2: a rule that applies only
+    early creates a break the tree can learn as a week-number artifact, and the
+    same computation must run at train and predict time or the model is fitted on
+    observed values and asked to score estimated ones.
+
+    prior_weight=0.0 is an exact no-op -- (0*prior + sum) / (0 + n) is the
+    unseeded mean -- which is what makes the incumbent the gate's own baseline
+    rather than a separate code path."""
     long = long.sort_values(["season", "team", "week", "start_date"], na_position="last")
+    if prior_weight:
+        long = long.merge(_prior_season_means(long), on=["season", "team"], how="left")
     grp = long.groupby(["season", "team"], sort=False)
     out = long[["id", "season", "team"]].copy()
-    for col in ["fh_pf", "fh_pa", "full_pf", "full_pa"]:
+    for col in _STD_COLS:
         # shift(1) excludes the current game -> strictly prior info only.
         # transform preserves the original row index (no misalignment).
-        out[col + "_std"] = grp[col].transform(lambda s: s.shift(1).expanding().mean())
+        if not prior_weight:
+            out[col + "_std"] = grp[col].transform(lambda s: s.shift(1).expanding().mean())
+            continue
+        # Sum and COUNT of the prior games, kept apart so the seed can be added
+        # with its own weight.
+        #
+        # fillna(0) before the sum is load-bearing: expanding().sum() over a
+        # window with no non-NaN value returns NaN, not 0, so the FIRST game of
+        # every season -- the one this whole function exists to fix -- would
+        # propagate NaN through the blend and land exactly where it started.
+        # Filling with 0 makes a missing game contribute nothing to the sum,
+        # which is what prior_n already assumes by counting only notna().
+        prior_sum = grp[col].transform(lambda s: s.shift(1).fillna(0).expanding().sum())
+        prior_n = grp[col].transform(lambda s: s.shift(1).notna().expanding().sum())
+        seed = long[col + "_prior"]
+        seeded = (prior_weight * seed + prior_sum) / (prior_weight + prior_n)
+        # A team with no prior season (a new FBS member, or the first season in
+        # the frame) keeps the unseeded value -- including its NaN. Inventing a
+        # league-average prior there would be a different feature, not this one.
+        unseeded = (prior_sum / prior_n).where(prior_n > 0)
+        out[col + "_std"] = seeded.where(seed.notna(), unseeded)
     out["games_played"] = grp.cumcount()
     return out
 
@@ -364,9 +429,10 @@ def build_feature_frame(
     seasons: Optional[range] = None,
     client: Optional[CFBDClient] = None,
     fbs_only: bool = True,
+    prior_weight: float = PRIOR_SEASON_WEIGHT,
 ) -> pd.DataFrame:
     games = _load_all_games(fbs_only=fbs_only)
-    std = _season_to_date(_team_long(games))
+    std = _season_to_date(_team_long(games), prior_weight=prior_weight)
 
     # Merge season-to-date stats back, matching each side on its own team name.
     df = games.copy()

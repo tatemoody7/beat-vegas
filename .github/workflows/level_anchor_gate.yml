@@ -1,0 +1,74 @@
+name: Level-anchor gate (walk-forward report)
+
+# Manual only. Builds one feature frame per prior-season weight k, fits the
+# incumbent BV line on the training seasons and grades every arm on the held-out
+# test season, PAIRED on the same games. k=0 reproduces the unseeded frame
+# exactly, so the incumbent is an arm rather than a separate code path.
+# Writes reports/level_anchor_<UTC>.md/.json/.csv, appends the markdown to the
+# run summary and uploads the files as an artifact. It is a REPORT, not a CI
+# gate: the job exits 0 whatever the numbers say, and adopting a k means editing
+# etl/features.PRIOR_SEASON_WEIGHT in a PR that cites the report.
+#
+# Reads Neon; writes nothing. Spends no Odds API credits, and no CFBD calls for
+# any season whose priors are already cached -- a season that cannot be fetched
+# warns and its columns go NaN for both arms equally (season_stats._cached_soft),
+# so the paired comparison stays valid. See docs/LEVEL_ANCHOR.md for the first
+# run and the rule it was judged against.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      train_seasons:
+        description: 'seasons the model trains on (space-separated)'
+        default: '2023'
+      test_season:
+        description: 'held-out season graded once'
+        default: '2024'
+      grid:
+        description: 'prior-season weights to try (space-separated; must include 0)'
+        default: '0 0.5 1 2 3'
+
+# Read-only, but it shares the DB with the writers and a long frame build should
+# not race a card build for the same pooler connections.
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Run the gate
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_TRAIN_SEASONS: ${{ inputs.train_seasons }}
+          IN_TEST_SEASON: ${{ inputs.test_season }}
+          IN_GRID: ${{ inputs.grid }}
+        run: |
+          # Arrays, not a word-split string: no glob expansion, no flag injection.
+          read -ra SEASONS <<< "$IN_TRAIN_SEASONS"
+          read -ra GRID <<< "$IN_GRID"
+          ARGS=(--train-seasons "${SEASONS[@]}" --test-season "$IN_TEST_SEASON")
+          ARGS+=(--grid "${GRID[@]}" --out reports/level_anchor)
+          echo "running: level_anchor_gate.py ${ARGS[*]}"
+          python scripts/level_anchor_gate.py "${ARGS[@]}"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: level-anchor-gate-report
+          path: reports/level_anchor_*
+          if-no-files-found: warn

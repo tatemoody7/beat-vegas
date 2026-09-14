@@ -50,7 +50,6 @@ from beatvegas.sources.weather import (
     WeatherUnavailable,
     decision_safe,
     fetch_hourly_series,
-    forecast_asof,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +57,7 @@ STAGING = REPO_ROOT / "data" / "cache" / "weather_staging.jsonl"
 DONE = REPO_ROOT / "data" / "cache" / "weather_staging.done"
 
 DECISION_MODEL = "icon_seamless"  # see the module docstring -- gusts, not preference
+DATASET_VERSION = "open_meteo_v1_2026-09-14"  # bump when the fetch methodology changes
 DECISION_FIRST_SEASON = 2024  # fixed-lead wind/gust/precip do not exist before this
 SLEEP_S = 0.3  # be polite to the free API
 MAX_CONSECUTIVE_FAILURES = 10
@@ -100,9 +100,14 @@ def _row(
         "game_id": int(game_id),
         "lead_hours": int(lead),
         "valid_time": kickoff.isoformat(),
-        "forecast_asof": (forecast_asof(kickoff, lead) or "").isoformat()
-        if forecast_asof(kickoff, lead)
-        else None,
+        # NOT valid_time - lead_hours. That is the nominal horizon, which
+        # `lead_hours` already carries; the run's initialisation and the moment it
+        # became publicly usable are different times again, and Open-Meteo states
+        # neither for the `_previous_dayN` variables. NULL is the honest answer --
+        # inventing one would make `available_at <= decision_time` untestable while
+        # looking like it had been tested.
+        "model_run_time": None,
+        "available_at": None,
         "decision_safe": decision_safe(source, lead),
         "temperature_f": w.get("temperature_f"),
         "wind_mph": w.get("wind_mph"),
@@ -111,6 +116,7 @@ def _row(
         "dome": bool(venue["dome"]),
         "source": source,
         "weather_model": model,
+        "dataset_version": DATASET_VERSION,
         "latitude": venue["lat"],
         "longitude": venue["lon"],
         "retrieved_at": datetime.utcnow().isoformat(),
@@ -225,11 +231,22 @@ def _parse_rows(leads: Optional[List[int]]) -> List[dict]:
         r = json.loads(ln)
         if leads and r["lead_hours"] not in leads:
             continue
-        for k in ("valid_time", "forecast_asof", "retrieved_at"):
+        for k in ("valid_time", "model_run_time", "available_at", "retrieved_at"):
             r[k] = datetime.fromisoformat(r[k]) if r[k] else None
         rows.append(r)
     # Last write wins, so a re-fetched venue-season supersedes its earlier rows.
-    latest = {(r["game_id"], r["lead_hours"]): r for r in rows}
+    # The key mirrors uq_weather_obs_reading exactly -- a different model or run is
+    # a DIFFERENT reading to be kept, not a replacement.
+    latest = {
+        (
+            r["game_id"],
+            r["lead_hours"],
+            r.get("source") or "",
+            r.get("weather_model") or "",
+            r.get("model_run_time") or "",
+        ): r
+        for r in rows
+    }
     return list(latest.values())
 
 

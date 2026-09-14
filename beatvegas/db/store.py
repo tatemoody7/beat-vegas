@@ -322,6 +322,30 @@ def _apply_migrations(engine) -> None:
         except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
             print(f"[db] WARNING: could not add uq_manual_pick_per_ledger index: {e}")
 
+    # weather_obs is keyed on a surrogate id so that ICON vs GFS, a provider
+    # change, or two runs of the same horizon can coexist instead of overwriting
+    # each other. Uniqueness is therefore an expression index rather than a PK.
+    #
+    # COALESCE for the same reason as above: source, weather_model and
+    # model_run_time are all legitimately NULL (Open-Meteo does not state a run
+    # time for the `_previous_dayN` variables), and Postgres treats NULLs as
+    # distinct -- so indexing the bare columns would let every re-fetch insert a
+    # duplicate. The epoch sentinel parses in both Postgres and SQLite.
+    if "weather_obs" in existing:
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_weather_obs_reading "
+                        "ON weather_obs "
+                        "(game_id, lead_hours, COALESCE(source, ''), "
+                        "COALESCE(weather_model, ''), "
+                        "COALESCE(model_run_time, '1970-01-01 00:00:00'))"
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
+            print(f"[db] WARNING: could not add uq_weather_obs_reading index: {e}")
+
 
 @contextmanager
 def session_scope() -> Iterator[Session]:

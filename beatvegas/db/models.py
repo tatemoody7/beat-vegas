@@ -198,22 +198,42 @@ class WeatherObs(Base):
 
     The legacy `weather` table stored four bare numbers keyed by game, which made
     two different things indistinguishable six months later: what the conditions
-    WERE around kickoff, and what the forecast SAID at a time we could still have
-    placed a bet. Those answer different questions, and conflating them is
-    look-ahead bias -- so the lead is part of the key and `decision_safe` is
-    stored rather than inferred.
+    WERE around kickoff, and what the forecast SAID while a bet was still
+    placeable. Those answer different questions, and using the first to argue an
+    edge is look-ahead bias. So the lead is part of the key and `decision_safe`
+    is stored rather than inferred.
 
     `lead_hours = 0` is the near-kickoff series, which tracks actual conditions
     (measured 1.82F / 1.55mph from the ERA5 actual, closer than a 1-day-lead
-    forecast). It is NEVER decision-safe. Only the fixed-lead rows are, and every
-    market-edge query must filter on `decision_safe`.
+    forecast). It is NEVER decision-safe and may never feed a real-money model --
+    `etl.features.WEATHER_OBS_LEAD_HOURS` refuses it outright.
+
+    THREE DIFFERENT TIMES, and conflating them is how false precision gets in:
+      lead_hours      the NOMINAL horizon we asked for. Always known. Never
+                      inferred from anything else.
+      model_run_time  when the run behind this value initialised. NULL unless the
+                      source actually states it -- Open-Meteo does not, for the
+                      `_previous_dayN` variables.
+      available_at    when that run became publicly usable, which is LATER than
+                      the run time (a global model takes hours to finish and
+                      distribute). NULL until a source gives it.
+    `available_at <= decision_time` is the invariant worth having. Until
+    available_at is populated, the nominal lead is the weaker guarantee we
+    actually have, and the docs say so rather than pretending otherwise.
+
+    Keyed on a surrogate id, NOT (game_id, lead_hours): comparing ICON against
+    GFS, changing provider, or keeping two runs of the same horizon all have to
+    be possible without overwriting history. The uniqueness constraint lives in
+    store.py as an expression index, because Postgres treats NULLs as distinct.
     """
 
     __tablename__ = "weather_obs"
-    game_id = Column(Integer, ForeignKey("games.id"), primary_key=True)
-    lead_hours = Column(Integer, primary_key=True)  # 0 = near kickoff; else 24, 72, ...
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
+    lead_hours = Column(Integer, nullable=False)  # nominal; 0 = near kickoff
     valid_time = Column(DateTime)  # the kickoff hour this value describes (UTC)
-    forecast_asof = Column(DateTime)  # valid_time - lead_hours, where meaningful
+    model_run_time = Column(DateTime)  # nullable -- only when the source states it
+    available_at = Column(DateTime)  # nullable -- when that run became public
     decision_safe = Column(Boolean, nullable=False, default=False)
     temperature_f = Column(Float)
     wind_mph = Column(Float)
@@ -222,13 +242,14 @@ class WeatherObs(Base):
     dome = Column(Boolean)
     source = Column(String)  # beatvegas.sources.weather.SOURCE_*
     weather_model = Column(String)  # Open-Meteo `models=`, where pinned
+    dataset_version = Column(String)  # bump when the fetch methodology changes
     latitude = Column(Float)  # the coordinates actually used, not a join at read time
     longitude = Column(Float)
     retrieved_at = Column(DateTime)
 
     __table_args__ = (
+        Index("ix_weather_obs_game_lead", "game_id", "lead_hours"),
         Index("ix_weather_obs_decision_safe", "decision_safe"),
-        Index("ix_weather_obs_lead", "lead_hours"),
     )
 
 

@@ -33,6 +33,7 @@ from typing import Dict, List, Optional, Sequence
 
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.backtest.weather_gate import (
+    DIAGNOSTIC_ARMS,
     WEATHER_ARMS,
     evaluate,
     render_markdown,
@@ -62,6 +63,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         nargs="+",
         default=[("legacy" if x is None else str(x)) for x in WEATHER_ARMS],
         help="weather leads to compare; must include 'legacy' (the incumbent arm)",
+    )
+    p.add_argument(
+        "--include-diagnostic-arms",
+        action="store_true",
+        help=(
+            "also score lead 0 (near-kickoff) as a BENCHMARK. It is not decision-safe and "
+            "can never be promoted; use it to bound what hindsight weather would be worth."
+        ),
     )
     p.add_argument("--min-games", type=int, default=0)
     p.add_argument("--out", default="reports/weather_gate")
@@ -96,6 +105,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     arms: List[Optional[int]] = [_arm(a) for a in args.arms]
     if None not in arms:
         print("--arms must include 'legacy' (the incumbent arm)", file=sys.stderr)
+        return 2
+    sneaked = [a for a in arms if a in DIAGNOSTIC_ARMS] if not args.include_diagnostic_arms else []
+    if sneaked:
+        # Lead 0 cannot be promoted, so it may not appear in a promotion report by
+        # accident -- only when the reader has said out loud that they want a
+        # benchmark. Refusing is cheaper than a caveat nobody reads.
+        print(
+            f"--arms contains a diagnostic (not decision-safe) lead: {sneaked}. "
+            "Pass --include-diagnostic-arms to score it as a benchmark.",
+            file=sys.stderr,
+        )
         return 2
     try_init_db()
 

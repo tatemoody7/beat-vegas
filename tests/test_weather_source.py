@@ -208,10 +208,13 @@ def test_decision_safe_is_true_only_for_a_real_fixed_lead(source, lead, expected
     assert W.decision_safe(source, lead) is expected
 
 
-def test_forecast_asof_is_the_kickoff_minus_the_lead():
-    kick = datetime(2024, 10, 12, 19, 0)
-    assert W.forecast_asof(kick, 72) == datetime(2024, 10, 9, 19, 0)
-    assert W.forecast_asof(kick, 0) is None
+def test_there_is_no_helper_that_derives_a_run_time_from_the_lead():
+    """`valid_time - lead_hours` is the NOMINAL horizon, which lead_hours already
+    carries. A run initialises at one time and becomes usable at another, and
+    Open-Meteo states neither for the `_previous_dayN` variables. A helper that
+    manufactures one invites `available_at <= decision_time` to look tested when
+    it is not, so it does not exist."""
+    assert not hasattr(W, "forecast_asof")
 
 
 def test_missing_coordinates_are_not_a_request(calls):

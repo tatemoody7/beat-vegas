@@ -263,10 +263,30 @@ PRIOR_SEASON_WEIGHT = 0.0
 # experiment rather than a separate code path -- the same shape as
 # PRIOR_SEASON_WEIGHT above. Repairing the weather DATA and letting the model use
 # the repaired values are two different decisions: the backfill writes weather_obs,
-# which nothing reads, and only this constant moves the live model. 0 is the
-# near-kickoff series (good for modelling, never decision-safe); 24 or 72 is the
-# forecast that genuinely existed that far ahead. See scripts/weather_gate.py.
+# which nothing reads, and only this constant moves the live model.
+#
+# LEAD 0 IS REFUSED HERE, not merely discouraged. It is the near-kickoff series,
+# which tracks what actually happened rather than what was knowable while a bet
+# was placeable -- feeding it to a model that prices real money is look-ahead
+# bias, and a rule that lives only in a comment is the kind that drifts. The
+# production choices are None, 24 and 72. A diagnostic read of lead 0 (football
+# modelling, data quality) must ask for it explicitly and can never be the basis
+# of a promotion. See scripts/weather_gate.py.
 WEATHER_OBS_LEAD_HOURS: Optional[int] = None
+
+DIAGNOSTIC_LEAD_HOURS = 0  # near-kickoff: benchmark only, never production
+
+
+def check_weather_lead(lead: Optional[int], allow_diagnostic: bool = False) -> Optional[int]:
+    """Refuse a weather lead that must never price real money."""
+    if lead == DIAGNOSTIC_LEAD_HOURS and not allow_diagnostic:
+        raise ValueError(
+            "weather lead 0 is the near-kickoff series and is not decision-safe: it "
+            "describes what happened, not what was knowable at bet time. Use None "
+            "(legacy), 24 or 72, or pass allow_diagnostic=True for a benchmark read "
+            "that may not be promoted."
+        )
+    return lead
 
 
 def _prior_season_means(long: pd.DataFrame) -> pd.DataFrame:
@@ -361,7 +381,11 @@ def _weather_frame(s, lead: Optional[int]) -> pd.DataFrame:
             ).all(),
             columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome"],
         ).assign(wx_gust=np.nan)
-    return pd.DataFrame(
+    # weather_obs may hold SEVERAL readings for one (game, lead) -- a different
+    # model, provider or run is kept rather than overwritten. Take the most
+    # recently retrieved, deterministically, so a feature frame never depends on
+    # row order.
+    rows = (
         s.query(
             WeatherObs.game_id,
             WeatherObs.temperature_f,
@@ -371,9 +395,13 @@ def _weather_frame(s, lead: Optional[int]) -> pd.DataFrame:
             WeatherObs.wind_gust_mph,
         )
         .filter(WeatherObs.lead_hours == lead)
-        .all(),
-        columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome", "wx_gust"],
+        .order_by(WeatherObs.retrieved_at.desc(), WeatherObs.id.desc())
+        .all()
     )
+    return pd.DataFrame(
+        rows,
+        columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome", "wx_gust"],
+    ).drop_duplicates(subset=["game_id"], keep="first")
 
 
 def _merge_tempo_weather(df: pd.DataFrame, weather_lead: Optional[int] = None) -> pd.DataFrame:
@@ -461,7 +489,9 @@ def build_feature_frame(
     fbs_only: bool = True,
     prior_weight: float = PRIOR_SEASON_WEIGHT,
     weather_lead: Optional[int] = WEATHER_OBS_LEAD_HOURS,
+    allow_diagnostic_lead: bool = False,
 ) -> pd.DataFrame:
+    check_weather_lead(weather_lead, allow_diagnostic_lead)
     games = _load_all_games(fbs_only=fbs_only)
     std = _season_to_date(_team_long(games), prior_weight=prior_weight)
 

@@ -36,7 +36,7 @@ FOUR SOURCES, AND THEY ARE NOT INTERCHANGEABLE:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional, Sequence
 
 import requests
@@ -217,10 +217,3 @@ def fetch_weather(
         lat, lon, day, day, source=source, lead_hours=lead_hours, timeout=timeout
     )
     return series.get(kickoff_utc.strftime("%Y-%m-%dT%H"))
-
-
-def forecast_asof(kickoff_utc: datetime, lead_hours: int) -> Optional[datetime]:
-    """Reference time of the run behind a fixed-lead value."""
-    if kickoff_utc is None or not lead_hours:
-        return None
-    return kickoff_utc - timedelta(hours=lead_hours)

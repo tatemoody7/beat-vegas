@@ -47,7 +47,15 @@ from .level_anchor import _paired_ci
 from .residual_gate import GateNotEvaluable, _bias, _clean, _mae, walk_forward_split
 
 # None must come first: it is the incumbent every other arm is paired against.
-WEATHER_ARMS: Sequence[Optional[int]] = (None, 0, 24, 72)
+#
+# LEAD 0 IS NOT HERE ON PURPOSE. It is the near-kickoff series, which tracks what
+# happened rather than what was knowable while a bet was placeable, so it must
+# never win a promotion contest -- and an arm that cannot be promoted does not
+# belong in the contest by default. It is available as a diagnostic benchmark
+# (how much would perfect hindsight weather be worth?) under an explicit flag,
+# and `promotable()` refuses it however it got here.
+WEATHER_ARMS: Sequence[Optional[int]] = (None, 24, 72)
+DIAGNOSTIC_ARMS: Sequence[int] = (0,)
 
 # More movers than this and the card cannot be eyeballed game by game, which is
 # the whole content of the promote-now rule.
@@ -56,6 +64,16 @@ EYEBALLABLE_MOVERS = 5
 
 def _tag(lead: Optional[int]) -> str:
     return "legacy" if lead is None else f"lead{lead}"
+
+
+def promotable(lead: Optional[int]) -> bool:
+    """May this arm ever become WEATHER_OBS_LEAD_HOURS?
+
+    The incumbent is not promotable because it already ships. Lead 0 is not
+    promotable because it is not decision-safe -- no result, however good, makes
+    hindsight weather a legitimate input to a real-money model.
+    """
+    return lead is not None and lead not in DIAGNOSTIC_ARMS
 
 
 @dataclass
@@ -70,7 +88,14 @@ def _frames(
     """One feature frame per arm. The build is the expensive step and does not
     depend on the season split, so it is done once and reused."""
     return {
-        _tag(lead): build_feature_frame(min_games=min_games, fbs_only=fbs_only, weather_lead=lead)
+        _tag(lead): build_feature_frame(
+            min_games=min_games,
+            fbs_only=fbs_only,
+            weather_lead=lead,
+            # features.check_weather_lead refuses lead 0 outright; the gate is the
+            # one caller allowed to ask for it, and only to benchmark it.
+            allow_diagnostic_lead=lead in DIAGNOSTIC_ARMS,
+        )
         for lead in arms
     }
 
@@ -157,6 +182,7 @@ def evaluate(
             "arm": t,
             "is_incumbent": lead is None,
             "decision_safe": lead is not None and lead >= 24,
+            "promotable": promotable(lead),
             "coverage": _coverage(frames[t], list(train_seasons) + [test_season]),
             "n": int(len(per_game)),
             "mae": _mae(per_game["actual"], per_game[f"pred_{t}"]),
@@ -194,6 +220,7 @@ def evaluate(
         "arms": [_tag(x) for x in leads],
         "bet_gap_pts": BET_GAP_PTS,
         "eyeballable_movers": EYEBALLABLE_MOVERS,
+        "diagnostic_arms": [_tag(x) for x in DIAGNOSTIC_ARMS],
         "n_test": int(len(per_game)),
         "n_with_close": int(per_game["line"].notna().sum()) if "line" in per_game else 0,
         "results": rows,
@@ -277,6 +304,13 @@ def render_markdown(report: Dict[str, Any]) -> str:
             f"| {g.get('n_clearing', '—')} | {g.get('n_crossing', '—')} |"
         )
     L.append("")
+    if any(r.get("promotable") is False and not r["is_incumbent"] for r in report["results"]):
+        L.append(
+            "A **diagnostic** arm is a benchmark, not a candidate: lead 0 is near-kickoff "
+            "weather, so however well it scores it can never price real money. Read it as "
+            "an upper bound on what perfect hindsight conditions would be worth."
+        )
+        L.append("")
     movers = [r for r in report["results"] if (r.get("gate") or {}).get("n_crossing") is not None]
     if movers:
         L.append("## Crossings")

@@ -525,10 +525,45 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   0.5 pts of Hard Rock), but the consensus MEDIAN moves on 13 of 63 games by up to
   **0.5 pts** — exactly `HR_OFF_MARKET_PTS`, so it can flip the off-market gate on a
   borderline game. Details + options: `docs/RANKING_AND_TRUST.md` §9.
-- **Two price gates that disagree**: the board's colour uses `EV_FLOOR` (-5%, normal
-  juice passes) while logging uses `killPrice` (break-even vs the market fair). Between
-  them is a band where **the board shows GREEN and `POST /api/picks` refuses the log** —
-  hit live on Alabama @ Kentucky at -120 (EV -2.7%, kill -113). `docs/RANKING_AND_TRUST.md` §8.
+- **`ev` IS NOT THE EV OF THE BET, and gating on `ev >= 0` bets nothing** (measured
+  2026-09-13, PR #123). `ev` is `ev_under(fair_under, hr_price)` where `fair_under` is the
+  **market's** no-vig fair probability at Hard Rock's number (`card.py::market_read`) — a
+  *price-shopping* number: "is Hard Rock's price better than the rest of the market's?"
+  The model's edge is not in it at all; that lives in `hr_gap`, in POINTS, on a different
+  scale, and the two are never combined into one expected value. So `ev >= 0` is not a
+  strict gate, it is an **unsatisfiable** one — it asks Hard Rock to beat the no-vig
+  consensus, which is a free arb. On the live week-2 card **0 of 42 priced rows cleared
+  it** (5 BET, 18 EDGE, 19 PASS; mean ev -0.04 to -0.07) and all six real tickets were
+  negative (-0.0086 to -0.0530). The other direction fails too: implying `P(under)` from
+  the gap and `bv_sigma` (a **constant 11.26** on all 156 of 2026's rows) makes a 5.32-pt
+  gap worth **+30% EV at -110**, while that season's grading says the model is LESS
+  accurate than Hard Rock in every spread bucket. **A true EV gate needs a calibrated
+  `P(under)`** — the two-team hurdle engine. `BREAK_EVEN_EV = 0.0` exists in
+  `model/score.py` + `verdict.ts`, parity-mirrored, **wired to nothing**, waiting for it.
+  The live bar is `BET_MIN_EV` (= `EV_FLOOR`), now the ONE name shared by `verdict.ts`,
+  `card.py::is_bet`, the kill price and `pickRules.checkPolicy`.
+  `docs/RANKING_AND_TRUST.md` §8b.
+- **The "green board, refused log" band was STALENESS, not two rules** (PR #123 — §8 of
+  `RANKING_AND_TRUST.md` used to say otherwise and was wrong). `breakEvenPrice` returns
+  the worst rung whose EV clears the bar, so `price >= killPrice` **is** `ev >= bar`: the
+  two agree at every price by construction. The quoted -113 was true break-even worked out
+  by hand; the code's kill price on that game was -125, and -120 clears it. The real cause
+  was `checkPolicy` comparing a LIVE price against a `killPrice` read off the **stored card
+  payload** — and `marketFairUnder` moves between builds. All six real week-2 tickets had a
+  kill price that changed across the week's eight builds (2-4 distinct values each; one game
+  went +100 → -105 → +100 in three days). **`POST /api/picks` now recomputes from
+  `lib/lineCheck.ts` and FAILS CLOSED**: no verifiable live price, no real-money BET
+  (`PRICE UNAVAILABLE`, deliberately a different rejection from the kill-price one — an
+  outage must never read as a run of discipline). A cached price may be displayed; it may
+  never authorize money. `PolicyContext.livePrice` is REQUIRED so a new caller cannot skip
+  the check by omission.
+- **`centred_snaps` falls back to the rungs it exists to reject** — `return ok or
+  list(snaps)` (`lines.py`). Fine for a multi-book consensus (some number beats none),
+  WRONG for one book: there is no consensus to fall back to, so it hands back the quote the
+  filter just rejected. Hard Rock is off-centre on 26 of 28 quotes inside 3h of kickoff —
+  the close-poll window — so the fallback fired EVERY TIME the filter mattered. Pass
+  **`strict=True`** from any single-book read; `book_closing_before_kickoff` and
+  `book_closing_price_before_kickoff` now do (the latter had no filter at all). PR #123.
 - `sources/odds.py::_normalize_totals` takes the **LAST** outcome in a market
   (`for oc in outcomes: ... over_price, line = ...`). Every book returns one point pair
   today so it is currently harmless, but a book returning alternate rungs would silently

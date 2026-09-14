@@ -34,17 +34,30 @@ PARITY = {
     "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
     "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
     "EV_FLOOR": score.EV_FLOOR,
+    "BREAK_EVEN_EV": score.BREAK_EVEN_EV,
+    "BET_MIN_EV": score.BET_MIN_EV,
 }
 
 
-def _ts_const(src: Union[str, Path], name: str) -> float:
+def _ts_const(src: Union[str, Path], name: str, _depth: int = 0) -> float:
     """The numeric value of `export const <name> = <number>;` in a TS source
-    (pass the source text, or the path to read it from)."""
+    (pass the source text, or the path to read it from).
+
+    One level of ALIAS is resolved: `export const BET_MIN_EV = EV_FLOOR;` reads
+    as EV_FLOOR's value. Without this an alias silently escapes the parity guard
+    -- which is how FAIR_EV_FLOOR and EDGE_SCORE_MIN have never been checked --
+    and an aliased gate constant is exactly the kind that must not drift."""
     if isinstance(src, Path):
         src = src.read_text()
     m = re.search(rf"export\s+const\s+{name}\s*=\s*(-?[0-9.]+)\s*;", src)
-    assert m, f"{name} is not exported as a numeric const (it must be, for this parity guard)"
-    return float(m.group(1))
+    if m:
+        return float(m.group(1))
+    alias = re.search(rf"export\s+const\s+{name}\s*=\s*([A-Z_][A-Z0-9_]*)\s*;", src)
+    assert alias and _depth < 3, (
+        f"{name} is not exported as a numeric const or a single-name alias "
+        "(it must be one of those, for this parity guard)"
+    )
+    return _ts_const(src, alias.group(1), _depth + 1)
 
 
 @pytest.mark.parametrize("name", sorted(PARITY))
@@ -176,3 +189,34 @@ def test_card_ts_has_no_build_day_for_every_unscheduled_weekday():
     idle = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} - built
     ts_map = _ts_weekday_map(_CARD_TS.read_text(), "BUILD_GATE_CLOSE_ET_MIN")
     assert idle.isdisjoint(ts_map), f"{sorted(idle & set(ts_map))} have no build but are gated"
+
+
+def test_the_two_money_constants_measure_different_things():
+    """BET_MIN_EV is the LIVE bar and it sits on the price-vs-market-fair metric,
+    so it is deliberately BELOW zero -- paying the vig is not optional. It equals
+    EV_FLOOR today, which keeps behaviour unchanged while giving the bar one name
+    that the board, the card, the kill price and the logger all read.
+
+    BREAK_EVEN_EV is the arithmetic reference for a wager's true EV. Nothing
+    gates on it yet because `ev` cannot express it: measured 2026-09-13, zero of
+    42 priced rows on the live week-2 card cleared ev >= 0, because ev >= 0 asks
+    Hard Rock to beat the no-vig consensus. Wiring it needs a calibrated
+    P(under). If you are here to "fix" BET_MIN_EV up to zero, read the note in
+    model/score.py first -- it makes the system bet nothing, for the wrong reason."""
+    assert score.BREAK_EVEN_EV == 0.0
+    assert score.BET_MIN_EV == score.EV_FLOOR
+    assert score.BET_MIN_EV < score.BREAK_EVEN_EV
+
+
+def test_bet_branch_gates_on_bet_min_ev_not_ev_floor():
+    """Source-text guard, the same shape as test_score_is_gap_only_on_both_sides.
+
+    The BET branch must test the money constant. EV_FLOOR still exists and still
+    describes the price landscape (the pos/fair/neg chips), so a grep for the
+    name is not enough -- this pins the branch itself."""
+    if not _TS.exists():
+        pytest.skip(f"{_TS} not present in this checkout")
+    src = _TS.read_text()
+    assert "i.ev >= BET_MIN_EV" in src, "verdict.ts BET branch must gate on BET_MIN_EV"
+    card = _CARD_PY.read_text()
+    assert "ev >= BET_MIN_EV" in card, "card.py is_bet must gate on BET_MIN_EV"

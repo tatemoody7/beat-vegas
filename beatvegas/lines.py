@@ -16,7 +16,7 @@ REAL_1H_CLOSE_WINDOW_H = 2.0
 REAL_FG_CLOSE_WINDOW_H = 3.0
 
 
-def centred_snaps(snaps: Sequence) -> list:
+def centred_snaps(snaps: Sequence, strict: bool = False) -> list:
     """Snapshots whose prices look like a book's MAIN number.
 
     A feed sometimes serves an off-centre rung of the alternate ladder as if it
@@ -27,8 +27,19 @@ def centred_snaps(snaps: Sequence) -> list:
     us against a number nobody could bet.
 
     Dropping the rungs rather than the book means a book still contributes its
-    last CENTRED quote. Falls back to all of them when nothing qualifies, so a
-    caller always gets a consensus rather than nothing.
+    last CENTRED quote.
+
+    `strict` decides what happens when NOTHING qualifies, and the right answer
+    depends on how many books the caller is aggregating:
+
+    * MULTI-BOOK consensus (strict=False, the default): fall back to all of
+      them. A median over rungs is a poor number, but every book being
+      off-centre at once is itself unusual, and some consensus beats none.
+    * SINGLE-BOOK reads (strict=True): return []. There is no consensus to fall
+      back to -- the fallback just hands back the one rung the filter was there
+      to reject. Hard Rock inside 3 h is off-centre on 26 of 28 quotes, so the
+      lenient fallback fired EVERY TIME the filter mattered, and the caller
+      believed it had a real close. See book_closing_before_kickoff.
     """
     # getattr, not attribute access: several callers pass snapshot-like objects
     # that carry only book/line/captured_at, and a quote with no prices cannot
@@ -38,6 +49,8 @@ def centred_snaps(snaps: Sequence) -> list:
         for s in snaps
         if is_centred_quote(getattr(s, "over_price", None), getattr(s, "under_price", None))
     ]
+    if strict:
+        return ok
     return ok or list(snaps)
 
 
@@ -138,8 +151,16 @@ def book_closing_before_kickoff(
 ) -> Tuple[Optional[float], Optional[float], Optional[object]]:
     """(opening, closing, closing_at) for ONE book's pre-kickoff snapshots — the
     number you actually bet at Hard Rock, not the consensus. Same rules as
-    closing_before_kickoff; (None, None, None) when the book has no snapshot."""
+    closing_before_kickoff; (None, None, None) when the book has no snapshot.
+
+    Centring is STRICT here (centred_snaps strict=True): one book is not a
+    consensus, so "nothing centred" must mean no close rather than the rung the
+    filter just rejected. A caller that gets None has to say so -- it must not
+    substitute a number nobody was offered."""
     mine = [s for s in snaps if getattr(s, "book", None) == book]
+    if not mine:
+        return None, None, None
+    mine = centred_snaps(mine, strict=True)
     if not mine:
         return None, None, None
     return closing_before_kickoff(mine, kickoff)
@@ -188,8 +209,16 @@ def book_closing_price_before_kickoff(snaps: Sequence, kickoff, book: str) -> Op
     """ONE book's closing UNDER price: the `under_price` of its latest pre-kickoff
     snapshot that carries one (an unpriced row is skipped, not read as -110).
     None when the book has no priced pre-kick snapshot. Fills a pick logged
-    with a NULL price (an unpriced Hard Rock line) at grade time."""
+    with a NULL price (an unpriced Hard Rock line) at grade time.
+
+    Off-centre rungs are rejected (strict, single-book — see centred_snaps): the
+    whole point of this helper is to record what the bettor was charged, and a
+    ladder rung's lopsided price is the one number that was never on offer at
+    the main total."""
     mine = [s for s in snaps if getattr(s, "book", None) == book]
+    if not mine:
+        return None
+    mine = centred_snaps(mine, strict=True)
     if not mine:
         return None
     priced = [s for s in pre_kickoff(mine, kickoff) if getattr(s, "under_price", None) is not None]

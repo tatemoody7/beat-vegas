@@ -37,6 +37,34 @@ export const HR_OFF_MARKET_PTS = 0.5;
 export const EV_FLOOR = -0.05;
 /** EV_FLOOR as a positive whole percent for prose ("up to 5% worse than fair"). */
 export const EV_FLOOR_PCT = Math.abs(EV_FLOOR * 100);
+// --- the money gate, and what `ev` actually measures ------------------------
+//
+// READ THIS BEFORE CHANGING EITHER NUMBER. `ev` is NOT the expected value of
+// the wager. It is evUnder(marketFairUnder, hrUnderPrice) — the market's no-vig
+// fair probability at Hard Rock's number against Hard Rock's price — so it
+// answers "is Hard Rock's price better or worse than the rest of the market's?"
+// The model's edge is not in it; that lives in hrGap, in POINTS.
+//
+// Measured 2026-09-13 on the live week-2 card: NO game clears ev >= 0. 0 of 42
+// priced rows, mean −0.04 on the BET tier, and all six real tickets negative.
+// ev >= 0 asks Hard Rock to beat the no-vig consensus — a free arb — so it is
+// an unsatisfiable gate, not a strict one. Implying P(under) from the gap fails
+// the other way: a 5.32-point gap would price at +30% EV while that season's
+// grading says the model is less accurate than Hard Rock in every spread bucket.
+//
+// A true EV gate needs a calibrated P(under) — the two-team hurdle engine. Until
+// then the bar stays on the price-shopping metric, named so evidence can raise it.
+//
+// BET_MIN_EV: the worst price-vs-market-fair a real bet may take. Equal to
+// EV_FLOOR today, so behaviour is unchanged — but it is now ONE number shared by
+// the board, card.py::is_bet, the kill price and pickRules.checkPolicy, which
+// used to disagree (docs/RANKING_AND_TRUST.md §8).
+export const BET_MIN_EV = EV_FLOOR;
+// BREAK_EVEN_EV: the arithmetic reference, below which a wager loses against a
+// genuinely fair price. NOTHING GATES ON IT YET, deliberately — today's `ev`
+// cannot express it. Mirrored in beatvegas/model/score.py so both languages stay
+// in step before it is wired.
+export const BREAK_EVEN_EV = 0;
 // weekly_update.py --min-games: the model needs this many FBS-vs-FBS games
 // played by both teams this season (0 since 2026-09-08: every game gets a
 // number off last season's priors; rows with under 2 games are tagged "early
@@ -324,11 +352,23 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       58 + hrGap * 10,
     );
   }
-  // BET needs Hard Rock's own number in the band at a JUDGEABLE price no worse
-  // than EV_FLOOR against the market's fair price (standard juice passes). No
-  // fair price (no book or exchange at Hard Rock's number, or Hard Rock itself
-  // unpriced) is not a pass: it is paper only (card.py blocker no_fair_price).
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && !priceNeg && i.ev !== null) {
+  // BET needs Hard Rock's own number in the band at a JUDGEABLE price that is
+  // worth taking — EV at or above BET_MIN_EV against the market's no-vig fair
+  // price. No fair price (no book or exchange at Hard Rock's number, or Hard
+  // Rock itself unpriced) is not a pass: it is paper only, and it is never a
+  // real bet (card.py blocker no_fair_price, pickRules PRICE UNAVAILABLE).
+  //
+  // This gate used to be `!priceNeg`, i.e. EV >= EV_FLOOR (-5%), which let the
+  // board colour a losing wager green. Measured on the six real week-2 tickets:
+  // four carried verdict_at_pick = 'BET' at negative EV while POST /api/picks
+  // refused to log them. EV_FLOOR still describes the price landscape below; it
+  // no longer decides whether money moves.
+  if (
+    hrGap !== null &&
+    hrGap >= BET_GAP_PTS &&
+    i.ev !== null &&
+    i.ev >= BET_MIN_EV
+  ) {
     // Confidence is the gap alone. The classifier's under_score used to gate
     // "high" (needed >= MODEL_BET_THRESHOLD); the 2026-09-06 post-mortem found
     // every score band hits the same rate against a fair line, so it no longer
@@ -344,15 +384,27 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       100 + hrGap * 10 + (i.ev ?? 0) * 100,
     );
   }
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && priceNeg) {
+  // Everything judgeable below the bar. Two headlines because the two cases are
+  // different bets: `priceNeg` is a materially bad price (worse than EV_FLOOR),
+  // while the band between EV_FLOOR and BET_MIN_EV is ordinary juice that still
+  // does not pay for itself — the case that used to colour green.
+  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.ev !== null) {
     return out(
       "WATCH",
       "medium",
-      "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass.",
+      priceNeg
+        ? "Model edge in the bettable range, but Hard Rock’s price is worse than the market — wait for a better number or pass."
+        : "Model edge in the bettable range, but Hard Rock’s price does not cover the edge — the bet loses money at this number. Wait for a better price.",
       false,
       60 + hrGap * 10,
     );
   }
+  // PRICE UNAVAILABLE. Reached only when the gap cleared and the price could not
+  // be judged at all, so the branch order above matters: BET is unreachable
+  // without a live EV, by construction rather than by accident. The money path
+  // fails closed on exactly this state (lib/pickRules.ts checkPolicy), and a
+  // cached card price must never stand in for it. Pinned by
+  // verdict.test.ts::"a gap that clears with no judgeable price is never a BET".
   if (hrGap !== null && hrGap >= BET_GAP_PTS && i.ev === null) {
     return out(
       "WATCH",

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLatestCard } from "@/lib/card";
+import { breakEvenPrice } from "@/lib/edge";
+import { getLineCheck } from "@/lib/lineCheck";
 import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
 import { checkPolicy, parsePickBody } from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
+import type { PolicyContext } from "@/lib/pickRules";
 
 // POST /api/picks — log a pick on a current-slate game. Validation and the
 // betting policy (1H-only real money, flat 1 unit, 5-bet weekly cap, the
@@ -75,15 +78,42 @@ export async function POST(req: NextRequest) {
   const cardQ = game
     ? getLatestCard(game.season, game.week)
     : Promise.resolve(null);
+  // The LIVE market read — the same loader the board renders from, so the gate
+  // and the screen cannot disagree. The card is built on a Tuesday; the bet is
+  // placed on a Saturday, and marketFairUnder moves in between.
+  const checkQ = game
+    ? getLineCheck(game.season, "1h")
+    : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
   let dup: { id: number }[];
   let cap: { n: number | bigint }[];
   let card: Awaited<ReturnType<typeof getLatestCard>>;
+  let checks: Awaited<ReturnType<typeof getLineCheck>>;
   try {
-    [dup, cap, card] = await Promise.all([dupQ, capQ, cardQ]);
+    [dup, cap, card, checks] = await Promise.all([dupQ, capQ, cardQ, checkQ]);
   } catch (e) {
     return dbError("policy checks", e);
   }
   const item = card?.items.find((i) => i.gameId === pick.gameId) ?? null;
+
+  // Fail closed: every branch that cannot produce a checkable price returns
+  // { ok: false }, and checkPolicy refuses the real-money BET rather than
+  // falling back to the card's cached number. Mirrors verdict.ts, where the BET
+  // branch requires a non-null ev and otherwise reads WATCH — so a game the
+  // board will not colour green is also a game the API will not log.
+  const row = checks.find((c) => c.gameId === pick.gameId) ?? null;
+  let livePrice: PolicyContext["livePrice"];
+  if (row === null) {
+    livePrice = { ok: false, reason: "no live line read for this game" };
+  } else if (row.hrUnderPrice === null) {
+    livePrice = { ok: false, reason: "Hard Rock has not priced its under" };
+  } else if (row.marketFairUnder === null) {
+    livePrice = {
+      ok: false,
+      reason: "no other book or exchange is priced at Hard Rock’s number",
+    };
+  } else {
+    livePrice = { ok: true, killPrice: breakEvenPrice(row.marketFairUnder) };
+  }
 
   const policy = checkPolicy(pick, {
     inSlate,
@@ -94,6 +124,7 @@ export async function POST(req: NextRequest) {
     week: game?.week ?? null,
     killLine: item?.killLine ?? null,
     killPrice: item?.killPrice ?? null,
+    livePrice,
   });
   if (!policy.ok) {
     return NextResponse.json(

@@ -20,6 +20,7 @@ from beatvegas.card import (
     PAPER_BLOCKERS,
     break_even_price,
     build_card,
+    ev_verdict,
     fair_price_window,
     gap_score,
     hold_note,
@@ -29,7 +30,7 @@ from beatvegas.card import (
     round_half_up,
 )
 from beatvegas.devig import devig_two_way, ev_under
-from beatvegas.model.score import BET_GAP_PTS, EV_FLOOR
+from beatvegas.model.score import BET_GAP_PTS, BET_MIN_EV, BREAK_EVEN_EV, EV_FLOOR
 
 NOW = datetime(2026, 9, 18, 22, 5)  # Friday 6:05pm ET, in UTC
 KICK = NOW + timedelta(days=1)
@@ -462,8 +463,11 @@ def test_round_half_up_and_kill_line():
     assert kill_line(23.2) == 25.0
 
 
-def test_break_even_price_is_the_worst_price_inside_the_floor():
-    assert EV_FLOOR == -0.05
+def test_break_even_price_is_the_worst_price_inside_the_bar():
+    """The kill price is the worst price at which is_bet still says BET, so its
+    floor is BET_MIN_EV -- the same bar -- and not zero. See model/score.py: a
+    zero floor here would name a price no board row has ever cleared."""
+    assert BET_MIN_EV == EV_FLOOR == -0.05
     assert break_even_price(0.5) == -110  # -110 is -4.5%: inside; -115 is -6.5%
     assert break_even_price(0.55) == -135  # -135 is -4.3%; -140 is -5.7%
     assert break_even_price(0.52) == -120  # -120 is -4.7%; -125 is -6.4%
@@ -472,8 +476,33 @@ def test_break_even_price_is_the_worst_price_inside_the_floor():
     assert break_even_price(0.0) is None
     for fair in (0.48, 0.5, 0.52, FAIR_UNDER, 0.55):
         p = break_even_price(fair)
-        assert ev_under(fair, p) >= EV_FLOOR
-        assert ev_under(fair, p - 5 if p != 100 else -105) < EV_FLOOR
+        assert ev_under(fair, p) >= BET_MIN_EV
+        assert ev_under(fair, p - 5 if p != 100 else -105) < BET_MIN_EV
+
+
+def test_break_even_price_is_never_optimistic_about_its_own_bar():
+    """The 5-cent grid cannot land exactly on the bar, and the rounding must
+    always fall on the strict side: the rung returned clears BET_MIN_EV, so
+    "needs X or better" can never invite a price the gate would refuse.
+    _american_steps walking worst-payout-to-best is what guarantees it."""
+    for i in range(30):
+        fair = 0.44 + 0.005 * i
+        p = break_even_price(fair)
+        if p is None:
+            continue
+        assert ev_under(fair, p) >= BET_MIN_EV, fair
+
+
+def test_break_even_at_a_genuinely_fair_price_is_reachable_but_unwired():
+    """BREAK_EVEN_EV is the arithmetic reference the future EV gate will use.
+    It is not the live bar, and this pins the gap between them so the day it IS
+    wired the difference is visible rather than surprising: at a 53.1% fair
+    under the live bar says -110 and true break-even says the same, but at 52%
+    the live bar tolerates -120 where break-even stops at -105."""
+    assert break_even_price(0.52, floor=BREAK_EVEN_EV) == -105
+    assert break_even_price(0.52, floor=BET_MIN_EV) == -120
+    assert ev_verdict(-0.06) == "neg"
+    assert ev_verdict(-0.02) == "fair"
 
 
 def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():

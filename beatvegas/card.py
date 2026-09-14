@@ -34,6 +34,7 @@ from .devig import devig_two_way, ev_under, is_centred_quote
 from .hardrock import HR_BOOK_KEY, normalize_book
 from .model.score import (
     BET_GAP_PTS,
+    BET_MIN_EV,
     EV_FLOOR,
     HR_OFF_MARKET_PTS,
     MODEL_VERSION,
@@ -251,9 +252,24 @@ def _american_steps() -> Iterable[int]:
         yield p
 
 
-def break_even_price(fair_under: float, floor: float = EV_FLOOR) -> Optional[int]:
+def break_even_price(fair_under: float, floor: float = BET_MIN_EV) -> Optional[int]:
     """The worst American price (5-cent steps) at which the under still clears
-    `floor` against `fair_under`; None if nothing in +/-1000 does."""
+    `floor` against `fair_under`; None if nothing in +/-1000 does.
+
+    DISPLAY ONLY -- the money gate compares `ev >= BET_MIN_EV` on the live price
+    directly (see is_bet / verdict.ts / pickRules.checkPolicy). The 5-cent grid
+    cannot express the true break-even, which at a 53.1% fair under is -113.2,
+    and a gate built on the grid manufactures a disagreement band all by itself.
+
+    The rounding direction is load-bearing and it is why _american_steps walks
+    worst-payout to best: the first rung to clear the floor is always at least as
+    strict as the true break-even, so "needs -110 or better" can never invite a
+    price that loses money. Stating -115 there would be optimistic and wrong.
+
+    The floor is BET_MIN_EV -- the SAME bar is_bet uses -- so the kill price is
+    by construction the price at which the card's own verdict flips. It is
+    EV_FLOOR today. It is NOT zero: see the long note in model/score.py for why
+    `ev` cannot express a true break-even until a calibrated P(under) exists."""
     for p in _american_steps():
         if ev_under(fair_under, p) >= floor:
             return p
@@ -592,7 +608,9 @@ def build_item(
     hr_line, hr_price, ev = m["hr_line"], m["hr_price"], m["ev"]
     market_line, fair_under = m["market_line"], m["fair_under"]
     ev_v = ev_verdict(ev)
-    price_pos, price_neg = ev_v == "pos", ev_v == "neg"
+    # price_pos drives the "good price" wording only. The BET gate reads
+    # BET_MIN_EV directly (price_ok below) rather than the ev_verdict chip.
+    price_pos = ev_v == "pos"
 
     bv_line = _num((prediction or {}).get("bv_line"))
     has_model = bv_line is not None
@@ -638,15 +656,21 @@ def build_item(
     # score under the amber band; the card never needs it, so 0 here.
     score = gap_score(gap) if has_model else 0
 
-    # A BET needs a JUDGEABLE price: ev None (no book or exchange priced at
-    # Hard Rock's number, or Hard Rock unpriced) is paper only (verdict.ts).
+    # A BET needs a JUDGEABLE price worth taking: EV at or above BET_MIN_EV
+    # against the market's no-vig fair under. ev None (no book or exchange
+    # priced at Hard Rock's number, or Hard Rock unpriced) is paper only and
+    # never a real bet (verdict.ts PRICE UNAVAILABLE, blocker no_fair_price).
+    #
+    # This was `not price_neg` — EV >= EV_FLOOR (-5%) — until 2026-09-13, which
+    # let the card rate a losing wager BET. Keep it identical to verdict.ts:331;
+    # tests/test_gate_parity.py reads both by source text.
+    price_ok = ev is not None and ev >= BET_MIN_EV
     is_bet = (
         has_model
         and hr_gap is not None
         and hr_gap >= BET_GAP_PTS
         and not off_market
-        and not price_neg
-        and ev is not None
+        and price_ok
         and not qb_out
     )
     # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
@@ -661,10 +685,10 @@ def build_item(
     if qualifies:
         if off_market:
             paper_blocker = "off_market"
-        elif price_neg:
-            paper_blocker = "price"
         elif ev is None:
             paper_blocker = "no_fair_price"
+        elif not price_ok:
+            paper_blocker = "price"
         elif qb_out:
             paper_blocker = "qb_out"
     blocker: Optional[str] = None
@@ -676,10 +700,10 @@ def build_item(
             blocker = "no_hr_line"
         elif off_market:
             blocker = "off_market"
-        elif price_neg:
-            blocker = "price"
         elif ev is None:
             blocker = "no_fair_price"
+        elif not price_ok:
+            blocker = "price"
         elif qb_out:
             blocker = "qb_out"
         else:

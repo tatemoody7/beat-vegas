@@ -202,34 +202,91 @@ weekend.** The options considered were (a) warn on the board but still allow,
 (b) make the card's hold binding on the API like the kill price, (c) stop
 holding on a missing pace read at all since the model still produces a number.
 
-## 8. Two price tests that disagree: green board, refused log
+## 8. Green board, refused log — RESOLVED 2026-09-13, and the diagnosis was wrong
 
-Hit live on 2026-09-11 on Alabama @ Kentucky at -120, and it is the same shape
-as §6 and §7 — two halves computing one question differently.
+Hit live on 2026-09-11 on Alabama @ Kentucky at -120. This section used to say
+the cause was two gates running different tests. **It is not.** Re-measured
+against the code:
 
-There are TWO price gates, and they are not the same test:
-
-| | Where | Rule | On Alabama @ Kentucky at -120 |
+| price | EV vs a 53.1% fair | board green? | logger accepts? |
 |---|---|---|---|
-| Tier / board colour | `edge.ts` via `evVerdict` | EV >= `EV_FLOOR` (-5%) | EV -2.7% -> **passes, shows GREEN** |
-| Logging | `pickRules.checkPolicy` | price >= `killPrice` | kill -113 -> **refused** |
+| -125 | -4.4% | yes | yes |
+| -120 | -2.7% | yes | yes |
+| -115 | -0.7% | yes | yes |
+| -130 | -6.1% | no | no |
 
-`killPrice = breakEvenPrice(marketFairUnder)` — the price at which the bet is
-exactly break-even against the market's fair value. `EV_FLOOR` deliberately
-allows normal juice (a -110 coin flip is -4.5%). Between the two there is a
-band — roughly -114 to -125 on a 53% fair — where **the board says bet and the
-API says no**.
+They agree at every price, and they agree *by construction*:
+`killPrice = breakEvenPrice(marketFairUnder)` returns the worst 5-cent rung whose
+EV still clears the bar, so `price >= killPrice` and `ev >= bar` are the same
+test. The "-113" this section used to quote was true break-even worked out by
+hand; the code's kill price on that game was **-125**, and -120 clears it.
 
-Measured on that game: market fair for the under 53.1% across five books, so
-kill price -113. At -115 EV is -0.8% (green) and the log is refused; at -120 EV
-is -2.7% (green) and the log is refused.
+**The real cause is staleness.** `checkPolicy` compared a LIVE price against a
+`killPrice` read off the stored card payload, and `marketFairUnder` moves between
+builds. Measured across week 2's eight builds on game 401862707:
 
-This is not obviously a bug — an owner could want the board to show "close" and
-the ledger to hold a hard line. But it is undocumented, and it reads as the
-system contradicting itself at the moment money is being placed. Whatever is
-decided, the board should say which of the two numbers it is showing.
+```
+2026-09-10 20:09   fair 0.4838   kill +100
+2026-09-11 20:18   fair 0.4884   kill -105     <- a full 5-cent step
+2026-09-12 12:00   fair 0.4863   kill +100
+```
 
-**Owner decision (2026-09-12): record for a future build.**
+The card is internally consistent (stored `kill_price` matches a recompute on
+249 of 251 priced items). It is consistent with *the market at build time*, which
+on a Saturday afternoon is hours old.
+
+**Fixed (PR "the close is real, and one price gate"):**
+
+1. `POST /api/picks` recomputes the kill price from `lib/lineCheck.ts`, the same
+   loader the board renders from. The card's number is now only a fallback for
+   the line, never for the price.
+2. **The money path fails closed.** No verifiable live price, no real-money BET —
+   `PRICE UNAVAILABLE`, a deliberately distinct rejection from the kill-price
+   one, because "we could not check" and "we checked and it is too dear" are
+   different failures and a post-mortem that conflates them reads an outage as a
+   run of discipline. A cached price may be displayed; it may not authorize money.
+3. The bar has one name, `BET_MIN_EV`, shared by `verdict.ts`, `card.py::is_bet`,
+   the kill price and `checkPolicy`. It equals `EV_FLOOR` today, so behaviour is
+   unchanged. `edge.ts`'s price *blocker* now reads that bar too rather than the
+   `evVerdict` display chip, which would have reported "gap" once the bar moved.
+
+## 8b. `ev` is not the expected value of the bet
+
+Worth stating plainly, because §8's original diagnosis followed from assuming it
+was, and the obvious "fix" — gate on `ev >= 0` — is much worse than the bug.
+
+`ev` is `ev_under(fair_under, hr_price)` where `fair_under` is the **market's**
+no-vig fair probability at Hard Rock's number (`card.py::market_read`). It asks
+*"is Hard Rock's price better or worse than the rest of the market's?"* — a
+price-shopping question. The model's edge is not in it. That lives in `hr_gap`,
+in POINTS, on a different scale, and the two are never combined into one
+expected value.
+
+So `ev >= 0` is not a strict gate, it is an **unsatisfiable** one: it asks Hard
+Rock to price better than the no-vig consensus, which is a free arb. Measured
+2026-09-13 on the live week-2 card in Neon:
+
+| tier | rows priced | clearing `ev >= 0` | mean ev |
+|---|---|---|---|
+| BET | 5 | **0** | -0.040 |
+| EDGE | 18 | **0** | -0.069 |
+| PASS | 19 | **0** | -0.055 |
+
+All six real week-2 tickets were negative (-0.0086, -0.0301, -0.0400, -0.0463,
+-0.0465, -0.0530). Nothing on the board has ever cleared zero.
+
+The other direction fails too. Implying `P(under)` from the gap and `bv_sigma`
+(a constant **11.26** on all 156 of 2026's prediction rows) makes a 5.32-point
+gap worth `Phi(0.47) = 68%`, i.e. **+30% EV at -110** — while the same season's
+grading says the model is LESS accurate than Hard Rock in every spread bucket.
+That gate bets everything.
+
+**A true EV gate needs a calibrated `P(under)`,** which is what the two-team
+hurdle engine is for. `BREAK_EVEN_EV = 0.0` exists on both sides, mirrored by
+`tests/test_gate_parity.py`, wired to nothing, waiting for it.
+
+**Owner decision (2026-09-13): keep the bar on the price metric; fix the
+mechanics; defer the EV gate to the engine.**
 
 ## 9. BetMGM is not quoting a centred main line
 

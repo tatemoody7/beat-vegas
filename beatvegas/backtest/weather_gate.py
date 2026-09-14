@@ -91,16 +91,30 @@ def _predict(frame: pd.DataFrame, train_seasons: Sequence[int], test_season: int
     ).set_index("id")
 
 
-def _coverage(frame: pd.DataFrame) -> Dict[str, Any]:
-    """How much of the arm's own test frame actually carries weather.
+def _coverage(frame: pd.DataFrame, seasons: Optional[Sequence[int]] = None) -> Dict[str, Any]:
+    """How much of the arm's frame actually carries weather, overall and per season.
 
-    An arm can look harmless purely because it has no data -- lead 24/72 hold
-    nothing before the 2024 season -- and that must be visible next to its MAE
-    rather than inferred later.
+    The per-season split is the load-bearing part. Leads 24/72 hold NOTHING before
+    2024, so training on 2023-2024 starves exactly the two decision-safe arms --
+    and their overall share still reads 60%, comfortably above any sane threshold.
+    An arm with an empty training season is not a weak result, it is not a result.
     """
     n = int(len(frame))
-    have = int(pd.to_numeric(frame.get("wx_temp"), errors="coerce").notna().sum()) if n else 0
-    return {"n_rows": n, "n_with_temp": have, "share": (have / n) if n else None}
+    temp = pd.to_numeric(frame.get("wx_temp"), errors="coerce") if n else pd.Series(dtype=float)
+    have = int(temp.notna().sum()) if n else 0
+    by_season: Dict[str, Optional[float]] = {}
+    if n and "season" in frame.columns:
+        for season, sub in frame.groupby("season"):
+            if seasons and int(season) not in [int(x) for x in seasons]:
+                continue
+            t = pd.to_numeric(sub.get("wx_temp"), errors="coerce")
+            by_season[str(int(season))] = float(t.notna().mean()) if len(sub) else None
+    return {
+        "n_rows": n,
+        "n_with_temp": have,
+        "share": (have / n) if n else None,
+        "by_train_season": by_season,
+    }
 
 
 def evaluate(
@@ -143,7 +157,7 @@ def evaluate(
             "arm": t,
             "is_incumbent": lead is None,
             "decision_safe": lead is not None and lead >= 24,
-            "coverage": _coverage(frames[t]),
+            "coverage": _coverage(frames[t], list(train_seasons) + [test_season]),
             "n": int(len(per_game)),
             "mae": _mae(per_game["actual"], per_game[f"pred_{t}"]),
             "mae_incumbent": _mae(per_game["actual"], per_game["pred_legacy"]),
@@ -183,13 +197,33 @@ def evaluate(
         "n_test": int(len(per_game)),
         "n_with_close": int(per_game["line"].notna().sum()) if "line" in per_game else 0,
         "results": rows,
-        "caveats": _caveats(rows, test_season),
+        "caveats": _caveats(rows, test_season, list(train_seasons)),
     }
     return WeatherGateResult(per_game=per_game.reset_index(), report=_clean(report))
 
 
-def _caveats(rows: List[Dict[str, Any]], test_season: int) -> List[str]:
+def _caveats(
+    rows: List[Dict[str, Any]], test_season: int, train_seasons: Sequence[int] = ()
+) -> List[str]:
     out: List[str] = []
+    # An arm with an EMPTY training season is starved, not weak -- and its overall
+    # share can still look fine (leads 24/72 read 60% while holding nothing in 2023).
+    for r in rows:
+        if r.get("lead_hours") is None:
+            continue
+        empty = [
+            s
+            for s in train_seasons
+            if (r["coverage"].get("by_train_season") or {}).get(str(int(s)), 1.0) is not None
+            and (r["coverage"]["by_train_season"] or {}).get(str(int(s)), 1.0) < 0.05
+        ]
+        if empty:
+            out.append(
+                f"{r['arm']}: training season(s) {', '.join(str(s) for s in empty)} carry "
+                "essentially NO weather for this arm, so it trains on a shorter history "
+                "than the incumbent. Its numbers here are handicapped, not a null result -- "
+                "re-run with a train window this arm actually covers before ranking it."
+            )
     if test_season < 2024:
         out.append(
             f"test season {test_season} predates the fixed-lead data: leads 24 and 72 "

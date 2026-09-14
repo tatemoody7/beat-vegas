@@ -102,3 +102,34 @@ def test_a_pre_2024_test_season_is_flagged_as_temperature_only():
                                     "coverage": {"share": 1.0, "n_with_temp": 1, "n_rows": 1},
                                     "gate": {"n_priced": 1}}], 2023))
     assert "predates the fixed-lead data" in caveats
+
+
+def test_an_arm_with_an_empty_training_season_is_called_starved_not_weak():
+    """Leads 24/72 hold nothing before 2024, yet their OVERALL share reads 60% --
+    comfortably above any threshold. The per-season split is what catches it."""
+    rows = [
+        {"arm": "legacy", "lead_hours": None,
+         "coverage": {"share": 0.34, "n_with_temp": 250, "n_rows": 744, "by_train_season": {}},
+         "gate": {"n_priced": 622}},
+        {"arm": "lead72", "lead_hours": 72,
+         "coverage": {"share": 0.60, "n_with_temp": 446, "n_rows": 744,
+                      "by_train_season": {"2023": 0.0, "2024": 0.97, "2025": 0.96}},
+         "gate": {"n_priced": 622}},
+    ]
+    caveats = " ".join(G._caveats(rows, 2025, [2023, 2024]))
+    assert "lead72" in caveats and "2023" in caveats
+    assert "handicapped, not a null result" in caveats
+
+
+def test_an_arm_covering_its_whole_train_window_is_not_flagged():
+    rows = [
+        {"arm": "legacy", "lead_hours": None,
+         "coverage": {"share": 0.34, "n_with_temp": 1, "n_rows": 1, "by_train_season": {}},
+         "gate": {"n_priced": 622}},
+        {"arm": "lead72", "lead_hours": 72,
+         "coverage": {"share": 0.96, "n_with_temp": 1, "n_rows": 1,
+                      "by_train_season": {"2024": 0.97, "2025": 0.96}},
+         "gate": {"n_priced": 622}},
+    ]
+    caveats = " ".join(G._caveats(rows, 2025, [2024]))
+    assert "handicapped" not in caveats

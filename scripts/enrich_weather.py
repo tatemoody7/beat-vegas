@@ -17,7 +17,7 @@ import time
 from beatvegas import ci
 from beatvegas.db.models import Game, Venue, Weather
 from beatvegas.db.store import session_scope, try_init_db, upsert
-from beatvegas.sources.weather import fetch_weather
+from beatvegas.sources.weather import WeatherUnavailable, fetch_weather
 
 PER_CALL_TIMEOUT_S = 8
 MAX_CONSECUTIVE_FAILURES = 15
@@ -65,9 +65,12 @@ def main() -> None:
         if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
             skipped += 1
             continue
-        w = fetch_weather(
-            lat, lon, start.date().isoformat(), hour=start.hour or 19, timeout=PER_CALL_TIMEOUT_S
-        )
+        # `start` is naive UTC and goes in whole; passing a date plus an hour is
+        # what let a UTC hour index a local-time array for three years.
+        try:
+            w = fetch_weather(lat, lon, start, timeout=PER_CALL_TIMEOUT_S)
+        except WeatherUnavailable:
+            w = None  # rate limited or down -- counts as a failure, same as no data
         time.sleep(0.15)  # be polite to the free API
         if w is None:
             skipped += 1

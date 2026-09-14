@@ -48,6 +48,7 @@ _CLONE_TABLES = [
     "fh_team_game",
     "team_tempo",
     "weather",
+    "weather_obs",
     "factor_scores",
     "model_runs",
 ]
@@ -141,7 +142,7 @@ def _clone_inputs() -> Dict[str, int]:
             model = by_table[table]
             rows = list(_maps(ss, model, drop_id=False))
             _chunked_insert(ds, model, rows)
-            if table != "weather":  # weather PK is game_id (no serial)
+            if table not in ("weather", "weather_obs"):  # PK is game_id (no serial)
                 _resync(ds, table)
             ds.commit()
             counts[table] = len(rows)

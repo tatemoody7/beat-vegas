@@ -193,6 +193,45 @@ class Weather(Base):
     dome = Column(Boolean)
 
 
+class WeatherObs(Base):
+    """Weather for a game AT A STATED LEAD, with the provenance to prove it.
+
+    The legacy `weather` table stored four bare numbers keyed by game, which made
+    two different things indistinguishable six months later: what the conditions
+    WERE around kickoff, and what the forecast SAID at a time we could still have
+    placed a bet. Those answer different questions, and conflating them is
+    look-ahead bias -- so the lead is part of the key and `decision_safe` is
+    stored rather than inferred.
+
+    `lead_hours = 0` is the near-kickoff series, which tracks actual conditions
+    (measured 1.82F / 1.55mph from the ERA5 actual, closer than a 1-day-lead
+    forecast). It is NEVER decision-safe. Only the fixed-lead rows are, and every
+    market-edge query must filter on `decision_safe`.
+    """
+
+    __tablename__ = "weather_obs"
+    game_id = Column(Integer, ForeignKey("games.id"), primary_key=True)
+    lead_hours = Column(Integer, primary_key=True)  # 0 = near kickoff; else 24, 72, ...
+    valid_time = Column(DateTime)  # the kickoff hour this value describes (UTC)
+    forecast_asof = Column(DateTime)  # valid_time - lead_hours, where meaningful
+    decision_safe = Column(Boolean, nullable=False, default=False)
+    temperature_f = Column(Float)
+    wind_mph = Column(Float)
+    wind_gust_mph = Column(Float)
+    precipitation = Column(Float)
+    dome = Column(Boolean)
+    source = Column(String)  # beatvegas.sources.weather.SOURCE_*
+    weather_model = Column(String)  # Open-Meteo `models=`, where pinned
+    latitude = Column(Float)  # the coordinates actually used, not a join at read time
+    longitude = Column(Float)
+    retrieved_at = Column(DateTime)
+
+    __table_args__ = (
+        Index("ix_weather_obs_decision_safe", "decision_safe"),
+        Index("ix_weather_obs_lead", "lead_hours"),
+    )
+
+
 class OddsSnapshot(Base):
     """One row per (game, book, market) observation. Repeated polling builds the
     full movement history; the earliest captured_at = posting time."""

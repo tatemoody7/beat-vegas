@@ -181,6 +181,43 @@ Research only — it never places bets or automates gambling.
   GHA starts cold and refetches, which is why it hid for three months), and **a season
   whose priors cannot be fetched now warns instead of killing the build** (`_cached_soft`,
   the same trade `backfill.py` makes for venues).
+- **2026-09-14 (EVERY WEATHER ROW WAS WRONG, AND "FORECAST" MEANT TWO THINGS).**
+  Coverage was the reported problem (38.3%, 729/1,902 modelled games). The real one
+  is that **all 2,647 outdoor rows were wrong**. Both writers asked Open-Meteo for
+  `timezone=auto` and then indexed the **local** hourly array at the **UTC** kickoff
+  hour — `Game.start_date` is naive UTC — so every reading was displaced by the
+  venue's UTC offset, 4-10 h for US venues, onto the wrong calendar day for a late
+  kickoff. LA Coliseum `2023-08-27 00:00Z` stored **63.2°F** (local midnight) against
+  **78.1°F** at the real 5pm PDT kickoff; Cramton Bowl stored 93.6 against 99.8 via
+  `backfill_enrichment.py`'s blind `T19` string-replace fallback. That is almost
+  certainly why `docs/POST_MORTEM.md` calls `wx_temp`/`wx_wind` **noise in every row**
+  while `factors/registry.py` still labels them tier 1 — the feature was never
+  measured, it was measured wrong. Fix is `timezone=UTC` everywhere, which makes the
+  hourly index equal the UTC hour; the ERA5 lookup then returns 78.1 and 99.8 exactly.
+  `sources/weather.py` had **zero tests** and **no retries** (a 429 and a network error
+  both returned `{}` — that is the 647 `empty` venues in `data/backfill_weather_full.log`
+  and why coverage stalled at 21%); it now shares `sources/_http.py` with `cfbd.py` and
+  raises `WeatherUnavailable`.
+  **Second, and it reshaped the design: "the forecast before kickoff" is not one
+  thing.** Open-Meteo's Historical Forecast API stitches the first hours of successive
+  runs, so it TRACKS ACTUALS — measured over 12 real kickoffs it sits **1.82°F / 1.55mph**
+  from the ERA5 actual, closer than a 1-day-lead forecast (2.30 / 1.67) or a 3-day
+  (3.55 / 2.26). Calling it decision-time would have been look-ahead bias. So the new
+  **`weather_obs`** table keys on `(game_id, lead_hours)` and stores `decision_safe`:
+  **lead 0 = near kickoff, never decision-safe**; **leads 24/72 = the Previous Runs API**,
+  the forecast that genuinely existed that far ahead, and the ONLY rows a market-edge
+  study may use. Fixed-lead **wind/gusts/precip start with the 2024 season** (2023 is
+  temperature-only), max lead is 7 days, and the model is **pinned to `icon_seamless`**
+  because the default `gfs_seamless` returns **gusts BELOW the mean wind** from 48h out
+  (7-9 of 18 samples; icon 0/18 at every lead). Gusts are captured for the first time.
+  **Repairing the data does NOT activate it**: the backfill writes a table nothing reads,
+  and `etl/features.py::WEATHER_OBS_LEAD_HOURS` ships `None`, reproducing the legacy
+  frame exactly — the incumbent is an ARM, same shape as `PRIOR_SEASON_WEIGHT = 0`.
+  Venue coordinates were audited BEFORE spending the requests (720 venues, lat
+  21.29→53.34, lon −157.82→−0.28, **zero** lat/lon swaps despite `backfill.py:183-184`'s
+  GeoJSON `x`/`y` fallback); `etl/venues.py::coord_problems` is the standing guard and
+  the backfill refuses to start on a bad pair. `backfill_enrichment.py`'s weather path
+  is DELETED. Read `docs/WEATHER.md` before touching any of this.
 - **2026-09-14 (THE CENSORING PREMISE WAS TESTED AND THE MARKET WINS).**
   The two-team probabilistic engine was to exploit the fact that an underdog's 1H
   score is censored at zero and the censoring grows with the spread. **It is not
@@ -496,7 +533,8 @@ pytest -q                            # run `pytest -q` / `cd web && npx vitest r
 ```
 Inside a **git worktree** run tests as `PYTHONPATH=. python -m pytest -q` — the venv's
 editable install points at the main checkout, so a bare `pytest` imports the wrong tree.
-Key scripts: `backfill.py`, `backfill_enrichment.py` (pace/weather), `weekly_update.py`
+Key scripts: `backfill.py`, `backfill_enrichment.py` (pace),
+`backfill_weather.py` + `weather_validate.py` (weather -> `weather_obs`), `weekly_update.py`
 (score), `poll_lines.py` (1H lines), `grade.py`, `pick.py`, `line_study.py`,
 `retrain.py` (logs model_runs + BV calibration), `backfill_bv_line.py`, `seed_demo.py`.
 **Pivot scripts**: `backfill_pbp.py` (1H PBP aggregates → `fh_team_game`),
@@ -579,6 +617,16 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   before committing. Deploy is automatic from `main` (Vercel).
 
 ## Gotchas
+- **Never ask Open-Meteo for `timezone=auto`.** A local-time series cannot be keyed by
+  a UTC timestamp, and `Game.start_date` is naive UTC. That mismatch silently wrecked
+  every weather row for three years (see the 2026-09-14 bullet). `timezone=UTC` makes
+  the hourly index equal the UTC hour. `tests/test_weather_source.py` pins it.
+- **Open-Meteo's Historical Forecast API is NOT "the forecast at decision time".** It
+  stitches the first hours of successive runs, so it tracks actuals (1.82°F from ERA5,
+  closer than a 1-day-lead forecast). Decision-time forecasts come from the **Previous
+  Runs API** (`*_previous_dayN`), 2024+ for wind/gusts/precip, max lead 7 days, and must
+  be pinned to `models=icon_seamless` — the default blend's gusts fall BELOW its own
+  mean wind from 48h out. Any market-edge query filters `weather_obs.decision_safe`.
 - **BetMGM's `totals_h1` is NOT a centred main line** (confirmed live 2026-09-12).
   It serves an off-centre rung: 4.86 pts from the market median on average, 61 of 63
   games 2+ pts off, with two-way prices ~235 points from -110 where every normal book

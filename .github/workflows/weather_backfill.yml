@@ -1,0 +1,111 @@
+name: Backfill weather (Open-Meteo -> weather_obs)
+
+# Fetches weather into weather_obs, which NOTHING READS: repairing the data and
+# letting the model use it are two different decisions, and only
+# etl.features.WEATHER_OBS_LEAD_HOURS does the second one. So this workflow is
+# safe to run at any time, including mid-season.
+#
+# Two kinds of row, never interchangeable. lead 0 is the near-kickoff series and
+# tracks what actually happened (decision_safe = false; using it for a market-edge
+# claim is look-ahead bias). Leads 24/72 are the forecast that genuinely existed
+# that far ahead, and are 2024+ only -- fixed-lead wind, gusts and precipitation
+# carry no data before the 2024 season.
+#
+# THE MAC IS USUALLY THE BETTER HOST. sunday.yml records Open-Meteo rate-limiting
+# GitHub's shared runners (the weather step there sat 20+ minutes on its first
+# live run, which is why it is capped at 8). Locally the full 2023-2026 range runs
+# at ~53 venue-seasons/min; here it may be far slower, which is what the generous
+# timeout and the resumability are for -- re-dispatch and it picks up where it
+# stopped, because the staging file records every venue-season it finished.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: 'first season'
+        default: '2023'
+      end:
+        description: 'last season'
+        default: '2026'
+      leads:
+        description: 'comma-separated lead hours (0 = near kickoff)'
+        default: '0,24,72'
+      promote:
+        description: 'write the staged rows into weather_obs'
+        type: boolean
+        default: true
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  weather:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SEASON_START: ${{ inputs.start }}
+      SEASON_END: ${{ inputs.end }}
+      LEADS: ${{ inputs.leads }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+
+      # Coordinates before requests: perfect weather for the wrong stadium is the
+      # one failure here that looks like success all the way down. The backfill
+      # refuses to start on a bad pair, but say so plainly first.
+      - name: Venue coordinate sanity
+        run: |
+          python - <<'PY'
+          from beatvegas.db.models import Venue
+          from beatvegas.db.store import session_scope
+          from beatvegas.etl.venues import coord_problems
+          with session_scope() as s:
+              rows = [{"id": v.id, "name": v.name, "latitude": v.latitude,
+                       "longitude": v.longitude} for v in s.query(Venue).all()]
+          bad = [(i, w) for i, w in coord_problems(rows) if w != "missing"]
+          missing = [i for i, w in coord_problems(rows) if w == "missing"]
+          print(f"{len(rows)} venues, {len(missing)} without coordinates, {len(bad)} implausible")
+          for i, w in bad:
+              print(f"::warning::venue {i}: {w}")
+          PY
+
+      - name: Fetch (staging only -- no database writes)
+        run: python scripts/backfill_weather.py --start "$SEASON_START" --end "$SEASON_END" --leads "$LEADS"
+
+      - name: Validate before promoting
+        run: python scripts/weather_validate.py
+
+      - name: Promote into weather_obs
+        if: ${{ inputs.promote }}
+        run: python scripts/backfill_weather.py --promote --leads "$LEADS"
+
+      - name: Coverage after
+        run: |
+          python - <<'PY'
+          from sqlalchemy import text
+          from beatvegas.db.store import session_scope
+          with session_scope() as s:
+              for r in s.execute(text(
+                  "select lead_hours, decision_safe, count(*), count(temperature_f) "
+                  "from weather_obs group by 1,2 order by 1,2")):
+                  print("weather_obs", r)
+          PY
+
+      # The staging file is the resume point: keep it so a timed-out run can be
+      # re-dispatched instead of re-fetching everything.
+      - name: Keep the staging file
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: weather-staging
+          path: data/cache/weather_staging.*
+          retention-days: 7

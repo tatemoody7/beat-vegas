@@ -313,6 +313,13 @@ class Result(Base):
     under_hit = Column(Boolean)
     closing_line = Column(Float)
     closing_captured_at = Column(DateTime)  # when the closing snapshot landed
+    # The book's own closing PRICE, kept separate from the price at the DECISION.
+    # Until 2026-09-14 a Hard Rock pick logged without a price had `price`
+    # BACKFILLED with this value at grading time, which makes any price-based CLV
+    # identically zero by construction and erases the difference between the two.
+    # `price` is now never overwritten -- unknown stays NULL -- and the close
+    # lives here.
+    closing_price = Column(Integer)
     clv = Column(Float)  # points CLV (closing_line - bet_line)
     clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
     units = Column(Float)
@@ -358,6 +365,20 @@ class ManualPick(Base):
     result = Column(String)  # under / over / push
     units = Column(Float)
     closing_line = Column(Float)
+    # The book's own closing PRICE, kept separate from the price at the DECISION.
+    # Until 2026-09-14 a Hard Rock pick logged without a price had `price`
+    # BACKFILLED with this value at grading time, which makes any price-based CLV
+    # identically zero by construction and erases the difference between the two.
+    # `price` is now never overwritten -- unknown stays NULL -- and the close
+    # lives here.
+    closing_price = Column(Integer)
+    # Where `price` came from: 'logged' (given at decision time), 'backfilled_close'
+    # (written by the pre-2026-09-14 grader and therefore NOT a decision price),
+    # or 'unknown' (pre-dates this column and could not be reconstructed).
+    # scripts/reconstruct_pick_prices.py classifies the rows that pre-date the fix;
+    # anything not 'logged' must be excluded from price-based CLV rather than
+    # quietly diluting it toward zero.
+    price_provenance = Column(String)
     clv = Column(Float)  # points CLV (closing_line - bet_line)
     clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
 

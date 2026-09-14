@@ -30,6 +30,7 @@ _MIGRATIONS = {
         "closing_captured_at": "TIMESTAMP",
         "market": "VARCHAR",
         "clv_prob": "FLOAT",
+        "closing_price": "INTEGER",
     },
     # post-mortem: the real-close grading column (2026-09-06, after the tables existed)
     "postmortem_games": {
@@ -53,6 +54,10 @@ _MIGRATIONS = {
         "cap_rank": "FLOAT",
     },
     "manual_picks": {
+        # The close price, kept apart from the price at the DECISION -- see the
+        # column comment on ManualPick.closing_price for why that matters.
+        "closing_price": "INTEGER",
+        "price_provenance": "VARCHAR(24)",
         "model_score_at_pick": "INTEGER",
         "model_line_at_pick": "FLOAT",
         "factors_json_at_pick": "TEXT",
@@ -332,6 +337,16 @@ def _apply_migrations(engine) -> None:
     # distinct -- so indexing the bare columns would let every re-fetch insert a
     # duplicate. The epoch sentinel parses in both Postgres and SQLite.
     if "weather_obs" in existing:
+        # The epoch sentinel needs a TYPE in Postgres -- a bare string literal
+        # inside COALESCE next to a timestamp is "could not determine data type",
+        # which the fail-soft below would swallow into a warning and leave the
+        # table with no uniqueness at all. SQLite has no cast syntax and needs the
+        # bare literal, so the expression differs by dialect.
+        epoch = (
+            "TIMESTAMP '1970-01-01 00:00:00'"
+            if not engine.url.get_backend_name().startswith("sqlite")
+            else "'1970-01-01 00:00:00'"
+        )
         try:
             with engine.begin() as conn:
                 conn.execute(
@@ -339,8 +354,7 @@ def _apply_migrations(engine) -> None:
                         "CREATE UNIQUE INDEX IF NOT EXISTS uq_weather_obs_reading "
                         "ON weather_obs "
                         "(game_id, lead_hours, COALESCE(source, ''), "
-                        "COALESCE(weather_model, ''), "
-                        "COALESCE(model_run_time, '1970-01-01 00:00:00'))"
+                        f"COALESCE(weather_model, ''), COALESCE(model_run_time, {epoch}))"
                     )
                 )
         except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB

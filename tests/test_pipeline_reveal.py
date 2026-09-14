@@ -90,10 +90,14 @@ def test_null_price_grades_without_raising_when_no_priced_hr_snapshot():
     assert row.units is None
 
 
-def test_null_price_is_filled_from_hard_rocks_priced_pre_kick_close():
+def test_the_close_lands_in_closing_price_and_never_in_price():
     """Game 2: Hard Rock opened unpriced, then priced -108 pre-kick (a -130
-    snapshot after kickoff must not count). Grading must fill the price and
-    compute units."""
+    snapshot after kickoff must not count).
+
+    The close is captured into `closing_price`; `price` -- the price at the
+    DECISION -- stays NULL because it was never known. Writing the close into
+    `price`, as this did until 2026-09-14, makes price CLV identically zero by
+    construction and leaves no way to tell such a row from a real one."""
     eng = _engine()
     with Session(eng) as s:
         s.add(_game(2))
@@ -114,6 +118,7 @@ def test_null_price_is_filled_from_hard_rocks_priced_pre_kick_close():
     with Session(eng) as s:
         row = s.query(ManualPick).filter(ManualPick.game_id == 2).one()
     assert row.graded is True
-    assert row.price == -108
+    assert row.price is None
+    assert row.closing_price == -108
     assert row.result == "under"
-    assert round(row.units, 3) == round(100 / 108, 3)
+    assert row.units is None  # no decision price, so no units

@@ -223,6 +223,14 @@ def fetch(start: int, end: int, leads: List[int], limit: Optional[int]) -> None:
     print(f"staged {written} rows -> {STAGING} ({skipped_novenue} venue-seasons unfetchable)")
 
 
+# Fields the staging file may predate. A backfill takes hours and can outlive a
+# schema tweak, so a row written by an older shape is upgraded rather than
+# rejected -- the readings themselves are unaffected by a provenance column being
+# added, and re-fetching to recover them would cost a day of Open-Meteo quota.
+_LEGACY_DEFAULTS = {"model_run_time": None, "available_at": None}
+_DROPPED_FIELDS = ("forecast_asof",)  # was valid_time - lead_hours; see the module docstring
+
+
 def _parse_rows(leads: Optional[List[int]]) -> List[dict]:
     rows = []
     for ln in STAGING.read_text().splitlines():
@@ -231,6 +239,11 @@ def _parse_rows(leads: Optional[List[int]]) -> List[dict]:
         r = json.loads(ln)
         if leads and r["lead_hours"] not in leads:
             continue
+        for field in _DROPPED_FIELDS:
+            r.pop(field, None)
+        for field, default in _LEGACY_DEFAULTS.items():
+            r.setdefault(field, default)
+        r.setdefault("dataset_version", DATASET_VERSION)
         for k in ("valid_time", "model_run_time", "available_at", "retrieved_at"):
             r[k] = datetime.fromisoformat(r[k]) if r[k] else None
         rows.append(r)

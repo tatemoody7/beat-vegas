@@ -77,6 +77,10 @@ _MIGRATIONS = {
         "spread": "FLOAT",
         "full_game_total_source": "VARCHAR",
         "spread_source": "VARCHAR",
+        # the immutable OPENING spread (2026-09-13) — see models.Game.spread_open
+        # for why the mutable `spread` above cannot serve as an as-of feature
+        "spread_open": "FLOAT",
+        "spread_open_source": "VARCHAR",
     },
     "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
     # which 1H engine froze the record (2026-09-07, after the table existed)

@@ -84,8 +84,25 @@ model run. Measured over 18 venue-hours, count of `gust < wind`:
 
 `icon_seamless` has full coverage on all four variables across 2024, 2025 and
 2026, and sits close to the default at 24h (1.18°F, 1.07 mph, 0.00in mean
-absolute difference). `scripts/weather_validate.py` re-checks `gust ≥ wind` on
-every backfill, so a silent regression here fails loudly.
+absolute difference).
+
+**Not every inversion is that defect, though.** The near-kickoff series inverts
+too — 15 of 4,227 rows (0.35%), every deficit 0.1–0.3 mph, every case under
+7.5 mph of wind. That is unit rounding: Open-Meteo works in m/s and converts, so
+on a calm hour where gust equals wind the conversion can flip them by a tenth.
+The two populations **overlap in magnitude** (gfs deficits start at 0.1 mph too),
+so a tolerance alone cannot separate them. The **rate** can:
+
+| source | inverted | worst deficit |
+|---|---|---|
+| `icon_seamless`, leads 24-144h | 0% | — |
+| near-kickoff (rounding) | 0.35% | 0.3 mph |
+| `gfs_seamless`, leads 48h+ | **32%** | **2.7 mph** |
+
+So `scripts/weather_validate.py` fails on either a deficit above 0.5 mph or an
+inversion rate above 1%, and `tests/test_weather_validate.py` pins that the
+loosened check still rejects the gfs population. A check relaxed without a test
+proving it still catches the thing it was built for is worse than the strict one.
 
 ## 3. Repairing the data does not activate it
 

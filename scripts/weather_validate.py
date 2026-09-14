@@ -46,6 +46,20 @@ GROUND_TRUTH = [
 # A first-half college football kickoff is never below this or above that.
 TEMP_BAND = (-30.0, 130.0)
 
+# A gust below the mean wind is physically impossible, but TWO different things
+# produce it and only one is a defect.
+#
+# Open-Meteo works in m/s and converts, so on a calm hour where gust == wind the
+# rounding can invert them by a tenth. Measured on the near-kickoff series: 15 of
+# 4,227 rows (0.35%), every deficit 0.1-0.3 mph, every case under 7.5 mph of wind.
+#
+# The real failure looks nothing like that. `gfs_seamless` at 48h+ fills gust and
+# mean wind from different model runs: 32% of samples inverted, deficits to
+# 2.7 mph. So neither magnitude nor count alone discriminates -- the RATE does,
+# and the two thresholds below are set between the measured populations.
+GUST_TOLERANCE_MPH = 0.5
+GUST_INVERSION_RATE_MAX = 0.01
+
 
 def _load_staging(path: Path) -> List[dict]:
     rows = []
@@ -126,13 +140,16 @@ def check_envelopes(rows: List[dict]) -> bool:
     ok = True
     for lead, rs in sorted(_by_lead(rows).items()):
         out = [r for r in rs if not r["dome"]]
-        gust_bad = [
-            r
-            for r in out
-            if r["wind_gust_mph"] is not None
-            and r["wind_mph"] is not None
-            and r["wind_gust_mph"] < r["wind_mph"]
+        gusted = [r for r in out if r["wind_gust_mph"] is not None and r["wind_mph"] is not None]
+        deficits = [
+            r["wind_mph"] - r["wind_gust_mph"] for r in gusted if r["wind_gust_mph"] < r["wind_mph"]
         ]
+        gust_rate = (len(deficits) / len(gusted)) if gusted else 0.0
+        gust_bad = [d for d in deficits if d > GUST_TOLERANCE_MPH]
+        if gust_rate > GUST_INVERSION_RATE_MAX:
+            # Rate, not magnitude, is what separates unit rounding from two
+            # variables arriving out of different model runs.
+            gust_bad = gust_bad or deficits
         precip_bad = [r for r in out if (r["precipitation"] or 0) < 0]
         temp_bad = [
             r
@@ -147,11 +164,18 @@ def check_envelopes(rows: List[dict]) -> bool:
         ]
         bad = len(gust_bad) + len(precip_bad) + len(temp_bad) + len(dome_dirty)
         ok = ok and bad == 0
+        worst = max(deficits) if deficits else 0.0
         print(
-            f"   lead {lead:>3}: {len(rs):>6} rows  gust<wind={len(gust_bad)}  "
-            f"precip<0={len(precip_bad)}  temp out of band={len(temp_bad)}  "
-            f"dome with weather={len(dome_dirty)}  {'ok' if bad == 0 else '*** PROBLEM ***'}"
+            f"   lead {lead:>3}: {len(rs):>6} rows  gust<wind={len(deficits)} "
+            f"({gust_rate:.2%}, worst {worst:.1f}mph)  precip<0={len(precip_bad)}  "
+            f"temp out of band={len(temp_bad)}  dome with weather={len(dome_dirty)}  "
+            f"{'ok' if bad == 0 else '*** PROBLEM ***'}"
         )
+        if deficits and not gust_bad:
+            print(
+                f"          (inversions are within {GUST_TOLERANCE_MPH}mph on "
+                f"<{GUST_INVERSION_RATE_MAX:.0%} of rows -- unit rounding on calm hours, not a defect)"
+            )
     return ok
 
 

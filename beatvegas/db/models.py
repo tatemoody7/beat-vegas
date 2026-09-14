@@ -78,6 +78,25 @@ class Game(Base):
     # beatvegas/line_sources.py.
     full_game_total_source = Column(String)
     spread_source = Column(String)
+    # The OPENING spread, and the reason it is a separate column rather than a
+    # reading of `spread` above.
+    #
+    # `spread` is MUTABLE: every capture that carries one overwrites it, so what
+    # is stored is whatever the last run before the row went quiet happened to
+    # see — effectively a closing number, with no timestamp saying so. Any model
+    # that reads it while pretending to price a game on Tuesday is using
+    # Saturday's information. Measured on 2026 (the only season carrying
+    # per-snapshot spreads): the spread moves a median 1.5 points over a game's
+    # snapshot history, 3.0 at the 90th percentile, and only 4 of 142 games
+    # never moved at all. Since spread is the primary driver of the first-half
+    # share, that leak flows straight into the target.
+    #
+    # `spread_open` is IMMUTABLE by construction — an opening line is a
+    # historical fact, so it is a legitimate as-of feature at the one timestamp
+    # the pre-2026 snapshot history cannot otherwise supply. Written only where
+    # NULL (scripts/backfill_spread_open.py); re-running never churns it.
+    spread_open = Column(Float)
+    spread_open_source = Column(String)
 
     __table_args__ = (UniqueConstraint("id", name="uq_game_id"),)
 

@@ -88,6 +88,41 @@ def pick_open_close(
     return None, None, None
 
 
+def pick_spread_open(
+    lines: List[Dict[str, Any]],
+) -> Tuple[Optional[float], Optional[str]]:
+    """(opening_spread, provider) by provider priority, home-relative.
+
+    CFBD serves `spreadOpen` beside the `overUnderOpen` pick_open_close already
+    reads; this module simply never parsed it, so the opening spread has been
+    sitting in responses the repo was already paying for.
+
+    It matters because `Game.spread` is MUTABLE -- overwritten by every capture
+    that carries one -- so it is effectively a closing number with no timestamp,
+    and `odds_snapshots.spread` is NULL for every row before 2026. That leaves
+    NO legitimate as-of spread for 2023-25, while the spread is the primary
+    driver of the first-half share. An opening line is a historical fact, so
+    this is the one as-of point recoverable after the fact.
+
+    Unlike pick_open_close there is NO backfill from the closing value: a
+    missing opener stays None. Substituting the close would manufacture exactly
+    the leak the column exists to avoid."""
+    by_provider: Dict[str, float] = {}
+    for ln in lines or []:
+        prov = _get(ln, "provider")
+        opn = _get(ln, "spreadOpen", "spread_open")
+        if prov is None or prov in by_provider or opn is None:
+            continue
+        by_provider[prov] = float(opn)
+    for prov in PROVIDER_PRIORITY:
+        if prov in by_provider:
+            return by_provider[prov], prov
+    if by_provider:
+        prov = next(iter(by_provider))
+        return by_provider[prov], prov
+    return None, None
+
+
 def open_close_lookup(
     client, season: int, season_type: str = DEFAULT_SEASON_TYPE
 ) -> Dict[int, Tuple[float, float, str]]:

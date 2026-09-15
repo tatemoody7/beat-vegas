@@ -291,3 +291,61 @@ def render_candidates(t: Dict[str, Any]) -> str:
                 f"A {r['bounds']['A']:.2f}, B {r['bounds']['B']:.2f} | {s['under_h0']:.1f} / {s['under_h1']:.1f} / {s['at_midpoint']:.1f} |"
             )
     return "\n".join(L) + "\n"
+
+
+# ---------------------------------------------------------------- the registered rule
+
+# Chosen by Tate on 2026-09-15 from the candidate table, before any week-3 decision
+# had graded. These values do not drift: the ledger inputs are the 2026 weeks 1-2
+# paper picks as read that day. docs/STOPPING_RULE.md and tests/test_docs_parity.py
+# quote them from here.
+REGISTERED: Dict[str, Any] = {
+    "registered_on": "2026-09-15",
+    "design": "sprt",
+    "alpha_total": 0.05,
+    "alpha_clock": 0.025,
+    "power": 0.80,
+    "edge": 0.04,
+    "breakeven": 0.5475,  # mean price-implied probability, 2026 wk 1-2 paper picks (n 25)
+    "sigma": {"profit": 0.924, "clv": 1.714},  # sample sds, same 25 picks
+    "mu1": {"profit": round(0.04 / 0.5475, 4), "clv": 0.50},  # 0.0731 u/bet; 0.50 pts
+    "start": {"season": 2026, "week": 3},
+    "unit": "1u = one unit risked; the paper ledger stakes 1u flat",
+    "observation": "the locked paper pick (manual_picks.is_paper, market 1H) -- one per decision",
+    "on_failure": "real money pauses (scripts/rule_pause.py on) and the rule is reviewed",
+    "on_success": "nothing automatic; a finding for Tate",
+}
+
+
+def registered_position(units: Sequence[float], clv: Sequence[float]) -> Dict[str, Any]:
+    """running_position under the registered design and constants."""
+    r = REGISTERED
+    out = running_position(
+        units, clv, r["design"], r["mu1"], r["sigma"], r["alpha_clock"], r["power"]
+    )
+    out["registered"] = {k: v for k, v in r.items() if k != "unit"}
+    return out
+
+
+def render_position(pos: Dict[str, Any]) -> str:
+    r = pos.get("registered", REGISTERED)
+    L = [
+        "# Stopping rule — running position",
+        "",
+        f"Design {r['design'].upper()}, total false-stop {100 * r['alpha_total']:.0f}% ({100 * r['alpha_clock']:.1f}% per "
+        f"clock), power {100 * r['power']:.0f}%, registered {r['registered_on']}. Observations: locked paper "
+        f"picks from {r['start']['season']} week {r['start']['week']} onward.",
+        "",
+        "| clock | n | mean | LLR | bounds A / B | status | verdict |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for name, c in pos["clocks"].items():
+        b = c.get("bounds", {})
+        mean = "—" if c["mean"] is None else "{:+.3f}".format(c["mean"])
+        llr = "—" if c.get("llr") is None else "{:+.3f}".format(c["llr"])
+        L.append(
+            f"| {name} | {c['n']} | {mean} | {llr} | {b.get('A', 0):.2f} / {b.get('B', 0):.2f} | "
+            f"{c['status']} | {c['verdict'] or '—'} |"
+        )
+    L += ["", f"Real money: **{pos['real_money']}**.", ""]
+    return "\n".join(L)

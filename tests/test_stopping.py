@@ -88,3 +88,81 @@ def test_render_candidates_names_both_clocks_and_designs():
     md = S.render_candidates(S.candidate_table(0.5475, 0.924, 1.714, 11.26))
     assert "| profit | +0.073 | fixed-n |" in md and "| clv | +1.129 | SPRT |" in md
     assert "| clv | +0.500 | fixed-n |" in md and "mu1" in md
+
+
+def test_registered_rule_is_the_one_tate_chose():
+    r = S.REGISTERED
+    assert r["design"] == "sprt" and r["alpha_total"] == 0.05 and r["alpha_clock"] == 0.025
+    assert r["mu1"]["profit"] == pytest.approx(0.0731, abs=1e-4) and r["mu1"]["clv"] == 0.50
+    assert r["start"] == {"season": 2026, "week": 3}
+    pos = S.registered_position([], [])
+    assert pos["design"] == "sprt" and pos["real_money"] == "unchanged"
+    assert "Stopping rule" in S.render_position(pos)
+
+
+def test_position_script_filters_to_locked_paper_decisions_from_week_3(monkeypatch):
+    from contextlib import contextmanager
+    from datetime import datetime
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import Base, ManualPick
+    from tests.conftest import _load_script
+
+    mod = _load_script("stopping_rule_position")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add_all(
+            [
+                ManualPick(
+                    season=2026,
+                    week=2,
+                    is_paper=True,
+                    market="1H",
+                    graded=True,
+                    units=0.9,
+                    clv=-1.0,
+                    placed_at=datetime(2026, 9, 11),
+                ),
+                ManualPick(
+                    season=2026,
+                    week=3,
+                    is_paper=True,
+                    market="1H",
+                    graded=True,
+                    units=-1.0,
+                    clv=0.5,
+                    placed_at=datetime(2026, 9, 18),
+                ),
+                ManualPick(
+                    season=2026,
+                    week=3,
+                    is_paper=False,
+                    market="1H",
+                    graded=True,
+                    units=0.9,
+                    clv=0.0,
+                    placed_at=datetime(2026, 9, 18),
+                ),
+                ManualPick(
+                    season=2026,
+                    week=3,
+                    is_paper=True,
+                    market="1H",
+                    graded=False,
+                    placed_at=datetime(2026, 9, 19),
+                ),
+            ]
+        )
+        s.commit()
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+
+    with scope() as s:
+        units, clv = mod.load_observations(s)
+    assert units == [-1.0] and clv == [-0.5]  # week 2 out, real out, ungraded out; clv sign flipped

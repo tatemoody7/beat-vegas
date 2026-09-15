@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordFrom, recordFromCounts } from "./record";
+import { recordFrom, recordFromCounts, wilson } from "./record";
 
 describe("recordFrom", () => {
   it("returns null with nothing graded", () => {
@@ -92,5 +92,58 @@ describe("recordFrom line value", () => {
       { result: "over", units: -1, clv: -0.5, stake: 1 },
     ]);
     expect(r!.clv).toBe("+0.75");
+  });
+});
+
+describe("wilson", () => {
+  // Digits checked once against beatvegas/postmortem.py::wilson_ci (2026-09-15):
+  //   wilson_ci(13, 25) == (0.334982179531473, 0.6996899607103998)
+  //   wilson_ci(0, 5)   == (0.0, 0.43449149475208104)
+  //   wilson_ci(5, 5)   == (0.5655085052479191, 1.0)
+  //   wilson_ci(89,161) == (0.47565184027902274, 0.627477466886159)
+  it("is null with nothing decided", () => {
+    expect(wilson(0, 0)).toBeNull();
+  });
+  it("matches the Python port to six decimals", () => {
+    const a = wilson(13, 25)!;
+    expect(a.lo).toBeCloseTo(0.334982, 6);
+    expect(a.hi).toBeCloseTo(0.69969, 5);
+    const b = wilson(89, 161)!;
+    expect(b.lo).toBeCloseTo(0.475652, 6);
+    expect(b.hi).toBeCloseTo(0.627477, 6);
+  });
+  it("is clamped to [0, 1] in the tails", () => {
+    expect(wilson(0, 5)).toEqual({ lo: 0, hi: expect.closeTo(0.434491, 6) });
+    const top = wilson(5, 5)!;
+    expect(top.lo).toBeCloseTo(0.565509, 6);
+    expect(top.hi).toBe(1);
+  });
+});
+
+describe("recordFrom carries wins, decided and the interval", () => {
+  it("on the 1-1-1P case", () => {
+    const rec = recordFrom([
+      { result: "under", units: 0.91, clv: 1.0, stake: 1 },
+      { result: "over", units: -1, clv: -0.5, stake: 1 },
+      { result: "push", units: 0, clv: null, stake: 1 },
+    ])!;
+    expect(rec.wins).toBe(1);
+    expect(rec.decided).toBe(2);
+    const ci = wilson(1, 2)!;
+    expect(rec.hitLo).toBe(ci.lo);
+    expect(rec.hitHi).toBe(ci.hi);
+  });
+  it("all pushes → no interval", () => {
+    const rec = recordFrom([
+      { result: "push", units: 0, clv: null, stake: 1 },
+    ])!;
+    expect(rec.decided).toBe(0);
+    expect(rec.hitLo).toBeNull();
+    expect(rec.hitHi).toBeNull();
+  });
+  it("recordFromCounts(89, 72, 5, …) decides 161 and carries the same interval", () => {
+    const rec = recordFromCounts(89, 72, 5, 8.9)!;
+    expect(rec.decided).toBe(161);
+    expect(rec.hitLo).toBeCloseTo(0.475652, 6);
   });
 });

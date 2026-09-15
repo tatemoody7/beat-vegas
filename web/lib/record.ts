@@ -7,6 +7,12 @@ import { signed } from "@/lib/format";
 export type Record3 = {
   /** Graded rows (wins + losses + pushes). */
   n: number;
+  /** Wins (unders) and decided rows (wins + losses); pushes are neither. */
+  wins: number;
+  decided: number;
+  /** 95% Wilson interval on the hit rate over decided rows; null when nothing is decided. */
+  hitLo: number | null;
+  hitHi: number | null;
   record: string; // e.g. "6-6" or "5-4-1P"
   hit: string; // "50.0%" or "—"
   units: string; // signed, "+0.91" / "-0.55"
@@ -28,6 +34,25 @@ export type Gradable = {
   /** Units risked; null/0 for paper and for results-ledger rows (flat 1u). */
   stake?: number | null;
 };
+
+/**
+ * Wilson score interval on a hit rate — a port of beatvegas/postmortem.py::wilson_ci,
+ * pinned to its digits in lib/record.test.ts. Correct in the tails where the normal
+ * approximation is not, which matters at the n this ledger has. Null at n = 0.
+ */
+export function wilson(
+  hits: number,
+  n: number,
+  z = 1.96,
+): { lo: number; hi: number } | null {
+  if (n <= 0) return null;
+  const p = hits / n;
+  const denom = 1 + (z * z) / n;
+  const centre = (p + (z * z) / (2 * n)) / denom;
+  const half =
+    (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
+  return { lo: Math.max(0, centre - half), hi: Math.min(1, centre + half) };
+}
 
 /** Record over already-graded rows. Null when there is nothing graded. */
 export function recordFrom(rows: Gradable[]): Record3 | null {
@@ -54,8 +79,13 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
     .filter((r) => r.clv !== null)
     .map((r) => -(r.clv as number));
   const roiNum = staked > 0 ? (100 * unitsSum) / staked : null;
+  const ci = wilson(wins, decided);
   return {
     n: rows.length,
+    wins,
+    decided,
+    hitLo: ci?.lo ?? null,
+    hitHi: ci?.hi ?? null,
     record: `${wins}-${decided - wins}${pushes ? `-${pushes}P` : ""}`,
     hit: decided ? `${((100 * wins) / decided).toFixed(1)}%` : "—",
     units: signed(unitsSum),
@@ -82,8 +112,13 @@ export function recordFromCounts(
   if (n === 0) return null;
   const decided = unders + overs;
   const roiNum = (100 * units) / n;
+  const ci = wilson(unders, decided);
   return {
     n,
+    wins: unders,
+    decided,
+    hitLo: ci?.lo ?? null,
+    hitHi: ci?.hi ?? null,
     record: `${unders}-${overs}${pushes ? `-${pushes}P` : ""}`,
     hit: decided ? `${((100 * unders) / decided).toFixed(1)}%` : "—",
     units: signed(units),

@@ -348,9 +348,30 @@ Either way the Lines table should label or drop it rather than showing it plain.
 - The answer bar wording (§6) — highest priority of these, it is read first and
   it is read wrong. Ships with the board rebuild, not before it.
 - The card/board split on `degraded` (§7) — pick one of the three options.
-- The two disagreeing price gates (§8) — green board vs refused log.
-- BetMGM polluting the consensus median (§9), and the fragile last-wins outcome
-  loop in `sources/odds.py` that would bite if any book ever returns rungs.
-- `game_records` still has no graded rows. Until it does, the Track record grid
-  and the factor ledger have no 2026 input. `rescore.yml` deliberately does not
-  backfill them, because those snapshots are meant to be frozen pre-kickoff.
+- ~~The two disagreeing price gates (§8)~~ — **resolved 2026-09-13**: it was stale
+  card data, not two rules (§8).
+- BetMGM polluting the consensus median (§9). The last-wins outcome loop in
+  `sources/odds.py` is fixed (over-first, and a market whose two outcomes sit at
+  different points is skipped as rungs).
+- ~~`game_records` has no graded rows~~ — week 2 froze pre-kickoff and graded;
+  week 1 was backfilled on 2026-09-15 from the 09-10 re-score with `captured_at`
+  after kickoff, so it is self-evidently retro and the records grid marks it
+  "scored after". Accuracy only, never a decision the board could have made.
+
+### Measured live, week 2 (post-mortem `live_2026`, 2026-09-15; Hard Rock-priced, graded)
+
+| Spread | n | Model bias | Model MAE | HR bias | HR MAE | Under % | Gate fired | Gate under % |
+|---|---|---|---|---|---|---|---|---|
+| <7 | 25 | −3.07 | 6.62 | −1.26 | 7.66 | 32% | 5 | 60% |
+| 7–14 | 22 | −0.81 | 6.35 | +0.91 | 8.18 | 55% | 7 | 57% |
+| 14–21 | 12 | −2.86 | 5.07 | −0.17 | 8.17 | 50% | 2 | 100% |
+| 21–28 | 10 | −0.90 | 8.75 | +0.60 | 8.60 | 40% | 4 | 75% |
+| **28+** | **20** | **−10.17** | **12.71** | −7.15 | 10.35 | **30%** | **7** | **29%** |
+
+The blowout blind spot (§2) confirmed live at n=20: model implied share .459
+against a realized .684, and the gate fired on 7 of 20 games that went under 29%
+of the time. Under 28 points the model's MAE is competitive with Hard Rock's at
+this n. Week 1 (retro-scored): model bias −1.57, MAE 8.12 vs the line's 7.71 over 50
+games. Decision (Tate, 2026-09-15): **hold the frozen 1.75 rule for real money; keep
+measuring by spread bucket.** Week 3 is the first live week inside the regime the
+rule was validated on (the 2023-25 backtest holds ~1 game from weeks 1-2).

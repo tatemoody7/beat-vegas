@@ -5,6 +5,37 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-15 (FULL SYSTEM REVIEW BEFORE WEEK 3; PRs #129 weather/money-path, #130 site,
+  plus measurement and docs PRs).** Verified top to bottom against live Neon, the GHA logs,
+  `/api/health`, ESPN and the API headers. **Ops were healthy** (grading current, CFBD
+  Academic tier live with ~2,640 calls left, 0 failed runs in 40). **The 44.9K Odds API
+  credits "used" this cycle are the one-time 2023-25 historical 1H-close purchase of Sep
+  6-8** (used went 162 → 38,317 → 44,309 in two days); live spend is ~50-100/day, 55K
+  left, renews Oct 6. `weather-clock` shipped: `weather_obs` = **27,876 rows** (2023 lead
+  0 only; 2024-26 at leads 0/24/72), validator 3/3, activation still OFF; `price` is never
+  overwritten and all 31 picks carry `price_provenance` (25 logged / 6 unknown); the
+  censoring re-run at 2,000 draws kept **DO NOT BUILD** (CI −0.0075..+0.0156/pt, paired
+  ΔBrier CI spans zero); the Historical Forecast API is **null through 2017, data from
+  2018**. **Early season (<2 current-season games) is PAPER ONLY on every surface now** —
+  `card.py::build_item` (blocker `early_season`), `verdict.ts`, `edge.ts` and
+  `pickRules.checkPolicy` read the same fact in the same gate position (Tate: card and site
+  must agree). **Live week-2 model read** (85 games, 72 HR-priced): model bias −3.1, MAE
+  competitive with Hard Rock under 28 pts, **−10.2 and 29% under on 28+ spreads (n=20)** —
+  the blowout blind spot confirmed live; Tate: **hold the frozen 1.75 rule**, keep measuring.
+  Gap quartiles run 8/42/67/50% under, so negative gaps carry over-side information at
+  n=13 — a two-sided *diagnostic* (measurement only) is the first research item. **Week 3
+  is the first live week inside the validated regime** (the 2023-25 gap ladder holds ~1
+  game from weeks 1-2; by week band 57.4 / 50.0 / 62.7 / 55.6%). Week 1's 50 retro
+  predictions were frozen into `game_records` with `captured_at` after kickoff and the
+  records grid marks them "scored after". Fixed: `grade_market_fg` idempotency,
+  `_rows_for_market` over-first + split-rung skip, duplicate `contrast_*` flags. Site:
+  answer bar marks placed bets, `MovementChart` and `betSlip.ts` deleted. Deleted the paused
+  `cfb-sunday-ops` task. Dependabot: #99/#104/#102 merged; **#100/#101/#103 are one
+  coordinated Prisma 5→7 migration** (schema `url` unsupported, adapter API change) and
+  wait on Tate's call. Research queue (Tate, in order): two-sided diagnostic → Hard Rock
+  lead/lag + microstructure → weather × offensive style (decision-safe rows, 2024-26) →
+  share-engine spec; classifier retirement planned for after 09-19. The 1H board's
+  `bv_sigma` is one number per slate (11.26) — never derive a probability from it.
 - **2026-09-13 (RESULTS + TRACK RECORD REBUILT, PR #122).** The Board is not SHORTER than
   the other two pages — 6,877px against 7,753 and 9,159. It works because it is **one
   element repeated 34 times under 5 headings**, and because it never makes you read a

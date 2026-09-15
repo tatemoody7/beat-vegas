@@ -200,3 +200,18 @@ def test_nothing_reads_the_frozen_blend():
                 if p.name not in ("blend.py", "blend_gate.py"):  # the writer and its CLI
                     offenders.append(str(p.relative_to(root)))
     assert offenders == [], offenders
+
+
+# --------------------------------------------------------------------------- #
+# docs/GATES.md quotes the H4 constants and stays exploratory
+# --------------------------------------------------------------------------- #
+def test_gates_doc_quotes_its_constants_and_makes_no_verdict():
+    from beatvegas.backtest import gates as G
+
+    body = _text(DOCS / "GATES.md")
+    assert f"n ≥ {G.WILSON_MIN_N}" in body
+    assert f"{G.FIXED_CEILING}" in body
+    assert f"(n·ratio + {G.TRUST_K})/(n + {G.TRUST_K})" in body
+    assert f"n = {G.TRUST_MIN_N}" in body
+    assert "EXPLORATORY" in body
+    assert "COSTLY**" not in body and "PROTECTIVE**" not in body

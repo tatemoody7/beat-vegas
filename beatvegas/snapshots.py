@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
+from sqlalchemy import text
 
 from .db.models import Card, Game, OddsSnapshot
 from .grading import trusted_first_half_total
@@ -215,3 +216,41 @@ def build_rows(session, season: int, cards: Optional[Iterable[Card]] = None) -> 
     ):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df[cols]
+
+
+HIST_SCOPE = "hist_2023_25"
+
+
+def postmortem_hist_rows(session, seasons: Sequence[int]) -> pd.DataFrame:
+    """FBS rows of the latest hist_2023_25 post-mortem run with a real close, a graded
+    first half and the stored walk-forward bv_line -- the 1,902-game cut every
+    2023-25 study reads. Columns: game_id, season, week, spread_abs, line_real, fh,
+    bv_line, kickoff. `df.attrs["run_id"]` names the run."""
+    run_id = session.execute(
+        text(
+            "select run_id from postmortem_runs where scope = :s order by computed_at desc limit 1"
+        ),
+        {"s": HIST_SCOPE},
+    ).scalar()
+    rows = (
+        session.execute(
+            text(
+                """
+            select g.game_id, g.season, g.week, g.spread_abs, g.line_real, g.fh, g.bv_line,
+                   gm.start_date as kickoff
+            from postmortem_games g left join games gm on gm.id = g.game_id
+            where g.run_id = :r and g.scope = :s and g.division = 'fbs'
+              and g.line_real is not null and g.fh is not null and g.bv_line is not null
+            """
+            ),
+            {"r": run_id, "s": HIST_SCOPE},
+        )
+        .mappings()
+        .all()
+    )
+    df = pd.DataFrame(rows)
+    df.attrs["run_id"] = run_id
+    if len(df):
+        df = df[df["season"].isin([int(x) for x in seasons])].reset_index(drop=True)
+        df.attrs["run_id"] = run_id
+    return df

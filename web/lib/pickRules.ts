@@ -1,4 +1,5 @@
 import { american, fmt } from "@/lib/format";
+import type { RulePause } from "@/lib/rulePause";
 import {
   MIN_GAMES_FOR_REAL_MONEY,
   REASONS,
@@ -171,6 +172,14 @@ export type PolicyContext = {
   livePrice:
     | { ok: true; killPrice: number | null }
     | { ok: false; reason: string };
+  /**
+   * The real-money pause (docs/STOPPING_RULE.md; lib/rulePause.ts). REQUIRED,
+   * like livePrice, so a new caller cannot skip it by omission. `paused: true`
+   * refuses every real-money 1H pick, overrides included; "unreadable" refuses
+   * them too — a switch we cannot see is not a switch that is off. Paper never
+   * reads it.
+   */
+  rulePause: RulePause;
 };
 
 /** Betting-policy checks that need DB facts (passed in). */
@@ -187,6 +196,26 @@ export function checkPolicy(
       } pick on that game.`,
       409,
     );
+  }
+  // THE PAUSE comes before every other money gate and applies to EVERY
+  // real-money first-half pick, WATCH/PASS overrides included: the switch is
+  // thrown because something is wrong, and an override while paused is exactly
+  // the bet it must stop. Two rejections on purpose — "switched off" and "cannot
+  // see the switch" are different facts, and a post-mortem must tell them apart
+  // from each other and from PRICE UNAVAILABLE. Paper is never touched.
+  if (!pick.isPaper && pick.market === "1H") {
+    if (ctx.rulePause.paused === "unreadable") {
+      return reject(
+        `RULE STATE UNREADABLE — ${ctx.rulePause.reason}. Real money needs the pause switch to be readable right now. Log it as paper, or re-try once the database is back.`,
+        409,
+      );
+    }
+    if (ctx.rulePause.paused === true) {
+      return reject(
+        `RULE PAUSED — real money is switched off${ctx.rulePause.note ? ` (${ctx.rulePause.note})` : ""}. Log it as paper; it still counts toward the record. scripts/rule_pause.py off resumes.`,
+        409,
+      );
+    }
   }
   // A real BET below the card's kill line, or at a worse price, is not the
   // bet the card rated: the edge is gone. Paper and WATCH/PASS (an owner

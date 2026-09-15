@@ -107,6 +107,7 @@ describe("checkPolicy", () => {
     week: 3,
     killLine: null,
     killPrice: null,
+    rulePause: { paused: false },
     livePrice: { ok: true, killPrice: null },
   };
   it("passes a clean pick", () => {
@@ -150,6 +151,7 @@ describe("checkPolicy", () => {
       minGamesPlayed: 3,
       killLine: 24.5,
       killPrice: -120,
+      rulePause: { paused: false },
       livePrice: { ok: true, killPrice: -120 },
     };
     it("rejects a real 1H BET below the kill line with a 409 that names the kill", () => {
@@ -252,6 +254,7 @@ describe("checkPolicy — PRICE UNAVAILABLE", () => {
     week: 3,
     killLine: 24.5,
     killPrice: -120,
+    rulePause: { paused: false },
     livePrice: { ok: false, reason: "Hard Rock has not priced its under" },
   };
 
@@ -334,6 +337,7 @@ describe("checkPolicy — early season is paper only", () => {
     week: 3,
     killLine: null,
     killPrice: null,
+    rulePause: { paused: false },
     livePrice: { ok: true, killPrice: null },
   };
 
@@ -379,6 +383,7 @@ describe("checkPolicy — early season is paper only", () => {
     const early = checkPolicy(bet, { ...base, minGamesPlayed: 1 });
     const noPrice = checkPolicy(bet, {
       ...base,
+      rulePause: { paused: false },
       livePrice: { ok: false, reason: "no live line read for this game" },
     });
     const killed = checkPolicy(bet, { ...base, killLine: 26.5 });
@@ -395,6 +400,7 @@ describe("checkPolicy — early season is paper only", () => {
     const out = checkPolicy(bet, {
       ...base,
       minGamesPlayed: 0,
+      rulePause: { paused: false },
       livePrice: { ok: false, reason: "no live line read for this game" },
     });
     if (out.ok) throw new Error("expected a refusal");
@@ -402,5 +408,118 @@ describe("checkPolicy — early season is paper only", () => {
     // win over the one that is a transient outage -- otherwise the log reads as
     // "we couldn't check" for a game we would never have bet anyway.
     expect(out.error).toContain("PRICE UNAVAILABLE");
+  });
+});
+
+describe("checkPolicy — RULE PAUSED (docs/STOPPING_RULE.md)", () => {
+  const base: PickRequest = {
+    gameId: 1,
+    market: "1H",
+    line: 24.5,
+    stake: 1,
+    price: -110,
+    isPaper: false,
+    verdict: "BET",
+  };
+  const ctx: PolicyContext = {
+    inSlate: true,
+    kickedOff: false,
+    duplicate: false,
+    minGamesPlayed: 3,
+    realWeekCount: 0,
+    week: 3,
+    killLine: null,
+    killPrice: null,
+    rulePause: { paused: true, note: "week 6 boundary crossed", since: null },
+    livePrice: { ok: true, killPrice: null },
+  };
+
+  it("refuses a real-money BET while paused, naming the note", () => {
+    const r = checkPolicy(base, ctx);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(409);
+      expect(r.error).toMatch(/^RULE PAUSED/);
+      expect(r.error).toContain("week 6 boundary crossed");
+    }
+  });
+
+  it("refuses a real-money WATCH or PASS override too — the pause is a money switch", () => {
+    for (const verdict of ["WATCH", "PASS"] as const) {
+      const r = checkPolicy({ ...base, verdict }, ctx);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/^RULE PAUSED/);
+    }
+  });
+
+  it("still allows a paper pick while paused", () => {
+    expect(checkPolicy({ ...base, isPaper: true }, ctx)).toEqual({ ok: true });
+  });
+
+  it("reads cleanly without a note", () => {
+    const r = checkPolicy(base, {
+      ...ctx,
+      rulePause: { paused: true, note: null, since: null },
+    });
+    if (!r.ok)
+      expect(r.error).toMatch(/^RULE PAUSED — real money is switched off\. /);
+  });
+
+  it("an unreadable switch refuses real money with its OWN reason", () => {
+    const r = checkPolicy(base, {
+      ...ctx,
+      rulePause: {
+        paused: "unreadable",
+        reason: "the app_settings table does not exist",
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(409);
+      expect(r.error).toMatch(/^RULE STATE UNREADABLE/);
+      expect(r.error).not.toContain("RULE PAUSED");
+    }
+  });
+
+  it("wins over a price outage and the early-season gate — an outage can never mask the switch", () => {
+    const r = checkPolicy(base, {
+      ...ctx,
+      minGamesPlayed: 0,
+      livePrice: { ok: false, reason: "Hard Rock has not priced its under" },
+    });
+    if (!r.ok) {
+      expect(r.error).toMatch(/^RULE PAUSED/);
+      expect(r.error).not.toContain("PRICE UNAVAILABLE");
+      expect(r.error).not.toContain("EARLY SEASON");
+    }
+  });
+
+  it("is grep-distinct from the other three rejections", () => {
+    const paused = checkPolicy(base, ctx);
+    const price = checkPolicy(base, {
+      ...ctx,
+      rulePause: { paused: false },
+      livePrice: { ok: false, reason: "no live line read for this game" },
+    });
+    const early = checkPolicy(base, {
+      ...ctx,
+      rulePause: { paused: false },
+      minGamesPlayed: 1,
+    });
+    for (const r of [price, early]) {
+      if (!r.ok) expect(r.error).not.toContain("RULE PAUSED");
+    }
+    if (!paused.ok) {
+      expect(paused.error).not.toContain("PRICE UNAVAILABLE");
+      expect(paused.error).not.toContain("kill");
+    }
+  });
+
+  it("not paused lets the clean pick through", () => {
+    expect(checkPolicy(base, { ...ctx, rulePause: { paused: false } })).toEqual(
+      {
+        ok: true,
+      },
+    );
   });
 });

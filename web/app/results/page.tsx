@@ -4,7 +4,7 @@ import { usd } from "@/lib/format";
 import { bankrollCurve, bankrollEnv, getHomeBoard } from "@/lib/homeBoard";
 import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
-import { loadPicks } from "@/lib/picks";
+import { isOffPolicy, isRealFirstHalf, loadPicks } from "@/lib/picks";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import { getWeeklyReview } from "@/lib/weeklyReview";
@@ -12,6 +12,7 @@ import BankrollHero from "@/app/components/BankrollHero";
 import Breakdown from "@/app/components/Breakdown";
 import PicksList from "@/app/components/PicksList";
 import RecordCard from "@/app/components/RecordCard";
+import RuleRecord from "@/app/components/RuleRecord";
 import Section, { EmptyLine } from "@/app/components/Section";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
@@ -21,9 +22,12 @@ export const dynamic = "force-dynamic";
 
 // Results is READ-ONLY (Tate 2026-09-13: "all the logging should happen on the
 // board page. The results is just to see what I picked and how it turned out").
-// Three questions in order: am I up or down (the bankroll hero), what should I
-// fix (the season summary + the breakdown), and what did I bet and how did it
-// land (the picks table).
+// Three questions in order (reordered 2026-09-15 — the paper ledger is the
+// scoreboard, real money the discipline test): how is the RULE doing (the paper
+// record, with its interval), did I follow it (the bankroll hero, under that
+// heading), and what did I bet and how did it land (the breakdown + the picks
+// table). Five bets a week can never settle whether the rule works; ~300 paper
+// decisions a season can, and real money's job is to match them.
 //
 // The bet slip, the card panel and the bankroll strip USED to head this page.
 // They are all about a bet not yet placed, which is the Board's job: a board
@@ -65,6 +69,10 @@ export default async function ResultsPage({
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
   const curve = bankrollCurve(allPicks, startUsd, unitUsd);
+  // Adherence, from data already on the page: how many real-money first-half
+  // bets were placed, and how many of those went against the verdict.
+  const realBets = allPicks.filter(isRealFirstHalf).length;
+  const againstVerdict = allPicks.filter(isOffPolicy).length;
   const hasRecord =
     ledger.market !== null ||
     ledger.model !== null ||
@@ -78,12 +86,13 @@ export default async function ResultsPage({
         <div>
           <h1 className="bv-page-title">Results</h1>
           <p className="bv-page-sub mt-1">
-            {`How the market, the model and you did in ${season}.`}
+            {`The rule’s paper record first, then whether real money followed it — ${season}.`}
           </p>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--text-dim)]">
-            Market = betting every first-half under at the closing line. Model =
-            the model’s picks. You = your own real-money bets, with paper kept
-            separate.
+            The rule = every game the card qualified, on paper at Hard Rock’s
+            number, one flat unit, uncapped. You = your real-money bets. Market
+            = every first-half under at the closing line. Model = the model’s
+            picks.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -102,11 +111,23 @@ export default async function ResultsPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <BankrollHero b={board.bankroll} points={curve} />
+      <RuleRecord rec={ledger.paper} />
+
+      <Section
+        title="Did I follow it"
+        caption={
+          realBets === 0
+            ? "No real-money bets yet."
+            : `${realBets} real-money ${realBets === 1 ? "bet" : "bets"}, ${againstVerdict} against the verdict. Real money is the discipline test; the rule above is the scoreboard.`
+        }
+      >
+        <BankrollHero b={board.bankroll} points={curve} />
+      </Section>
 
       {/* Season summary. Only records with something in them render: five
           near-empty cards in week 2 is the placeholder problem in card form
-          (Tate 2026-09-10). */}
+          (Tate 2026-09-10). The paper record is not here: it is the lead above,
+          and nothing is said twice. Four cards on a 4-column grid, so none strands. */}
       <Section
         title={`Season summary · ${season}`}
         empty={
@@ -116,7 +137,7 @@ export default async function ResultsPage({
         }
         caption={`Win rate is the share of settled bets that won — pushes do not count either way. Units are what was won or lost, at one unit = ${usd(unitUsd)}. ROI is units won divided by units risked. Line value is how far the line moved our way after the bet, on average; positive is good.`}
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <RecordCard
             title="Market — first half"
             rec={ledger.market}
@@ -134,12 +155,6 @@ export default async function ResultsPage({
             rec={ledger.you}
             showClv
             hint="Your real-money first-half bets. This is the record the bankroll follows."
-          />
-          <RecordCard
-            title="You — paper"
-            rec={ledger.paper}
-            showClv
-            hint="Tracked with no money on them. Never mixed into the real record."
           />
           <RecordCard
             title="Market — full game"

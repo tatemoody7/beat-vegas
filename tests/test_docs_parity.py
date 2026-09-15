@@ -215,3 +215,16 @@ def test_gates_doc_quotes_its_constants_and_makes_no_verdict():
     assert f"n = {G.TRUST_MIN_N}" in body
     assert "EXPLORATORY" in body
     assert "COSTLY**" not in body and "PROTECTIVE**" not in body
+
+
+# --------------------------------------------------------------------------- #
+# docs/SHARP_BOOKS.md quotes the probe's regions and budget
+# --------------------------------------------------------------------------- #
+def test_sharp_books_doc_quotes_the_probe_constants():
+    from tests.conftest import _load_script
+
+    P = _load_script("sharp_book_probe")
+    body = _text(DOCS / "SHARP_BOOKS.md")
+    assert ", ".join(P.DISCOVERY_REGIONS.split(",")) in body
+    assert f"cap {P.parse_args([]).max_credits} credits" in body
+    assert "no swap" in body.lower()

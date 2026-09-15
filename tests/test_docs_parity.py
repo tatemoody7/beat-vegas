@@ -228,3 +228,20 @@ def test_sharp_books_doc_quotes_the_probe_constants():
     assert ", ".join(P.DISCOVERY_REGIONS.split(",")) in body
     assert f"cap {P.parse_args([]).max_credits} credits" in body
     assert "no swap" in body.lower()
+
+
+# --------------------------------------------------------------------------- #
+# docs/STOPPING_RULE.md quotes the registered constants
+# --------------------------------------------------------------------------- #
+def test_stopping_rule_doc_quotes_the_registered_constants():
+    from beatvegas.backtest import stopping as S
+
+    r = S.REGISTERED
+    b = S.sprt_bounds(r["alpha_clock"], 1 - r["power"])
+    body = _text(DOCS / "STOPPING_RULE.md")
+    assert r["registered_on"] in body and "SPRT" in body
+    assert f"{100 * r['alpha_total']:.0f}%, {100 * r['alpha_clock']:.1f}% per clock" in body
+    assert f"+{r['mu1']['profit']:.4f} u/bet" in body and f"+{r['mu1']['clv']:.2f} pts/bet" in body
+    assert f"A = ln((1−β)/α) = {b['A']:.3f}" in body and f"B = ln(β/(1−α)) = {b['B']:.3f}" in body
+    assert "2026 week 3" in body and "pauses real money" in body
+    assert "no confidence band" in body

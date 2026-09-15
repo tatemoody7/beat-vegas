@@ -25,6 +25,13 @@ on:
         description: 'extra arguments (space-separated, no shell syntax)'
         default: ''
 
+# Read-only, but it shares the writers' group so a study never runs beside a
+# grading or card job on the same pooler (tests/test_workflows.py requires it of
+# every workflow that carries DATABASE_URL).
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
 jobs:
   study:
     runs-on: ubuntu-latest

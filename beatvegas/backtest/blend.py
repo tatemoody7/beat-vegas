@@ -54,6 +54,11 @@ BUCKETS: Tuple[Tuple[float, float, str], ...] = (
 FREEZE_PATH = REPO_ROOT / "data" / "blend.json"
 SPLITS: Tuple[Tuple[Tuple[int, ...], int], ...] = (((2023,), 2024), ((2023, 2024), 2025))
 
+SOURCE_NOTE = {
+    "postmortem": "the stored walk-forward bv_line in postmortem_games (hist_2023_25)",
+    "refit": "bv_line refit per season on every prior played season in the Neon frame",
+}
+
 RULE = (
     "PRE-REGISTERED (docs/HYPOTHESES.md H3A/H3B, 2026-09-15): one global w chosen on the "
     "training seasons by MAE against the realized 1H total, reported on the held-out season "
@@ -406,7 +411,7 @@ def bucket_verdict(splits: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             adopted.append(name)
         else:
             why = "; ".join(
-                f"{s['test_season']}: n={r['n_test']}, Holm p={r.get('p_holm')}"
+                f"{s['test_season']}: n={r['n_test']}, Holm p={_f(r.get('p_holm'))}"
                 for s, r in zip(done, rows)
             )
             reasons.append(f"{name}: not adopted ({why})")
@@ -493,10 +498,10 @@ def render_markdown(r: Dict[str, Any]) -> str:
     L = [
         "# The blend — what weight does the close deserve against our number?",
         "",
-        f"Real-close rows: {r['n_rows']} games over seasons {r['seasons']}; walk-forward bv_line "
-        "refit on every prior played season. Market input on 2023-25 is the CLOSE (look-ahead "
-        "relative to decision time); the 2026 block is the cards' decision-time consensus and is "
-        "descriptive only.",
+        f"Real-close rows: {r['n_rows']} games over seasons {r['seasons']}; bv_line source: "
+        f"{SOURCE_NOTE.get(r.get('source'), r.get('source'))}. Market input on 2023-25 is the CLOSE "
+        "(look-ahead relative to decision time); the 2026 block is the cards' decision-time "
+        "consensus and is descriptive only.",
         "",
         f"## Verdict: **{v['word']}**",
         "",

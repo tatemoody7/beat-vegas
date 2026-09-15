@@ -28,6 +28,7 @@ const base: EdgeInput = {
   fhShare: null,
   qbOut: false,
   qbOutDetail: null,
+  minGamesPlayed: null,
   bvAdjust: null,
   bvAdjustReason: null,
   factorBoard: null,
@@ -672,5 +673,35 @@ describe("edgeScore — no model read", () => {
     expect(e.score).toBe(49);
     expect(e.tier).toBe("PASS");
     expect(e.blocker).toBeNull();
+  });
+});
+
+describe("edgeScore — early season is paper only", () => {
+  it("a would-be BET with one game played → EDGE / early_season, verdict WATCH", () => {
+    // Everything else clears (in-band Hard Rock gap, on-market, good price).
+    // Gate order: no_hr_line → off_market → no_fair_price → price → qb_out →
+    // early_season → gap, mirrored by beatvegas/card.py::build_item.
+    const e = edgeScore({ ...base, minGamesPlayed: 1 });
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("early_season");
+    expect(e.score).toBe(80);
+    expect(e.verdict.verdict).toBe("WATCH");
+    expect(e.action).toBe(
+      "Paper only — 1 game played this season; real money needs 2. Everything else clears: first-half under 24.5 at -105 on Hard Rock.",
+    );
+  });
+  it("two games played clears the gate; unknown (null) is not early season", () => {
+    expect(edgeScore({ ...base, minGamesPlayed: 2 }).tier).toBe("BET");
+    expect(edgeScore({ ...base, minGamesPlayed: null }).tier).toBe("BET");
+  });
+  it("a price problem is still reported as price, not early_season", () => {
+    const e = edgeScore({
+      ...base,
+      minGamesPlayed: 0,
+      ev: -0.08,
+      evVerdict: "neg",
+    });
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("price");
   });
 });

@@ -153,6 +153,52 @@ def render_markdown(r: Dict[str, Any]) -> str:
             f"- log-loss: market **{wf['log_loss_market']:.5f}** vs with-spread "
             f"**{wf['log_loss_with_spread']:.5f}**",
         ]
+        ci = wf.get("brier_delta_ci") or {}
+        if ci.get("delta") is not None:
+            L.append(
+                f"- paired bootstrap on that delta ({ci['n_boot']} resamples): "
+                f"**{ci['delta']:+.5f}** CI [{ci['lo']:+.5f}, {ci['hi']:+.5f}] — "
+                f"excludes zero: **{ci['excludes_zero']}**"
+            )
+        cal = wf.get("calibration_market") or {}
+        if cal:
+            L += [
+                "",
+                "#### Is the market's price actually CENTRED?",
+                "",
+                "A Brier near 0.25 does not answer this. A constant 0.50 forecast scores "
+                "exactly 0.25 on any binary sample whatever the base rate, and Brier "
+                "decomposes as reliability - resolution + uncertainty, where uncertainty "
+                "alone is p(1-p) — about 0.2500 at this Under rate. So 0.25 says the "
+                "probabilities sit near a half with little resolution. These say whether "
+                "they are centred:",
+                "",
+                f"- mean implied **{100 * cal['mean_predicted']:.2f}%** vs realized "
+                f"**{100 * cal['mean_realized']:.2f}%** — bias **{cal['bias_pp']:+.2f} pp** "
+                f"(calibration-in-the-large, n={cal['n']})",
+                f"- calibration intercept **{cal['intercept']:+.4f}**, slope "
+                f"**{cal['slope']:.4f}** (0 and 1 = calibrated; slope < 1 = over-confident)",
+            ]
+        rel = wf.get("reliability_market") or []
+        if rel:
+            L += [
+                "",
+                "| predicted | realized | n | Wilson 95% |",
+                "|---|---|---|---|",
+            ]
+            for b in rel:
+                lo = f"{100 * b['lo']:.1f}%" if b["lo"] is not None else "—"
+                hi = f"{100 * b['hi']:.1f}%" if b["hi"] is not None else "—"
+                L.append(
+                    f"| {100 * b['predicted']:.1f}% | {100 * b['realized']:.1f}% | "
+                    f"{b['n']} | {lo}–{hi} |"
+                )
+            L.append("")
+            L.append(
+                "Quantile bins, not equal-width: these probabilities cluster hard around "
+                "0.50, so equal-width cutting leaves most bins empty and resolves nothing "
+                "in the only region that has data."
+            )
     L += [
         "",
         "### Realized minus implied, by spread bucket",
@@ -195,7 +241,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--scope", default=HIST_SCOPE)
     p.add_argument("--out", default="reports/censoring")
     p.add_argument("--test-season", type=int, default=2025)
-    p.add_argument("--n-boot", type=int, default=400)
+    # 400 is enough to look at; a CI that gets QUOTED in percentage points needs
+    # more than that, and the whole run is seconds either way.
+    p.add_argument("--n-boot", type=int, default=2000)
     return p.parse_args(argv)
 
 
@@ -213,7 +261,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "push_audit": C.push_audit(df),
         "gate": C.spread_residual(df, n_boot=args.n_boot),
         "per_season": C.per_season(df),
-        "walk_forward": C.walk_forward(df, args.test_season),
+        "walk_forward": C.walk_forward(df, args.test_season, n_boot=args.n_boot),
         "realized_vs_implied": C.realized_vs_implied(df),
         "zero_mass": C.zero_mass_by_bucket(df),
         "score_support": C.score_support(df),

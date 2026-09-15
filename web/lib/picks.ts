@@ -2,6 +2,8 @@ import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { boardGames } from "@/lib/board";
+import { parseFactors } from "@/lib/score";
+import { minGamesPlayedFrom } from "@/lib/homeBoard";
 import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
@@ -17,6 +19,12 @@ export type SlateOption = {
   week: number;
   away: string;
   home: string;
+  /**
+   * Fewest current-season games played by either team, or null when unknown.
+   * Carried so POST /api/picks can enforce MIN_GAMES_FOR_REAL_MONEY without a
+   * second query -- boardGames already parsed the factors.
+   */
+  minGamesPlayed: number | null;
 };
 
 export type PickFull = {
@@ -76,11 +84,18 @@ export async function getSlate(season: number): Promise<SlateOption[]> {
     startDate: r.start_date ?? null,
     away: r.away_team ?? "?",
     home: r.home_team ?? "?",
+    minGamesPlayed: minGamesPlayedFrom(parseFactors(r.factors_json)),
   }));
   const week = defaultWeek(games);
   return games
     .filter((g) => g.week === week)
-    .map(({ gameId, week, away, home }) => ({ gameId, week, away, home }));
+    .map(({ gameId, week, away, home, minGamesPlayed }) => ({
+      gameId,
+      week,
+      away,
+      home,
+      minGamesPlayed,
+    }));
 }
 
 const truthy = (v: unknown) => v === true || Number(v) === 1;

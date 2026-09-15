@@ -1171,3 +1171,23 @@ describe("parseCardItem gap_basis", () => {
     expect(junk!.items[0].gapBasis).toBeNull();
   });
 });
+
+describe("parseCard — early_season blocker", () => {
+  it("keeps the card's early_season blocker and paper_blocker", () => {
+    const c = parseCard(
+      rawCard({
+        items: [
+          rawItem({
+            game_id: 9,
+            tier: "EDGE",
+            blocker: "early_season",
+            qualifies: true,
+            paper_blocker: "early_season",
+          }),
+        ],
+      }),
+    );
+    expect(c?.items[0].blocker).toBe("early_season");
+    expect(c?.items[0].paperBlocker).toBe("early_season");
+  });
+});

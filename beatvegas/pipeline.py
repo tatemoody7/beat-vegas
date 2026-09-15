@@ -48,6 +48,7 @@ _CLONE_TABLES = [
     "fh_team_game",
     "team_tempo",
     "weather",
+    "weather_obs",
     "factor_scores",
     "model_runs",
 ]

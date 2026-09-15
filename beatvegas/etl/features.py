@@ -18,7 +18,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from ..db.models import Game, TeamTempo, Venue, Weather
+from ..db.models import Game, TeamTempo, Venue, Weather, WeatherObs
 from ..db.store import session_scope
 from ..sources.cfbd import CFBDClient
 from ..sources.season_stats import (
@@ -257,6 +257,37 @@ _STD_COLS = ["fh_pf", "fh_pa", "full_pf", "full_pa"]
 # it addresses.
 PRIOR_SEASON_WEIGHT = 0.0
 
+# Which weather_obs LEAD feeds the model, or None for the legacy `weather` table.
+#
+# None reproduces today's frame exactly, so the incumbent is an ARM of this
+# experiment rather than a separate code path -- the same shape as
+# PRIOR_SEASON_WEIGHT above. Repairing the weather DATA and letting the model use
+# the repaired values are two different decisions: the backfill writes weather_obs,
+# which nothing reads, and only this constant moves the live model.
+#
+# LEAD 0 IS REFUSED HERE, not merely discouraged. It is the near-kickoff series,
+# which tracks what actually happened rather than what was knowable while a bet
+# was placeable -- feeding it to a model that prices real money is look-ahead
+# bias, and a rule that lives only in a comment is the kind that drifts. The
+# production choices are None, 24 and 72. A diagnostic read of lead 0 (football
+# modelling, data quality) must ask for it explicitly and can never be the basis
+# of a promotion. See scripts/weather_gate.py.
+WEATHER_OBS_LEAD_HOURS: Optional[int] = None
+
+DIAGNOSTIC_LEAD_HOURS = 0  # near-kickoff: benchmark only, never production
+
+
+def check_weather_lead(lead: Optional[int], allow_diagnostic: bool = False) -> Optional[int]:
+    """Refuse a weather lead that must never price real money."""
+    if lead == DIAGNOSTIC_LEAD_HOURS and not allow_diagnostic:
+        raise ValueError(
+            "weather lead 0 is the near-kickoff series and is not decision-safe: it "
+            "describes what happened, not what was knowable at bet time. Use None "
+            "(legacy), 24 or 72, or pass allow_diagnostic=True for a benchmark read "
+            "that may not be promoted."
+        )
+    return lead
+
 
 def _prior_season_means(long: pd.DataFrame) -> pd.DataFrame:
     """Each team's PRIOR-season mean of every _STD_COLS metric, keyed to the
@@ -337,7 +368,43 @@ def wind_band(w) -> np.ndarray:
     return out
 
 
-def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
+def _weather_frame(s, lead: Optional[int]) -> pd.DataFrame:
+    """The weather columns, from whichever table this arm reads."""
+    if lead is None:
+        return pd.DataFrame(
+            s.query(
+                Weather.game_id,
+                Weather.temperature_f,
+                Weather.wind_mph,
+                Weather.precipitation,
+                Weather.dome,
+            ).all(),
+            columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome"],
+        ).assign(wx_gust=np.nan)
+    # weather_obs may hold SEVERAL readings for one (game, lead) -- a different
+    # model, provider or run is kept rather than overwritten. Take the most
+    # recently retrieved, deterministically, so a feature frame never depends on
+    # row order.
+    rows = (
+        s.query(
+            WeatherObs.game_id,
+            WeatherObs.temperature_f,
+            WeatherObs.wind_mph,
+            WeatherObs.precipitation,
+            WeatherObs.dome,
+            WeatherObs.wind_gust_mph,
+        )
+        .filter(WeatherObs.lead_hours == lead)
+        .order_by(WeatherObs.retrieved_at.desc(), WeatherObs.id.desc())
+        .all()
+    )
+    return pd.DataFrame(
+        rows,
+        columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome", "wx_gust"],
+    ).drop_duplicates(subset=["game_id"], keep="first")
+
+
+def _merge_tempo_weather(df: pd.DataFrame, weather_lead: Optional[int] = None) -> pd.DataFrame:
     """Exact (season, week, team) join for pace + (game_id) join for weather."""
     with session_scope() as s:
         tempo = pd.DataFrame(
@@ -350,16 +417,7 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
             ).all(),
             columns=["season", "week", "team", "sec_play", "plays"],
         )
-        wx = pd.DataFrame(
-            s.query(
-                Weather.game_id,
-                Weather.temperature_f,
-                Weather.wind_mph,
-                Weather.precipitation,
-                Weather.dome,
-            ).all(),
-            columns=["game_id", "wx_temp", "wx_wind", "wx_precip", "wx_dome"],
-        )
+        wx = _weather_frame(s, weather_lead)
 
     for side in ("home", "away"):
         t = tempo.rename(
@@ -376,14 +434,14 @@ def _merge_tempo_weather(df: pd.DataFrame) -> pd.DataFrame:
     if not wx.empty:
         df = df.merge(wx, left_on="id", right_on="game_id", how="left")
     else:
-        for c in ("wx_temp", "wx_wind", "wx_precip", "wx_dome"):
+        for c in ("wx_temp", "wx_wind", "wx_precip", "wx_dome", "wx_gust"):
             df[c] = pd.NA
     # dome -> numeric for the model (True/False/NA -> 1.0/0.0/NaN)
     df["wx_dome"] = df["wx_dome"].map({True: 1.0, False: 0.0})
     # A dome has no weather: null whatever the row stores (legacy rows carried a
     # 72F / 0 mph placeholder) so the model never learns "72 and calm = dome".
     dome = df["wx_dome"] == 1.0
-    df.loc[dome, ["wx_temp", "wx_wind", "wx_precip"]] = np.nan
+    df.loc[dome, ["wx_temp", "wx_wind", "wx_precip", "wx_gust"]] = np.nan
     # Extra (non-FEATURE_COLS) column: coarse wind band for display / analysis.
     df["wx_wind_band"] = wind_band(df["wx_wind"])
     return df
@@ -430,7 +488,10 @@ def build_feature_frame(
     client: Optional[CFBDClient] = None,
     fbs_only: bool = True,
     prior_weight: float = PRIOR_SEASON_WEIGHT,
+    weather_lead: Optional[int] = WEATHER_OBS_LEAD_HOURS,
+    allow_diagnostic_lead: bool = False,
 ) -> pd.DataFrame:
+    check_weather_lead(weather_lead, allow_diagnostic_lead)
     games = _load_all_games(fbs_only=fbs_only)
     std = _season_to_date(_team_long(games), prior_weight=prior_weight)
 
@@ -566,7 +627,7 @@ def build_feature_frame(
     # combined_sec_play/combined_plays/wx_* are in FEATURE_COLS. In-season the
     # upcoming week's rows come from enrich_tempo.py / enrich_weather.py
     # (sunday.yml) — a missing row means NaN inputs, not an error.
-    df = _merge_tempo_weather(df)
+    df = _merge_tempo_weather(df, weather_lead)
 
     # --- situational features (schedule-derived; real model inputs) ---
     df = df.merge(situational_frame(), on="id", how="left")

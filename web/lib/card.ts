@@ -44,6 +44,8 @@ export type CardBlocker =
   | "price"
   | "no_fair_price"
   | "qb_out"
+  /** A team on this row has fewer than MIN_GAMES_FOR_REAL_MONEY games this season: paper only. */
+  | "early_season"
   | "gap"
   | "no_model"
   | "cap"
@@ -150,6 +152,7 @@ const BLOCKERS: readonly CardBlocker[] = [
   "price",
   "no_fair_price",
   "qb_out",
+  "early_season",
   "gap",
   "no_model",
   "cap",

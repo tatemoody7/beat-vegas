@@ -115,14 +115,27 @@ def wilson(hits: int, n: int, z: float = 1.959963985) -> Tuple[Optional[float], 
     return float((centre - half) / denom), float((centre + half) / denom)
 
 
-def reliability(p: np.ndarray, y: np.ndarray, bins: int = 10) -> List[Dict[str, Any]]:
-    """Calibration table: predicted vs realized within probability bins."""
+def reliability(
+    p: np.ndarray, y: np.ndarray, bins: int = 10, method: str = "quantile"
+) -> List[Dict[str, Any]]:
+    """Calibration table: predicted vs realized within probability bins.
+
+    QUANTILE bins by default. Equal-width cutting is the wrong tool for a market
+    price: de-vigged 1H Under probabilities cluster hard around 0.50, so most
+    equal-width bins come back empty or with an n too small to read, and the
+    table says nothing about the region where every observation actually lives.
+    Quantile bins put the same count in each and resolve the middle. Pass
+    method="width" when the absolute scale matters more than the resolution.
+    """
     p, y = np.asarray(p, float), np.asarray(y, float)
-    edges = (
-        np.linspace(p.min(), p.max(), bins + 1)
-        if p.max() > p.min()
-        else np.array([p.min(), p.min() + 1e-9])
-    )
+    if p.max() <= p.min():
+        edges = np.array([p.min(), p.min() + 1e-9])
+    elif method == "quantile":
+        edges = np.unique(np.quantile(p, np.linspace(0, 1, bins + 1)))
+        if len(edges) < 2:
+            edges = np.array([p.min(), p.max()])
+    else:
+        edges = np.linspace(p.min(), p.max(), bins + 1)
     idx = np.clip(np.digitize(p, edges[1:-1]), 0, len(edges) - 2)
     out: List[Dict[str, Any]] = []
     for b in range(len(edges) - 1):
@@ -141,6 +154,73 @@ def reliability(p: np.ndarray, y: np.ndarray, bins: int = 10) -> List[Dict[str, 
             }
         )
     return out
+
+
+def calibration_intercept_slope(p: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
+    """Regress the outcome on logit(p). Intercept 0, slope 1 = calibrated.
+
+    This is the diagnostic a Brier score CANNOT give you. A constant 0.50
+    forecast scores exactly 0.25 on any binary sample whatever the base rate, and
+    Brier decomposes as reliability - resolution + uncertainty, where uncertainty
+    alone is p_bar(1 - p_bar) -- about 0.2500 at a 49.5% Under rate. So a Brier
+    near 0.25 says the probabilities are clustered near a half with little
+    resolution; it says nothing about whether they are centred.
+
+    Slope < 1 means the forecast is over-confident (spread too wide), slope > 1
+    under-confident. A non-zero intercept at slope 1 is a level shift.
+    """
+    p = np.clip(np.asarray(p, float), 1e-6, 1 - 1e-6)
+    y = np.asarray(y, float)
+    z = np.log(p / (1 - p))
+    X = np.column_stack([np.ones_like(z), z])
+    b = _fit_logit(np.zeros_like(z), X, y)
+    return {
+        "n": int(len(y)),
+        "intercept": float(b[0]),
+        "slope": float(b[1]),
+        "mean_predicted": float(p.mean()),
+        "mean_realized": float(y.mean()),
+        # Calibration-in-the-large: the honest one-number version, and the claim
+        # the Brier score was wrongly asked to support.
+        "bias_pp": float((p.mean() - y.mean()) * 100),
+    }
+
+
+def brier_delta_ci(
+    p_base: np.ndarray,
+    p_alt: np.ndarray,
+    y: np.ndarray,
+    n_boot: int = 2000,
+    seed: int = 7,
+) -> Dict[str, Any]:
+    """Paired bootstrap CI for (Brier_base - Brier_alt): positive = alt is better.
+
+    Paired on the GAME, because both forecasts see the same outcomes and an
+    unpaired interval would drown a real difference in the between-game variance
+    that cancels. Without this a fourth-decimal Brier improvement reads as a
+    result when it is indistinguishable from resampling noise.
+    """
+    p_base = np.asarray(p_base, float)
+    p_alt = np.asarray(p_alt, float)
+    y = np.asarray(y, float)
+    n = len(y)
+    if n == 0:
+        return {"n": 0, "delta": None, "lo": None, "hi": None, "n_boot": int(n_boot)}
+    delta = brier(p_base, y) - brier(p_alt, y)
+    rng = np.random.default_rng(seed)
+    boots = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = rng.integers(0, n, n)
+        boots[i] = brier(p_base[idx], y[idx]) - brier(p_alt[idx], y[idx])
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    return {
+        "n": int(n),
+        "delta": float(delta),
+        "lo": float(lo),
+        "hi": float(hi),
+        "n_boot": int(n_boot),
+        "excludes_zero": bool(lo > 0 or hi < 0),
+    }
 
 
 # ------------------------------------------------------------------ market read
@@ -345,7 +425,7 @@ def per_season(df: pd.DataFrame) -> List[Dict[str, Any]]:
     return out
 
 
-def walk_forward(df: pd.DataFrame, test_season: int) -> Dict[str, Any]:
+def walk_forward(df: pd.DataFrame, test_season: int, n_boot: int = 2000) -> Dict[str, Any]:
     """Fit on every earlier season, score the held-out one. The only evidence
     that counts: an in-sample coefficient proves nothing about a season it has
     already seen."""
@@ -380,6 +460,13 @@ def walk_forward(df: pd.DataFrame, test_season: int) -> Dict[str, Any]:
         "log_loss_with_spread": log_loss(p_mdl, y_te),
         "spread_helps_brier": bool(brier(p_mdl, y_te) < brier(p_mkt, y_te)),
         "brier_delta": float(brier(p_mkt, y_te) - brier(p_mdl, y_te)),
+        # Whether that delta is distinguishable from resampling noise. Without
+        # it a fourth-decimal improvement reads like a result.
+        "brier_delta_ci": brier_delta_ci(p_mkt, p_mdl, y_te, n_boot=n_boot),
+        # What a Brier score cannot tell you: is the market's price centred, or
+        # merely clustered near a half? See calibration_intercept_slope.
+        "calibration_market": calibration_intercept_slope(p_mkt, y_te),
+        "reliability_market": reliability(p_mkt, y_te),
     }
 
 

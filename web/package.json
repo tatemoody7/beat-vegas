@@ -25,19 +25,19 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/eslintrc": "^3.3.7",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.3.4",
+    "eslint": "^10.10.0",
+    "eslint-config-next": "^16.3.5",
     "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.8.3",
-    "prisma": "^5.22.0",
+    "prettier": "^3.9.6",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^2.1.9"
+    "typescript": "^7",
+    "vitest": "^5.0.0"
   }
 }

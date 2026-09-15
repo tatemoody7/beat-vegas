@@ -142,6 +142,15 @@ def test_edge_qb_out_blocks_the_bet_and_flags_it():
     assert it["tier"] == "EDGE" and it["blocker"] == "qb_out"
     assert it["action"] == ("Starting QB out — recheck. Our number does not know about it.")
     assert any(w.startswith("QB OUT") and "Smith" in w for w in it["why"])
+    # The read itself rides on the item (2026-09-15), so a later study can grade
+    # the QB gate on its own rather than only when it was the first blocker.
+    assert it["qb_out"] is True and "Smith" in it["qb_out_detail"]
+
+
+def test_qb_out_field_is_false_and_detail_none_when_no_preview_flags_it():
+    snaps = [snap(1, "hardrockbet", 24.5)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)], []))
+    assert it["qb_out"] is False and it["qb_out_detail"] is None
 
 
 def test_edge_gap_blocker_when_the_score_clears_55_short_of_the_bar():
@@ -605,6 +614,8 @@ ITEM_KEYS = {
     "bv_line",
     "under_score",
     "games_played",
+    "qb_out",
+    "qb_out_detail",
     "gap",
     "gap_basis",
     "kill_line",

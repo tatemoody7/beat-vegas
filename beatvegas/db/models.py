@@ -193,6 +193,66 @@ class Weather(Base):
     dome = Column(Boolean)
 
 
+class WeatherObs(Base):
+    """Weather for a game AT A STATED LEAD, with the provenance to prove it.
+
+    The legacy `weather` table stored four bare numbers keyed by game, which made
+    two different things indistinguishable six months later: what the conditions
+    WERE around kickoff, and what the forecast SAID while a bet was still
+    placeable. Those answer different questions, and using the first to argue an
+    edge is look-ahead bias. So the lead is part of the key and `decision_safe`
+    is stored rather than inferred.
+
+    `lead_hours = 0` is the near-kickoff series, which tracks actual conditions
+    (measured 1.82F / 1.55mph from the ERA5 actual, closer than a 1-day-lead
+    forecast). It is NEVER decision-safe and may never feed a real-money model --
+    `etl.features.WEATHER_OBS_LEAD_HOURS` refuses it outright.
+
+    THREE DIFFERENT TIMES, and conflating them is how false precision gets in:
+      lead_hours      the NOMINAL horizon we asked for. Always known. Never
+                      inferred from anything else.
+      model_run_time  when the run behind this value initialised. NULL unless the
+                      source actually states it -- Open-Meteo does not, for the
+                      `_previous_dayN` variables.
+      available_at    when that run became publicly usable, which is LATER than
+                      the run time (a global model takes hours to finish and
+                      distribute). NULL until a source gives it.
+    `available_at <= decision_time` is the invariant worth having. Until
+    available_at is populated, the nominal lead is the weaker guarantee we
+    actually have, and the docs say so rather than pretending otherwise.
+
+    Keyed on a surrogate id, NOT (game_id, lead_hours): comparing ICON against
+    GFS, changing provider, or keeping two runs of the same horizon all have to
+    be possible without overwriting history. The uniqueness constraint lives in
+    store.py as an expression index, because Postgres treats NULLs as distinct.
+    """
+
+    __tablename__ = "weather_obs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
+    lead_hours = Column(Integer, nullable=False)  # nominal; 0 = near kickoff
+    valid_time = Column(DateTime)  # the kickoff hour this value describes (UTC)
+    model_run_time = Column(DateTime)  # nullable -- only when the source states it
+    available_at = Column(DateTime)  # nullable -- when that run became public
+    decision_safe = Column(Boolean, nullable=False, default=False)
+    temperature_f = Column(Float)
+    wind_mph = Column(Float)
+    wind_gust_mph = Column(Float)
+    precipitation = Column(Float)
+    dome = Column(Boolean)
+    source = Column(String)  # beatvegas.sources.weather.SOURCE_*
+    weather_model = Column(String)  # Open-Meteo `models=`, where pinned
+    dataset_version = Column(String)  # bump when the fetch methodology changes
+    latitude = Column(Float)  # the coordinates actually used, not a join at read time
+    longitude = Column(Float)
+    retrieved_at = Column(DateTime)
+
+    __table_args__ = (
+        Index("ix_weather_obs_game_lead", "game_id", "lead_hours"),
+        Index("ix_weather_obs_decision_safe", "decision_safe"),
+    )
+
+
 class OddsSnapshot(Base):
     """One row per (game, book, market) observation. Repeated polling builds the
     full movement history; the earliest captured_at = posting time."""
@@ -253,6 +313,13 @@ class Result(Base):
     under_hit = Column(Boolean)
     closing_line = Column(Float)
     closing_captured_at = Column(DateTime)  # when the closing snapshot landed
+    # The book's own closing PRICE, kept separate from the price at the DECISION.
+    # Until 2026-09-14 a Hard Rock pick logged without a price had `price`
+    # BACKFILLED with this value at grading time, which makes any price-based CLV
+    # identically zero by construction and erases the difference between the two.
+    # `price` is now never overwritten -- unknown stays NULL -- and the close
+    # lives here.
+    closing_price = Column(Integer)
     clv = Column(Float)  # points CLV (closing_line - bet_line)
     clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
     units = Column(Float)
@@ -298,6 +365,20 @@ class ManualPick(Base):
     result = Column(String)  # under / over / push
     units = Column(Float)
     closing_line = Column(Float)
+    # The book's own closing PRICE, kept separate from the price at the DECISION.
+    # Until 2026-09-14 a Hard Rock pick logged without a price had `price`
+    # BACKFILLED with this value at grading time, which makes any price-based CLV
+    # identically zero by construction and erases the difference between the two.
+    # `price` is now never overwritten -- unknown stays NULL -- and the close
+    # lives here.
+    closing_price = Column(Integer)
+    # Where `price` came from: 'logged' (given at decision time), 'backfilled_close'
+    # (written by the pre-2026-09-14 grader and therefore NOT a decision price),
+    # or 'unknown' (pre-dates this column and could not be reconstructed).
+    # scripts/reconstruct_pick_prices.py classifies the rows that pre-date the fix;
+    # anything not 'logged' must be excluded from price-based CLV rather than
+    # quietly diluting it toward zero.
+    price_provenance = Column(String)
     clv = Column(Float)  # points CLV (closing_line - bet_line)
     clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
 

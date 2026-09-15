@@ -604,6 +604,7 @@ ITEM_KEYS = {
     "ev",
     "bv_line",
     "under_score",
+    "games_played",
     "gap",
     "gap_basis",
     "kill_line",
@@ -746,7 +747,9 @@ def test_price_sentence_blames_the_other_books_only_when_hard_rock_has_a_price()
 
 
 def test_blocker_order_off_market_then_price_then_no_fair_price_then_qb_out():
-    assert PAPER_BLOCKERS == ("off_market", "price", "no_fair_price", "qb_out")
+    # early_season is last: every market gate has passed and only the games-played
+    # policy (paper only) stands between the game and a real-money BET.
+    assert PAPER_BLOCKERS == ("off_market", "price", "no_fair_price", "qb_out", "early_season")
     # Hard Rock alone (no fair price) AND a QB out: the price gate's "cannot
     # judge" branch is named first; the QB news is transient.
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
@@ -892,3 +895,52 @@ def test_edge_items_sort_by_gap_before_price():
     snaps += market(1, 24.5) + market(2, 24.5)
     c = card([g1, g2], snaps, [model(1, 22.4), model(2, 21.9)])  # gaps 2.1, 2.6
     assert [it["game_id"] for it in c["items"]] == [2, 1]
+
+
+# --- early season (paper only) -----------------------------------------------
+
+
+def model_with_games(gid, bv_line, h, a):
+    m = model(gid, bv_line)
+    m["factors_json"] = json.dumps({"h_games_played": h, "a_games_played": a})
+    return m
+
+
+def test_early_season_team_is_paper_only_on_the_card():
+    """A would-be BET whose team has under MIN_GAMES_FOR_REAL_MONEY games this
+    season is EDGE / early_season: still qualifies for the paper ledger (tagged),
+    never a real-money BET. Mirrors verdict.ts + pickRules.checkPolicy."""
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    c = card([game()], snaps, [model_with_games(1, 22.4, 1, 3)])
+    it = only(c)
+    assert it["tier"] == "EDGE" and it["blocker"] == "early_season"
+    assert it["qualifies"] is True and it["paper_blocker"] == "early_season"
+    assert it["games_played"] == 1
+    assert it["action"] == (
+        "Paper only — 1 game played this season; real money needs 2. "
+        "Everything else clears: first-half under 24.5 at -110 on Hard Rock."
+    )
+    assert c["counts"]["bet"] == 0 and c["counts"]["edge"] == 1
+
+
+def test_two_games_played_clears_the_early_season_gate():
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model_with_games(1, 22.4, 2, 5)]))
+    assert it["tier"] == "BET" and it["blocker"] is None
+    assert it["games_played"] == 2 and it["paper_blocker"] is None
+
+
+def test_early_season_is_named_only_after_the_price_gate_passes():
+    """Gate order: a price problem is reported as a price problem even when the
+    team is also early-season (card.py and edge.ts share the order)."""
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -130)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model_with_games(1, 22.4, 0, 0)]))
+    assert it["tier"] == "EDGE" and it["blocker"] == "price"
+    assert it["paper_blocker"] == "price" and it["games_played"] == 0
+
+
+def test_a_prediction_without_games_played_is_not_early_season():
+    """Old rows carry no h/a_games_played: unknown must not read as early season."""
+    snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
+    it = only(card([game()], snaps, [model(1, 22.4)]))
+    assert it["tier"] == "BET" and it["games_played"] is None

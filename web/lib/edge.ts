@@ -18,6 +18,7 @@ import {
   BET_GAP_PTS,
   BET_MIN_EV,
   HR_OFF_MARKET_PTS,
+  MIN_GAMES_FOR_REAL_MONEY,
   verdictFor,
   type VerdictInput,
   type VerdictResult,
@@ -54,6 +55,8 @@ export type EdgeBlocker =
   | "price"
   | "no_fair_price"
   | "qb_out"
+  /** A team on this row has fewer than MIN_GAMES_FOR_REAL_MONEY games this season: paper only. */
+  | "early_season"
   | "gap";
 
 export type EdgeResult = {
@@ -231,6 +234,11 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     else if (i.ev === null) blocker = "no_fair_price";
     else if (i.ev < BET_MIN_EV) blocker = "price";
     else if (i.qbOut) blocker = "qb_out";
+    else if (
+      i.minGamesPlayed !== null &&
+      i.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY
+    )
+      blocker = "early_season";
     else blocker = "gap";
   } else {
     tier = "PASS";
@@ -273,6 +281,10 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     }
   } else if (blocker === "qb_out") {
     action = "Starting QB out — recheck. Our number does not know about it.";
+  } else if (blocker === "early_season") {
+    const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
+    const n = i.minGamesPlayed ?? 0;
+    action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
     // blocker "gap": the amber band — a model row short of the bar.
     action = `Not yet — the line is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;

@@ -23,7 +23,7 @@ from .grading import (
     under_result,
     units_won,
 )
-from .hardrock import HR_BOOK_KEY, normalize_book
+from .hardrock import normalize_book
 from .lines import (
     book_closing_price_before_kickoff,
     closing_before_kickoff,
@@ -139,6 +139,10 @@ def add_pick(
         market=market,
         line=line,
         price=price,
+        # Recorded here because this is the only moment it is knowable: after the
+        # fact a stored price gives no clue whether it was the price at the
+        # decision or something a later job wrote in.
+        price_provenance="logged" if price is not None else "unknown",
         stake=PAPER_STAKE if is_paper else stake,
         is_paper=bool(is_paper),
         is_bonus=bool(is_bonus),
@@ -171,6 +175,7 @@ def graded_pick_fields(
     fair_open=None,
     fair_close=None,
     is_bonus: bool = False,
+    closing_price=None,
 ) -> dict:
     """Pure: the graded ManualPick fields for one pick + its line snapshots.
     `price` None (an unpriced line) grades the result and CLV but no units.
@@ -192,6 +197,8 @@ def graded_pick_fields(
         "closing_line": closing,
         "clv": clv_under(line, closing) if closing is not None else None,
         "clv_prob": price_clv_under(fair_open, fair_close),
+        # Stored beside `price`, never into it. See the ManualPick column comment.
+        "closing_price": closing_price,
     }
 
 
@@ -244,8 +251,22 @@ def grade_pick(session, pick: ManualPick, game) -> bool:
     # consensus_open_close already drops non-centred quotes (lines.centred_snaps),
     # so a book still contributes its last real number.
     opening, closing, _closing_at = closing_before_kickoff(snaps, game.start_date)
-    if pick.price is None and normalize_book(pick.book) == HR_BOOK_KEY:
-        pick.price = book_closing_price_before_kickoff(snaps, game.start_date, HR_BOOK_KEY)
+    # THE CLOSING PRICE GOES IN ITS OWN COLUMN. It used to be written into
+    # `pick.price` whenever a Hard Rock ticket had none, which silently turned the
+    # price at the DECISION into the price at the CLOSE. Any price-based CLV over
+    # those rows is then identically zero by construction -- and because nothing
+    # marked them, they were indistinguishable from genuinely priced tickets and
+    # would have diluted the metric toward zero, looking exactly like a null
+    # result. An unknown decision price stays NULL; that is recoverable, a
+    # fabricated one is not.
+    #
+    # Unlike the closing LINE (graded against consensus, because Hard Rock posts
+    # an off-centre rung on 26 of 28 late quotes), the closing PRICE is correctly
+    # the book's own: it is what you could have taken at that book at the close.
+    book = normalize_book(pick.book)
+    closing_price = (
+        book_closing_price_before_kickoff(snaps, game.start_date, book) if book else None
+    )
     fair_open, fair_close = fair_under_before_kickoff(snaps, game.start_date)
     for k, v in graded_pick_fields(
         actual,
@@ -257,6 +278,7 @@ def grade_pick(session, pick: ManualPick, game) -> bool:
         fair_open,
         fair_close,
         is_bonus=bool(getattr(pick, "is_bonus", False)),
+        closing_price=closing_price,
     ).items():
         setattr(pick, k, v)
     pick.graded = True

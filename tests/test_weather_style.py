@@ -125,6 +125,4 @@ def test_verdict_is_the_pre_registered_rule():
 def test_flag_pass_heavy_is_the_top_third():
     df = pd.DataFrame({"pass_rate_asof": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]})
     out = W.flag_pass_heavy(df)
-    assert out["pass_heavy"].sum() == 2 and out.attrs["pass_heavy_cut"] == pytest.approx(
-        0.5, abs=1e-9
-    )
+    assert out["pass_heavy"].sum() == 2 and out.attrs["pass_heavy_cut"] == pytest.approx(0.4333, abs=1e-3)

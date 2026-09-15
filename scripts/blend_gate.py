@@ -23,9 +23,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import pandas as pd
-from sqlalchemy import text
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from residual_gate import (  # noqa: E402
@@ -65,39 +62,6 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
-HIST_SCOPE = "hist_2023_25"
-
-
-def load_postmortem_rows(session, seasons) -> "pd.DataFrame":
-    """FBS rows of the latest hist_2023_25 post-mortem run with a real close, a graded
-    first half and a stored walk-forward bv_line."""
-    run_id = session.execute(
-        text(
-            "select run_id from postmortem_runs where scope = :s order by computed_at desc limit 1"
-        ),
-        {"s": HIST_SCOPE},
-    ).scalar()
-    rows = (
-        session.execute(
-            text(
-                """
-            select g.game_id, g.season, g.week, g.spread_abs, g.line_real, g.fh, g.bv_line,
-                   gm.start_date as kickoff
-            from postmortem_games g left join games gm on gm.id = g.game_id
-            where g.run_id = :r and g.scope = :s and g.division = 'fbs'
-              and g.line_real is not null and g.fh is not null and g.bv_line is not null
-            """
-            ),
-            {"r": run_id, "s": HIST_SCOPE},
-        )
-        .mappings()
-        .all()
-    )
-    df = pd.DataFrame(rows)
-    df.attrs["run_id"] = run_id
-    return df[df["season"].isin(seasons)] if len(df) else df
-
-
 def run(pg, live_rows, seasons, n_boot: int, do_freeze: bool) -> Dict[str, Any]:
     splits = [
         B.evaluate_split(pg, tr, te, n_boot=n_boot)
@@ -135,9 +99,9 @@ def main(argv: Optional[list] = None) -> int:
         return 0
     with session_scope() as s:
         if args.source == "postmortem":
-            rows = load_postmortem_rows(s, args.seasons)
+            rows = snapshots.postmortem_hist_rows(s, args.seasons)
             print(
-                f"[blend] postmortem_games {HIST_SCOPE} run {rows.attrs.get('run_id')}: "
+                f"[blend] postmortem_games {snapshots.HIST_SCOPE} run {rows.attrs.get('run_id')}: "
                 f"{len(rows)} rows with close + result + stored bv_line"
             )
             pg = B.per_game_frame_from_postmortem(rows)

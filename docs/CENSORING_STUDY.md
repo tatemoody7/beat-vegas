@@ -49,11 +49,35 @@ closing price (median 7 books per game).
   alone is p̄(1−p̄) = 0.4949 × 0.5051 = **0.2500**. The observed figure *is* the
   uncertainty term: it says the market's probabilities cluster near a half with
   little resolution. **The calibration evidence is the line above** — mean implied
-  50.06% against realized 49.49%, a 0.57 pp gap — and, since 2026-09-14, the
-  calibration intercept/slope and reliability tables that
-  `censoring.calibration_intercept_slope` and `reliability` now produce
+  50.06% against realized 49.49%, a 0.57 pp gap — and the measured calibration
+  below (re-run 2026-09-15, 2,000 bootstrap draws).
 - **spread coefficient +0.00369 per point, bootstrap 95% CI
-  [−0.0083, +0.0157] — includes zero**
+  [−0.0075, +0.0156] (2,000 resamples) — includes zero**
+
+Measured calibration on the held-out 2025 season (n=626 decided games), from
+`censoring.calibration_intercept_slope` and quantile-binned `reliability`:
+
+- calibration-in-the-large: mean implied **50.08%** vs realized **49.04%**,
+  bias **+1.04 pp**
+- logistic fit of outcome on logit(p): intercept **−0.034**, slope **−1.33**.
+  **Read the slope as unidentified, not as a finding**: the market's
+  probabilities span about 48–51.5%, a logit range of ~0.14, so the slope is a
+  ratio of two small noisy numbers and its sign carries no information at this
+  n. The reliability bins are the honest picture — six quantile bins, every
+  realized rate inside its Wilson interval around the predicted value:
+
+| predicted | realized | n | Wilson 95% |
+|---|---|---|---|
+| 48.0% | 47.6% | 42 | 33.4–62.3% |
+| 48.9% | 48.8% | 82 | 38.3–59.4% |
+| 49.4% | 59.2% | 49 | 45.2–71.8% |
+| 50.0% | 49.4% | 251 | 43.3–55.5% |
+| 50.6% | 55.8% | 43 | 41.1–69.6% |
+| 51.4% | 44.0% | 159 | 36.5–51.8% |
+
+- walk-forward ΔBrier (market 0.25040 → with-spread 0.25029) = **+0.00011**,
+  paired bootstrap 95% CI **[−0.00016, +0.00040]** (2,000 resamples) — includes
+  zero. The fourth-decimal "improvement" is noise, measured as such.
 
 Three independent reads, all the same:
 
@@ -112,8 +136,9 @@ is not "there is no censoring."** The mechanism is real, strong and monotone.
 conditioning on the book's own de-vigged probability, *no stable residual signal
 was detected* in spread. That is not the same as showing the market prices
 censoring correctly, and this report used to say the stronger thing. The
-confidence interval is wide enough to matter: `[−0.0083, +0.0157]` per point
-works out to **−4.36 pp to +8.24 pp** across the whole 7-to-28 spread range, so
+confidence interval is wide enough to matter: `[−0.0075, +0.0156]` per point
+(2,000 resamples) works out to **−3.9 pp to +8.2 pp** across the whole 7-to-28
+spread range, so
 the data is consistent both with no effect and with effects large enough to be
 worth having. Failing to detect is not proving absent.
 

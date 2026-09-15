@@ -50,8 +50,15 @@ kickoffs, mean absolute difference against the ERA5 actual:
 | Previous Runs, 1-day lead | 2.30°F | 1.67 mph |
 | Previous Runs, 3-day lead | 3.55°F | 2.26 mph |
 
-Monotone in lead time, with the Historical Forecast API sitting at lead ≈ 0. So
-`weather_obs` keys on `lead_hours` and stores `decision_safe`:
+Monotone in lead time, with the Historical Forecast API sitting at lead ≈ 0.
+
+**How far back it goes (measured 2026-09-15, LA Coliseum, hourly temperature,
+wind, gusts, precipitation):** every field is **null through 2017-10-01** and
+**populated from 2018-01-01**. An earlier probe only checked the HTTP status,
+which is 200 either way. Nothing before 2018 is available from this API; the
+backfill covers 2023+ and is unaffected.
+
+So `weather_obs` keys on `lead_hours` and stores `decision_safe`:
 
 - **`lead_hours = 0`** — near-kickoff. Good for modelling and data quality.
   `decision_safe = false`. **Never** the basis of a market-edge claim.

@@ -536,6 +536,7 @@ export async function getHomeBoard(
       fhShare: row.factors.fh_share ?? null,
       qbOut: Boolean(row.factors.qb_out_home || row.factors.qb_out_away),
       qbOutDetail: row.factors.qb_out_detail ?? null,
+      minGamesPlayed: minGamesPlayedFrom(row.factors),
       bvAdjust: row.bvAdjust,
       bvAdjustReason: row.bvAdjustReason,
       factorBoard: row.factors.factor_board,

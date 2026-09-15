@@ -117,6 +117,8 @@ export type VerdictInput = {
   fhShare: number | null;
   qbOut: boolean;
   qbOutDetail: string | null;
+  /** Fewest current-season games played by either team (homeBoard.minGamesPlayedFrom); null = unknown. */
+  minGamesPlayed: number | null;
   bvAdjust: number | null;
   bvAdjustReason: string | null;
   factorBoard: BoardFactor[] | null | undefined;
@@ -379,6 +381,27 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // four carried verdict_at_pick = 'BET' at negative EV while POST /api/picks
   // refused to log them. EV_FLOOR still describes the price landscape below; it
   // no longer decides whether money moves.
+  // Early season (Tate, 2026-09-14): a team with fewer than
+  // MIN_GAMES_FOR_REAL_MONEY current-season games is PAPER ONLY. Checked after
+  // the price so a price problem is still reported as a price problem; mirrors
+  // card.py blocker early_season and pickRules.checkPolicy's refusal.
+  if (
+    hrGap !== null &&
+    hrGap >= BET_GAP_PTS &&
+    i.ev !== null &&
+    i.ev >= BET_MIN_EV &&
+    i.minGamesPlayed !== null &&
+    i.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY
+  ) {
+    const n = i.minGamesPlayed;
+    return out(
+      "WATCH",
+      "medium",
+      `Our number clears the bar at a fair price, but ${n} game${n === 1 ? "" : "s"} played this season is under the ${MIN_GAMES_FOR_REAL_MONEY} real money needs — paper only until then.`,
+      false,
+      62 + hrGap * 10,
+    );
+  }
   if (
     hrGap !== null &&
     hrGap >= BET_GAP_PTS &&

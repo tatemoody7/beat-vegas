@@ -13,7 +13,12 @@ import type { LineBasis } from "@/lib/edge";
 import type { CardBlocker } from "@/lib/card";
 import type { SlipBlock } from "@/lib/betSlip";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import { BET_GAP_PTS, STRONG_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
+import {
+  BET_GAP_PTS,
+  STRONG_GAP_PTS,
+  WEEKLY_BET_CAP,
+  MIN_GAMES_FOR_REAL_MONEY,
+} from "@/lib/verdict";
 
 /** Look a key up; an unknown key gets the fallback, never itself. */
 export function labelOf<K extends string>(
@@ -58,6 +63,7 @@ export const BLOCKER_SHORT: Record<AnyBlocker, string> = {
   price: "Price too short",
   no_fair_price: "Price can't be compared",
   qb_out: "Starting QB out",
+  early_season: "Early season — paper only",
   gap: "Gap too small",
   no_model: "No model number",
   cap: "Past the weekly cap",
@@ -72,6 +78,7 @@ export const GATE_TEXT: Record<AnyBlocker | "none" | "untagged", string> = {
   price: "Hard Rock's price was too short",
   no_fair_price: "Hard Rock's price could not be compared",
   qb_out: "A starting QB was out",
+  early_season: `A team had under ${MIN_GAMES_FOR_REAL_MONEY} games this season`,
   gap: "The gap was too small",
   no_model: "No model number yet",
   cap: `Past the ${WEEKLY_BET_CAP}-bet week`,
@@ -118,6 +125,8 @@ export function blockerTag(
       return "Not yet — no other book is at that number, so the price can't be compared";
     case "qb_out":
       return "Starting QB out — recheck";
+    case "early_season":
+      return `Paper only — a team has under ${MIN_GAMES_FOR_REAL_MONEY} games this season`;
     case "gap":
       return ctx.killLine != null
         ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`

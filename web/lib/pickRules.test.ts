@@ -362,7 +362,8 @@ describe("checkPolicy — early season is paper only", () => {
 
   it("allows real money once both teams have played the minimum", () => {
     expect(
-      checkPolicy(bet, { ...base, minGamesPlayed: MIN_GAMES_FOR_REAL_MONEY }).ok,
+      checkPolicy(bet, { ...base, minGamesPlayed: MIN_GAMES_FOR_REAL_MONEY })
+        .ok,
     ).toBe(true);
   });
 
@@ -381,7 +382,8 @@ describe("checkPolicy — early season is paper only", () => {
       livePrice: { ok: false, reason: "no live line read for this game" },
     });
     const killed = checkPolicy(bet, { ...base, killLine: 26.5 });
-    if (early.ok || noPrice.ok || killed.ok) throw new Error("expected refusals");
+    if (early.ok || noPrice.ok || killed.ok)
+      throw new Error("expected refusals");
     expect(noPrice.error).toContain("PRICE UNAVAILABLE");
     expect(killed.error).toContain("kill line");
     for (const other of [noPrice.error, killed.error]) {

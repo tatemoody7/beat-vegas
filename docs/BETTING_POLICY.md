@@ -132,7 +132,9 @@ A game is BET when all of these hold:
    `docs/LEVEL_ANCHOR.md`) — do not confuse the two.
 2. **Both teams have played at least 2 games this season** —
    `MIN_GAMES_FOR_REAL_MONEY = 2`, enforced server-side in
-   `web/lib/pickRules.ts::checkPolicy`. Under that, the game is **PAPER ONLY**.
+   `web/lib/pickRules.ts::checkPolicy` and mirrored on the card
+   (`beatvegas/card.py`, blocker `early_season`) and the board (`web/lib/verdict.ts`
+   keeps it at Watch), so the three never disagree. Under that, the game is **PAPER ONLY**.
    Being able to produce a number is not the same as that regime being validated
    for money: the blowout blind spot was traced to exactly this regime (weeks 1–2,
    ~59% of features NaN) and the backtest behind the gap rule is weeks 3+. Such
@@ -163,8 +165,9 @@ bet many small edges rather than one big one. It is not a gate.
 - The model **does** read weeks 1–2 (`MIN_GAMES_FOR_MODEL = 0` since 2026-09-08),
   and those games are scored, ranked and paper-logged like any other. What they
   cannot take is **real money**: `MIN_GAMES_FOR_REAL_MONEY = 2` refuses the bet
-  server-side while either team is under two current-season games. The board tags
-  them "early season".
+  server-side while either team is under two current-season games; the card lists
+  the game as Watch with blocker `early_season` and the paper pick carries that
+  tag. The board tags them "early season".
 - The reason is a measured one, not caution for its own sake: the model's blowout
   blind spot sits precisely here (weeks 1–2, ~59% of features NaN), and the
   backtest behind the 1.75 gap rule is weeks 3+. The regime has never been

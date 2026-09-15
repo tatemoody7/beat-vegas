@@ -49,11 +49,17 @@ data — ordinary shrinkage — not where it has none.**
 
 ## Why it has no purchase on weeks 1-2
 
-**The NaNs were never the problem.** `HistGradientBoostingRegressor` handles
-missing values natively: it learns a routing direction for them at each split.
-"No games played yet" is a usable *signal* to the tree, not an absence.
+**The NaNs are not INHERENTLY the problem.** `HistGradientBoostingRegressor`
+handles missing values natively: it learns a routing direction for them at each
+split. "No games played yet" is a usable *signal* to the tree, not an absence.
 Replacing it with a noisy prior-season estimate trades one imperfect input for
 another, and the two roughly cancel.
+
+Stated no more strongly than the experiment supports: **this particular remedy
+was not justified**. Native handling means early-season NaNs are not broken by
+construction; it does not prove missingness costs nothing. Missingness can still
+remove information, and it can still create a train/serve distribution shift.
+What was tested, and failed, is the expanding-mean prior-season seed.
 
 The premise this change was built on — 68 NaN features, therefore weeks 1-2 are
 broken — conflated **missing** with **harmful**.

@@ -207,7 +207,7 @@ def log_paper_picks(
     """Insert one PAPER pick per QUALIFYING item (Hard Rock's 1H line >=
     BET_GAP_PTS above ours — any tier) that has no paper pick yet, tagged with
     the gate that blocked a real bet (`blocker`: none = BET, price, off_market,
-    no_fair_price, qb_out, cap, degraded). Tate's real ticket on the same game never blocks it and is
+    no_fair_price, qb_out, early_season, cap, degraded). Tate's real ticket on the same game never blocks it and is
     never blocked by it (per-ledger guard). `window_hours` restricts logging to
     games kicking off within that many hours — the games this build is the
     DECISION build for (beatvegas.ci.PAPER_WINDOW_HOURS: the midweek builds take

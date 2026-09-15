@@ -46,6 +46,7 @@ reports/residual_gate_*
 reports/level_anchor_*
 reports/censoring_*
 reports/hr_lag_*
+reports/weather_gate_*
 reports/weather_style_*
 reports/two_sided_*
 

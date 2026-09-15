@@ -13,19 +13,14 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from ..config import cfbd_api_key, load_config
+from ._http import BACKOFF_SECONDS, MAX_RETRY_AFTER, RETRY_EXC, retry_after
 
-# Transient failures worth a second look. requests.Timeout covers both
-# ConnectTimeout and ReadTimeout (the Aug 30 2026 Sunday run died on ONE
-# ReadTimeout); ConnectionError covers resets and DNS blips.
-_RETRY_EXC = (requests.Timeout, requests.ConnectionError)
-# Between attempts 1->2, 2->3, 3->4. The old (2, 4) ladder gave a rate limit six
-# seconds to clear, which it never does: CFBD 429'd every grading run on
-# 2026-09-12/13 across four attempts spread over two days. A 429 is a quota
-# window, not a blip, so wait in minutes-adjacent steps. Timeouts and connection
-# errors ride the same ladder -- they are rare enough that the extra wait costs
-# nothing, and the job has no deadline.
-_BACKOFF_SECONDS = (5, 20, 60)
-_MAX_RETRY_AFTER = 120  # honour the server's Retry-After, but never stall a job on it
+# The retry ladder lives in `_http` so every source shares one, rather than each
+# inventing its own (or, as `weather.py` did until 2026-09-13, none at all).
+_RETRY_EXC = RETRY_EXC
+_BACKOFF_SECONDS = BACKOFF_SECONDS
+_MAX_RETRY_AFTER = MAX_RETRY_AFTER
+_retry_after = retry_after
 
 # CFBD reports the calls left in the MONTHLY budget on every response, including
 # the 429 that says the budget is gone. Nothing read it until 2026-09-13, which
@@ -75,24 +70,6 @@ def _is_quota_exhausted(resp: requests.Response) -> bool:
     except Exception:  # noqa: BLE001 - a body we cannot read is not proof of anything
         return False
     return "quota" in body
-
-
-def _retry_after(resp: requests.Response) -> Optional[float]:
-    """Seconds the server asked us to wait, or None if it did not say.
-
-    Only the delta-seconds form is honoured; the HTTP-date form is rare here and
-    a bad parse should fall back to our own ladder rather than raise.
-    """
-    raw = resp.headers.get("Retry-After")
-    if not raw:
-        return None
-    try:
-        secs = float(raw.strip())
-    except ValueError:
-        return None
-    if secs <= 0:
-        return None
-    return min(secs, _MAX_RETRY_AFTER)
 
 
 class CFBDClient:

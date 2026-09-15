@@ -194,3 +194,105 @@ def test_zero_mass_identifies_the_dog_by_spread_sign():
     assert got[0]["fav_shutout_pct"] == pytest.approx(0.0)
     assert got[0]["dog_mean"] == pytest.approx(0.0)
     assert got[0]["fav_mean"] == pytest.approx(21.0)
+
+
+# --------------------------------------------------------------------------- #
+# A Brier score cannot tell you a line is centred
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("base_rate", [0.45, 0.50, 0.55])
+def test_a_constant_half_forecast_scores_exactly_quarter_at_any_base_rate(base_rate):
+    """The error this fixes. docs/CENSORING_STUDY.md read Brier 0.2500 as proof of
+    'what a correctly centred line looks like'. It is not: a constant 0.50
+    forecast scores exactly 0.25 on ANY binary sample, however far off-centre the
+    base rate is. A score near 0.25 says the probabilities cluster near a half
+    with little resolution, and nothing about whether they are right."""
+    n = 2000
+    y = np.zeros(n)
+    y[: int(round(base_rate * n))] = 1.0
+    p = np.full(n, 0.5)
+    assert C.brier(p, y) == pytest.approx(0.25, abs=1e-12)
+
+
+def test_the_uncertainty_term_alone_is_about_a_quarter_here():
+    """Brier = reliability - resolution + uncertainty, and uncertainty is
+    p_bar(1 - p_bar). At the study's 49.49% Under rate that is 0.2500 on its own,
+    which is why the observed 0.2500 was never evidence of calibration."""
+    p_bar = 0.4949
+    assert p_bar * (1 - p_bar) == pytest.approx(0.2500, abs=5e-5)
+
+
+def test_calibration_intercept_slope_sees_what_brier_misses():
+    rng = np.random.default_rng(0)
+    n = 20000
+    truth = rng.uniform(0.3, 0.7, n)
+    y = (rng.uniform(size=n) < truth).astype(float)
+
+    honest = C.calibration_intercept_slope(truth, y)
+    assert honest["slope"] == pytest.approx(1.0, abs=0.15)
+    assert honest["intercept"] == pytest.approx(0.0, abs=0.15)
+    assert abs(honest["bias_pp"]) < 1.5
+
+    # A forecast shifted 8 points high: still a perfectly ordinary Brier, but the
+    # bias and the intercept say plainly that it is off-centre. The intercept goes
+    # NEGATIVE because the fit has to pull an over-prediction back down -- the sign
+    # is the direction of the correction, not of the error.
+    shifted = np.clip(truth + 0.08, 1e-6, 1 - 1e-6)
+    off = C.calibration_intercept_slope(shifted, y)
+    assert off["bias_pp"] > 5, "over-prediction must show as positive bias"
+    assert off["intercept"] < -0.1, "and the fit must correct downward"
+    assert abs(off["intercept"]) > abs(honest["intercept"])
+    # Brier alone would barely flinch at this, which is the whole point.
+    assert abs(C.brier(shifted, y) - C.brier(truth, y)) < 0.02
+
+
+def test_brier_delta_ci_calls_a_real_improvement_real_and_noise_noise():
+    rng = np.random.default_rng(3)
+    n = 4000
+    truth = rng.uniform(0.2, 0.8, n)
+    y = (rng.uniform(size=n) < truth).astype(float)
+    flat = np.full(n, y.mean())
+
+    # truth genuinely beats a flat base rate
+    real = C.brier_delta_ci(flat, truth, y, n_boot=300, seed=1)
+    assert real["delta"] > 0 and real["excludes_zero"] is True
+
+    # the same forecast against itself cannot be an improvement
+    none = C.brier_delta_ci(truth, truth, y, n_boot=300, seed=1)
+    assert none["delta"] == pytest.approx(0.0, abs=1e-12)
+    assert none["excludes_zero"] is False
+
+
+def test_brier_delta_ci_is_paired_on_the_game():
+    """Pairing is what makes a small delta legible: both forecasts see the same
+    outcomes, so the between-game variance cancels instead of drowning it."""
+    rng = np.random.default_rng(5)
+    n = 3000
+    y = (rng.uniform(size=n) < 0.5).astype(float)
+    base = np.full(n, 0.5)
+    alt = np.clip(base + 0.01 * (2 * y - 1), 1e-6, 1 - 1e-6)  # a tiny real edge
+    out = C.brier_delta_ci(base, alt, y, n_boot=300, seed=2)
+    assert out["delta"] > 0
+    assert out["lo"] > 0  # pairing resolves it despite the size
+
+
+def test_reliability_uses_quantile_bins_so_a_clustered_forecast_still_resolves():
+    """De-vigged 1H Under probabilities sit in a narrow band around 0.50. Cutting
+    equal-width there leaves almost every bin empty."""
+    rng = np.random.default_rng(11)
+    n = 2000
+    p = np.clip(rng.normal(0.5, 0.012, n), 1e-6, 1 - 1e-6)
+    p = np.concatenate([p, [0.05, 0.95]])  # two far-out points stretch the range
+    y = (rng.uniform(size=len(p)) < p).astype(float)
+
+    q = C.reliability(p, y, bins=10, method="quantile")
+    w = C.reliability(p, y, bins=10, method="width")
+    assert len(q) > len(w), "quantile bins must resolve the clustered middle"
+    assert min(b["n"] for b in q) > 1
+    assert sum(b["n"] for b in q) == len(p)
+
+
+def test_reliability_survives_a_degenerate_forecast():
+    p = np.full(50, 0.5)
+    y = (np.arange(50) % 2).astype(float)
+    out = C.reliability(p, y)
+    assert len(out) == 1 and out[0]["n"] == 50

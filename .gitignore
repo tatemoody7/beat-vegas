@@ -52,6 +52,7 @@ reports/two_sided_*
 reports/when_to_bet_*
 reports/blend_*
 reports/gates_*
+reports/sharp_books_*
 
 # Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
 # It was untracked AND unignored, so a `git add -A` would have swept several MB

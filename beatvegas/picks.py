@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from .db.models import ManualPick, OddsSnapshot
+from .db.models import AppSetting, ManualPick, OddsSnapshot
 from .grading import (
     clv_under,
     price_clv_under,
@@ -283,3 +283,32 @@ def grade_pick(session, pick: ManualPick, game) -> bool:
         setattr(pick, k, v)
     pick.graded = True
     return True
+
+
+RULE_PAUSED_KEY = "rule_paused"
+
+
+def rule_paused(session) -> Optional[str]:
+    """The note (or "") when real money is paused, None when it is not.
+
+    Paused means the `rule_paused` row holds exactly the string "true" -- the
+    Python writer controls the value, so nothing else is accepted. An absent row
+    is "never switched on", not paused. A caller that cannot READ the row must
+    refuse real money (fail closed); this helper does not swallow errors.
+    """
+    row = session.get(AppSetting, RULE_PAUSED_KEY)
+    if row is None or (row.value or "").strip() != "true":
+        return None
+    return row.note or ""
+
+
+def set_rule_paused(session, paused: bool, note: Optional[str] = None) -> AppSetting:
+    """Write the switch. Idempotent: one row, replaced in place."""
+    row = session.get(AppSetting, RULE_PAUSED_KEY)
+    if row is None:
+        row = AppSetting(key=RULE_PAUSED_KEY, value="false")
+        session.add(row)
+    row.value = "true" if paused else "false"
+    row.note = (note or "").strip() or None
+    row.updated_at = datetime.utcnow()
+    return row

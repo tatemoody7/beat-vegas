@@ -274,3 +274,14 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
 - [ ] Vercel env: `BANKROLL_USD=100`, `UNIT_USD=10` (defaults match).
 - [ ] Hard Rock account funded ($100).
 - [ ] After the `is_paper` migration (`migrate.yml`) — done 2026-09-01.
+
+## The pause
+
+A server-side switch, one row in `app_settings` (`rule_paused`), thrown and cleared by
+`scripts/rule_pause.py on|off|status`. While it is on, **every real-money first-half pick
+is refused** — on the site (`POST /api/picks`, its own `RULE PAUSED` rejection) and from
+the terminal (`pick.py add`, and `--force` does not bypass it). **Paper picks continue**
+and still count toward the record. When the state cannot be read at all, real money is
+refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch that is off.
+`docs/STOPPING_RULE.md` says what throws it — a pre-registered failure boundary on the
+paper rule — and that nothing resumes real money until the rule has been reviewed.

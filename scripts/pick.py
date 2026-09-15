@@ -29,6 +29,7 @@ from beatvegas.picks import (
     grade_pick,
     graded_pick_fields,
     model_read,
+    rule_paused,
 )
 
 __all__ = ["graded_pick_fields"]  # re-exported from beatvegas.picks for existing importers
@@ -91,6 +92,22 @@ def cmd_add(args) -> None:
                 print(
                     f"REFUSED: {'paper ' if args.paper else ''}pick #{dup.id} already logged "
                     f"on this game/market (UNDER {dup.line}). Pass --force to log a second bet on it."
+                )
+                return
+
+        # THE PAUSE (docs/STOPPING_RULE.md). While the rule_paused switch is on,
+        # no real-money pick is logged from anywhere -- not the site, not here --
+        # and --force does not bypass it: the switch exists because something is
+        # wrong, and an override while paused is exactly the bet it must stop.
+        # Paper continues; it still counts toward the record.
+        if not args.paper:
+            note = rule_paused(s)
+            if note is not None:
+                print(
+                    "REFUSED: RULE PAUSED — real money is switched off"
+                    + (f" ({note})" if note else "")
+                    + ". Log it with --paper; it still counts toward the record. "
+                    "scripts/rule_pause.py off resumes."
                 )
                 return
 

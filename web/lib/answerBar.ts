@@ -15,6 +15,9 @@ export type AnswerBet = {
   matchup: string;
   /** "u30.5 -110", or "no line yet" when Hard Rock has not posted. */
   numbers: string;
+  /** A real-money ticket is already logged on this game (HomeGame.picked):
+   *  rendered muted and sorted below the open bets, because it is done. */
+  picked: boolean;
 };
 
 export type AnswerNear = {
@@ -26,7 +29,10 @@ export type AnswerNear = {
 };
 
 export type Answer = {
+  /** Open (unplaced) bets first by rank, then the placed ones. */
   bets: AnswerBet[];
+  /** How many of `bets` are still open, i.e. decisions left to make. */
+  open: number;
   /** The best games that are not bets yet, best first. */
   closest: AnswerNear[];
   used: number;
@@ -68,6 +74,11 @@ function byRank(a: HomeGame, b: HomeGame): number {
   );
 }
 
+/** Open bets before placed ones, each group by rank. */
+function openFirst(a: HomeGame, b: HomeGame): number {
+  return Number(a.picked) - Number(b.picked) || byRank(a, b);
+}
+
 /**
  * Pure: the week's answer. A kicked-off game is never a bet and never the
  * closest — it is not a decision any more.
@@ -80,12 +91,14 @@ export function buildAnswer(
   const live = games.filter((g) => !g.kickedOff);
   const bets = live
     .filter((g) => g.edge.tier === "BET")
-    .sort(byRank)
+    .sort(openFirst)
     .map((g) => ({
       gameId: g.row.gameId,
       matchup: matchupOf(g),
       numbers: numbersOf(g),
+      picked: g.picked,
     }));
+  const open = bets.filter((b) => !b.picked).length;
 
   const closest = live
     .filter((g) => g.edge.tier !== "BET")
@@ -98,5 +111,5 @@ export function buildAnswer(
       needs: shortNeed(g.edge.action),
     }));
 
-  return { bets, closest, used, cap };
+  return { bets, open, closest, used, cap };
 }

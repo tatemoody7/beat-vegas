@@ -36,8 +36,9 @@ export const dynamic = "force-dynamic"; // always read live DB
 // The answer bar is the only thing above the games: it replaced the bankroll
 // strip, the slip header and the card panel headline, all three of which said
 // "no bets this week" in three different ways before the first game appeared.
-// Nothing follows the last game row — the slip, the card and the bankroll all
-// live on /slip now, because Tate never scrolls past the board (2026-09-10).
+// Nothing follows the last game row, because Tate never scrolls past the board
+// (2026-09-10). Logging lives on /game/[id]; the bankroll lives on /results; the
+// card status banner is the only other thing on this page.
 export default async function BoardPage({
   searchParams,
 }: {

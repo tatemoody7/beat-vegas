@@ -16,8 +16,16 @@ export default function AnswerBar({
   answer: Answer;
   nextBuild: string | null;
 }) {
-  const { bets, closest, used, cap } = answer;
-  const live = bets.length > 0;
+  const { bets, open, closest, used, cap } = answer;
+  const placed = bets.length - open;
+  const live = open > 0;
+  // What is left to decide leads. A week whose bets are all placed is not
+  // "no bets yet", and a placed ticket is not "live" — it is done.
+  const headline = live
+    ? `${open} ${open === 1 ? "bet" : "bets"} live`
+    : placed > 0
+      ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
+      : "No bets yet this week";
 
   return (
     <div
@@ -29,31 +37,34 @@ export default function AnswerBar({
           className="text-lg font-semibold"
           style={{ color: live ? "var(--good)" : "var(--text)" }}
         >
-          {live
-            ? `${bets.length} ${bets.length === 1 ? "bet" : "bets"} live`
-            : "No bets yet this week"}
+          {headline}
         </span>
         <span className="font-mono text-sm text-[var(--text-muted)]">
           {`${used} of ${cap} slots used`}
         </span>
       </div>
 
-      {live && (
+      {bets.length > 0 && (
         <ul className="mt-2 space-y-1">
           {bets.map((b) => (
             <li
               key={b.gameId}
-              className="flex flex-wrap items-baseline gap-x-2"
+              className={`flex flex-wrap items-baseline gap-x-2 ${b.picked ? "opacity-60" : ""}`}
             >
               <Link
                 href={`/game/${b.gameId}`}
-                className="text-sm font-semibold text-[var(--accent)] hover:underline"
+                className={`text-sm font-semibold hover:underline ${b.picked ? "text-[var(--text-muted)]" : "text-[var(--accent)]"}`}
               >
                 {b.matchup}
               </Link>
-              <span className="font-mono text-sm text-[var(--text)]">
+              <span
+                className={`font-mono text-sm ${b.picked ? "text-[var(--text-muted)]" : "text-[var(--text)]"}`}
+              >
                 {b.numbers}
               </span>
+              {b.picked && (
+                <span className="bv-badge bv-badge--push">bet logged</span>
+              )}
             </li>
           ))}
         </ul>

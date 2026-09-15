@@ -14,7 +14,6 @@ import {
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
-import MovementChart from "@/app/components/MovementChart";
 import TeamLogo from "@/app/components/TeamLogo";
 
 // One game, in full. This is where every number the board used to hide behind a
@@ -161,13 +160,9 @@ function LinesSection({ g }: { g: HomeGame }) {
           />
           <BookTable m={fh} />
           {/* The price sentence belongs to the decision, and it is printed
-              there. Repeating it under the book table said it twice. */}
-          {g.movement !== null && g.movement.points.length > 1 && (
-            <MovementChart
-              points={g.movement.points}
-              books={g.movement.books}
-            />
-          )}
+              there. Repeating it under the book table said it twice. The
+              per-book time-series chart that sat here is gone too (Tate,
+              2026-09-13: "scribbles"); the table above is the movement read. */}
         </div>
       )}
 

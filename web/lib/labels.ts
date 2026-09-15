@@ -11,7 +11,6 @@ import { american, fmt } from "@/lib/format";
 import type { EdgeBlocker, EdgeTier } from "@/lib/edge";
 import type { LineBasis } from "@/lib/edge";
 import type { CardBlocker } from "@/lib/card";
-import type { SlipBlock } from "@/lib/betSlip";
 import type { PickReason, Verdict } from "@/lib/verdict";
 import {
   BET_GAP_PTS,
@@ -137,51 +136,6 @@ export function blockerTag(
       return `Past the ${WEEKLY_BET_CAP}-bet week — paper only`;
     case "degraded":
       return "Paper only — an input is missing";
-  }
-}
-
-// --- bet slip -----------------------------------------------------------------
-
-export type SlipBlockContext = {
-  line?: number | null;
-  price?: number | null;
-  killLine?: number | null;
-  killPrice?: number | null;
-  liveLine?: number | null;
-  livePrice?: number | null;
-};
-
-/** Why the slip will not log this bet — typed-value form and live-line form. */
-export function slipBlockText(
-  block: SlipBlock,
-  live: boolean,
-  ctx: SlipBlockContext = {},
-): string {
-  const kl = ctx.killLine != null ? `u${fmt(ctx.killLine)}` : "the kill line";
-  const kp = ctx.killPrice != null ? american(ctx.killPrice) : "the kill price";
-  switch (block) {
-    case "degraded":
-      return "An input is missing, so this is paper only.";
-    case "cap":
-      return `${WEEKLY_BET_CAP} real-money bets are already logged this week.`;
-    case "kill_line":
-      if (live) {
-        const now =
-          ctx.liveLine != null ? `u${fmt(ctx.liveLine)}` : "a lower total";
-        return `Hard Rock is now at ${now}, below the kill line of ${kl}.`;
-      }
-      return ctx.line != null
-        ? `u${fmt(ctx.line)} is below the kill line of ${kl} — not the bet we rated.`
-        : `That total is below the kill line of ${kl} — not the bet we rated.`;
-    case "kill_price":
-      if (live) {
-        const now =
-          ctx.livePrice != null ? american(ctx.livePrice) : "a worse price";
-        return `Hard Rock is now ${now}, worse than the kill price of ${kp}.`;
-      }
-      return ctx.price != null
-        ? `${american(ctx.price)} is worse than the kill price of ${kp} — not the bet we rated.`
-        : `That price is worse than the kill price of ${kp} — not the bet we rated.`;
   }
 }
 

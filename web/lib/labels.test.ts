@@ -9,7 +9,6 @@ import {
   PROXY_TEXT,
   REASON_TEXT,
   RULE_TEXT,
-  slipBlockText,
   TIER_TEXT,
 } from "./labels";
 
@@ -63,22 +62,6 @@ describe("blockerTag", () => {
     );
     expect(blockerTag("qb_out")).toBe("Starting QB out — recheck");
     expect(blockerTag(null)).toBeNull();
-  });
-});
-
-describe("slipBlockText", () => {
-  it("reads differently for a typed value and a live line", () => {
-    expect(
-      slipBlockText("kill_line", false, { line: 24, killLine: 24.5 }),
-    ).toBe("u24.0 is below the kill line of u24.5 — not the bet we rated.");
-    expect(
-      slipBlockText("kill_line", true, { liveLine: 24, killLine: 24.5 }),
-    ).toBe("Hard Rock is now at u24.0, below the kill line of u24.5.");
-    expect(
-      slipBlockText("kill_price", false, { price: -125, killPrice: -115 }),
-    ).toBe("-125 is worse than the kill price of -115 — not the bet we rated.");
-    expect(slipBlockText("cap", false)).toMatch(/already logged this week/);
-    expect(slipBlockText("degraded", true)).toMatch(/paper only/);
   });
 });
 

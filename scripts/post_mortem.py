@@ -29,11 +29,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from beatvegas import postmortem as pm
+from beatvegas import snapshots
 from beatvegas.config import REPO_ROOT
 from beatvegas.db.models import (
     Card,
     Game,
-    OddsSnapshot,
     PostMortemBucket,
     PostMortemGame,
     PostMortemRun,
@@ -45,11 +45,9 @@ from beatvegas.db.models import (
 from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.proxy_line import _load_share_coeffs
-from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.lines import (
     REAL_1H_CLOSE_WINDOW_H,
     REAL_FG_CLOSE_WINDOW_H,
-    book_closing_before_kickoff,
     real_closes,
 )
 from beatvegas.model.score import MODEL_VERSION
@@ -139,29 +137,10 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
 
 
 def _hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) -> Dict[int, float]:
-    """game_id -> Hard Rock's OWN pre-kickoff 1H close (the per-game close polls,
-    lines_watch.yml); games without one are simply absent."""
-    if not game_ids:
-        return {}
-    by_game: Dict[int, List] = {}
-    ids = list(game_ids)
-    for i in range(0, len(ids), 1000):
-        for snap in (
-            session.query(OddsSnapshot)
-            .filter(
-                OddsSnapshot.market == "1H_total",
-                OddsSnapshot.book == HR_BOOK_KEY,
-                OddsSnapshot.game_id.in_(ids[i : i + 1000]),
-            )
-            .all()
-        ):
-            by_game.setdefault(snap.game_id, []).append(snap)
-    out: Dict[int, float] = {}
-    for gid, snaps in by_game.items():
-        _open, close, _at = book_closing_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
-        if close is not None:
-            out[gid] = float(close)
-    return out
+    """game_id -> Hard Rock's OWN pre-kickoff 1H close. Lives in
+    beatvegas/snapshots.py since 2026-09-15 so the studies share it; kept here by
+    name for the existing callers and tests."""
+    return snapshots.hr_closes(session, game_ids, kickoffs)
 
 
 def load_live(

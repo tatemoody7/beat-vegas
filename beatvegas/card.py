@@ -843,6 +843,11 @@ def build_item(
         "bv_line": None if bv_line is None else round2(bv_line),
         "under_score": under_score,
         "games_played": games_played,
+        # The QB-out read this build saw (Rotowire via the preview). Additive
+        # since 2026-09-15 so the gates study can grade the qb_out gate ALONE:
+        # `blocker` only names it when off_market and price already passed.
+        "qb_out": qb_out,
+        "qb_out_detail": qb_detail,
         "gap": gap,
         "gap_basis": gap_basis,
         "kill_line": k_line,

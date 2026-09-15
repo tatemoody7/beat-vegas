@@ -200,6 +200,44 @@ def per_game_frame(
     return pd.concat(frames, ignore_index=True)
 
 
+def per_game_frame_from_postmortem(rows: pd.DataFrame) -> pd.DataFrame:
+    """The same per-game frame from `postmortem_games` (scope hist_2023_25): the
+    STORED walk-forward bv_line beside the real close and the trusted first half --
+    the 1,902-game cut every other 2023-25 study read. Needed because the Neon
+    feature frame starts at 2023, so a refit has nothing to train on for 2023.
+    Expects columns game_id, season, week, spread_abs, line_real, fh, bv_line."""
+    cols = [
+        "game_id",
+        "season",
+        "week",
+        "kickoff",
+        "spread_abs",
+        "bucket",
+        "close",
+        "actual",
+        "pred_bv",
+    ]
+    if rows.empty:
+        return pd.DataFrame(columns=cols)
+    r = rows.copy()
+    for c in ("season", "week", "spread_abs", "line_real", "fh", "bv_line"):
+        r[c] = pd.to_numeric(r[c], errors="coerce")
+    r = r.dropna(subset=["line_real", "fh", "bv_line"])
+    return pd.DataFrame(
+        {
+            "game_id": r["game_id"].astype(int).to_numpy(),
+            "season": r["season"].astype(int).to_numpy(),
+            "week": r["week"].to_numpy(),
+            "kickoff": r["kickoff"].to_numpy() if "kickoff" in r else pd.NaT,
+            "spread_abs": r["spread_abs"].to_numpy(),
+            "bucket": [bucket_of(v) for v in r["spread_abs"]],
+            "close": r["line_real"].astype(float).to_numpy(),
+            "actual": r["fh"].astype(float).to_numpy(),
+            "pred_bv": np.round(r["bv_line"].astype(float).to_numpy(), 2),
+        }
+    ).reset_index(drop=True)
+
+
 # ---------------------------------------------------------------- one split
 
 

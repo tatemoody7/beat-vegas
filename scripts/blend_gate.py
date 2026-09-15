@@ -23,6 +23,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import pandas as pd
+from sqlalchemy import text
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from residual_gate import (  # noqa: E402
@@ -42,6 +45,14 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--seasons", type=int, nargs="+", default=[2023, 2024, 2025])
+    ap.add_argument(
+        "--source",
+        choices=("postmortem", "refit"),
+        default="postmortem",
+        help="postmortem: the stored walk-forward bv_line in postmortem_games (hist_2023_25, "
+        "all three seasons); refit: rebuild the feature frame and refit bv_line per season "
+        "(on Neon the frame starts at 2023, so 2023 itself cannot be predicted)",
+    )
     ap.add_argument("--live-season", type=int, default=2026)
     ap.add_argument("--out", default="reports/blend")
     ap.add_argument("--n-boot", type=int, default=2000)
@@ -54,13 +65,51 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
+HIST_SCOPE = "hist_2023_25"
+
+
+def load_postmortem_rows(session, seasons) -> "pd.DataFrame":
+    """FBS rows of the latest hist_2023_25 post-mortem run with a real close, a graded
+    first half and a stored walk-forward bv_line."""
+    run_id = session.execute(
+        text(
+            "select run_id from postmortem_runs where scope = :s order by computed_at desc limit 1"
+        ),
+        {"s": HIST_SCOPE},
+    ).scalar()
+    rows = (
+        session.execute(
+            text(
+                """
+            select g.game_id, g.season, g.week, g.spread_abs, g.line_real, g.fh, g.bv_line,
+                   gm.start_date as kickoff
+            from postmortem_games g left join games gm on gm.id = g.game_id
+            where g.run_id = :r and g.scope = :s and g.division = 'fbs'
+              and g.line_real is not null and g.fh is not null and g.bv_line is not null
+            """
+            ),
+            {"r": run_id, "s": HIST_SCOPE},
+        )
+        .mappings()
+        .all()
+    )
+    df = pd.DataFrame(rows)
+    df.attrs["run_id"] = run_id
+    return df[df["season"].isin(seasons)] if len(df) else df
+
+
 def run(pg, live_rows, seasons, n_boot: int, do_freeze: bool) -> Dict[str, Any]:
     splits = [
         B.evaluate_split(pg, tr, te, n_boot=n_boot)
         for tr, te in B.SPLITS
         if te in seasons and all(s in seasons for s in tr)
     ]
-    frozen = B.freeze(pg, seasons) if do_freeze else None
+    # The frozen w is only meaningful AFTER every registered split evaluated on the
+    # same rows; a partial frame (a season missing) must not freeze anything.
+    all_evaluated = bool(splits) and all(s.get("evaluated") for s in splits)
+    frozen = B.freeze(pg, seasons) if (do_freeze and all_evaluated) else None
+    if do_freeze and not all_evaluated:
+        print("[blend] --freeze refused: not every registered split evaluated")
     w_live = (
         frozen["w"]
         if frozen
@@ -84,16 +133,31 @@ def main(argv: Optional[list] = None) -> int:
     if not try_init_db():
         print("[blend] DB unreachable — skipped.")
         return 0
-    df = load_played_frame(fbs_only=True)
-    df = df[df["season"] <= max(args.seasons)]
-    print(f"[blend] played feature frame: {len(df)} rows, seasons {sorted(df['season'].unique())}")
     with session_scope() as s:
-        ids = df[df["season"].isin(args.seasons)]["id"].tolist()
-        closes = load_closes(s, ids)
-        print(f"[blend] real 1H closes: {len(closes)} of {len(ids)} games in {args.seasons}")
-        pg = B.per_game_frame(df, closes, args.seasons)
+        if args.source == "postmortem":
+            rows = load_postmortem_rows(s, args.seasons)
+            print(
+                f"[blend] postmortem_games {HIST_SCOPE} run {rows.attrs.get('run_id')}: "
+                f"{len(rows)} rows with close + result + stored bv_line"
+            )
+            pg = B.per_game_frame_from_postmortem(rows)
+        else:
+            df = load_played_frame(fbs_only=True)
+            df = df[df["season"] <= max(args.seasons)]
+            print(
+                f"[blend] played feature frame: {len(df)} rows, seasons "
+                f"{sorted(int(x) for x in df['season'].unique())}"
+            )
+            ids = df[df["season"].isin(args.seasons)]["id"].tolist()
+            closes = load_closes(s, ids)
+            print(f"[blend] real 1H closes: {len(closes)} of {len(ids)} games in {args.seasons}")
+            pg = B.per_game_frame(df, closes, args.seasons)
         live_rows = None if args.no_live else snapshots.build_rows(s, args.live_season)
+    print(
+        f"[blend] per-game rows by season: {pg.groupby('season').size().to_dict() if len(pg) else {}}"
+    )
     r = run(pg, live_rows, args.seasons, args.n_boot, args.freeze)
+    r["source"] = args.source
     if r["freeze"]:
         print(f"[blend] frozen w written to {B.write_freeze(r['freeze'])}")
     md = B.render_markdown(r)

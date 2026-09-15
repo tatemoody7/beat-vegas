@@ -42,8 +42,16 @@ closing price (median 7 books per game).
 
 - market mean P(under) **50.06%** against realized **49.49%** — a gap of
   **0.57 pp**
-- Brier **0.2500**, identical to a flat coin flip, which is what a correctly
-  centred line looks like
+- Brier **0.2500** — which on its own says **nothing** about whether the line is
+  centred, and this report previously claimed otherwise. A constant 0.50 forecast
+  scores exactly 0.25 on any binary sample whatever the base rate, and Brier
+  decomposes as reliability − resolution + uncertainty where the uncertainty term
+  alone is p̄(1−p̄) = 0.4949 × 0.5051 = **0.2500**. The observed figure *is* the
+  uncertainty term: it says the market's probabilities cluster near a half with
+  little resolution. **The calibration evidence is the line above** — mean implied
+  50.06% against realized 49.49%, a 0.57 pp gap — and, since 2026-09-14, the
+  calibration intercept/slope and reliability tables that
+  `censoring.calibration_intercept_slope` and `reliability` now produce
 - **spread coefficient +0.00369 per point, bootstrap 95% CI
   [−0.0083, +0.0157] — includes zero**
 
@@ -63,7 +71,11 @@ Brier from 0.25040 to 0.25029: an improvement in the fourth decimal place.
 
 **And it would not pay even if it were real.** Taken at face value the
 coefficient moves P(under) by **+1.94 pp across the entire 7-to-28 spread
-range**, against a **2.38 pp** vig hurdle at −110.
+range**, under the **2.38 pp** break-even hurdle at −110. Treat that hurdle as
+illustrative rather than as the economic test: real tickets are not all −110, and
+break-even at −105, −115 and −120 differs materially. The decisive point is not
+that 1.94 < 2.38 — it is that no stable positive signal survives out of sample at
+the prices actually quoted.
 
 The bucket view says the same thing in a form you can eyeball — the differences
 are not merely small, they are non-monotone, with adjacent buckets swinging
@@ -94,9 +106,24 @@ assumption. It cannot show the market is wrong, in either direction.
 | 28+ | 65 | **23.1%** | 14.5–34.6% | **0.0%** | 5.3 | 23.5 |
 
 Monotone, large, and exactly as asymmetric as the theory says. **So the finding
-is not "there is no censoring." It is: the censoring is real, strong and
-monotone — and the market prices it correctly.** That is a much more useful
-result than a null, and it is the one that closes the question.
+is not "there is no censoring."** The mechanism is real, strong and monotone.
+
+**What the evidence supports, stated no more strongly than it can bear:** after
+conditioning on the book's own de-vigged probability, *no stable residual signal
+was detected* in spread. That is not the same as showing the market prices
+censoring correctly, and this report used to say the stronger thing. The
+confidence interval is wide enough to matter: `[−0.0083, +0.0157]` per point
+works out to **−4.36 pp to +8.24 pp** across the whole 7-to-28 spread range, so
+the data is consistent both with no effect and with effects large enough to be
+worth having. Failing to detect is not proving absent.
+
+**Why DO NOT BUILD is still the right call** rests on three things, none of which
+is the point estimate: the coefficient **flips sign by season** (+0.0057 / −0.0038
+/ +0.0093), it produces **no out-of-sample gain** (a fourth-decimal Brier move,
+now reported with a paired bootstrap CI so it can be read as the noise it is), and
+the bucket differences are **non-monotone**, swinging 13 points in opposite
+directions on adjacent buckets. A specialised engine is days of work; that is not
+a foundation to spend them on.
 
 **A correction worth recording.** The plan quoted a 37.6% underdog shutout rate
 at 28+. On the real-close cut it is **23.1%**. The higher figure came from the
@@ -106,9 +133,10 @@ instance of the standing rule: split on `line_real` before concluding anything.
 
 ## What this does and does not close
 
-**Closed:** the censoring-specific engine. There is no evidence of exploitable
-residual information in spread, and the point estimate is below the vig hurdle
-even if real.
+**Closed:** the censoring-specific engine. No *detectable* exploitable residual
+information in spread, an unstable sign, no out-of-sample gain, and a point
+estimate under the −110 hurdle even taken at face value. Closed on the weight of
+those together — not on a claim that the true effect is zero.
 
 **Not closed:** whether the market errs on some *other* conditioning variable —
 weather, pace, travel, rest. This tested spread because spread is what the

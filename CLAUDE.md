@@ -162,10 +162,13 @@ Research only — it never places bets or automates gambling.
   zero, not monotone in k); weeks 3+, which nobody was testing, improved monotonically
   (+0.038 to +0.117, CI excluding zero at k≥1) — the seed is ordinary shrinkage and helps
   where a team already has SOME data.
-  **The NaNs were never the problem: `HistGradientBoostingRegressor` handles missing
-  values natively**, learning a routing direction for them, so "no games played yet" is a
-  usable SIGNAL to the tree rather than an absence. Counting NaN cells and concluding the
-  model is starved conflates *missing* with *harmful*.
+  **The NaNs are not INHERENTLY the problem: `HistGradientBoostingRegressor` handles
+  missing values natively**, learning a routing direction for them, so "no games played
+  yet" is a usable SIGNAL to the tree rather than an absence. Counting NaN cells and
+  concluding the model is starved conflates *missing* with *harmful*. (Softened
+  2026-09-14 from "were never the problem": what the experiment proved is that THIS
+  remedy was not justified, not that missingness is costless — it can still remove
+  information or create train/serve skew.)
   **And MAE is close to blind to what the change does.** The seed genuinely lifts
   bv_line's level (2026 wks 1-2: 24.26 → 25.20 at k=3 against a realized 26.90, about a
   third of the bias) while MAE barely moves — ~1 pt of bias is nothing against ~11 pts of
@@ -250,8 +253,18 @@ Research only — it never places bets or automates gambling.
   the implied value.
   **The mechanism is real — that is the useful part.** Dog 1H shutout rate runs
   8.6% → 12.0% → 16.3% → 17.0% → **23.1%** by spread bucket while the favourite's
-  falls to **0.0%**. So the finding is not "no censoring", it is "the censoring is
-  real, strong and monotone, and the market prices it correctly."
+  falls to **0.0%**. So the finding is not "no censoring".
+  **CORRECTED 2026-09-14 — do not restate the old, stronger version.** This used to
+  read "and the market prices it correctly", which the evidence does not support:
+  the CI `[−0.0083, +0.0157]` per point is **−4.36 pp to +8.24 pp** across the
+  7-to-28 range, consistent with no effect AND with effects worth having. The
+  supported claim is *no stable residual signal was DETECTED after conditioning on
+  the price*. DO NOT BUILD stands on the season-by-season sign flip, the absent
+  out-of-sample gain and the non-monotone buckets — not on the point estimate.
+  Likewise **"Brier 0.2500 = a correctly centred line" was wrong**: a constant 0.50
+  forecast scores exactly 0.25 at any base rate, and p̄(1−p̄) here IS 0.2500, so the
+  number was the uncertainty term. Calibration is carried by the 0.57 pp
+  implied-vs-realized gap and by `calibration_intercept_slope` / `reliability`.
   **Correction to an earlier figure:** the 37.6% dog-shutout rate at 28+ quoted in
   planning is from the full 3,601-row population; on the real-close cut it is
   **23.1%**. The unpriced games are not a random sample. Split on `line_real`.

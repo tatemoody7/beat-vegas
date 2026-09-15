@@ -21,8 +21,10 @@ the bet card follows. Change it here first, then in code.
 - **Edge-driven, capped at 5 real-money bets per week.** The cap is a
   ceiling, not a target. Zero bets is a valid, normal week.
 - Only games whose verdict on the This Week page is **BET** are bettable. Real bets are
-  placed off the most recent decision build (Tue/Thu/Fri ~4:05pm ET, Sat ~8:05am ET) via
-  the Bet Slip, and all of them count toward the same weekly cap. BETs are ranked by gap
+  placed off the most recent decision build (Tue/Thu/Fri ~4:05pm ET, Sat ~8:05am ET) and
+  logged from the **game page** (`/game/[id]` -> Log pick -> `POST /api/picks`); all of
+  them count toward the same weekly cap. *(The Bet Slip was deleted 2026-09-13 — logging
+  lives on the game page now.)* BETs are ranked by gap
   — the 6th+ by gap is paper only (`blocker: cap`).
   A BET whose blocker is `degraded` is **held**: paper only, no cap slot (see
   "Degraded card" below). WATCH is not a bet. Passing costs nothing.
@@ -59,10 +61,13 @@ the bet card follows. Change it here first, then in code.
   **ProphetX**, **Novig**, **DraftKings Predictions**, Crypto.com, Underdog
   Predict. They sell game-winner / spread / futures contracts priced with no
   vig — and, as far as we can tell, **no first-half totals**, so they cannot
-  carry our real-money market. **Use: price comparison only.** Kalshi,
-  Polymarket, Novig and ProphetX flow into the Sunday full-game capture via
-  The Odds API region `us_ex` and sharpen the "market fair price" Hard Rock
-  is judged against on each This Week card. FanDuel Predicts is not in any feed we use.
+  carry our real-money market. **Use: price comparison only, and FULL-GAME only.** Kalshi,
+  Polymarket, Novig and ProphetX flow into the Sunday **full-game** capture via
+  The Odds API region `us_ex`. They do **not** sharpen the first-half fair price:
+  re-verified 2026-09-07, `us_ex` returns **zero** first-half-total bookmakers, so
+  no 1H sweep pays for that region (`beatvegas/ci.py`) and the exchange-first path
+  in `card.py` sits dormant on the market we actually bet. (See "The exchanges post
+  no first-half totals" below — this file used to claim both things at once.) FanDuel Predicts is not in any feed we use.
 - **Sweepstakes / DFS** — Fliff (sweepstakes book; its lines are in our feed),
   PrizePicks, Underdog, DraftKings Pick6. Not used.
 
@@ -108,32 +113,43 @@ The site is one page: every game on the week in a single ranked list.
   single game (`pace`, ~5% of games each week) holds that game only and does
   **not** flip the card's status — the banner would fire most Saturdays with
   every bet fine. A held bet keeps its tier but its blocker is `degraded`: it is
-  **paper only, takes no weekly-cap slot**, is never in the BET list or the Bet
-  Slip, and appears under "Held" on the board and in the Saturday text. The
-  build prints `CARD STATUS: <status> slot=<slot> held=<games> (bets <n>)` as
-  line 2 of its summary; the Saturday text flags a non-final status up front
-  (its BETS header reads `BETS (DEGRADED - n held back)`), lists the held bets
-  under `HELD BACK (input failed)`, and spells the status and each failed input
-  out in its CARD STATUS section.
+  **paper only, takes no weekly-cap slot**, is never in the BET list, and appears
+  under "Held" on the board. The build prints
+  `CARD STATUS: <status> slot=<slot> held=<games> (bets <n>)` as line 2 of its
+  summary, and the board carries the card-status banner beside the missed-build
+  and stale-results ones.
 
 ## What BET means (lib/verdict.ts)
 
 A game is BET when all of these hold:
 
-1. The model has a read (both teams have played 2+ games; weeks 1–2 never
-   qualify by design).
-2. **Hard Rock's own** first-half number sits **≥ 1.75 points above our number**
+1. The model has a read. **This no longer means "2+ games played"** —
+   `MIN_GAMES_FOR_MODEL` has been **0** since 2026-09-08. The model can score a
+   game with zero current-season games because `HistGradientBoostingRegressor`
+   handles missing season-to-date features natively, and static/prior-season
+   features (SP+, talent, returning production) still contribute. The tested
+   expanding-mean prior-season **seed remains disabled** (`PRIOR_SEASON_WEIGHT = 0`,
+   `docs/LEVEL_ANCHOR.md`) — do not confuse the two.
+2. **Both teams have played at least 2 games this season** —
+   `MIN_GAMES_FOR_REAL_MONEY = 2`, enforced server-side in
+   `web/lib/pickRules.ts::checkPolicy`. Under that, the game is **PAPER ONLY**.
+   Being able to produce a number is not the same as that regime being validated
+   for money: the blowout blind spot was traced to exactly this regime (weeks 1–2,
+   ~59% of features NaN) and the backtest behind the gap rule is weeks 3+. Such
+   games are still scored, ranked and paper-logged so the cohort accrues
+   evidence; only the real-money BET is refused, with its own rejection reason.
+3. **Hard Rock's own** first-half number sits **≥ 1.75 points above our number**
    (not the consensus line — the consensus can sit 1.75 above while Hard Rock
    posts a lower number). This is the top-20% gap band. (≥ 3.0 points = top-10%,
    "high" confidence. The classifier's under_score no longer gates the label: the
    2026-09-06 post-mortem found it carries no information about the outcome, so
    it stays a display chip only.)
-3. A **live** first-half line has actually been captured — never an estimate.
-4. Hard Rock's under price is no more than 5 cents (per $1) worse than the
+4. A **live** first-half line has actually been captured — never an estimate.
+5. Hard Rock's under price is no more than 5 cents (per $1) worse than the
    market's no-vig fair price. Standard -110 juice on a balanced market
    passes; -115 or worse fails unless the market itself leans under. (Decided
    2026-09-05: the earlier 2-cent version could almost never fire.)
-5. Hard Rock's first-half total is **not more than 0.5 points below the
+6. Hard Rock's first-half total is **not more than 0.5 points below the
    market's** — a lower number is a worse under, and Hard Rock's house rules
    can void bets on lines that differ materially from the general market.
    Off-market numbers are WATCH until Hard Rock moves back toward the market.
@@ -142,35 +158,47 @@ Sigma (~12 points) is the noise of any single game's outcome. It is why
 every card says "still close to a coin flip on any single game" and why we
 bet many small edges rather than one big one. It is not a gate.
 
-## Weeks 1–2 (no model)
+## Weeks 1–2 (scored, but PAPER ONLY)
 
-- Any bet is a **price bet**, not a model bet: Hard Rock's under paying
-  better than the market's fair price. These show as WATCH — "price edge
-  only". Fewer bets is the right answer; the bar is high.
+- The model **does** read weeks 1–2 (`MIN_GAMES_FOR_MODEL = 0` since 2026-09-08),
+  and those games are scored, ranked and paper-logged like any other. What they
+  cannot take is **real money**: `MIN_GAMES_FOR_REAL_MONEY = 2` refuses the bet
+  server-side while either team is under two current-season games. The board tags
+  them "early season".
+- The reason is a measured one, not caution for its own sake: the model's blowout
+  blind spot sits precisely here (weeks 1–2, ~59% of features NaN), and the
+  backtest behind the 1.75 gap rule is weeks 3+. The regime has never been
+  validated for money.
 - Before any bet: read the injuries and news block on each This Week card (unofficial Rotowire / ESPN) — the
   number does not know about a starting QB being out.
 
 ## Weekly rhythm
 
-GitHub cron drops some single-slot runs, so every job has retry slots, the card
-job re-sweeps before it builds, and two Claude routines re-dispatch what cron
-dropped (`cfb-saturday-card` for the final card, `cfb-sunday-ops` for the Sunday
-capture). The builds themselves are triggered by a Vercel cron dispatching the
-slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
-(`lines_watch.yml` header), which fits the 20K plan several times over.
+GitHub cron drops some single-slot runs, so every job has retry slots and the
+card job re-sweeps before it builds. The builds themselves are triggered by a
+**Vercel cron** dispatching the slot by name; GitHub cron is the backup.
+
+**There are no scheduled Claude routines and no scheduled texts** (retired
+2026-09-13). They were LOCAL Claude sessions, and on battery this Mac sleeps
+after a minute, so they fired only when the laptop happened to be awake —
+`cfb-saturday-card` ran twice all season. **The board is the failure signal now**:
+`web/lib/boardHealth.ts` surfaces a stale-results banner and a missed-build
+banner, and GitHub emails failed runs.
+
+Odds API: ~567 credits a week expected (`lines_watch.yml` header), comfortably
+inside the **100K/month** tier the project has been on since 2026-09-06.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
 | Sun 2pm / 3pm / 4:30pm       | Full-game openers captured; pace/weather refreshed; board scored; derived 1H lines posted | `sunday.yml`        |
-| Sun 4:45pm                   | **Ops routine**: verify/kick `sunday.yml`, text the weekend recap | `cfb-sunday-ops` |
+
 | Tue / Thu / Fri ~4:05pm      | **Decision build**: forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build. Timed to when Hard Rock actually posts first-half lines. Tuesday and Thursday paper-log only the games kicking off before the NEXT build (48 h / 24 h); **Friday paper-logs the rest of the week** — it is the decision build for the weekend. Gated 3:45–5:15pm ET so DST needs no edit | `card.yml` |
 | Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
 | Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every decision build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
-| Sat 8:50am                   | **Card routine**: verify/kick the `sat_am` build, text the BET list (line, price, kill numbers) | `cfb-saturday-card` |
-| Game days                    | **Tate bets off the Bet Slip** on the Board, off the most recent decision build (one tap logs the ticket) | you |
+
+| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) | you |
 | Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
-| Mon 9am                      | Coaching digest includes a one-line grading check (kicks `grade.yml` if needed) | `monday-coaching` |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 
 ## Measuring, not promising
@@ -220,7 +248,7 @@ slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
   A paper pick never
   blocks your real ticket on the same game, and vice versa (the duplicate
   guard is per ledger). The card ranks BETs by gap (the cap-5 rule the
-  backtest measured), so the text order is the cap order. A real ticket this
+  backtest measured), so the card order is the cap order. A real ticket this
   week on a game that is not on the card (a Thursday game already played)
   still consumes one of the five slots.
 - **Unpriced lines.** When Hard Rock has posted the first-half number but no
@@ -237,8 +265,9 @@ slot by name; GitHub cron is the backup. Odds API: ~567 credits a week expected
 ## Pre-flight checklist (do once)
 
 - [ ] GitHub Actions email notifications on for failed runs (GitHub → Settings →
-      Notifications → Actions). That email plus the Claude routines are the only
-      failure alert; there is no push layer.
+      Notifications → Actions). That email plus the **board's own banners**
+      (`web/lib/boardHealth.ts`: stale results, missed build, card status) are the
+      only failure alert; there is no push layer and no scheduled routine.
 - [ ] Vercel env: `BANKROLL_USD=100`, `UNIT_USD=10` (defaults match).
 - [ ] Hard Rock account funded ($100).
 - [ ] After the `is_paper` migration (`migrate.yml`) — done 2026-09-01.

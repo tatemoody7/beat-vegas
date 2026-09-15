@@ -163,3 +163,32 @@ def test_live_frame_takes_the_last_final_build_before_kickoff():
     assert len(lf) == 1 and lf.iloc[0].market_line == 44.5  # game 2 built AT kickoff is out
     s = B.live_summary(lf, 0.8)
     assert s["n"] == 1 and s["mae"]["blend"] == pytest.approx(abs(0.8 * 44.5 + 0.2 * 42.2 - 41.0))
+
+
+def test_per_game_frame_from_postmortem_maps_the_stored_columns():
+    rows = pd.DataFrame(
+        {
+            "game_id": [1, 2, 3],
+            "season": [2023, 2024, 2024],
+            "week": [3, 4, 5],
+            "spread_abs": [7.0, 22.0, None],
+            "line_real": [44.5, 50.0, 41.0],
+            "fh": [40.0, 55.0, None],  # game 3 ungraded -> dropped
+            "bv_line": [42.123, 47.0, 40.0],
+        }
+    )
+    pg = B.per_game_frame_from_postmortem(rows)
+    assert len(pg) == 2 and list(pg.columns)[:3] == ["game_id", "season", "week"]
+    assert pg.iloc[0].close == 44.5 and pg.iloc[0].actual == 40.0 and pg.iloc[0].pred_bv == 42.12
+    assert list(pg.bucket) == ["<14", "21-28"]
+    assert B.per_game_frame_from_postmortem(rows.iloc[0:0]).empty
+
+
+def test_script_refuses_to_freeze_on_a_partial_frame(load_script):
+    mod = load_script("blend_gate")
+    pg = _pg(seasons=(2024, 2025))  # 2023 missing -> the first split cannot evaluate
+    r = mod.run(pg, None, [2023, 2024, 2025], 100, True)
+    assert r["freeze"] is None and r["verdict"]["word"] == "NOT EVALUATED"
+    full = _pg(seasons=(2023, 2024, 2025))
+    r2 = mod.run(full, None, [2023, 2024, 2025], 100, True)
+    assert r2["freeze"] is not None and r2["freeze"]["fitted_on"] == "2023-2025"

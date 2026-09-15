@@ -1,5 +1,6 @@
 "use client";
 
+import { displayLineValue } from "@/lib/clvDirection";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { american, signed } from "@/lib/format";
@@ -220,7 +221,7 @@ export default function PicksList({
                     {num(p.units)}
                   </td>
                   <td className="bv-num font-mono text-[var(--text-muted)]">
-                    {num(p.clv)}
+                    {num(displayLineValue(p.clv))}
                   </td>
                   <td className="whitespace-nowrap">
                     <button

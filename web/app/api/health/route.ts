@@ -6,6 +6,7 @@ import {
   getGradeHealth,
   staleness,
 } from "@/lib/boardHealth";
+import { getRulePause } from "@/lib/rulePause";
 import { currentCfbSeason } from "@/lib/season";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +37,13 @@ export async function GET() {
     const r = rows[0];
     const grading = staleness(await getGradeHealth(currentCfbSeason()));
     const build = buildStatus(await getBuildHealth());
+    const pause = await getRulePause();
     return NextResponse.json({
       ok: true,
+      // The real-money pause (docs/STOPPING_RULE.md): thrown, or unreadable —
+      // both mean real money is refused right now.
+      rulePaused: pause.paused === true,
+      rulePauseReadable: pause.paused !== "unreadable",
       lastFullGameCapture: r?.last_fg_capture?.toISOString() ?? null,
       resultsStale: grading.stale,
       buildMissed: build.missed,

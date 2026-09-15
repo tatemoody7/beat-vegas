@@ -16,6 +16,7 @@ import {
 } from "@/lib/homeBoard";
 import { nextBuild } from "@/lib/nextBuild";
 import { getLatestCard } from "@/lib/card";
+import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import AnswerBar from "@/app/components/AnswerBar";
@@ -66,6 +67,10 @@ export default async function BoardPage({
   // about to bet off, not about a bet already placed (Tate 2026-09-13).
   const card =
     board.week === null ? null : await getLatestCard(season, board.week);
+  // The real-money pause (docs/STOPPING_RULE.md) — a banner, because a switch
+  // that only speaks when you try to log a bet is a switch you find out about
+  // at the worst moment.
+  const pause = await getRulePause();
 
   const filters = parseFilters(sp);
   const games = board.games.filter((g) => matchesFilters(g, filters));
@@ -113,6 +118,29 @@ export default async function BoardPage({
       </div>
 
       <CardStatusBanner card={card} />
+
+      {pause.paused === true && (
+        <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--text)]">
+            Real money is paused.
+          </p>
+          <p className="mt-1">
+            {pause.note ? `${pause.note}. ` : ""}
+            {`Every real-money first-half pick is refused until the rule has been reviewed. Paper picks still log and count toward the record.`}
+          </p>
+        </div>
+      )}
+
+      {pause.paused === "unreadable" && (
+        <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--text)]">
+            Real money is off until the pause switch can be read.
+          </p>
+          <p className="mt-1">
+            {`${pause.reason}. A switch we cannot see is not a switch that is off. Paper picks still log.`}
+          </p>
+        </div>
+      )}
 
       {buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">

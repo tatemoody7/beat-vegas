@@ -5,7 +5,9 @@ import { getLineCheck } from "@/lib/lineCheck";
 import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
 import { checkPolicy, parsePickBody } from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
+import { getRulePause, NOT_PAUSED } from "@/lib/rulePause";
 import type { PolicyContext } from "@/lib/pickRules";
+import type { RulePause } from "@/lib/rulePause";
 
 // POST /api/picks — log a pick on a current-slate game. Validation and the
 // betting policy (1H-only real money, flat 1 unit, 5-bet weekly cap, the
@@ -87,12 +89,25 @@ export async function POST(req: NextRequest) {
   const checkQ = game
     ? getLineCheck(game.season, "1h")
     : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
+  // The real-money pause (docs/STOPPING_RULE.md). Read ONLY for a real-money
+  // pick, so a settings read can never touch a paper pick; getRulePause never
+  // throws — a failed read comes back as the UNREADABLE state, which
+  // checkPolicy refuses with its own reason.
+  const pauseQ: Promise<RulePause> =
+    game && !pick.isPaper ? getRulePause() : Promise.resolve(NOT_PAUSED);
   let dup: { id: number }[];
   let cap: { n: number | bigint }[];
   let card: Awaited<ReturnType<typeof getLatestCard>>;
   let checks: Awaited<ReturnType<typeof getLineCheck>>;
+  let rulePause: RulePause;
   try {
-    [dup, cap, card, checks] = await Promise.all([dupQ, capQ, cardQ, checkQ]);
+    [dup, cap, card, checks, rulePause] = await Promise.all([
+      dupQ,
+      capQ,
+      cardQ,
+      checkQ,
+      pauseQ,
+    ]);
   } catch (e) {
     return dbError("policy checks", e);
   }
@@ -128,6 +143,7 @@ export async function POST(req: NextRequest) {
     minGamesPlayed,
     killLine: item?.killLine ?? null,
     killPrice: item?.killPrice ?? null,
+    rulePause,
     livePrice,
   });
   if (!policy.ok) {

@@ -575,6 +575,20 @@ class Card(Base):
     __table_args__ = (Index("ix_cards_season_week_built", "season", "week", "built_at"),)
 
 
+class AppSetting(Base):
+    """One row per operational switch (key -> text value). The first and, so far,
+    only key is `rule_paused`: while its value is the string "true", every
+    real-money first-half pick is refused server-side (web/lib/pickRules.ts and
+    scripts/pick.py) and paper picks continue. Toggled by scripts/rule_pause.py.
+    docs/STOPPING_RULE.md says when it is thrown."""
+
+    __tablename__ = "app_settings"
+    key = Column(String(32), primary_key=True)
+    value = Column(Text, nullable=False)
+    note = Column(Text)
+    updated_at = Column(DateTime)  # naive UTC, like every other timestamp here
+
+
 class PostMortemRun(Base):
     """One post-mortem computation per scope (scripts/post_mortem.py, Monday
     grade.yml). Delete-then-insert per scope, so each scope has exactly one live

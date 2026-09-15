@@ -1,0 +1,190 @@
+{
+ "lead_hours": 72,
+ "n": 1220,
+ "pass_heavy_cut": 0.5350578594639201,
+ "buckets": [
+  {
+   "style": "pass-heavy",
+   "band": "< 10",
+   "n": 118,
+   "realized_under": 0.5508474576271186,
+   "implied_under": 0.5005836974538761,
+   "diff_pp": 5.026376017324252,
+   "wilson": [
+    0.46090894140297894,
+    0.6375797020848015
+   ]
+  },
+  {
+   "style": "pass-heavy",
+   "band": "10\u201315",
+   "n": 110,
+   "realized_under": 0.5272727272727272,
+   "implied_under": 0.4992291114541052,
+   "diff_pp": 2.8043615818622025,
+   "wilson": [
+    0.4346369434411707,
+    0.6180679328144583
+   ]
+  },
+  {
+   "style": "pass-heavy",
+   "band": "15\u201320",
+   "n": 98,
+   "realized_under": 0.46938775510204084,
+   "implied_under": 0.5015263049811834,
+   "diff_pp": -3.213854987914261,
+   "wilson": [
+    0.3736095693775932,
+    0.5674753279778384
+   ]
+  },
+  {
+   "style": "pass-heavy",
+   "band": "20\u201325",
+   "n": 42,
+   "realized_under": 0.5238095238095238,
+   "implied_under": 0.5021009884478586,
+   "diff_pp": 2.170853536166528,
+   "wilson": [
+    0.37722464128149835,
+    0.6664039877231809
+   ]
+  },
+  {
+   "style": "pass-heavy",
+   "band": "25+",
+   "n": 43,
+   "realized_under": 0.4883720930232558,
+   "implied_under": 0.5027465677165925,
+   "diff_pp": -1.4374474693336747,
+   "wilson": [
+    0.34617447543675695,
+    0.6324769153367575
+   ]
+  },
+  {
+   "style": "other",
+   "band": "< 10",
+   "n": 234,
+   "realized_under": 0.49145299145299143,
+   "implied_under": 0.4997511475026531,
+   "diff_pp": -0.8298156049661665,
+   "wilson": [
+    0.4280562060172381,
+    0.5551258682106817
+   ]
+  },
+  {
+   "style": "other",
+   "band": "10\u201315",
+   "n": 209,
+   "realized_under": 0.507177033492823,
+   "implied_under": 0.5012112476240353,
+   "diff_pp": 0.5965785868787599,
+   "wilson": [
+    0.43988203130464565,
+    0.5742129669940735
+   ]
+  },
+  {
+   "style": "other",
+   "band": "15\u201320",
+   "n": 203,
+   "realized_under": 0.5024630541871922,
+   "implied_under": 0.5015446735806898,
+   "diff_pp": 0.09183806065024003,
+   "wilson": [
+    0.43427856575456963,
+    0.5705560549529656
+   ]
+  },
+  {
+   "style": "other",
+   "band": "20\u201325",
+   "n": 100,
+   "realized_under": 0.41,
+   "implied_under": 0.5017639517074509,
+   "diff_pp": -9.176395170745094,
+   "wilson": [
+    0.31867313019145227,
+    0.5079856994888147
+   ]
+  },
+  {
+   "style": "other",
+   "band": "25+",
+   "n": 63,
+   "realized_under": 0.5873015873015873,
+   "implied_under": 0.5009934715010754,
+   "diff_pp": 8.63081158005119,
+   "wilson": [
+    0.4641531769458304,
+    0.7004153437564391
+   ]
+  }
+ ],
+ "fit": {
+  "n": 1220,
+  "coef": {
+   "intercept": -0.09688727457919062,
+   "gust_per5": 0.025960527243831525,
+   "pass_heavy": 0.30271189181298797,
+   "gust_x_pass_heavy": -0.07641725654937118
+  },
+  "ci": {
+   "intercept": [
+    -0.403435811305993,
+    0.20018249712019393
+   ],
+   "gust_per5": [
+    -0.06719318246626153,
+    0.12111971583459454
+   ],
+   "pass_heavy": [
+    -0.17702148501389584,
+    0.8115613082778904
+   ],
+   "gust_x_pass_heavy": [
+    -0.23562964685879648,
+    0.08430597159291188
+   ]
+  },
+  "n_boot": 1000,
+  "swing_pp_pass_heavy_p10_to_p90_gust": -4.609778979640761,
+  "gust_p10_p90_mph": [
+   5.6,
+   23.9
+  ]
+ },
+ "per_season": [
+  {
+   "season": 2024,
+   "n": 611,
+   "coef": {
+    "intercept": 0.23158325278024589,
+    "gust_per5": -0.07013339456375742,
+    "pass_heavy": 0.08575133754048726,
+    "gust_x_pass_heavy": -0.0026404390583353427
+   }
+  },
+  {
+   "season": 2025,
+   "n": 609,
+   "coef": {
+    "intercept": -0.33230376337721595,
+    "gust_per5": 0.09237048981455179,
+    "pass_heavy": 0.38443740834166884,
+    "gust_x_pass_heavy": -0.11200129562100139
+   }
+  }
+ ],
+ "verdict": {
+  "signal": false,
+  "reasons": [
+   "interaction CI [-0.236, +0.084] includes zero"
+  ],
+  "rule": "PRE-REGISTERED: interaction (gust x pass-heavy) bootstrap CI excludes zero, same sign every season, and the pass-heavy swing across the p10-p90 gust range clears 2.38 pp. Written before the numbers were read. Weather stays out of the model regardless until a separate promotion test passes."
+ },
+ "generated_at": "2026-09-15T16:41:32.758444+00:00"
+}

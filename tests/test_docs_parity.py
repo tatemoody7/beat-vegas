@@ -172,3 +172,31 @@ def test_when_to_bet_doc_quotes_the_pre_registered_constants():
     assert f"n ≥ {W.MIN_MATCHED}" in body
     assert f"alpha **{int(W.FAMILY_ALPHA * 100)}%**" in body
     assert "NOT YET EVALUABLE" in body
+
+
+# --------------------------------------------------------------------------- #
+# docs/BLEND.md quotes the frozen w and the H3B constants
+# --------------------------------------------------------------------------- #
+def test_blend_doc_quotes_the_frozen_w_and_the_bucket_rule():
+    import json
+
+    from beatvegas.backtest import blend as B
+
+    body = _text(DOCS / "BLEND.md")
+    frozen = json.loads((DOCS.parent / "data" / "blend.json").read_text())
+    assert f"w = {frozen['w']:.2f}" in body and frozen["fitted_on"] == "2023-2025"
+    assert f"n ≥ {B.MIN_BUCKET_N}" in body
+    assert f"{int(B.FAMILY_ALPHA * 100)}%" in body
+    assert "BLEND WINS AT CLOSE" in body and "NOT ADOPTED" in body
+
+
+def test_nothing_reads_the_frozen_blend():
+    """data/blend.json is a measurement. The only code that names it is its writer."""
+    root = DOCS.parent
+    offenders = []
+    for folder in ("beatvegas", "scripts", "web/lib", "web/app"):
+        for p in (root / folder).rglob("*"):
+            if p.suffix in (".py", ".ts", ".tsx") and "blend.json" in p.read_text(errors="ignore"):
+                if p.name not in ("blend.py", "blend_gate.py"):  # the writer and its CLI
+                    offenders.append(str(p.relative_to(root)))
+    assert offenders == [], offenders

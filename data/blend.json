@@ -1,0 +1,9 @@
+{
+  "w": 0.8,
+  "mae_at_w": 8.566890641430074,
+  "n": 1902,
+  "fitted_on": "2023-2025",
+  "market_input": "real 1H close (REAL_1H_CLOSE_WINDOW_H)",
+  "fitted_at": "2026-09-15T20:52:31.953621+00:00",
+  "read_by": "nothing -- measurement only (docs/HYPOTHESES.md H3A)"
+}

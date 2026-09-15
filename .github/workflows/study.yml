@@ -1,0 +1,64 @@
+name: Study (manual, read-only report)
+
+# Runs one of the registered study scripts (docs/HYPOTHESES.md) against Neon and
+# uploads its reports/<name>_<UTC>.{md,json,csv} as an artifact. Exists because the
+# campus network filters Neon's port 5432, so a feature-frame study cannot run on
+# the Mac. Every script here is a REPORT: exits 0 whatever the numbers say, writes
+# no table, spends no Odds API credits. The blend's --freeze writes data/blend.json
+# into the RUNNER's checkout only; the committed copy comes from the artifact.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'which study'
+        type: choice
+        options:
+          - blend_gate
+          - when_to_bet_study
+          - gates_study
+        default: blend_gate
+      args:
+        description: 'extra arguments (space-separated, no shell syntax)'
+        default: ''
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -e .
+      - name: Cache CFBD reference data (weekly)
+        uses: ./.github/actions/cfbd-cache
+      - name: Run the study
+        env:
+          IN_SCRIPT: ${{ inputs.script }}
+          IN_ARGS: ${{ inputs.args }}
+        run: |
+          case "$IN_SCRIPT" in
+            blend_gate|when_to_bet_study|gates_study) ;;
+            *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
+          esac
+          read -ra ARGS <<< "$IN_ARGS"
+          echo "running: scripts/$IN_SCRIPT.py ${ARGS[*]}"
+          python "scripts/$IN_SCRIPT.py" "${ARGS[@]}"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: study-${{ inputs.script }}
+          path: |
+            reports/*
+            data/blend.json
+          if-no-files-found: warn

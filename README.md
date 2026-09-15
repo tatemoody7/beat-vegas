@@ -74,7 +74,8 @@ python scripts/pick.py summary                 # your hit rate, units, CLV
 ```
 
 **Line Study** — how often the under cashed by opening-line value (real opening
-lines where captured, else proxy):
+lines where captured, else proxy). On the site it sits folded under Track record;
+the CLI is the full version:
 ```bash
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
@@ -115,7 +116,10 @@ itself before it builds.
 
 Manual-only workflows: `post-lines.yml` (derived lines for the board),
 `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
-`enrich_tempo.yml` (re-backfill pace). Dispatch any workflow from the Mac with
+`enrich_tempo.yml` (re-backfill pace), `weather_backfill.yml` (Open-Meteo into
+`weather_obs`), `rescore.yml` (re-score a played week without freezing records),
+`residual_gate.yml` and `level_anchor_gate.yml` (pre-registered model challengers;
+the report is the deliverable). Dispatch any workflow from the Mac with
 `gh workflow run <file> --ref main` (add `-f market=1h|1h_close` for
 `lines_watch.yml`).
 
@@ -123,12 +127,14 @@ Manual-only workflows: `post-lines.yml` (derived lines for the board),
 
 The product is the Next.js app in `web/` (App Router + TypeScript + Tailwind +
 Prisma + Recharts), deployed on **Vercel**, reading/writing **Neon Postgres**,
-behind a simple password gate, at **https://beat-vegas.vercel.app**. Four tabs:
-**Board** (the home page — every game with a Hard Rock total in one ranked list, an
-edge score 0-100, a BET / EDGE / PASS tier, one line saying what to do, and cards that
-expand into the lines, the model, the reasons and the news), **Results** (market /
-model / your-picks ledgers with CLV plus the bankroll curve), **Research**
-(calibration, gap-vs-CLV, model runs), **Glossary**. Plain-English,
+behind a simple password gate, at **https://beat-vegas.vercel.app**. Three tabs
+plus a game page: **Board** (the home page — one rolling week grouped by day, every
+game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and one
+line saying what to do; each row links to **`/game/[id]`**, where the decision, the
+lines, the reasons, the news and the Log-pick button live), **Results** (read-only:
+bankroll, the real and paper ledgers, your decisions, line value), **Track record**
+(`/proof`: the real-close gap ladder, post-mortem bands, calibration, line study,
+glossary; `/proof/records` is every rated game by week, with a CSV). Plain-English,
 modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` classes
 in `web/app/globals.css`).
 
@@ -181,9 +187,13 @@ which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the gate of
   ```
   (Weather is slow — one ranged call per venue; safe to re-run, idempotent.)
 
-Pace + weather were the only inputs that moved 1H-total prediction error;
-situational/returning were flat (kept as context). All of it is still proxy-graded
-until real lines accrue.
+Pace was the one enrichment that moved 1H-total prediction error;
+situational/returning were flat (kept as context). **Weather is an open hypothesis,
+not a finding**: every historical weather value was mis-timed until 2026-09-14
+(`docs/WEATHER.md`), so the earlier "weather helped" read was measured on the wrong
+hours and is withdrawn. The corrected data sits in `weather_obs`, which the model
+does not read until a pre-registered test says it should. All of it is still
+proxy-graded until real lines accrue.
 
 ## Methodology note
 Free sources have **no historical 1H betting line**. The backtest therefore grades

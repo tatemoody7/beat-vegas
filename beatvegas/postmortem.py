@@ -1307,10 +1307,26 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
             )
         )
 
+    # The same contrast is computed once per segment (fbs_only, all) and per
+    # proxy; when a selection's rows are identical in two segments (every
+    # real-close full-game row is FBS, so `all` == `fbs_only` there) the two
+    # flags are the same statement twice. Keep the first, drop the twin.
+    seen_contrasts: set = set()
     for c in contrasts:
         q, d = c.get("q_value"), c.get("effect")
         if q is None or d is None:
             continue
+        twin = (
+            c["bucket"],
+            c.get("selection"),
+            c.get("proxy_kind"),
+            c.get("unders"),
+            c.get("overs"),
+            round(d, 9),
+        )
+        if twin in seen_contrasts:
+            continue
+        seen_contrasts.add(twin)
         if q < 0.10 and abs(d) >= 0.2 and c.get("unders", 0) >= 30 and c.get("overs", 0) >= 30:
             flags.append(
                 _flag(

@@ -28,6 +28,10 @@ const LEGEND: [string, string][] = [
     "Gap",
     `the line minus our number. Positive means the line is above us, which leans under. ${BET_GAP_PTS}+ is the band we bet`,
   ],
+  [
+    "Scored after",
+    "our number for that game was produced after kickoff (a re-score of a played week). It counts for accuracy, never as a bet we could have made",
+  ],
 ];
 
 function fmt(v: number | null, digits = 1): string {
@@ -143,6 +147,11 @@ export default async function RecordsPage({
                   <td className="text-[var(--text)]">
                     {r.away} <span className="text-[var(--text-dim)]">@</span>{" "}
                     {r.home}
+                    {r.scoredAfterKickoff && (
+                      <span className="bv-badge bv-badge--push ml-2">
+                        scored after
+                      </span>
+                    )}
                   </td>
                   <td className="bv-num font-mono text-[var(--text-muted)]">
                     {fmt(r.fullGameTotal)}

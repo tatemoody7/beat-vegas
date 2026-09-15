@@ -159,3 +159,16 @@ def test_the_clv_direction_convention_is_stated_the_way_the_code_computes_it():
     site reported this backwards for a week; the docs must not reintroduce it."""
     body = _text(GLOSSARY)
     assert re.search(r"negative is the\s*\n?\s*good direction", body, re.I)
+
+
+# --------------------------------------------------------------------------- #
+# docs/WHEN_TO_BET.md quotes the H6 rule's constants
+# --------------------------------------------------------------------------- #
+def test_when_to_bet_doc_quotes_the_pre_registered_constants():
+    from beatvegas.backtest import when_to_bet as W
+
+    body = _text(DOCS / "WHEN_TO_BET.md")
+    assert W.CONFIRMATORY_DATE.isoformat() in body
+    assert f"n ≥ {W.MIN_MATCHED}" in body
+    assert f"alpha **{int(W.FAMILY_ALPHA * 100)}%**" in body
+    assert "NOT YET EVALUABLE" in body

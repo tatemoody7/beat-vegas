@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { displayLineValue } from "@/lib/clvDirection";
 import { clvSummary, type DqPickRow } from "@/lib/decision-quality";
 
 // Which sign of clv is GOOD, pinned against real week-2 tickets.
@@ -58,4 +59,13 @@ test("no clv anywhere leaves every field null rather than zero", () => {
   expect(r.avg).toBeNull();
   expect(r.pctFavourable).toBeNull();
   expect(r.avgPointsGained).toBeNull();
+});
+
+test("the picks table shows a fallen line as a positive line value", () => {
+  // TTU @ Ore St: bet under 28.5, closed 27.5 — stored −1, shown +1.00.
+  expect(displayLineValue(-1)).toBe(1);
+  // Tenn @ GT paper pick: bet 25.5, closed 28.5 — moved against, shown −3.00.
+  expect(displayLineValue(3)).toBe(-3);
+  expect(displayLineValue(0)).toBe(-0);
+  expect(displayLineValue(null)).toBeNull();
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outcome, recordsToCsv, type RecordRow } from "./records";
+import { outcome, recordsToCsv, scoredAfter, type RecordRow } from "./records";
 
 const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   season: 2025,
@@ -16,6 +16,8 @@ const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   rank: 3,
   firstHalfTotal: 24,
   outcome: "under",
+
+  scoredAfterKickoff: null,
   ...o,
 });
 
@@ -37,11 +39,11 @@ describe("recordsToCsv", () => {
     const csv = recordsToCsv([row(), row({ week: 4 })]);
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome",
+      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome,scored_after_kickoff",
     );
     expect(lines).toHaveLength(4); // header + 2 rows + trailing ""
     expect(lines[3]).toBe("");
-    expect(lines[1].split(",")).toHaveLength(14);
+    expect(lines[1].split(",")).toHaveLength(15);
   });
 
   it("leaves a missing value as an empty cell, never a literal null", () => {
@@ -50,7 +52,7 @@ describe("recordsToCsv", () => {
     ]);
     expect(csv).not.toContain("null");
     expect(csv.split("\n")[1]).toBe(
-      "2025,3,Kansas,Missouri,52.5,-7,,,2.4,0.2,74,3,,",
+      "2025,3,Kansas,Missouri,52.5,-7,,,2.4,0.2,74,3,,,",
     );
   });
 
@@ -58,7 +60,7 @@ describe("recordsToCsv", () => {
     const csv = recordsToCsv([row({ home: "Texas A&M, College Station" })]);
     const body = csv.split("\n")[1];
     expect(body).toContain('"Texas A&M, College Station"');
-    // Still 14 fields once the quoted comma is respected.
+    // Still 15 fields once the quoted comma is respected.
     expect(body.match(/"/g)).toHaveLength(2);
   });
 
@@ -67,7 +69,20 @@ describe("recordsToCsv", () => {
     // one empty line. Harmless in every spreadsheet we have opened it in;
     // pinned so it is a known shape rather than a surprise.
     expect(recordsToCsv([])).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome\n\n",
+      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome,scored_after_kickoff\n\n",
     );
+  });
+});
+
+describe("scoredAfter", () => {
+  it("is true only when the prediction postdates kickoff, null when unknown", () => {
+    expect(scoredAfter("2026-09-10T21:45:05Z", "2026-08-29T23:00:00Z")).toBe(
+      true,
+    );
+    expect(scoredAfter("2026-09-08T20:34:57Z", "2026-09-12T16:00:00Z")).toBe(
+      false,
+    );
+    expect(scoredAfter(null, "2026-09-12T16:00:00Z")).toBeNull();
+    expect(scoredAfter("2026-09-08T20:34:57Z", null)).toBeNull();
   });
 });

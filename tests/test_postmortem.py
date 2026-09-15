@@ -1012,3 +1012,29 @@ def test_created_order_puts_a_null_timestamp_first():
     ]
     ordered = sorted(rows, key=pm.created_order)
     assert [r.created_at for r in ordered] == [None, datetime(2026, 8, 1), datetime(2026, 9, 1)]
+
+
+def test_derive_flags_drops_a_contrast_repeated_verbatim_across_segments():
+    """The same contrast is computed per segment; when `all` and `fbs_only`
+    hold identical rows the two flags are one statement twice (POST_MORTEM.md
+    carried eight WATCH lines duplicated). A twin with different numbers stays."""
+    base = {
+        "bucket": "fh_pf_sum",
+        "q_value": 0.02,
+        "effect": 0.35,
+        "stat_win": 40.1,
+        "stat_loss": 44.8,
+        "unders": 120,
+        "overs": 110,
+        "selection": "cap5",
+        "proxy_kind": "fg",
+    }
+    twin = dict(base, segment="all")
+    other = dict(base, segment="all", selection="gap175", unders=156, overs=133, effect=0.39)
+    flags = pm.derive_flags([], contrasts=[dict(base, segment="fbs_only"), twin, other], n_tests=10)
+    codes = [f["code"] for f in flags if f["code"].startswith("contrast_")]
+    assert codes == ["contrast_fh_pf_sum", "contrast_fh_pf_sum"]
+    assert [f["evidence"]["selection"] for f in flags if f["code"].startswith("contrast_")] == [
+        "cap5",
+        "gap175",
+    ]

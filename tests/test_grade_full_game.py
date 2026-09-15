@@ -91,3 +91,45 @@ def test_grade_market_fg_skips_unfinished():
         s.commit()
         closings = grade._closings_fg(s, 2026)
         assert grade.grade_market_fg(s, closings) == 0  # no final score
+
+
+def test_grade_market_fg_removes_a_stale_row_when_the_close_is_gone():
+    """grade_market / grade_model delete BEFORE the skip so a re-grade cleans up;
+    grade_market_fg skipped first, so a full-game row whose close later failed
+    the window kept its stale graded row forever."""
+    grade = _load("grade")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(
+            Game(
+                id=3,
+                season=2026,
+                week=1,
+                home_team="A",
+                away_team="B",
+                start_date=datetime(2026, 9, 1, 12),
+                home_points=21,
+                away_points=20,
+            )
+        )
+        s.add(
+            Result(
+                game_id=3,
+                model_version="market_fg",
+                market="full",
+                actual_first_half_total=41,
+                line_used=50.0,
+                line_kind="real",
+                under_hit=True,
+                closing_line=50.0,
+                units=0.9,
+            )
+        )
+        s.commit()
+        # No full-game snapshot at all now -> the close is None for game 3.
+        closings = grade._closings_fg(s, 2026)
+        closings.setdefault(3, (s.get(Game, 3), (None, None), None, (None, None)))
+        assert grade.grade_market_fg(s, closings) == 0
+        s.commit()
+        assert s.query(Result).filter(Result.model_version == "market_fg").count() == 0

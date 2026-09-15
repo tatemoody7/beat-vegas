@@ -80,7 +80,9 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     inputs: { slot: "sat_am" },
     days: ["Sat"],
     // 7:00–8:15am: wide enough that the EDT entry always lands inside it, and
-    // closed early enough that the build finishes before the 8:50am text.
+    // closed before the 9:15 ET gate so a late Hobby tick cannot dispatch a
+    // build the gate would then refuse. (It once also had to beat an 8:50am
+    // text; that routine was retired 2026-09-13 and the window kept.)
     dispatchOpenMin: 7 * 60,
     dispatchCloseMin: 8 * 60 + 15,
     gateOpenMin: 7 * 60 + 45,

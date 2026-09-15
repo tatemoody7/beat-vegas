@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildMovement,
-  shortT,
-  summarizeMarket,
-  type MoveSnap,
-} from "./movement";
+import { buildMovement, summarizeMarket, type MoveSnap } from "./movement";
 
 const snap = (o: Partial<MoveSnap>): MoveSnap => ({
   game_id: 1,
@@ -12,26 +7,6 @@ const snap = (o: Partial<MoveSnap>): MoveSnap => ({
   book: "draftkings",
   line: 24.5,
   ...o,
-});
-
-describe("shortT (UTC snapshot text -> ET display)", () => {
-  it("converts naive-UTC timestamps to ET (EDT, -4h)", () => {
-    expect(shortT("2025-10-13 12:00:00")).toBe("10-13 08:00");
-    expect(shortT("2025-10-13 12:00:00.000000")).toBe("10-13 08:00");
-  });
-
-  it("converts during EST (-5h) and crosses the date line", () => {
-    expect(shortT("2025-12-01 03:30:00")).toBe("11-30 22:30");
-  });
-
-  it("accepts ISO 'T' separators", () => {
-    expect(shortT("2025-10-13T12:00:00")).toBe("10-13 08:00");
-  });
-
-  it("returns unparseable input unchanged", () => {
-    expect(shortT("not a timestamp")).toBe("not a timestamp");
-    expect(shortT("")).toBe("");
-  });
 });
 
 describe("summarizeMarket (open -> current per book and by consensus)", () => {
@@ -95,7 +70,7 @@ describe("summarizeMarket (open -> current per book and by consensus)", () => {
 });
 
 describe("buildMovement", () => {
-  it("keeps the 1H chart shape and summarizes both markets", () => {
+  it("summarizes both markets", () => {
     const m = buildMovement(
       [
         snap({
@@ -111,9 +86,8 @@ describe("buildMovement", () => {
       ],
       [snap({ line: 52.5, spread: -7, market: "full_game_total" })],
     );
-    expect(m.books).toEqual(["draftkings"]);
-    expect(m.points).toHaveLength(2);
-    expect(m.rows).toHaveLength(2);
+    expect(m.firstHalf?.books.map((b) => b.book)).toEqual(["draftkings"]);
+    expect(m.firstHalf?.open).toBe(24);
     expect(m.firstHalf?.cur).toBe(23.5);
     expect(m.fullGame?.cur).toBe(52.5);
     expect(m.fullGame?.spreadCur).toBe(-7);
@@ -122,7 +96,6 @@ describe("buildMovement", () => {
   it("reports no first half when only the full game was captured", () => {
     const m = buildMovement([], [snap({ line: 52.5 })]);
     expect(m.firstHalf).toBeNull();
-    expect(m.books).toEqual([]);
     expect(m.fullGame?.open).toBe(52.5);
   });
 });

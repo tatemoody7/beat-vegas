@@ -1,18 +1,17 @@
 import { isCentredQuote } from "@/lib/devig";
 import { Prisma } from "@prisma/client";
-import { etParts, pad2 } from "@/lib/et";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
-// Per-game line history for the board cards (getMovements for a whole week;
+// Per-game line history for the game page (getMovements for a whole week;
 // there is no standalone page). Two markets per game:
-//   * first half (1H_total) — the market we bet: a per-book series for the
-//     chart plus open → current per book and by consensus;
+//   * first half (1H_total) — the market we bet: open → current per book and
+//     by consensus (the BookTable on /game/[id]);
 //   * full game (full_game_total) — context only: consensus open → current
-//     total and spread, plus the per-book series.
-// The 1H `books` / `points` / `rows` shape is unchanged (MovementChart reads it).
-
-export type MovementPoint = { t: string } & Record<string, number | string>;
+//     total and spread.
+// The per-book time-series chart that used to sit under the table is gone
+// (Tate, 2026-09-13: it "looks like scribbles"); the per-book list is the
+// movement read, and it stays.
 
 /** One book's first and latest capture of a market. */
 export type BookMove = {
@@ -34,32 +33,14 @@ export type MarketMovement = {
   spreadOpen: number | null;
   spreadCur: number | null;
   books: BookMove[];
-  /** Pivoted per-book series (one row per capture time) for a chart. */
-  series: { books: string[]; points: MovementPoint[] };
 };
 
 export type Movement = {
-  // --- first half (unchanged shape, read by MovementChart) -----------------
-  books: string[];
-  points: MovementPoint[]; // pivoted: one row per captured_at, a column per book
-  rows: { captured_at: string; book: string; line: number }[]; // ET-formatted, ordered
   /** First-half open → current summary; null when no 1H line was captured. */
   firstHalf: MarketMovement | null;
   /** Full-game total + spread movement; null when none captured. */
   fullGame: MarketMovement | null;
 };
-
-// "2025-10-13 12:00:00.000000" (stored naive UTC) -> "10-13 08:00" in ET.
-// Without the conversion every point on the movement chart reads 4-5h late
-// for the Florida user actually timing these moves.
-export function shortT(s: string): string {
-  const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
-  if (!m) return s;
-  const d = new Date(`${m[1]}T${m[2]}:00Z`);
-  if (Number.isNaN(d.getTime())) return s;
-  const p = etParts(d);
-  return `${pad2(p.month)}-${pad2(p.day)} ${pad2(p.hour)}:${pad2(p.minute)}`;
-}
 
 export type MoveSnap = {
   game_id: number | bigint;
@@ -71,23 +52,6 @@ export type MoveSnap = {
   spread?: number | null;
   market?: string | null;
 };
-
-function pivot(snaps: MoveSnap[]): Pick<Movement, "books" | "points" | "rows"> {
-  const books = new Set<string>();
-  const byTime = new Map<string, MovementPoint>();
-  const rows: Movement["rows"] = [];
-  for (const s of snaps) {
-    if (s.line === null || s.captured_at === null) continue;
-    const book = (s.book ?? "?").toLowerCase();
-    const t = shortT(s.captured_at);
-    books.add(book);
-    rows.push({ captured_at: t, book, line: s.line });
-    const pt = byTime.get(t) ?? { t };
-    pt[book] = s.line; // ordered ascending → last write wins (aggfunc="last")
-    byTime.set(t, pt);
-  }
-  return { books: [...books], points: [...byTime.values()], rows };
-}
 
 /**
  * Open → current per book and by consensus for one market's snapshots
@@ -126,17 +90,12 @@ export function summarizeMarket(snaps: MoveSnap[]): MarketMovement | null {
   books.sort((a, b) => b.cur - a.cur || a.book.localeCompare(b.book));
   const spreads = (pick: (b: BookMove) => number | null) =>
     books.map(pick).filter((v): v is number => v !== null);
-  const kept = snaps.filter(
-    (s) => (s.book ?? "?").toLowerCase() !== "consensus",
-  );
-  const piv = pivot(kept);
   return {
     open: median(books.map((b) => b.open)),
     cur: median(books.map((b) => b.cur)),
     spreadOpen: median(spreads((b) => b.openSpread)),
     spreadCur: median(spreads((b) => b.curSpread)),
     books,
-    series: { books: piv.books, points: piv.points },
   };
 }
 
@@ -146,7 +105,6 @@ export function buildMovement(
   fullGame: MoveSnap[],
 ): Movement {
   return {
-    ...pivot(firstHalf),
     firstHalf: summarizeMarket(firstHalf),
     fullGame: summarizeMarket(fullGame),
   };

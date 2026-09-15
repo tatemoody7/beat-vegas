@@ -140,7 +140,7 @@ def test_cap_rankings_reorder_by_trust_and_report_overlap():
             _row(3, gap=2.5, spread=6.0),
             _row(4, gap=2.4, spread=7.0),
             _row(5, gap=2.3, spread=8.0),
-            _row(6, gap=2.2, spread=9.0),
+            _row(6, gap=2.2, spread=9.0, blocker="cap", over_cap=True),  # capped: still in the pool
             _row(7, gap=2.0, spread=25.0, tier="EDGE", blocker="price"),  # not in the pool
         ]
     )

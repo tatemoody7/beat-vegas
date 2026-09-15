@@ -282,9 +282,12 @@ def cap_rankings(
     cap: int = WEEKLY_BET_CAP,
     n_boot: int = 2000,
 ) -> List[Dict[str, Any]]:
-    """Per week: the card's BET rows (tier BET, no blocker -- the ranked pool)
-    ranked three ways; the top `cap` of each graded at Hard Rock's number."""
-    pool = cut[(cut["tier"] == "BET") & cut["blocker"].isna()].copy()
+    """Per week: the card's BET rows BEFORE the cap (tier BET with no blocker, or
+    blocker "cap" -- every gate but the cap passed) ranked three ways; the top
+    `cap` of each graded at Hard Rock's number. Slots held by real tickets on
+    earlier builds are ignored here on purpose: the question is which five the
+    ranking would pick, not which five were still free on Saturday."""
+    pool = cut[(cut["tier"] == "BET") & (cut["blocker"].isna() | (cut["blocker"] == "cap"))].copy()
     pool["gap_num"] = pd.to_numeric(pool["gap"], errors="coerce")
     pool["bucket"] = [bucket_of(v) for v in pd.to_numeric(pool["spread"], errors="coerce").abs()]
     out: List[Dict[str, Any]] = []

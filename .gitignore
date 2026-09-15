@@ -45,6 +45,7 @@ config.yaml
 reports/residual_gate_*
 reports/level_anchor_*
 reports/censoring_*
+reports/two_sided_*
 
 # Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
 # It was untracked AND unignored, so a `git add -A` would have swept several MB

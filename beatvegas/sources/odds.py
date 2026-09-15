@@ -332,13 +332,26 @@ def _rows_for_market(
             for mkt in bm.get("markets", []):
                 if mkt.get("key") != market_key:
                     continue
-                over_price = under_price = line = None
+                over_price = under_price = None
+                over_pt = under_pt = None
                 for oc in mkt.get("outcomes", []):
                     name = (oc.get("name") or "").lower()
                     if name == "over":
-                        over_price, line = oc.get("price"), oc.get("point")
+                        over_price, over_pt = oc.get("price"), oc.get("point")
                     elif name == "under":
-                        under_price, line = oc.get("price"), oc.get("point")
+                        under_price, under_pt = oc.get("price"), oc.get("point")
+                # One line per book, over-first (the same tie-break as
+                # sources/draftkings.py). A market whose two outcomes sit at
+                # DIFFERENT points is alternate rungs, not a centred line, and
+                # pairing an over price from one rung with an under price from
+                # another would make a number up — skip it rather than guess.
+                if (
+                    over_pt is not None
+                    and under_pt is not None
+                    and float(over_pt) != float(under_pt)
+                ):
+                    continue
+                line = over_pt if over_pt is not None else under_pt
                 if line is None:
                     continue
                 row = {

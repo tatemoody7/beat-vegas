@@ -23,6 +23,10 @@ export type RecordRow = {
   rank: number | null;
   firstHalfTotal: number | null; // real 1H result
   outcome: "under" | "over" | "push" | null;
+  /** Our number was produced AFTER kickoff (a retro re-score, e.g. 2026 week 1):
+   *  accuracy only, never a decision the board could have acted on. Null when
+   *  either timestamp is missing. */
+  scoredAfterKickoff: boolean | null;
 };
 
 const num = (v: number | bigint | null | undefined): number | null =>
@@ -37,6 +41,19 @@ export function outcome(
   if (fh < line) return "under";
   if (fh > line) return "over";
   return "push";
+}
+
+/** Exported for its test. True when the prediction was created after the game
+ *  kicked off (a retro re-score); null when either side is unknown. */
+export function scoredAfter(
+  createdAt: Date | string | null | undefined,
+  startDate: Date | string | null | undefined,
+): boolean | null {
+  if (createdAt == null || startDate == null) return null;
+  const c = new Date(createdAt).getTime();
+  const k = new Date(startDate).getTime();
+  if (Number.isNaN(c) || Number.isNaN(k)) return null;
+  return c > k;
 }
 
 export async function getRecordSeasons(): Promise<number[]> {
@@ -70,11 +87,13 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
       bv_sigma: number | null;
       under_score: number | bigint | null;
       rank: number | bigint | null;
+      created_at: Date | string | null;
+      start_date: Date | string | null;
     }[]
   >`
     SELECT g.season, g.week, g.away_team, g.home_team, g.full_game_total, g.spread,
            g.first_half_total, p.line_used, p.bv_line, p.bv_gap, p.bv_sigma,
-           p.under_score, p.rank
+           p.under_score, p.rank, p.created_at, g.start_date
     FROM games g
     LEFT JOIN predictions p
       ON p.game_id = g.id AND p.model_version = ${MODEL_VERSION}
@@ -104,6 +123,7 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
       rank: num(r.rank),
       firstHalfTotal: fh,
       outcome: outcome(fh, line),
+      scoredAfterKickoff: scoredAfter(r.created_at, r.start_date),
     };
   });
 }
@@ -130,6 +150,7 @@ const CSV_COLUMNS: { key: keyof RecordRow; header: string }[] = [
   { key: "rank", header: "rank" },
   { key: "firstHalfTotal", header: "first_half_total_actual" },
   { key: "outcome", header: "outcome" },
+  { key: "scoredAfterKickoff", header: "scored_after_kickoff" },
 ];
 
 function csvCell(v: unknown): string {

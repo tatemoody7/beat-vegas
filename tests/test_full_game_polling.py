@@ -311,3 +311,47 @@ def test_spread_none_for_every_book_leaves_game_spread_alone(monkeypatch):
         g = s.get(Game, 1)
         assert g.spread == -3.0 and g.spread_source is None
         assert g.full_game_total == 50.0 and g.full_game_total_source == "oddsapi"
+
+
+def test_oddsapi_normalize_is_over_first_and_skips_split_rungs():
+    """One line per book, over-first (sources/draftkings.py's tie-break). A
+    market whose Over and Under sit at DIFFERENT points is alternate rungs:
+    pairing the prices would invent a line, so the book is skipped."""
+    from beatvegas.sources.odds import normalize_full_game
+
+    def bm(key, outcomes):
+        return {"key": key, "markets": [{"key": "totals", "outcomes": outcomes}]}
+
+    events = [
+        {
+            "id": "evt9",
+            "commence_time": "2026-09-19T20:00:00Z",
+            "home_team": "Kansas",
+            "away_team": "Arizona State",
+            "bookmakers": [
+                # under listed first: the line must still be 55.5, not whichever came last
+                bm(
+                    "fanduel",
+                    [
+                        {"name": "Under", "price": -112, "point": 55.5},
+                        {"name": "Over", "price": -108, "point": 55.5},
+                    ],
+                ),
+                # split rungs: over 54.5 / under 56.5 -> not a centred line, skipped
+                bm(
+                    "betmgm",
+                    [
+                        {"name": "Over", "price": 195, "point": 54.5},
+                        {"name": "Under", "price": -275, "point": 56.5},
+                    ],
+                ),
+                # one-sided market still yields its point
+                bm("kalshi", [{"name": "Under", "price": -102, "point": 55.5}]),
+            ],
+        }
+    ]
+    rows = {r["book"]: r for r in normalize_full_game(events)}
+    assert set(rows) == {"fanduel", "kalshi"}
+    assert rows["fanduel"]["line"] == 55.5
+    assert rows["fanduel"]["over_price"] == -108 and rows["fanduel"]["under_price"] == -112
+    assert rows["kalshi"]["line"] == 55.5 and rows["kalshi"]["over_price"] is None

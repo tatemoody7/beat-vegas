@@ -86,14 +86,17 @@ def grade_market_fg(session, closings_fg) -> int:
     """Full-game market ledger: consensus open/close vs the realized total."""
     n = 0
     for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings_fg.items():
-        if closing is None:
-            continue
-        actual = g.home_points + g.away_points
+        # Delete BEFORE the skip, as grade_market/grade_model do: a game whose
+        # close later fails the window (or was a rung) must lose its stale
+        # graded row on re-grade, not keep it forever.
         (
             session.query(Result)
             .filter(Result.game_id == gid, Result.model_version == MODEL_MARKET_FG)
             .delete()
         )
+        if closing is None:
+            continue
+        actual = g.home_points + g.away_points
         session.add(
             Result(
                 game_id=gid,

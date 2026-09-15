@@ -559,11 +559,20 @@ def test_graded_pick_fields_leave_units_none_when_unpriced():
     assert fields["clv"] == -0.5  # line CLV still grades without a price (closing - line)
 
 
-def test_grade_fills_null_price_from_hard_rocks_close_else_units_none(capsys):
-    """A pick logged with price NULL (unpriced Hard Rock line): the grader fills
-    the price from Hard Rock's priced pre-kick close when one was captured and
-    grades units; with no priced HR snapshot the result still lands but units
-    stay None, and the summary counts it for hit rate only."""
+def test_grade_never_overwrites_the_decision_price_with_the_close(capsys):
+    """A pick logged with price NULL keeps price NULL, and the book's pre-kick
+    close lands in `closing_price` instead.
+
+    This asserts the INVERSE of the behaviour that shipped until 2026-09-14, when
+    the grader wrote Hard Rock's closing price into `price`. That turned the price
+    at the DECISION into the price at the CLOSE, which makes any price-based CLV
+    identically zero by construction -- and nothing marked the affected rows, so
+    they were indistinguishable from genuinely priced tickets and would have
+    diluted the metric toward zero, looking exactly like a null result. Unknown
+    stays NULL: that is recoverable, a fabricated value is not.
+
+    Units still require a decision price, so an unpriced ticket grades the result
+    and the record but contributes no units or ROI."""
     from datetime import datetime, timedelta
 
     from beatvegas.db.models import Game, OddsSnapshot
@@ -627,13 +636,17 @@ def test_grade_fills_null_price_from_hard_rocks_close_else_units_none(capsys):
     with Session(eng) as s:
         priced = s.query(ManualPick).filter(ManualPick.game_id == 2).one()
         unpriced = s.query(ManualPick).filter(ManualPick.game_id == 3).one()
-    assert priced.graded and priced.price == -108 and priced.result == "under"
-    assert round(priced.units, 3) == round(100 / 108, 3)
+    # game 2: HR closed at -108 pre-kick. That is the CLOSE, not our entry.
+    assert priced.graded and priced.result == "under"
+    assert priced.price is None, "the decision price was unknown and must stay unknown"
+    assert priced.closing_price == -108, "the close belongs in its own column"
+    assert priced.units is None, "no decision price means no units, by design"
+    # game 3: HR never priced the under pre-kick, so there is no close either.
     assert unpriced.graded and unpriced.price is None and unpriced.result == "under"
-    assert unpriced.units is None
-    # summary: both count for the record / hit rate; units/ROI over the priced one only
+    assert unpriced.closing_price is None and unpriced.units is None
+    # summary: both count for the record / hit rate; neither contributes units now
     assert "PAPER RECORD: 2-0" in out and "hit=100.0%" in out
-    assert f"units={100 / 108:+.2f}" in out and "(1 unpriced)" in out
+    assert "(2 unpriced)" in out
     # list must not choke on the unpriced graded row
     pick.cmd_list(_args(season=2026))
     assert "under (unpriced," in capsys.readouterr().out

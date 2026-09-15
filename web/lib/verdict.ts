@@ -71,6 +71,22 @@ export const BREAK_EVEN_EV = 0;
 // season" on the board).
 export const MIN_GAMES_FOR_MODEL = 0;
 
+/**
+ * Real money needs both teams to have played this many games THIS season.
+ *
+ * Separate from MIN_GAMES_FOR_MODEL on purpose. The model can score a week-1
+ * game -- HistGradientBoosting handles missing season-to-date features natively,
+ * and static/prior-season features still carry signal -- but being able to
+ * produce a number is not the same as that regime being validated for money.
+ * The blowout blind spot was traced to exactly this regime (weeks 1-2, ~59% of
+ * features NaN), and the backtest behind the gap rule is weeks 3+.
+ *
+ * So under-2-games games are PAPER ONLY (Tate, 2026-09-14): they still get
+ * scored, ranked and paper-logged so the cohort accrues evidence, and
+ * pickRules.checkPolicy refuses the real-money BET.
+ */
+export const MIN_GAMES_FOR_REAL_MONEY = 2;
+
 export type Verdict = "BET" | "WATCH" | "PASS";
 export type Confidence = "high" | "medium" | "low" | "none";
 /** Why a pick was made — stored on manual_picks.reason (shared with pick.py). */
@@ -101,6 +117,8 @@ export type VerdictInput = {
   fhShare: number | null;
   qbOut: boolean;
   qbOutDetail: string | null;
+  /** Fewest current-season games played by either team (homeBoard.minGamesPlayedFrom); null = unknown. */
+  minGamesPlayed: number | null;
   bvAdjust: number | null;
   bvAdjustReason: string | null;
   factorBoard: BoardFactor[] | null | undefined;
@@ -363,6 +381,27 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // four carried verdict_at_pick = 'BET' at negative EV while POST /api/picks
   // refused to log them. EV_FLOOR still describes the price landscape below; it
   // no longer decides whether money moves.
+  // Early season (Tate, 2026-09-14): a team with fewer than
+  // MIN_GAMES_FOR_REAL_MONEY current-season games is PAPER ONLY. Checked after
+  // the price so a price problem is still reported as a price problem; mirrors
+  // card.py blocker early_season and pickRules.checkPolicy's refusal.
+  if (
+    hrGap !== null &&
+    hrGap >= BET_GAP_PTS &&
+    i.ev !== null &&
+    i.ev >= BET_MIN_EV &&
+    i.minGamesPlayed !== null &&
+    i.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY
+  ) {
+    const n = i.minGamesPlayed;
+    return out(
+      "WATCH",
+      "medium",
+      `Our number clears the bar at a fair price, but ${n} game${n === 1 ? "" : "s"} played this season is under the ${MIN_GAMES_FOR_REAL_MONEY} real money needs — paper only until then.`,
+      false,
+      62 + hrGap * 10,
+    );
+  }
   if (
     hrGap !== null &&
     hrGap >= BET_GAP_PTS &&

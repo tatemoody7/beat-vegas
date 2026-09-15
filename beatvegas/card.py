@@ -37,6 +37,7 @@ from .model.score import (
     BET_MIN_EV,
     EV_FLOOR,
     HR_OFF_MARKET_PTS,
+    MIN_GAMES_FOR_REAL_MONEY,
     MODEL_VERSION,
     SCORE_BET_MIN,
     SCORE_WATCH_MIN,
@@ -103,7 +104,7 @@ TOTAL_BANDS = ((45.0, "<45"), (52.0, "45–52"), (60.0, "52–60"), (math.inf, "
 # gate's "cannot judge" branch (no book or exchange priced at that number, or
 # Hard Rock itself unpriced) so it follows price; qb_out is transient news
 # resolved by kickoff.
-PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out")
+PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out", "early_season")
 
 # Inputs that can fail on a build while every job still reports success. Each
 # one either narrows the slate the card was built from or makes a gate read
@@ -621,6 +622,15 @@ def build_item(
     under_score = None if under_score is None else int(under_score)
     qb_out = bool((preview or {}).get("qb_out"))
     qb_detail = (preview or {}).get("qb_out_detail")
+    # Fewest current-season games played by either team, off the prediction's
+    # stored factors (etl/features.py cumcount, leak-free). Under
+    # MIN_GAMES_FOR_REAL_MONEY the game is PAPER ONLY (Tate, 2026-09-14): still
+    # scored, ranked and paper-logged, never a real-money BET. Mirrors
+    # web/lib/verdict.ts + pickRules.checkPolicy so the card and the site agree.
+    games_played = _games_played(prediction)
+    early_season = (
+        has_model and games_played is not None and games_played < MIN_GAMES_FOR_REAL_MONEY
+    )
 
     off_market = (
         hr_line is not None
@@ -672,6 +682,7 @@ def build_item(
         and not off_market
         and price_ok
         and not qb_out
+        and not early_season
     )
     # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
     # >= BET_GAP_PTS above our number is logged, tagged with the gate that
@@ -691,6 +702,8 @@ def build_item(
             paper_blocker = "price"
         elif qb_out:
             paper_blocker = "qb_out"
+        elif early_season:
+            paper_blocker = "early_season"
     blocker: Optional[str] = None
     if is_bet:
         tier = "BET"
@@ -706,6 +719,8 @@ def build_item(
             blocker = "price"
         elif qb_out:
             blocker = "qb_out"
+        elif early_season:
+            blocker = "early_season"
         else:
             blocker = "gap"
     else:
@@ -762,6 +777,14 @@ def build_item(
             )
     elif blocker == "qb_out":
         action = "Starting QB out — recheck. Our number does not know about it."
+    elif blocker == "early_season":
+        at = f" at {american(hr_price)}" if hr_price is not None else ""
+        n = games_played or 0
+        action = (
+            f"Paper only — {n} game{'s' if n != 1 else ''} played this season; real money "
+            f"needs {MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under "
+            f"{fmt(hr_line)}{at} on Hard Rock."
+        )
     elif tier == "EDGE":
         # blocker "gap": the amber band — a model row short of the bar.
         action = (
@@ -819,6 +842,7 @@ def build_item(
         "ev": None if ev is None else round(ev, 4),
         "bv_line": None if bv_line is None else round2(bv_line),
         "under_score": under_score,
+        "games_played": games_played,
         "gap": gap,
         "gap_basis": gap_basis,
         "kill_line": k_line,
@@ -906,6 +930,26 @@ def apply_weekly_cap(
 
 
 # --- degraded inputs -------------------------------------------------------------
+
+
+def _games_played(pred: Optional[Dict]) -> Optional[int]:
+    """min(h_games_played, a_games_played) off the prediction's factors, or None
+    when the row carries neither (an old row, or no model)."""
+    f = _pred_factors(pred) if pred else None
+    if not f:
+        return None
+    vals = []
+    for k in ("h_games_played", "a_games_played"):
+        v = f.get(k)
+        if isinstance(v, bool) or v is None:
+            continue
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(fv):
+            vals.append(int(fv))
+    return min(vals) if vals else None
 
 
 def _pred_factors(pred: Dict) -> Optional[Dict]:

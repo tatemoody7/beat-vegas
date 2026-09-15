@@ -27,6 +27,7 @@ const base: VerdictInput = {
   fhShare: null,
   qbOut: false,
   qbOutDetail: null,
+  minGamesPlayed: null,
   bvAdjust: null,
   bvAdjustReason: null,
   factorBoard: null,
@@ -468,5 +469,20 @@ describe("verdictFor — the price gate", () => {
       evVerdict: "fair",
     });
     expect(atTrueBreakEven.verdict).toBe("BET");
+  });
+});
+
+describe("verdictFor — early season is paper only", () => {
+  it("WATCH, never BET, while a team has under MIN_GAMES_FOR_REAL_MONEY games", () => {
+    const v = verdictFor({ ...base, minGamesPlayed: 1 });
+    expect(v.verdict).toBe("WATCH");
+    expect(v.headline).toBe(
+      "Our number clears the bar at a fair price, but 1 game played this season is under the 2 real money needs — paper only until then.",
+    );
+    expect(v.strength).toBe(62 + 2.7 * 10);
+  });
+  it("BET again at two games, and unknown games-played does not block", () => {
+    expect(verdictFor({ ...base, minGamesPlayed: 2 }).verdict).toBe("BET");
+    expect(verdictFor({ ...base, minGamesPlayed: null }).verdict).toBe("BET");
   });
 });

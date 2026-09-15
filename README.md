@@ -180,12 +180,22 @@ which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the gate of
 - **Situational** (`etl/situational.py`): rest, short week, off-bye, travel distance,
   time-zone shift, kickoff hour — model features + a "Spot" card chip.
 - **Returning production** (CFBD `/player/returning`): roster-churn prior + chip.
-- **Historical pace/weather** (`scripts/backfill_enrichment.py`): backfills
-  TeamRankings tempo + Open-Meteo weather so they feed the model.
+- **Historical pace** (`scripts/backfill_enrichment.py`): backfills TeamRankings
+  tempo so it feeds the model.
   ```bash
-  python scripts/backfill_enrichment.py --tempo --weather --start 2018 --end 2025
+  python scripts/backfill_enrichment.py --start 2018 --end 2025
   ```
-  (Weather is slow — one ranged call per venue; safe to re-run, idempotent.)
+- **Weather** (`scripts/backfill_weather.py`): Open-Meteo into `weather_obs`, one
+  call per venue-season, resumable. Two kinds of row, never interchangeable:
+  `lead_hours = 0` is the near-kickoff series (tracks what actually happened —
+  good for modelling, **never** for a market-edge claim), and `lead_hours = 24/72`
+  is the forecast that genuinely existed that far ahead. Only the latter carries
+  `decision_safe = true`.
+  ```bash
+  python scripts/backfill_weather.py --start 2023 --end 2026 --leads 0,24,72
+  python scripts/backfill_weather.py --promote          # staging file -> weather_obs
+  ```
+  (Slow — ~90 min for the full range; safe to re-run, resumes from the staging file.)
 
 Pace was the one enrichment that moved 1H-total prediction error;
 situational/returning were flat (kept as context). **Weather is an open hypothesis,

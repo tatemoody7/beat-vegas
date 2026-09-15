@@ -33,6 +33,9 @@ PARITY = {
     "WEEKLY_BET_CAP": score.WEEKLY_BET_CAP,
     "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
     "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
+    # The money gate that MIN_GAMES_FOR_MODEL deliberately is NOT: the model
+    # scores a week-1 game, real money will not take one.
+    "MIN_GAMES_FOR_REAL_MONEY": score.MIN_GAMES_FOR_REAL_MONEY,
     "EV_FLOOR": score.EV_FLOOR,
     "BREAK_EVEN_EV": score.BREAK_EVEN_EV,
     "BET_MIN_EV": score.BET_MIN_EV,

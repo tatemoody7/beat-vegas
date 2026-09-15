@@ -553,6 +553,7 @@ Research only — it never places bets or automates gambling.
   real-line CLV can show an edge. Details: `research/swarm/2026-09-01-1h-under-edges/PROXY_FIX_RESULTS.md`.
 - **Engine:** market-blind 1H-total regressor ranks the board by line-vs-prediction gap (`score_slate`, gbm_v2). Proxy-graded selection stats are no longer quoted as an edge (see fair-proxy note above); 117-factor framework in `beatvegas/factors/`.
 - **History & details live in:** git log + PR descriptions, `docs/` (`PIVOT.md`, `BV_LINE.md`), `~/.claude/plans/`, and this project's memory dir (auto-loads). Read those instead of reconstructing from this file.
+- **Every study has a row in `docs/HYPOTHESES.md`** (status, data, n, comparisons run, the criterion written before the run). Add the row FIRST, then write the script; `tests/test_hypotheses_registry.py` keeps it honest. 2023-25 is exploratory from 2026-09-15 on.
 
 ## What it does
 Pulls free data (CFBD, **bulk play-by-play via cfbfastR parquet + CFBD /plays**,

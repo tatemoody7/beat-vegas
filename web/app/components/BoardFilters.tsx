@@ -27,13 +27,6 @@ export default function BoardFilters({ current }: { current: Filters }) {
     });
   }
 
-  const chip = (on: boolean) =>
-    `rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
-      on
-        ? "border-[var(--accent-strong)] bg-[var(--accent-soft)] text-[var(--accent)]"
-        : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
-    }`;
-
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -41,7 +34,7 @@ export default function BoardFilters({ current }: { current: Filters }) {
           type="button"
           onClick={() => toggleFlag("mine", current.myTeams)}
           aria-pressed={current.myTeams}
-          className={chip(current.myTeams)}
+          className="bv-chip"
         >
           My teams
         </button>
@@ -49,7 +42,7 @@ export default function BoardFilters({ current }: { current: Filters }) {
           type="button"
           onClick={() => toggleFlag("hr", current.hrOnly)}
           aria-pressed={current.hrOnly}
-          className={chip(current.hrOnly)}
+          className="bv-chip"
         >
           Hard Rock line posted
         </button>

@@ -56,6 +56,21 @@ export function scoredAfter(
   return c > k;
 }
 
+/** The week the records grid opens on: the LATEST week with a graded game.
+ *  The season's schedule is present to week 15 from day one, so "the last
+ *  week present" opened on one pending Navy @ Army row in September (Tate
+ *  2026-09-16). Null when nothing has been graded; the page then falls back to
+ *  the last week. */
+export function defaultWeek(
+  rows: Pick<RecordRow, "week" | "outcome">[],
+): number | null {
+  let best: number | null = null;
+  for (const r of rows) {
+    if (r.outcome !== null && (best === null || r.week > best)) best = r.week;
+  }
+  return best;
+}
+
 export async function getRecordSeasons(): Promise<number[]> {
   // Seasons with content THIS GRID can show: a played game or a model row
   // (the grid's own JOIN below). Display-only derived_lines predictions must

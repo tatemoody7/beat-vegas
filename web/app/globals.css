@@ -7,7 +7,6 @@
   --surface: #111a2e;
   --surface-2: #16213a;
   --border: #3a4a6b; /* visible card edge (2.2:1 on the canvas) */
-  --border-soft: var(--border);
   --border-strong: #55688f; /* control edges: 3:1 on a card */
 
   /* Text — every step clears WCAG AA (4.5:1) on --surface */
@@ -19,6 +18,7 @@
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
   --accent-soft: rgba(56, 189, 248, 0.12);
+  --accent-line: rgba(56, 189, 248, 0.45); /* hover edge on chrome */
 
   /* GRADE + OUTCOME colours (lib/grade.ts). One language everywhere:
      good = bet / won, warn = watch / warning, bad = pass / lost, push = grey.
@@ -26,7 +26,7 @@
   --good: #3ddc84; /* 9.7:1 on a card */
   --warn: #f0b04a; /* 9.1:1 */
   --bad: #f87171; /* 6.3:1 */
-  --push: #8b98b0;
+  --push: var(--text-dim); /* grey grade = the dim text step, on purpose */
   --good-bg: rgba(61, 220, 132, 0.12);
   --warn-bg: rgba(240, 176, 74, 0.12);
   --bad-bg: rgba(248, 113, 113, 0.12);
@@ -50,18 +50,11 @@
      the sticky day heading hangs off it and `html` reserves it as scroll
      padding, so a `#game-<id>` jump from the bet card lands the target BELOW
      the chrome instead of under it. Measured in the browser, not guessed.
-     Below `sm` MainNav's `w-full` wraps onto its own second row, so the
-     header is taller — hence the media query.
-     Measured in-browser: 97px wrapped, 69px single-row. Each value sits a
-     hair UNDER its measurement so the day heading tucks against the header
-     with no gap for content to show through. */
-  --header-h: 6rem;
-}
-
-@media (min-width: 40rem) {
-  :root {
-    --header-h: 4.25rem;
-  }
+     Since 2026-09-16 the header is ONE row at every width (wordmark, tabs,
+     Lock), so there is one value. It sits a hair UNDER the measurement so the
+     day heading tucks against the header with no gap for content to show
+     through. */
+  --header-h: 4.25rem;
 }
 
 /* Anchor jumps (the bet card's "Show on board" links) must clear the sticky
@@ -115,9 +108,11 @@ body {
       border-color 0.18s ease-out,
       box-shadow 0.18s ease-out;
   }
+  /* A card that is a link (every board row) lifts on hover. */
+  a.bv-card:hover,
   .bv-card[data-interactive="true"]:hover {
     transform: translateY(-2px);
-    border-color: rgba(56, 189, 248, 0.45);
+    border-color: var(--accent-line);
     box-shadow: var(--shadow-card-hover);
   }
   /* A game that clears every gate. Green already means bet and won, and nothing
@@ -127,6 +122,7 @@ body {
     border-color: var(--good);
     background: linear-gradient(180deg, var(--good-bg), var(--bg-2));
   }
+  a.bv-card--lit:hover,
   .bv-card--lit[data-interactive="true"]:hover {
     border-color: var(--good);
   }
@@ -191,20 +187,10 @@ body {
     color: var(--text-muted);
     background: transparent;
   }
-  .bv-badge--good {
-    color: var(--good);
-    border-color: var(--good);
-    background: var(--good-bg);
-  }
   .bv-badge--warn {
     color: var(--warn);
     border-color: var(--warn-border);
     background: var(--warn-bg);
-  }
-  .bv-badge--bad {
-    color: var(--bad);
-    border-color: var(--bad);
-    background: var(--bad-bg);
   }
   .bv-badge--push {
     color: var(--push);
@@ -216,26 +202,29 @@ body {
     border-color: var(--accent-strong);
     background: var(--accent-soft);
   }
-  .bv-badge--wrap {
-    white-space: normal;
-    text-align: left;
-    line-height: 1.3;
+
+  /* Toggle chip (board filters, breakdown tabs): one shape, so a toggle looks
+     like a toggle everywhere. `aria-pressed` (a filter) or `aria-selected`
+     (a tab) carries the on state. */
+  .bv-chip {
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
   }
-  .bv-badge--solid {
-    border-color: transparent;
-    color: var(--badge-ink);
+  .bv-chip:hover {
+    color: var(--text);
   }
-  .bv-badge--solid.bv-badge--good {
-    background: var(--good);
-  }
-  .bv-badge--solid.bv-badge--warn {
-    background: var(--warn);
-  }
-  .bv-badge--solid.bv-badge--bad {
-    background: var(--bad);
-  }
-  .bv-badge--solid.bv-badge--push {
-    background: var(--push);
+  .bv-chip[aria-pressed="true"],
+  .bv-chip[aria-selected="true"] {
+    border-color: var(--accent-strong);
+    background: var(--accent-soft);
+    color: var(--accent);
   }
 
   /* Sticky day header on the rolling board (Thu / Fri / Sat). Parks directly
@@ -257,26 +246,13 @@ body {
     border-bottom: 1px solid var(--border);
   }
 
-  /* Compact stat block: dim label over a big mono value */
-  .bv-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
+  /* Small uppercase label over a number */
   .bv-stat-label {
     font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-dim);
-  }
-  .bv-stat-value {
-    font-family: var(--font-geist-mono), ui-monospace, monospace;
-    font-variant-numeric: tabular-nums;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1.1;
   }
 
   /* Data pill */
@@ -298,18 +274,7 @@ body {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Green/red factor board (Option-A tiered stack) — pure explainer */
-  .bv-fac-tier {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin: 0.75rem 0 0.35rem;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
+  /* Green/red factor rows on the game page */
   .bv-fac-row {
     display: flex;
     align-items: center;
@@ -367,7 +332,7 @@ body {
     transition: border-color 0.15s ease;
   }
   .bv-select:hover {
-    border-color: rgba(56, 189, 248, 0.45);
+    border-color: var(--accent-line);
   }
 
   /* Page heading (shared) */
@@ -444,7 +409,7 @@ body {
   .bv-btn {
     border-radius: var(--r-sm);
     background: var(--accent-strong);
-    color: #04121f;
+    color: var(--badge-ink);
     font-weight: 600;
     font-size: 0.875rem;
     padding: 0.5rem 1.1rem;
@@ -456,6 +421,17 @@ body {
   .bv-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  /* Secondary button: outlined, on the surface. Cyan only on hover. */
+  .bv-btn--ghost {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .bv-btn--ghost:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--accent-line);
   }
 
   /* Nav link + active state */
@@ -494,19 +470,18 @@ body {
   }
 }
 
-/* Phones only: below `sm` the header's nav row (MainNav) holds all three
-   labels — Board/Results/Track record — on one line at a tighter gap-x-4.
-   Drop the label size a touch so they fit at 375px without wrapping; `sm`+
-   keeps the normal 0.9rem from .bv-nav-link above. */
+/* Phones only: the header is one row — wordmark, three tabs, Lock — so the
+   labels drop a step to fit 360px without wrapping; `sm`+ keeps 0.9rem. */
 @media (max-width: 640px) {
   .bv-nav-link {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
   }
 }
 
 /* Respect reduced-motion: kill transforms/transitions */
 @media (prefers-reduced-motion: reduce) {
   .bv-card,
+  a.bv-card:hover,
   .bv-card[data-interactive="true"]:hover {
     transition: none;
     transform: none;

@@ -7,7 +7,12 @@ import {
   RESULT_PENDING,
   RESULT_TEXT,
 } from "@/lib/labels";
-import { getRecordSeasons, getSeasonRecords, RecordRow } from "@/lib/records";
+import {
+  defaultWeek,
+  getRecordSeasons,
+  getSeasonRecords,
+  RecordRow,
+} from "@/lib/records";
 import { resolveSeason } from "@/lib/season";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -60,7 +65,7 @@ export default async function RecordsPage({
   const week =
     Number.isInteger(reqWeek) && weeks.includes(reqWeek)
       ? reqWeek
-      : (weeks[weeks.length - 1] ?? null);
+      : (defaultWeek(all) ?? weeks[weeks.length - 1] ?? null);
   const rows = week === null ? all : all.filter((r) => r.week === week);
 
   return (
@@ -114,7 +119,8 @@ export default async function RecordsPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <dl className="bv-card mb-4 grid grid-cols-1 gap-x-6 gap-y-1 p-3 text-xs sm:grid-cols-2">
+      {/* A legend is a note, not a thing: no card around it (Tate 2026-09-16). */}
+      <dl className="mb-4 grid grid-cols-1 gap-x-6 gap-y-1 border-t border-[var(--border)] pt-3 text-xs sm:grid-cols-2">
         {LEGEND.map(([k, v]) => (
           <div key={k} className="flex gap-2">
             <dt className="shrink-0 font-semibold text-[var(--text)]">{k}</dt>

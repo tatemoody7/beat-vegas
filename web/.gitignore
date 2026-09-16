@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# screenshot captures from scripts/shots.mjs
+/shots/
 
 # next.js
 /.next/

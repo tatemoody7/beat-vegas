@@ -70,6 +70,14 @@ Research only — it never places bets or automates gambling.
   `pip install --no-deps --no-build-isolation -e .`, and `cache: pip` keys on the lock.
   **Local dev is unchanged** (`pip install -e .` against `requirements.txt`; this Mac is 3.9).
   Regenerate per the lock's header; Dependabot (`pip`, monthly) bumps pins with hashes.
+  **PR 5: `research_preview.yml` is DELETED.** Its Tue/Fri 13Z runs previewed **week 1 all
+  season** — `research_preview.py::_upcoming_week` took the smallest week with a
+  `home_points IS NULL` game, and week 1 has never-final rows — so every run was ~650 ESPN
+  calls and 456 `game_previews` rewrites for a week nobody was looking at, and it was the
+  job that claimed each ISO week's empty CFBD cache key (PR 1). The four decision builds in
+  `card.yml` already run the preview with an explicit `--week`; the script stays, and its
+  default week now comes from `beatvegas.season.detect_week` (the same rule `card.yml` and
+  `sunday.yml` use), with the old scan only as the off-season fallback.
 - **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
   page-by-page review with Tate (every page and state captured at 1440 and 390, seven
   Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three
@@ -660,7 +668,7 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 ## Architecture
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade,
   run by **GitHub Actions** (`.github/workflows/`: `sunday.yml`, `lines_watch.yml`,
-  `card.yml`, `grade.yml`, `research_preview.yml`). No notification code: GitHub emails
+  `card.yml`, `grade.yml`). No notification code: GitHub emails
   failed runs. Nothing runs the engine on the Mac, and **since 2026-09-13 nothing texts
   Tate either** — every scheduled routine was retired (see the bullet below). The bet
   card is built in the cloud (`card.yml`; slots in
@@ -882,7 +890,7 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   with header `Neon-Connection-String: $DATABASE_URL` and body `{"query": "..."}` returns
   rows as JSON from campus in <1s. Use it for ad-hoc reads/small writes when 5432 is blocked;
   the SQLAlchemy scripts still need GHA). So **Neon-writing scheduled jobs run in GitHub Actions**
-  (`.github/workflows/sunday.yml` + `lines_watch.yml` + `card.yml` + `grade.yml` + `research_preview.yml`).
+  (`.github/workflows/sunday.yml` + `lines_watch.yml` + `card.yml` + `grade.yml`).
   **DK's API 403s GHA datacenter IPs** (confirmed), so prod captures full-game lines with
   `poll_full_game --source oddsapi` (`auto` falls back to **CFBD /lines**, `sources/cfbd_lines.py`;
   DK only works from the Mac, which can't write Neon). Local jobs degrade gracefully via

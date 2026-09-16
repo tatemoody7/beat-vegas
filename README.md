@@ -116,7 +116,6 @@ itself before it builds.
 | When (ET)                          | Workflow / routine     | What                                                                 |
 | ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
 | Sun 2pm / 3pm / 4:30pm             | `sunday.yml`           | Openers (multi-book incl. exchanges) → pace + weather → score → derived 1H lines |
-| Tue / Fri 9am                      | `research_preview.yml` | News + injuries / QB-out → This Week cards                              |
 | Tue / Thu ~4:05pm (ET-gated 3:45–5:15) | `card.yml` slots `tue_pm` / `thu_pm` | Full 1H sweep of the rolling week + injury refresh → FINAL card → paper-log the qualifying games kicking off before the next build (48 h / 24 h), each with its blocker |
 | Fri ~4:05pm (ET-gated 3:45–5:15)   | `card.yml` slot `fri_pm` | The decision build for the weekend: same sweep, and it paper-logs the REST OF THE WEEK — 78% of Hard Rock's 1H lines are up by Friday afternoon and they barely move afterwards |
 | Sat ~8:05am (ET-gated 7:45–9:15)   | `card.yml` slot `sat_am` | Same whole-week sweep before the morning sitting; also on the rest of the week, but Friday has priced most of it, so it logs only what newly qualifies |

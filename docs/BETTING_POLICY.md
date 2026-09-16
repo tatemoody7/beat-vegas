@@ -197,7 +197,6 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
 
 | Tue / Thu / Fri ~4:05pm      | **Decision build**: forced fresh sweep of the whole week's Hard Rock games + injury refresh, then build. Timed to when Hard Rock actually posts first-half lines. Tuesday and Thursday paper-log only the games kicking off before the NEXT build (48 h / 24 h); **Friday paper-logs the rest of the week** — it is the decision build for the weekend. Gated 3:45–5:15pm ET so DST needs no edit | `card.yml` |
 | Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
-| Tue / Fri 9am                | News + injuries / QB-out → board cards (also refreshed by every decision build) | `research_preview.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 
 | Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) | you |

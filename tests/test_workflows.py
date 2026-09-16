@@ -195,21 +195,38 @@ def test_card_yml_can_rehearse_a_degraded_card_on_demand():
     assert "--max-credits-per-run $MAX_CREDITS" in sweep["run"]
 
 
-def test_card_yml_installs_before_resolving_the_slot():
-    """The resolve step probes the `cards` table (beatvegas.ci.slots_built_today),
-    so python + the package must be installed BEFORE it runs, and the old
-    `gh run list --status success` retry check — which counted a gate-skip run as
-    a success and blocked the EST build — must be gone."""
+def test_card_yml_gates_on_the_eastern_clock_before_installing_anything():
+    """Two of each slot's four backup crons fall outside the ET window in any
+    DST regime (the DST design), and until 2026-09-16 every one of them paid
+    setup-python + pip install to learn that (20 of 29 card runs that month
+    were skips, ~1 billed minute each). The gate is stdlib-only, so it runs on
+    the runner's python3 straight after checkout (GATE_ONLY=true, no DB probe);
+    setup, install, the cache restore and the full resolve are all gated on it.
+    The full resolve still probes the `cards` table, so python + the package
+    must be installed BEFORE it, and the old `gh run list --status success`
+    retry check — which counted a gate-skip run as a success and blocked the
+    EST build — must stay gone."""
     steps = _card_steps()
+    assert str(steps[0].get("uses", "")).startswith("actions/checkout@")
+    gate = steps[1]
+    assert gate.get("id") == "gate"
+    assert gate["env"]["GATE_ONLY"] == "true"
+    assert {"SCHEDULE", "INPUT_SLOT", "INPUT_FORCE"} <= set(gate["env"])
+    assert "python3 -m beatvegas.ci" in gate["run"]
+    assert "if" not in gate, "the gate itself must always run"
     setup = next(
         i for i, s in enumerate(steps) if str(s.get("uses", "")).startswith("actions/setup-python@")
     )
     install = next(i for i, s in enumerate(steps) if s.get("name") == "Install")
+    restore = next(i for i, s in enumerate(steps) if s.get("id") == "cfbd_cache")
     resolve = next(i for i, s in enumerate(steps) if s.get("id") == "slot")
-    assert setup < resolve and install < resolve
-    assert "if" not in steps[setup] and "if" not in steps[install]
+    assert 1 < setup < install < restore < resolve
+    for i in (setup, install, restore, resolve):
+        assert steps[i].get("if") == "steps.gate.outputs.slot != 'skip'", steps[i].get("name")
+    assert steps[setup]["with"].get("cache") == "pip"
     run = steps[resolve]["run"]
     assert "beatvegas.ci" in run
+    assert "GATE_ONLY" not in (steps[resolve].get("env") or {}), "the full resolve must probe"
     assert "gh run list" not in run and "retry_since" not in run
     assert "GH_TOKEN" not in (steps[resolve].get("env") or {})
     # Every step after the resolve is gated on it (directly or via a derived output).
@@ -230,7 +247,10 @@ def test_card_yml_installs_before_resolving_the_slot():
 def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
     """grade.yml runs twice a day with no skip gate, so each run must be cheap:
     the PBP step fetches only the weeks still missing rows, and the post-mortem
-    regrades only the live season except on Monday ET / a manual dispatch."""
+    regrades only the live season except on Monday ET or a dispatch that asks
+    for it (hist=true). NOT every dispatch: the Vercel cron that is this
+    workflow's primary trigger is a dispatch, and keying on the event ran the
+    2023-25 regrade (7 MB read, 3.5 MB rewrite) every single day."""
     data = _load(WF_DIR / "grade.yml")
     steps = data["jobs"]["grade"]["steps"]
     runs = [s["run"] for s in steps if isinstance(s.get("run"), str)]
@@ -242,8 +262,12 @@ def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
     assert pm["env"]["ET_DOW"] == "${{ steps.season.outputs.et_dow }}"
     assert "scope=live" in pm["run"]
     assert '"$ET_DOW" = "1"' in pm["run"]
-    assert '"$GITHUB_EVENT_NAME" = "workflow_dispatch"' in pm["run"]
+    assert pm["env"]["IN_HIST"] == "${{ inputs.hist }}"
+    assert '"$IN_HIST" = "true"' in pm["run"]
+    assert 'GITHUB_EVENT_NAME" = "workflow_dispatch' not in pm["run"]
     assert '--scope "$scope"' in pm["run"]
+    hist = _on(data)["workflow_dispatch"]["inputs"]["hist"]
+    assert hist["type"] == "boolean" and hist["default"] is False
     # Both crons stay; no case-block gate.
     assert len(_cron_strings(data)) == 2
     assert not any('case "$SCHEDULE"' in r for r in runs)
@@ -355,3 +379,142 @@ def test_lines_watch_has_no_mapping_for_a_cron_it_no_longer_runs():
     mapped = set(re.findall(r"^\s*'([-\d,* /]+)'\)", run, re.M))
     orphans = mapped - crons
     assert not orphans, f"case branches for crons that no longer exist: {sorted(orphans)}"
+
+
+# --- Actions minutes + the CFBD reference cache (2026-09-16). The repo is
+# private, so every runner minute is metered against 2,000/month; CI was 58% of
+# the bill and the CFBD cache had been saving an EMPTY payload all season.
+
+FEATURE_FRAME_SCRIPTS = (
+    # Every script here reaches etl/features.build_feature_frame, which fetches
+    # the SP+/talent/roster/returning/adv references (~22 CFBD calls) unless
+    # data/cache already holds them.
+    "scripts/weekly_update.py",
+    "scripts/grade_factor_ledger.py",
+    "scripts/post_derived_lines.py",
+    "scripts/residual_gate.py",
+    "scripts/level_anchor_gate.py",
+)
+CACHE_RESTORE = "./.github/actions/cfbd-cache"
+CACHE_SAVE = "./.github/actions/cfbd-cache-save"
+ACTIONS_DIR = WF_DIR.parent / "actions"
+
+
+def _steps(data: dict):
+    for job in (data.get("jobs") or {}).values():
+        yield from (job.get("steps") or [])
+
+
+def test_ci_runs_on_pull_requests_only_and_caches_pip():
+    """`push: main` re-ran the exact content the PR had just passed (81 of 284
+    runs in half a month); Vercel deploys main on its own. The python job also
+    reinstalled pandas/sklearn from PyPI every run."""
+    data = _load(WF_DIR / "ci.yml")
+    assert set(_on(data)) == {"pull_request"}
+    setups = [s for s in _steps(data) if str(s.get("uses", "")).startswith("actions/setup-python@")]
+    assert setups and all(s["with"].get("cache") == "pip" for s in setups)
+
+
+def test_every_scheduled_python_workflow_caches_pip():
+    """A scheduled job runs dozens of times a month; the ~40 s reinstall is a
+    billed minute each time."""
+    checked = 0
+    for p in _workflows():
+        data = _load(p)
+        if not _cron_strings(data):
+            continue
+        for s in _steps(data):
+            if str(s.get("uses", "")).startswith("actions/setup-python@"):
+                assert (s.get("with") or {}).get("cache") == "pip", (
+                    f"{p.name}: setup-python without cache: pip"
+                )
+                checked += 1
+    assert checked >= 4
+
+
+def test_cfbd_cache_is_restored_where_features_build_and_saved_only_when_populated():
+    """The single `actions/cache` step saved in its post-job hook whenever the
+    key was missing -- whoever ran first. The first job of every ISO week was
+    the Tuesday research preview (zero CFBD calls), so the key held 12 KB of
+    espn_teams.json and every later run re-fetched the ~22 reference calls the
+    cache exists to share (~1,900 of the 3,000-call month). Now: a restore step
+    with id `cfbd_cache` wherever a feature frame is built, and ONE save step,
+    after the last such script, that runs on always() and only when this run
+    populated the directory (the save action checks the files itself)."""
+    checked = 0
+    for p in _workflows():
+        data = _load(p)
+        steps = list(_steps(data))
+        runs_features = any(
+            isinstance(s.get("run"), str) and any(k in s["run"] for k in FEATURE_FRAME_SCRIPTS)
+            for s in steps
+        )
+        restores = [i for i, s in enumerate(steps) if s.get("uses") == CACHE_RESTORE]
+        saves = [i for i, s in enumerate(steps) if s.get("uses") == CACHE_SAVE]
+        for s in steps:
+            assert not str(s.get("uses", "")).startswith("actions/cache@"), (
+                f"{p.name}: use the split restore/save composites, not actions/cache"
+            )
+        if runs_features:
+            assert restores, f"{p.name}: builds a feature frame without restoring the CFBD cache"
+        if not restores:
+            assert not saves, f"{p.name}: saves a cache it never restored"
+            continue
+        assert len(restores) == 1 and steps[restores[0]].get("id") == "cfbd_cache", p.name
+        assert len(saves) == 1, f"{p.name}: exactly one save step"
+        save = steps[saves[0]]
+        assert save["with"]["key"] == "${{ steps.cfbd_cache.outputs.key }}", p.name
+        cond = save.get("if") or ""
+        assert cond.startswith("always()"), f"{p.name}: the save must run on always()"
+        assert "steps.cfbd_cache.outputs.hit != 'true'" in cond, p.name
+        last_feature = max(
+            (
+                i
+                for i, s in enumerate(steps)
+                if isinstance(s.get("run"), str)
+                and any(k in s["run"] for k in FEATURE_FRAME_SCRIPTS)
+            ),
+            default=restores[0],
+        )
+        assert saves[0] > last_feature > restores[0] or saves[0] > restores[0], p.name
+        checked += 1
+    assert checked >= 6, (
+        f"expected the card, grade, sunday, rescore, study and gate workflows; got {checked}"
+    )
+
+
+def test_cfbd_cache_actions_are_split_and_sha_pinned():
+    """Restore and save are two composites so the save can be gated on the
+    directory actually holding reference files, and both pin actions/cache's
+    sub-actions to a SHA -- the one mutable `@v4` tag PR #98 left behind sat
+    inside the jobs carrying DATABASE_URL."""
+    sha = re.compile(r"^actions/cache/(restore|save)@[0-9a-f]{40}$")
+    restore = _load(ACTIONS_DIR / "cfbd-cache" / "action.yml")
+    assert set(restore["outputs"]) == {"key", "hit"}
+    r_steps = restore["runs"]["steps"]
+    assert r_steps[0]["id"] == "week" and "%G-W%V" in r_steps[0]["run"]
+    assert r_steps[1]["id"] == "restore" and sha.match(r_steps[1]["uses"]).group(1) == "restore"
+    assert r_steps[1]["with"]["path"] == "data/cache"
+    assert not any("restore-keys" in (s.get("with") or {}) for s in r_steps), (
+        "no restore-keys: SP+ would freeze"
+    )
+
+    save = _load(ACTIONS_DIR / "cfbd-cache-save" / "action.yml")
+    assert save["inputs"]["key"]["required"] is True
+    s_steps = save["runs"]["steps"]
+    check = s_steps[0]
+    assert check["id"] == "check" and "populated=" in check["run"]
+    for name in ("sp_", "talent_", "roster_", "returning_", "adv_"):
+        assert name in check["run"], f"the populated check must look for {name}*.json"
+    assert "-size +1k" in check["run"], "2-byte empty payloads must not count"
+    assert sha.match(s_steps[1]["uses"]).group(1) == "save"
+    assert s_steps[1]["if"] == "steps.check.outputs.populated == 'true'"
+    assert s_steps[1]["with"]["path"] == "data/cache"
+
+    # Repo-wide: every remote `uses:` under .github is a 40-hex SHA.
+    for path in list(WF_DIR.glob("*.yml")) + list(ACTIONS_DIR.glob("*/action.yml")):
+        for m in re.finditer(r"^\s*-?\s*uses:\s*(\S+)", path.read_text(), re.M):
+            ref = m.group(1)
+            if ref.startswith("./"):
+                continue
+            assert re.search(r"@[0-9a-f]{40}$", ref), f"{path.name}: {ref} is not pinned to a SHA"

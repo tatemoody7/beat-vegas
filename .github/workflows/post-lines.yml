@@ -51,6 +51,9 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
       - name: Post derived lines
         # Inputs go through env, never inlined into bash (script-injection hygiene).
         env:
@@ -62,3 +65,8 @@ jobs:
           if [ -n "$IN_SEASON" ]; then ARGS="$ARGS --season $IN_SEASON"; fi
           if [ -n "$IN_WEEK" ]; then ARGS="$ARGS --week $IN_WEEK"; fi
           python scripts/post_derived_lines.py $ARGS
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

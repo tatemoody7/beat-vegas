@@ -1,31 +1,47 @@
-name: CFBD reference cache
+name: CFBD reference cache (restore)
 description: >
-  Share CFBD reference downloads (SP+, talent, roster, returning production)
-  across the week's workflow runs instead of re-fetching them on every one.
+  Restore the week's CFBD reference downloads (SP+, talent, roster, returning
+  production, advanced stats) into data/cache so a feature build re-uses them
+  instead of re-fetching. Pair with ./.github/actions/cfbd-cache-save at the
+  END of the job.
 
 # Why this exists: CFBD's monthly call quota ran out on 2026-09-12 and 429'd
 # every endpoint for two days, which stopped grading dead. The cause was not one
-# greedy job -- it was ~76 workflow runs a month each re-downloading the same
-# unchanged reference tables, because beatvegas/sources/season_stats.py::_cached
-# writes to data/cache/ and a GitHub runner starts with an empty one.
-#
-# A feature build fetches sp/talent/roster/returning for every season in the
-# frame: roughly 17 calls, on all 26 card builds, 17 Sunday runs and 10 research
-# previews. That is most of a 1,000-call month spent on rows that do not change.
+# greedy job -- it was every workflow run re-downloading the same unchanged
+# reference tables, because beatvegas/sources/season_stats.py::_cached writes to
+# data/cache/ and a GitHub runner starts with an empty one.
 #
 # The key carries the ISO week, so every run inside one week shares a single
 # download and each new week re-fetches once. That is deliberate: SP+ ratings
 # update weekly in season, and _cached has no expiry -- a season-long key would
 # silently freeze the model's SP+ features at week 1. There are NO restore-keys
 # for the same reason.
+#
+# RESTORE AND SAVE ARE SPLIT ON PURPOSE (2026-09-16). The old single
+# `actions/cache` step saved in its post-job hook whenever the key was missing,
+# whoever ran first -- and the first job of every ISO week was the Tuesday
+# research preview, which makes zero CFBD calls. So the week's key was saved at
+# 12,840 bytes holding only espn_teams.json, every later run logged "Cache hit
+# occurred ... not saving", and each of them re-fetched the ~22 reference calls
+# the cache exists to share: ~1,900 of the 3,000-call Academic month, measured.
+# The save action below refuses to save a cache that holds no reference files.
+
+outputs:
+  key:
+    description: The week's cache key; pass it to cfbd-cache-save.
+    value: ${{ steps.week.outputs.key }}
+  hit:
+    description: "'true' when the week's cache already existed (nothing to save)."
+    value: ${{ steps.restore.outputs.cache-hit }}
 
 runs:
   using: composite
   steps:
     - id: week
       shell: bash
-      run: echo "key=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache@v4
+      run: echo "key=cfbd-ref-$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: data/cache
-        key: cfbd-ref-${{ steps.week.outputs.key }}
+        key: ${{ steps.week.outputs.key }}

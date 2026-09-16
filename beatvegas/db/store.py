@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, tuple_
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -377,27 +377,55 @@ def session_scope() -> Iterator[Session]:
         s.close()
 
 
+UPSERT_CHUNK = 500
+
+
 def upsert(
-    session: Session, model, rows: Iterable[dict], pk_fields, overwrite_none: bool = False
+    session: Session,
+    model,
+    rows: Iterable[dict],
+    pk_fields,
+    overwrite_none: bool = False,
+    chunk: int = UPSERT_CHUNK,
 ) -> int:
     """Insert-or-update rows by primary-key fields. Returns count processed.
 
     On UPDATE, keys whose value is None are skipped unless `overwrite_none` —
     a source that lacks a field (CFBD has no line yet for an upcoming game) must
     not erase a value another job already stored (the Sunday opener's
-    Game.spread / full_game_total). Inserts set every key as given."""
+    Game.spread / full_game_total). Inserts set every key as given.
+
+    The existence check is BATCHED: one `WHERE pk IN (...)` per `chunk` rows
+    (a row-value tuple IN for a composite key) instead of one SELECT per row.
+    backfill.py re-upserts ~3,700 season rows twice a day, which was ~7,400
+    round trips a day against Neon for a schedule that barely changes. Rows
+    that repeat a key inside one call still apply in order (the second row
+    updates the object the first one inserted), as before."""
     if isinstance(pk_fields, str):
         pk_fields = [pk_fields]
+    rows = list(rows)
+    if not rows:
+        return 0
+    cols = [getattr(model, f) for f in pk_fields]
     n = 0
-    for row in rows:
-        key = {f: row[f] for f in pk_fields}
-        obj = session.query(model).filter_by(**key).one_or_none()
-        if obj is None:
-            session.add(model(**row))
+    for start in range(0, len(rows), max(1, chunk)):
+        batch = rows[start : start + max(1, chunk)]
+        keys = [tuple(r[f] for f in pk_fields) for r in batch]
+        if len(cols) == 1:
+            q = session.query(model).filter(cols[0].in_([k[0] for k in keys]))
         else:
-            for k, v in row.items():
-                if v is None and not overwrite_none:
-                    continue
-                setattr(obj, k, v)
-        n += 1
+            q = session.query(model).filter(tuple_(*cols).in_(keys))
+        existing = {tuple(getattr(o, f) for f in pk_fields): o for o in q.all()}
+        for row, key in zip(batch, keys):
+            obj = existing.get(key)
+            if obj is None:
+                obj = model(**row)
+                session.add(obj)
+                existing[key] = obj
+            else:
+                for k, v in row.items():
+                    if v is None and not overwrite_none:
+                        continue
+                    setattr(obj, k, v)
+            n += 1
     return n

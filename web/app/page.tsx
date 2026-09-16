@@ -105,10 +105,6 @@ export default async function BoardPage({
         </div>
       </div>
 
-      <p className="bv-page-sub mb-4 mt-1">
-        {`Every game this week, ranked best to worst. #1 is the strongest game on the board; the bets are the ones lit up green. Open a game for the numbers behind it.`}
-      </p>
-
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       <AnswerBar answer={answer} nextBuild={build?.label ?? null} />

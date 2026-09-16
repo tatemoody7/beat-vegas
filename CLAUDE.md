@@ -5,6 +5,29 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
+  page-by-page review with Tate (every page and state captured at 1440 and 390, seven
+  Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three
+  typefaces, the colours and the board's full action sentence all STAY** — he rejected a
+  trimmed status and a flat "surface tiers" treatment. What changed: copy cut to the bone
+  site-wide (a definition lives once, in the glossary); the game page's decision block is
+  the three tiles + the sentence + the log button (`GapBar`, gap caption, blocker/price
+  lines, tier word and full-game footer are gone); **Results is Concept A "Scoreboard"**
+  (`ScoreboardBand` = rule on paper / my money / line value with the curve inside, one
+  `RecordTable` for market/model/rule/you/full game, `DecisionsStrip`); **Track record is
+  Concept A "One finding"** (headline + `GapLadderChart` in one card with games and units
+  under each bar, `RecordTable` with a "plausibly" column, `PmLiveNotes` as one panel, flags
+  as rows, ONE fold for method, glossary as two-column one-liners). Foundations: one-row
+  header at every width (69px, `--header-h` is one value), `.bv-chip`, `.bv-btn--ghost`,
+  dead classes gone, `a.bv-card:hover` lifts board rows, `/proof/records` opens on the
+  latest GRADED week. **`web/scripts/shots.mjs`** (Playwright driving the installed Chrome,
+  `channel: "chrome"`) captures every page at both widths with height / overflow / header /
+  first-answer / small-text / tap-target counts and `--diff before after`. Direction doc:
+  `docs/superpowers/specs/2026-09-16-redesign-direction.md` (+ two research reports beside
+  it). Measured: Results 3,408 → 2,890px, Track record 2,840 → 2,211, game page ~1,925 →
+  1,644, phone header 97 → 69 everywhere. Deleted: `RuleRecord`, `BankrollHero`,
+  `RecordCard`, `GapBar`. Data item flagged, NOT fixed: week-2 SDSU @ UCLA is graded WON
+  on a first half of 0 (the ESPN false-zero the guard should have caught).
 - **2026-09-15 (FULL SYSTEM REVIEW BEFORE WEEK 3; PRs #129 weather/money-path, #130 site,
   plus measurement and docs PRs).** Verified top to bottom against live Neon, the GHA logs,
   `/api/health`, ESPN and the API headers. **Ops were healthy** (grading current, CFBD

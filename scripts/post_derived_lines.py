@@ -35,7 +35,7 @@ from beatvegas.etl.context import context_for_games, prior_season_efficiency
 from beatvegas.etl.form import form_for_games
 from beatvegas.etl.match import match_event
 from beatvegas.etl.proxy_line import fh_share, proxy_total
-from beatvegas.factors.board import historical_references
+from beatvegas.factors.board import historical_references, load_references
 from beatvegas.factors.ledger import load_ledger
 from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.model.score import derived_factors
@@ -223,6 +223,13 @@ def main() -> None:
     ap.add_argument(
         "--no-refs", action="store_true", help="skip the historical factor references (faster)"
     )
+    ap.add_argument(
+        "--refs",
+        metavar="PATH",
+        help="read the factor references from this JSON (written by weekly_update.py "
+        "--write-refs earlier in the same run) instead of rebuilding the historical frame; "
+        "falls back to the rebuild when the file is missing",
+    )
     args = ap.parse_args()
 
     if not try_init_db():
@@ -231,7 +238,10 @@ def main() -> None:
     fetched, source = fetch(args.source, args.season)
     now = datetime.utcnow()
     efficiency = prior_season_efficiency(args.season)  # fail-soft: {} on CFBD trouble
-    refs = {} if args.no_refs else historical_references()
+    if args.no_refs:
+        refs = {}
+    else:
+        refs = (load_references(args.refs) if args.refs else None) or historical_references()
 
     with session_scope() as s:
         gmeta = {

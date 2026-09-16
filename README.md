@@ -21,11 +21,20 @@ first-half share.) The true edge, if any, lives in the gap between the **real** 
 line and actual results, so the season's job is to collect real Hard Rock lines and
 measure closing-line value (CLV). See `docs/BETTING_POLICY.md`.
 
+**The 2026 season is the measurement.** Hard Rock's first-half lines are captured in
+four whole-week builds (Tue / Thu / Fri / Sat); every game that clears the rule is logged
+on paper and graded at Hard Rock's close; from week 3 the paper record runs under a
+pre-registered stopping rule (`docs/STOPPING_RULE.md`) whose failure boundary pauses real
+money. Every test ever run on the data has a row in `docs/HYPOTHESES.md`. The 2023-25
+first-half closes were bought from the Odds API history in September 2026 (1,902 real
+closes), so the backtest grades at real closes where they exist — and that set is treated
+as spent for exploration.
+
 **The product: the "BV line" (make our own number first).** We don't assume Vegas
 is soft (that thesis was refuted). A **market-blind** regressor projects an
 independent 1H total (`beatvegas/model/bv_line.py`); the board ranks games by the
-**gap** to the real Vegas line, and the This Week page turns the gap + Hard Rock's
-price into a plain-English BET / WATCH / PASS verdict (`web/lib/verdict.ts`). The
+**gap** to the real Vegas line, and the board and each game page turn the gap + Hard
+Rock's price into a plain-English Bet / Watch / Pass verdict (`web/lib/verdict.ts`). The
 BV line is noisy (σ ≈ 12 pts on any single game), so gates are in points from the
 validated top-20% ranking rule (≥ 1.75), never in σ. Full write-up: `docs/BV_LINE.md`.
 

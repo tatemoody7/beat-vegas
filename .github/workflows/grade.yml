@@ -61,8 +61,17 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: requirements.lock
       - name: Install
-        run: pip install -e .
+        # Hash-pinned: requirements.lock names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install --no-deps --no-build-isolation -e .
       - name: Restore CFBD reference data (weekly cache)
         # grade_factor_ledger.py builds the feature frame, which fetches the
         # SP+/talent/roster/returning references (~22 CFBD calls) -- twice a
@@ -81,7 +90,9 @@ jobs:
         # the part grading actually needs -- on 2026-09-12 CFBD hit its monthly
         # call quota and 429'd for two days, taking every grade with it.
         continue-on-error: true
-        run: python scripts/backfill.py --season ${{ steps.season.outputs.season }}
+        env:
+          SEASON: ${{ steps.season.outputs.season }}
+        run: python scripts/backfill.py --season "$SEASON"
       - name: Backfill any missing final scores (ESPN, no key, no quota)
         # Scores only, onto games the step above already created, keyed by id
         # (ESPN's event ids are the ids we store). Second source for the one
@@ -100,11 +111,17 @@ jobs:
         # Enrichment, not grading: PBP aggregates feed next week's SCORING, so a
         # flaky CFBD call here must never stop this week's grades from landing.
         continue-on-error: true
-        run: python scripts/backfill_pbp.py --season ${{ steps.season.outputs.season }} --only-missing
+        env:
+          SEASON: ${{ steps.season.outputs.season }}
+        run: python scripts/backfill_pbp.py --season "$SEASON" --only-missing
       - name: Grade market vs model ledger
-        run: python scripts/grade.py --season ${{ steps.season.outputs.season }}
+        env:
+          SEASON: ${{ steps.season.outputs.season }}
+        run: python scripts/grade.py --season "$SEASON"
       - name: Grade my picks
-        run: python scripts/pick.py grade --season ${{ steps.season.outputs.season }}
+        env:
+          SEASON: ${{ steps.season.outputs.season }}
+        run: python scripts/pick.py grade --season "$SEASON"
       - name: Grade frozen game records
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)

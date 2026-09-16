@@ -62,8 +62,17 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: requirements.lock
       - name: Install
-        run: pip install -e .
+        # Hash-pinned: requirements.lock names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install --no-deps --no-build-isolation -e .
       - name: Restore CFBD reference data (weekly cache)
         id: cfbd_cache
         uses: ./.github/actions/cfbd-cache
@@ -157,7 +166,10 @@ jobs:
         if: steps.captured.outputs.need_score == 'true'
         continue-on-error: true
         timeout-minutes: 5
-        run: python scripts/enrich_tempo.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }} --date "$(date -u +%F)"
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: python scripts/enrich_tempo.py --season "$SEASON" --week "$WEEK" --date "$(date -u +%F)"
       - name: Refresh weather forecasts for the active week (Open-Meteo)
         id: weather
         # wx_* are model inputs joined on game_id; the forecast API covers the
@@ -170,7 +182,10 @@ jobs:
         # Open-Meteo rate-limits the runner: the first live run sat 20+ min in
         # this step. Cap it — scoring must not wait on forecasts.
         timeout-minutes: 8
-        run: python scripts/enrich_weather.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }}
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: python scripts/enrich_weather.py --season "$SEASON" --week "$WEEK"
       - name: Score + rank the board
         if: steps.captured.outputs.need_score == 'true'
         # --write-refs: the board-tint anchors come off the frame this step has
@@ -182,7 +197,10 @@ jobs:
         # rows, then inserts the week's fresh ones). Gated with scoring, so it
         # never runs off-season (the script exits 1 on zero rows).
         if: steps.captured.outputs.need_score == 'true'
-        run: python scripts/post_derived_lines.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --refs "$RUNNER_TEMP/factor_refs.json"
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: python scripts/post_derived_lines.py --season "$SEASON" --week "$WEEK" --refs "$RUNNER_TEMP/factor_refs.json"
       - name: Warn when the board scored WITHOUT pace/weather
         # The enrichment steps are continue-on-error so an unofficial-source
         # outage never blocks the board, but a silent miss means the week

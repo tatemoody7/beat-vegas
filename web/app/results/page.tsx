@@ -108,6 +108,17 @@ export default async function ResultsPage({
         linesMoved={{ n: dq.clv.n, pctFavourable: dq.clv.pctFavourable }}
       />
 
+      {/* The ledger sits right under the scoreboard (Tate 2026-09-16): what I
+          bet and how it landed is the second thing on the page, before the
+          comparisons. It opens on real money; Paper and All are one click. */}
+      <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
+        Your picks
+        <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
+          {weekLabel}
+        </span>
+      </h2>
+      <PicksList picks={review.picks} showWeek={review.week === null} />
+
       <Section
         title={`Season summary · ${season}`}
         empty={
@@ -251,14 +262,6 @@ export default async function ResultsPage({
           </div>
         )}
       </Section>
-
-      <h2 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-        Your picks
-        <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-          {`${weekLabel} · ${review.picks.length}`}
-        </span>
-      </h2>
-      <PicksList picks={review.picks} showWeek={review.week === null} />
     </div>
   );
 }

@@ -115,8 +115,9 @@ def test_card_rescores_with_the_residual_engine_after_the_sweep():
     assert sweep < rescore < build
     run = steps[rescore]["run"]
     assert "--if-engine residual" in run
-    assert "--season" in run and "--week" in run
-    assert "steps.active.outputs.season" in run and "steps.active.outputs.week" in run
+    assert '--season "$SEASON"' in run and '--week "$WEEK"' in run
+    assert steps[rescore]["env"]["SEASON"] == "${{ steps.active.outputs.season }}"
+    assert steps[rescore]["env"]["WEEK"] == "${{ steps.active.outputs.week }}"
     # Gated exactly like the sweep: no sweep, nothing new to condition on.
     assert steps[rescore].get("if") == steps[sweep].get("if")
     assert "need_sweep" in steps[rescore]["if"]
@@ -161,7 +162,8 @@ def test_card_yml_wires_the_status_files_through_to_the_build():
     sweep, preview, build = steps["sweep"], steps["preview"], steps["build"]
     assert '--status-file "$RUNNER_TEMP/sweep_status.json"' in sweep["run"]
     assert '--status-file "$RUNNER_TEMP/preview_status.json"' in preview["run"]
-    assert "--slot" in build["run"] and "steps.slot.outputs.slot" in build["run"]
+    assert '--slot "$SLOT"' in build["run"]
+    assert build["env"]["SLOT"] == "${{ steps.slot.outputs.slot }}"
     assert '--sweep-status "$SWEEP_STATUS"' in build["run"]
     assert '--preview-status "$PREVIEW_STATUS"' in build["run"]
     # Either step dying before it wrote its own file still reaches the card as
@@ -547,3 +549,112 @@ def test_cfbd_cache_actions_are_split_and_sha_pinned():
             if ref.startswith("./"):
                 continue
             assert re.search(r"@[0-9a-f]{40}$", ref), f"{path.name}: {ref} is not pinned to a SHA"
+
+
+# --- Script-injection hygiene, repo-wide (2026-09-16 security review). A `${{ }}`
+# inside a run: block is substituted into the script TEXT before bash parses
+# it. Every job here carries secrets, so any value a person can type -- a
+# dispatch input, or a step output derived from one -- has to cross into the
+# shell as an environment variable. card.yml's season/week were the one
+# regression (four run: blocks), and the guard on residual_gate/rescore did
+# not cover `steps.*.outputs`, so this is the general rule.
+
+INLINE_EXPR = re.compile(r"\$\{\{\s*(inputs\.|steps\.|github\.event\.)")
+
+
+def test_no_run_block_inlines_an_expression_in_a_job_that_holds_secrets():
+    checked = 0
+    for p in _workflows():
+        for jname, job in (_load(p).get("jobs") or {}).items():
+            if "secrets." not in yaml.safe_dump(job.get("env") or {}):
+                continue
+            for st in job.get("steps") or []:
+                run = st.get("run")
+                if not isinstance(run, str):
+                    continue
+                m = INLINE_EXPR.search(run)
+                assert m is None, (
+                    f"{p.name}:{jname} step {st.get('name') or st.get('id')!r} inlines "
+                    f"`{run[m.start() : m.start() + 40]}...` into bash; pass it through env:"
+                )
+                checked += 1
+    assert checked > 30
+
+
+def test_card_yml_validates_the_two_typed_inputs_before_using_them():
+    steps = _card_steps_by_id()
+    resolve = steps["active"]
+    assert set(resolve["env"]) == {"INPUT_SEASON", "INPUT_WEEK"}
+    run = resolve["run"]
+    assert '[[ "$INPUT_SEASON" =~ ^[0-9]{4}$ ]]' in run
+    assert '[[ "$INPUT_WEEK" =~ ^[0-9]{1,2}$ ]]' in run
+    # The checks run BEFORE the values are used or echoed to $GITHUB_OUTPUT.
+    assert run.index("^[0-9]{4}$") < run.index('echo "season=')
+    # Downstream, only env carries them.
+    for sid in ("sweep", "preview", "build"):
+        assert not INLINE_EXPR.search(steps[sid]["run"]), sid
+    assert steps["sweep"]["env"]["SWEEP_ARGS"] == "${{ steps.slot.outputs.sweep_args }}"
+    assert "$SWEEP_ARGS" in steps["sweep"]["run"]
+    assert steps["preview"]["env"]["SEASON"] == "${{ steps.active.outputs.season }}"
+
+
+# --- Hash-pinned installs (2026-09-16). requirements.txt caps the next major;
+# requirements.lock pins the exact release and its sha256 hashes, and every
+# runner installs from the lock with --require-hashes, then this repo with
+# --no-build-isolation so the build backend (also locked) is never fetched
+# unhashed.
+
+LOCK = WF_DIR.parent.parent / "requirements.lock"
+REQS = WF_DIR.parent.parent / "requirements.txt"
+
+
+def _pkg_names(text: str):
+    out = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("--"):
+            continue
+        name = re.split(r"[<>=!~\[; \\]", line, maxsplit=1)[0]
+        out.add(name.lower().replace("_", "-"))
+    return out
+
+
+def test_every_python_install_is_hash_pinned_and_the_pip_cache_keys_on_the_lock():
+    checked = 0
+    for p in _workflows():
+        data = _load(p)
+        for job in (data.get("jobs") or {}).values():
+            steps = job.get("steps") or []
+            # CI's web job has an "Install" step too (`npm ci`); only pip installs count.
+            installs = [
+                s for s in steps if s.get("name") == "Install" and "pip" in str(s.get("run"))
+            ]
+            for s in installs:
+                run = s["run"]
+                assert "pip install --require-hashes -r requirements.lock" in run, p.name
+                assert "pip install --no-deps --no-build-isolation -e ." in run, p.name
+                assert "pip install -e .\n" not in run + "\n" or "--no-deps" in run, p.name
+                checked += 1
+            for s in steps:
+                if str(s.get("uses", "")).startswith("actions/setup-python@"):
+                    w = s.get("with") or {}
+                    if w.get("cache") == "pip":
+                        assert w.get("cache-dependency-path") == "requirements.lock", p.name
+    assert checked >= 14
+
+
+def test_the_lock_covers_requirements_and_carries_a_hash_for_every_pin():
+    lock = LOCK.read_text()
+    pins = re.findall(r"^([A-Za-z0-9_.\-]+)==([^\s\\]+)", lock, re.M)
+    assert len(pins) >= 30
+    names = {n.lower().replace("_", "-") for n, _ in pins}
+    for req in _pkg_names(REQS.read_text()):
+        assert req in names, f"{req} is in requirements.txt but not in requirements.lock"
+    # The build backend rides in the lock so the editable install needs no isolation.
+    assert {"setuptools", "wheel"} <= names
+    # Every pinned block has at least one --hash line.
+    blocks = re.split(r"\n(?=[A-Za-z0-9_.\-]+==)", lock)
+    pinned_blocks = [b for b in blocks if re.match(r"[A-Za-z0-9_.\-]+==", b)]
+    assert len(pinned_blocks) == len(pins)
+    for b in pinned_blocks:
+        assert "--hash=sha256:" in b, b.splitlines()[0]

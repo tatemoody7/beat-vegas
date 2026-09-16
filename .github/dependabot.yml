@@ -24,6 +24,19 @@ updates:
       actions:
         patterns: ["*"]
 
+  # requirements.lock (hash-pinned, resolved for the 3.11 runner). Dependabot
+  # rewrites the pins and their hashes together; requirements.txt keeps the
+  # human-readable ranges and is not what the runners install from.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+    groups:
+      python:
+        patterns: ["*"]
+
   - package-ecosystem: npm
     directory: /web
     schedule:

@@ -141,9 +141,18 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: requirements.lock
       - name: Install
         if: steps.gate.outputs.slot != 'skip'
-        run: pip install -e .
+        # Hash-pinned: requirements.lock names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install --no-deps --no-build-isolation -e .
       - name: Restore CFBD reference data (weekly cache)
         id: cfbd_cache
         if: steps.gate.outputs.slot != 'skip'
@@ -168,7 +177,19 @@ jobs:
         env:
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}
+        # The two dispatch inputs are the only values on this job a person
+        # types. They reach every later step through `env:` (never inlined as
+        # `${{ }}` into a run: block, where GitHub substitutes the text before
+        # bash parses it), and they are shape-checked here so a stray quote
+        # fails the run instead of becoming a command in a job that holds all
+        # three secrets. tests/test_workflows.py guards both properties.
         run: |
+          if [ -n "$INPUT_SEASON" ] && ! [[ "$INPUT_SEASON" =~ ^[0-9]{4}$ ]]; then
+            echo "::error::season input must be a four-digit year, got '$INPUT_SEASON'"; exit 1
+          fi
+          if [ -n "$INPUT_WEEK" ] && ! [[ "$INPUT_WEEK" =~ ^[0-9]{1,2}$ ]]; then
+            echo "::error::week input must be one or two digits, got '$INPUT_WEEK'"; exit 1
+          fi
           read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
           SEASON="${INPUT_SEASON:-$SEASON}"
           WEEK="${INPUT_WEEK:-$WEEK}"
@@ -239,6 +260,9 @@ jobs:
         continue-on-error: true
         env:
           MAX_CREDITS: ${{ inputs.max_credits }}
+          # From beatvegas/ci.py's fixed table, not from a person; passed as
+          # env all the same so no run: block on this job inlines an expression.
+          SWEEP_ARGS: ${{ steps.slot.outputs.sweep_args }}
         # Default cap 150: per-event calls now cost 1 credit, so the CLI's 400
         # default would be 400 events and could no longer bind - including on
         # the --hr-universe FALLBACK, which sweeps every event in the window
@@ -248,7 +272,7 @@ jobs:
         run: |
           extra="--max-credits-per-run 150"
           if [ -n "$MAX_CREDITS" ]; then extra="--max-credits-per-run $MAX_CREDITS"; fi
-          python scripts/poll_lines.py ${{ steps.slot.outputs.sweep_args }} \
+          python scripts/poll_lines.py $SWEEP_ARGS \
             --status-file "$RUNNER_TEMP/sweep_status.json" $extra
       - name: Re-score after the sweep (residual engine only; no-op under the incumbent)
         # The residual engine conditions on the LIVE 1H line, so its numbers
@@ -257,7 +281,10 @@ jobs:
         # exits 0 without touching the database when config model.engine is
         # not `residual`, so the incumbent's card day is unchanged.
         if: steps.inputs.outputs.need_sweep == 'true'
-        run: python scripts/weekly_update.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --if-engine residual
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: python scripts/weekly_update.py --season "$SEASON" --week "$WEEK" --if-engine residual
       - name: Research preview (forced on every scheduled build; else only when today's is missing)
         id: preview
         if: steps.inputs.outputs.need_preview == 'true'
@@ -266,21 +293,27 @@ jobs:
         # injury feed makes that gate pass EVERY game, so --status-file records it
         # and the build marks those games degraded.
         continue-on-error: true
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
         run: |
           python scripts/research_preview.py \
-            --season "${{ steps.active.outputs.season }}" \
-            --week "${{ steps.active.outputs.week }}" \
+            --season "$SEASON" \
+            --week "$WEEK" \
             --status-file "$RUNNER_TEMP/preview_status.json"
       - name: Build + publish the card (+ paper-log qualifying games in the slot's window)
         id: build
         if: steps.slot.outputs.slot != 'skip'
         env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+          SLOT: ${{ steps.slot.outputs.slot }}
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
           NO_PAPER: ${{ steps.slot.outputs.no_paper }}
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |
-          if [ -z "${{ steps.active.outputs.week }}" ]; then
+          if [ -z "$WEEK" ]; then
             echo "no active week — nothing to build"
             echo "No active week — no card built." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -308,8 +341,8 @@ jobs:
           if [ "$SWEEP_OUTCOME" = "failure" ] && [ ! -f "$SWEEP_STATUS" ]; then
             echo '{"complete": false, "reason": "step_failed", "events_in_window": 0, "events_polled": 0, "credits_spent": null}' > "$SWEEP_STATUS"
           fi
-          python scripts/build_card.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" $extra \
-            --slot "${{ steps.slot.outputs.slot }}" \
+          python scripts/build_card.py --season "$SEASON" --week "$WEEK" $extra \
+            --slot "$SLOT" \
             --sweep-status "$SWEEP_STATUS" \
             --preview-status "$PREVIEW_STATUS"
       - name: Save CFBD reference cache (only when this run populated it)

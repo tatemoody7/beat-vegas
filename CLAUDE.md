@@ -64,12 +64,17 @@ Research only — it never places bets or automates gambling.
   `env:`; `test_workflows.py` enforces **no `${{ inputs./steps./github.event.` inside any
   `run:` of a job with secrets in `env`**, repo-wide (grade and sunday's trusted inlines were
   converted too so the rule has no exceptions). (2) `actions/cache` pinned + Dependabot dirs
-  (landed in PR 1). (3) **`requirements.lock`**: `uv pip compile --generate-hashes` for
+  (landed in PR 1). (3) **`requirements/lock.txt`**: `uv pip compile --generate-hashes` for
   Python 3.11 / x86_64 manylinux (the runner), 39 pins incl. `setuptools`+`wheel`; every
-  workflow installs `pip install --require-hashes -r requirements.lock` then
+  workflow installs `pip install --require-hashes -r requirements/lock.txt` then
   `pip install --no-deps --no-build-isolation -e .`, and `cache: pip` keys on the lock.
   **Local dev is unchanged** (`pip install -e .` against `requirements.txt`; this Mac is 3.9).
   Regenerate per the lock's header; Dependabot (`pip`, monthly) bumps pins with hashes.
+  **The lock is `requirements/lock.txt`, not `requirements.lock`** (moved the same evening):
+  Dependabot's Python fetcher only sees `.txt`/`.in` files, so a `.lock` was invisible and its
+  first pip run (#171, closed) raised every range in `requirements.txt` to the latest release
+  instead — `scikit-learn>=1.7.2` would have broken the local 3.9 venv. The pip entry points at
+  `directory: /requirements`, which holds nothing else.
   **PR 5: `research_preview.yml` is DELETED.** Its Tue/Fri 13Z runs previewed **week 1 all
   season** — `research_preview.py::_upcoming_week` took the smallest week with a
   `home_points IS NULL` game, and week 1 has never-final rows — so every run was ~650 ESPN

@@ -599,12 +599,12 @@ def test_card_yml_validates_the_two_typed_inputs_before_using_them():
 
 
 # --- Hash-pinned installs (2026-09-16). requirements.txt caps the next major;
-# requirements.lock pins the exact release and its sha256 hashes, and every
+# requirements/lock.txt pins the exact release and its sha256 hashes, and every
 # runner installs from the lock with --require-hashes, then this repo with
 # --no-build-isolation so the build backend (also locked) is never fetched
 # unhashed.
 
-LOCK = WF_DIR.parent.parent / "requirements.lock"
+LOCK = WF_DIR.parent.parent / "requirements" / "lock.txt"
 REQS = WF_DIR.parent.parent / "requirements.txt"
 
 
@@ -631,7 +631,7 @@ def test_every_python_install_is_hash_pinned_and_the_pip_cache_keys_on_the_lock(
             ]
             for s in installs:
                 run = s["run"]
-                assert "pip install --require-hashes -r requirements.lock" in run, p.name
+                assert "pip install --require-hashes -r requirements/lock.txt" in run, p.name
                 assert "pip install --no-deps --no-build-isolation -e ." in run, p.name
                 assert "pip install -e .\n" not in run + "\n" or "--no-deps" in run, p.name
                 checked += 1
@@ -639,8 +639,26 @@ def test_every_python_install_is_hash_pinned_and_the_pip_cache_keys_on_the_lock(
                 if str(s.get("uses", "")).startswith("actions/setup-python@"):
                     w = s.get("with") or {}
                     if w.get("cache") == "pip":
-                        assert w.get("cache-dependency-path") == "requirements.lock", p.name
+                        assert w.get("cache-dependency-path") == "requirements/lock.txt", p.name
     assert checked >= 14
+
+
+def test_the_lock_lives_where_dependabot_can_see_it():
+    """Dependabot's Python fetcher only fetches files ending in .txt or .in
+    (dependabot-core python/shared_file_fetcher.rb). A `requirements.lock` was
+    invisible to it, so it raised every range in requirements.txt instead
+    (#171). The lock must be a .txt in its own directory, and the pip entry
+    must point at that directory and nowhere else."""
+    assert LOCK.suffix == ".txt" and LOCK.parent.name == "requirements"
+    assert LOCK.exists()
+    bot = yaml.safe_load((WF_DIR.parent / "dependabot.yml").read_text())
+    pip = [u for u in bot["updates"] if u["package-ecosystem"] == "pip"]
+    assert len(pip) == 1 and pip[0]["directory"] == "/requirements"
+    # Nothing else in that directory could be mistaken for a manifest.
+    assert sorted(f.name for f in LOCK.parent.iterdir()) == ["lock.txt"]
+    # And it must not look like pip-compile output, or Dependabot would go
+    # hunting for a lock.in that does not exist.
+    assert "--output-file" not in LOCK.read_text()
 
 
 def test_the_lock_covers_requirements_and_carries_a_hash_for_every_pin():
@@ -649,7 +667,7 @@ def test_the_lock_covers_requirements_and_carries_a_hash_for_every_pin():
     assert len(pins) >= 30
     names = {n.lower().replace("_", "-") for n, _ in pins}
     for req in _pkg_names(REQS.read_text()):
-        assert req in names, f"{req} is in requirements.txt but not in requirements.lock"
+        assert req in names, f"{req} is in requirements.txt but not in requirements/lock.txt"
     # The build backend rides in the lock so the editable install needs no isolation.
     assert {"setuptools", "wheel"} <= names
     # Every pinned block has at least one --hash line.

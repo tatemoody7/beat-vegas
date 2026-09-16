@@ -24,11 +24,15 @@ updates:
       actions:
         patterns: ["*"]
 
-  # requirements.lock (hash-pinned, resolved for the 3.11 runner). Dependabot
-  # rewrites the pins and their hashes together; requirements.txt keeps the
-  # human-readable ranges and is not what the runners install from.
+  # requirements/lock.txt (hash-pinned, resolved for the 3.11 runner). Dependabot
+  # rewrites the pins and their hashes together. Its Python fetcher only sees
+  # files ending in .txt or .in, so the lock lives in its own directory under a
+  # .txt name and this entry points THERE -- not at `/`, where Dependabot found
+  # requirements.txt and raised every human-readable range to the latest
+  # release instead (PR #171, closed). requirements.txt stays the local-dev
+  # range file and is not what the runners install from.
   - package-ecosystem: pip
-    directory: /
+    directory: /requirements
     schedule:
       interval: monthly
     commit-message:

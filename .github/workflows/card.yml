@@ -141,17 +141,17 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: requirements.lock
+          cache-dependency-path: requirements/lock.txt
       - name: Install
         if: steps.gate.outputs.slot != 'skip'
-        # Hash-pinned: requirements.lock names the exact release AND sha256 of
+        # Hash-pinned: requirements/lock.txt names the exact release AND sha256 of
         # every package (see its header), so a compromised upload of any of them
         # cannot reach a runner that holds DATABASE_URL and the API keys. The
         # editable install of this repo then runs without build isolation, so
         # the build backend (setuptools, also in the lock) is never fetched
         # unhashed. Local dev keeps plain `pip install -e .`.
         run: |
-          pip install --require-hashes -r requirements.lock
+          pip install --require-hashes -r requirements/lock.txt
           pip install --no-deps --no-build-isolation -e .
       - name: Restore CFBD reference data (weekly cache)
         id: cfbd_cache

@@ -9,8 +9,10 @@
 # runs with `--no-build-isolation` and never fetches a build backend unhashed.
 #
 # Local development keeps `pip install -e .` against requirements.txt (this Mac
-# runs 3.9; the lock is resolved for the runner). Dependabot (pip, monthly)
-# bumps these pins with their hashes. To regenerate by hand:
+# runs 3.9; the lock is resolved for the runner). Dependabot (pip, monthly,
+# directory /requirements) bumps these pins with their hashes -- it only sees
+# .txt/.in files, which is why this is requirements/lock.txt and not
+# requirements.lock. To regenerate by hand:
 #
 #   { cat requirements.txt; echo "setuptools>=68,<81"; echo "wheel>=0.41,<1"; } > /tmp/lock-input.txt
 #   uv pip compile /tmp/lock-input.txt --python-version 3.11 \

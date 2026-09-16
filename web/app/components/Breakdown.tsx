@@ -73,15 +73,6 @@ function RecHead() {
   );
 }
 
-// The board's filter chips, same shape (BoardFilters.tsx) so a toggle looks
-// like a toggle everywhere on the site.
-const chip = (on: boolean) =>
-  `rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
-    on
-      ? "border-[var(--accent-strong)] bg-[var(--accent-soft)] text-[var(--accent)]"
-      : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
-  }`;
-
 export default function Breakdown({ views }: { views: BreakdownView[] }) {
   const [active, setActive] = useState(views[0]?.id ?? "");
   const view = views.find((v) => v.id === active) ?? views[0];
@@ -103,7 +94,7 @@ export default function Breakdown({ views }: { views: BreakdownView[] }) {
               role="tab"
               aria-selected={v.id === view.id}
               onClick={() => setActive(v.id)}
-              className={chip(v.id === view.id)}
+              className="bv-chip"
             >
               {v.tab}
             </button>

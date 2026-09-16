@@ -74,7 +74,7 @@ export default function LineStudyView({
         )}
       </div>
 
-      <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
+      <div className="h-72 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-2)] p-3">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}

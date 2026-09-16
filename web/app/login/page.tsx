@@ -57,7 +57,7 @@ export default function LoginPage() {
         />
         {/* Amber, not red — red is reserved for over outcomes. */}
         {err && (
-          <p role="alert" className="mt-2 text-sm text-[#e0a44a]">
+          <p role="alert" className="mt-2 text-sm text-[var(--warn)]">
             {err}
           </p>
         )}

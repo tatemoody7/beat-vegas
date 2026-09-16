@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { outcome, recordsToCsv, scoredAfter, type RecordRow } from "./records";
+import {
+  defaultWeek,
+  outcome,
+  recordsToCsv,
+  scoredAfter,
+  type RecordRow,
+} from "./records";
 
 const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   season: 2025,
@@ -84,5 +90,22 @@ describe("scoredAfter", () => {
     );
     expect(scoredAfter(null, "2026-09-12T16:00:00Z")).toBeNull();
     expect(scoredAfter("2026-09-08T20:34:57Z", null)).toBeNull();
+  });
+});
+
+describe("defaultWeek", () => {
+  it("opens on the latest week with a graded game, not the last week scheduled", () => {
+    const rows = [
+      { week: 1, outcome: "under" as const },
+      { week: 2, outcome: "over" as const },
+      { week: 3, outcome: null },
+      { week: 15, outcome: null }, // Navy @ Army, on the schedule from day one
+    ];
+    expect(defaultWeek(rows)).toBe(2);
+  });
+
+  it("is null when nothing has been graded yet", () => {
+    expect(defaultWeek([{ week: 1, outcome: null }])).toBeNull();
+    expect(defaultWeek([])).toBeNull();
   });
 });

@@ -33,7 +33,6 @@ export type BreakdownView = {
   tab: string;
   /** Header for the first column. */
   head: string;
-  caption: string;
   /** Shown in place of the table when there is nothing to show. */
   empty: string;
   rows: BreakdownRow[];
@@ -101,10 +100,6 @@ export default function Breakdown({ views }: { views: BreakdownView[] }) {
           ))}
         </div>
       </div>
-      <p className="mb-3 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]">
-        {view.caption}
-      </p>
-
       {view.rows.length === 0 ? (
         <p className="bv-empty">{view.empty}</p>
       ) : (

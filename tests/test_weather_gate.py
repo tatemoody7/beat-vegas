@@ -36,21 +36,48 @@ def _report(**over):
         "n_with_close": 400,
         "results": [
             {
-                "arm": "legacy", "lead_hours": None, "is_incumbent": True, "decision_safe": False,
+                "arm": "legacy",
+                "lead_hours": None,
+                "is_incumbent": True,
+                "decision_safe": False,
                 "coverage": {"n_rows": 600, "n_with_temp": 230, "share": 0.38},
-                "n": 600, "mae": 9.10, "mae_incumbent": 9.10, "bias": -0.20,
-                "bias_incumbent": -0.20, "paired_gain": {}, "n_changed": 0,
-                "gate": {"n_priced": 400, "mean_gap": 0.4, "n_clearing": 40,
-                         "n_clearing_incumbent": 40, "n_crossing": 0, "crossing_ids": []},
+                "n": 600,
+                "mae": 9.10,
+                "mae_incumbent": 9.10,
+                "bias": -0.20,
+                "bias_incumbent": -0.20,
+                "paired_gain": {},
+                "n_changed": 0,
+                "gate": {
+                    "n_priced": 400,
+                    "mean_gap": 0.4,
+                    "n_clearing": 40,
+                    "n_clearing_incumbent": 40,
+                    "n_crossing": 0,
+                    "crossing_ids": [],
+                },
             },
             {
-                "arm": "lead72", "lead_hours": 72, "is_incumbent": False, "decision_safe": True,
+                "arm": "lead72",
+                "lead_hours": 72,
+                "is_incumbent": False,
+                "decision_safe": True,
                 "coverage": {"n_rows": 600, "n_with_temp": 580, "share": 0.97},
-                "n": 600, "mae": 9.12, "mae_incumbent": 9.10, "bias": -0.18,
-                "bias_incumbent": -0.20, "paired_gain": {}, "n_changed": 512,
-                "gate": {"n_priced": 400, "mean_gap": 0.4, "n_clearing": 43,
-                         "n_clearing_incumbent": 40, "n_crossing": 3,
-                         "crossing_ids": [1, 2, 3]},
+                "n": 600,
+                "mae": 9.12,
+                "mae_incumbent": 9.10,
+                "bias": -0.18,
+                "bias_incumbent": -0.20,
+                "paired_gain": {},
+                "n_changed": 512,
+                "gate": {
+                    "n_priced": 400,
+                    "mean_gap": 0.4,
+                    "n_clearing": 43,
+                    "n_clearing_incumbent": 40,
+                    "n_crossing": 3,
+                    "crossing_ids": [1, 2, 3],
+                },
             },
         ],
         "caveats": ["MAE is near-blind to a change of this kind."],
@@ -88,8 +115,18 @@ def test_decision_safety_is_visible_per_arm():
 
 def test_thin_coverage_is_caveated_rather_than_read_as_a_null():
     rows = [
-        {"arm": "legacy", "lead_hours": None, "coverage": {"n_rows": 10, "n_with_temp": 4, "share": 0.4}, "gate": {"n_priced": 5}},
-        {"arm": "lead72", "lead_hours": 72, "coverage": {"n_rows": 10, "n_with_temp": 1, "share": 0.1}, "gate": {"n_priced": 5}},
+        {
+            "arm": "legacy",
+            "lead_hours": None,
+            "coverage": {"n_rows": 10, "n_with_temp": 4, "share": 0.4},
+            "gate": {"n_priced": 5},
+        },
+        {
+            "arm": "lead72",
+            "lead_hours": 72,
+            "coverage": {"n_rows": 10, "n_with_temp": 1, "share": 0.1},
+            "gate": {"n_priced": 5},
+        },
     ]
     caveats = " ".join(G._caveats(rows, 2025))
     assert "absence, not evidence" in caveats
@@ -98,9 +135,19 @@ def test_thin_coverage_is_caveated_rather_than_read_as_a_null():
 
 
 def test_a_pre_2024_test_season_is_flagged_as_temperature_only():
-    caveats = " ".join(G._caveats([{"arm": "lead72", "lead_hours": 72,
-                                    "coverage": {"share": 1.0, "n_with_temp": 1, "n_rows": 1},
-                                    "gate": {"n_priced": 1}}], 2023))
+    caveats = " ".join(
+        G._caveats(
+            [
+                {
+                    "arm": "lead72",
+                    "lead_hours": 72,
+                    "coverage": {"share": 1.0, "n_with_temp": 1, "n_rows": 1},
+                    "gate": {"n_priced": 1},
+                }
+            ],
+            2023,
+        )
+    )
     assert "predates the fixed-lead data" in caveats
 
 
@@ -108,13 +155,23 @@ def test_an_arm_with_an_empty_training_season_is_called_starved_not_weak():
     """Leads 24/72 hold nothing before 2024, yet their OVERALL share reads 60% --
     comfortably above any threshold. The per-season split is what catches it."""
     rows = [
-        {"arm": "legacy", "lead_hours": None,
-         "coverage": {"share": 0.34, "n_with_temp": 250, "n_rows": 744, "by_train_season": {}},
-         "gate": {"n_priced": 622}},
-        {"arm": "lead72", "lead_hours": 72,
-         "coverage": {"share": 0.60, "n_with_temp": 446, "n_rows": 744,
-                      "by_train_season": {"2023": 0.0, "2024": 0.97, "2025": 0.96}},
-         "gate": {"n_priced": 622}},
+        {
+            "arm": "legacy",
+            "lead_hours": None,
+            "coverage": {"share": 0.34, "n_with_temp": 250, "n_rows": 744, "by_train_season": {}},
+            "gate": {"n_priced": 622},
+        },
+        {
+            "arm": "lead72",
+            "lead_hours": 72,
+            "coverage": {
+                "share": 0.60,
+                "n_with_temp": 446,
+                "n_rows": 744,
+                "by_train_season": {"2023": 0.0, "2024": 0.97, "2025": 0.96},
+            },
+            "gate": {"n_priced": 622},
+        },
     ]
     caveats = " ".join(G._caveats(rows, 2025, [2023, 2024]))
     assert "lead72" in caveats and "2023" in caveats
@@ -123,13 +180,23 @@ def test_an_arm_with_an_empty_training_season_is_called_starved_not_weak():
 
 def test_an_arm_covering_its_whole_train_window_is_not_flagged():
     rows = [
-        {"arm": "legacy", "lead_hours": None,
-         "coverage": {"share": 0.34, "n_with_temp": 1, "n_rows": 1, "by_train_season": {}},
-         "gate": {"n_priced": 622}},
-        {"arm": "lead72", "lead_hours": 72,
-         "coverage": {"share": 0.96, "n_with_temp": 1, "n_rows": 1,
-                      "by_train_season": {"2024": 0.97, "2025": 0.96}},
-         "gate": {"n_priced": 622}},
+        {
+            "arm": "legacy",
+            "lead_hours": None,
+            "coverage": {"share": 0.34, "n_with_temp": 1, "n_rows": 1, "by_train_season": {}},
+            "gate": {"n_priced": 622},
+        },
+        {
+            "arm": "lead72",
+            "lead_hours": 72,
+            "coverage": {
+                "share": 0.96,
+                "n_with_temp": 1,
+                "n_rows": 1,
+                "by_train_season": {"2024": 0.97, "2025": 0.96},
+            },
+            "gate": {"n_priced": 622},
+        },
     ]
     caveats = " ".join(G._caveats(rows, 2025, [2024]))
     assert "handicapped" not in caveats

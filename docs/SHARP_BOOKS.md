@@ -65,6 +65,11 @@ BetUS is worth one sentence: it posted on more events than any of our nine retai
 did in discovery, tracks Hard Rock within a third of a point, and is not sharp. It could
 widen the consensus; it would not sharpen it.
 
+**Decision (Tate, 2026-09-15): no change to the ten keys.** BetUS is not added and no
+retail key is displaced; the consensus stays the nine retail books it has been graded
+against all season. The Friday-evening repeat probe (≈ 80 credits, does Pinnacle's
+first-half coverage widen toward kickoff) remains an open option, not a scheduled run.
+
 ## Reproduce
 
 ```

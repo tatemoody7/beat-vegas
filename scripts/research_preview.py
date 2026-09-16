@@ -28,7 +28,7 @@ from typing import Optional
 from beatvegas import ci
 from beatvegas.db.models import Game, GamePreview, Team
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.season import current_season
+from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
 from beatvegas.sources.espn import espn_team_id, team_news, teams_available
 
@@ -63,7 +63,14 @@ def write_status(
 
 
 def _upcoming_week(s, season: int) -> int:
-    """Smallest week with games not yet final; falls back to the min week."""
+    """The week the board is about to bet -- beatvegas.season.detect_week, the
+    same rule card.yml and sunday.yml resolve with. The old rule ("smallest
+    week with a game not yet final") sat on week 1 all season, because week 1
+    keeps never-final rows, and the retired Tue/Fri workflow previewed it 456
+    games at a time. The scan below is only the off-season fallback."""
+    wk = detect_week(season)
+    if wk is not None:
+        return int(wk)
     rows = s.query(Game.week).filter(Game.season == season, Game.home_points.is_(None)).all()
     weeks = sorted({r[0] for r in rows if r[0] is not None})
     if weeks:

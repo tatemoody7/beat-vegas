@@ -11,6 +11,11 @@ the 1,902 real-close games of 2023-25 was written down nowhere. That season set 
 **exploratory / in-sample** from here on. Anything important is validated prospectively on
 2026+ decisions using locked decision-time state. Add the row first, run the script second.
 
+The "external review" that `TWO_SIDED.md`, `WEATHER_STYLE.md` and the share-engine spec
+refer to is the 2026-09-13 write-up filed at
+`docs/external/2026-09-13-chatgpt-cfb-totals-review.pdf`; `docs/EXTERNAL_REVIEW.md` maps
+its claims to the rows below.
+
 ## Vocabulary
 
 - **status** — `pre-registered` (criterion written, not yet run), `exploratory` (counts

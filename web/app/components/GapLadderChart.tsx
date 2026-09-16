@@ -4,34 +4,102 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { BandRow } from "@/lib/postmortem";
 
 // THE finding, as a picture: the wider the gap between Hard Rock's first-half
-// line and our number, the more often the under wins. It was an 8-column table
-// under a 60-word caption, while a tangent (which totals go under most) had the
-// page's only chart — the page ranked its own findings upside down (Tate
-// 2026-09-13). The table stays directly beneath this for the range, the
-// probability and the ROI; this carries the shape.
+// line and our number, the more often the under wins. Since 2026-09-16 the
+// chart carries the numbers the band table used to hold — the rate on each
+// bar, games and units under each band — so the table no longer follows it
+// (Tate: "a chart that needs a paragraph has already failed"; one that needs a
+// table under it is the same failure).
 //
 // Approved on the rule "if it isn't obvious I don't want it": the bars climb
 // left to right, the ones that make money are green, and the break-even line
-// is drawn and labelled. Nothing here needs a paragraph to read.
+// is drawn and labelled.
 
 // Recharts takes colour strings, not CSS variables — same literals as
 // LineStudyView, from the design tokens.
 const AXIS = "#aab6cc"; // --text-muted
+const DIM = "#8b98b0"; // --text-dim
 const GRID = "#3a4a6b"; // --border
 const GOOD = "#3ddc84"; // --good
 const BAD = "#f87171"; // --bad
+const INK = "#04121f"; // --badge-ink, on a filled bar
 
 /** Rows thinner than this say nothing; they plot, but greyed. */
 const THIN = "#6b7a99";
+
+type Datum = {
+  bucket: string;
+  hitPct: number;
+  n: number;
+  units: string;
+  fill: string;
+};
+
+/** Two-line category tick: the band, then games · units. */
+function BandTick({
+  x,
+  y,
+  payload,
+  byBucket,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  byBucket: Map<string, Datum>;
+}) {
+  const d = payload ? byBucket.get(payload.value) : undefined;
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text
+        x={0}
+        y={0}
+        dy={14}
+        textAnchor="middle"
+        fill={AXIS}
+        fontSize={12}
+        fontWeight={600}
+      >
+        {payload?.value}
+      </text>
+      {/* Games and units on their own lines: side by side they collided at
+          390px, where five bands share ~300px. */}
+      {d && (
+        <>
+          <text
+            x={0}
+            y={0}
+            dy={29}
+            textAnchor="middle"
+            fill={DIM}
+            fontSize={11}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {d.n.toLocaleString()}
+          </text>
+          <text
+            x={0}
+            y={0}
+            dy={43}
+            textAnchor="middle"
+            fill={DIM}
+            fontSize={11}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {`${Number(d.units) >= 0 ? "+" : ""}${Number(d.units).toFixed(1)}u`}
+          </text>
+        </>
+      )}
+    </g>
+  );
+}
 
 export default function GapLadderChart({
   rows,
@@ -40,15 +108,14 @@ export default function GapLadderChart({
   rows: BandRow[];
   breakeven: number;
 }) {
-  const data = rows
+  const data: Datum[] = rows
     .filter((r) => r.hitPct !== null)
     .map((r) => ({
       bucket: r.bucket,
       hitPct: r.hitPct as number,
       n: r.n,
-      record: r.record,
-      // A band under 30 games is greyed in the table for the same reason it is
-      // greyed here: it is a count, not a rate, and colouring it green would
+      units: r.units,
+      // A band under 30 games is a count, not a rate; colouring it green would
       // promise an edge the sample cannot support.
       fill:
         r.size === "small"
@@ -58,14 +125,15 @@ export default function GapLadderChart({
             : BAD,
     }));
   if (data.length === 0) return null;
+  const byBucket = new Map(data.map((d) => [d.bucket, d]));
 
   const maxPct = data.reduce((m, d) => Math.max(m, d.hitPct), 0);
   const minPct = data.reduce((m, d) => Math.min(m, d.hitPct), 100);
   // Round the axis out to whole 5s and tick it by hand. Recharts' own choice
   // inside a tight domain came out 40/47/54/61/65, which reads like an
-  // accident rather than a scale.
+  // accident rather than a scale. Extra headroom at the top for the labels.
   const lo = Math.max(0, Math.floor((minPct - 4) / 5) * 5);
-  const hi = Math.ceil((maxPct + 4) / 5) * 5;
+  const hi = Math.ceil((maxPct + 7) / 5) * 5;
   const ticks: number[] = [];
   for (let t = lo; t <= hi; t += 5) ticks.push(t);
 
@@ -74,76 +142,58 @@ export default function GapLadderChart({
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 12, right: 16, bottom: 28, left: 0 }}
+          margin={{ top: 8, right: 8, bottom: 22, left: 0 }}
         >
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="bucket"
-            tick={{ fill: AXIS, fontSize: 11 }}
             stroke={GRID}
-            label={{
-              value: "How far Hard Rock’s line sat above our number (points)",
-              position: "insideBottom",
-              offset: -16,
-              fill: AXIS,
-              fontSize: 11,
-            }}
+            tickLine={false}
+            interval={0}
+            height={56}
+            tick={<BandTick byBucket={byBucket} />}
           />
-          {/* No y-axis label. A rotated one clipped against the 288px plot
-              ("How often the under wo"), and it only repeated the heading
-              above the chart. The % on the ticks carries it. Domain is
-              rounded out to multiples of 5 so the ticks read 40/45/50 rather
-              than 39/46/53. */}
+          {/* No y-axis label: the % on the ticks carries it. */}
           <YAxis
             domain={[lo, hi]}
             ticks={ticks}
             tick={{ fill: AXIS, fontSize: 11 }}
             stroke={GRID}
             tickFormatter={(v) => `${v}%`}
-            width={46}
-          />
-          <Tooltip
-            cursor={{ fill: GRID, opacity: 0.4 }}
-            contentStyle={{
-              background: "#0a0f1e",
-              border: `1px solid ${GRID}`,
-              borderRadius: 8,
-              color: "#eef2f9",
-              fontSize: 12,
-            }}
-            formatter={(value, _name, item) => {
-              const d = item?.payload as (typeof data)[number];
-              return [
-                `${Number(value).toFixed(1)}% of unders won (${d.record})`,
-                `${d.n} games`,
-              ];
-            }}
+            width={44}
           />
           <ReferenceLine
             y={breakeven}
             stroke={AXIS}
             strokeDasharray="4 4"
             label={{
-              value: `${breakeven}% — you break even here`,
+              value: `${breakeven}% break-even`,
               fill: AXIS,
               fontSize: 11,
-              // insideTopLeft, not Right: the right-hand bars are the tall
-              // green ones, and the label rendered dark-on-green there and was
-              // unreadable. The space just above the line on the LEFT is empty
-              // by definition — those bars are the ones below break-even.
-              position: "insideTopLeft",
+              // Below the line at the left: the bars there are the short red
+              // ones, so that strip is empty by definition, and the bar values
+              // sit INSIDE their bars so nothing else is drawn there. Above the
+              // line at the right it rendered dark-on-green.
+              position: "insideBottomLeft",
             }}
           />
-          {/* isAnimationActive={false} is load-bearing, not a preference: under
-              Recharts 3.8 the bars animate up from height 0, the animation
-              never completes, and a zero-height rectangle renders as an empty
-              group — a blank plot area beside a full table. Same trap as
-              LineStudyView. */}
-          <Bar
-            dataKey="hitPct"
-            isAnimationActive={false}
-            radius={[2, 2, 0, 0]}
-          />
+          {/* isAnimationActive={false} is load-bearing: under Recharts 3 the
+              bars animate up from height 0, the animation never completes,
+              and a zero-height rectangle renders as an empty group. */}
+          <Bar dataKey="hitPct" isAnimationActive={false} radius={[2, 2, 0, 0]}>
+            {/* Inside the bar, in badge ink: the shortest bar is ~30px tall
+                at this domain, room for one 12px line, and it keeps the space
+                above the bars free for the break-even label. */}
+            <LabelList
+              dataKey="hitPct"
+              position="insideTop"
+              fill={INK}
+              fontSize={12}
+              fontWeight={700}
+              offset={6}
+              formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
+            />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

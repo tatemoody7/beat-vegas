@@ -5,6 +5,29 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-16 (SECURITY REVIEW + COST AUDIT; PR 1 of 5 = Actions minutes + CFBD cache).**
+  Full-codebase security pass found **no exploitable vulnerability** (auth, injection,
+  secrets history, workflow permissions, headers all verified, live-probed); three
+  hardening items ship in PR 4. Cost: **~$62/mo → ~$33/mo** — The Odds API 100K ($59) is
+  2.5x oversized for ~1,000-1,500 live credits/mo (Tate downgrades to 20K/$30 on Oct 6);
+  Neon Launch (~$3) stays and the egress gets fixed anyway (PR 3). **The two FREE quotas
+  were the real risks:** GitHub Actions on a private repo ran **~2,830 billed min/mo vs
+  2,000 free** (CI 58%: PR + push double-ran every merge; no pip cache on ci/grade/sunday;
+  20 of 29 card runs installed Python to discover `slot=skip`), and CFBD ran **~4,000
+  calls/mo vs 3,000** because **`.github/actions/cfbd-cache` had been saving an EMPTY
+  payload all season** — `actions/cache` saves in its post hook whoever runs first, and
+  the first job each ISO week was the Tuesday research preview (zero CFBD calls), so the
+  key held 12,840 bytes of `espn_teams.json` and every later run "hit" it and re-fetched
+  22 reference calls; `grade.yml` (the heaviest caller, 2x/day) never mounted it at all.
+  PR 1: CI is `pull_request` only + `cache: pip` (also grade/sunday/preview); `card.yml`
+  runs a stdlib-only **`GATE_ONLY=true` ET gate on the runner's python3 before
+  setup-python**, so out-of-window backup crons cost seconds; the cache is split into
+  `cfbd-cache` (restore, outputs `key`/`hit`) and **`cfbd-cache-save`, which refuses to
+  save unless ≥4 reference files >1 KB exist**, wired into every feature-frame workflow
+  incl. grade and the gates (`tests/test_workflows.py` enforces both); both pinned to the
+  v4.3.0 SHA; `grade.yml` runs the 2023-25 post-mortem `scope=both` **only Monday ET or
+  `hist=true`**, not on every dispatch (the Vercel cron IS a dispatch, so it ran daily).
+  Plan + full audit: `~/.claude/plans/in-this-next-session-lovely-wind.md`.
 - **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
   page-by-page review with Tate (every page and state captured at 1440 and 390, seven
   Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three
@@ -136,7 +159,8 @@ Research only — it never places bets or automates gambling.
   last SCHEDULED run was **2026-09-06** — a week of nothing, on the only full-game opener
   capture, which also refreshes pace, weather, scoring and the derived 1H lines. Empty
   `inputs` (it declares one OPTIONAL `force`, unlike `grade.yml` which declares none and
-  422s on any). `cronJobs.test.ts` already checks every entry lands whole in both DST regimes.
+  422'd on any until 2026-09-16, when it gained an optional `hist` flag the cron never sends).
+  `cronJobs.test.ts` already checks every entry lands whole in both DST regimes.
 - **The board is now the ONLY failure signal**, so `web/lib/boardHealth.ts` (was
   `gradeHealth.ts`) reports stale RESULTS and a MISSED BUILD. A missed build means no card
   *and no line sweep*, which otherwise looks completely normal. The build check asks whether
@@ -186,7 +210,9 @@ Research only — it never places bets or automates gambling.
   every season (~17 calls) on all 26 card builds + 17 Sunday runs + 10 previews.
   `.github/actions/cfbd-cache` now shares that across each week's runs — keyed by ISO week
   with **no restore-keys on purpose**, since `_cached` has no expiry and a longer key would
-  silently freeze SP+ at week 1. Tate is registering the **free Academic tier** (3,000
+  silently freeze SP+ at week 1. **It did not work until 2026-09-16** — the single
+  `actions/cache` step saved whatever the first job of the week left in `data/cache`, which
+  was nothing; see the 2026-09-16 bullet for the restore/save split. Tate is registering the **free Academic tier** (3,000
   calls, .edu) — if that is not enough, Tier 2 is $5/mo for 30,000.
 - **2026-09-13 (LINE VALUE WAS REPORTED WITH THE SIGN INVERTED, PR #115).**
   `grading.py::clv_under` = `closing - bet`. Every bet is an UNDER and a HIGHER number is

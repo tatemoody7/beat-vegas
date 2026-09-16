@@ -135,7 +135,8 @@ the report is the deliverable). Dispatch any workflow from the Mac with
 
 The product is the Next.js app in `web/` (App Router + TypeScript + Tailwind +
 Prisma + Recharts), deployed on **Vercel**, reading/writing **Neon Postgres**,
-behind a simple password gate, at **https://beat-vegas.vercel.app**. Three tabs
+readable by anyone with the link (the password is only needed to log picks), at
+**https://beat-vegas.vercel.app**. Three tabs
 plus a game page: **Board** (the home page — one rolling week grouped by day, every
 game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and one
 line saying what to do; each row links to **`/game/[id]`**, where the decision, the
@@ -161,7 +162,7 @@ npx vitest run         # tests
 ```
 `web/.env` holds `DATABASE_URL` (gitignored): Neon (prod data) or the local
 Postgres sandbox from `scripts/simulate_week.py` (use this on the campus network,
-which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the gate off.
+which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the write gate off.
 
 ### Deploy loop
 1. Edit code in `web/`, `npm run lint` / `npm run format`, test with `npm run dev`.

@@ -28,6 +28,17 @@ Research only — it never places bets or automates gambling.
   v4.3.0 SHA; `grade.yml` runs the 2023-25 post-mortem `scope=both` **only Monday ET or
   `hist=true`**, not on every dispatch (the Vercel cron IS a dispatch, so it ran daily).
   Plan + full audit: `~/.claude/plans/in-this-next-session-lovely-wind.md`.
+  **PR 2 (sunday.yml):** the `captured` probe now answers TWO positive facts — `need_capture`
+  (no full-game snapshot today ET) and **`need_score` (no model prediction row for the active
+  week today ET)** — and pace/weather/score/derived-lines/warn are all gated on `need_score`;
+  a run that captured but died before scoring leaves no row, so the next tick still scores
+  (2026-09-13 ran FOUR full ticks for one capture: ~1,150 Open-Meteo calls, 88 CFBD calls,
+  40 runner-min). `enrich_weather.py` is **FBS-vs-FBS only by default** via `etl/fbs.py`
+  (`--all-divisions` opts out): week 3 was 311 games fetched for 57 scored, 8 of the job's
+  11 minutes. `weekly_update.py --write-refs` dumps `factor_references(frame)` and
+  `post_derived_lines.py --refs` reads it (`factors/board.py::save_references` /
+  `load_references`, falls back to `historical_references()`), so the ~4.6 MB historical
+  frame is built once per Sunday run, not twice.
 - **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
   page-by-page review with Tate (every page and state captured at 1440 and 390, seven
   Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three

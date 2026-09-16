@@ -12,7 +12,8 @@ export default function BandTable({
 }: {
   title: string;
   rows: BandRow[];
-  caption: string;
+  /** Optional one-liner; the column heads carry the rest. */
+  caption?: string;
   /**
    * "estimated" drops the green/red on units. Colour is the grade language,
    * and a record graded against a line we worked out is not a grade (Tate
@@ -25,9 +26,11 @@ export default function BandTable({
       <h3 className="mb-1 mt-4 text-sm font-semibold text-[var(--text)]">
         {title}
       </h3>
-      <p className="mb-2 text-xs leading-relaxed text-[var(--text-dim)]">
-        {caption}
-      </p>
+      {caption && (
+        <p className="mb-2 text-xs leading-relaxed text-[var(--text-dim)]">
+          {caption}
+        </p>
+      )}
       <div className="bv-table-wrap">
         <table className="bv-table">
           <thead>

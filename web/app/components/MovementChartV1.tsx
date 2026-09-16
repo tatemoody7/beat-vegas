@@ -12,26 +12,21 @@ import {
 import type { MovementPoint } from "@/lib/movement";
 import { bookLabel } from "@/lib/books";
 
-// One color-coded line per book. Books are sampled at different times, so
-// connectNulls bridges the per-book gaps (mirrors Streamlit's line chart).
-// Chart chrome from the design tokens' literal values: Recharts takes colour
-// strings, not CSS variables. Keep the token name beside each one.
+// VARIANT 1 — emphasis. Hard Rock is the only book you can bet from Florida,
+// so it is the only line that gets a colour; every other book is the same
+// recessive grey and reads as "the rest of the market". Nothing here can be
+// mistaken for the grade language, and it does not care how many books post.
 const AXIS = "#aab6cc"; // --text-muted
 const GRID = "#1b2336"; // --grid
 const AXIS_RULE = "#243049"; // --axis-rule
 const SURFACE = "#0a0f1e"; // --bg-2
 const INK = "#eef2f9"; // --text
+const HR = "#38bdf8"; // --accent — 8.91:1 on --bg-2
+const REST = "#55688f"; // --border-strong — 3.42:1, ΔE 25.2 from the cyan
 
-const COLORS = [
-  "#38bdf8",
-  "#f59e0b",
-  "#34d399",
-  "#f472b6",
-  "#a78bfa",
-  "#fb7185",
-];
+const HARD_ROCK = "hardrockbet";
 
-export default function MovementChart({
+export default function MovementChartV1({
   points,
   books,
 }: {
@@ -44,6 +39,10 @@ export default function MovementChart({
   const lo = Math.min(...lines);
   const hi = Math.max(...lines);
   const pad = 0.5;
+
+  // Hard Rock draws last so it sits on top of the grey pack.
+  const others = books.filter((b) => b !== HARD_ROCK);
+  const hr = books.find((b) => b === HARD_ROCK);
 
   // The chart is decoration over a text fact: BookTable above it carries every
   // book's open and current number. This names the shape.
@@ -58,7 +57,6 @@ export default function MovementChart({
       aria-label={summary}
       className="flex h-80 w-full flex-col rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3"
     >
-      {/* The chart takes what the legend below leaves, so neither overflows the box. */}
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -94,32 +92,50 @@ export default function MovementChart({
                 fontSize: 12,
               }}
             />
-            {books.map((b, i) => (
+            {others.map((b) => (
               <Line
                 key={b}
                 type="monotone"
                 dataKey={b}
                 name={bookLabel(b)}
-                stroke={COLORS[i % COLORS.length]}
-                strokeWidth={2}
-                dot={{ r: 2 }}
+                stroke={REST}
+                strokeWidth={1.5}
+                dot={false}
                 connectNulls
                 isAnimationActive={false}
               />
             ))}
+            {hr && (
+              <Line
+                key={hr}
+                type="monotone"
+                dataKey={hr}
+                name={bookLabel(hr)}
+                stroke={HR}
+                strokeWidth={2.5}
+                dot={{ r: 3 }}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
       <div className="mt-2 flex flex-wrap gap-3 px-1 text-xs text-[var(--text-muted)]">
-        {books.map((b, i) => (
-          <span key={b} className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-2 w-3 rounded-sm"
-              style={{ background: COLORS[i % COLORS.length] }}
-            />
-            {bookLabel(b)}
-          </span>
-        ))}
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-3 rounded-sm"
+            style={{ background: HR }}
+          />
+          Hard Rock — the one you can bet
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-3 rounded-sm"
+            style={{ background: REST }}
+          />
+          {`${others.length} other book${others.length === 1 ? "" : "s"} — in the table above`}
+        </span>
       </div>
     </div>
   );

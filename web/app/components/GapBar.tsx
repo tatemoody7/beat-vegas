@@ -12,6 +12,18 @@ import { BET_GAP_PTS } from "@/lib/verdict";
 
 const PAD = 2; // points of breathing room either side of the outermost mark
 
+// The two captions ("our number", "the line") are about 69px and 45px wide, so
+// centred on their own ticks they collide once the marks sit closer than ~17%
+// of the track. Measured at a real 375px viewport on a 0.7-point gap: they
+// overlapped by 25px. Past this threshold each caption leans away from the
+// other instead of centring.
+//
+// Leaning is only ever safe BECAUSE it is conditional. PAD holds the outermost
+// mark at least 2 of the (>=5.75) points from each end, so a colliding pair is
+// always between ~35% and ~65% of the track with room on both sides — while a
+// wide gap, which would push a leaning label off the edge, never triggers it.
+const COLLIDE_PCT = 20;
+
 export default function GapBar({
   ourNumber,
   line,
@@ -87,8 +99,18 @@ export default function GapBar({
           />
         )}
 
-        <Mark at={pct(ourNumber)} value={ourNumber} caption="our number" />
-        <Mark at={pct(line)} value={line} caption="the line" />
+        <Mark
+          at={pct(ourNumber)}
+          value={ourNumber}
+          caption="our number"
+          lean={lean(pct(ourNumber), pct(line))}
+        />
+        <Mark
+          at={pct(line)}
+          value={line}
+          caption="the line"
+          lean={lean(pct(line), pct(ourNumber))}
+        />
 
         {kill !== null && (
           <span
@@ -113,15 +135,33 @@ export default function GapBar({
   );
 }
 
+/** Centre a mark's labels unless the other mark is close enough to collide. */
+function lean(at: number, other: number): "left" | "center" | "right" {
+  if (Math.abs(at - other) >= COLLIDE_PCT) return "center";
+  return at <= other ? "left" : "right";
+}
+
 function Mark({
   at,
   value,
   caption,
+  lean,
 }: {
   at: number;
   value: number;
   caption: string;
+  /** Which side of its tick the labels hang from. */
+  lean: "left" | "center" | "right";
 }) {
+  // The tick stays exactly on the number; only the text moves. `left` hangs
+  // the label's right edge on the tick, `right` hangs its left edge, each with
+  // a 2px nudge so neither touches the rule.
+  const off =
+    lean === "center"
+      ? "translateX(-50%)"
+      : lean === "left"
+        ? "translateX(calc(-100% - 2px))"
+        : "translateX(2px)";
   return (
     <>
       <div
@@ -130,14 +170,14 @@ function Mark({
         aria-hidden
       />
       <span
-        className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-xs text-[var(--text)]"
-        style={{ left: `${at}%` }}
+        className="absolute top-0 whitespace-nowrap font-mono text-xs text-[var(--text)]"
+        style={{ left: `${at}%`, transform: off }}
       >
         {fmt(value)}
       </span>
       <span
-        className="absolute bottom-0 -translate-x-1/2 whitespace-nowrap text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]"
-        style={{ left: `${at}%` }}
+        className="absolute bottom-0 whitespace-nowrap text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]"
+        style={{ left: `${at}%`, transform: off }}
       >
         {caption}
       </span>

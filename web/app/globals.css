@@ -34,6 +34,13 @@
   --warn-border: rgba(240, 176, 74, 0.4);
   --badge-ink: #04121f; /* text on a filled good/warn/bad badge */
 
+  /* CHART CHROME. Recharts takes colour strings, not CSS variables, so every
+     chart mirrors these as named constants with the token name in a comment.
+     Both sit BELOW --border (2.2:1) on purpose: a gridline is a hairline one
+     shade off the surface, not a card edge. Ratios measured on --bg-2. */
+  --grid: #1b2336; /* 1.22:1 — the gridline, recessive by design */
+  --axis-rule: #243049; /* 1.45:1 — the baseline and the tooltip edge */
+
   /* Radii (3) */
   --r-sm: 0.375rem; /* badges, chips, inputs, buttons */
   --r-md: 0.625rem; /* tables, inner panels */

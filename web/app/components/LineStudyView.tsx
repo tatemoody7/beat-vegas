@@ -21,7 +21,11 @@ import type { LineBucket } from "@/lib/lineStudy";
 // Chart chrome comes from the design tokens' literal values: Recharts takes
 // colour strings, not CSS variables.
 const AXIS = "#aab6cc"; // --text-muted
-const GRID = "#3a4a6b"; // --border
+const GRID = "#1b2336"; // --grid
+const AXIS_RULE = "#243049"; // --axis-rule
+const HOVER = "#3a4a6b"; // --border — the hover cursor wash, not a chart rule
+const SURFACE = "#0a0f1e"; // --bg-2
+const INK = "#eef2f9"; // --text
 const GOOD = "#3ddc84"; // --good
 const BAD = "#f87171"; // --bad
 export default function LineStudyView({
@@ -43,6 +47,8 @@ export default function LineStudyView({
   const yMax = Math.max(70, Math.ceil(maxPct + 5));
 
   const hl = buckets.find((b) => b.line === highlight);
+  // The chart is not the only carrier: the ranked table below says every number.
+  const beats = buckets.filter((b) => b.under_pct >= breakeven).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -74,7 +80,11 @@ export default function LineStudyView({
         )}
       </div>
 
-      <div className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3">
+      <div
+        role="img"
+        aria-label={`Under rate by first-half total, ${buckets.length} totals with enough games. ${beats} of them beat the ${breakeven}% break-even rate. The full numbers are in the table below.`}
+        className="h-72 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-2)] p-3"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
@@ -84,13 +94,13 @@ export default function LineStudyView({
               dataKey="line"
               tick={{ fill: AXIS, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: GRID }}
+              axisLine={{ stroke: AXIS_RULE }}
             />
             <YAxis
               domain={[0, yMax]}
               tick={{ fill: AXIS, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: GRID }}
+              axisLine={{ stroke: AXIS_RULE }}
               label={{
                 value: "Under %",
                 angle: -90,
@@ -100,12 +110,12 @@ export default function LineStudyView({
               }}
             />
             <Tooltip
-              cursor={{ fill: GRID, opacity: 0.4 }}
+              cursor={{ fill: HOVER, opacity: 0.4 }}
               contentStyle={{
-                background: "#0a0f1e",
-                border: `1px solid ${GRID}`,
+                background: SURFACE,
+                border: `1px solid ${AXIS_RULE}`,
                 borderRadius: 8,
-                color: "#eef2f9",
+                color: INK,
                 fontSize: 12,
               }}
               formatter={(value, _name, item) => {
@@ -117,11 +127,13 @@ export default function LineStudyView({
               y={breakeven}
               stroke={AXIS}
               strokeDasharray="4 4"
+              // "right" parks the label outside the plot, where the container
+              // clips it to a single character. Inside-top-left always fits.
               label={{
                 value: `${breakeven}% break-even`,
                 fill: AXIS,
                 fontSize: 10,
-                position: "right",
+                position: "insideTopLeft",
               }}
             />
             {/* isAnimationActive={false} is load-bearing, not a preference.

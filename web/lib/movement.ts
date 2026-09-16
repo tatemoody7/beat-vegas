@@ -1,5 +1,6 @@
 import { isCentredQuote } from "@/lib/devig";
 import { Prisma } from "@prisma/client";
+import { cache } from "react";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -112,11 +113,23 @@ export function buildMovement(
 
 // One query for a whole week's board: game id -> movement, for every game with
 // at least one first-half or full-game snapshot.
+//
+// cache()d per request through a STRING key: React's cache() compares object
+// arguments by identity, and every caller builds a fresh array, so caching on
+// `gameIds` itself would dedupe nothing. /game/[id] calls this twice per view
+// (generateMetadata + body); the week's snapshots are ~212 KB.
 export async function getMovements(
   gameIds: number[],
 ): Promise<Map<number, Movement>> {
+  if (gameIds.length === 0) return new Map<number, Movement>();
+  return movementsForKey([...new Set(gameIds)].sort((a, b) => a - b).join(","));
+}
+
+const movementsForKey = cache(async function movementsForKey(
+  key: string,
+): Promise<Map<number, Movement>> {
+  const gameIds = key.split(",").map(Number);
   const out = new Map<number, Movement>();
-  if (gameIds.length === 0) return out;
   const snaps = await prisma.$queryRaw<MoveSnap[]>`
     SELECT game_id, CAST(captured_at AS TEXT) AS captured_at, book, line,
            over_price, under_price, spread, market
@@ -141,4 +154,4 @@ export async function getMovements(
     out.set(gid, buildMovement(g.fh, g.fg));
   }
   return out;
-}
+});

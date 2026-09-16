@@ -2,7 +2,8 @@ import { bookLabel } from "@/lib/books";
 import { prisma } from "@/lib/prisma";
 import { etClock12, etParts } from "@/lib/et";
 import { settledOf, type Settled } from "@/lib/grade";
-import { getBoard, type BoardRow } from "@/lib/board";
+import { boardUniverse, getBoard, type BoardRow } from "@/lib/board";
+import { cache } from "react";
 import {
   edgeScore,
   type EdgeContext,
@@ -456,7 +457,7 @@ export function tierCounts(games: HomeGame[]): {
 
 /** The season and week one game sits in, so a game page can rebuild the same
  *  board context the board itself uses. Null when the id is not a game. */
-export async function gameSeasonWeek(
+export const gameSeasonWeek = cache(async function gameSeasonWeek(
   gameId: number,
 ): Promise<{ season: number; week: number } | null> {
   const rows = await prisma.$queryRaw<
@@ -464,7 +465,7 @@ export async function gameSeasonWeek(
   >`SELECT season, week FROM games WHERE id = ${gameId} LIMIT 1`;
   if (rows.length === 0) return null;
   return { season: Number(rows[0].season), week: Number(rows[0].week) };
-}
+});
 
 /**
  * One game, with the whole week's context behind it. It loads the full board on
@@ -488,19 +489,27 @@ export async function getHomeBoard(
   requestedWeek?: number,
   now: Date = new Date(),
 ): Promise<HomeBoard> {
-  const [board, checks, { picks, record, paperRecord }] = await Promise.all([
-    getBoard(season),
-    getLineCheck(season, "1h"),
-    getPicks(season),
-  ]);
-
+  // Pick the week FIRST, off the three-column universe (~1 KB), then pay for
+  // that week's rows, consensus lines and book quotes only. Measured with a
+  // per-query byte meter on the 2026 week-3 board: 2.28 MB -> 1.05 MB per
+  // board render, 2.74 MB -> 0.98 MB per game page. Season-wide renders, times
+  // every dev refresh and screenshot pass pointed at production, are what
+  // exhausted the Free plan's 5 GB/month egress on 2026-09-16.
+  const universe = await boardUniverse(season);
   // Default to the week you are about to bet (earliest week with a game still
   // to kick off — lib/week.ts); ?week= lets Tate review a past one.
-  const weeks = weeksOf(board);
+  const weeks = weeksOf(universe);
   const week =
     requestedWeek !== undefined && weeks.includes(requestedWeek)
       ? requestedWeek
-      : defaultWeek(board, now);
+      : defaultWeek(universe, now);
+  const [board, checks, { picks, record, paperRecord }] = await Promise.all([
+    week === null ? Promise.resolve([] as BoardRow[]) : getBoard(season, week),
+    week === null
+      ? Promise.resolve([] as LineCheckRow[])
+      : getLineCheck(season, "1h", week),
+    getPicks(season),
+  ]);
   const rows = board.filter((b) => b.week === week);
   const [previews, movements] = await Promise.all([
     week === null

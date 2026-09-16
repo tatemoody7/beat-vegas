@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { EV_FLOOR } from "@/lib/verdict";
 import { isExchange, isSynthetic } from "@/lib/books";
@@ -213,8 +214,14 @@ export function evVerdictFor(ev: number | null): EvVerdict {
 export const getLineCheck = cache(async function getLineCheck(
   season: number,
   market: Market,
+  week?: number,
 ): Promise<LineCheckRow[]> {
   const dbMarket = MARKET_DB[market];
+  // One week when the caller knows it (the board renders one week; season-wide
+  // this DISTINCT ON was ~162 KB a render). Season-wide for /api/picks, which
+  // checks one game and is cheap to keep simple.
+  const weekClause =
+    week === undefined ? Prisma.empty : Prisma.sql`AND g.week = ${week}`;
   // Latest line per (game, case-folded book key) for the market. The CFBD
   // synthetic "consensus" aggregate is not a book anyone can bet and would
   // double-count the real ones, so it never enters the market read.
@@ -237,6 +244,7 @@ export const getLineCheck = cache(async function getLineCheck(
       g.week, g.away_team, g.home_team
     FROM odds_snapshots o JOIN games g ON g.id = o.game_id
     WHERE g.season = ${season} AND o.market = ${dbMarket}
+      ${weekClause}
       AND LOWER(COALESCE(o.book, '')) <> 'consensus'
       -- pre-kickoff only: a poll that ran after kickoff captures an in-game
       -- number (e.g. u31.5 -275 at halftime) that must never read as the line

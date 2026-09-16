@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { safeNext } from "@/lib/gate";
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
@@ -29,8 +30,14 @@ export default function LoginPage() {
       // would render from the pre-login cache — or bounce straight back here.
       // The lint rule is right in general and wrong for the two places that
       // change the auth cookie.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/";
+      // `?next=` brings a reader back to the game they were about to log
+      // (LogPickButton). Read at submit time from window, not useSearchParams,
+      // which would need a Suspense boundary for this static page. safeNext
+      // accepts a same-origin path only — no open redirect.
+       
+      window.location.href = safeNext(
+        new URLSearchParams(window.location.search).get("next"),
+      );
     } catch {
       setErr("Could not reach the server. Try again.");
       setBusy(false);
@@ -45,7 +52,7 @@ export default function LoginPage() {
           <span className="text-[var(--text)]"> VEGAS</span>
         </h1>
         <p className="mb-4 text-sm text-[var(--text-muted)]">
-          Enter the password.
+          The password is only for logging picks. Everything else is open.
         </p>
         <input
           type="password"

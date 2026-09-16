@@ -9,6 +9,7 @@ import { getWeeklyReview } from "@/lib/weeklyReview";
 import Breakdown from "@/app/components/Breakdown";
 import DecisionsStrip from "@/app/components/DecisionsStrip";
 import PicksList from "@/app/components/PicksList";
+import { viewerIsAuthed } from "@/lib/session";
 import RecordTable from "@/app/components/RecordTable";
 import ScoreboardBand from "@/app/components/ScoreboardBand";
 import Section from "@/app/components/Section";
@@ -46,6 +47,7 @@ export default async function ResultsPage({
 }: {
   searchParams: Promise<{ season?: string; week?: string }>;
 }) {
+  const authed = await viewerIsAuthed();
   const seasons = await getSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
@@ -117,7 +119,11 @@ export default async function ResultsPage({
           {weekLabel}
         </span>
       </h2>
-      <PicksList picks={review.picks} showWeek={review.week === null} />
+      <PicksList
+        picks={review.picks}
+        showWeek={review.week === null}
+        authed={authed}
+      />
 
       <Section
         title={`Season summary · ${season}`}

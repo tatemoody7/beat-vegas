@@ -385,11 +385,14 @@ export default function GameDetail({
   g,
   unitUsd,
   backHref,
+  authed,
 }: {
   g: HomeGame;
   /** The flat stake, read server-side — a client component cannot read it. */
   unitUsd: number;
   backHref: string;
+  /** Signed in (or the gate is off): the log-pick form is offered. */
+  authed: boolean;
 }) {
   const { row, edge, check } = g;
   const line = check?.hrLine ?? row.curLine ?? row.factors.line ?? null;
@@ -482,6 +485,7 @@ export default function GameDetail({
 
         <div className="mt-4 border-t border-[var(--border)] pt-3">
           <LogPickButton
+            authed={authed}
             unitUsd={unitUsd}
             prefill={{
               gameId: row.gameId,

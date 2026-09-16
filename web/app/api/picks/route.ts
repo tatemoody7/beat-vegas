@@ -6,6 +6,7 @@ import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
 import { checkPolicy, parsePickBody } from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
 import { getRulePause, NOT_PAUSED } from "@/lib/rulePause";
+import { requireAuth } from "@/lib/session";
 import type { PolicyContext } from "@/lib/pickRules";
 import type { RulePause } from "@/lib/rulePause";
 
@@ -22,6 +23,10 @@ function dbError(where: string, e: unknown) {
 }
 
 export async function POST(req: NextRequest) {
+  // The site reads publicly; a WRITE needs the cookie. Checked here as well as
+  // in middleware so a matcher edit can never open the ledger.
+  const denied = await requireAuth(req);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await req.json();

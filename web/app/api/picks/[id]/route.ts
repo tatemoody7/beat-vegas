@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { deletePick, updatePick } from "@/lib/picks";
 import { parsePickEdit } from "@/lib/pickRules";
+import { requireAuth } from "@/lib/session";
 
 // A pick id is a row id: 1.5 and -3 are not ids. Number.isFinite accepted
 // both; they matched nothing and fell through as a 409 "not found", which
@@ -23,9 +24,11 @@ function serverError(where: string, e: unknown) {
 // staked more than a flat unit); a graded pick is immutable, because a ledger
 // that can be rewritten once the result is known proves nothing.
 export async function PATCH(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
   const { id } = await params;
   const pickId = Number(id);
   if (badId(pickId)) {
@@ -61,9 +64,11 @@ export async function PATCH(
 
 // DELETE /api/picks/<id> — remove a pending (ungraded) pick only.
 export async function DELETE(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
   const { id } = await params;
   const pickId = Number(id);
   if (badId(pickId)) {

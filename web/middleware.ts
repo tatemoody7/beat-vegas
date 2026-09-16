@@ -5,33 +5,51 @@ import {
   gateMisconfigured,
   isAuthed,
 } from "@/lib/auth";
+import { gateDecision } from "@/lib/gate";
 
-// Locks the whole app when APP_PASSWORD is set: browser requests redirect to
-// /login, API requests get 401. /login + /api/login + static assets are exempt
-// via the matcher below — and so is /api/cron, which Vercel's scheduler calls
-// with no session cookie. Without that exemption every cron invocation would
-// get a 401, Vercel would record it as completed, and no build would ever be
-// dispatched while the dashboard looked healthy. That route authenticates
-// itself against CRON_SECRET instead, and fails closed when it is unset.
+// PUBLIC READ-ONLY since 2026-09-16: every page and every GET is open, so the
+// link can be shared. The password guards writes — POST/PATCH/DELETE on the
+// pick routes (401 for /api/*, redirect to /login for a browser form). The
+// rule itself is lib/gate.ts::gateDecision, unit-tested; this is the adapter.
+//
+// /login + /api/login + static assets are exempt via the matcher below — and
+// so is /api/cron, which Vercel's scheduler calls with no session cookie. That
+// route authenticates itself against CRON_SECRET and fails closed when unset.
 export async function middleware(req: NextRequest) {
-  if (gateMisconfigured()) {
-    // Deployed without APP_PASSWORD: fail closed, never serve the board open.
-    return new NextResponse(
-      "APP_PASSWORD is not configured for this deployment.",
-      { status: 503 },
-    );
-  }
-  if (!gateEnabled()) return NextResponse.next();
-
   const token = req.cookies.get(AUTH_COOKIE)?.value;
-  if (await isAuthed(token)) return NextResponse.next();
-
-  if (req.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const decision = gateDecision({
+    method: req.method,
+    pathname: req.nextUrl.pathname,
+    gateEnabled: gateEnabled(),
+    misconfigured: gateMisconfigured(),
+    // Only evaluated when it can matter (an unsafe method with the gate on):
+    // the PBKDF2 key is memoised, but the MAC is still per request.
+    authed:
+      gateEnabled() &&
+      !gateMisconfigured() &&
+      req.method !== "GET" &&
+      req.method !== "HEAD"
+        ? await isAuthed(token)
+        : false,
+  });
+  switch (decision) {
+    case "misconfigured":
+      // Deployed without APP_PASSWORD: fail closed, never serve a ledger anyone can post to.
+      return new NextResponse(
+        "APP_PASSWORD is not configured for this deployment.",
+        { status: 503 },
+      );
+    case "next":
+      return NextResponse.next();
+    case "unauthorized":
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    case "redirect": {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
-  const url = req.nextUrl.clone();
-  url.pathname = "/login";
-  return NextResponse.redirect(url);
 }
 
 // The exemptions are ANCHORED — `api/login$` and `api/login/`, not a bare

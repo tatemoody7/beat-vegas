@@ -57,9 +57,12 @@ function loggedAs(p: PickFull): string {
 export default function PicksList({
   picks,
   showWeek = true,
+  authed = true,
 }: {
   picks: PickFull[];
   showWeek?: boolean;
+  /** Signed in: the edit / delete controls render. Public readers see the ledger only. */
+  authed?: boolean;
 }) {
   const router = useRouter();
   const realCount = picks.filter((p) => !p.isPaper).length;
@@ -277,7 +280,7 @@ export default function PicksList({
                       >
                         {open === p.id ? "hide" : "details"}
                       </button>
-                      {!p.graded && (
+                      {authed && !p.graded && (
                         <>
                           <button
                             onClick={() => startEdit(p)}

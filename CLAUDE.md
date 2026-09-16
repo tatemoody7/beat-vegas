@@ -5,6 +5,20 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-16 (SITE IS PUBLIC READ-ONLY).** Tate wanted friends to open the link. Every page
+  and every GET is open; the password guards WRITES only — `POST /api/picks`,
+  `PATCH`/`DELETE /api/picks/[id]`, `/api/logout`. The rule is one pure function,
+  `web/lib/gate.ts::gateDecision` (safe methods pass; unsafe + no cookie → 401 under `/api`,
+  redirect to `/login` elsewhere; Vercel without `APP_PASSWORD` still 503s everything), called
+  by `middleware.ts`, AND every pick route calls `lib/session.ts::requireAuth` itself so a
+  matcher edit can never open the ledger. `viewerIsAuthed()` (cookies()) drives the header
+  (Lock when signed in, **Unlock** link otherwise), hides PicksList's edit/delete for readers,
+  and swaps the game page's log button for "Unlock to log a pick" → `/login?next=/game/<id>`
+  (`safeNext` accepts same-origin paths only). `app/robots.ts` + `robots: noindex` keep
+  crawlers off (each render is metered Neon egress). What a stranger with the link now sees:
+  the board, the real-money ledger and bankroll figure, Track record, the CSV export. Verified
+  live on a gated dev server: public GETs 200, unsigned POST/PATCH/DELETE 401, form POST 307,
+  cookie flow 200 → Lock shown → `POST /api/picks` reaches validation (400).
 - **2026-09-16 (SECURITY REVIEW + COST AUDIT; PR 1 of 5 = Actions minutes + CFBD cache).**
   Full-codebase security pass found **no exploitable vulnerability** (auth, injection,
   secrets history, workflow permissions, headers all verified, live-probed); three
@@ -754,7 +768,8 @@ which would break the py3.9 runtime); `npm run lint` + `npm run format` in `web/
 
 ## Web app (`web/`) — shipped + redesigned
 Next.js (App Router) + TypeScript + Tailwind v4 + **Prisma** + **Recharts**, live on
-Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
+Vercel (Neon-backed; **readable by anyone with the link since 2026-09-16, password only to log
+picks**) at https://beat-vegas.vercel.app.
 - **Views (3 tabs)** — Board / Results / Track record, plus `/game/[id]` and
   `/proof/records`. Historical description of the old four-tab shape follows; see the
   2026-09-10 bullets above for what ships now. Board (`/`, THE home page — the week grouped by day, every game with a
@@ -769,7 +784,9 @@ Vercel (Neon-backed, password-gated) at https://beat-vegas.vercel.app.
   (`SCORE_BET_MIN`/`SCORE_WATCH_MIN` mirrored in `model/score.py`); every enum label lives in
   `web/lib/labels.ts`; the point gates are exported from `model/score.py` and parity-tested
   against `verdict.ts`. API routes read the same SQL
-  the page loaders use; the app is locked by `middleware.ts` + `APP_PASSWORD` cookie.
+  the page loaders use; **reads are public, writes need the `APP_PASSWORD` cookie**
+  (`lib/gate.ts::gateDecision` in `middleware.ts`, plus `lib/session.ts::requireAuth` inside
+  every pick route).
 - **Design system**: plain-English copy + a modern sportsbook look in
   `web/app/globals.css` — deep-navy canvas, electric-cyan brand accent, Archivo display
   font, reusable `.bv-card`/`.bv-pill`/`.bv-stat`/`.bv-table`/`.bv-btn`/`.bv-nav-link`

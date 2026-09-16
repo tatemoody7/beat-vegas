@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import Link from "next/link";
 import { gateEnabled } from "@/lib/auth";
+import { viewerIsAuthed } from "@/lib/session";
 import HeaderChrome from "@/app/components/HeaderChrome";
 import "./globals.css";
 
@@ -20,11 +21,17 @@ export const metadata: Metadata = {
   title: "Beat Vegas — first-half unders",
   description:
     "College football first-half under totals. What to bet, and the numbers behind it.",
+  // Readable without a password since 2026-09-16, but not for search engines:
+  // every render is metered Neon egress. app/robots.ts says the same to crawlers.
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Lock (signed in) or Unlock (reading publicly) in the header; the gate is
+  // write-only, so this is about what the visitor can DO, not see.
+  const authed = await viewerIsAuthed();
   return (
     <html
       lang="en"
@@ -47,7 +54,7 @@ export default function RootLayout({
                 First-half unders
               </span>
             </Link>
-            <HeaderChrome gateEnabled={gateEnabled()} />
+            <HeaderChrome gateEnabled={gateEnabled()} authed={authed} />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">

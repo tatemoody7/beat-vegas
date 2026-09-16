@@ -55,6 +55,21 @@ Research only — it never places bets or automates gambling.
   default. NOT done: `odds_snapshots` index (EXPLAIN unreachable from this session — the
   Postgres MCP timed out on a suspended compute) and trimming `factors_json` on the board
   row (`factor_board` inside it feeds `edge.ts`, so it cannot be dropped).
+  **PR 4 (security hardening — the review's three items):** (1) `card.yml`'s dispatch
+  `season`/`week` were echoed raw to `$GITHUB_OUTPUT` and then inlined as
+  `${{ steps.active.outputs.* }}` into four `run:` blocks on a job holding all three secrets
+  — `${{ }}` is substituted into the script TEXT before bash parses it, so a dispatcher (Tate,
+  or whoever holds `GITHUB_DISPATCH_TOKEN`) could run a shell with `DATABASE_URL` in scope.
+  Now shape-checked (`^[0-9]{4}$` / `^[0-9]{1,2}$`) and every value crosses into bash via
+  `env:`; `test_workflows.py` enforces **no `${{ inputs./steps./github.event.` inside any
+  `run:` of a job with secrets in `env`**, repo-wide (grade and sunday's trusted inlines were
+  converted too so the rule has no exceptions). (2) `actions/cache` pinned + Dependabot dirs
+  (landed in PR 1). (3) **`requirements.lock`**: `uv pip compile --generate-hashes` for
+  Python 3.11 / x86_64 manylinux (the runner), 39 pins incl. `setuptools`+`wheel`; every
+  workflow installs `pip install --require-hashes -r requirements.lock` then
+  `pip install --no-deps --no-build-isolation -e .`, and `cache: pip` keys on the lock.
+  **Local dev is unchanged** (`pip install -e .` against `requirements.txt`; this Mac is 3.9).
+  Regenerate per the lock's header; Dependabot (`pip`, monthly) bumps pins with hashes.
 - **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
   page-by-page review with Tate (every page and state captured at 1440 and 390, seven
   Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three

@@ -132,9 +132,18 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: requirements.lock
       - name: Install
         if: steps.precheck.outputs.skip != 'true'
-        run: pip install -e .
+        # Hash-pinned: requirements.lock names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install --no-deps --no-build-isolation -e .
       - name: 1H opener sweep (Hard Rock universe, games without an HR 1H line yet)
         if: steps.resolve.outputs.market == '1h_open'
         run: python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6

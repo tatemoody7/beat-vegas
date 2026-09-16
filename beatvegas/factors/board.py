@@ -205,6 +205,39 @@ def build_factor_board(
     return board
 
 
+def save_references(refs: Dict[str, Tuple[float, float]], path) -> None:
+    """Write factor references as JSON so a later step in the SAME run can reuse
+    them instead of rebuilding the whole historical feature frame (a ~4.6 MB
+    Neon read plus the CFBD reference joins). sunday.yml: weekly_update.py
+    writes them, post_derived_lines.py reads them."""
+    import json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({k: [float(v[0]), float(v[1])] for k, v in refs.items()}))
+
+
+def load_references(path) -> Optional[Dict[str, Tuple[float, float]]]:
+    """The inverse of save_references. None when the file is missing, empty or
+    unreadable, so the caller can fall back to historical_references()."""
+    import json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    try:
+        raw = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict) or not raw:
+        return None
+    out: Dict[str, Tuple[float, float]] = {}
+    for k, v in raw.items():
+        if isinstance(v, (list, tuple)) and len(v) == 2:
+            out[str(k)] = (float(v[0]), float(v[1]))
+    return out or None
+
+
 def historical_references(min_games: int = 0) -> Dict[str, Tuple[float, float]]:
     """`factor_references` over the whole historical feature frame, fail-soft.
 

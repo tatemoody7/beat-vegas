@@ -42,6 +42,7 @@ from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import apply_min_games, build_feature_frame
 from beatvegas.etl.proxy_line import proxy_total
+from beatvegas.factors.board import factor_references, save_references
 from beatvegas.hardrock import HR_BOOK_KEY
 from beatvegas.lines import (
     REAL_1H_CLOSE_WINDOW_H,
@@ -305,6 +306,12 @@ def main() -> None:
         action="store_true",
         help="do not freeze GameRecords (a retrospective re-score of a played week)",
     )
+    ap.add_argument(
+        "--write-refs",
+        metavar="PATH",
+        help="also write the historical factor references (board tint anchors) as JSON, "
+        "so post_derived_lines.py --refs PATH can reuse them instead of rebuilding the frame",
+    )
     args = ap.parse_args()
     engine = engine_name()
     if args.if_engine and engine != args.if_engine:
@@ -326,6 +333,11 @@ def main() -> None:
     # "scoring broke": the frame keeps every game with a full-game total
     # (including the unplayed target week), and the cut is applied here.
     frame = build_feature_frame(min_games=0)
+    if args.write_refs:
+        # Same frame historical_references() would build (min_games=0), so the
+        # derived-lines step gets identical anchors without a second build.
+        save_references(factor_references(frame), args.write_refs)
+        print(f"factor references written to {args.write_refs}")
     in_week = (frame["season"] == args.season) & (frame["week"] == week)
     n_with_total = int(in_week.sum())
     df = apply_min_games(frame, args.min_games)

@@ -73,31 +73,42 @@ jobs:
           read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
           echo "season=$SEASON" >> "$GITHUB_OUTPUT"
           echo "week=$WEEK" >> "$GITHUB_OUTPUT"
-      - name: Already captured today? (ET; the credit guard)
+      - name: Already captured / scored today? (ET; the credit AND minutes guard)
         id: captured
         if: steps.active.outputs.week != ''
         env:
           FORCE: ${{ inputs.force }}
-        # Three crons fire every Sunday and each capture costs 6 credits
-        # (2 markets x 3 regions), so a good week spent 18 credits to get one
-        # useful capture. card.yml solved the same problem with a positive fact
-        # from the database -- a `cards` row for today -- rather than a run-list
-        # probe; this is the same idea, keyed on a full_game_total snapshot
-        # written today (ET). The rest of the job is idempotent and free, so
-        # only this step is gated: a second cron still re-scores, which is what
-        # you want if the first run half-failed.
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        # Three GitHub crons and three Vercel ticks fire every Sunday (the DST
+        # design: each regime lands two inside the window). card.yml solved the
+        # same problem with a positive fact from the database -- a `cards` row
+        # for today -- rather than a run-list probe; this is the same idea, on
+        # TWO facts:
+        #   need_capture: no full_game_total snapshot written today (ET). Each
+        #     capture costs 6 credits (2 markets x 3 regions).
+        #   need_score:   no model prediction row for the active week written
+        #     today (ET). Until 2026-09-16 only the capture was gated and the
+        #     "free" rest of the job re-ran on every tick: on 2026-09-13 four
+        #     runs each re-fetched ~290 Open-Meteo forecasts and 22 CFBD
+        #     reference calls and rebuilt the frame twice -- 40 runner-minutes
+        #     for one useful capture. Keying scoring on its own positive fact
+        #     keeps the property the old design had: a run that captured but
+        #     died before scoring leaves no prediction row, so the next tick
+        #     still scores. `force` overrides both.
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
           from datetime import datetime
           from zoneinfo import ZoneInfo
-          from beatvegas.db.models import OddsSnapshot
+          from beatvegas.db.models import Game, OddsSnapshot, Prediction
           from beatvegas.db.store import init_db, session_scope
           init_db()
           et = ZoneInfo("America/New_York")
           midnight_et = datetime.now(et).replace(hour=0, minute=0, second=0, microsecond=0)
-          # captured_at is stored naive UTC.
+          # captured_at / created_at are stored naive UTC.
           since = midnight_et.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+          season, week = int(os.environ["SEASON"]), int(os.environ["WEEK"])
           with session_scope() as s:
               n = (
                   s.query(OddsSnapshot.id)
@@ -107,9 +118,24 @@ jobs:
                   )
                   .count()
               )
+              # Model rows only: post_derived_lines.py's display rows are
+              # model_version "derived_lines" and are written AFTER scoring.
+              scored = (
+                  s.query(Prediction.id)
+                  .join(Game, Game.id == Prediction.game_id)
+                  .filter(
+                      Game.season == season,
+                      Game.week == week,
+                      Prediction.model_version != "derived_lines",
+                      Prediction.created_at >= since,
+                  )
+                  .count()
+              )
           force = os.environ.get("FORCE") == "true"
           print(f"need_capture={'true' if (force or n == 0) else 'false'}")
+          print(f"need_score={'true' if (force or scored == 0) else 'false'}")
           print(f"rows_today={n}")
+          print(f"scored_today={scored}")
           PY
           cat "$GITHUB_OUTPUT"
       - name: Capture full-game openers (multi-book incl. Hard Rock + no-vig exchanges)
@@ -128,7 +154,7 @@ jobs:
         # pace = NaN. Unofficial scrape: a TeamRankings outage must not block
         # scoring, so this step is non-fatal (the board still posts; pace chips
         # read "no data").
-        if: steps.active.outputs.week != ''
+        if: steps.captured.outputs.need_score == 'true'
         continue-on-error: true
         timeout-minutes: 5
         run: python scripts/enrich_tempo.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }} --date "$(date -u +%F)"
@@ -136,31 +162,33 @@ jobs:
         id: weather
         # wx_* are model inputs joined on game_id; the forecast API covers the
         # coming Saturday from Sunday (16-day horizon). Non-fatal for the same
-        # reason as pace.
-        if: steps.active.outputs.week != ''
+        # reason as pace. FBS-vs-FBS only (the scored set) since 2026-09-16:
+        # the full week was ~290 calls and 8 minutes, 80% of it for games the
+        # model never reads.
+        if: steps.captured.outputs.need_score == 'true'
         continue-on-error: true
         # Open-Meteo rate-limits the runner: the first live run sat 20+ min in
         # this step. Cap it — scoring must not wait on forecasts.
         timeout-minutes: 8
         run: python scripts/enrich_weather.py --season ${{ steps.active.outputs.season }} --week ${{ steps.active.outputs.week }}
       - name: Score + rank the board
-        run: python scripts/weekly_update.py
+        if: steps.captured.outputs.need_score == 'true'
+        # --write-refs: the board-tint anchors come off the frame this step has
+        # already built; the derived-lines step below reads them instead of
+        # building the whole historical frame a second time (~4.6 MB from Neon).
+        run: python scripts/weekly_update.py --write-refs "$RUNNER_TEMP/factor_refs.json"
       - name: Post derived 1H lines for the active week
         # Idempotent replace (post_derived_lines deletes the season's derived
-        # rows, then inserts the week's fresh ones). Skips cleanly off-season —
-        # the script exits 1 on zero rows, which would redden every dead Sunday.
-        run: |
-          if [ -z "${{ steps.active.outputs.week }}" ]; then
-            echo "no active week — skipping derived-lines post"
-            exit 0
-          fi
-          python scripts/post_derived_lines.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}"
+        # rows, then inserts the week's fresh ones). Gated with scoring, so it
+        # never runs off-season (the script exits 1 on zero rows).
+        if: steps.captured.outputs.need_score == 'true'
+        run: python scripts/post_derived_lines.py --season "${{ steps.active.outputs.season }}" --week "${{ steps.active.outputs.week }}" --refs "$RUNNER_TEMP/factor_refs.json"
       - name: Warn when the board scored WITHOUT pace/weather
         # The enrichment steps are continue-on-error so an unofficial-source
         # outage never blocks the board, but a silent miss means the week
         # scored with pace/wx = NaN. Surface it (::warning:: + step summary,
         # not a failure) whenever either step did not succeed.
-        if: steps.active.outputs.week != '' && (steps.pace.outcome != 'success' || steps.weather.outcome != 'success')
+        if: steps.captured.outputs.need_score == 'true' && (steps.pace.outcome != 'success' || steps.weather.outcome != 'success')
         env:
           PACE_OUTCOME: ${{ steps.pace.outcome }}
           WX_OUTCOME: ${{ steps.weather.outcome }}

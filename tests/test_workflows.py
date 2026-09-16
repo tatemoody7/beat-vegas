@@ -307,8 +307,16 @@ def test_sunday_capture_is_gated_so_three_crons_spend_one_slates_credits():
     week where all three fired paid 18 to capture one slate. The expensive step
     is now gated on a positive fact -- a full_game_total snapshot written today
     (ET) -- the same shape as card.yml's built-today probe, with `force` for a
-    deliberate re-capture. Only the capture is gated: the rest of the job costs
-    nothing and re-running it is what you want if the first run half-failed."""
+    deliberate re-capture.
+
+    Since 2026-09-16 the REST of the job is gated on a second positive fact,
+    `need_score` (no model prediction row for the active week written today
+    ET): "free and idempotent" was ~290 Open-Meteo calls, 22 CFBD reference
+    calls and two feature-frame builds per tick, and 2026-09-13 ran four ticks
+    for one capture. A run that captured but died before scoring leaves no
+    prediction row, so the next tick still scores -- the old design's one
+    virtue, kept. The scorer also writes the board-tint references once and
+    the derived-lines step reads them instead of rebuilding the frame."""
     data = _load(WF_DIR / "sunday.yml")
     steps = data["jobs"]["capture-and-score"]["steps"]
     by_name = {s.get("name"): s for s in steps}
@@ -318,13 +326,32 @@ def test_sunday_capture_is_gated_so_three_crons_spend_one_slates_credits():
     assert "America/New_York" in gate["run"], "the guard must key on the ET day"
     assert gate["env"]["FORCE"] == "${{ inputs.force }}"
     assert "force" in _on(data)["workflow_dispatch"]["inputs"]
+    assert "need_score=" in gate["run"] and 'model_version != "derived_lines"' in gate["run"]
+    assert gate["env"]["SEASON"] == "${{ steps.active.outputs.season }}"
+    assert gate["env"]["WEEK"] == "${{ steps.active.outputs.week }}"
 
     capture = next(s for s in steps if s.get("name", "").startswith("Capture full-game openers"))
     assert capture["if"] == "steps.captured.outputs.need_capture == 'true'"
     assert "poll_full_game.py" in capture["run"]
 
-    # The free, idempotent work stays ungated.
-    assert by_name["Score + rank the board"].get("if") is None
+    score_gate = "steps.captured.outputs.need_score == 'true'"
+    for name in (
+        "Refresh pace for the active week (TeamRankings, season-to-date as of today)",
+        "Refresh weather forecasts for the active week (Open-Meteo)",
+        "Score + rank the board",
+        "Post derived 1H lines for the active week",
+    ):
+        assert by_name[name].get("if") == score_gate, name
+    assert by_name["Warn when the board scored WITHOUT pace/weather"]["if"].startswith(score_gate)
+    score = by_name["Score + rank the board"]["run"]
+    derived = by_name["Post derived 1H lines for the active week"]["run"]
+    assert '--write-refs "$RUNNER_TEMP/factor_refs.json"' in score
+    assert '--refs "$RUNNER_TEMP/factor_refs.json"' in derived
+    # Weather is FBS-only by default: no --all-divisions on the scheduled path.
+    assert (
+        "--all-divisions"
+        not in by_name["Refresh weather forecasts for the active week (Open-Meteo)"]["run"]
+    )
 
 
 def test_card_yml_crons_and_ci_CRON_SLOTS_are_the_same_set():

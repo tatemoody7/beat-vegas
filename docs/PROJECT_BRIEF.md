@@ -15,7 +15,8 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   SP+, returning production, venues), TeamRankings (tempo), Open-Meteo (weather),
   The Odds API (live 1H totals).
 - Derives **actual 1H points** for every game, builds **leak-free** pre-kickoff
-  features, and a model scores each upcoming game **0–100** for under value.
+  features, and a **market-blind** model projects each game's 1H total; the board
+  ranks games by the **gap** between that number and Hard Rock's line.
 - Tracks **line movement** and learns when 1H totals post.
 - Grades **market vs model vs my own picks** with units + CLV, and a "Line Study"
   ranks which opening line numbers cash unders most.
@@ -58,32 +59,51 @@ surface the best 1H-under opportunities each week — while I stay the decision-
   chooses (best single look: Friday after ~5:30pm ET, when ~78% of Hard Rock's 1H
   lines are up and the Friday card has built).
 
-## Status & roadmap
-- **Done:** data pipeline, backtest, 0–100 scoring, line tracking, free
-  enrichments, historical pace/weather backfill, private GitHub repo,
-  Neon Postgres, GitHub Actions running the weekly engine.
-- **Done:** Next.js app live on Vercel backed by Neon Postgres, password gate
-  (the old Streamlit dashboard was removed).
-- **Done:** the **BV line** + gap vs Vegas + gap-vs-CLV tracker (live). Now
-  **market-blind** (no Vegas number feeds it, by rule), with an **80% prediction
-  band** so gaps are read in units of noise (the line's σ ≈ 12 pts — most single-game
-  gaps are noise, and the UI says so), a **near-kickoff line poll** so CLV is
-  trustworthy, and a forward-only **QB-out flag**. See `BV_LINE.md`.
-- **Always:** collect real 1H lines this season and re-measure the edge for real —
-  the verdict is whether the biggest (noise-adjusted) BV-vs-Vegas gaps earn positive CLV.
+## Status & roadmap (as of 2026-09-15, week 3 of the 2026 season)
+- **Done:** data pipeline, backtest, line tracking, free enrichments, private GitHub
+  repo, Neon Postgres, GitHub Actions running the engine, a Vercel cron as the primary
+  trigger (GitHub cron is the backup).
+- **Done:** Next.js app live on Vercel backed by Neon Postgres, password gate. Three
+  tabs — Board / Results / Track record — plus a page per game. The board shows a rank
+  and Bet / Watch / Pass with the gap bar; there is **no** 0–100 score, confidence meter
+  or prediction band on the page (cut 2026-09-10: "if it isn't obvious I don't want it").
+- **Done:** the **BV line** + gap vs Hard Rock (live). Market-blind by rule; gates are
+  in **points** (≥ 1.75, from the validated top-20%-by-gap rule), never σ; a real-money
+  bet needs Hard Rock's own line and a live price, enforced server-side and failing
+  closed. A forward-only **QB-out flag** (Rotowire) blocks paper picks.
+- **Done (Sep 2026):** every historical weather row was wrong (UTC kickoff indexed into
+  a local-time series) and was repaired into `weather_obs` with decision-safe leads;
+  activation is **deferred** on blast radius. The hypothesis registry
+  (`docs/HYPOTHESES.md`) lists every test with its pre-registered criterion; the
+  1,902-game 2023-25 real-close set is **spent** for exploration. A pre-registered
+  **stopping rule** (SPRT, two clocks) runs on the paper ledger from week 3, with a
+  real-money pause switch. The **share engine** — a market-conditioned challenger that
+  predicts the first-half split — is spec'd and registered (`H-SHARE`), not built; a
+  pass of its gate earns a prospective paper arm, not promotion.
+- **Always:** the verdict is whether the rule's paper picks earn positive line value
+  against Hard Rock's close and profit at actual prices — hit rate stops nothing.
 
 ## Good things to brainstorm in this Project
-- Which *new free signals* might actually move the model (pace helped;
-  situational/returning did not; weather is unmeasured on correct data). Ideas:
-  decision-time weather × offensive style, coordinator/scheme changes, 1Q-only
-  splits, opponent-adjusted pace, garbage-time-free 1H efficiency.
-- How to present "confidence" honestly when the edge is marginal or unconfirmed.
+- Which *new free signals* might move the model. Pace helped; situational/returning did
+  not; decision-time weather × offensive style is **null after the price control** (R09).
+  Still open and unregistered: coordinator/scheme changes, 1Q-only splits,
+  opponent-adjusted pace, garbage-time-free 1H efficiency, travel **against market
+  error**, QB news vs cluster injuries — see the unregistered list in
+  `docs/EXTERNAL_REVIEW.md`. Any new test gets a row in `docs/HYPOTHESES.md` first.
+- ~~How to present "confidence"~~ — decided 2026-09-10: nothing on the page but rank,
+  Bet / Watch / Pass and the gap bar. A chart that needs a paragraph has failed.
 - ~~Bankroll/staking views~~ — decided 2026-09-01: flat units, see `BETTING_POLICY.md`
   (Kelly stays an advisory chip only).
-- What "good" looks like for the live tracking after N weeks of real lines.
-- Whether/when a paid 1H-line history feed would be worth it to validate the proxy.
+- ~~What "good" looks like for the live tracking~~ — answered by the stopping rule:
+  profit per unit at actual prices and favourable line value vs Hard Rock's strict
+  close, SPRT at 5% total false-stop; see `STOPPING_RULE.md`.
+- ~~Whether/when a paid 1H-line history feed would be worth it~~ — bought 2026-09-06/08
+  (Odds API history, 2023-25 first-half closes). It validated the fair proxy and is now
+  the spent exploratory set.
+- When the share engine's gate report exists: what its prospective paper arm's stopping
+  clock should be, and how a challenger and a champion share one board.
 
 ## Pointers
 - Repo: https://github.com/tatemoody7/beat-vegas (private)
-- Full technical plan & history: the plan file (ADDENDUMs 1–5) in Claude Code.
+- Every test and its result: `docs/HYPOTHESES.md` (the index) and the study docs it points at.
 - Session continuity for Claude Code: `CLAUDE.md` at the repo root.

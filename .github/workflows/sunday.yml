@@ -61,9 +61,11 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
+          cache: pip
       - name: Install
         run: pip install -e .
-      - name: Cache CFBD reference data (weekly)
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
         uses: ./.github/actions/cfbd-cache
       - name: Resolve active week
         id: active
@@ -167,3 +169,8 @@ jobs:
           echo "::warning::$MSG"
           echo "## WARNING: $MSG" >> "$GITHUB_STEP_SUMMARY"
           echo "Board posted; pace/wx chips may read 'no data' for the active week. Re-run the failed enrichment or re-dispatch sunday.yml." >> "$GITHUB_STEP_SUMMARY"
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

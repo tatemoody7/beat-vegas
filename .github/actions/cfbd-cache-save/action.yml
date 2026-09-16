@@ -1,0 +1,38 @@
+name: CFBD reference cache (save)
+description: >
+  Save data/cache under the week's key -- but ONLY when this run actually
+  populated it with CFBD reference files. A job that restored the cache and
+  made no CFBD calls must not claim the week's key with an empty payload (see
+  ./.github/actions/cfbd-cache/action.yml for the incident).
+
+inputs:
+  key:
+    description: The key from the cfbd-cache restore step (steps.<id>.outputs.key).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        KEY: ${{ inputs.key }}
+      # The reference files season_stats.py::_cached writes. `-size +1k` also
+      # excludes the 2-byte empty payloads that bug used to leave behind.
+      run: |
+        n=$(find data/cache -maxdepth 1 -type f \
+              \( -name 'sp_*.json' -o -name 'talent_*.json' -o -name 'roster_*.json' \
+                 -o -name 'returning_*.json' -o -name 'adv_*.json' \) -size +1k 2>/dev/null \
+            | wc -l | tr -d ' ')
+        echo "CFBD reference files (>1 KB) in data/cache: ${n:-0}; key='$KEY'"
+        if [ -n "$KEY" ] && [ "${n:-0}" -ge 4 ]; then
+          echo "populated=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "populated=false" >> "$GITHUB_OUTPUT"
+          echo "not saving: this run did not populate the reference cache"
+        fi
+    - if: steps.check.outputs.populated == 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: data/cache
+        key: ${{ inputs.key }}

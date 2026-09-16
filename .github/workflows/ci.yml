@@ -1,6 +1,6 @@
 name: CI
 
-# Pull-request / main gate: the web app's unit tests, lint and type-check, and
+# Pull-request gate: the web app's unit tests, lint and type-check, and
 # the Python engine's ruff + unit tests. No secrets and no database: the Python
 # tests that need Postgres are marked `integration` (deselected here) or skip
 # themselves when the local pg_sim sandbox is unavailable (tests/conftest.py).
@@ -14,9 +14,12 @@ permissions:
   contents: read
 
 on:
+  # pull_request ONLY (2026-09-16). It used to run on `push: main` as well, so
+  # every merge re-ran the exact content the PR had just passed -- 81 of 284
+  # CI runs in the first half of September, on a private repo where Actions
+  # minutes are metered (2,000/month free) and CI was 58% of the bill. Vercel
+  # deploys main on its own; the PR run is the gate.
   pull_request:
-  push:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -53,6 +56,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
+          cache: pip
       - name: Install
         # ruff is a project dependency (requirements.txt), so no separate install.
         run: pip install -e .

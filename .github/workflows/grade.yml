@@ -10,7 +10,10 @@ name: Daily grading (results + ledger)
 # finals refresh only writes games CFBD marks completed (a noon-ET Saturday run
 # never freezes a live score), the PBP step fetches only the weeks still missing
 # fh_team_game rows, and the post-mortem regrades only the live season except on
-# Monday (ET) and on a manual dispatch, when it also redoes the 2023-25 history.
+# Monday (ET) -- or a dispatch with hist=true -- when it also redoes the 2023-25
+# history. (Until 2026-09-16 EVERY dispatch did the history pass, and the Vercel
+# cron that is this workflow's primary trigger IS a dispatch, so the 7 MB read +
+# 3.5 MB rewrite ran daily instead of weekly.)
 # Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
 # ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
 # (sunday.yml). A red run here means "the ledger or PBP factors are stale";
@@ -33,7 +36,13 @@ on:
     # pass. GitHub cron is best-effort; grading spends no Odds API credits.
     - cron: '30 10 * * *'
     - cron: '0 16 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      hist:
+        description: 'also regrade the 2023-25 history (post-mortem scope both); default is Monday ET only'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: neon-writers
@@ -51,8 +60,15 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
+          cache: pip
       - name: Install
         run: pip install -e .
+      - name: Restore CFBD reference data (weekly cache)
+        # grade_factor_ledger.py builds the feature frame, which fetches the
+        # SP+/talent/roster/returning references (~22 CFBD calls) -- twice a
+        # day here. This job was the one heavy caller NOT sharing the cache.
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
       - name: Resolve season
         id: season
         run: |
@@ -97,13 +113,21 @@ jobs:
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
         # Regrades the season's cards at Hard Rock's numbers (scope live) every
         # run; the stored 2023-25 ratings under the flat and fair proxies (scope
-        # hist, the expensive half) only on Monday ET and on a manual dispatch.
+        # hist, the expensive half) only on Monday ET or when dispatched with
+        # hist=true. NOT on every dispatch: the Vercel cron dispatches this
+        # workflow daily, so keying on the event ran the history pass every day.
         # Delete-then-rewrite per scope, no API calls. Feeds the Results page
         # panel and docs/POST_MORTEM.md.
         env:
           ET_DOW: ${{ steps.season.outputs.et_dow }}
+          IN_HIST: ${{ inputs.hist }}
         run: |
           scope=live
-          if [ "$ET_DOW" = "1" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then scope=both; fi
-          echo "post-mortem scope=$scope (et_dow=$ET_DOW event=$GITHUB_EVENT_NAME)"
+          if [ "$ET_DOW" = "1" ] || [ "$IN_HIST" = "true" ]; then scope=both; fi
+          echo "post-mortem scope=$scope (et_dow=$ET_DOW hist=$IN_HIST event=$GITHUB_EVENT_NAME)"
           python scripts/post_mortem.py --write --md "" --scope "$scope"
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

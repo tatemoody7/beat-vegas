@@ -403,3 +403,50 @@ def test_resolve_slot_cli_gate_skips_without_touching_the_db(monkeypatch, capsys
     ci.resolve_slot_cli()
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert out["slot"] == "sat_am" and seen == [utc(2026, 11, 14, 13, 5)]
+
+
+def test_gate_only_mode_runs_the_et_gate_and_never_probes(monkeypatch, capsys):
+    """GATE_ONLY=true is what card.yml runs on the runner's system python BEFORE
+    setup-python / pip install: it must answer the Eastern-clock gate with the
+    standard library alone and never touch the cards table, even for a tick
+    that is INSIDE its window (that probe needs SQLAlchemy, which is not
+    installed yet). Without GATE_ONLY the same tick probes, as before."""
+    import json
+
+    from beatvegas import ci
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return utc(2026, 11, 14, 13, 5)  # 8:05am ET (EST): inside sat_am's window
+
+    monkeypatch.setattr(ci, "datetime", FrozenDatetime)
+    monkeypatch.setenv("SCHEDULE", "5 13 * * 6")
+    monkeypatch.setenv("INPUT_SLOT", "")
+    monkeypatch.setenv("GATE_ONLY", "true")
+    monkeypatch.delenv("INPUT_FORCE", raising=False)
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+
+    def boom(now):
+        raise AssertionError("GATE_ONLY must never probe the cards table")
+
+    monkeypatch.setattr(ci, "slots_built_today", boom)
+    ci.resolve_slot_cli()
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["slot"] == "sat_am"
+
+    # An out-of-window tick still skips, with the same reason the full resolve gives.
+    FrozenDatetime.now = classmethod(lambda cls, tz=None: utc(2026, 11, 14, 12, 35))
+    monkeypatch.setenv("SCHEDULE", "35 12 * * 6")
+    ci.resolve_slot_cli()
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["slot"] == "skip" and "outside" in out["reason"]
+
+    # Same in-window tick WITHOUT GATE_ONLY: the probe runs (unchanged behaviour).
+    monkeypatch.delenv("GATE_ONLY")
+    FrozenDatetime.now = classmethod(lambda cls, tz=None: utc(2026, 11, 14, 13, 5))
+    monkeypatch.setenv("SCHEDULE", "5 13 * * 6")
+    seen = []
+    monkeypatch.setattr(ci, "slots_built_today", lambda now: seen.append(now) or set())
+    ci.resolve_slot_cli()
+    assert seen == [utc(2026, 11, 14, 13, 5)]

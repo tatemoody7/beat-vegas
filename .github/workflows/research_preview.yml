@@ -37,9 +37,16 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
+          cache: pip
       - name: Install
         run: pip install -e .
-      - name: Cache CFBD reference data (weekly)
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
         uses: ./.github/actions/cfbd-cache
       - name: Build week preview (slate + ESPN news/injuries)
         run: python scripts/research_preview.py
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

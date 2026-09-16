@@ -351,15 +351,23 @@ def resolve_for_cli(
 def resolve_slot_cli() -> None:
     """Entry point for card.yml: reads SCHEDULE / INPUT_SLOT / INPUT_FORCE,
     probes the cards table only when the answer can change (resolve_for_cli),
-    appends the slot fields to $GITHUB_OUTPUT (or prints JSON locally)."""
+    appends the slot fields to $GITHUB_OUTPUT (or prints JSON locally).
+
+    GATE_ONLY=true runs the Eastern-clock gate and NOTHING else -- no DB probe,
+    no imports beyond the standard library -- so card.yml can run it with the
+    runner's system Python before checkout has been followed by setup-python
+    and `pip install`. Two of each slot's four backup crons fall outside the ET
+    window in any DST regime; they used to pay ~40 s of install (and a billed
+    runner minute) to learn that. The full resolve, with the probe, still runs
+    after the install for the ticks that pass."""
     schedule = os.environ.get("SCHEDULE", "")
     now = datetime.now(timezone.utc)
-    out = resolve_for_cli(
-        schedule,
-        now,
-        os.environ.get("INPUT_SLOT", ""),
-        force=os.environ.get("INPUT_FORCE", "") == "true",
-    )
+    input_slot = os.environ.get("INPUT_SLOT", "")
+    force = os.environ.get("INPUT_FORCE", "") == "true"
+    if os.environ.get("GATE_ONLY", "") == "true":
+        out = resolve_slot(schedule, now, input_slot, force=force)
+    else:
+        out = resolve_for_cli(schedule, now, input_slot, force=force)
     path = os.environ.get("GITHUB_OUTPUT")
     if path:
         with open(path, "a", encoding="utf-8") as fh:

@@ -118,16 +118,39 @@ jobs:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: ET gate (stdlib only, before any install)
+        id: gate
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_SLOT: ${{ inputs.slot }}
+          INPUT_FORCE: ${{ inputs.force }}
+          GATE_ONLY: 'true'
+        # Two of each slot's four backup crons land outside the ET window in
+        # any DST regime (the DST design), and until 2026-09-16 every one of
+        # them paid setup-python + pip install (~40 s, a whole billed minute)
+        # to find that out: 20 of 29 card runs that month were skips. The
+        # resolver's gate needs only the standard library, so it runs here on
+        # the runner's python3 straight after checkout; everything below is
+        # gated on it. The full resolve with the cards-table probe still runs
+        # after the install (step `slot`).
+        run: |
+          python3 -m beatvegas.ci
+          echo "gate slot=$(grep '^slot=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2) (schedule='$SCHEDULE')"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.gate.outputs.slot != 'skip'
         with:
           python-version: '3.11'
           cache: pip
       - name: Install
+        if: steps.gate.outputs.slot != 'skip'
         run: pip install -e .
-      - name: Cache CFBD reference data (weekly)
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        if: steps.gate.outputs.slot != 'skip'
         uses: ./.github/actions/cfbd-cache
       - name: Resolve slot (beatvegas/ci.py; ET gate + once-per-day cards probe)
         id: slot
+        if: steps.gate.outputs.slot != 'skip'
         env:
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_SLOT: ${{ inputs.slot }}
@@ -289,6 +312,11 @@ jobs:
             --slot "${{ steps.slot.outputs.slot }}" \
             --sweep-status "$SWEEP_STATUS" \
             --preview-status "$PREVIEW_STATUS"
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.gate.outputs.slot != 'skip' && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}
       - name: Fail the run if the sweep did not complete
         # The card is published either way (see continue-on-error above); this
         # is what still turns the run red, so GitHub's failed-workflow email --

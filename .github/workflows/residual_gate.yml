@@ -49,6 +49,9 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
       - name: Run the gate
         # Inputs go through env, never inlined into bash (script-injection hygiene).
         env:
@@ -69,3 +72,8 @@ jobs:
           name: residual-gate-report
           path: reports/residual_gate_*
           if-no-files-found: warn
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

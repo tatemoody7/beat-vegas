@@ -47,7 +47,8 @@ jobs:
           python-version: '3.11'
       - name: Install
         run: pip install -e .
-      - name: Cache CFBD reference data (weekly)
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
         uses: ./.github/actions/cfbd-cache
       - name: Run the study
         env:
@@ -70,3 +71,8 @@ jobs:
             reports/*
             data/blend.json
           if-no-files-found: warn
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

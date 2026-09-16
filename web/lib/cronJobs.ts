@@ -91,7 +91,7 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
   sunday: {
     workflow: "sunday.yml",
     // sunday.yml declares ONE optional input (`force`), so an empty object is
-    // accepted -- unlike grade.yml below, which declares none and 422s on any.
+    // accepted -- like grade.yml's optional `hist`; neither is sent from here.
     inputs: {},
     days: ["Sun"],
     // The last workflow whose only trigger was GitHub's best-effort cron, which
@@ -111,8 +111,10 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
   },
   grade: {
     workflow: "grade.yml",
-    // grade.yml declares `workflow_dispatch:` with no inputs, and GitHub
-    // answers 422 "Unexpected inputs provided" if any are sent.
+    // grade.yml declares one OPTIONAL input (`hist`, the 2023-25 post-mortem
+    // regrade); the daily dispatch sends none, so the history pass stays a
+    // Monday-only job. GitHub answers 422 to any input a workflow does NOT
+    // declare, so never add a key here without adding it to the workflow.
     inputs: {},
     days: null,
     // No window: grading is idempotent, spends no Odds credits and has no

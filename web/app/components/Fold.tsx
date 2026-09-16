@@ -26,17 +26,23 @@ export default function Fold({
       open={defaultOpen}
       className="mt-4 border-t border-[var(--border)] pt-4"
     >
-      <summary className="flex min-h-11 cursor-pointer items-center gap-2">
+      <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-0.5">
         <span className="text-sm font-semibold text-[var(--text)]">
           {title}
         </span>
-        {hint && <span className="text-xs text-[var(--text-dim)]">{hint}</span>}
         <span
           aria-hidden="true"
-          className="ml-auto text-xs text-[var(--text-dim)]"
+          className="order-2 ml-auto text-xs text-[var(--text-dim)] sm:order-3"
         >
           ▾
         </span>
+        {/* The hint drops to its own line on a phone rather than squeezing
+            the title into three. */}
+        {hint && (
+          <span className="order-3 basis-full text-xs text-[var(--text-dim)] sm:order-2 sm:basis-auto">
+            {hint}
+          </span>
+        )}
       </summary>
       <div className="mt-3">{children}</div>
     </details>

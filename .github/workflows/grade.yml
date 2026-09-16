@@ -85,9 +85,12 @@ jobs:
       - name: Backfill any missing final scores (ESPN, no key, no quota)
         # Scores only, onto games the step above already created, keyed by id
         # (ESPN's event ids are the ids we store). Second source for the one
-        # input grading cannot do without.
+        # input grading cannot do without. Four days back: this runs twice a
+        # day, so a Saturday final is caught Sunday, Monday and Tuesday; ten
+        # days was eleven scoreboard calls a run for a window nothing late
+        # ever landed in.
         continue-on-error: true
-        run: python scripts/backfill_scores_espn.py --days-back 10
+        run: python scripts/backfill_scores_espn.py --days-back 4
       - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
         # fh_team_game feeds the season-to-date FH factors the Sunday scorer
         # reads; without this the current season never accrues PBP rows.

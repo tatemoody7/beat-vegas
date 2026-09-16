@@ -1,4 +1,5 @@
 import { isCentredQuote } from "@/lib/devig";
+import { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
@@ -77,15 +78,21 @@ export type ConsensusLine = { open: number | null; cur: number | null };
 // double-count the real books), and book keys are case-folded so a legacy
 // "DraftKings" row and an Odds API "draftkings" row are one book.
 // Season-scoped: an unbounded scan grows with every season of movement history.
+// Week-scoped when `week` is given (the board only ever renders one week, and
+// this query was ~210 KB per render season-wide against a 5 GB/month egress
+// cap that took the site down on 2026-09-16); season-wide for the research
+// readers (lib/lineStudy.ts) that genuinely need every game.
 export async function consensusLines(
   season: number,
   market = "1H_total",
+  week?: number,
 ): Promise<Map<number, ConsensusLine>> {
   const snaps = await prisma.$queryRaw<SnapRow[]>`
     SELECT s.game_id, LOWER(s.book) AS book, s.line, s.over_price, s.under_price,
            CAST(s.captured_at AS TEXT) AS captured_at
     FROM odds_snapshots s JOIN games g ON g.id = s.game_id
     WHERE s.market = ${market} AND g.season = ${season}
+      ${weekClause(week)}
       AND (g.start_date IS NULL OR s.captured_at IS NULL
            OR s.captured_at <= g.start_date)
       AND LOWER(COALESCE(s.book, '')) <> 'consensus'
@@ -152,23 +159,22 @@ async function bvAdjustments(
   return out; // later rows overwrite earlier → latest wins
 }
 
+/** `AND g.week = N` when a week is given, nothing otherwise. */
+function weekClause(week: number | undefined): Prisma.Sql {
+  return week === undefined ? Prisma.empty : Prisma.sql`AND g.week = ${week}`;
+}
+
 /**
- * The board's GAME UNIVERSE for a season — the predictions rows and their game
- * facts, without the two expensive joins getBoard adds on top (the full-season
- * consensus-line scan and the adjustment lookup).
- *
- * Split out so a caller that only needs "which games are on the board" does not
- * pay for line medians it will not read. getBoard still composes on top of it,
- * so there is exactly ONE definition of the universe and the two cannot drift.
+ * The ONE definition of the board's game universe, as a WHERE fragment over
+ * `predictions p JOIN games g`: this season, games Hard Rock has posted a
+ * full-game total on (the only book Tate can bet), the newest real model
+ * version (display-only derived_lines never outranks a model), optionally one
+ * week. boardGames and boardUniverse both build on it so they cannot drift.
  */
-export async function boardGames(season: number): Promise<PredRow[]> {
-  return prisma.$queryRaw<PredRow[]>`
-    SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
-           p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
-           g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
-           g.away_team_id, g.home_team_id
-    FROM predictions p JOIN games g ON g.id = p.game_id
+function universeWhere(season: number, week?: number): Prisma.Sql {
+  return Prisma.sql`
     WHERE g.season = ${season}
+      ${weekClause(week)}
       -- The site's game universe: games Hard Rock has posted a full-game total
       -- on (the only book Tate can bet). Everything else stays out of view.
       AND EXISTS (
@@ -184,10 +190,68 @@ export async function boardGames(season: number): Promise<PredRow[]> {
         -- the model's picks behind "DERIVED — no model pick" cards.
         ORDER BY (p2.model_version = 'derived_lines') ASC,
                  p2.created_at DESC
-        LIMIT 1)
+        LIMIT 1)`;
+}
+
+/**
+ * The board's GAME UNIVERSE for a season — the predictions rows and their game
+ * facts, without the two expensive joins getBoard adds on top (the
+ * consensus-line scan and the adjustment lookup). `week` narrows it to one
+ * week's rows; factors_json is ~5 KB a row, so the season-wide pull was the
+ * single heaviest payload on a board render (~283 KB).
+ *
+ * Split out so a caller that only needs "which games are on the board" does not
+ * pay for line medians it will not read. getBoard still composes on top of it,
+ * so there is exactly ONE definition of the universe and the two cannot drift.
+ */
+export async function boardGames(
+  season: number,
+  week?: number,
+): Promise<PredRow[]> {
+  return prisma.$queryRaw<PredRow[]>`
+    SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
+           p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
+           g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
+           g.away_team_id, g.home_team_id
+    FROM predictions p JOIN games g ON g.id = p.game_id
+    ${universeWhere(season, week)}
     ORDER BY p.rank
   `;
 }
+
+export type UniverseRow = {
+  gameId: number;
+  week: number;
+  startDate: Date | null;
+};
+
+/**
+ * The same universe as boardGames, three columns wide: enough to know which
+ * weeks exist and which one is "this week" (lib/week.ts), so getHomeBoard can
+ * pick the week BEFORE it pays for that week's rows, lines and books. ~1 KB
+ * where the full rows were ~283 KB. cache()d per request (season is a stable
+ * key).
+ */
+export const boardUniverse = cache(async function boardUniverse(
+  season: number,
+): Promise<UniverseRow[]> {
+  const rows = await prisma.$queryRaw<
+    {
+      game_id: number | bigint;
+      week: number | bigint;
+      start_date: Date | null;
+    }[]
+  >`
+    SELECT p.game_id, g.week, g.start_date
+    FROM predictions p JOIN games g ON g.id = p.game_id
+    ${universeWhere(season)}
+  `;
+  return rows.map((r) => ({
+    gameId: Number(r.game_id),
+    week: Number(r.week),
+    startDate: r.start_date ?? null,
+  }));
+});
 
 /**
  * The board for a season, ONCE per request.
@@ -197,17 +261,22 @@ export async function boardGames(season: number): Promise<PredRow[]> {
  * ran the whole thing TWICE per page view, because generateMetadata and the
  * page body both call getHomeGame and Next dedupes fetch(), not Prisma.
  *
- * cache() is keyed on `season` only, which is why the caching lives here rather
- * than on getHomeBoard: that takes a `now` defaulting to new Date(), so every
- * call would be a fresh key and dedupe nothing. `now` only affects pure
- * derivation downstream, never the query.
+ * cache() is keyed on `season` (and the optional `week`) only, which is why the
+ * caching lives here rather than on getHomeBoard: that takes a `now` defaulting
+ * to new Date(), so every call would be a fresh key and dedupe nothing. `now`
+ * only affects pure derivation downstream, never the query.
+ *
+ * `week` scopes the rows AND the consensus scan to one week (the home board
+ * and the game page know their week before they call). Omitted = the whole
+ * season, for callers that need it.
  */
 export const getBoard = cache(async function getBoard(
   season: number,
+  week?: number,
 ): Promise<BoardRow[]> {
   const [preds, lines, adjustments] = await Promise.all([
-    boardGames(season),
-    consensusLines(season),
+    boardGames(season, week),
+    consensusLines(season, "1H_total", week),
     bvAdjustments(season),
   ]);
   return preds.map((p) => {

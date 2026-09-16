@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 // Week research preview: this week's games + injuries/QB-out (Rotowire's college
@@ -51,8 +52,11 @@ export async function getPreview(
   }
 }
 
-/** Previews for one week keyed by game id — for the This Week cards. */
-export async function getPreviewByGame(
+/** Previews for one week keyed by game id — for the This Week cards.
+ *  cache()d per request: /game/[id] builds the board in generateMetadata AND
+ *  the body, and this ~128 KB pull was not deduped like the loaders in
+ *  lib/board.ts are. */
+export const getPreviewByGame = cache(async function getPreviewByGame(
   season: number,
   week: number,
 ): Promise<Map<number, PreviewGame>> {
@@ -61,7 +65,7 @@ export async function getPreviewByGame(
   if (p.week !== week) return out; // fell back to another week: no match
   for (const g of p.games) out.set(g.gameId, g);
   return out;
-}
+});
 
 async function getPreviewUnsafe(
   season: number,

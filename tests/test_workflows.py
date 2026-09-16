@@ -256,6 +256,8 @@ def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
     runs = [s["run"] for s in steps if isinstance(s.get("run"), str)]
     pbp = next(r for r in runs if "scripts/backfill_pbp.py" in r)
     assert "--only-missing" in pbp
+    espn = next(r for r in runs if "scripts/backfill_scores_espn.py" in r)
+    assert "--days-back 4" in espn, "twice a day, four days back covers every late final"
     resolve = next(s for s in steps if s.get("id") == "season")
     assert "et_dow=$(TZ=America/New_York date +%u)" in resolve["run"]
     pm = next(s for s in steps if "scripts/post_mortem.py" in (s.get("run") or ""))

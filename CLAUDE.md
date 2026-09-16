@@ -39,6 +39,22 @@ Research only — it never places bets or automates gambling.
   `post_derived_lines.py --refs` reads it (`factors/board.py::save_references` /
   `load_references`, falls back to `historical_references()`), so the ~4.6 MB historical
   frame is built once per Sunday run, not twice.
+  **PR 3 (Neon egress):** the board picks its week off a 3-column `boardUniverse` (cached;
+  `universeWhere()` is the ONE definition of the universe, shared with `boardGames`) and
+  only then loads that week's rows, `consensusLines(season, market, week)` and
+  `getLineCheck(season, market, week)`; `getPreviewByGame`, `getMovements` (string key —
+  React `cache()` compares arrays by identity) and `gameSeasonWeek` are `cache()`d, so
+  `/game/[id]`'s metadata+body double render dedupes. **Measured with a per-query byte
+  meter (JSON-serialized results) on the week-3 board: 2.28 MB → 1.05 MB per board render,
+  2.31 → 1.08 on Results, 2.74 → 0.98 MB per game page.** `store.py::upsert` batches its
+  existence check (one `IN` per 500 rows, row-value tuples for composite keys) — was one
+  SELECT per row, ~7,400 round trips/day from `backfill.py`. `grade.yml` ESPN look-back
+  10 → 4 days. `web/lib/prisma.ts` warns once when a dev server's `DATABASE_URL` is
+  `neon.tech` — `next dev` + screenshot passes against PROD through the redesign sprint are
+  what tripped the 5 GB; `web/.env.example` documents the `simulate_week.py` sandbox as the
+  default. NOT done: `odds_snapshots` index (EXPLAIN unreachable from this session — the
+  Postgres MCP timed out on a suspended compute) and trimming `factors_json` on the board
+  row (`factor_board` inside it feeds `edge.ts`, so it cannot be dropped).
 - **2026-09-16 (SITE REDESIGN — discovery + five stacked PRs #154-#158).** A full
   page-by-page review with Tate (every page and state captured at 1440 and 390, seven
   Q&A rounds, two mockup rounds). **Outcome: the structure, the gradient cards, the three

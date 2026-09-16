@@ -34,7 +34,9 @@ export default function BankrollCurve({
   const pad = Math.max(5, (hi - lo) * 0.15);
 
   return (
-    <div className="h-56 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-2)] p-3">
+    // No frame of its own: it sits inside the scoreboard card, and a box in a
+    // box is the "too many boxes" Tate named (2026-09-16).
+    <div className="h-52 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={points}

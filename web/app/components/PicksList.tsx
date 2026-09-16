@@ -365,12 +365,6 @@ export default function PicksList({
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
-        Rows marked <span className="bv-badge bv-badge--warn">paper</span> had
-        no money on them. Line value positive means the line moved your way
-        after the bet. Open a row for our number at the time, why it was logged,
-        and the note.
-      </p>
     </>
   );
 }

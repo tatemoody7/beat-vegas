@@ -19,10 +19,14 @@ export default function BoardFilters({ current }: { current: Filters }) {
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
+  // One filter at a time (Tate 2026-09-16): the two answer different
+  // questions, and "my teams that Hard Rock has priced" is a view nobody asked
+  // for. Turning one on turns the other off; clicking the active one clears it.
   function toggleFlag(key: "mine" | "hr", on: boolean) {
     push((p) => {
-      if (on) p.delete(key);
-      else p.set(key, "1");
+      p.delete("mine");
+      p.delete("hr");
+      if (!on) p.set(key, "1");
     });
   }
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { bookLabel } from "@/lib/books";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
-import { basisPhrase, blockerTag, distinctTag, TIER_TEXT } from "@/lib/labels";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
@@ -12,17 +11,20 @@ import {
   type TeamSplit,
 } from "@/lib/score";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
-import GapBar from "@/app/components/GapBar";
 import LogPickButton from "@/app/components/LogPickButton";
 import TeamLogo from "@/app/components/TeamLogo";
 
 // One game, in full. This is where every number the board used to hide behind a
-// disclosure now lives: the decision up top (the gap drawn, the price, the kill
-// number, the log button), then Lines, What is behind it, and Injuries and news.
-// The board row is a link to here and carries none of it.
+// disclosure now lives: the decision up top (the three numbers, the sentence,
+// the log button), then Lines, What is behind it, and Injuries and news. The
+// board row is a link to here and carries none of it.
 //
 // There is no "Our number" section: the decision block already states the
-// number, the gap and the kill line, so it only repeated them (Tate, 2026-09-10).
+// number (Tate, 2026-09-10). Since 2026-09-16 the decision is the three tiles
+// and the sentence alone: the gap bar, the gap caption, the blocker tag and the
+// price line each said the same gap a different way, and Tate cut them; the
+// tier word left the header and the full-game line left Lines for the same
+// reason. Every caption a returning reader does not need is gone too.
 //
 // Colour is the grade language (globals.css): --good bet, --warn watch,
 // --bad pass. Cyan stays chrome — links and buttons only.
@@ -61,17 +63,6 @@ function move(open: number | null, cur: number | null): string {
   return d === 0 ? "no move" : signed(d, 1);
 }
 
-function spreadText(
-  fg: MarketMovement | null,
-  stored: number | null | undefined,
-): string {
-  if (fg !== null && fg.spreadOpen !== null && fg.spreadCur !== null) {
-    return `${fmt(fg.spreadOpen)} → ${fmt(fg.spreadCur)}`;
-  }
-  const one = fg?.spreadCur ?? stored ?? null;
-  return one === null ? "—" : fmt(one);
-}
-
 function BookTable({ m }: { m: MarketMovement }) {
   return (
     <div className="bv-table-wrap">
@@ -101,16 +92,12 @@ function BookTable({ m }: { m: MarketMovement }) {
           ))}
         </tbody>
       </table>
-      <p className="px-3 py-2 text-xs text-[var(--text-dim)]">
-        {`Open is the first first-half total each book posted. Move is how far it has come since. Down is good for an under you already have.`}
-      </p>
     </div>
   );
 }
 
 function LinesSection({ g }: { g: HomeGame }) {
   const fh = g.movement?.firstHalf ?? null;
-  const fg = g.movement?.fullGame ?? null;
   const f = g.row.factors;
   const share =
     f.fh_share !== null &&
@@ -141,9 +128,6 @@ function LinesSection({ g }: { g: HomeGame }) {
               </>
             }
           />
-          <p className="text-xs text-[var(--text-dim)]">
-            {`Worked out from the posted full-game total. Not a prediction and not a bet.`}
-          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -159,26 +143,11 @@ function LinesSection({ g }: { g: HomeGame }) {
             }
           />
           <BookTable m={fh} />
-          {/* The price sentence belongs to the decision, and it is printed
-              there. Repeating it under the book table said it twice. The
-              per-book time-series chart that sat here is gone too (Tate,
-              2026-09-13: "scribbles"); the table above is the movement read. */}
+          {/* The per-book time-series chart that sat here is gone (Tate,
+              2026-09-13: "scribbles"), and so is the full-game footer
+              (2026-09-16); the table is the movement read. */}
         </div>
       )}
-
-      <div className="mt-3 border-t border-[var(--border)] pt-2">
-        <Row
-          label="Full game"
-          value={
-            fg === null && f.full_game_total == null
-              ? "—"
-              : `total ${fg === null ? fmt(f.full_game_total) : `${fmt(fg.open)} → ${fmt(fg.cur)} (${move(fg.open, fg.cur)})`} · spread ${spreadText(fg, f.spread)}`
-          }
-        />
-        <p className="mt-1 text-xs text-[var(--text-dim)]">
-          {`We never bet the full game. It is here because the first-half line is priced off it.`}
-        </p>
-      </div>
     </Section>
   );
 }
@@ -267,15 +236,10 @@ function WhySection({ g }: { g: HomeGame }) {
           {factors.map((fac) => (
             <FactorRow key={fac.key} f={fac} />
           ))}
-          {factors.some((x) => x.hypothesis) && (
-            <p className="mt-1 text-xs text-[var(--text-dim)]">
-              {`Rows marked unproven have not been checked against real lines yet.`}
-            </p>
-          )}
         </div>
       ) : (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
-          {`Nothing here yet. It fills in when the week is scored on Sunday.`}
+          {`Nothing here yet. It fills in when the week is scored.`}
         </p>
       )}
       <div className="space-y-1">
@@ -297,9 +261,6 @@ function WhySection({ g }: { g: HomeGame }) {
         />
         <Row label="Rest and travel" value={restTravel} />
       </div>
-      <p className="mt-2 text-xs text-[var(--text-dim)]">
-        {`These explain the score. None of them change it.`}
-      </p>
     </Section>
   );
 }
@@ -378,12 +339,12 @@ function NewsSection({ g }: { g: HomeGame }) {
     <Section title="Injuries and news">
       {qbOut && (
         <p className="mb-2 rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]">
-          {`Starting QB out: ${f.qb_out_detail ?? "a starting quarterback is listed out"}. Unofficial, from Rotowire. Our number does not know about it.`}
+          {`Starting QB out: ${f.qb_out_detail ?? "a starting quarterback is listed out"}. Our number does not know about it.`}
         </p>
       )}
       {p === null ? (
         <p className="text-xs text-[var(--text-dim)]">
-          {`No injuries or news pulled for this game yet. Check the starting lineups yourself before any real bet.`}
+          {`No injuries or news pulled for this game yet.`}
         </p>
       ) : (
         <>
@@ -399,9 +360,11 @@ function NewsSection({ g }: { g: HomeGame }) {
               injuries={p.homeInjuries}
             />
           </div>
-          <p className="mt-2 text-xs text-[var(--text-dim)]">
-            {`Unofficial: Rotowire injuries and ESPN headlines${at ? `, pulled ${at} ET` : ""}. Check the lineups yourself.`}
-          </p>
+          {at && (
+            <p className="mt-2 text-xs text-[var(--text-dim)]">
+              {`Rotowire and ESPN, pulled ${at} ET`}
+            </p>
+          )}
         </>
       )}
     </Section>
@@ -431,21 +394,6 @@ export default function GameDetail({
   const { row, edge, check } = g;
   const line = check?.hrLine ?? row.curLine ?? row.factors.line ?? null;
   const tone = tierTone(g);
-  // The tag and the action line come from the same blocker, so it only earns a
-  // place when it is not an echo of the sentence right above it.
-  const tag =
-    edge.tier === "EDGE"
-      ? distinctTag(
-          blockerTag(edge.blocker, {
-            hrLine: check?.hrLine ?? null,
-            hrPrice: check?.hrUnderPrice ?? null,
-            marketLine: row.curLine,
-            killLine: edge.kill.line,
-            killPrice: edge.kill.price,
-          }),
-          edge.action,
-        )
-      : null;
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null
@@ -481,11 +429,6 @@ export default function GameDetail({
           <span className="text-sm text-[var(--text-dim)]">
             {g.kickoff ?? "kickoff time TBD"}
           </span>
-          {g.settled === null && (
-            <span className="text-sm font-semibold" style={{ color: tone }}>
-              {TIER_TEXT[edge.tier]}
-            </span>
-          )}
         </div>
       </div>
 
@@ -531,22 +474,11 @@ export default function GameDetail({
           />
         </div>
 
-        <GapBar
-          ourNumber={row.bvLine}
-          line={line}
-          killLine={edge.kill.line}
-          lineLabel={basisPhrase(g.gapBasis, g.basisBooks)}
-        />
-
         <p
-          className={`mt-4 text-base ${played && g.settled === null ? "text-[var(--text-dim)]" : "text-[var(--text)]"}`}
+          className={`text-base ${played && g.settled === null ? "text-[var(--text-dim)]" : "text-[var(--text)]"}`}
         >
           {resultLine ?? edge.action}
         </p>
-        {tag !== null && (
-          <p className="mt-2 text-xs text-[var(--warn)]">{tag}</p>
-        )}
-        <p className="mt-2 text-xs text-[var(--text-muted)]">{g.priceLine}</p>
 
         <div className="mt-4 border-t border-[var(--border)] pt-3">
           <LogPickButton

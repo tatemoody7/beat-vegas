@@ -42,6 +42,11 @@ function loggedAs(p: PickFull): string {
   return parts.filter(Boolean).join(" · ");
 }
 
+// The table opens on MY BETS — the real-money rows — with Paper and All one
+// click away (Tate 2026-09-16: "my picks vs the paper picks, with my picks the
+// default"). When nothing real has been logged yet it opens on All, so the
+// page never leads with an empty table.
+//
 // `showWeek` is false when the page is already filtered to one week — the
 // column then prints the same number on every row. The Market column is gone
 // for the same reason (the whole product is first halves; a full-game ticket
@@ -57,6 +62,15 @@ export default function PicksList({
   showWeek?: boolean;
 }) {
   const router = useRouter();
+  const realCount = picks.filter((p) => !p.isPaper).length;
+  const paperCount = picks.length - realCount;
+  const [view, setView] = useState<"real" | "paper" | "all">(
+    realCount > 0 ? "real" : "all",
+  );
+  const shown =
+    view === "all"
+      ? picks
+      : picks.filter((p) => (view === "paper" ? p.isPaper : !p.isPaper));
   const [deleting, setDeleting] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   // Independent of `editing` on purpose: reading the frozen note while you
@@ -140,231 +154,266 @@ export default function PicksList({
   const num = (n: number | null, dp = 2) =>
     n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
 
+  const VIEWS: { id: typeof view; label: string; n: number }[] = [
+    { id: "real", label: "My bets", n: realCount },
+    { id: "paper", label: "Paper", n: paperCount },
+    { id: "all", label: "All", n: picks.length },
+  ];
+
   return (
     <>
-      <div className="bv-table-wrap">
-        <table className="bv-table">
-          <thead>
-            <tr>
-              {showWeek && <th className="bv-num">Week</th>}
-              <th>Matchup</th>
-              <th className="bv-num">Your line</th>
-              <th className="bv-num">Price</th>
-              <th className="bv-num">Stake</th>
-              <th>Result</th>
-              <th className="bv-num">Units</th>
-              <th className="bv-num">Line value</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {picks.map((p) => (
-              <React.Fragment key={p.id}>
-                <tr className="align-top">
-                  {showWeek && (
-                    <td className="bv-num text-[var(--text-muted)]">
-                      {p.week ?? "—"}
+      <div
+        role="tablist"
+        aria-label="Which picks to show"
+        className="mb-2 flex flex-wrap gap-2"
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={view === v.id}
+            onClick={() => setView(v.id)}
+            className="bv-chip"
+          >
+            {`${v.label} ${v.n}`}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <EmptyLine>
+          {view === "real"
+            ? "No real-money bets logged yet."
+            : "No paper picks logged yet."}
+        </EmptyLine>
+      ) : (
+        <div className="bv-table-wrap">
+          <table className="bv-table">
+            <thead>
+              <tr>
+                {showWeek && <th className="bv-num">Week</th>}
+                <th>Matchup</th>
+                <th className="bv-num">Your line</th>
+                <th className="bv-num">Price</th>
+                <th className="bv-num">Stake</th>
+                <th>Result</th>
+                <th className="bv-num">Units</th>
+                <th className="bv-num">Line value</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((p) => (
+                <React.Fragment key={p.id}>
+                  <tr className="align-top">
+                    {showWeek && (
+                      <td className="bv-num text-[var(--text-muted)]">
+                        {p.week ?? "—"}
+                      </td>
+                    )}
+                    <td className="text-[var(--text)]">
+                      {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
+                      {p.home}
+                      {p.market === "full" && (
+                        <span className="bv-badge ml-1">
+                          {labelOf(MARKET_TEXT, p.market, "Full game")}
+                        </span>
+                      )}
+                      {p.isPaper && (
+                        <span className="bv-badge bv-badge--warn ml-1">
+                          paper
+                        </span>
+                      )}
+                      {p.isBonus && (
+                        <span className="bv-badge ml-1">
+                          bonus — a loss costs nothing
+                        </span>
+                      )}
                     </td>
-                  )}
-                  <td className="text-[var(--text)]">
-                    {p.away} <span className="text-[var(--text-dim)]">@</span>{" "}
-                    {p.home}
-                    {p.market === "full" && (
-                      <span className="bv-badge ml-1">
-                        {labelOf(MARKET_TEXT, p.market, "Full game")}
+                    <td className="bv-num text-[var(--text-muted)]">
+                      {p.line !== null ? `under ${p.line}` : "—"}
+                    </td>
+                    <td className="bv-num font-mono text-[var(--text-muted)]">
+                      {p.price === null ? "—" : american(p.price)}
+                    </td>
+                    <td className="bv-num font-mono text-[var(--text-muted)]">
+                      {p.stake === null ? "—" : `${p.stake}u`}
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          color: p.graded
+                            ? labelOf(RESULT_COLOR, p.result, "var(--text-dim)")
+                            : "var(--text-dim)",
+                        }}
+                      >
+                        {p.graded
+                          ? labelOf(RESULT_TEXT, p.result, RESULT_PENDING)
+                          : RESULT_PENDING}
                       </span>
-                    )}
-                    {p.isPaper && (
-                      <span className="bv-badge bv-badge--warn ml-1">
-                        paper
-                      </span>
-                    )}
-                    {p.isBonus && (
-                      <span className="bv-badge ml-1">
-                        bonus — a loss costs nothing
-                      </span>
-                    )}
-                  </td>
-                  <td className="bv-num text-[var(--text-muted)]">
-                    {p.line !== null ? `under ${p.line}` : "—"}
-                  </td>
-                  <td className="bv-num font-mono text-[var(--text-muted)]">
-                    {p.price === null ? "—" : american(p.price)}
-                  </td>
-                  <td className="bv-num font-mono text-[var(--text-muted)]">
-                    {p.stake === null ? "—" : `${p.stake}u`}
-                  </td>
-                  <td>
-                    <span
+                    </td>
+                    <td
+                      className="bv-num font-mono"
                       style={{
-                        color: p.graded
-                          ? labelOf(RESULT_COLOR, p.result, "var(--text-dim)")
-                          : "var(--text-dim)",
+                        color:
+                          p.units === null
+                            ? "var(--text-dim)"
+                            : p.units >= 0
+                              ? "var(--good)"
+                              : "var(--bad)",
                       }}
                     >
-                      {p.graded
-                        ? labelOf(RESULT_TEXT, p.result, RESULT_PENDING)
-                        : RESULT_PENDING}
-                    </span>
-                  </td>
-                  <td
-                    className="bv-num font-mono"
-                    style={{
-                      color:
-                        p.units === null
-                          ? "var(--text-dim)"
-                          : p.units >= 0
-                            ? "var(--good)"
-                            : "var(--bad)",
-                    }}
-                  >
-                    {num(p.units)}
-                  </td>
-                  <td className="bv-num font-mono text-[var(--text-muted)]">
-                    {num(displayLineValue(p.clv))}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <button
-                      onClick={() => setOpen(open === p.id ? null : p.id)}
-                      aria-expanded={open === p.id}
-                      aria-controls={`pick-detail-${p.id}`}
-                      className="text-xs text-[var(--text-dim)] hover:text-[var(--accent)]"
-                    >
-                      {open === p.id ? "hide" : "details"}
-                    </button>
-                    {!p.graded && (
-                      <>
-                        <button
-                          onClick={() => startEdit(p)}
-                          className="ml-2 text-xs text-[var(--text-dim)] hover:text-[var(--accent)]"
-                        >
-                          edit
-                        </button>
-                        <button
-                          onClick={() => del(p.id)}
-                          disabled={deleting === p.id}
-                          className="ml-2 text-xs text-[var(--text-dim)] hover:text-[var(--bad)] disabled:opacity-50"
-                        >
-                          {deleting === p.id ? "…" : "delete"}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-                {open === p.id && (
-                  <tr id={`pick-detail-${p.id}`}>
-                    <td
-                      colSpan={showWeek ? 9 : 8}
-                      className="bg-[var(--surface-2)] px-3 py-3"
-                    >
-                      <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-xs sm:grid-cols-[auto_1fr]">
-                        <dt className="text-[var(--text-dim)]">
-                          Our number then
-                        </dt>
-                        <dd className="font-mono text-[var(--text-muted)]">
-                          {p.modelLine ?? "—"}
-                        </dd>
-                        <dt className="text-[var(--text-dim)]">
-                          Why you logged it
-                        </dt>
-                        <dd className="text-[var(--text-muted)]">
-                          {loggedAs(p)}
-                        </dd>
-                        <dt className="text-[var(--text-dim)]">Note</dt>
-                        <dd className="text-[var(--text-muted)]">
-                          {p.note ?? "—"}
-                        </dd>
-                      </dl>
-                      <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
-                        Both are frozen at the moment you logged the pick, so
-                        they cannot be rewritten later.
-                      </p>
+                      {num(p.units)}
                     </td>
-                  </tr>
-                )}
-                {editing === p.id && (
-                  <tr>
-                    <td
-                      colSpan={showWeek ? 9 : 8}
-                      className="bg-[var(--surface-2)] px-3 py-3"
-                    >
-                      <div className="flex flex-wrap items-end gap-3 text-xs">
-                        <label className="flex flex-col gap-1">
-                          <span className="text-[var(--text-dim)]">
-                            Price (American)
-                          </span>
-                          <input
-                            value={draft.price}
-                            onChange={(e) =>
-                              setDraft({ ...draft, price: e.target.value })
-                            }
-                            placeholder="-125"
-                            className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-[var(--text-dim)]">
-                            Stake (units)
-                          </span>
-                          <input
-                            value={draft.stake}
-                            onChange={(e) =>
-                              setDraft({ ...draft, stake: e.target.value })
-                            }
-                            placeholder="1"
-                            className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
-                          />
-                        </label>
-                        <label className="flex items-center gap-2 pb-1">
-                          <input
-                            type="checkbox"
-                            checked={draft.isBonus}
-                            onChange={(e) =>
-                              setDraft({ ...draft, isBonus: e.target.checked })
-                            }
-                          />
-                          <span>Bonus bet (a loss books nothing)</span>
-                        </label>
-                        <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
-                          <span className="text-[var(--text-dim)]">Note</span>
-                          <input
-                            value={draft.note}
-                            onChange={(e) =>
-                              setDraft({ ...draft, note: e.target.value })
-                            }
-                            className="rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1"
-                          />
-                        </label>
-                        <button
-                          onClick={() => save(p.id)}
-                          disabled={saving}
-                          className="bv-btn disabled:opacity-50"
-                        >
-                          {saving ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          onClick={() => setEditing(null)}
-                          className="text-[var(--text-dim)] hover:text-[var(--text)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {error && (
-                        <p className="mt-2 text-xs text-[var(--bad)]">
-                          {error}
-                        </p>
+                    <td className="bv-num font-mono text-[var(--text-muted)]">
+                      {num(displayLineValue(p.clv))}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <button
+                        onClick={() => setOpen(open === p.id ? null : p.id)}
+                        aria-expanded={open === p.id}
+                        aria-controls={`pick-detail-${p.id}`}
+                        className="text-xs text-[var(--text-dim)] hover:text-[var(--accent)]"
+                      >
+                        {open === p.id ? "hide" : "details"}
+                      </button>
+                      {!p.graded && (
+                        <>
+                          <button
+                            onClick={() => startEdit(p)}
+                            className="ml-2 text-xs text-[var(--text-dim)] hover:text-[var(--accent)]"
+                          >
+                            edit
+                          </button>
+                          <button
+                            onClick={() => del(p.id)}
+                            disabled={deleting === p.id}
+                            className="ml-2 text-xs text-[var(--text-dim)] hover:text-[var(--bad)] disabled:opacity-50"
+                          >
+                            {deleting === p.id ? "…" : "delete"}
+                          </button>
+                        </>
                       )}
-                      <p className="mt-2 text-xs text-[var(--text-dim)]">
-                        {`One unit is $10. A bonus bet pays profit only, so a $20 bonus at -125 wins $16 and loses nothing — tick the box and set the stake to 2. Editing stops once the game is graded.`}
-                      </p>
                     </td>
                   </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  {open === p.id && (
+                    <tr id={`pick-detail-${p.id}`}>
+                      <td
+                        colSpan={showWeek ? 9 : 8}
+                        className="bg-[var(--surface-2)] px-3 py-3"
+                      >
+                        <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-xs sm:grid-cols-[auto_1fr]">
+                          <dt className="text-[var(--text-dim)]">
+                            Our number then
+                          </dt>
+                          <dd className="font-mono text-[var(--text-muted)]">
+                            {p.modelLine ?? "—"}
+                          </dd>
+                          <dt className="text-[var(--text-dim)]">
+                            Why you logged it
+                          </dt>
+                          <dd className="text-[var(--text-muted)]">
+                            {loggedAs(p)}
+                          </dd>
+                          <dt className="text-[var(--text-dim)]">Note</dt>
+                          <dd className="text-[var(--text-muted)]">
+                            {p.note ?? "—"}
+                          </dd>
+                        </dl>
+                        <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
+                          Both are frozen at the moment you logged the pick, so
+                          they cannot be rewritten later.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                  {editing === p.id && (
+                    <tr>
+                      <td
+                        colSpan={showWeek ? 9 : 8}
+                        className="bg-[var(--surface-2)] px-3 py-3"
+                      >
+                        <div className="flex flex-wrap items-end gap-3 text-xs">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[var(--text-dim)]">
+                              Price (American)
+                            </span>
+                            <input
+                              value={draft.price}
+                              onChange={(e) =>
+                                setDraft({ ...draft, price: e.target.value })
+                              }
+                              placeholder="-125"
+                              className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[var(--text-dim)]">
+                              Stake (units)
+                            </span>
+                            <input
+                              value={draft.stake}
+                              onChange={(e) =>
+                                setDraft({ ...draft, stake: e.target.value })
+                              }
+                              placeholder="1"
+                              className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
+                            />
+                          </label>
+                          <label className="flex items-center gap-2 pb-1">
+                            <input
+                              type="checkbox"
+                              checked={draft.isBonus}
+                              onChange={(e) =>
+                                setDraft({
+                                  ...draft,
+                                  isBonus: e.target.checked,
+                                })
+                              }
+                            />
+                            <span>Bonus bet (a loss books nothing)</span>
+                          </label>
+                          <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+                            <span className="text-[var(--text-dim)]">Note</span>
+                            <input
+                              value={draft.note}
+                              onChange={(e) =>
+                                setDraft({ ...draft, note: e.target.value })
+                              }
+                              className="rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1"
+                            />
+                          </label>
+                          <button
+                            onClick={() => save(p.id)}
+                            disabled={saving}
+                            className="bv-btn disabled:opacity-50"
+                          >
+                            {saving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => setEditing(null)}
+                            className="text-[var(--text-dim)] hover:text-[var(--text)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {error && (
+                          <p className="mt-2 text-xs text-[var(--bad)]">
+                            {error}
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-[var(--text-dim)]">
+                          {`One unit is $10. A bonus bet pays profit only, so a $20 bonus at -125 wins $16 and loses nothing — tick the box and set the stake to 2. Editing stops once the game is graded.`}
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }

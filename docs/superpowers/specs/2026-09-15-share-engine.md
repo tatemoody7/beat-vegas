@@ -69,7 +69,8 @@ and three-outcome scoring for the distribution. Reuse `beatvegas/backtest/censor
 `brier_multi`, `log_loss`, `wilson`, `reliability` (quantile bins),
 `calibration_intercept_slope`, `brier_delta_ci`.
 
-The challenger is promoted to *drive the gap* only if **all** hold:
+The challenger earns its prospective paper arm (see the 2026-09-15 amendment below;
+it is no longer promoted straight to *drive the gap*) only if **all** hold:
 
 1. **Beats the market's own close on MAE** out of sample (the bar is **8.582**,
    the close's MAE on the real-close cut; `bv_line` does not clear it).
@@ -91,6 +92,17 @@ The challenger is promoted to *drive the gap* only if **all** hold:
 Report as `docs/SHARE_ENGINE.md` with **bias, MAE, gate-crossings and blast radius**
 side by side — MAE alone is near-blind to what a level shift does to selection
 ([level-anchor-not-adopted]).
+
+## Amendment 2026-09-15 — what a pass licenses (Tate)
+
+The eight criteria above are unchanged. What changed is what passing them earns.
+`docs/HYPOTHESES.md` declares the 2023-25 real-close set **spent** — five studies had
+read it before this spec was written — so a pass on that set is a look at in-sample data,
+not fresh validation. **Passing all eight licenses a prospective paper arm, not
+promotion**: the engine's picks are logged on paper beside the champion's, one canonical
+observation per decision, under a stopping clock registered in its own row before the
+first pick is logged. `engine: share` flips only after that arm clears its clock. A fail
+on any criterion is a finding and changes nothing. Registry row **H-SHARE**.
 
 ## Blast radius on the board (measure before promotion)
 

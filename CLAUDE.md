@@ -32,9 +32,11 @@ Research only — it never places bets or automates gambling.
   answer bar marks placed bets, `MovementChart` and `betSlip.ts` deleted. Deleted the paused
   `cfb-sunday-ops` task. Dependabot: #99/#104/#102 merged; **#100/#101/#103 are one
   coordinated Prisma 5→7 migration** (schema `url` unsupported, adapter API change) and
-  wait on Tate's call. Research queue (Tate, in order): two-sided diagnostic → Hard Rock
-  lead/lag + microstructure → weather × offensive style (decision-safe rows, 2024-26) →
-  share-engine spec; classifier retirement planned for after 09-19. The 1H board's
+  wait on Tate's call. Research queue (Tate, in order) — ALL SHIPPED the same day: two-sided
+  diagnostic (`TWO_SIDED.md`), Hard Rock lead/lag + microstructure (#135), weather ×
+  offensive style (#137), share-engine spec (#136, NOT built; registered as `H-SHARE` in
+  `HYPOTHESES.md` — a pass of its gate licenses a prospective paper arm, not promotion);
+  classifier retirement planned for after 09-19. The 1H board's
   `bv_sigma` is one number per slate (11.26) — never derive a probability from it.
 - **2026-09-13 (RESULTS + TRACK RECORD REBUILT, PR #122).** The Board is not SHORTER than
   the other two pages — 6,877px against 7,753 and 9,159. It works because it is **one

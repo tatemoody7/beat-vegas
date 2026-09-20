@@ -49,6 +49,14 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    # ...and requirements/.python-version tells Dependabot which interpreter to
+    # resolve for. Without it, its resolver ignores Requires-Python markers and
+    # proposes wheels the runner cannot install: contourpy 1.4.0 (PR #173) and
+    # numpy 2.5.3 / scipy 1.18.1 (PR #184) all need 3.12 while the runner and the
+    # lock are 3.11, and both are MINOR bumps, so the major-version ignore above
+    # never sees them. The file sits beside the manifest rather than at the repo
+    # root so a root-level pyenv shim cannot start switching this Mac's
+    # interpreter (local dev is 3.9).
 
   - package-ecosystem: npm
     directory: /web

@@ -122,3 +122,43 @@ def test_the_close_lands_in_closing_price_and_never_in_price():
     assert row.closing_price == -108
     assert row.result == "under"
     assert row.units is None  # no decision price, so no units
+
+
+def test_every_clone_table_has_a_model_behind_it():
+    """_CLONE_TABLES and the model map in _clone_inputs are two hand-kept lists,
+    and `weather_obs` reached the first without the second on 2026-09-14 -- so
+    scripts/simulate_week.py has raised KeyError('weather_obs') ever since, and
+    the offseason dry-run has been unusable. Nothing else exercised this path.
+    Read the mapped tablenames out of the function's own source rather than
+    running it (it needs a live Postgres sandbox)."""
+    import inspect
+    import re
+
+    from beatvegas import pipeline
+    from beatvegas.db import models as M
+
+    src = inspect.getsource(pipeline._clone_inputs)
+    body = src[src.index("by_table = {") : src.index("src = create_engine")]
+    mapped = {
+        getattr(M, name).__tablename__
+        for name in re.findall(r"M\.([A-Za-z]\w+)", body)
+        if hasattr(getattr(M, name, None), "__tablename__")
+    }
+    missing = set(pipeline._CLONE_TABLES) - mapped
+    assert not missing, f"_CLONE_TABLES names tables with no model in by_table: {missing}"
+
+
+def test_the_clone_migrates_the_source_sqlite_before_reading_it():
+    """The real SQLite file is written only by local runs, so it lags the models by
+    every table and column added since; the ORM then SELECTs one that is not there
+    and the clone dies ("no such table: weather_obs", "no such column:
+    games.full_game_total_source"). The fix is the additive, idempotent pair
+    store.init_db() already runs."""
+    import inspect
+
+    from beatvegas import pipeline
+
+    src = inspect.getsource(pipeline._clone_inputs)
+    for call in ("M.Base.metadata.create_all(src)", "_apply_migrations(src)"):
+        assert call in src, call
+        assert src.index(call) < src.index("with SrcS()"), call

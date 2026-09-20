@@ -111,14 +111,12 @@ describe("createPick writes the book and the price's provenance", () => {
   beforeEach(() => {
     executeRaw.mockReset();
     queryRaw.mockReset().mockResolvedValue([]);
-    findUnique
-      .mockReset()
-      .mockResolvedValue({
-        season: 2026,
-        week: 3,
-        home_team: "H",
-        away_team: "A",
-      });
+    findUnique.mockReset().mockResolvedValue({
+      season: 2026,
+      week: 3,
+      home_team: "H",
+      away_team: "A",
+    });
   });
   const sent = () => {
     const [strings, ...values] = executeRaw.mock.calls[0] as [

@@ -70,3 +70,18 @@ updates:
       dev-tooling:
         dependency-type: development
         patterns: ["*"]
+    # Three majors are deliberate human decisions, not routine bumps, and each
+    # one buried in an 11-package group is how a green CI hides a real break:
+    #   eslint 10   -- eslint-config-next's eslint-plugin-react throws inside
+    #                  usedPropTypes and `eslint .` exits 2 (measured 2026-09-20).
+    #   typescript 7 -- the Go compiler rewrite; typescript-eslint and
+    #                  eslint-config-next compatibility is unproven here.
+    #   vitest 5    -- 450 tests and a config this repo's parity guards read.
+    # Take each on its own when there is time to watch it.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]

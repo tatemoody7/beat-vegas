@@ -34,7 +34,7 @@ export default function LoginPage() {
       // (LogPickButton). Read at submit time from window, not useSearchParams,
       // which would need a Suspense boundary for this static page. safeNext
       // accepts a same-origin path only — no open redirect.
-       
+
       window.location.href = safeNext(
         new URLSearchParams(window.location.search).get("next"),
       );

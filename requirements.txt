@@ -5,6 +5,14 @@
 # change on our side. The floors stay where they were; the ceilings stop the
 # next major, not the next patch.
 #
+# The ceilings are raised only on evidence. pytest <9 -> <10 and the lock's
+# setuptools <81 -> <85 clear two advisories (a tmpdir handling flaw and a
+# MANIFEST.in exclusion bypass) whose only fixed releases need Python >= 3.10.
+# That is safe BECAUSE pip honours Requires-Python: the 3.11 runner resolves to
+# pytest 9.x / setuptools 84, and this Mac's 3.9 venv keeps resolving to pytest
+# 8.4.2 from the same range. Measured 2026-09-20: the full suite passes under
+# pytest 9.1.1 + setuptools 84 (1,161 passed, 15 skipped).
+#
 # NOT a substitute for a hash-pinned lockfile, which is what actually defends
 # against a compromised release rather than merely a breaking one. That needs a
 # 3.11 toolchain to resolve against (the workflows' runtime) and is tracked
@@ -21,5 +29,5 @@ SQLAlchemy>=2.0,<3
 psycopg[binary]>=3.1,<4
 PyYAML>=6.0,<7
 scikit-learn>=1.3,<2
-pytest>=7.4,<9
+pytest>=7.4,<10
 ruff>=0.6,<1

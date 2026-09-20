@@ -15,7 +15,7 @@ import {
   VERDICT_TEXT,
 } from "@/lib/labels";
 import type { PickFull } from "@/lib/picks";
-import { isOffPolicy } from "@/lib/picks";
+import { isOffPolicy } from "@/lib/pickRules";
 import { EmptyLine } from "@/app/components/Section";
 
 // Every logged pick, with the decision frozen at log time. Nothing here is

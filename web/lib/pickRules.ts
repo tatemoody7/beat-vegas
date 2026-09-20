@@ -34,6 +34,22 @@ export type PickRequest = {
   hrLine?: number | null;
 };
 
+/**
+ * Real money placed where the site graded WATCH/PASS. A legacy pick with no
+ * frozen verdict is NOT off-policy — we cannot know. Flagged on Results.
+ *
+ * It lives HERE, not beside the ledger in lib/picks.ts, because
+ * app/components/PicksList.tsx is a client component and calls it: importing it
+ * from lib/picks pulled prisma — and with Prisma 7, `pg` and its dns/net/tls
+ * requires — into the browser bundle. The parameter is structural so this module
+ * never imports the ledger. lib/picks re-exports it for server callers.
+ */
+export const isOffPolicy = (p: {
+  isPaper: boolean;
+  verdictAtPick: Verdict | null;
+}): boolean =>
+  !p.isPaper && p.verdictAtPick !== null && p.verdictAtPick !== "BET";
+
 export type Rejection = { ok: false; error: string; status: number };
 export type Parsed = { ok: true; pick: PickRequest };
 

@@ -65,6 +65,20 @@ const movedRoutes: { source: string; destination: string }[] = [
 ];
 
 const nextConfig: NextConfig = {
+  /**
+   * `pg` (the Prisma 7 Postgres driver adapter) is a Node library: it reaches
+   * for dns/net/tls/fs. Bundling it produces "Module not found: Can't resolve
+   * 'dns'" and the page 500s. Keep it external so the server runtime requires it
+   * at run time instead. @prisma/adapter-pg and the Neon driver ride along for
+   * the same reason.
+   */
+  serverExternalPackages: [
+    "pg",
+    "@prisma/adapter-pg",
+    "@prisma/adapter-neon",
+    "@neondatabase/serverless",
+  ],
+
   async redirects() {
     return movedRoutes.map((r) => ({ ...r, permanent: true }));
   },

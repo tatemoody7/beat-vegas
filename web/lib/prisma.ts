@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { neonConfig, Pool } from "@neondatabase/serverless";
+import { neonConfig } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 import ws from "ws";
 
 // Singleton — avoids exhausting connections during Next.js dev hot-reload.
@@ -10,21 +11,43 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /**
- * NEON_HTTP=1 (web/.env, local only): reach Neon over HTTPS/WebSockets on
- * port 443 through Prisma's Neon driver adapter instead of raw Postgres on
- * 5432. Some networks (the campus network) let a 5432 connection open and then
- * drop the TLS data, so the plain client hangs with "Can't reach database
- * server". Production on Vercel keeps the plain TCP client (flag unset).
+ * Prisma 7: every client carries a driver adapter; the Rust-engine TCP client
+ * is gone. Two lanes, chosen by environment:
+ *
+ * - NEON_HTTP=1 (web/.env, local only): reach Neon over HTTPS/WebSockets on
+ *   port 443 through the Neon serverless driver. Some networks (the campus
+ *   network) let a 5432 connection open and then drop the TLS data, so a plain
+ *   Postgres client hangs with "Can't reach database server". The Neon adapter
+ *   only speaks Neon's proxy, so it cannot reach the local sandbox.
+ * - otherwise: node-postgres (`pg`) over TCP — Vercel production against Neon,
+ *   and `next dev` against the local sim (scripts/simulate_week.py).
+ *
+ * `lanes()` is exported for lib/prisma.test.ts, which pins the choice: this is
+ * the one thing the Prisma 7 migration could silently get wrong.
  */
+export type Lane = "neon-http" | "pg";
+
+export function laneFor(env: {
+  DATABASE_URL?: string | undefined;
+  NEON_HTTP?: string | undefined;
+  [k: string]: string | undefined;
+}): Lane {
+  const url = env.DATABASE_URL ?? "";
+  return env.NEON_HTTP === "1" && url.startsWith("postgres")
+    ? "neon-http"
+    : "pg";
+}
+
 function makeClient(): PrismaClient {
   const url = process.env.DATABASE_URL ?? "";
-  if (process.env.NEON_HTTP === "1" && url.startsWith("postgres")) {
+  if (laneFor(process.env) === "neon-http") {
     neonConfig.webSocketConstructor = ws;
     neonConfig.poolQueryViaFetch = true;
-    const pool = new Pool({ connectionString: url });
-    return new PrismaClient({ adapter: new PrismaNeon(pool) });
+    return new PrismaClient({
+      adapter: new PrismaNeon({ connectionString: url }),
+    });
   }
-  return new PrismaClient();
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 }
 
 export const prisma = globalForPrisma.prisma ?? makeClient();

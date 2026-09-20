@@ -245,10 +245,10 @@ export const countsAgainstCap = (p: PickFull): boolean =>
   isRealFirstHalf(p) && !p.isBonus;
 export const isPaperFirstHalf = (p: PickFull): boolean =>
   p.isPaper && p.market === "1H";
-/** Real money placed where the site graded WATCH/PASS (or a legacy pick with no
- *  frozen verdict is NOT off-policy — we cannot know). Flagged on Results. */
-export const isOffPolicy = (p: PickFull): boolean =>
-  !p.isPaper && p.verdictAtPick !== null && p.verdictAtPick !== "BET";
+/** Real money placed where the site graded WATCH/PASS. Defined in lib/pickRules
+ *  (a module free of prisma) because a client component calls it; re-exported
+ *  here so server callers keep one import. */
+export { isOffPolicy } from "@/lib/pickRules";
 
 export type PickRecords = {
   picks: PickFull[];

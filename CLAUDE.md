@@ -132,9 +132,9 @@ Research only — it never places bets or automates gambling.
   10 → 4 days. `web/lib/prisma.ts` warns once when a dev server's `DATABASE_URL` is
   `neon.tech` — `next dev` + screenshot passes against PROD through the redesign sprint are
   what tripped the 5 GB; `web/.env.example` documents the `simulate_week.py` sandbox as the
-  default. NOT done: `odds_snapshots` index (EXPLAIN unreachable from this session — the
-  Postgres MCP timed out on a suspended compute) and trimming `factors_json` on the board
-  row (`factor_board` inside it feeds `edge.ts`, so it cannot be dropped).
+  default. NOT done: trimming `factors_json` on the board
+  row (`factor_board` inside it feeds `edge.ts`, so it cannot be dropped). The
+  **`odds_snapshots` index was TESTED 2026-09-20 and REJECTED** — see the gotcha below.
   **PR 4 (security hardening — the review's three items):** (1) `card.yml`'s dispatch
   `season`/`week` were echoed raw to `$GITHUB_OUTPUT` and then inlined as
   `${{ steps.active.outputs.* }}` into four `run:` blocks on a job holding all three secrets
@@ -896,6 +896,18 @@ picks**) at https://beat-vegas.vercel.app.
   0.5 pts of Hard Rock), but the consensus MEDIAN moves on 13 of 63 games by up to
   **0.5 pts** — exactly `HR_OFF_MARKET_PTS`, so it can flip the off-market gate on a
   borderline game. Details + options: `docs/RANKING_AND_TRUST.md` §9.
+- **An index on `odds_snapshots.market` does NOT help, and the criterion is why we know.**
+  The cost audit left "add an index leading on `market`" as an open item because every read
+  filters on it first (`lineCheck.ts`, `board.ts::consensusLines`, `movement.ts`) and nothing
+  led on it. Tested 2026-09-20 on the live database with the keep-rule frozen BEFORE the
+  numbers were read (keep only if the season-wide `lineCheck` statement's execution time falls
+  ≥30% on the median of three warm runs; plan shape alone does not count):
+  **31.5 ms → 29.7 ms, a 5.7% gain. Rejected and dropped.** The reason is cardinality —
+  `market` holds two values in a 45/55 split, so leading with it cannot filter: Postgres
+  switched from a Seq Scan to a Bitmap Index Scan and still read all 28,200 `1H_total` rows.
+  The plan LOOKED fixed, which is exactly what the time-based criterion was written to catch.
+  Do not re-propose this index; a useful one would lead on something selective, and at ~30 ms
+  for a whole season the scan is not the cost.
 - **`ev` IS NOT THE EV OF THE BET, and gating on `ev >= 0` bets nothing** (measured
   2026-09-13, PR #123). `ev` is `ev_under(fair_under, hr_price)` where `fair_under` is the
   **market's** no-vig fair probability at Hard Rock's number (`card.py::market_read`) — a

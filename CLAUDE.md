@@ -76,6 +76,28 @@ Research only — it never places bets or automates gambling.
   opposite sign — and that 2.90-pt gap IS the whole deficit (raw model bias is only
   −1.09). The step meant to REMOVE bias adds 1.81 pts of it. Not a coding error; the
   residual sign is right. Registered as **H-INTERCEPT**, criterion written first.
+  **H-INTERCEPT RAN THE SAME DAY AND IS `tested-null`: NO ARM ADOPTED** (`scripts/
+  intercept_gate.py`, grid lambda in {0, 0.25, 0.5, 0.75, 1.0} declared before the run).
+  Every challenger beat the incumbent on mean |bias| (1.784 -> 1.565 at lambda=0) and on
+  the worst season (2.895 -> 1.990 at lambda=0.5) and every one failed the per-season
+  clause, for two reasons. **2025 wants the OPPOSITE fix**: the model reads +2.46 HIGH
+  there before calibration, so shrinking monotonically worsens 2025 (1.31 -> 2.46) while
+  improving 2026 (-2.90 -> -1.09). No constant multiplier serves both -- which IS the
+  finding. And **2024 cannot discriminate at all**: its training window is 2023 alone, so
+  `oof_residuals` has no scorable fold, `bias_corrections` returns 0.0, every arm
+  coincides and the interval is [0, 0]. The every-season clause is UNSATISFIABLE there,
+  about the test rather than the intercept; the criterion was NOT amended to route around
+  it. Two more things the run exposed: **6 of 12 challenger-season intervals have ZERO
+  WIDTH** (two arms differ by a constant, so the difference of absolute means is constant
+  unless a resample crosses zero bias -- "CI excludes zero" is near-vacuous against a
+  constant shift), and **dropping the intercept does NOT repair selection**: 2026 still
+  clears the bar on 42.6% of priced games at lambda=0 against 60.7% at the incumbent and a
+  validated band of 15-20%, while **2024 sits at 18.8% with no intercept applied at all**.
+  Registered alongside: **H-INSEASON** (`pre-registered`, its own family
+  `in-season-calibration`) -- `score_slate` trains on `season < target_season` strictly, so
+  2026's own 153 graded games reach neither the fit nor the intercept; the arms are a
+  precision-weighted blend `w = n/(n+k)`, k in {25, 50, 100, 200}, `c_season` from the RAW
+  pre-intercept prediction, window closing strictly before the build. NOT built yet.
   **Ruled out, so do not re-run these:** no feature changed (143 vs 153 rows at
   `min_games=0`; nothing missing, max NaN shift 7.7pp, max level shift 0.76sd — the
   weather lead is dead); week-of-season (OOF by band −1.62/−1.05/−1.76/−2.44, an early

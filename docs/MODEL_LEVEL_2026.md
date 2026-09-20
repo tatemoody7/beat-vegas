@@ -209,3 +209,87 @@ The gate is `scripts/intercept_gate.py` (`beatvegas/backtest/intercept.py` holds
 arithmetic and `_verdict` applies the registered rule verbatim). It is a report, not a CI
 gate, and changing the intercept would mean editing `model/bv_line.py` in a PR that cites
 the report.
+
+## H-INTERCEPT — result. NO ARM ADOPTED. The intercept stays as it is.
+
+Run 2026-09-20, `scripts/intercept_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
+2,000 bootstrap draws. Judged on the criterion committed before the run, applied verbatim
+and **not edited**. `ADOPT: none`.
+
+| season | test n | train n | intercept applied | priced |
+|---|---|---|---|---|
+| 2024 | 732 | 736 | **+0.0000 (no scorable fold)** | 623 |
+| 2025 | 744 | 1,468 | −1.1508 | 622 |
+| 2026 | 153 | 2,212 | −1.8092 | 61 |
+
+Signed bias, prediction − actual:
+
+| λ | 2024 | 2025 | 2026 | mean abs | worst |
+|---|---|---|---|---|---|
+| 0.0 (drop it) | +1.15 | +2.46 | −1.09 | **1.565** | 2.457 |
+| 0.25 | +1.15 | +2.17 | −1.54 | 1.619 | 2.169 |
+| 0.5 | +1.15 | +1.88 | −1.99 | 1.674 | **1.990** |
+| 0.75 | +1.15 | +1.59 | −2.44 | 1.729 | 2.443 |
+| 1.0 (incumbent) | +1.15 | +1.31 | −2.90 | 1.784 | 2.895 |
+
+**Every challenger beats the incumbent on both aggregate measures.** λ=0 takes the mean
+from 1.784 to 1.565 and λ=0.5 takes the worst season from 2.895 to 1.990. The row still
+fails, on the per-season clause, for two independent reasons.
+
+**(a) 2025 wants the OPPOSITE fix, at every λ.** The model reads 2.46 points HIGH on 2025
+before calibration, so the correction it needs is the one the incumbent applies; shrinking
+it monotonically makes 2025 worse (1.31 → 2.46) while making 2026 better (−2.90 → −1.09).
+No constant multiplier can serve both. **That is the finding**: a season-level intercept
+estimated from two observations does not transfer, because the two observations disagree
+about its sign.
+
+**(b) 2024 cannot discriminate at all, and that is about the test.** Its training window is
+2023 alone, and `oof_residuals` needs a prior season inside the window (`min_train=500`),
+so `bias_corrections` returns 0.0. Every arm predicts the same number there, every
+bootstrap draw of the difference is exactly 0, and the interval is [0, 0] — which cannot
+exclude zero. **The criterion's "in every season" clause is unsatisfiable on 2024 for a
+reason that has nothing to do with the intercept.** The criterion was not amended to route
+around it: a row is closed under the rule it was registered with. A future row testing
+this estimator should hold out only seasons whose training window has a scorable fold.
+
+### A third thing the run exposed: the CI clause is nearly vacuous here
+
+**6 of the 12 challenger-season intervals have ZERO WIDTH.** Two arms differ by a
+constant, so while a resampled bias keeps its sign the difference of absolute means is
+that same constant in every replicate; width appears only where a resample can carry the
+bias across zero. So "a paired bootstrap 95% CI excluding zero" is satisfied by
+construction wherever the bias is comfortably away from zero. What decided every arm here
+was the plain comparison — is this season's |bias| lower at all — and the interval added
+nothing. A criterion testing a constant shift should say so rather than dress the
+comparison in an interval.
+
+### Secondary — reported, never optimised
+
+| λ | 2024 share clearing 1.75 | 2025 | 2026 |
+|---|---|---|---|
+| 0.0 | 18.8% (117/623) | 7.2% (45/622) | 42.6% (26/61) |
+| 0.5 | 18.8% | 8.8% | 47.5% |
+| 1.0 (incumbent) | 18.8% | **11.9% (74/622)** | **60.7% (37/61)** |
+
+Two things worth keeping. **2024 sits at 18.8% — inside the 15-20% band the rule was
+validated on — with no intercept applied at all.** And **dropping the intercept does not
+repair 2026's selection**: 42.6% is still roughly three times the validated band, so the
+intercept is the largest single piece of the level deficit but not the whole of what moved
+the bar. 2026 is 61 priced games in weeks 1-3, when first halves run hot in every season,
+so that column is thin and seasonal both.
+
+MAE is flat across the grid by construction (8.918 / 9.088-9.287 / 8.026-8.233): a level
+shift of a point or two is nothing against ~9 points of per-game error, which is exactly
+why this row was judged on bias.
+
+### What it changes
+
+Nothing. `bias_corrections` is untouched, `BET_GAP_PTS` is untouched, and a constant shift
+cannot reorder a board, so the ranking never depended on this. H-STOP keeps measuring the
+frozen rule.
+
+What it redirects to is **H-INSEASON**, registered the same day in its own family: the
+intercept is a season-level number estimated from prior seasons only, and `score_slate`
+trains on `season < target_season` strictly, so 2026's own 153 graded games are used for
+nothing — not the fit, not the intercept. Shrinking a number estimated from the wrong
+seasons cannot fix it; re-estimating it from the right ones might.

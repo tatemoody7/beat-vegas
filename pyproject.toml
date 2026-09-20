@@ -9,6 +9,11 @@ description = "College football first-half unders research & analysis system (re
 requires-python = ">=3.9"
 dynamic = ["dependencies"]
 
+[project.optional-dependencies]
+# scripts/fetch_team_logos.py composites every mark over the site background to
+# flag low-contrast ones; nothing the runners execute needs matplotlib.
+logos = ["matplotlib>=3.7,<4"]
+
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
 

@@ -15,6 +15,7 @@ downloaded mark over the site background and PRINTS the low-contrast ones rather
 than shipping a navy blob silently. It never drops them -- that is a judgment
 call for a human looking at the list.
 
+    pip install -e ".[logos]"                      # matplotlib is an extra, not a runner dep
     python scripts/fetch_team_logos.py             # config backfill.end_season
     python scripts/fetch_team_logos.py --season 2026
 """

@@ -5,6 +5,72 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-20 (WEEK 3 GRADED + A MAINTENANCE SWEEP; PRs #176-#187).**
+  **Week 3 was the first live week inside the prospective validation regime.** Real money
+  **3-1, +1.65u** (season **6-4, +2.01u**, bankroll $120.10) and every BET the cards named
+  was placed, nothing else. Paper **14-16, −4.09u** (−3.27u re-priced at −110; two picks were
+  logged at −180/−185, which the registration says to leave alone). **The registered stopping
+  rule (H-STOP) is running after n=30: profit LLR −0.44, CLV LLR −0.51 against bounds
+  +3.47 / −1.58.** Nothing has triggered; real money stays on.
+  **The live gap ladder held and replicated across weeks 2-3** (HR-priced, n=106):
+  neg 11.5% under / 0-1.75 39% / 1.75-3 38% / **3-5 69%** / 5+ 57%; above the bar the rule is
+  **29-23 (55.8%)**, on the 2023-25 backtest. The 3-5 band was strong in BOTH weeks (71%, 67%)
+  and 1.75-3 weak in both (40%, 38%). **Negative gaps went over 23 of 26 times** — which the
+  history does NOT show (2023-25 real-close neg band is 47.6% under, n=1,200), so it is
+  registered as **H-NEGGAP, `live-tracking`, measurement only**: counts and a Wilson interval
+  weekly, no gate or side change may come from it.
+  **The model sits ~2 pts BELOW the market every week** (bias vs outcome −1.57/−3.11/−4.23
+  against the market's own −0.65/+0.59/−2.25) and its MAE is ~0.4 worse than Hard Rock's in
+  each. **Early-season first halves run hot in EVERY season** (wk1-3 share of the full-game
+  total 0.53-0.56 vs 0.52-0.53 from wk4), so the under went 39-41% in weeks 2-3.
+  On Saturday morning **14 of 72 Hard Rock quotes were off-market or unpriceable** (2-3 pts of
+  overnight move at −150..−175), which is why Friday stays the look.
+  **`early_season` blocked 10 games on the Friday card** because `games_played` counts
+  FBS-vs-FBS only and an FCS opener leaves a team at 1; they went 5-5. NOT changed — the count
+  is correct for what the gate measures (the feature frame is FBS-only, so an FCS game gives
+  the model no season-to-date row at all); whether FCS games belong in the FEATURES is a model
+  question, not a gate one.
+  **THE "FALSE ZERO" WAS NOT ONE (PR #176).** The 09-16 note calling week-2 SDSU @ UCLA
+  "graded WON on a first half of 0, the ESPN false-zero the guard should have caught" was
+  WRONG: UCLA scored all 28 after the break. **All 15 games on file with a 0-0 half against a
+  scored final are real scoreless halves** — every one reconciles against ESPN's quarter box,
+  three (Iowa @ Northwestern 2023, Nebraska @ Purdue 2024, SDSU @ UCLA 2026) are confirmed in
+  game reports, and 15 of 11,800 graded halves is 0.127%, with 103 halves at ≤3 points and 387
+  at ≤7. Only one touched a ledger. The planned repair would have destroyed real data. What
+  WAS wrong is the rule's shape, now evidence-based both ways — see the ESPN gotcha below.
+  **The money path got two fixes.** `web/lib/picks.ts::createPick` never wrote `book` or
+  `price_provenance` and defaulted a missing price to **−110**, so all ten 2026 real tickets
+  read as priced when nothing had verified the number and none carried a closing price
+  (`grade_pick` computes one only when `book` is set). Now both are written, a missing price
+  is stored NULL, and **`checkPolicy` refuses any real ticket without one (`PRICE MISSING`),
+  at every verdict and both markets** — paper is exempt so H-STOP's observations are untouched.
+  `tests/test_pick_columns_parity.py` reads both INSERT column lists out of the TypeScript by
+  regex so the two writers cannot drift again. Backfilled + regraded: all ten tickets now carry
+  `hardrockbet` and a closing price, and **only `closing_price` changed** (record, units and
+  line value byte-identical).
+  **The week sandbox had been dead since 2026-09-14 (PR #179)** — `_CLONE_TABLES` gained
+  `weather_obs` and the model map did not, so `simulate_week.py` raised `KeyError`. It also now
+  runs `create_all` + `_apply_migrations` on the source SQLite first, which lags the models by
+  every table and column added since the last local run. Nothing exercises that path, so it
+  rots silently; two guards read `_clone_inputs`' own source.
+  **Prisma 5 → 7 (PR #181).** Every client now carries a driver adapter (`PrismaPg` by
+  default, `PrismaNeon` under `NEON_HTTP=1`), the datasource URL moved to `prisma.config.ts`,
+  and `pg` is in `serverExternalPackages`. **`isOffPolicy` moved to `lib/pickRules.ts`**:
+  `PicksList` is a client component and importing it from `lib/picks` pulled prisma — and with
+  Prisma 7, `pg`'s dns/net/tls — into the BROWSER bundle, 500ing Results and Track record.
+  `lib/prisma.test.ts` now scans `app/` for any "use client" file importing a VALUE from a
+  database-backed module, which tsc and eslint both pass happily. Verified on both lanes
+  against a real week and one prod pass; **naive-UTC timestamps round-trip exactly** under
+  adapter-pg (the kicked-off gate depends on it).
+  **Dependency hygiene:** matplotlib is the `logos` extra, not a runner dep (it dragged in a
+  contourpy needing 3.12), lock regenerated 39 → 32 pins; `requirements/.python-version` = 3.11
+  so Dependabot stops proposing wheels the runner cannot install (its resolver ignores
+  Requires-Python, and those were MINOR bumps a major-ignore could not catch); `overrides` clear
+  the 4 HIGH advisories Prisma 7 put in the PRODUCTION tree (`@prisma/client` → `prisma` CLI →
+  `@prisma/config`/mysql2); **react-dom 19.2.4 → 19.3.0**, a mismatch merged in #167 that
+  stopped `next dev` starting. **eslint 10 is MEASURED BROKEN here** (eslint-config-next's
+  eslint-plugin-react throws in `usedPropTypes`), so it, TypeScript 7 and vitest 5 are ignored
+  in `dependabot.yml` and are each a decision to take on their own.
 - **2026-09-16 (SITE IS PUBLIC READ-ONLY).** Tate wanted friends to open the link. Every page
   and every GET is open; the password guards WRITES only — `POST /api/picks`,
   `PATCH`/`DELETE /api/picks/[id]`, `/api/logout`. The rule is one pure function,

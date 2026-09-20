@@ -42,9 +42,11 @@ def trusted_first_half_total(
 
     A LINE-SCORE 0 with a non-zero final score is the known false-zero
     corruption (placeholder all-zero quarters) — grading it would fabricate an
-    UNDER win. A play-by-play 0 is a genuinely scoreless first half (verified
-    against the running score) and grades normally, as does 0-0 in a 0-0
-    final."""
+    UNDER win. A play-by-play 0 grades normally: since 2026-09-20 the writer
+    (`etl.first_half.attach_first_half`) persists a scoreless PBP half only when
+    the feed's own running score reaches the stored final, and every legacy PBP
+    zero on file (15 games, 2023-26) was checked against ESPN's box score and is
+    a real scoreless half. 0-0 in a 0-0 final grades too."""
     if first_half_total is None:
         return None
     if source == "pbp":

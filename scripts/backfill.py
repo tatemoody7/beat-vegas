@@ -21,6 +21,7 @@ from beatvegas.db.models import Game, Team, Venue
 from beatvegas.db.store import init_db, session_scope, upsert
 from beatvegas.etl.first_half import (
     attach_first_half,
+    final_from_plays,
     first_half_from_line_scores,
     first_half_from_plays,
     line_scores_trustworthy,
@@ -95,15 +96,18 @@ def backfill_season(
     # must reject as a *linescore* but PBP can confirm as real). This keeps the
     # default run cheap while never leaving a resolvable game NULL.
     pbp_lookup: Dict[int, Any] = {}
+    pbp_final: Dict[int, Any] = {}
     if use_pbp:
         weeks = sorted({_get(g, "week") for g in games if _get(g, "week") is not None})
     else:
         weeks = sorted({_get(g, "week") for g in games if _needs_pbp(g)} - {None})
     for wk in weeks:
         try:
-            pbp_lookup.update(
-                first_half_from_plays(client.plays(year=season, week=wk, season_type=season_type))
-            )
+            plays = client.plays(year=season, week=wk, season_type=season_type)
+            pbp_lookup.update(first_half_from_plays(plays))
+            # The same feed vouches for its own 0-0 halves: attach_first_half
+            # keeps a scoreless PBP half only if the feed reaches the final.
+            pbp_final.update(final_from_plays(plays))
         except Exception as e:  # noqa: BLE001 - log and continue
             print(f"  [warn] plays {season} wk{wk}: {e}")
 
@@ -115,7 +119,11 @@ def backfill_season(
         # store.upsert never writes None, so the row's existing values (or
         # NULLs, for an unplayed game) stand until the game is final.
         completed = _is_completed(g)
-        fh = attach_first_half(g, pbp_lookup or None) if completed else dict(_NO_FIRST_HALF)
+        fh = (
+            attach_first_half(g, pbp_lookup or None, pbp_final or None)
+            if completed
+            else dict(_NO_FIRST_HALF)
+        )
         if fh["first_half_total"] is not None:
             n_with_1h += 1
         ou, sp, prov = total_by_game.get(gid, (None, None, None))

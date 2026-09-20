@@ -33,15 +33,28 @@ def test_trusted_line_scores_skip_pbp():
     assert _needs_pbp(g) is False
 
 
-def test_zero_first_half_with_scoring_final_needs_pbp():
-    # The linescore 0-0 half can't be trusted (could be a placeholder), but PBP
-    # can confirm it — this game must be queued for the plays fetch.
+def test_reconciled_zero_first_half_does_not_need_pbp():
+    # A full box whose quarters sum to each side's final is evidence enough for a
+    # scoreless half (since 2026-09-20): no plays fetch, no CFBD call spent.
     g = {
         "id": 3,
         "homePoints": 20,
         "awayPoints": 7,
         "homeLineScores": [0, 0, 13, 7],
         "awayLineScores": [0, 0, 0, 7],
+    }
+    assert _needs_pbp(g) is False
+
+
+def test_partial_zero_box_with_scoring_final_needs_pbp():
+    # Two quarters posted, final known: the 0-0 half cannot be reconciled, so PBP
+    # must be asked to confirm it.
+    g = {
+        "id": 3,
+        "homePoints": 20,
+        "awayPoints": 7,
+        "homeLineScores": [0, 0],
+        "awayLineScores": [0, 0],
     }
     assert _needs_pbp(g) is True
 

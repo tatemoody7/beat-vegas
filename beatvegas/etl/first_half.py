@@ -2,7 +2,8 @@
 
 Two paths, in order of preference:
   1. Per-quarter line scores from CFBD /games (light, reliable): 1H = Q1 + Q2.
-  2. Play-by-play fallback: cumulative running score at the end of period 2.
+  2. Play-by-play fallback: cumulative running score at the end of period 2,
+     corroborated for a scoreless half by the feed reaching the stored final.
 
 CFBD JSON key casing has varied across API versions, so every lookup tolerates
 both camelCase and snake_case. Functions here are pure and unit-tested.
@@ -46,28 +47,39 @@ def _all_numbers(ls: Any) -> bool:
 def line_scores_trustworthy(game: Dict[str, Any], first_half: Tuple[int, int]) -> bool:
     """Guard against corrupt/placeholder line scores (e.g. all-zero quarters that
     yielded a real 27-point final). Reject when the quarter totals can't be
-    reconciled with the final score, or when the first half is 0 points despite
-    the game having scored. When the final score is unknown we can't check, so we
-    trust the line scores."""
+    reconciled with the final score. When the final score is unknown we can't
+    check, so we trust the line scores.
+
+    A 0-point first half in a game that scored is SUSPICIOUS, not invalid: a
+    scoreless half is real football (Iowa-Northwestern 2023, Nebraska-Purdue 2024,
+    SDSU-UCLA 2026 all finished with points after a 0-0 half). It is trusted only
+    on evidence -- every quarter present as a number, at least four of them, and
+    each side's quarters summing to its final. Anything short of that (a partial
+    box, an in-progress placeholder) is rejected, and the PBP path gets its turn."""
     home_pts = _get(game, "homePoints", "home_points")
     away_pts = _get(game, "awayPoints", "away_points")
     home_1h, away_1h = first_half
-    # A 0-point first half is implausible once the game has any points.
+    home_ls = _get(game, "homeLineScores", "home_line_scores")
+    away_ls = _get(game, "awayLineScores", "away_line_scores")
+    # Per-quarter totals must reconcile with the final score, when both are known.
+    if home_pts is not None and _all_numbers(home_ls) and sum(home_ls) != home_pts:
+        return False
+    if away_pts is not None and _all_numbers(away_ls) and sum(away_ls) != away_pts:
+        return False
+    # A scoreless half once the game has points needs the full, reconciled box.
     final_total = (home_pts or 0) + (away_pts or 0)
     if (
         (home_pts is not None or away_pts is not None)
         and final_total > 0
         and (home_1h + away_1h) == 0
     ):
-        return False
-    # Per-quarter totals must reconcile with the final score, when both are known.
-    home_ls = _get(game, "homeLineScores", "home_line_scores")
-    away_ls = _get(game, "awayLineScores", "away_line_scores")
-    if home_pts is not None and _all_numbers(home_ls) and sum(home_ls) != home_pts:
-        return False
-    if away_pts is not None and _all_numbers(away_ls) and sum(away_ls) != away_pts:
-        return False
+        return _full_box_reconciles(home_ls, home_pts) and _full_box_reconciles(away_ls, away_pts)
     return True
+
+
+def _full_box_reconciles(ls: Any, pts: Any) -> bool:
+    """Four or more numeric quarters whose sum is exactly the side's final."""
+    return pts is not None and _all_numbers(ls) and len(ls) >= 4 and sum(ls) == pts
 
 
 def _play_home_away_score(p: Dict[str, Any]) -> Tuple[Any, Any]:
@@ -108,11 +120,36 @@ def first_half_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, i
     return best
 
 
+def final_from_plays(plays: List[Dict[str, Any]]) -> Dict[int, Tuple[int, int]]:
+    """Map game_id -> (home, away) running score on the LAST play of the game
+    (every period, overtime included): the largest combined running score seen.
+    Used to corroborate a play-by-play feed against the stored final -- a feed
+    that never reaches the final is incomplete and cannot vouch for a 0-0 half."""
+    best: Dict[int, Tuple[int, int]] = {}
+    for p in plays:
+        gid = _get(p, "gameId", "game_id")
+        hs, as_ = _play_home_away_score(p)
+        if gid is None or hs is None or as_ is None:
+            continue
+        cur = best.get(gid)
+        if cur is None or (hs + as_) > (cur[0] + cur[1]):
+            best[gid] = (int(hs), int(as_))
+    return best
+
+
 def attach_first_half(
-    game: Dict[str, Any], pbp_lookup: Optional[Dict[int, Tuple[int, int]]] = None
+    game: Dict[str, Any],
+    pbp_lookup: Optional[Dict[int, Tuple[int, int]]] = None,
+    pbp_final: Optional[Dict[int, Tuple[int, int]]] = None,
 ) -> Dict[str, Any]:
     """Return a dict of the first-half columns to persist for one game.
-    Prefers line scores; falls back to play-by-play if provided."""
+    Prefers line scores; falls back to play-by-play if provided.
+
+    A play-by-play 0-0 half in a game that scored is persisted only when the same
+    feed corroborates itself: `pbp_final[gid]` (see `final_from_plays`) must equal
+    the stored final. A feed that stops short of the final is incomplete, and an
+    incomplete feed's 0-0 is exactly the false zero this module exists to keep out
+    of the ledger. With no `pbp_final` to check against, the zero is not trusted."""
     gid = _get(game, "id")
     res = first_half_from_line_scores(game)
     source = "linescores"
@@ -123,6 +160,8 @@ def attach_first_half(
     if res is None and pbp_lookup and gid in pbp_lookup:
         res = pbp_lookup[gid]
         source = "pbp"
+        if res is not None and not _pbp_zero_corroborated(game, res, pbp_final):
+            res = None
     if res is None:
         return {
             "home_first_half_points": None,
@@ -137,3 +176,22 @@ def attach_first_half(
         "first_half_total": home_1h + away_1h,
         "first_half_source": source,
     }
+
+
+def _pbp_zero_corroborated(
+    game: Dict[str, Any],
+    first_half: Tuple[int, int],
+    pbp_final: Optional[Dict[int, Tuple[int, int]]],
+) -> bool:
+    """True unless the PBP half is 0-0 in a game that scored AND the feed's own
+    running score never reaches the stored final."""
+    if (first_half[0] + first_half[1]) != 0:
+        return True
+    home_pts = _get(game, "homePoints", "home_points")
+    away_pts = _get(game, "awayPoints", "away_points")
+    if ((home_pts or 0) + (away_pts or 0)) == 0:
+        return True  # 0-0 final (or unknown): nothing to contradict
+    if not pbp_final:
+        return False
+    fin = pbp_final.get(_get(game, "id"))
+    return fin is not None and fin == (int(home_pts or 0), int(away_pts or 0))

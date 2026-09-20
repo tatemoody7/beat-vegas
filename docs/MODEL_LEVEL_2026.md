@@ -294,7 +294,13 @@ trains on `season < target_season` strictly, so 2026's own 153 graded games are 
 nothing — not the fit, not the intercept. Shrinking a number estimated from the wrong
 seasons cannot fix it; re-estimating it from the right ones might.
 
-## H-INSEASON — result. ALL FOUR ARMS PASS. Read the caveat before the table.
+## H-INSEASON — result. PASSED ITS DEVELOPMENTAL GATE. NOT a betting-value finding.
+
+**What this result is, stated before any number** (Tate, 2026-09-20): H-INSEASON passed
+its registered **developmental** gate. The primary level-bias metric is **partly mechanical
+for this estimator**, so the pass does **not** establish prospective betting value, and
+nothing below should be quoted as evidence that an in-season intercept improves the betting
+system. The only thing it licenses is properly registered prospective paper collection.
 
 Run 2026-09-20, `scripts/inseason_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
 2,000 draws, α 0.05. Judged on the criterion frozen before the script existed.
@@ -376,10 +382,18 @@ stopping criterion. H-STOP is untouched and the champion's rule is never mixed w
 challenger's. Live selection does not change, `bias_corrections` is not edited, and
 `BET_GAP_PTS` is not moved.
 
-Two decisions are open and are not made here: **which k**, since all four pass and the
-criterion does not rank passing arms, and whether the paper arm starts now.
+**No k is chosen, and none will be chosen from this run.** All four passed, the registered
+gate contained no ranking rule, and picking the best-looking arm out of the same 2024-26
+data that produced the table would be post-hoc. The four values go forward together as one
+**H-INSEASON challenger family**; if a single challenger must be named anywhere for display,
+it is the family, never one of its arms.
 
 The declared limitation still stands: the bootstrap resamples games within a season and is
 blind to between-season variation, the dominant uncertainty here. Three seasons, one of
 them three weeks long, is thin — and these are **development** seasons, since 2026
 motivated the hypothesis. Prospective evidence begins with decisions logged from here.
+
+The prospective phase is deliberately judged on measures that are **not** mechanically tied
+to the correction: paper profit at actually available prices and CLV against the closing
+market, with prediction error and level bias demoted to secondary diagnostics. Its rule
+lives in its own registry row, written before its first pick.

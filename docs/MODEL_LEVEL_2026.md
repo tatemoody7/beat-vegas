@@ -113,6 +113,61 @@ of them carries a real close, so the bucket the seed targets is empty where sele
 is measured. The seed fixes NaN early-season features; the 2026 deficit is present in
 **every week and every spread band**, so it is a different fault.
 
+## Found: the calibration intercept, not a feature
+
+Run 2026-09-20 on the `min_games=0` frame the live board scores from. Three things
+were checked in order and the first two came back clean.
+
+**It is not a broken feature.** Comparing the 153 played 2026 week 1-3 rows against
+the 143 equivalent 2025 rows, feature by feature: **no feature is entirely missing in
+either season**, the largest NaN-rate shift is 7.7 points (`home_fh_off_redzone_td`),
+and the largest level shift is 0.76 standard deviations (`wx_wind`). The weather
+columns move 4.3 points of NaN rate, which kills that lead. The inputs are ordinary.
+
+**It is not the training-set filter, though that filter really does differ.**
+`scripts/weekly_update.py` builds the frame with `min_games=0` and hands it to
+`score_slate`, which derives its training set from the frame it is given — so the live
+board trains on a population that every backtest path (`backtest/engine.py`,
+`scripts/backtest.py`, `validate_engine`, `retrain`, `residual_gate`, `weekly_report`,
+all `min_games=2`) excludes. Holding the target fixed and varying only that filter
+moves 2026 by **+1.72 pts** [+1.23, +2.22]... but **−0.37** on 2025 and **−0.27** on
+2024. The sign flips, so it is an interaction, not the cause.
+
+**It is the global intercept.** `bv_line_for_slate` adds
+`bias_corrections(train)["global"]` to every prediction: the mean walk-forward
+out-of-fold residual. With `min_train = 500` and three training seasons, only two
+folds are scorable, so that mean is an average of **two season-level numbers**, then
+extrapolated to a third:
+
+| season | OOF correction it needed | n |
+|---|---|---|
+| 2024 | **−1.15** | 732 |
+| 2025 | **−2.46** | 744 |
+| **2026 (what it actually needed)** | **+1.09** | 153 |
+
+The intercept applied to the live board is **−1.81**, the mean of the first two.
+2026 needed **+1.09** — the opposite sign. The gap is **2.90 points, which is the
+entire level deficit**:
+
+| | bias on 2026 wk1-3 |
+|---|---|
+| raw model, before calibration | **−1.09** |
+| after the −1.81 intercept | **−2.90** |
+
+So the raw regressor is only a point low, and the step meant to remove bias adds
+1.81 points of it. The same arithmetic explains the `min_games` result above: adding
+2025 to the training window moves the intercept from −1.15 to −1.81, and that is most
+of the 1.72-point shift.
+
+It is not a coding error — the residual sign is right (`actual − pred`, added). It is a
+**season-level effect estimated from two observations and extrapolated to a third**,
+and the two it saw disagree with each other by 1.3 points. It could not have been
+expected to transfer, and it did not.
+
+The week-of-season explanation was tested and rejected: OOF residuals by band run
+−1.62 / −1.05 / −1.76 / −2.44 for weeks 1-3 / 4-6 / 7-10 / 11+, so an early-season
+slate is mis-corrected by only 0.19 points. The problem is the season, not the week.
+
 ## What this rules out, and what is left
 
 The obvious, already-built remedy does not address the 2026 level deficit. That is a
@@ -120,13 +175,9 @@ useful negative: it redirects rather than closes.
 
 **The 2026 drift cannot be studied on 2023-25 at all**, because the model is well
 calibrated there (bias +1.24 on 2025, and its 2023-25 mean line equals the realized
-mean to the decimal). Whatever changed is specific to how 2026 rows are built or
-scored, so the next step is a **row-level comparison of one team's 2026 feature vector
-against the same team's 2025 vector**, looking for a feature that shifted meaning
-rather than a modelling choice that needs tuning. Candidates in order: the season-to-date
-block on partial 2026 data, the repaired weather columns (`wx_temp`/`wx_wind` changed
-on every historical row on 2026-09-14, mean |Δtemp| 6.79°F, and both are model
-features), and the FBS filter's 2026 team list.
+mean to the decimal). That row-level feature comparison has since been run — see
+"Found: the calibration intercept" above — and the inputs are clean. The fault is in
+the calibration step, not in the data.
 
 Until that is found, the honest position is the one the board already takes: the
 **ranking** is unaffected by a level shift, the **threshold** is not, and H-STOP is

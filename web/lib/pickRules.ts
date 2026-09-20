@@ -193,8 +193,7 @@ export type PolicyContext = {
    * like a price is worse than no price, because it reads as verified.
    */
   livePrice:
-    | { ok: true; killPrice: number | null }
-    | { ok: false; reason: string };
+    { ok: true; killPrice: number | null } | { ok: false; reason: string };
   /**
    * The real-money pause (docs/STOPPING_RULE.md; lib/rulePause.ts). REQUIRED,
    * like livePrice, so a new caller cannot skip it by omission. `paused: true`

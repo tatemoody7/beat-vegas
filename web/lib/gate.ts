@@ -9,10 +9,7 @@
 // cannot open the ledger by accident.
 
 export type GateDecision =
-  | "misconfigured"
-  | "next"
-  | "unauthorized"
-  | "redirect";
+  "misconfigured" | "next" | "unauthorized" | "redirect";
 
 /** Methods that never change state; RFC 9110 §9.2.1. */
 export const SAFE_METHODS: ReadonlySet<string> = new Set([

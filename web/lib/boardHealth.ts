@@ -118,8 +118,7 @@ export type BuildHealth = {
 };
 
 export type BuildStatus =
-  | { missed: false }
-  | { missed: true; day: string; lastBuiltAt: Date | null };
+  { missed: false } | { missed: true; day: string; lastBuiltAt: Date | null };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 

@@ -650,3 +650,37 @@ def test_grade_never_overwrites_the_decision_price_with_the_close(capsys):
     # list must not choke on the unpriced graded row
     pick.cmd_list(_args(season=2026))
     assert "under (unpriced," in capsys.readouterr().out
+
+
+def test_data_migration_backfills_hard_rock_as_the_book_on_real_tickets():
+    """Until 2026-09-20 the website never wrote `book`, and grade_pick computes
+    closing_price only when it is set, so every real 2026 ticket was invisible to
+    price-CLV. Every real ticket is Hard Rock's (the only Florida book), so the
+    backfill states a known fact; paper rows and pre-2026 rows are untouched."""
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    common = dict(
+        game_id=1, week=3, home_team="H", away_team="A", side="under", market="1H", line=28.5
+    )
+    with Session(eng) as s:
+        s.add_all(
+            [
+                ManualPick(id=1, season=2026, is_paper=False, **common),  # web ticket, no book
+                ManualPick(id=2, season=2026, is_paper=None, **common),  # legacy NULL flag = real
+                ManualPick(
+                    id=3, season=2026, is_paper=True, **common
+                ),  # paper: build_card's business
+                ManualPick(
+                    id=4, season=2026, is_paper=False, book="draftkings", **common
+                ),  # already set
+                ManualPick(id=5, season=2025, is_paper=False, **common),  # out of scope
+            ]
+        )
+        s.commit()
+
+    _apply_migrations(eng)
+    _apply_migrations(eng)  # idempotent
+
+    with Session(eng) as s:
+        books = {p.id: p.book for p in s.query(ManualPick).order_by(ManualPick.id)}
+    assert books == {1: "hardrockbet", 2: "hardrockbet", 3: None, 4: "draftkings", 5: None}

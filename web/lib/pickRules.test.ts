@@ -9,6 +9,27 @@ import { MIN_GAMES_FOR_REAL_MONEY } from "./verdict";
 
 const good = { gameId: 42, line: 24.5, price: -110 };
 
+describe("a missing price is stored as null, never invented", () => {
+  it("parses an omitted, null or blank price as null", () => {
+    for (const body of [
+      { gameId: 42, line: 24.5 },
+      { gameId: 42, line: 24.5, price: null },
+      { gameId: 42, line: 24.5, price: "" },
+    ]) {
+      const r = parsePickBody(body);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.pick.price).toBeNull();
+    }
+  });
+  it("still parses a real price and still rejects a malformed one", () => {
+    const r = parsePickBody({ ...good, price: -115 });
+    expect(r.ok && r.pick.price).toBe(-115);
+    expect(parsePickBody({ ...good, price: -105.5 })).toMatchObject({
+      ok: false,
+    });
+  });
+});
+
 describe("parsePickBody", () => {
   it("accepts a minimal real 1H pick with flat 1-unit defaults", () => {
     const r = parsePickBody(good);
@@ -521,5 +542,59 @@ describe("checkPolicy — RULE PAUSED (docs/STOPPING_RULE.md)", () => {
         ok: true,
       },
     );
+  });
+});
+
+describe("PRICE MISSING: every real ticket carries its price", () => {
+  const ctx: PolicyContext = {
+    inSlate: true,
+    kickedOff: false,
+    duplicate: false,
+    minGamesPlayed: 3,
+    realWeekCount: 0,
+    week: 3,
+    killLine: null,
+    killPrice: null,
+    rulePause: { paused: false },
+    livePrice: { ok: true, killPrice: null },
+  };
+  const real = (o: Partial<PickRequest>): PickRequest => ({
+    gameId: 1,
+    market: "1H",
+    line: 24.5,
+    stake: 1,
+    price: null,
+    isPaper: false,
+    ...o,
+  });
+  it("refuses a priceless real ticket at every verdict, first half or full game", () => {
+    for (const verdict of ["BET", "WATCH", "PASS"] as const) {
+      const r = checkPolicy(real({ verdict }), ctx);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/^PRICE MISSING/);
+    }
+    const fg = checkPolicy(real({ market: "full", verdict: "PASS" }), ctx);
+    expect(fg.ok).toBe(false);
+    if (!fg.ok) expect(fg.error).toMatch(/^PRICE MISSING/);
+  });
+  it("lets a priceless PAPER pick through (the card's pricing is not the site's business)", () => {
+    expect(checkPolicy(real({ isPaper: true, verdict: "WATCH" }), ctx)).toEqual(
+      {
+        ok: true,
+      },
+    );
+  });
+  it("is checked before the kill price, so the kill compare never sees null", () => {
+    const r = checkPolicy(real({ verdict: "BET" }), {
+      ...ctx,
+      livePrice: { ok: true, killPrice: -110 },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/^PRICE MISSING/);
+    const priced = checkPolicy(real({ verdict: "BET", price: -105 }), {
+      ...ctx,
+      livePrice: { ok: true, killPrice: -110 },
+    });
+    expect(priced).toEqual({ ok: true });
   });
 });

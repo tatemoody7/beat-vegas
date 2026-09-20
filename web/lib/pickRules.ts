@@ -16,14 +16,17 @@ import {
 
 export const PAPER_STAKE = 1.0;
 export const DEFAULT_STAKE = 1.0;
-export const DEFAULT_PRICE = -110;
 
 export type PickRequest = {
   gameId: number;
   market: "1H" | "full";
   line: number;
   stake: number;
-  price: number;
+  /** American odds on the ticket. `null` when the request carried none — the
+   *  server never invents a price (it used to default to -110, which then read
+   *  back as a verified fact). A REAL ticket without one is refused by
+   *  checkPolicy (PRICE MISSING); paper may be logged priceless. */
+  price: number | null;
   isPaper: boolean;
   note?: string;
   // Tracking (shared contract with scripts/pick.py add --verdict/--reason/...):
@@ -104,13 +107,17 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
   // the bankroll.
   const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
 
-  let price = DEFAULT_PRICE;
-  if (b.price !== undefined) {
-    price = Number(b.price);
+  // No default. A missing price is stored as NULL with price_provenance
+  // 'unknown'; a real ticket is then refused below (PRICE MISSING), a paper pick
+  // goes in priceless. Inventing -110 here made every web pick look priced.
+  let price: number | null = null;
+  if (b.price !== undefined && b.price !== null && b.price !== "") {
+    const n = Number(b.price);
     // American odds are integers with |price| >= 100 (the column is an int).
-    if (b.price === null || !Number.isInteger(price) || Math.abs(price) < 100) {
+    if (!Number.isInteger(n) || Math.abs(n) < 100) {
       return reject("Enter the odds as a whole number, like -110.");
     }
+    price = n;
   }
 
   const note =
@@ -233,6 +240,18 @@ export function checkPolicy(
       );
     }
   }
+  // EVERY real ticket carries its price — BET, WATCH or PASS override, first
+  // half or full game. Until 2026-09-20 a request without one was stored at an
+  // invented -110 with no provenance, so all ten 2026 real tickets read as
+  // priced when nothing had verified them, and none carried a closing price.
+  // The ledger is only worth grading if every price on it was on a ticket.
+  // Paper is exempt (its pricing is the card's business; H-STOP reads the
+  // paper ledger's actual prices and this must not change them).
+  if (!pick.isPaper && pick.price === null) {
+    return reject(
+      "PRICE MISSING — a real ticket needs the odds it was written at (a whole number, like -110). Enter them, or log it as paper.",
+    );
+  }
   // A real BET below the card's kill line, or at a worse price, is not the
   // bet the card rated: the edge is gone. Paper and WATCH/PASS (an owner
   // override, already off-policy) are exempt.
@@ -277,7 +296,7 @@ export function checkPolicy(
     // offered right now is the one that decides whether this is still the bet
     // the card rated.
     const killPrice = ctx.livePrice.killPrice ?? ctx.killPrice;
-    if (killPrice !== null && pick.price < killPrice) {
+    if (killPrice !== null && pick.price !== null && pick.price < killPrice) {
       return reject(
         `${american(pick.price)} is worse than the kill price. We rated this at ${american(killPrice)} or better — at a worse price it is a different bet. Pass on it.`,
         409,

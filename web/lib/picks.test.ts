@@ -1,10 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createPick,
   isDuplicatePick,
   isPaperFirstHalf,
   isRealFirstHalf,
   type PickFull,
 } from "./picks";
+
+// createPick writes through raw SQL; capture the tagged template it sends.
+const executeRaw = vi.fn();
+const queryRaw = vi.fn();
+const findUnique = vi.fn();
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    games: { findUnique: (...a: unknown[]) => findUnique(...a) },
+    $queryRaw: (...a: unknown[]) => queryRaw(...a),
+    $executeRaw: (...a: unknown[]) => executeRaw(...a),
+  },
+}));
 import { recordFrom } from "./record";
 
 const pick = (o: Partial<PickFull>): PickFull => ({
@@ -91,5 +104,45 @@ describe("a unique-constraint violation is read as a duplicate, not a crash", ()
       false,
     );
     expect(isDuplicatePick(undefined)).toBe(false);
+  });
+});
+
+describe("createPick writes the book and the price's provenance", () => {
+  beforeEach(() => {
+    executeRaw.mockReset();
+    queryRaw.mockReset().mockResolvedValue([]);
+    findUnique
+      .mockReset()
+      .mockResolvedValue({
+        season: 2026,
+        week: 3,
+        home_team: "H",
+        away_team: "A",
+      });
+  });
+  const sent = () => {
+    const [strings, ...values] = executeRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      ...unknown[],
+    ];
+    return { sql: strings.join("?"), values };
+  };
+
+  it("stores a priced ticket as Hard Rock's with provenance 'logged'", async () => {
+    await createPick({ gameId: 7, line: 26.5, price: -115 });
+    const { sql, values } = sent();
+    expect(sql).toMatch(/INSERT INTO manual_picks/);
+    expect(sql).toMatch(/\bbook, price_provenance\b/);
+    expect(values).toContain("hardrockbet");
+    expect(values).toContain("logged");
+    expect(values).toContain(-115);
+  });
+
+  it("stores a priceless paper pick as NULL with provenance 'unknown' — never -110", async () => {
+    await createPick({ gameId: 7, line: 26.5, isPaper: true });
+    const { values } = sent();
+    expect(values).toContain("unknown");
+    expect(values).toContain(null);
+    expect(values).not.toContain(-110);
   });
 });

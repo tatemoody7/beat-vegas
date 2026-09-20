@@ -40,6 +40,15 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    # Dependabot sees only the lock, not requirements.txt's deliberate
+    # next-major caps, so left alone it proposes pandas 3 / pytest 9 against
+    # ranges that forbid them (PR #173). Majors are a human decision here; a
+    # regenerated lock (the header recipe) takes every minor/patch within the
+    # caps, and uv honours python_requires markers that Dependabot ignored
+    # (contourpy 1.4.0 needs 3.12; the runner is 3.11).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web

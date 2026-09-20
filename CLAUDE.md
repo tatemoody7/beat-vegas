@@ -710,6 +710,7 @@ the user's own picks. Also generates a weekly report (`scripts/weekly_report.py`
 ## Setup
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+pip install -e ".[logos]"            # only for scripts/fetch_team_logos.py (matplotlib)
 cp config.example.yaml config.yaml   # add CFBD + Odds API keys (gitignored)
 pytest -q                            # run `pytest -q` / `cd web && npx vitest run` for current counts
 ```

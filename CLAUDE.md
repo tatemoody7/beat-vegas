@@ -118,8 +118,9 @@ Research only — it never places bets or automates gambling.
   `docs/superpowers/specs/2026-09-16-redesign-direction.md` (+ two research reports beside
   it). Measured: Results 3,408 → 2,890px, Track record 2,840 → 2,211, game page ~1,925 →
   1,644, phone header 97 → 69 everywhere. Deleted: `RuleRecord`, `BankrollHero`,
-  `RecordCard`, `GapBar`. Data item flagged, NOT fixed: week-2 SDSU @ UCLA is graded WON
-  on a first half of 0 (the ESPN false-zero the guard should have caught).
+  `RecordCard`, `GapBar`. (A data item flagged here on 09-16 — "SDSU @ UCLA graded WON on
+  a first half of 0, the false zero the guard should have caught" — was WRONG: the half
+  really was 0-0; see the 2026-09-20 bullet.)
 - **2026-09-15 (FULL SYSTEM REVIEW BEFORE WEEK 3; PRs #129 weather/money-path, #130 site,
   plus measurement and docs PRs).** Verified top to bottom against live Neon, the GHA logs,
   `/api/health`, ESPN and the API headers. **Ops were healthy** (grading current, CFBD
@@ -982,12 +983,19 @@ picks**) at https://beat-vegas.vercel.app.
   (|spread| ≤ 14, from the Sunday full-game capture) > wide > none; outdoor > dome; slower pace
   first; kickoff order last. A plain `[:18]` swept Friday night + the noon wave and never
   reached the evening games the card wants.
-- **ESPN line scores are not always right.** `sources/espn_scores.py` is the no-quota
-  scores fallback, but ESPN's quarter data can be corrupt: SDSU @ UCLA (2026 wk 2) came
-  back `[0,0,0,0]` against a 38-point final, and the `summary` endpoint returned nulls.
-  `line_scores_trustworthy` caught it and left the game NULL rather than writing a false
-  0-0 first half, which is exactly right — that one game stays ungraded until CFBD PBP is
-  reachable. Never relax that guard to "fill in" a missing 1H.
+- **ESPN line scores populate LATE, and a scoreless half is real football.**
+  `sources/espn_scores.py` is the no-quota scores fallback. SDSU @ UCLA (2026 wk 2) came
+  back `[0,0,0,0]` against a 38-point final mid-week and the `summary` endpoint returned
+  nulls; `line_scores_trustworthy` rejected the box (quarters did not sum to the final —
+  the reconciliation rule) and CFBD PBP later graded the game at a REAL 0-0 half (UCLA
+  scored all 28 after the break). **Fifteen games on file (2023-26) have a 0-0 first half
+  against a scored final; all fifteen check out against ESPN's box score and three against
+  game reports** — none was a false zero. So since 2026-09-20 the guard is EVIDENCE-based: a
+  0-0 half is trusted from line scores when four or more numeric quarters sum to each side's
+  final, and from PBP only when the same feed's running score reaches the stored final
+  (`etl/first_half.py::final_from_plays`, `attach_first_half(pbp_final=...)`). The
+  all-zero placeholder box is still rejected by reconciliation. Never "fill in" a missing
+  1H without one of those two proofs.
 - **ESPN: send NO custom headers.** Akamai 403s a bare spoofed UA (`Mozilla/5.0`, or a Chrome UA
   without client hints); requests' default UA is served. The spoof blanked every preview until
   2026-09-02. `research_preview.py` now exits 3 when the team list is empty instead of writing

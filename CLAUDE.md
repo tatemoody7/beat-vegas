@@ -62,6 +62,35 @@ Research only — it never places bets or automates gambling.
   database-backed module, which tsc and eslint both pass happily. Verified on both lanes
   against a real week and one prod pass; **naive-UTC timestamps round-trip exactly** under
   adapter-pg (the kicked-off gate depends on it).
+  **THE MODEL'S LEVEL DEFICIT IS THE CALIBRATION INTERCEPT (PRs #192, #194).** The
+  model's average line was 24.81 against a realized 29.35 on Hard-Rock-priced games,
+  where in 2023-25 its mean equalled the realized mean to the decimal. That inflates
+  every `gap = line - bv_line` and takes the fixed 1.75 bar from selecting 10-20% of
+  games to **47-51%** — the historical 85th-percentile gap is 1.79 (so 1.75 WAS the top
+  ~15%), and 2026's is 5.26-6.26. **The rule was validated as "top 20% by gap" and
+  deployed as a constant**; those agree only while the level is stable.
+  **Cause:** `bv_line_for_slate` adds `bias_corrections(train)["global"]`, the mean
+  walk-forward OOF residual. With `min_train=500` and three training seasons only TWO
+  folds are scorable, so it averages two season numbers and extrapolates to a third:
+  2024 needed **−1.15**, 2025 **−2.46**, 2026 **+1.09**. It applied **−1.81** — the
+  opposite sign — and that 2.90-pt gap IS the whole deficit (raw model bias is only
+  −1.09). The step meant to REMOVE bias adds 1.81 pts of it. Not a coding error; the
+  residual sign is right. Registered as **H-INTERCEPT**, criterion written first.
+  **Ruled out, so do not re-run these:** no feature changed (143 vs 153 rows at
+  `min_games=0`; nothing missing, max NaN shift 7.7pp, max level shift 0.76sd — the
+  weather lead is dead); week-of-season (OOF by band −1.62/−1.05/−1.76/−2.44, an early
+  slate is mis-corrected by 0.19); and the prior-season level anchor (**H-LEVEL
+  tested-null** on the reserved 2025 set — and it could not have passed, since 2025's
+  incumbent bias is **+1.24**, the model reads HIGH there).
+  **A real train/serve difference found alongside, NOT fixed:** `weekly_update.py`
+  builds the frame at `min_games=0` and `score_slate` derives TRAINING from whatever
+  frame it is handed, so the live board trains on a population every backtest path
+  (`backtest/engine.py`, `backtest.py`, `validate_engine`, `retrain`, `residual_gate`,
+  `weekly_report`, all `min_games=2`) excludes. Worth **+1.72** [+1.23, +2.22] on 2026
+  but **−0.37** on 2025 and **−0.27** on 2024 — an interaction, not the cause.
+  **Nothing above changed live selection:** a level shift cannot reorder the board
+  (which is why the gap ladder still reads sanely), and H-STOP is measuring the frozen
+  rule.
   **Dependency hygiene:** matplotlib is the `logos` extra, not a runner dep (it dragged in a
   contourpy needing 3.12), lock regenerated 39 → 32 pins; `requirements/.python-version` = 3.11
   so Dependabot stops proposing wheels the runner cannot install (its resolver ignores
@@ -896,6 +925,16 @@ picks**) at https://beat-vegas.vercel.app.
   0.5 pts of Hard Rock), but the consensus MEDIAN moves on 13 of 63 games by up to
   **0.5 pts** — exactly `HR_OFF_MARKET_PTS`, so it can flip the off-market gate on a
   borderline game. Details + options: `docs/RANKING_AND_TRUST.md` §9.
+- **`build_feature_frame()` DEFAULTS to `min_games=2`, and the live board does not.**
+  The default drops any game where either team has under 2 FBS-vs-FBS games played, so
+  weeks 1-3 come back with **4 rows for a whole season** instead of 143 — a diagnostic
+  that forgets this is reading noise (it cost a whole pass on 2026-09-20). The live
+  scoring path is `scripts/weekly_update.py`, which builds at **`min_games=0`**
+  (`--min-games` default 0) and hands that frame to `score_slate`, which derives its
+  TRAINING set from whatever frame it is given — so the eligibility rule and the
+  training rule are the same knob, which they should not be. Every backtest and
+  validation path passes `min_games=2`. The frame takes ~8 minutes to build: cache it
+  (`df.to_pickle(...)`) before running more than one comparison against it.
 - **An index on `odds_snapshots.market` does NOT help, and the criterion is why we know.**
   The cost audit left "add an index leading on `market`" as an open item because every read
   filters on it first (`lineCheck.ts`, `board.ts::consensusLines`, `movement.ts`) and nothing

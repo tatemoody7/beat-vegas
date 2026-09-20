@@ -88,7 +88,7 @@ def _clone_inputs() -> Dict[str, int]:
     (sim Postgres) engine. Chunked + sequence-resynced (Postgres pkey safety),
     mirroring scripts/deploy_neon.py."""
     from beatvegas.db import models as M
-    from beatvegas.db.store import get_engine
+    from beatvegas.db.store import _apply_migrations, get_engine
 
     # reuse the proven helpers rather than reimplementing
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -104,12 +104,23 @@ def _clone_inputs() -> Dict[str, int]:
             M.FhTeamGame,
             M.TeamTempo,
             M.Weather,
+            M.WeatherObs,
             M.FactorScore,
             M.ModelRun,
         )
     }
 
     src = create_engine(f"sqlite:///{REAL_SQLITE}", future=True)
+    # The real SQLite file is only written by a local run, so it lags the models
+    # by every table and column added since -- `weather_obs` (2026-09-14) and
+    # `games.full_game_total_source` (line_sources) each broke the clone outright,
+    # because the ORM SELECTs every mapped column of every cloned table. Both of
+    # these are the additive, idempotent passes store.init_db() already runs
+    # whenever anything opens this file normally: create_all adds missing tables
+    # and never drops one, _apply_migrations adds missing columns. Nothing is
+    # removed and no row is touched.
+    M.Base.metadata.create_all(src)
+    _apply_migrations(src)
     dst = get_engine()
     SrcS, DstS = sessionmaker(bind=src), sessionmaker(bind=dst)
     counts: Dict[str, int] = {}

@@ -655,7 +655,14 @@ def test_the_lock_lives_where_dependabot_can_see_it():
     pip = [u for u in bot["updates"] if u["package-ecosystem"] == "pip"]
     assert len(pip) == 1 and pip[0]["directory"] == "/requirements"
     # Nothing else in that directory could be mistaken for a manifest.
-    assert sorted(f.name for f in LOCK.parent.iterdir()) == ["lock.txt"]
+    # `.python-version` is the one exception and is not one: Dependabot reads it
+    # to pick the interpreter it resolves against (3.11, the runner), which is
+    # what stops it proposing wheels that need 3.12 -- contourpy 1.4.0 (#173),
+    # numpy 2.5.3 / scipy 1.18.1 (#184), all MINOR bumps the semver-major ignore
+    # cannot catch. It lives here rather than at the repo root so a pyenv shim
+    # cannot switch this Mac's interpreter (local dev is 3.9).
+    assert sorted(f.name for f in LOCK.parent.iterdir()) == [".python-version", "lock.txt"]
+    assert (LOCK.parent / ".python-version").read_text().strip() == "3.11"
     # And it must not look like pip-compile output, or Dependabot would go
     # hunting for a lock.in that does not exist.
     assert "--output-file" not in LOCK.read_text()

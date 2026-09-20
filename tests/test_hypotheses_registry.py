@@ -35,6 +35,7 @@ STUDY_DOCS = [
     "docs/HR_LAG.md",
     "docs/WEATHER_STYLE.md",
     "docs/WEATHER.md",
+    "docs/MODEL_LEVEL_2026.md",
 ]
 
 # Results that live only on the machine that ran them (`/research/` is gitignored).

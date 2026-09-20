@@ -139,6 +139,18 @@ _DATA_MIGRATIONS = [
         "AND EXISTS (SELECT 1 FROM predictions p2 WHERE p2.game_id = manual_picks.game_id "
         "AND p2.model_version = 'gbm_v1' AND p2.under_score IS NOT NULL)",
     ),
+    # Until 2026-09-20 the website's createPick never wrote `book`, and
+    # picks.grade_pick computes closing_price only when `book` is set — so every
+    # real 2026 ticket (all logged from the site) had no closing price and sat
+    # outside the price-CLV read. Every real ticket is Hard Rock's (the only
+    # book bettable from Florida; BETTING_POLICY.md), so the fact is known.
+    # Paper rows already carry the key from build_card. `pick.py grade
+    # --season 2026 --regrade` then fills closing_price on the next pass.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET book = 'hardrockbet' "
+        "WHERE book IS NULL AND COALESCE(is_paper, FALSE) = FALSE AND season >= 2026",
+    ),
 ]
 
 _engine = None

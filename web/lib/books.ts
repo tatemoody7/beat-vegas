@@ -1,6 +1,11 @@
 // Friendly sportsbook names for the raw Odds API / CFBD book keys stored in
 // odds_snapshots. Shared by Line Check and the Movement chart so a key never
 // leaks into the UI as "betonlineag".
+/** The Odds API key for Hard Rock Bet — the only book bettable from Florida and
+ *  the book every real ticket is written at. Mirrors beatvegas/hardrock.py
+ *  HR_BOOK_KEY (tests/test_pick_columns_parity.py pins the two together). */
+export const HR_BOOK_KEY = "hardrockbet";
+
 export const BOOK_LABELS: Record<string, string> = {
   hardrockbet: "Hard Rock",
   draftkings: "DraftKings",

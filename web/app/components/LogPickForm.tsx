@@ -46,7 +46,12 @@ export default function LogPickForm({
   const [line, setLine] = useState<string>(
     prefill.line === null ? "" : String(prefill.line),
   );
-  const [price, setPrice] = useState<string>(String(prefill.price ?? -110));
+  // Blank when Hard Rock has not priced the under: the form never invents odds.
+  // A real ticket must have them (the server refuses PRICE MISSING); paper may
+  // go in blank and is stored priceless.
+  const [price, setPrice] = useState<string>(
+    prefill.price === null ? "" : String(prefill.price),
+  );
   const [isPaper, setIsPaper] = useState(prefill.verdict !== "BET");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,9 +65,17 @@ export default function LogPickForm({
       setErr("Enter the first-half total you are taking the under on.");
       return;
     }
-    const priceNum = Number(price);
-    if (!Number.isInteger(priceNum) || Math.abs(priceNum) < 100) {
-      setErr("Enter the odds as a number, like -110.");
+    let priceNum: number | null = null;
+    if (price.trim() !== "") {
+      priceNum = Number(price);
+      if (!Number.isInteger(priceNum) || Math.abs(priceNum) < 100) {
+        setErr("Enter the odds as a number, like -110.");
+        return;
+      }
+    } else if (!isPaper) {
+      setErr(
+        "A real ticket needs its odds. Enter them as a number, like -110.",
+      );
       return;
     }
     setBusy(true);
@@ -131,7 +144,9 @@ export default function LogPickForm({
             onChange={(e) => setPrice(e.target.value)}
             className={field}
           />
-          <span className={hintCls}>As a number, like -110.</span>
+          <span className={hintCls}>
+            As a number, like -110. Required for real money.
+          </span>
         </label>
         <div className="flex flex-col gap-1 self-end pb-2">
           <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">

@@ -8,6 +8,7 @@ import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
 import { DEFAULT_STAKE, PAPER_STAKE, type PickEdit } from "@/lib/pickRules";
+import { HR_BOOK_KEY } from "@/lib/books";
 
 // My Picks data layer: the current slate (for API validation), the user's
 // logged picks with the model + verdict snapshot frozen at log time, and the
@@ -289,7 +290,8 @@ export type CreatePickInput = {
   market?: "1H" | "full"; // default 1H
   line: number;
   stake?: number;
-  price?: number;
+  /** American odds on the ticket; null/absent = none given (stored NULL, provenance 'unknown'). */
+  price?: number | null;
   note?: string;
   isPaper?: boolean;
   verdict?: Verdict;
@@ -348,7 +350,14 @@ export async function createPick(
   // Flat 1 unit for real AND paper (paper record reads in units; is_paper keeps
   // it out of the bankroll). The client's stake is never trusted.
   const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
-  const price = input.price ?? -110;
+  // Never invent a price. NULL + 'unknown' is an honest row; -110 + nothing
+  // (the behaviour until 2026-09-20) read as a verified ticket price and left
+  // every real 2026 ticket without a closing price, because grade_pick only
+  // computes one when `book` is set — which this writer never did either.
+  // Mirrors beatvegas/picks.py add_pick (price_provenance, book=HR_BOOK_KEY).
+  const price = input.price ?? null;
+  const priceProvenance = price === null ? "unknown" : "logged";
+  const book = HR_BOOK_KEY;
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();
   const verdict = input.verdict ?? null;
@@ -363,12 +372,14 @@ export async function createPick(
     await prisma.$executeRaw`
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
+         book, price_provenance,
          stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
          factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
          ev_at_pick, hr_line_at_pick)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-         ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
+         ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
+         ${book}, ${priceProvenance}, ${stake},
          ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
          ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine})
     `;
@@ -383,11 +394,12 @@ export async function createPick(
       await prisma.$executeRaw`
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
-         stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
-         factors_json_at_pick, graded)
+         book, stake, is_paper, placed_at, note, model_score_at_pick,
+         model_line_at_pick, factors_json_at_pick, graded)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-         ${game.away_team}, 'under', ${market}, ${input.line}, ${price}, ${stake},
+         ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
+         ${book}, ${stake},
          ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
          ${factorsAtPick}, false)
     `;

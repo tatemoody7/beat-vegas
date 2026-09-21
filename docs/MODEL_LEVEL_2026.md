@@ -293,3 +293,93 @@ intercept is a season-level number estimated from prior seasons only, and `score
 trains on `season < target_season` strictly, so 2026's own 153 graded games are used for
 nothing — not the fit, not the intercept. Shrinking a number estimated from the wrong
 seasons cannot fix it; re-estimating it from the right ones might.
+
+## H-INSEASON — result. ALL FOUR ARMS PASS. Read the caveat before the table.
+
+Run 2026-09-20, `scripts/inseason_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
+2,000 draws, α 0.05. Judged on the criterion frozen before the script existed.
+`ADOPT: ['k25', 'k50', 'k100', 'k200']`. Reproduced identically from the previous
+session's cached frame.
+
+**As-of rule used: the week boundary** — a game in week *w* is scored from the completed
+games of weeks < *w* only. Live, the window closes strictly before the build's timestamp;
+the two differ only for a midweek build after a Thursday game of the same week.
+
+| arm | 2024 | 2025 | 2026 | mean abs | worst | mean w |
+|---|---|---|---|---|---|---|
+| k25 | +0.37 | +0.28 | −1.78 | **0.810** | **1.776** | 0.73 |
+| k50 | +0.45 | +0.38 | −2.00 | 0.944 | 2.003 | 0.65 |
+| k100 | +0.55 | +0.51 | −2.26 | 1.106 | 2.257 | 0.55 |
+| k200 | +0.67 | +0.66 | −2.49 | 1.275 | 2.486 | 0.43 |
+| incumbent | +1.15 | +1.31 | −2.90 | 1.784 | 2.895 | 0.00 |
+
+Every arm beats the incumbent on both aggregate measures with the interval entirely below
+zero (k25: mean −0.974 [−1.016, −0.507], worst −1.119 [−1.244, −0.800]), no season is
+entirely worse, and all four survive Holm at adjusted p = 0.0040.
+
+### The caveat that matters more than the table
+
+**The primary measure is close to self-fulfilling, and a pass on it is weaker evidence
+than it looks.** The estimator subtracts an estimate of the season's own level error, and
+the primary measure is that season's level error. Any estimator whose running mean
+converges toward the season mean drives season-level bias toward zero — whether or not it
+improves a single prediction. This is not leakage: the window is strictly prior, and a
+week-8 game is corrected only by weeks 1-7. It is a measure that cannot fail.
+
+MAE does not rescue it. It improves in all three seasons (8.918 → 8.840, 9.088 → 8.988,
+8.233 → 8.094 at k25), but by **exactly the amount removing that much bias implies** — for
+errors around 9 points, removing 1.5 points of level is worth about 0.07 of MAE. That is
+the same fact restated, not corroboration.
+
+**What the run does establish, and it is not nothing:** the season's level is estimable
+from its own completed games early enough to be worth applying, and the correction is not
+purely mechanical. If within-season bias were constant, the prefix mean would zero every
+week band. It does not:
+
+| arm | 2024 weeks 1-3 / 4-6 / 7-10 / 11+ | 2025 |
+|---|---|---|
+| incumbent | +1.01 / +0.02 / +0.97 / **+2.13** | +1.04 / +0.99 / +1.36 / +1.61 |
+| k25 | −0.04 / −0.52 / +0.33 / **+1.22** | −0.05 / +0.20 / +0.36 / +0.46 |
+
+2024's bias drifts within the season and the prefix mean lags it by design, leaving +1.22
+at weeks 11+. So there is real within-season structure the estimator is only partly
+tracking.
+
+### The consequential number is selection
+
+| arm | 2024 | 2025 | 2026 |
+|---|---|---|---|
+| incumbent | 18.8% | 11.9% | 60.7% |
+| k25 | 24.6% | 18.2% | 49.2% |
+| k200 | 22.5% | 16.4% | 55.7% |
+
+The share clearing 1.75 becomes far more **uniform across seasons**, which is what a
+level correction should do, and 2025 moves from 11.9% into the validated 15-20% band.
+Two things temper it: 2024 moves above the band rather than into it, and **2026 is still
+at 49.2%** against a band of 15-20%.
+
+**2026 is where the estimator is weakest, for a structural reason.** The season is weeks
+1-3 and nothing else, so week 1 — about a third of its 153 games — gets no in-season
+evidence at all and takes the full −1.81 prior intercept. The in-season correction is
+weakest exactly when a season is young, which is when the 2026 deficit bit hardest.
+
+Worth putting beside it: on 2026 alone, **simply dropping the intercept beat every
+in-season arm** (H-INTERCEPT's λ=0 gives −1.09 against k25's −1.78). The in-season blend
+wins overall because it also fixes 2025 (+0.28 against λ=0's +2.46), which dropping the
+intercept made worse.
+
+### What it licenses, and what it does not
+
+Under the registered rule: **a prospective paper arm, and nothing more.** Before that arm
+logs its first pick it needs its own registry row with its own prospective validation or
+stopping criterion. H-STOP is untouched and the champion's rule is never mixed with the
+challenger's. Live selection does not change, `bias_corrections` is not edited, and
+`BET_GAP_PTS` is not moved.
+
+Two decisions are open and are not made here: **which k**, since all four pass and the
+criterion does not rank passing arms, and whether the paper arm starts now.
+
+The declared limitation still stands: the bootstrap resamples games within a season and is
+blind to between-season variation, the dominant uncertainty here. Three seasons, one of
+them three weeks long, is thin — and these are **development** seasons, since 2026
+motivated the hypothesis. Prospective evidence begins with decisions logged from here.

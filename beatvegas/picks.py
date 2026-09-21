@@ -202,10 +202,16 @@ def graded_pick_fields(
     }
 
 
-def grade_pick(session, pick: ManualPick, game) -> bool:
+def grade_pick(session, pick, game) -> bool:
     """Grade one ungraded pick against its (finished) game in place. Returns
     True when the pick was graded, False when the game isn't gradeable yet (not
     finished, or a known-false 1H zero — never grade that).
+
+    `pick` is a ManualPick or a ChallengerPick: this reads only the decision
+    fields both carry and writes only the names `graded_pick_fields` returns, so
+    the H-INSEASON challenger arms are graded by the champion's own code instead
+    of a second implementation that could drift from it. It never queries or
+    writes a ledger table itself, so passing one row can never touch the other.
 
     Rules, shared by the terminal grader and the week-sim reveal:
     - a full-game ticket grades the final total; a 1H ticket grades the TRUSTED

@@ -131,6 +131,23 @@ Research only — it never places bets or automates gambling.
   across the four arms, and no k selected until the prospective rule allows it. Live
   selection, `bias_corrections` and `BET_GAP_PTS` are untouched, and **H-STOP is completely
   unchanged**.
+  **THE PROSPECTIVE LEDGER IS BUILT AND REGISTERED (H-INSEASON-P, `docs/INSEASON_PAPER.md`).**
+  Four arms log paper observations at every card build from the same snapshot, through the
+  SAME `build_card` the champion runs (only `bv_line` moves), and grade through the SAME
+  `picks.grade_pick`. They write to **`challenger_picks`, never `manual_picks`** -- its own
+  table because every query feeding the bankroll, the cap, Results and H-STOP's observations
+  reads `manual_picks`, and one missed filter would contaminate the champion's clock; the
+  table has no `is_paper`/`is_bonus` column at all. **`Prediction.bv_intercept` is new** and
+  is what makes it work: the RAW pre-intercept prediction is `bv_line - bv_intercept`, and
+  `c_season` MUST come from the raw number (a calibrated one re-applies `c_prior` scaled by
+  `w`, and no report would show it). The as-of window is SQL, not memory: a game counts only
+  if it kicked off before the build AND its first half is graded. Position:
+  `PYTHONPATH=. python scripts/challenger_position.py`. Budget is `stopping.CHALLENGER` --
+  H-STOP's own mu1/sigma reused, but 5% split /4 arms (Bonferroni) then /2 clocks = 0.625%
+  per arm-clock, bounds ln A +4.8520 / ln B -1.6032. An arm PASSES only when BOTH clocks
+  cross A, is DROPPED when EITHER crosses B; **if more than one arm passes, no k is chosen --
+  that needs its own registered row**. **Run `migrate.yml` before the next card build** (new
+  table + column).
   **Ruled out, so do not re-run these:** no feature changed (143 vs 153 rows at
   `min_games=0`; nothing missing, max NaN shift 7.7pp, max level shift 0.76sd — the
   weather lead is dead); week-of-season (OOF by band −1.62/−1.05/−1.76/−2.44, an early

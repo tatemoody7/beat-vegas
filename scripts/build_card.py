@@ -36,6 +36,18 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 from beatvegas.card import REFERENCE_MODEL_VERSION, build_card, card_games, degraded_inputs
+from beatvegas.challenger import (
+    PAPER_ARMS,
+    arm_context,
+    arm_label,
+    arm_predictions,
+)
+from beatvegas.challenger_picks import (
+    add_challenger_pick,
+    current_intercept,
+    existing_challenger_pick,
+    season_read_as_of,
+)
 from beatvegas.db.models import (
     Card,
     Game,
@@ -137,6 +149,7 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
             "game_id": p.game_id,
             "model_version": p.model_version,
             "bv_line": p.bv_line,
+            "bv_intercept": p.bv_intercept,
             "under_score": p.under_score,
             "line_used": p.line_used,
             # the stored pace chip: degraded_inputs reads it
@@ -315,6 +328,97 @@ def _status_line(card: Dict) -> str:
     return line
 
 
+def log_challenger_picks(
+    session,
+    *,
+    games,
+    snaps,
+    preds,
+    previews,
+    season: int,
+    week: int,
+    now: datetime,
+    slot: Optional[str],
+    held,
+    real,
+    degraded,
+    window_hours: Optional[float] = None,
+) -> Dict[str, int]:
+    """One paper observation per qualifying game per H-INSEASON arm.
+
+    Registry row H-INSEASON-P. Every arm is rebuilt through the SAME `build_card`
+    the champion just ran, with only `bv_line` moved to that arm's intercept, so
+    the gates, the blockers and `qualifies` are the champion's code rather than a
+    parallel implementation that could drift. The snapshot is identical: same
+    games, same Hard Rock lines and prices, same previews, same degraded inputs,
+    same paper window.
+
+    Writes to `challenger_picks` and NOTHING ELSE. No path here can reach
+    `manual_picks`, the bankroll, the 5-bet cap or H-STOP's observations.
+    """
+    read = season_read_as_of(session, season, now, MODEL_VERSION)
+    c_prior = current_intercept(session, season, MODEL_VERSION)
+    # The champion's own number at this build, frozen beside the arm's so the
+    # paired diagnostic in docs/INSEASON_PAPER.md can be computed later. It
+    # decides nothing.
+    champion_lines = {
+        int(pr["game_id"]): pr.get("bv_line")
+        for pr in preds
+        if pr.get("model_version") == MODEL_VERSION and pr.get("bv_line") is not None
+    }
+    added: Dict[str, int] = {}
+    for k in PAPER_ARMS:
+        label = arm_label(k)
+        ctx = arm_context(c_prior, read, k)
+        arm_card = build_card(
+            games,
+            snaps,
+            arm_predictions(preds, read, k, model_version=MODEL_VERSION),
+            previews,
+            season=season,
+            week=week,
+            now=now,
+            held_game_ids=held,
+            prior_bet_game_ids=real,
+            slot=slot,
+            degraded=degraded,
+        )
+        n = 0
+        for it in arm_card["items"]:
+            if not it.get("qualifies"):
+                continue
+            if window_hours is not None and it.get("kick"):
+                kick = datetime.fromisoformat(it["kick"].replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                )
+                if kick - now > timedelta(hours=window_hours):
+                    continue
+            gid = it["game_id"]
+            if existing_challenger_pick(session, gid, label) is not None:
+                continue
+            add_challenger_pick(
+                session,
+                game_id=gid,
+                season=season,
+                week=week,
+                home_team=it["home"],
+                away_team=it["away"],
+                line=it["hr_line"],
+                price=it.get("hr_price"),
+                book="hardrockbet",
+                slot=slot,
+                placed_at=now,
+                blocker="cap" if it.get("over_cap") else (it.get("paper_blocker") or "none"),
+                arm_line_at_pick=it.get("bv_line"),
+                champion_line_at_pick=champion_lines.get(gid),
+                gap_at_pick=it.get("gap"),
+                **ctx,
+            )
+            n += 1
+        added[label] = n
+    return added
+
+
 def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
     c = card["counts"]
     paper = card.get("paper", {})
@@ -447,9 +551,31 @@ def run(
             degraded=degraded,
         )
         picks_added = 0
+        challenger_added: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
                 picks_added = log_paper_picks(s, card, now, window_hours=paper_window_hours)
+                # H-INSEASON-P: the challenger family logs beside the champion,
+                # from the same snapshot, into its own table. A failure here must
+                # never cost the real card -- the challenger is a measurement.
+                try:
+                    challenger_added = log_challenger_picks(
+                        s,
+                        games=games,
+                        snaps=snaps,
+                        preds=preds,
+                        previews=previews,
+                        season=season,
+                        week=week,
+                        now=now,
+                        slot=slot,
+                        held=held,
+                        real=real,
+                        degraded=degraded,
+                        window_hours=paper_window_hours,
+                    )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    print(f"[card] WARNING: challenger family not logged: {e}")
             s.add(
                 Card(
                     season=season,
@@ -460,6 +586,11 @@ def run(
             )
 
     lines = summary_lines(card, len(games), picks_added)
+    if challenger_added:
+        lines.append(
+            "  CHALLENGER (H-INSEASON family, paper only): "
+            + ", ".join(f"{a} +{n}" for a, n in sorted(challenger_added.items()))
+        )
     print("\n".join(lines))
     if dry_run:
         print(json.dumps(card, indent=2, ensure_ascii=False, allow_nan=False))

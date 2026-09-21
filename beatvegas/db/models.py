@@ -293,6 +293,11 @@ class Prediction(Base):
     bv_lo = Column(Float)  # 80% prediction band lower bound
     bv_hi = Column(Float)  # 80% prediction band upper bound
     bv_sigma = Column(Float)  # residual std (gap noise scale)
+    # The global calibration intercept bv_line_for_slate ADDED to this row
+    # (bias_corrections(train)['global']). Stored so the raw, pre-intercept
+    # prediction stays recoverable as bv_line - bv_intercept: H-INSEASON-P's
+    # arms need raw residuals, and re-deriving them would mean refitting.
+    bv_intercept = Column(Float)
     line_used = Column(Float)
     rank = Column(Integer)
     factors_json = Column(String)  # per-game factor payload for cards
@@ -498,6 +503,64 @@ class FactorLedger(Base):
     recent_mean = Column(Float)  # trailing-window hit rate
     drift_flag = Column(Boolean)  # "cooling": recent below breakeven, all-time above
     created_at = Column(DateTime)
+
+
+class ChallengerPick(Base):
+    """A paper pick from one arm of the H-INSEASON challenger family.
+
+    DELIBERATELY NOT A COLUMN ON `manual_picks`. Four arms plus the champion's
+    own paper pick are all `is_paper=true` on the same game and market, which
+    `uq_manual_pick_per_ledger` forbids outright -- but the reason for a separate
+    table is stronger than the index: every query that feeds the bankroll, the
+    5-bet cap, Results and H-STOP's observation set reads `manual_picks`, and a
+    single missed `arm IS NULL` filter would contaminate the champion's clock.
+    Isolation here is structural rather than remembered.
+
+    Never real money. `is_paper` is not a column because there is no other kind.
+    Registry row H-INSEASON-P; spec in docs/INSEASON_PAPER.md.
+    """
+
+    __tablename__ = "challenger_picks"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    arm = Column(String, index=True)  # 'k25' | 'k50' | 'k100' | 'k200'
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    home_team = Column(String)
+    away_team = Column(String)
+    side = Column(String, default="under")
+    market = Column(String, default="1H")
+
+    # Frozen at the decision, exactly as the champion's paper ledger freezes them.
+    line = Column(Float)  # the Hard Rock 1H total the arm would have taken
+    price = Column(Integer)
+    stake = Column(Float, default=1.0)  # one flat unit, so units/ROI compare
+    book = Column(String)
+    slot = Column(String)  # which build made the decision
+    placed_at = Column(DateTime)
+    blocker = Column(String)  # the gate that would have blocked a real bet
+
+    # The arm's own read, and the champion's beside it for the paired diagnostic.
+    arm_line_at_pick = Column(Float)  # the arm's bv_line
+    champion_line_at_pick = Column(Float)  # the champion's bv_line, same build
+    c_prior = Column(Float)
+    c_season = Column(Float)
+    in_season_n = Column(Integer)  # completed games the arm could see
+    in_season_weight = Column(Float)  # w = n / (n + k)
+    gap_at_pick = Column(Float)
+
+    # Every field `picks.graded_pick_fields` returns, under the same names, so
+    # `picks.grade_pick` grades an arm's observation with the champion's own code
+    # rather than a copy of it. tests/test_challenger.py pins the correspondence.
+    graded = Column(Boolean, default=False)
+    actual_first_half_total = Column(Integer)
+    result = Column(String)  # under / over / push
+    units = Column(Float)
+    opening_line = Column(Float)
+    closing_line = Column(Float)
+    clv = Column(Float)  # closing - bet; for an under, NEGATIVE is favourable
+    clv_prob = Column(Float)
+    closing_price = Column(Integer)
 
 
 class ModelRun(Base):

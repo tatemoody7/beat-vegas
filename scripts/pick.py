@@ -20,6 +20,7 @@ import argparse
 from datetime import datetime
 from typing import List, Optional
 
+from beatvegas.challenger_picks import grade_challenger_picks
 from beatvegas.db.models import Game, ManualPick
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import resolve_game
@@ -196,6 +197,14 @@ def cmd_grade(args) -> None:
             if grade_pick(s, p, g):
                 graded += 1
     print(f"graded {graded} pick(s) for {season}")
+    # H-INSEASON-P's arms settle by the same rules, in their own table. A failure
+    # here is a measurement outage, never a reason to fail the real grading run.
+    try:
+        with session_scope() as s:
+            n = grade_challenger_picks(s, season, regrade=regrade)
+        print(f"graded {n} challenger observation(s) for {season}")
+    except Exception as e:  # noqa: BLE001 - the champion's ledger comes first
+        print(f"[grade] WARNING: challenger ledger not graded: {e}")
     cmd_summary(args)
 
 

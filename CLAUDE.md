@@ -98,10 +98,12 @@ Research only — it never places bets or automates gambling.
   2026's own 153 graded games reach neither the fit nor the intercept; the arms are a
   precision-weighted blend `w = n/(n+k)`, k in {25, 50, 100, 200}, `c_season` from the RAW
   pre-intercept prediction, window closing strictly before the build.
-  **H-INSEASON RAN THE SAME DAY: ALL FOUR ARMS PASS** (`scripts/inseason_gate.py`; mean abs
-  bias 1.784 -> **0.810** at k=25, worst 2.895 -> 1.776, no season worse, Holm adjusted
-  p 0.0040 on all four). **READ THE CAVEAT BEFORE QUOTING THE PASS: the primary measure is
-  close to SELF-FULFILLING.** The estimator subtracts an estimate of the season's own level
+  **H-INSEASON RAN THE SAME DAY AND PASSED ITS DEVELOPMENTAL GATE -- THIS IS NOT A
+  BETTING-VALUE FINDING AND MAY NOT BE QUOTED AS ONE** (Tate, 2026-09-20). All four arms
+  passed (`scripts/inseason_gate.py`; mean abs bias 1.784 -> **0.810** at k=25, worst
+  2.895 -> 1.776, no season worse, Holm adjusted p 0.0040 on all four), but **the primary
+  level-bias measure is PARTLY MECHANICAL for this estimator**, so the pass establishes no
+  prospective betting value. The estimator subtracts an estimate of the season's own level
   error and is judged on that error, so any running mean converging to the season mean
   drives the metric to zero whether or not a single prediction improves. It is NOT leakage
   (the window is strictly prior; a week-8 game sees weeks 1-7). MAE does not rescue it --
@@ -117,10 +119,18 @@ Research only — it never places bets or automates gambling.
   in-season evidence -- the estimator is weakest exactly when a season is young, which is
   when the deficit bit. And on 2026 ALONE, simply dropping the intercept beat every
   in-season arm (-1.09 vs k25's -1.78); the blend wins overall only because it also fixes
-  2025 (+0.28 vs +2.46). **Licenses a prospective paper arm and nothing more**, and that
-  arm needs its OWN registry row and clock before its first pick. **Which k is UNCHOSEN**
-  (all four pass; the criterion does not rank passing arms) and whether the arm starts now
-  is Tate's call. Live selection, `bias_corrections` and `BET_GAP_PTS` are untouched.
+  2025 (+0.28 vs +2.46). **The only thing it licenses is properly registered prospective
+  paper collection**, whose row is written before its first pick. **NO k is chosen and none
+  will be chosen from this run** (Tate): the gate had no ranking rule, so picking the
+  best-looking arm out of the same 2024-26 data would be post-hoc. All four go forward
+  together as **one H-INSEASON challenger family** on identical decision-time snapshots,
+  beside the frozen champion; if one challenger must be named for display it is the FAMILY,
+  never an arm. The prospective phase is judged on measures NOT mechanically tied to the
+  correction -- paper profit at actually available prices and CLV vs the closing market --
+  with prediction error and level bias as secondary diagnostics, multiplicity controlled
+  across the four arms, and no k selected until the prospective rule allows it. Live
+  selection, `bias_corrections` and `BET_GAP_PTS` are untouched, and **H-STOP is completely
+  unchanged**.
   **Ruled out, so do not re-run these:** no feature changed (143 vs 153 rows at
   `min_games=0`; nothing missing, max NaN shift 7.7pp, max level shift 0.76sd — the
   weather lead is dead); week-of-season (OOF by band −1.62/−1.05/−1.76/−2.44, an early

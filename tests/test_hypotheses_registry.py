@@ -61,21 +61,37 @@ COLUMNS = [
 ]
 
 
-def _rows() -> list[dict]:
+def _table_lines() -> list[list[str]]:
+    """Every data line of the registry tables, split into cells, wrong width and all.
+
+    A cell containing a bare `|` -- `|mean bias|` was the real case -- splits into
+    extra columns. Until 2026-09-20 `_rows()` dropped such a line silently, so the
+    two rows that had one (H-LEVEL, H-INTERCEPT) were the only rows in the file
+    their own honesty guard never read, and they rendered with phantom columns on
+    GitHub. Widths are now checked, not skipped: write `\\|` inside a cell.
+    """
     if not REGISTRY.exists():  # pragma: no cover - the registry is checked in
         pytest.skip("docs/HYPOTHESES.md not present in this checkout")
-    rows = []
+    out = []
     for line in REGISTRY.read_text().splitlines():
         if not line.startswith("|"):
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != len(COLUMNS):
-            continue
+        cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
         if cells[0] in ("id", "") or set(cells[0]) <= {"-"}:
             continue
-        rows.append(dict(zip(COLUMNS, cells)))
-    assert rows, "no registry rows parsed"
-    return rows
+        out.append(cells)
+    assert out, "no registry rows parsed"
+    return out
+
+
+def test_every_row_has_the_expected_number_of_columns():
+    """The width check that makes every other test in this file reachable."""
+    bad = {c[0]: len(c) for c in _table_lines() if len(c) != len(COLUMNS)}
+    assert not bad, f"unescaped `|` inside a cell (write `\\|`): {bad}"
+
+
+def _rows() -> list[dict]:
+    return [dict(zip(COLUMNS, c)) for c in _table_lines() if len(c) == len(COLUMNS)]
 
 
 def test_ids_are_unique():

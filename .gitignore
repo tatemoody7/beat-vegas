@@ -44,6 +44,7 @@ config.yaml
 # FINDING is committed to docs/ -- see docs/LEVEL_ANCHOR.md -- never the file.
 reports/residual_gate_*
 reports/level_anchor_*
+reports/intercept_*
 reports/censoring_*
 reports/hr_lag_*
 reports/weather_gate_*

@@ -182,3 +182,30 @@ the calibration step, not in the data.
 Until that is found, the honest position is the one the board already takes: the
 **ranking** is unaffected by a level shift, the **threshold** is not, and H-STOP is
 measuring the frozen rule. Nothing here licenses a change to live selection.
+
+## H-INTERCEPT — the grid, declared before the run
+
+H-INTERCEPT's criterion cell says the shrinkage grid is "declared in advance" without
+stating it. **This is that declaration, committed before the gate was run** (Tate,
+2026-09-20): the arms are the intercept scaled by
+
+**λ ∈ {0, 0.25, 0.5, 0.75, 1.0}**, where λ=1 is the incumbent and λ=0 drops the intercept.
+
+λ=1 reproduces `bv_line_for_slate` exactly rather than re-implementing it, so the
+incumbent is an arm of the experiment. Each arm is a constant shift of one fitted model,
+so the whole grid costs one fit per held-out season — and a constant shift cannot reorder
+a board, which is why the ranking is untouched whatever the gate returns.
+
+Two details of how the rule is read, also fixed before the run:
+
+- **The mean across seasons is equal-weight.** The criterion says "the MEAN |level bias|
+  across the three held-out seasons", and the question is whether a correction transfers
+  *between* seasons; game-weighting would hand that question to 2025 (744 rows) over 2026
+  (153).
+- **`comparisons run` counts challenger-versus-incumbent tests**, so the grid is 4
+  comparisons per season, not 5 — λ=1 is not compared against itself.
+
+The gate is `scripts/intercept_gate.py` (`beatvegas/backtest/intercept.py` holds the
+arithmetic and `_verdict` applies the registered rule verbatim). It is a report, not a CI
+gate, and changing the intercept would mean editing `model/bv_line.py` in a PR that cites
+the report.

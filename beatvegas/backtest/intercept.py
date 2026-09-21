@@ -124,6 +124,15 @@ def _abs_bias_ci(
     When both shifts are equal -- which is every arm on a season whose intercept
     is 0 -- every replicate is exactly 0 and the interval is [0, 0]. That is the
     structural tie, reported as such rather than as a failed comparison.
+
+    The interval also COLLAPSES for an ordinary season, and that is a property of
+    the question rather than a defect. Both arms differ by a constant, so as long
+    as a resampled bias keeps its sign the difference of absolute means is exactly
+    `shift_arm - shift_inc` -- the same number in every replicate. Width appears
+    only where a resample can carry the bias across zero. So "the CI excludes
+    zero" is close to vacuous here: it is satisfied by construction wherever the
+    bias is comfortably away from zero, and the clause that actually decides an
+    arm is whether its |bias| is lower at all. `deterministic` marks it.
     """
     n = int(len(actual))
     if n == 0:
@@ -141,6 +150,9 @@ def _abs_bias_ci(
         "lo": float(lo),
         "hi": float(hi),
         "excludes_zero": bool(lo > 0 or hi < 0),
+        # Zero width with the arms genuinely apart: no resample crossed zero
+        # bias, so the statistic is constant. See the docstring.
+        "deterministic": bool(float(hi) - float(lo) < 1e-9 and shift_arm != shift_inc),
         "n_boot": int(n_boot),
     }
 
@@ -252,7 +264,7 @@ def evaluate(
         "n_boot": N_BOOT,
         "seasons": seasons_meta,
         "arms": arms,
-        "caveats": _caveats(seasons_meta),
+        "caveats": _caveats(seasons_meta, arms),
     }
     return InterceptResult(per_game=per_game.reset_index(), report=_clean(report))
 
@@ -298,7 +310,7 @@ def _verdict(arm: Dict[str, Any], incumbent: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _caveats(seasons_meta: List[Dict[str, Any]]) -> List[str]:
+def _caveats(seasons_meta: List[Dict[str, Any]], arms: List[Dict[str, Any]]) -> List[str]:
     out = [
         "lambda=1.0 IS the incumbent -- the same code path with the intercept scaled, "
         "not a re-implementation.",
@@ -309,6 +321,23 @@ def _caveats(seasons_meta: List[Dict[str, Any]]) -> List[str]:
         "Three seasons is THIN. A pass would be a finding and would license a registered "
         "parallel paper arm only; H-STOP is running on the frozen rule.",
     ]
+    n_det = sum(
+        1
+        for a in arms
+        if not a["is_incumbent"]
+        for s in a["seasons"].values()
+        if s["vs_incumbent"].get("deterministic")
+    )
+    n_cmp = sum(1 for a in arms if not a["is_incumbent"]) * len(seasons_meta)
+    if n_det:
+        out.append(
+            f"{n_det} of {n_cmp} challenger-season intervals have ZERO WIDTH. Two arms "
+            "differ by a constant, so while a resampled bias keeps its sign the "
+            "difference of absolute means is that constant in every replicate; width "
+            "appears only where a resample can cross zero bias. So the criterion's "
+            "'CI excludes zero' clause is close to vacuous against a constant shift -- "
+            "what decides an arm here is whether its |bias| is lower at all."
+        )
     for s in seasons_meta:
         if s["degenerate"]:
             out.append(

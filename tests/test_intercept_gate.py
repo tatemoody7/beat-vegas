@@ -204,3 +204,32 @@ def test_the_incumbent_arm_is_never_adopted(frame):
 def test_grid_without_the_incumbent_is_refused(frame):
     with pytest.raises(ValueError, match="incumbent"):
         evaluate(frame, test_seasons=[2026], grid=[0.0, 0.5])
+
+
+def test_a_constant_shift_gives_a_zero_width_interval_and_says_so():
+    """The clause "CI excludes zero" is near-vacuous against a constant shift.
+
+    Both arms differ by a fixed amount, so while a resampled bias keeps its sign
+    the difference of absolute means is that same amount every time. Width only
+    appears where a resample can cross zero bias.
+    """
+    rng = np.random.default_rng(5)
+    actual = rng.normal(28, 10, 500)
+    raw = actual + 4.0 + rng.normal(0, 1, 500)  # bias comfortably away from zero
+    ci = _abs_bias_ci(raw, actual, 0.0, -1.0)
+    assert ci["deterministic"] is True
+    assert ci["hi"] - ci["lo"] < 1e-9
+    assert ci["excludes_zero"] is True  # satisfied by construction, not by evidence
+
+    # A bias sitting ON zero is the case where resamples straddle and width appears.
+    near_zero = actual + rng.normal(0, 1, 500)
+    wide = _abs_bias_ci(near_zero, actual, 0.0, -1.0)
+    assert wide["deterministic"] is False
+    assert wide["hi"] - wide["lo"] > 1e-6
+
+
+def test_the_zero_width_caveat_reaches_the_report(frame):
+    res = evaluate(frame, test_seasons=[2025, 2026], grid=[0.0, 1.0])
+    md = render_markdown(res.report)
+    assert "ZERO WIDTH" in md
+    assert "close to vacuous" in md

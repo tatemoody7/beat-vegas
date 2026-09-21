@@ -25,6 +25,7 @@ _MIGRATIONS = {
         "bv_lo": "FLOAT",
         "bv_hi": "FLOAT",
         "bv_sigma": "FLOAT",
+        "bv_intercept": "FLOAT",
     },
     "results": {
         "closing_captured_at": "TIMESTAMP",
@@ -326,6 +327,22 @@ def _apply_migrations(engine) -> None:
     #
     # Fail-soft like the one above: an existing DB holding duplicates keeps
     # running, it just does not gain the backstop.
+    if "challenger_picks" in existing:
+        # One canonical observation per decision per arm (H-INSEASON-P). The
+        # champion's own guard is the same shape, one ledger over; the arm takes
+        # the place is_paper holds there.
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_challenger_pick_per_arm "
+                        "ON challenger_picks "
+                        "(game_id, COALESCE(market, '1H'), arm)"
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - duplicate rows in a legacy DB
+            print(f"[db] WARNING: could not add uq_challenger_pick_per_arm index: {e}")
+
     if "manual_picks" in existing:
         try:
             with engine.begin() as conn:

@@ -29,7 +29,7 @@ from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
 from ..factors.board import build_factor_board, factor_references
 from ..factors.ledger import load_ledger
-from .bv_line import bv_line_for_slate, residual_band
+from .bv_line import bias_corrections, bv_line_for_slate, residual_band
 from .residual import (
     RESIDUAL_MIN_TRAIN,
     residual_1h_for_slate,
@@ -476,6 +476,11 @@ def score_slate(
     # whole board, and under the residual engine it is the per-row fallback.
     # (An independent calibrated "BV line" from a MARKET-BLIND regressor.)
     target["bv_line"] = bv_line_for_slate(train, target).round(2)
+    # The intercept that number carries, stored per row so the RAW, pre-intercept
+    # prediction stays recoverable as bv_line - bv_intercept. H-INSEASON-P's arms
+    # re-estimate the calibration from the season's own raw residuals, and without
+    # this they would have to refit the model to see them.
+    target["bv_intercept"] = round(float(bias_corrections(train).get("global", 0.0)), 6)
     band = residual_band(train)
     bands: List = [(pd.Series(True, index=target.index), band)]
     fallback: Optional[str] = None
@@ -597,6 +602,7 @@ def store_predictions(
                     bv_lo=_f(r.get("bv_lo")),
                     bv_hi=_f(r.get("bv_hi")),
                     bv_sigma=_f(r.get("bv_sigma")),
+                    bv_intercept=_f(r.get("bv_intercept")),
                     line_used=_f(line),
                     rank=int(r["rank"]),
                     factors_json=json.dumps(

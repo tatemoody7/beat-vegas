@@ -349,3 +349,74 @@ def render_position(pos: Dict[str, Any]) -> str:
         )
     L += ["", f"Real money: **{pos['real_money']}**.", ""]
     return "\n".join(L)
+
+
+# --- The H-INSEASON challenger family (registry row H-INSEASON-P) -------------
+#
+# A SEPARATE dict from REGISTERED above, deliberately. H-STOP measures the
+# champion and must not move; this measures four challenger arms and shares only
+# the generic machinery. The alternatives and sds ARE H-STOP's, reused so the
+# challenger is held to the champion's bar in the champion's units.
+#
+# The error budget is the one difference that matters: 5% total, split /4 across
+# the arms (Bonferroni) and then /2 across the two clocks, so each arm-clock runs
+# at 0.625% -- against H-STOP's 2.5%, because H-STOP tests one ledger and this
+# tests four correlated ones.
+#
+# docs/INSEASON_PAPER.md quotes these; tests/test_docs_parity.py pins it.
+CHALLENGER: Dict[str, Any] = {
+    "registered_on": "2026-09-20",
+    "design": "sprt",
+    "arms": ["k25", "k50", "k100", "k200"],
+    "alpha_total": 0.05,
+    "multiplicity": "bonferroni",
+    "alpha_arm": 0.05 / 4,  # 1.25% per arm
+    "alpha_clock": 0.05 / 4 / 2,  # 0.625% per arm-clock
+    "power": 0.80,
+    "sigma": REGISTERED["sigma"],
+    "mu1": REGISTERED["mu1"],
+    "unit": "1u = one unit risked; every challenger observation stakes 1u flat",
+    "observation": "one qualifying pick per arm per game (challenger_picks) -- never manual_picks",
+    "pass": "BOTH clocks cross A",
+    "drop": "EITHER clock crosses B",
+    "on_pass": (
+        "if exactly one arm passes it may be named; if more than one does, no k is chosen "
+        "here and that choice needs its own registered row"
+    ),
+    "touches": "nothing live -- no real-money selection, no model edit, H-STOP unchanged",
+}
+
+
+def challenger_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, Any]:
+    """The running position of every arm, under the challenger's own budget.
+
+    `arms` maps an arm label to {"units": [...], "clv": [...]} in placed order,
+    where clv is ALREADY the favourable direction (see grading.clv_under: the
+    stored value is closing - bet, and for an under a falling line is good).
+    """
+    c = CHALLENGER
+    out = {
+        "registered": {k: v for k, v in c.items() if k != "unit"},
+        "arms": {
+            label: running_position(
+                obs.get("units", []),
+                obs.get("clv", []),
+                c["design"],
+                c["mu1"],
+                c["sigma"],
+                c["alpha_clock"],
+                c["power"],
+            )
+            for label, obs in sorted(arms.items())
+        },
+    }
+    for pos in out["arms"].values():
+        clocks = pos.get("clocks", {})
+        verdicts = {k: v.get("verdict") for k, v in clocks.items()}
+        passed = verdicts and all(v == "SUCCESS" for v in verdicts.values())
+        dropped = any(v == "FAILURE" for v in verdicts.values())
+        pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
+    passers = [a for a, p in out["arms"].items() if p["family_verdict"] == "PASS"]
+    out["passers"] = passers
+    out["may_name_k"] = len(passers) == 1
+    return out

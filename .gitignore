@@ -46,6 +46,7 @@ reports/residual_gate_*
 reports/level_anchor_*
 reports/intercept_*
 reports/inseason_*
+reports/challenger_*
 reports/censoring_*
 reports/hr_lag_*
 reports/weather_gate_*

@@ -127,19 +127,23 @@ def _n_picks(eng) -> int:
 
 
 def test_cmd_add_refuses_real_money_while_paused_even_with_force(capsys):
+    """Since 2026-09-22 the CLI is paper-only, so real money is refused before
+    the pause is even consulted -- and --force changes nothing. The pause itself
+    is still enforced on the site's write path (pickRules.checkPolicy) and read
+    fail-closed there; scripts/rule_pause.py remains its only writer."""
     pick, eng = _pick_module_paused(True)
     pick.cmd_add(_args())
     assert _n_picks(eng) == 0
     pick.cmd_add(_args(force=True))
     assert _n_picks(eng) == 0
     out = capsys.readouterr().out
-    assert "RULE PAUSED" in out and "boundary crossed" in out
+    assert "REFUSED" in out and "paper-only" in out
 
 
-def test_cmd_add_still_logs_paper_while_paused_and_real_when_not():
+def test_cmd_add_still_logs_paper_while_paused_and_never_real():
     pick, eng = _pick_module_paused(True)
     pick.cmd_add(_args(paper=True))
-    assert _n_picks(eng) == 1
+    assert _n_picks(eng) == 1  # the pause is about money; paper keeps accruing
     pick2, eng2 = _pick_module_paused(False)
     pick2.cmd_add(_args())
-    assert _n_picks(eng2) == 1
+    assert _n_picks(eng2) == 0  # real money is logged on the site, never here

@@ -176,9 +176,19 @@ def _pick_module():
 
 
 def test_add_stores_the_decision_snapshot():
+    """The CLI is paper-only since 2026-09-22 (real money is logged on the site,
+    where the policy gates run); the decision snapshot is stored either way."""
     pick, eng = _pick_module()
     pick.cmd_add(
-        _args(reason="model_gap", verdict="BET", gap=2.25, ev=0.031, hr_line=24.5, stake=2.0)
+        _args(
+            paper=True,
+            reason="model_gap",
+            verdict="BET",
+            gap=2.25,
+            ev=0.031,
+            hr_line=24.5,
+            stake=2.0,
+        )
     )
     with Session(eng) as s:
         (row,) = s.query(ManualPick).all()
@@ -187,12 +197,12 @@ def test_add_stores_the_decision_snapshot():
     assert row.gap_at_pick == 2.25
     assert row.ev_at_pick == 0.031
     assert row.hr_line_at_pick == 24.5
-    assert row.stake == 2.0 and row.is_paper is False
+    assert row.stake == 1.0 and row.is_paper is True  # paper stakes one flat unit
 
 
 def test_add_defaults_to_manual_reason_and_null_snapshot():
     pick, eng = _pick_module()
-    pick.cmd_add(_args())
+    pick.cmd_add(_args(paper=True))
     with Session(eng) as s:
         (row,) = s.query(ManualPick).all()
     assert row.reason == "manual"
@@ -394,7 +404,7 @@ def test_pick_add_freezes_the_model_read_on_the_ticket():
             )
         )
         s.commit()
-    pick.cmd_add(_args())
+    pick.cmd_add(_args(paper=True))
     with Session(eng) as s:
         (row,) = s.query(ManualPick).all()
     assert row.model_line_at_pick == 22.4 and row.model_score_at_pick == 78
@@ -426,26 +436,43 @@ def test_existing_pick_is_scoped_per_ledger():
         assert existing_pick(s, 1, "1H", is_paper=False) is not None
 
 
-def test_real_ticket_is_not_refused_by_the_cards_paper_pick(capsys):
+def test_real_ticket_is_not_blocked_by_the_cards_paper_pick():
+    """The ledgers are scoped apart: the card's paper pick on a game never
+    blocks Tate's real ticket on it. The real ticket is written by the site
+    (POST /api/picks -> picks.ts createPick) through the same per-ledger
+    duplicate rule `existing_pick` implements; the CLI no longer writes real
+    money, so the rule is exercised here directly."""
     pick, eng = _pick_module()
     with Session(eng) as s:
         _paper(s)
         s.commit()
-    pick.cmd_add(_args(price=-110))  # Tate's real bet on the same game
-    out = capsys.readouterr().out
-    assert "REFUSED" not in out
-    with Session(eng) as s:
+        assert existing_pick(s, 1, "1H", is_paper=False) is None  # the real ledger is clear
+        add_pick(
+            s,
+            game_id=1,
+            season=2026,
+            week=13,
+            home_team="Michigan",
+            away_team="Ohio State",
+            line=24.5,
+            price=-110,
+            is_paper=False,
+        )
+        s.commit()
         rows = s.query(ManualPick).order_by(ManualPick.id).all()
     assert [r.is_paper for r in rows] == [True, False]
 
 
-def test_second_real_ticket_is_still_refused(capsys):
+def test_the_cli_refuses_real_money_dup_or_not(capsys):
+    """Since 2026-09-22 `pick.py add` is paper-only: it ran none of the policy
+    gates and defaulted a missing price to -110. Real money is logged on the site."""
     pick, eng = _pick_module()
     pick.cmd_add(_args())
     pick.cmd_add(_args(price=-105))
-    assert "REFUSED" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert out.count("REFUSED") == 2 and "paper-only" in out
     with Session(eng) as s:
-        assert s.query(ManualPick).count() == 1
+        assert s.query(ManualPick).count() == 0
 
 
 def test_second_paper_pick_is_refused(capsys):

@@ -3,7 +3,7 @@ import { getLatestCard } from "@/lib/card";
 import { breakEvenPrice } from "@/lib/edge";
 import { getLineCheck } from "@/lib/lineCheck";
 import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
-import { checkPolicy, parsePickBody } from "@/lib/pickRules";
+import { checkPolicy, parsePickBody, serverVerdict } from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
 import { getRulePause, NOT_PAUSED } from "@/lib/rulePause";
 import { requireAuth } from "@/lib/session";
@@ -138,7 +138,26 @@ export async function POST(req: NextRequest) {
     livePrice = { ok: true, killPrice: breakEvenPrice(row.marketFairUnder) };
   }
 
-  const policy = checkPolicy(pick, {
+  // THE VERDICT IS DECIDED HERE, not by the client. The card's model read and
+  // slate bar, the live Hard Rock line/price/centring and consensus, the card's
+  // QB-out flag and the season's games played -- the same gates the card and the
+  // board apply. A request that says "WATCH" on a game the server rates BET is
+  // gated as a BET; a request that says "BET" on a game the server rates WATCH
+  // is logged as the off-policy WATCH it is.
+  const verdict = serverVerdict({
+    bvLine: item?.bvLine ?? null,
+    bar: item?.bar ?? null,
+    hrLine: row?.hrLine ?? null,
+    hrUnderPrice: row?.hrUnderPrice ?? null,
+    hrCentred: row?.hrCentred ?? null,
+    ev: row?.ev ?? null,
+    marketLine: row?.median ?? null,
+    qbOut: item?.blocker === "qb_out" || item?.paperBlocker === "qb_out",
+    minGamesPlayed,
+  });
+  const judged = { ...pick, verdict };
+
+  const policy = checkPolicy(judged, {
     inSlate,
     // A pick after kickoff isn't a real bet (start_date is naive UTC).
     kickedOff: !!game?.start_date && game.start_date <= new Date(),
@@ -160,7 +179,7 @@ export async function POST(req: NextRequest) {
 
   let tracked: boolean;
   try {
-    ({ tracked } = await createPick(pick));
+    ({ tracked } = await createPick(judged));
   } catch (e) {
     // The uq_manual_pick_per_ledger backstop fired. The duplicate check above
     // already passed, so this is the race it cannot close — a double-click, or

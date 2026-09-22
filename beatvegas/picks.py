@@ -99,7 +99,7 @@ def add_pick(
     home_team: str,
     away_team: str,
     line: float,
-    price: Optional[int] = -110,
+    price: Optional[int] = None,
     stake: float = 1.0,
     is_paper: bool = False,
     is_bonus: bool = False,

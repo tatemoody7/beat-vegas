@@ -36,7 +36,7 @@ def _args(**kw) -> Namespace:
         note=None,
         market="1h",
         force=False,
-        paper=False,
+        paper=True,  # the CLI is paper-only since 2026-09-22; real money is logged on the site
         reason="manual",
         verdict=None,
         gap=None,
@@ -122,3 +122,27 @@ def test_paper_pick_is_flagged_and_stakes_one_unit():
         (row,) = s.query(ManualPick).all()
         assert row.is_paper is True
         assert row.stake == 1.0
+
+
+def test_real_money_add_is_refused_the_cli_is_paper_only(capsys):
+    """Real money is logged on the site, where POST /api/picks runs every gate.
+    This command ran none of them and defaulted a missing price to -110."""
+    pick, eng = _pick_module_with_rematch()
+    pick.cmd_add(_args(week=15, paper=False))
+    out = capsys.readouterr().out
+    assert "REFUSED" in out and "paper-only" in out
+    with Session(eng) as s:
+        assert s.query(ManualPick).count() == 0
+
+
+def test_a_missing_price_is_stored_null_not_minus_110():
+    import inspect
+
+    from beatvegas.picks import add_pick
+
+    assert inspect.signature(add_pick).parameters["price"].default is None
+    pick, eng = _pick_module_with_rematch()
+    pick.cmd_add(_args(week=15, paper=True, price=None))
+    with Session(eng) as s:
+        (row,) = s.query(ManualPick).all()
+        assert row.price is None

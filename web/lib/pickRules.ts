@@ -1,8 +1,12 @@
 import { american, fmt } from "@/lib/format";
 import type { RulePause } from "@/lib/rulePause";
 import {
+  BET_GAP_PTS,
+  BET_MIN_EV,
+  HR_OFF_MARKET_PTS,
   MIN_GAMES_FOR_REAL_MONEY,
   REASONS,
+  WATCH_GAP_PTS,
   WEEKLY_BET_CAP,
   type PickReason,
   type Verdict,
@@ -205,6 +209,48 @@ export type PolicyContext = {
 };
 
 /** Betting-policy checks that need DB facts (passed in). */
+/** What the server needs to decide the verdict itself (2026-09-22). */
+export type ServerVerdictInput = {
+  /** Our number for the game (the week's card item); null = no model read. */
+  bvLine: number | null;
+  /** H-PCT: the card's slate bar; null = the fallback constant. */
+  bar: number | null;
+  /** The LIVE Hard Rock read (lib/lineCheck.ts), not the card's. */
+  hrLine: number | null;
+  hrUnderPrice: number | null;
+  hrCentred: boolean | null;
+  ev: number | null;
+  /** Consensus median line (lib/lineCheck.ts), for the off-market gate. */
+  marketLine: number | null;
+  qbOut: boolean;
+  minGamesPlayed: number | null;
+};
+
+/**
+ * The verdict, decided on the SERVER from the card's model read and the live
+ * line read. Until 2026-09-22 checkPolicy keyed its kill-line, kill-price,
+ * early-season and PRICE UNAVAILABLE gates on a verdict the CLIENT sent, so a
+ * request that said "WATCH" skipped all four and landed as a self-declared
+ * off-policy row. Same gates as card.py::is_bet and verdict.ts, in the same
+ * order; the client's word is not consulted.
+ */
+export function serverVerdict(i: ServerVerdictInput): Verdict {
+  if (i.bvLine === null) return "PASS";
+  if (i.hrLine === null) return "WATCH";
+  const gap = Math.round((i.hrLine - i.bvLine) * 100) / 100;
+  const bar = i.bar ?? BET_GAP_PTS;
+  if (gap < WATCH_GAP_PTS) return "PASS";
+  if (!(gap >= bar && gap > 0) || i.hrCentred === false) return "WATCH";
+  if (i.marketLine !== null && i.marketLine - i.hrLine > HR_OFF_MARKET_PTS)
+    return "WATCH";
+  if (i.qbOut) return "WATCH";
+  if (i.hrUnderPrice === null || i.ev === null || i.ev < BET_MIN_EV)
+    return "WATCH";
+  if (i.minGamesPlayed !== null && i.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY)
+    return "WATCH";
+  return "BET";
+}
+
 export function checkPolicy(
   pick: PickRequest,
   ctx: PolicyContext,

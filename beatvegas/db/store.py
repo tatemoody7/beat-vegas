@@ -58,6 +58,9 @@ _MIGRATIONS = {
         # The close price, kept apart from the price at the DECISION -- see the
         # column comment on ManualPick.closing_price for why that matters.
         "closing_price": "INTEGER",
+        # When the consensus close was last confirmed pre-kick (H-STOP-2's
+        # line-value clock cuts on its age). 2026-09-22.
+        "closing_captured_at": "TIMESTAMP",
         "price_provenance": "VARCHAR(24)",
         "model_score_at_pick": "INTEGER",
         "model_line_at_pick": "FLOAT",

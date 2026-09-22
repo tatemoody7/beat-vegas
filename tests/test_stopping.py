@@ -4,10 +4,14 @@ to be peeked at."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from beatvegas.backtest import stopping as S
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_effect_sizes():
@@ -166,3 +170,62 @@ def test_position_script_filters_to_locked_paper_decisions_from_week_3(monkeypat
     with scope() as s:
         units, clv = mod.load_observations(s)
     assert units == [-1.0] and clv == [-0.5]  # week 2 out, real out, ungraded out; clv sign flipped
+
+
+def test_breakeven_and_per_pick_mu1():
+    assert S.breakeven_from_price(-110) == pytest.approx(110 / 210)
+    assert S.breakeven_from_price(-180) == pytest.approx(180 / 280)
+    assert S.breakeven_from_price(+140) == pytest.approx(100 / 240)
+    # the same 4-pp edge is worth less profit at a shorter price
+    assert S.mu1_for_price(-110, 0.04) == pytest.approx(0.0764, abs=1e-4)
+    assert S.mu1_for_price(-180, 0.04) == pytest.approx(0.0622, abs=1e-4)
+    # H-STOP's single 0.0731 is the same edge over the ledger's mean break-even
+    assert 0.04 / 0.5475 == pytest.approx(0.0731, abs=1e-4)
+
+
+def test_per_pick_llr_reduces_to_the_constant_formula():
+    x = [0.9, -1.0, 0.9, 0.9, -1.0]
+    mu = 0.0731
+    a = S.sprt_llr(x, mu, 0.924)
+    b = S.sprt_llr_perpick(x, [mu] * len(x), 0.924)
+    assert np.allclose(a, b)
+    with pytest.raises(ValueError):
+        S.sprt_llr_perpick(x, [mu, mu], 0.924)
+
+
+def test_clock_2_is_registered_as_written_and_the_doc_quotes_it():
+    r = S.REGISTERED_2
+    assert r["design"] == "sprt" and r["alpha_clock"] == 0.025 and r["power"] == 0.80
+    assert r["sigma"] == {"profit": 0.929, "clv": 1.371}
+    assert r["mu1"]["clv"] == 0.50 and r["edge"] == 0.04
+    assert r["start"] == {"season": 2026, "week": 5}
+    doc = (ROOT / "docs" / "STOPPING_RULE.md").read_text()
+    assert "## Clock 2" in doc
+    for token in ("0.929", "1.371", "+3.466", "−1.584", "0.04 / b"):
+        assert token in doc, token
+    # closed clock stays as written
+    assert S.REGISTERED["sigma"] == {"profit": 0.924, "clv": 1.714}
+
+
+def test_clock_2_position_excludes_stale_closes_and_keeps_unpriced_clv():
+    pos = S.registered_position_2(
+        units=[0.9, -1.0, float("nan")],
+        prices=[-110, -180, float("nan")],
+        clv=[0.5, -0.5, 1.0, 0.0],
+        clv_in_window=[True, False, True, True],
+    )
+    assert pos["clocks"]["profit"]["n"] == 2
+    assert pos["clocks"]["clv"]["n"] == 3
+    assert pos["clocks"]["clv"]["excluded_no_close_in_window"] == 1
+    assert pos["real_money"] == "unchanged"
+    md = S.render_position_2(pos)
+    assert "Clock 2" in md and "excluded from the line-value clock" in md
+    empty = S.registered_position_2([], [], [], [])
+    assert empty["clocks"]["profit"]["status"] == "no observations"
+
+
+def test_clock_2_failure_boundary_pauses_real_money():
+    # 40 straight losses at -110 cross B on the profit clock
+    pos = S.registered_position_2([-1.0] * 40, [-110] * 40, [], [])
+    assert pos["clocks"]["profit"]["verdict"] == "failure"
+    assert pos["real_money"] == "PAUSE"

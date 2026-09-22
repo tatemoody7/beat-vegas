@@ -5,6 +5,30 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-22 evening (THE SERVING SKEW — B-SERVE; H-PCT and H-STOP-2 registered; PRs
+  #215-#217).** The full system review (plan file `lets-get-all-the-vast-nautilus.md`) found
+  the live model scoring every upcoming game with **57 of 115 inputs NaN that are present on
+  every training row**: `fh_factor_frame` joins the first-half PBP season-to-date features on
+  the game's OWN id, an upcoming game has no PBP row yet, and every backtest scores played
+  rows so none could see it. Masking exactly those columns on played rows moves the
+  prediction **−1.99 / −1.30 / −2.58 pts** (2026 / 2025 / 2024) with MAE improving — the level
+  deficit the intercept studies were chasing. **They are out of `BV_FEATURE_COLS`
+  (`SERVE_UNAVAILABLE_COLS`) and `weekly_update.py` now fails a scoring run whose target rows
+  are >90% NaN on a column training is <10% NaN on** (`serve_skew_report`, the guard for the
+  class). Effective at the week-5 Sunday refit (2026-09-27); H-INTERCEPT/H-INSEASON are not
+  reopened (they studied a symptom). **Tate's decisions from the review:** the constant 1.75
+  bar becomes a per-slate percentile (**H-PCT**, top 20% of Hard-Rock-priced centred games by
+  gap, `slate_bar`; code in the next PR); **H-STOP closes at n=30, superseded, and H-STOP-2**
+  measures the new rule with a per-pick alternative (μ₁ᵢ = 0.04 / break-even), σ 0.929 / 1.371
+  from the 55 graded 2026 paper picks, the line-value clock against the centred consensus
+  close INSIDE the 2 h window (unpriced picks included), priced picks only on profit;
+  `manual_picks.closing_captured_at` is new (run `migrate.yml` before the next grade) and
+  `grade_pick` stores it; `stopping_rule_position.py --clock 2` is the default. The
+  challenger `family_verdict` compared against `"SUCCESS"` while the verdicts are lowercase —
+  no arm could ever pass; fixed with a real crossing test. The 2023-25 real-close set is
+  declared exhausted for rule selection. Still to ship from the review: the percentile rule
+  across card.py and the site, the money-path holes (PATCH/DELETE after kickoff, `pick.py add`,
+  server-side verdict), budget/close monitoring on the board, the site honesty pass.
 - **2026-09-22 (ONE FROZEN GATE, TWO VERDICTS: THE INPUTS WERE NOT FROZEN. H-INSEASON
   TESTED-NULL, CHALLENGER FAMILY WITHDRAWN; PRs #203-#213).** Picking up the handoff's
   check ("the first build after #201 writes `bv_intercept` and logs four `challenger_picks`

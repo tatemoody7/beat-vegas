@@ -370,6 +370,12 @@ class ManualPick(Base):
     result = Column(String)  # under / over / push
     units = Column(Float)
     closing_line = Column(Float)
+    # When the consensus close above was last confirmed pre-kickoff (the freshest
+    # centred pre-kick snapshot / last_seen_at). H-STOP-2's line-value clock
+    # counts a pick only when this sits inside lines.REAL_1H_CLOSE_WINDOW_H of
+    # kickoff; the clv column itself is stored whatever the age, so the history
+    # stays comparable and the age can be cut afterwards. 2026-09-22.
+    closing_captured_at = Column(DateTime)
     # The book's own closing PRICE, kept separate from the price at the DECISION.
     # Until 2026-09-14 a Hard Rock pick logged without a price had `price`
     # BACKFILLED with this value at grading time, which makes any price-based CLV

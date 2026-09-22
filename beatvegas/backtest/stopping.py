@@ -258,6 +258,158 @@ def running_position(
     return out
 
 
+# ------------------------------------------------- per-pick alternative (Clock 2)
+
+
+def breakeven_from_price(price: float) -> float:
+    """The hit rate at which a bet at this American price returns zero."""
+    p = float(price)
+    if p == 0:
+        raise ValueError("an American price cannot be 0")
+    return (-p) / (-p + 100.0) if p < 0 else 100.0 / (p + 100.0)
+
+
+def mu1_for_price(price: float, edge: float) -> float:
+    """H1 mean profit per 1u at THIS price for a hit rate `edge` above the price's
+    own break-even. At -110 with edge 0.04 this is 0.0764; H-STOP's single
+    0.0731 was the same edge over the ledger's MEAN break-even 0.5475."""
+    return float(edge) / breakeven_from_price(price)
+
+
+def sprt_llr_perpick(x: Sequence[float], mu1s: Sequence[float], sigma: float) -> np.ndarray:
+    """Cumulative LLR when each observation carries its own alternative mean:
+    sum_i (mu1_i x_i - mu1_i^2 / 2) / sigma^2. With a constant mu1 this is
+    exactly `sprt_llr`."""
+    xs = np.asarray(x, float)
+    ms = np.asarray(mu1s, float)
+    if xs.shape != ms.shape:
+        raise ValueError("one mu1 per observation")
+    return np.cumsum((ms * xs - ms**2 / 2.0) / sigma**2)
+
+
+def sprt_clock(
+    x: Sequence[float], mu1s: Sequence[float], sigma: float, alpha_clock: float, power: float
+) -> Dict[str, Any]:
+    """One SPRT clock with a per-observation alternative; the same dict shape
+    `running_position` emits for its sprt branch."""
+    xs = np.asarray(x, float)
+    ms = np.asarray(mu1s, float)
+    keep = ~np.isnan(xs)
+    xs, ms = xs[keep], ms[keep]
+    n = int(len(xs))
+    c: Dict[str, Any] = {"n": n, "mean": float(xs.mean()) if n else None}
+    bounds = sprt_bounds(alpha_clock, 1 - power)
+    c["bounds"] = bounds
+    if n == 0:
+        c["status"], c["verdict"], c["llr"] = "no observations", None, None
+        return c
+    path = sprt_llr_perpick(xs, ms, sigma)
+    hit_a = np.nonzero(path >= bounds["A"])[0]
+    hit_b = np.nonzero(path <= bounds["B"])[0]
+    first_a = int(hit_a[0]) + 1 if len(hit_a) else None
+    first_b = int(hit_b[0]) + 1 if len(hit_b) else None
+    c["llr"] = float(path[-1])
+    if first_a is not None and (first_b is None or first_a < first_b):
+        c["status"], c["verdict"], c["stopped_at"] = "stopped", "success", first_a
+    elif first_b is not None:
+        c["status"], c["verdict"], c["stopped_at"] = "stopped", "failure", first_b
+    else:
+        c["status"], c["verdict"] = "running", None
+    return c
+
+
+# Clock 2 -- H-STOP-2, registered 2026-09-22 before its first observation
+# (docs/STOPPING_RULE.md "Clock 2"; docs/HYPOTHESES.md H-STOP-2). Measures the
+# H-PCT rule on the corrected model (B-SERVE) from the week-5 refit. Same
+# design, alpha, power and bounds as Clock 1; four corrections written first:
+# a per-pick profit alternative, sigma with provenance, the line-value clock
+# against the centred consensus close INSIDE the 2 h window with unpriced picks
+# included, priced picks only on the profit clock. Values do not drift.
+REGISTERED_2: Dict[str, Any] = {
+    "registered_on": "2026-09-22",
+    "design": "sprt",
+    "alpha_total": 0.05,
+    "alpha_clock": 0.025,
+    "power": 0.80,
+    "edge": 0.04,  # 4 pp of hit rate over EACH pick's own break-even
+    # sample sds of the 55 graded 2026 paper picks as stored 2026-09-22 (weeks 2-3;
+    # week 2 alone 0.924 / 1.714, week 3 alone 0.944 / 0.984), treated as known
+    "sigma": {"profit": 0.929, "clv": 1.371},
+    "mu1": {"profit": "0.04 / break-even, per pick (mu1_for_price)", "clv": 0.50},
+    "start": {"season": 2026, "week": 5},
+    "close_window_h": 2.0,  # lines.REAL_1H_CLOSE_WINDOW_H: a close older than this leaves the clv clock
+    "observation": "the locked paper pick of the H-PCT rule (manual_picks.is_paper, market 1H) -- one per decision",
+    "profit_clock": "priced picks only",
+    "clv_clock": "every pick whose consensus close was confirmed inside the window, priced or not",
+    "on_failure": "real money pauses (scripts/rule_pause.py on) and the rule is reviewed",
+    "on_success": "nothing automatic; a finding for Tate",
+}
+
+
+def registered_position_2(
+    units: Sequence[float],
+    prices: Sequence[float],
+    clv: Sequence[float],
+    clv_in_window: Sequence[bool],
+) -> Dict[str, Any]:
+    """Clock 2's position. `units`/`prices` are the PRICED picks in placed order
+    (units None/NaN are dropped together with their price); `clv` is favourable
+    line value for EVERY pick in placed order and `clv_in_window` says whether
+    that pick's close was confirmed inside the registered window -- picks outside
+    it are excluded from the clv clock and counted."""
+    r = REGISTERED_2
+    u = np.asarray(units, float)
+    pr = np.asarray(prices, float)
+    keep = ~np.isnan(u) & ~np.isnan(pr)
+    mu_profit = np.array([mu1_for_price(p, r["edge"]) for p in pr[keep]])
+    profit = sprt_clock(u[keep], mu_profit, r["sigma"]["profit"], r["alpha_clock"], r["power"])
+    c = np.asarray(clv, float)
+    ok = np.asarray(clv_in_window, bool)
+    c_ok = c[ok]
+    clv_clock = sprt_clock(
+        c_ok, np.full(len(c_ok), r["mu1"]["clv"]), r["sigma"]["clv"], r["alpha_clock"], r["power"]
+    )
+    clv_clock["excluded_no_close_in_window"] = int((~ok).sum())
+    out: Dict[str, Any] = {
+        "design": r["design"],
+        "clocks": {"profit": profit, "clv": clv_clock},
+        "registered": {k: v for k, v in r.items()},
+    }
+    verdicts = [cl.get("verdict") for cl in out["clocks"].values()]
+    out["real_money"] = "PAUSE" if "failure" in verdicts else "unchanged"
+    return out
+
+
+def render_position_2(pos: Dict[str, Any]) -> str:
+    r = pos["registered"]
+    L = [
+        "# Stopping rule, Clock 2 (H-STOP-2) — running position",
+        "",
+        f"Design {r['design'].upper()}, total false-stop {100 * r['alpha_total']:.0f}% "
+        f"({100 * r['alpha_clock']:.1f}% per clock), power {100 * r['power']:.0f}%, registered "
+        f"{r['registered_on']}. Observations: locked paper picks of the H-PCT rule from "
+        f"{r['start']['season']} week {r['start']['week']}. Profit clock: priced picks, per-pick "
+        f"H1 = {r['edge']} / break-even. Line-value clock: consensus close inside "
+        f"{r['close_window_h']:.0f} h of kickoff, unpriced picks included.",
+        "",
+        "| clock | n | mean | LLR | bounds A / B | status | verdict |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for name, c in pos["clocks"].items():
+        b = c.get("bounds", {})
+        mean = c.get("mean")
+        llr = c.get("llr")
+        L.append(
+            f"| {name} | {c.get('n', 0)} | {'—' if mean is None else format(mean, '+.3f')} | "
+            f"{'—' if llr is None else format(llr, '+.3f')} | {b.get('A', float('nan')):.2f} / "
+            f"{b.get('B', float('nan')):.2f} | {c.get('status', '')} | {c.get('verdict') or '—'} |"
+        )
+    ex = pos["clocks"]["clv"].get("excluded_no_close_in_window", 0)
+    L += ["", f"Picks excluded from the line-value clock (no close inside the window): {ex}.", ""]
+    L.append(f"Real money: **{pos['real_money']}**.")
+    return "\n".join(L) + "\n"
+
+
 # ---------------------------------------------------------------- markdown
 
 
@@ -413,8 +565,11 @@ def challenger_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str
     for pos in out["arms"].values():
         clocks = pos.get("clocks", {})
         verdicts = {k: v.get("verdict") for k, v in clocks.items()}
-        passed = verdicts and all(v == "SUCCESS" for v in verdicts.values())
-        dropped = any(v == "FAILURE" for v in verdicts.values())
+        # running_position emits lowercase verdicts; until 2026-09-22 this compared
+        # against "SUCCESS"/"FAILURE", so no arm could ever pass or be dropped and
+        # the one test covering it asserted "accruing" -- pinning the bug.
+        passed = bool(verdicts) and all(v == "success" for v in verdicts.values())
+        dropped = any(v == "failure" for v in verdicts.values())
         pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
     passers = [a for a, p in out["arms"].items() if p["family_verdict"] == "PASS"]
     out["passers"] = passers

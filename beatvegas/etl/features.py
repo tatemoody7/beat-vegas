@@ -13,7 +13,7 @@ upcoming slate can be scored; trainers/graders go through training_frame().
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -127,6 +127,21 @@ FEATURE_COLS += FH_FACTOR_COLS
 # the model learns the under direction. Built from FH factors, so leak-free.
 MATCHUP_COLS = ["mm_explosive_edge", "mm_epa_edge", "mm_success_edge", "mm_pace", "mm_havoc"]
 FEATURE_COLS += MATCHUP_COLS
+
+# SERVING SKEW (B-SERVE, 2026-09-22). fh_factor_frame joins the first-half PBP
+# season-to-date aggregates onto games BY THE GAME'S OWN ID: a played game has a
+# play-by-play row and receives its teams' prior-game means; an UPCOMING game has
+# no play-by-play row yet, so the join finds nothing and every one of these
+# columns is NaN on every row the live model scores -- while every training row
+# (all played) carries them. 100% NaN on the 58 scored week-4 rows, 0.0% NaN on
+# 2023-25 weeks 4+. HistGradientBoosting learns a routing direction for missing
+# values only from missing values it sees in training, so the live model sent
+# every game down 57 branches it never trained; masking these columns on played
+# rows moved the calibrated prediction by -1.99 / -1.30 / -2.58 points (2026 /
+# 2025 / 2024) while MAE improved. They leave the regressor's inputs
+# (model/bv_line.BV_FEATURE_COLS); the classifier keeps FEATURE_COLS and is
+# being retired. `serve_skew_report` below is the guard for the CLASS.
+SERVE_UNAVAILABLE_COLS = list(FH_FACTOR_COLS) + list(MATCHUP_COLS)
 
 MARKET_COLS = {"full_game_total", "proj_1h_ratio"}
 
@@ -679,3 +694,49 @@ def build_feature_frame(
             df[c] = np.nan
         df[c] = pd.to_numeric(df[c], errors="coerce")
     return df.reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
+# Train/serve skew guard (B-SERVE)
+
+
+def serve_skew_report(
+    df: pd.DataFrame, season: int, week: int, cols: Sequence[str]
+) -> pd.DataFrame:
+    """Per column: the NaN share on the rows about to be SCORED (`season`/`week`)
+    against the NaN share on the rows the model TRAINS on (played rows of prior
+    seasons). A column near 1.0 on the left and near 0.0 on the right is an
+    input the model will route through branches it never saw in training."""
+    present = [c for c in cols if c in df.columns]
+    needed = {"season", "week", "first_half_total"}
+    if not present or not needed <= set(df.columns):
+        # A frame with none of the inputs, or without the columns that define
+        # "scored" and "played" (a stubbed test frame), has nothing to check.
+        out = pd.DataFrame(columns=["target_nan", "train_nan"])
+        out.attrs["n_target"] = 0
+        out.attrs["n_train"] = 0
+        return out
+    target = df[(df["season"] == int(season)) & (df["week"] == int(week))]
+    train = df[(df["season"] < int(season)) & played_mask(df)]
+    out = pd.DataFrame(
+        {
+            "target_nan": target[present].isna().mean() if len(target) else float("nan"),
+            "train_nan": train[present].isna().mean() if len(train) else float("nan"),
+        }
+    )
+    out.index.name = "column"
+    out.attrs["n_target"] = int(len(target))
+    out.attrs["n_train"] = int(len(train))
+    return out
+
+
+def serve_skew_violations(
+    report: pd.DataFrame, target_min: float = 0.9, train_max: float = 0.1
+) -> list:
+    """Columns that are NaN on more than `target_min` of the scored rows and on
+    less than `train_max` of the training rows. Any entry is a defect: the live
+    model would score every game through a branch it never trained."""
+    if report.empty or report.attrs.get("n_target", 0) == 0:
+        return []
+    bad = report[(report["target_nan"] > target_min) & (report["train_nan"] < train_max)]
+    return sorted(bad.index.tolist())

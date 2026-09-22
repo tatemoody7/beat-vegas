@@ -40,7 +40,12 @@ import pandas as pd
 from beatvegas.config import engine_name
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.etl.features import apply_min_games, build_feature_frame
+from beatvegas.etl.features import (
+    apply_min_games,
+    build_feature_frame,
+    serve_skew_report,
+    serve_skew_violations,
+)
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.factors.board import factor_references, save_references
 from beatvegas.hardrock import HR_BOOK_KEY
@@ -55,6 +60,7 @@ from beatvegas.model.artifacts import (
     latest_artifact,
     persist_artifact,
 )
+from beatvegas.model.bv_line import BV_FEATURE_COLS
 from beatvegas.model.score import score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
@@ -342,6 +348,27 @@ def main() -> None:
     n_with_total = int(in_week.sum())
     df = apply_min_games(frame, args.min_games)
     n_eligible = int(((df["season"] == args.season) & (df["week"] == week)).sum())
+
+    # B-SERVE guard: an input NaN on the rows about to be scored and present on
+    # the training rows is a defect (the model would route every game through
+    # branches it never trained). 57 such columns went unnoticed for a season
+    # because every backtest scores played rows; this fails the run instead.
+    skew = serve_skew_report(df, args.season, week, BV_FEATURE_COLS)
+    bad = serve_skew_violations(skew)
+    print(
+        f"serve-skew check: {skew.attrs.get('n_target', 0)} target rows vs "
+        f"{skew.attrs.get('n_train', 0)} training rows over {len(skew)} inputs; "
+        f"{len(bad)} column(s) NaN at serving but not in training"
+    )
+    if bad:
+        for c in bad:
+            print(
+                f"  SERVE-SKEW {c}: target NaN {skew.loc[c, 'target_nan']:.2f}, train NaN {skew.loc[c, 'train_nan']:.2f}"
+            )
+        print(
+            "ERROR: refusing to score -- see beatvegas/etl/features.py SERVE_UNAVAILABLE_COLS (B-SERVE)"
+        )
+        sys.exit(1)
 
     lines, kinds = ranking_line_lookup(args.season, week, basis=basis)
     # The residual engine can only learn from games with a REAL close; the

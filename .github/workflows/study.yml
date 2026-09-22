@@ -21,6 +21,7 @@ on:
           - when_to_bet_study
           - gates_study
           - stopping_rule_position
+          - neggap_level_study
         default: blend_gate
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
@@ -64,7 +65,7 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position) ;;
+            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"

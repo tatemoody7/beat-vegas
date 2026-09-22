@@ -5,32 +5,43 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
-- **2026-09-22 (THE STUDY NUMBERS WERE MAC NUMBERS; CHALLENGER COLLECTION PAUSED; PRs
-  #203-#211).** Picking up the handoff's check ("the first build after #201 writes
-  `bv_intercept` and logs four `challenger_picks` rows") found it could never have passed:
-  `score_slate` rewrites only the target week, so all 214 pre-merge 2026 rows carried NULL
-  forever and the arms would have logged NOTHING, silently. `scripts/backfill_bv_intercept.py`
-  + `backfill_intercept.yml` (dry run verifies, write fills NULL rows only, `bv_line`
-  checksummed 5,261.84 unchanged) fixed that — and its tolerance guard exposed the bigger
-  fact: **the runner recomputes the intercept as −1.2360, not the −1.8092 in
-  `MODEL_LEVEL_2026.md`, from the same 2,212 rows**, and reproduces every stored week-4
-  `bv_line` to 0.01 at that value. Every fitted number in that doc came from this Mac
-  (scikit-learn 1.6.1); the board runs 1.9.1, and HGB is not pinned across platforms. The
-  gate workflows had NEVER run on the runner (a `from scripts.*` import failed; #209). Run
-  there, H-INTERCEPT is still ADOPT none (2026 incumbent bias −2.25, raw −1.01) but
-  **H-INSEASON does NOT clear its criterion: Holm p 0.056 vs the Mac's 0.004**, every arm
-  still better on both primaries. **Tate: neither run is authoritative; reconcile the two
-  from inputs through final statistics, re-run the frozen gate on the reconciled setup,
-  then apply the criterion. Statuses unchanged; H-INSEASON-P collection PAUSED before its
-  first pick** (`build_card.py` writes no challenger row unless `CHALLENGER_COLLECT=1`, which
-  no workflow sets). Also: `card.yml` timeout 15 → 30 (Monday's first-of-week build was cut
-  at 15m22s, reported `cancelled`); `grade.yml` skips when a run finished in the last 4 h
-  (three triggers a day ran every step, ~540 min/mo); H-NEGGAP-L registered + built
-  (`scripts/neggap_level_study.py`, measurement only) and `TWO_SIDED.md`'s live section
-  brought to week 3 (23 over of 26); 15 merged branches deleted (`dataviz-audit` kept);
-  the `cfb-*` Cowork task folders archived (the tasks were already gone from the scheduler).
-  **Any number meant to describe the live model must come from a runner dispatch**
-  (`study.yml`, the `*_gate.yml`); a local run is a smoke test.
+- **2026-09-22 (ONE FROZEN GATE, TWO VERDICTS: THE INPUTS WERE NOT FROZEN. H-INSEASON
+  TESTED-NULL, CHALLENGER FAMILY WITHDRAWN; PRs #203-#213).** Picking up the handoff's
+  check ("the first build after #201 writes `bv_intercept` and logs four `challenger_picks`
+  rows") found it could never have passed: `score_slate` rewrites only the target week, so
+  all 214 pre-merge 2026 rows carried NULL forever and the arms would have logged NOTHING,
+  silently. `scripts/backfill_bv_intercept.py` + `backfill_intercept.yml` fixed that (dry run
+  verifies the stored rows reproduce, write fills NULL rows only, `bv_line` checksummed
+  5,261.84 unchanged) — and its tolerance guard exposed the real story: **the runner
+  recomputes the intercept as −1.2360, not the −1.8092 in `MODEL_LEVEL_2026.md`**, and
+  reproduces every stored week-4 `bv_line` to 0.01 at that value. The gate workflows had
+  NEVER run on the runner (a `from scripts.*` import failed there; #209); run there,
+  H-INTERCEPT is still ADOPT none but **H-INSEASON misses its criterion, Holm p 0.056 vs
+  the Mac's 0.004**. Tate: reconcile before either result decides anything. **Reconciled
+  the same afternoon by crossing both frames with both libraries** (`MODEL_LEVEL_2026.md`,
+  Reconciliation): same frame + same library reproduce to six decimals on both machines,
+  thread count is irrelevant, scikit-learn 1.6.1 vs 1.9.1 moves the intercept ~0.1 and never
+  a verdict — **the whole difference is the FRAME**: 40 of 196 columns, all CFBD reference
+  features (advanced-stat PPA/explosiveness/success, roster experience on every 2023-25
+  row, returning production), because `season_stats._cached` has no expiry, this Mac's cache
+  held the tables as fetched in **June 2026**, the runner refetches each ISO week, and CFBD
+  revised them in between. June data passes in both libraries; September data fails in both.
+  **Tate's disposition: the criterion is judged on the data the system uses.** H-INSEASON is
+  `tested-null`; **H-INSEASON-P is withdrawn before its first pick, zero rows ever logged**
+  (`build_card.py` logs nothing unless `CHALLENGER_COLLECT=1`, which no workflow sets; the
+  table, arm code and `challenger_position.py` stay for a family that earns its own row).
+  Every gate run now writes a frame fingerprint beside its report
+  (`beatvegas/etl/frame_fingerprint.py`; `scripts/frame_snapshot.py` via `study.yml` dumps
+  the runner's frame); this Mac's June cache was refreshed. **Any number meant to describe
+  the live model must come from a runner dispatch AND name its frame fingerprint**; the
+  champion itself is re-fitted each Sunday on whatever CFBD serves that week. Also today:
+  `card.yml` timeout 15 → 30 (Monday's first-of-week build was cut at 15m22s, reported
+  `cancelled`); `grade.yml` skips when a run finished in the last 4 h (three triggers a day
+  ran every step, ~540 min/mo); H-NEGGAP-L registered + built (`scripts/neggap_level_study.py`,
+  measurement only — its arm columns now wait on a future licensed family) and
+  `TWO_SIDED.md`'s live section brought to week 3 (23 over of 26); 15 merged branches deleted
+  (`dataviz-audit` kept); the `cfb-*` Cowork task folders archived (the tasks were already gone
+  from the scheduler).
 - **2026-09-20 (WEEK 3 GRADED + A MAINTENANCE SWEEP; PRs #176-#187).**
   **Week 3 was the first live week inside the prospective validation regime.** Real money
   **3-1, +1.65u** (season **6-4, +2.01u**, bankroll $120.10) and every BET the cards named

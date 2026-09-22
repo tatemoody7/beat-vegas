@@ -36,6 +36,7 @@ from beatvegas.backtest.inseason import K_GRID, TEST_SEASONS, evaluate, render_m
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.db.store import try_init_db
 from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.frame_fingerprint import write_fingerprint
 
 # Run as `python scripts/<name>.py` (the workflows do), sys.path holds scripts/
 # and not the repo root, so `from scripts.x import` fails with
@@ -79,6 +80,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try_init_db()
 
     frame = build_feature_frame(min_games=args.min_games, fbs_only=not args.all_divisions)
+    # Pin the inputs: which snapshot of CFBD's reference tables this run was judged
+    # on (docs/MODEL_LEVEL_2026.md, Reconciliation -- the same frozen gate gave two
+    # verdicts on two snapshots). Written beside the report as <stem>_frame.json.
+    md_path, _json_path, _csv = report_paths(args.out)
+    fp = write_fingerprint(frame, md_path.with_name(md_path.stem + "_frame.json"))
+    print(
+        f"[gate] frame fingerprint: rows={fp['rows']} by_season={fp['by_season']} sklearn={fp['sklearn']}"
+    )
 
     closes = {}
     if not args.no_closes:

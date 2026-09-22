@@ -15,41 +15,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-import numpy as np
-import pandas as pd
-
 from beatvegas.etl.features import build_feature_frame
-
-
-def fingerprint(df: pd.DataFrame) -> dict:
-    """Per-column non-null count, mean and std (numeric columns), so two frames
-    can be diffed without shipping either."""
-    import sklearn
-
-    cols = {}
-    for c in sorted(df.columns):
-        s = df[c]
-        entry = {"non_null": int(s.notna().sum()), "dtype": str(s.dtype)}
-        if pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s):
-            v = pd.to_numeric(s, errors="coerce")
-            entry["mean"] = None if v.notna().sum() == 0 else float(np.nanmean(v))
-            entry["std"] = None if v.notna().sum() < 2 else float(np.nanstd(v))
-        cols[c] = entry
-    return {
-        "rows": int(len(df)),
-        "by_season": {int(k): int(v) for k, v in df["season"].value_counts().sort_index().items()},
-        "platform": platform.platform(),
-        "python": platform.python_version(),
-        "sklearn": sklearn.__version__,
-        "numpy": np.__version__,
-        "pandas": pd.__version__,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "columns": cols,
-    }
+from beatvegas.etl.frame_fingerprint import fingerprint
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

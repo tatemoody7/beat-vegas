@@ -3,9 +3,17 @@
 Written 2026-09-22 from the system review. Each item names the exact plan and the
 date; the board cannot see any of these until the change is made.
 
+## Status 2026-09-22 evening
+
+- **The repository was made PUBLIC at ~18:20Z** (Tate), which removes the Actions minute cap
+  and unblocked every job. The billing fix below is still worth finishing so the repo can go
+  private again if wanted: GitHub's Payment information form timed out on every save (unicorn
+  page), so no card could be added; a **Billing support ticket** is filed from help.github.com
+  (replies to boomtatermac@gmail.com; "View tickets" on help.github.com).
+
 ## Do now
 
-1. **GitHub → Settings → Billing and plans → Actions.** On 2026-09-22 at ~17:29Z GitHub
+1. **GitHub → Settings → Billing and licensing.** (Only needed now to be able to return the repo to private.) On 2026-09-22 at ~17:29Z GitHub
    stopped starting jobs on this private repo: *"The job was not started because recent
    account payments have failed or your spending limit needs to be increased."* Every
    scheduled job — the card builds, daily grading, Sunday's refit, the close polls — is

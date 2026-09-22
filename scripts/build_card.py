@@ -560,12 +560,12 @@ def run(
         )
         picks_added = 0
         challenger_added: Dict[str, int] = {}
+        challenger_paused = False
         if not dry_run and card["items"]:
             if not no_paper:
                 picks_added = log_paper_picks(s, card, now, window_hours=paper_window_hours)
                 # H-INSEASON-P: the challenger family logs beside the champion,
-                # from the same snapshot, into its own table. A failure here must
-                # never cost the real card -- the challenger is a measurement.
+                # from the same snapshot, into its own table.
                 #
                 # PAUSED 2026-09-22 before the first pick (Tate): the gate that
                 # licensed this family read Holm p 0.004 on the Mac and 0.056 on
@@ -574,11 +574,10 @@ def run(
                 # CHALLENGER_COLLECT=1 is set in the environment; card.yml does
                 # not set it. docs/INSEASON_PAPER.md carries the status.
                 if not challenger_collection_enabled():
-                    print(
-                        "[card] challenger family: collection PAUSED pending the "
-                        "Mac/runner reconciliation (docs/INSEASON_PAPER.md); no row written"
-                    )
+                    challenger_paused = True
                 else:
+                    # A failure here must never cost the real card -- the
+                    # challenger is a measurement.
                     try:
                         challenger_added = log_challenger_picks(
                             s,
@@ -607,6 +606,11 @@ def run(
             )
 
     lines = summary_lines(card, len(games), picks_added)
+    if challenger_paused:
+        lines.append(
+            "  CHALLENGER (H-INSEASON family): collection PAUSED pending the Mac/runner "
+            "reconciliation (docs/INSEASON_PAPER.md); no row written"
+        )
     if challenger_added:
         lines.append(
             "  CHALLENGER (H-INSEASON family, paper only): "

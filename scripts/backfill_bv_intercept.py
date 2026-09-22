@@ -41,11 +41,17 @@ from beatvegas.etl.features import apply_min_games, build_feature_frame, trainin
 from beatvegas.model.bv_line import bias_corrections, bv_line_for_slate
 from beatvegas.model.score import MODEL_VERSION
 
-# The intercept the live board applied all season (docs/MODEL_LEVEL_2026.md,
-# "2026 | 153 | 2,212 | -1.8092"). A recomputation that lands elsewhere means
-# the training frame or the platform differs from the one that scored the rows,
-# and the "raw" predictions recovered from it would be wrong by the difference.
-RECORDED_INTERCEPT = -1.8092
+# The intercept the live board applies. VERIFIED on the runner 2026-09-22 (run
+# 35746685925): recomputing bv_line_for_slate for the 58 stored week-4 rows on
+# today's frame reproduced every one of them to 0.01 at this value, so the model
+# and the intercept that scored them are exactly these. It is NOT the -1.8092
+# docs/MODEL_LEVEL_2026.md quotes: that number came from this project's Mac
+# (scikit-learn 1.6.1), and HistGradientBoosting output is not pinned across
+# platforms -- the runner (1.9.1) fits a different forest from the same 2,212
+# rows. A recomputation that lands elsewhere means the training frame or the
+# platform differs from the one that scored the rows, and the "raw" predictions
+# recovered from it would be wrong by the difference.
+RECORDED_INTERCEPT = -1.2360
 TOLERANCE = 0.001
 
 

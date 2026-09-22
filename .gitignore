@@ -58,6 +58,7 @@ reports/gates_*
 reports/sharp_books_*
 reports/stopping_*
 reports/neggap_level_*
+reports/frame_snapshot_*
 
 # Agent research scratch output (swarm dossiers, residual-gate CSV/JSON dumps).
 # It was untracked AND unignored, so a `git add -A` would have swept several MB

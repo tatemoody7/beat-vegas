@@ -24,6 +24,28 @@ import type { EvVerdict } from "@/lib/lineCheck";
 import { american, fmt, round2, signed } from "@/lib/format";
 
 export const BET_GAP_PTS = 1.75;
+// H-PCT (registered 2026-09-22): the bar is a PER-SLATE PERCENTILE, not a
+// constant. The rule was validated as "the top 20% of games by gap"; deployed as
+// 1.75 it selected 47-51% of Hard-Rock-priced games once the model's level moved.
+// `slateBar` is the k-th largest gap, k = max(1, round(PCT_SHARE * N)), over the
+// slate's Hard-Rock-priced games with a CENTRED Hard Rock quote and a model
+// read; a game is in the band at gap >= bar with gap > 0. BET_GAP_PTS stands in
+// only when a slate has no such game. Mirrors beatvegas/model/score.py
+// (PCT_SHARE, slate_bar); tests/fixtures/slate_bar_vectors.json is read by both
+// test suites; tests/test_gate_parity.py pins PCT_SHARE.
+export const PCT_SHARE = 0.2;
+
+export function slateBar(
+  gaps: ReadonlyArray<number | null | undefined>,
+  share: number = PCT_SHARE,
+): number | null {
+  const vals = gaps
+    .filter((g): g is number => typeof g === "number" && Number.isFinite(g))
+    .sort((a, b) => b - a);
+  if (vals.length === 0) return null;
+  const k = Math.max(1, Math.round(share * vals.length));
+  return vals[k - 1];
+}
 export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
 export const MODEL_BET_THRESHOLD = 53; // model ledger only; not a verdict input since 2026-09-06
@@ -122,6 +144,10 @@ export type VerdictInput = {
   bvAdjust: number | null;
   bvAdjustReason: string | null;
   factorBoard: BoardFactor[] | null | undefined;
+  /** H-PCT: this slate's bar (lib/homeBoard.ts computes it over the week); null/absent = the fallback constant. */
+  bar?: number | null;
+  /** Both of Hard Rock's sides priced like a main number; false = an off-centre rung, which never qualifies. */
+  hrCentred?: boolean | null;
 };
 
 export type VerdictResult = {
@@ -148,8 +174,10 @@ export function deriveReason(
   hasModel: boolean,
   hrGap: number | null,
   priceEdgeOnly: boolean,
+  bar: number = BET_GAP_PTS,
 ): PickReason {
-  if (hasModel && hrGap !== null && hrGap >= BET_GAP_PTS) return "model_gap";
+  if (hasModel && hrGap !== null && hrGap >= bar && hrGap > 0)
+    return "model_gap";
   if (priceEdgeOnly) return "price_edge";
   return "manual";
 }
@@ -185,11 +213,11 @@ export function priceSentence(i: VerdictInput): string {
 
 // What a gap of this size means. The band is a RANKING rule the backtest
 // validated; it is not a proven win rate.
-function sizeSentence(gap: number): string {
+function sizeSentence(gap: number, bar: number = BET_GAP_PTS): string {
   if (gap >= STRONG_GAP_PTS) {
     return " Gaps this big are the top ~10% of a season — the strongest end of the band the backtest validated for ranking games. Against a fair estimated line the backtest found no confirmed edge, so only real-line closing-line value this season can prove one; still close to a coin flip on any single game.";
   }
-  if (gap >= BET_GAP_PTS) {
+  if (gap >= bar) {
     return " That puts it in the top ~20% of gaps — the selection band the backtest validated for ranking games, not a proven win rate. Against a fair estimated line the backtest found no confirmed edge; only closing-line value against real lines this season can prove one, and any single game is still close to a coin flip.";
   }
   if (gap >= WATCH_GAP_PTS) {
@@ -276,6 +304,11 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     hasModel && i.hrLine !== null && i.bvLine !== null
       ? round2(i.hrLine - i.bvLine)
       : null;
+  // H-PCT: this slate's bar (the fallback constant when the caller has none),
+  // and whether Hard Rock's quote is centred -- a rung is never in the band.
+  const bar = i.bar ?? BET_GAP_PTS;
+  const centred = i.hrCentred ?? true;
+  const inBand = hrGap !== null && centred && hrGap > 0 && hrGap >= bar;
   const pricePos = i.evVerdict === "pos";
   const priceNeg = i.evVerdict === "neg";
 
@@ -311,7 +344,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
     flags,
     priceEdgeOnly,
     hrGap,
-    reason: deriveReason(hasModel, hrGap, priceEdgeOnly),
+    reason: deriveReason(hasModel, hrGap, priceEdgeOnly, bar),
     strength,
   });
 
@@ -346,7 +379,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // into it — WATCH until Hard Rock's number is back within half a point.
   if (
     hrGap !== null &&
-    hrGap >= BET_GAP_PTS &&
+    inBand &&
     i.liveLine !== null &&
     i.liveLine - i.hrLine! > HR_OFF_MARKET_PTS
   ) {
@@ -361,7 +394,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
   // A starting QB listed out: the number does not know it. Never BET into it;
   // WATCH until the news settles and the line has had a chance to react.
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.qbOut) {
+  if (hrGap !== null && inBand && i.qbOut) {
     return out(
       "WATCH",
       "medium",
@@ -387,7 +420,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // card.py blocker early_season and pickRules.checkPolicy's refusal.
   if (
     hrGap !== null &&
-    hrGap >= BET_GAP_PTS &&
+    inBand &&
     i.ev !== null &&
     i.ev >= BET_MIN_EV &&
     i.minGamesPlayed !== null &&
@@ -402,12 +435,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       62 + hrGap * 10,
     );
   }
-  if (
-    hrGap !== null &&
-    hrGap >= BET_GAP_PTS &&
-    i.ev !== null &&
-    i.ev >= BET_MIN_EV
-  ) {
+  if (hrGap !== null && inBand && i.ev !== null && i.ev >= BET_MIN_EV) {
     // Confidence is the gap alone. The classifier's under_score used to gate
     // "high" (needed >= MODEL_BET_THRESHOLD); the 2026-09-06 post-mortem found
     // every score band hits the same rate against a fair line, so it no longer
@@ -427,7 +455,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // different bets: `priceNeg` is a materially bad price (worse than EV_FLOOR),
   // while the band between EV_FLOOR and BET_MIN_EV is ordinary juice that still
   // does not pay for itself — the case that used to colour green.
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.ev !== null) {
+  if (hrGap !== null && inBand && i.ev !== null) {
     return out(
       "WATCH",
       "medium",
@@ -444,7 +472,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   // fails closed on exactly this state (lib/pickRules.ts checkPolicy), and a
   // cached card price must never stand in for it. Pinned by
   // verdict.test.ts::"a gap that clears with no judgeable price is never a BET".
-  if (hrGap !== null && hrGap >= BET_GAP_PTS && i.ev === null) {
+  if (hrGap !== null && inBand && i.ev === null) {
     return out(
       "WATCH",
       "medium",
@@ -455,7 +483,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       59 + hrGap * 10,
     );
   }
-  if (i.hrLine === null && consensusGap >= BET_GAP_PTS) {
+  if (i.hrLine === null && consensusGap >= bar) {
     return out(
       "WATCH",
       "low",
@@ -466,7 +494,7 @@ export function verdictFor(i: VerdictInput): VerdictResult {
       50 + consensusGap * 10,
     );
   }
-  if (hrGap !== null && i.liveLine !== null && consensusGap >= BET_GAP_PTS) {
+  if (hrGap !== null && i.liveLine !== null && consensusGap >= bar) {
     const below = round2(i.liveLine - i.hrLine!);
     return out(
       "WATCH",

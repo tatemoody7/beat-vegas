@@ -479,6 +479,12 @@ def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
             )
     for n in card["notes"]:
         out.append(f"  note: {n}")
+    sl = card.get("slate") or {}
+    if sl:
+        out.append(
+            f"  BAR: {sl.get('bar')} pts = top {int(round(100 * float(sl.get('share', 0))))}% of "
+            f"{sl.get('n', 0)} priced centred games ({sl.get('basis')})"
+        )
     return out
 
 

@@ -486,3 +486,43 @@ describe("verdictFor — early season is paper only", () => {
     expect(verdictFor({ ...base, minGamesPlayed: null }).verdict).toBe("BET");
   });
 });
+
+describe("H-PCT: the per-slate bar and the centred quote", () => {
+  const base = {
+    away: "A",
+    home: "H",
+    underScore: 60,
+    bvLine: 24,
+    liveLine: 27,
+    fallbackLine: null,
+    gap: 3,
+    hrLine: 27,
+    hrUnderPrice: -110,
+    ev: 0.01,
+    evVerdict: "fair" as const,
+    fhShare: null,
+    qbOut: false,
+    qbOutDetail: null,
+    minGamesPlayed: 5,
+    bvAdjust: null,
+    bvAdjustReason: null,
+    factorBoard: null,
+  };
+  it("a gap that clears the constant but not this slate's bar is not a BET", () => {
+    expect(verdictFor({ ...base }).verdict).toBe("BET");
+    expect(verdictFor({ ...base, bar: 3.5 }).verdict).not.toBe("BET");
+    expect(verdictFor({ ...base, bar: 3.0 }).verdict).toBe("BET");
+  });
+  it("an off-centre Hard Rock rung never qualifies however big the gap", () => {
+    expect(
+      verdictFor({ ...base, gap: 6, hrLine: 30, hrCentred: false }).verdict,
+    ).not.toBe("BET");
+    expect(
+      verdictFor({ ...base, gap: 6, hrLine: 30, hrCentred: true }).verdict,
+    ).toBe("BET");
+  });
+  it("deriveReason follows the bar", () => {
+    expect(deriveReason(true, 2.0, false)).toBe("model_gap");
+    expect(deriveReason(true, 2.0, false, 2.5)).toBe("manual");
+  });
+});

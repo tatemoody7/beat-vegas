@@ -120,6 +120,8 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   reason: null,
   degradedInputs: [],
   gateBlocker: null,
+  bar: null,
+  hrCentred: null,
   ...o,
 });
 
@@ -135,6 +137,7 @@ const card = (o: Partial<Card> = {}): Card => ({
   paper: { qualifying: 0, overCap: 0, cap: 5 },
   items: [],
   notes: [],
+  slate: null,
   ...o,
 });
 
@@ -204,6 +207,7 @@ describe("parseCard", () => {
     const c = parseCard({ season: "2026", week: 3 });
     expect(c).toEqual({
       season: 2026,
+      slate: null,
       week: 3,
       builtAt: null,
       modelRead: false,

@@ -26,8 +26,16 @@ Research only — it never places bets or automates gambling.
   `grade_pick` stores it; `stopping_rule_position.py --clock 2` is the default. The
   challenger `family_verdict` compared against `"SUCCESS"` while the verdicts are lowercase —
   no arm could ever pass; fixed with a real crossing test. The 2023-25 real-close set is
-  declared exhausted for rule selection. Still to ship from the review: the percentile rule
-  across card.py and the site, the money-path holes (PATCH/DELETE after kickoff, `pick.py add`,
+  declared exhausted for rule selection. **H-PCT shipped the same evening (#218):** `slate_bar` = the k-th largest gap, k =
+  max(1, round(0.2 × N)) over the slate's Hard-Rock-priced games with a CENTRED quote and a
+  model read (`beatvegas/model/score.py::slate_bar`, mirrored by `verdict.ts::slateBar`, both
+  pinned to `tests/fixtures/slate_bar_vectors.json` — the repo's first shared golden vector);
+  `build_card` reads it over the slate first and every item carries `bar` and `hr_centred`; a
+  rung never qualifies; the kill line and the 0-100 score stretch with the bar; the board
+  computes the same bar over the week's rows (`HomeBoard.slate`) and the card payload carries
+  `slate`; `BET_GAP_PTS` stays only as the empty-slate fallback (docs parity test rewritten);
+  gate-focused tests hold the bar fixed via `build_card(bar=…)`, the slate has its own tests.
+  Still to ship from the review: the money-path holes (PATCH/DELETE after kickoff, `pick.py add`,
   server-side verdict), budget/close monitoring on the board, the site honesty pass.
 - **2026-09-22 (ONE FROZEN GATE, TWO VERDICTS: THE INPUTS WERE NOT FROZEN. H-INSEASON
   TESTED-NULL, CHALLENGER FAMILY WITHDRAWN; PRs #203-#213).** Picking up the handoff's

@@ -44,7 +44,12 @@ def _game(gid, away, home, kick):
 
 
 @pytest.fixture
-def env():
+def env(monkeypatch):
+    # These integration tests exercise gates, caps, windows and logging with the
+    # bar HELD at the constant; the per-slate bar (H-PCT) is tested on its own.
+    import beatvegas.card as _card
+
+    monkeypatch.setattr(_card, "slate_bar", lambda gaps, share=0.2: None)
     """(module, engine): the script bound to a fresh in-memory SQLite DB."""
     mod = _load_script("build_card")
     eng = create_engine("sqlite:///:memory:")

@@ -194,7 +194,9 @@ export function edgeScore(i: EdgeInput): EdgeResult {
           : null;
   const gap = bvLine !== null && basis !== null ? round2(basis - bvLine) : null;
 
-  const killLine = bvLine !== null ? roundHalfUp(bvLine + BET_GAP_PTS) : null;
+  // H-PCT: the kill line and the score scale stretch with this slate's bar.
+  const bar = i.bar ?? BET_GAP_PTS;
+  const killLine = bvLine !== null ? roundHalfUp(bvLine + bar) : null;
   const killPrice =
     i.marketFairUnder !== null ? breakEvenPrice(i.marketFairUnder) : null;
   const kill = {
@@ -208,7 +210,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   // so green always means the gap rule passed. No-model rows score on context
   // alone and stay under the amber band (CONTEXT_CAP < SCORE_WATCH_MIN).
   const score = hasModel
-    ? clamp(Math.floor(50 + SCORE_PER_GAP_PT * (gap ?? 0)), 0, 100)
+    ? clamp(Math.floor(50 + ((SCORE_BET_MIN - 50) / bar) * (gap ?? 0)), 0, 100)
     : contextScore(i.context);
 
   // --- Tier + blocker -------------------------------------------------------

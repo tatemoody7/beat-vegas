@@ -41,7 +41,7 @@ the bet card follows. Change it here first, then in code.
 ## Which markets
 
 - **Real money: first-half (1H) unders only.** That is the market the system is
-  built to measure. The ≥ 1.75-point gap band is the validated **top-20% ranking
+  built to measure. The gap band (this week's top 20% by gap, H-PCT) is the validated **top-20% ranking
   rule**, not a proven edge: against a fair proxy line the backtest shows **no
   confirmed edge**; only real-line CLV this season can show one.
 - Full-game is decision-support only. Its backtest on real lines found no
@@ -140,12 +140,17 @@ A game is BET when all of these hold:
    ~59% of features NaN) and the backtest behind the gap rule is weeks 3+. Such
    games are still scored, ranked and paper-logged so the cohort accrues
    evidence; only the real-money BET is refused, with its own rejection reason.
-3. **Hard Rock's own** first-half number sits **≥ 1.75 points above our number**
-   (not the consensus line — the consensus can sit 1.75 above while Hard Rock
-   posts a lower number). This is the top-20% gap band. (≥ 3.0 points = top-10%,
-   "high" confidence. The classifier's under_score no longer gates the label: the
-   2026-09-06 post-mortem found it carries no information about the outcome, so
-   it stays a display chip only.)
+3. **Hard Rock's own** first-half number sits **at or above this week's bar** — the
+   gap of the **top 20%** of the slate's Hard-Rock-priced games with a centred quote
+   and a model read (`slate_bar`, H-PCT, registered 2026-09-22, effective the week-5
+   refit), and the gap is positive. Not the consensus line — the consensus can clear
+   the bar while Hard Rock posts a lower number — and never on an off-centre Hard
+   Rock rung (both sides no worse than −160). The rule was validated as "the top 20%
+   by gap"; deployed as a constant it selected half the board once the model's level
+   moved. **The fallback bar, used only when a slate has no such game, is 1.75.**
+   (≥ 3.0 points = "high" confidence wording. The classifier's under_score no longer
+   gates the label: the 2026-09-06 post-mortem found it carries no information about
+   the outcome, so it stays a display chip only.)
 4. A **live** first-half line has actually been captured — never an estimate.
 5. Hard Rock's under price is no more than 5 cents (per $1) worse than the
    market's no-vig fair price. Standard -110 juice on a balanced market
@@ -216,7 +221,7 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
   game are not editable — they are what the bet *was* — and a graded pick is refused. A
   ledger that can be rewritten once the result is known is not evidence of anything.
 - Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
-  **every game whose Hard Rock first-half line sits ≥ 1.75 above our number**,
+  **every game whose Hard Rock first-half line clears this week's bar (the slate's top 20% by gap, on a centred quote)**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
   BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
   Hard Rock's number so the price could not be judged, `qb_out`, `cap` = the

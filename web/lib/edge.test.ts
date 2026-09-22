@@ -705,3 +705,45 @@ describe("edgeScore — early season is paper only", () => {
     expect(e.blocker).toBe("price");
   });
 });
+
+describe("H-PCT: the kill line and the score scale with the slate bar", () => {
+  const input = {
+    away: "A",
+    home: "H",
+    underScore: 60,
+    bvLine: 24,
+    liveLine: 27,
+    fallbackLine: null,
+    gap: 3,
+    hrLine: 27,
+    hrUnderPrice: -110,
+    ev: 0.01,
+    evVerdict: "fair" as const,
+    fhShare: null,
+    qbOut: false,
+    qbOutDetail: null,
+    minGamesPlayed: 5,
+    bvAdjust: null,
+    bvAdjustReason: null,
+    factorBoard: null,
+    marketLine: 27,
+    bestLine: 27,
+    marketFairUnder: 0.5,
+    context: { leans: [] } as never,
+  };
+  it("kill line is our number plus the bar", () => {
+    expect(edgeScore(input).kill.line).toBe(26); // 24 + 1.75 -> 25.75 -> 26
+    expect(edgeScore({ ...input, bar: 3 }).kill.line).toBe(27);
+  });
+  it("a gap of exactly the bar scores exactly 70", () => {
+    // edgeScore measures the gap itself (Hard Rock's line minus our number):
+    // 27 - 24 = 3 here, whatever `gap` the input carries.
+    expect(edgeScore({ ...input, bar: 3 }).score).toBe(70);
+    expect(
+      edgeScore({ ...input, hrLine: 25.75, liveLine: 25.75, marketLine: 25.75 })
+        .score,
+    ).toBe(70);
+    expect(edgeScore({ ...input, bar: 3.5 }).score).toBeLessThan(70);
+    expect(edgeScore({ ...input }).score).toBe(84); // the fallback bar: 50 + 20/1.75 * 3, floored
+  });
+});

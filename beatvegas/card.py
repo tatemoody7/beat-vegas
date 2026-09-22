@@ -39,9 +39,11 @@ from .model.score import (
     HR_OFF_MARKET_PTS,
     MIN_GAMES_FOR_REAL_MONEY,
     MODEL_VERSION,
+    PCT_SHARE,
     SCORE_BET_MIN,
     SCORE_WATCH_MIN,
     WEEKLY_BET_CAP,
+    slate_bar,
 )
 
 # lineCheck.ts evVerdictFor: "pos" above this, "neg" below EV_FLOOR, else fair.
@@ -229,11 +231,14 @@ def fmt(n: Optional[float], dp: int = 1) -> str:
     return "—" if n is None else f"{n:.{dp}f}"
 
 
-def gap_score(gap: Optional[float]) -> int:
+def gap_score(gap: Optional[float], bar: float = BET_GAP_PTS) -> int:
     """The 0-100 score for a model row: the gap alone, floored, clamped
-    (edge.ts). A gap of exactly BET_GAP_PTS is exactly SCORE_BET_MIN; a gap of
-    None (no line anywhere) sits at 50."""
-    return max(0, min(100, math.floor(50 + SCORE_PER_GAP_PT * (gap or 0))))
+    (edge.ts). A gap of exactly the BAR is exactly SCORE_BET_MIN -- green means
+    the gap rule passed -- so the scale stretches with the slate's bar (H-PCT);
+    at the fallback bar it is SCORE_PER_GAP_PT per point. A gap of None (no line
+    anywhere) sits at 50."""
+    per_pt = (SCORE_BET_MIN - 50) / bar if bar and bar > 0 else SCORE_PER_GAP_PT
+    return max(0, min(100, math.floor(50 + per_pt * (gap or 0))))
 
 
 def american(p: int) -> str:
@@ -277,9 +282,10 @@ def break_even_price(fair_under: float, floor: float = BET_MIN_EV) -> Optional[i
     return None
 
 
-def kill_line(bv_line: float) -> float:
-    """Our number plus the bet gap, rounded up to the next half point."""
-    return round_half_up(bv_line + BET_GAP_PTS)
+def kill_line(bv_line: float, bar: float = BET_GAP_PTS) -> float:
+    """Our number plus this slate's bar (H-PCT; the constant when no bar),
+    rounded up to the next half point: the line at which the game qualifies."""
+    return round_half_up(bv_line + bar)
 
 
 def ev_verdict(ev: Optional[float]) -> str:
@@ -485,6 +491,10 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     return {
         "hr_line": hr_line,
         "hr_price": hr_price,
+        # Both of Hard Rock's sides priced like a main number (devig.is_centred_quote).
+        # Display keeps the raw quote; H-PCT's qualification universe does not:
+        # a -180 rung can no longer manufacture a qualifying gap (2026-09-22).
+        "hr_centred": bool(hr) and is_centred_quote(hr.get("over_price"), hr.get("under_price")),
         "hr_open": _hr_open(snaps),
         "hr_hold": _hold_of(hr) if hr else None,
         "market_line": _median(lines),
@@ -601,12 +611,17 @@ def build_item(
     reference_line: Optional[float],
     preview: Optional[Dict],
     now: Optional[datetime] = None,
+    bar: Optional[float] = None,
 ) -> Dict[str, Any]:
     """One card item for one game (the edge.ts rules, minus the context-only
     score, which never decides a tier). `now` is the build time — it only ages
-    out stale exchange quotes (market_read)."""
+    out stale exchange quotes (market_read). `bar` is this slate's H-PCT bar
+    (build_card computes it over the whole slate first); None means the
+    fallback constant, which is what a single-item caller and the tests get."""
+    bar_pts = BET_GAP_PTS if bar is None else float(bar)
     m = market_read(snaps, now)
     hr_line, hr_price, ev = m["hr_line"], m["hr_price"], m["ev"]
+    hr_centred = bool(m.get("hr_centred"))
     market_line, fair_under = m["market_line"], m["fair_under"]
     ev_v = ev_verdict(ev)
     # price_pos drives the "good price" wording only. The BET gate reads
@@ -658,13 +673,13 @@ def build_item(
     )
     hr_gap = round2(hr_line - bv_line) if has_model and hr_line is not None else None
 
-    k_line = kill_line(bv_line) if has_model else None
+    k_line = kill_line(bv_line, bar_pts) if has_model else None
     k_price = break_even_price(fair_under) if fair_under is not None else None
 
     # --- tier + blocker (edge.ts) -------------------------------------------
     # Gap only, floored (edge.ts). The site gives no-model rows a context-only
     # score under the amber band; the card never needs it, so 0 here.
-    score = gap_score(gap) if has_model else 0
+    score = gap_score(gap, bar_pts) if has_model else 0
 
     # A BET needs a JUDGEABLE price worth taking: EV at or above BET_MIN_EV
     # against the market's no-vig fair under. ev None (no book or exchange
@@ -675,19 +690,14 @@ def build_item(
     # let the card rate a losing wager BET. Keep it identical to verdict.ts:331;
     # tests/test_gate_parity.py reads both by source text.
     price_ok = ev is not None and ev >= BET_MIN_EV
-    is_bet = (
-        has_model
-        and hr_gap is not None
-        and hr_gap >= BET_GAP_PTS
-        and not off_market
-        and price_ok
-        and not qb_out
-        and not early_season
-    )
+    # H-PCT: in the band = Hard Rock's gap at or above this slate's bar, positive,
+    # on a centred Hard Rock quote. The same three facts decide the paper ledger.
+    in_band = has_model and hr_gap is not None and hr_centred and hr_gap >= bar_pts and hr_gap > 0
+    is_bet = in_band and not off_market and price_ok and not qb_out and not early_season
     # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
     # >= BET_GAP_PTS above our number is logged, tagged with the gate that
     # blocked a real bet (None = it was a BET). The weekly cap adds "cap" later.
-    qualifies = has_model and hr_gap is not None and hr_gap >= BET_GAP_PTS
+    qualifies = in_band
     paper_blocker: Optional[str] = None
     # Gate order (PAPER_BLOCKERS): off_market and price are market reads on
     # Hard Rock's number; no_fair_price is the price gate's "cannot judge"
@@ -857,6 +867,10 @@ def build_item(
         "paper_logged": False,
         # paper ledger + weekly cap (apply_weekly_cap fills cap_rank / over_cap)
         "qualifies": qualifies,
+        # H-PCT: the bar this item was judged against and whether Hard Rock's
+        # quote was centred (a rung never qualifies). 2026-09-22.
+        "bar": round2(bar_pts),
+        "hr_centred": hr_centred,
         "paper_blocker": paper_blocker,
         "cap_rank": None,
         "over_cap": False,
@@ -1200,6 +1214,7 @@ def build_card(
     prior_bet_game_ids: Optional[Set[int]] = None,
     slot: Optional[str] = None,
     degraded: Sequence[Dict] = (),
+    bar: Optional[float] = None,
 ) -> Dict[str, Any]:
     """The card payload for one week.
 
@@ -1212,6 +1227,9 @@ def build_card(
     previews:    {game_id, qb_out, qb_out_detail}
     slot:        which build wrote this card (beatvegas.ci.CARD_STATUS_BY_SLOT);
                  None on an ad-hoc build.
+    bar:         hold the qualification bar at this value instead of reading it
+                 off the slate (H-PCT). Tests of gates, caps and logging use it;
+                 production never passes it.
     degraded:    the failed inputs from `degraded_inputs`. Every game an entry
                  touched goes paper only; a build-wide entry that held a game
                  (CARD_STATUS_INPUTS) also makes the card status "degraded".
@@ -1234,11 +1252,33 @@ def build_card(
             reference_by_game[gid] = _num(p["line_used"])
     preview_by_game = {int(p["game_id"]): p for p in previews}
 
-    items: List[Dict] = []
-    for g in games:
-        kick = _naive_utc(g.get("kick"))
-        if kick is None or kick <= now_n:
+    # H-PCT: the bar is a property of the SLATE, so it is read first over every
+    # upcoming game with a centred Hard Rock quote and a model read, then handed
+    # to each item. BET_GAP_PTS stands in only when no game is in that universe.
+    upcoming = [g for g in games if (k := _naive_utc(g.get("kick"))) is not None and k > now_n]
+    slate_gaps: List[float] = []
+    for g in upcoming:
+        gid = int(g["game_id"])
+        pred = model_by_game.get(gid)
+        bv = _num((pred or {}).get("bv_line"))
+        if bv is None:
             continue
+        m = market_read(snaps_by_game.get(gid, []), now_n)
+        if m["hr_line"] is None or not m.get("hr_centred"):
+            continue
+        slate_gaps.append(round2(m["hr_line"] - bv))
+    bar_value = slate_bar(slate_gaps) if bar is None else None
+    slate = {
+        "bar": round2(bar_value)
+        if bar_value is not None
+        else (round2(float(bar)) if bar is not None else BET_GAP_PTS),
+        "n": len(slate_gaps),
+        "share": PCT_SHARE,
+        "basis": "slate" if bar_value is not None else ("held" if bar is not None else "fallback"),
+    }
+
+    items: List[Dict] = []
+    for g in upcoming:
         gid = int(g["game_id"])
         items.append(
             build_item(
@@ -1248,6 +1288,7 @@ def build_card(
                 reference_by_game.get(gid),
                 preview_by_game.get(gid),
                 now_n,
+                bar=slate["bar"],
             )
         )
     items.sort(key=_sort_key)
@@ -1315,6 +1356,8 @@ def build_card(
             "degraded": deg,
             "counts": counts,
             "paper": paper,
+            # H-PCT: the bar every item on this card was judged against.
+            "slate": slate,
             "items": public,
             "notes": notes,
         }

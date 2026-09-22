@@ -85,7 +85,7 @@ different games, so pairing would discard most of the ledger.
 | clock | quantity | H0 | H1 (frozen at registration) | sd |
 |---|---|---|---|---|
 | profit | units won per 1u risked at the actual price | mean 0 | **+0.0731 u/bet** | 0.924 |
-| line value | favourable line value vs Hard Rock's strict close, points | mean 0 | **+0.50 pts/bet** | 1.714 |
+| line value | favourable line value vs the centred consensus close, points (this row said "Hard Rock's strict close" until 2026-09-22; the code never graded against the rung) | mean 0 | **+0.50 pts/bet** | 1.714 |
 
 The alternatives and standard deviations are **H-STOP's own, reused deliberately** rather
 than re-derived, so the challenger and the champion are held to the same bar in the same

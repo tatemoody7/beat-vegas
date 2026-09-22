@@ -247,7 +247,8 @@ def test_card_yml_gates_on_the_eastern_clock_before_installing_anything():
 
 
 def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
-    """grade.yml runs twice a day with no skip gate, so each run must be cheap:
+    """grade.yml fires three times a day (Vercel dispatch + two GitHub crons),
+    so each run must be cheap even when the probe below lets it through:
     the PBP step fetches only the weeks still missing rows, and the post-mortem
     regrades only the live season except on Monday ET or a dispatch that asks
     for it (hist=true). NOT every dispatch: the Vercel cron that is this
@@ -275,6 +276,34 @@ def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
     # Both crons stay; no case-block gate.
     assert len(_cron_strings(data)) == 2
     assert not any('case "$SCHEDULE"' in r for r in runs)
+
+
+def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
+    """Three triggers a day (the Vercel dispatch at ~10:52Z and GitHub's 10:30Z
+    and 16:00Z crons, which fire 2-4 h late) each ran every step: ~18
+    runner-minutes a day for one useful pass, measured 2026-09-20/21. The
+    probe reads a POSITIVE fact -- a postmortem_runs row with scope=live inside
+    the last four hours; the post-mortem is the job's last step, so the row
+    proves a whole run completed -- and gates every work step on it. Four
+    hours, not "today": the noon-ET second pass for late finals is deliberate
+    and stays. hist=true forces. The cache save stays on always()."""
+    data = _load(WF_DIR / "grade.yml")
+    steps = data["jobs"]["grade"]["steps"]
+    probe = next(s for s in steps if s.get("id") == "probe")
+    assert "postmortem_runs" in probe["run"] and "scope = 'live'" in probe["run"]
+    assert "timedelta(hours=4)" in probe["run"]
+    assert probe["env"]["IN_HIST"] == "${{ inputs.hist }}"
+    assert 'os.environ.get("IN_HIST") == "true"' in probe["run"]
+    assert "need_grade=" in probe["run"]
+    idx = steps.index(probe)
+    assert steps[idx - 1].get("id") == "season", "the probe runs right after the season resolves"
+    gate = "steps.probe.outputs.need_grade == 'true'"
+    for s in steps[idx + 1 :]:
+        if s.get("uses") == CACHE_SAVE:
+            assert (s.get("if") or "").startswith("always()")
+            continue
+        assert s.get("if") == gate, f"{s.get('name')} is not gated on the probe"
+    assert any("scripts/post_mortem.py" in (s.get("run") or "") for s in steps[idx + 1 :])
 
 
 def test_rescore_yml_is_dispatch_only_and_writes_through_env():

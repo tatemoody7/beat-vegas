@@ -6,7 +6,8 @@ name: Daily grading (results + ledger)
 # Thursday game is graded Friday morning, Friday's on Saturday, Saturday's on
 # Sunday, and Monday's run is the full weekly pass. grade.py is season-wide and
 # delete-then-rewrite idempotent, so a late final simply grades next morning. Off-season every step is a green no-op.
-# Both crons run every step with no skip gate, so each run is kept CHEAP: the
+# Each run is kept CHEAP (and since 2026-09-22 a run that finds a completed
+# grading run inside the last four hours skips the work -- see the probe): the
 # finals refresh only writes games CFBD marks completed (a noon-ET Saturday run
 # never freezes a live score), the PBP step fetches only the weeks still missing
 # fh_team_game rows, and the post-mortem regrades only the live season except on
@@ -84,7 +85,46 @@ jobs:
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
           # ISO weekday in Eastern time (1 = Monday): the weekly full pass.
           echo "et_dow=$(TZ=America/New_York date +%u)" >> "$GITHUB_OUTPUT"
+      - name: Already graded in the last four hours? (the minutes guard)
+        id: probe
+        env:
+          IN_HIST: ${{ inputs.hist }}
+        # Three triggers fire every day -- the Vercel cron's dispatch (~10:52Z)
+        # and GitHub's two crons (10:30Z and 16:00Z), which run 2-4 hours late
+        # -- and until 2026-09-22 all three ran every step: ~18 runner-minutes a
+        # day for one useful pass, measured over 09-20/09-21. Same idea as
+        # card.yml's `cards`-row probe and sunday.yml's `captured` step: a
+        # POSITIVE fact from the database, not a run-list lookup. The fact here
+        # is a `postmortem_runs` row with scope=live -- the post-mortem is this
+        # job's LAST step, so its row proves the whole run completed. A
+        # four-hour window (not "today") keeps the deliberate second daily pass
+        # for late finals while collapsing the 10:30Z-cron / 10:52Z-dispatch
+        # pair and any late duplicate. `hist=true` (the manual history regrade)
+        # always runs.
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from datetime import datetime, timedelta
+          from sqlalchemy import text
+          from beatvegas.db.store import init_db, session_scope
+          init_db()
+          # computed_at is stored naive UTC.
+          since = datetime.utcnow() - timedelta(hours=4)
+          with session_scope() as s:
+              recent = s.execute(
+                  text(
+                      "SELECT count(*) FROM postmortem_runs "
+                      "WHERE scope = 'live' AND computed_at >= :since"
+                  ),
+                  {"since": since},
+              ).scalar() or 0
+          force = os.environ.get("IN_HIST") == "true"
+          print(f"need_grade={'true' if (force or recent == 0) else 'false'}")
+          print(f"recent_runs={recent}")
+          PY
+          cat "$GITHUB_OUTPUT"
       - name: Refresh schedule, lines and scores (CFBD)
+        if: steps.probe.outputs.need_grade == 'true'
         # Primary source: this is also what creates new games and refreshes
         # lines, so it runs first. continue-on-error because ESPN below covers
         # the part grading actually needs -- on 2026-09-12 CFBD hit its monthly
@@ -94,6 +134,7 @@ jobs:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/backfill.py --season "$SEASON"
       - name: Backfill any missing final scores (ESPN, no key, no quota)
+        if: steps.probe.outputs.need_grade == 'true'
         # Scores only, onto games the step above already created, keyed by id
         # (ESPN's event ids are the ids we store). Second source for the one
         # input grading cannot do without. Four days back: this runs twice a
@@ -103,6 +144,7 @@ jobs:
         continue-on-error: true
         run: python scripts/backfill_scores_espn.py --days-back 4
       - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
+        if: steps.probe.outputs.need_grade == 'true'
         # fh_team_game feeds the season-to-date FH factors the Sunday scorer
         # reads; without this the current season never accrues PBP rows.
         # --only-missing: one CFBD call per week that still has a finished FBS
@@ -115,22 +157,27 @@ jobs:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/backfill_pbp.py --season "$SEASON" --only-missing
       - name: Grade market vs model ledger
+        if: steps.probe.outputs.need_grade == 'true'
         env:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/grade.py --season "$SEASON"
       - name: Grade my picks
+        if: steps.probe.outputs.need_grade == 'true'
         env:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/pick.py grade --season "$SEASON"
       - name: Grade frozen game records
+        if: steps.probe.outputs.need_grade == 'true'
         run: python scripts/grade_records.py
       - name: Grade factor credibility ledger (real lines only)
+        if: steps.probe.outputs.need_grade == 'true'
         # Display chips only -- nothing downstream reads this to decide a bet,
         # and it calls CFBD /ratings/sp, which 429'd and skipped the post-mortem
         # on 2026-09-13 after this guard was reverted by mistake.
         continue-on-error: true
         run: python scripts/grade_factor_ledger.py
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
+        if: steps.probe.outputs.need_grade == 'true'
         # Regrades the season's cards at Hard Rock's numbers (scope live) every
         # run; the stored 2023-25 ratings under the flat and fair proxies (scope
         # hist, the expensive half) only on Monday ET or when dispatched with

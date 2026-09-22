@@ -523,3 +523,58 @@ statistics changes the champion's number without any code change.
 runner refetches weekly and the live board is fitted on. H-INSEASON is `tested-null`; H-INSEASON-P is
 withdrawn before its first pick, with zero rows ever logged. This Mac's June cache is refreshed so local
 studies read the same tables as the runner, and every gate run now writes its frame fingerprint.**
+
+## The serving skew (2026-09-22) — 57 inputs present on every training row, missing on every scored row
+
+Found by the system review, after the reconciliation above. It is the most likely cause of
+the deficit this document has been chasing, and it is a defect, not a modelling question
+(registry row **B-SERVE**, `adopted`).
+
+**Mechanism.** The first-half play-by-play season-to-date features (`FH_FACTOR_COLS`, 52
+columns) and their five derived matchup columns (`mm_*`) are built in
+`etl/fh_factors.py::fh_factor_frame` as a `shift(1).expanding().mean()` over `fh_team_game`
+rows and then joined onto games **by the game's own id**. A played game has a play-by-play
+row and receives its teams' prior-game means. An upcoming game has no play-by-play row yet,
+so the join finds nothing and every one of the 57 columns is NaN — even though its teams'
+prior games exist. In the historical seasons every row is played, so the training frame and
+every backtest carry the columns on ~100% of rows.
+
+| rows | NaN share on the 57 columns |
+|---|---|
+| 2026 week 4 (the 58 rows scored on 2026-09-20) | **100%** |
+| 2026 weeks 2-3 (now played) | ~4-10% |
+| 2023-25 weeks 4+ (training) | **0.0%** |
+
+`HistGradientBoostingRegressor` learns a routing direction for missing values only from
+missing values it sees in training; on a column it never saw missing, a NaN at prediction
+time is sent to whichever child the implementation defaults to. The model has been scoring
+every live game through 57 branches it never trained.
+
+**Measured effect** (the runner's frame snapshot 2026-09-22T15:56Z, scikit-learn 1.9.1;
+train `season < test`, the champion's own `bias_corrections`; the same played rows predicted
+with the 57 columns present and then masked to NaN, exactly the serving condition):
+
+| test rows | n | bias, columns present | bias, columns masked | mean shift | mean \|shift\| per game | MAE present → masked |
+|---|---|---|---|---|---|---|
+| 2026 weeks 2-3 | 104 | −2.52 | **−4.51** | **−1.99** | 2.85 | 8.29 → 8.20 |
+| 2025 weeks 4+ | 601 | +0.57 | −0.73 | **−1.30** | 2.41 | 9.01 → 8.83 |
+| 2024 weeks 4+ | 596 | +0.98 | −1.60 | **−2.58** | 3.39 | 9.08 → 8.89 |
+
+Three things follow. The masked prediction is **1.3-2.6 points lower** in every season: that
+is the size and sign of the 2026 level deficit, and it is not an intercept. The per-game
+shift is **2.4-3.4 points**, so the skew reorders the board as well as lowering it — the
+constant bar was firing on a reshuffled slate. And MAE is slightly **better without** the
+columns in all three seasons, consistent with the 2026-09 ablation (9.22 with vs 9.18
+without the PBP family): the features were noise in training and poison at serving.
+
+**Why nothing caught it.** Every validation path scores played rows. The stored week-4
+predictions reproduce exactly on today's frame (the verify run above) because today's frame
+has the same NaNs. The intercept studies measured a real symptom on the correct data and
+attributed it to calibration.
+
+**The fix (next PR, effective at the week-5 refit):** the 57 columns leave `BV_FEATURE_COLS`
+as `SERVE_UNAVAILABLE_COLS`; `weekly_update.py` prints a per-column NaN-share comparison of
+the target rows against the training rows and fails if any column is >90% NaN on the target
+and <10% on training — the guard for the class, not the instance. The level, the selection
+share and the intercept are then re-derived on the runner and appended here. H-INTERCEPT and
+H-INSEASON are not reopened: they studied a symptom.

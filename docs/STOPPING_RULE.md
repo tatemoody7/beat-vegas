@@ -29,7 +29,7 @@ the clocks and stops nothing.
 | clock | observation | H0 | H1 (frozen) | sd (frozen) | source of the frozen values |
 |---|---|---|---|---|---|
 | profit | units won per 1u risked at the actual price | mean 0 | **+0.0731 u/bet** = a 4-pp edge over a break-even of 0.5475 (edge ÷ break-even) | 0.924 | 2026 weeks 1-2 paper picks, n 25, read 2026-09-15 |
-| line value | favourable line value vs Hard Rock's strict close, points | mean 0 | **+0.50 pts/bet** (Tate's choice: below week 2's observed +0.61; the 4-pp-equivalent 1.13 would stop in a dozen bets) | 1.714 | same 25 picks |
+| line value | favourable line value vs the centred consensus close (the code, `picks.grade_pick`, never graded against Hard Rock's own rung; this cell said otherwise until 2026-09-22), points | mean 0 | **+0.50 pts/bet** (Tate's choice: below week 2's observed +0.61; the 4-pp-equivalent 1.13 would stop in a dozen bets) | 1.714 | same 25 picks |
 
 Both alternatives are **frozen**. They do not move with later prices or later
 volatility; if the ledger's character changes, that is a new registered row.
@@ -97,3 +97,46 @@ sequential by construction — that is the point of choosing SPRT over a fixed n
 PYTHONPATH=. python scripts/stopping_rule_candidates.py --breakeven 0.5475 --sd-units 0.924 --sd-clv 1.714 --sigma-outcome 11.26
 PYTHONPATH=. python scripts/stopping_rule_position.py --out reports/stopping      # weekly; GHA study.yml when on campus
 ```
+
+## Clock 1 closed — 2026-09-22, n = 30, no boundary crossed. Superseded.
+
+Position at close: profit LLR −0.44, line-value LLR −0.51 against +3.466 / −1.584. Neither
+boundary. The clock did not decide anything; it was **superseded** because the champion it
+measured changes at the week-5 refit (B-SERVE: 57 inputs the model never saw missing in
+training were missing on every row it scored, worth about two points of level) and its
+constant 1.75 bar is replaced by a per-slate percentile (H-PCT). The 30 observations stay in
+`manual_picks` as history and are never mixed into Clock 2. Registry rows H-STOP and R10 are
+`rejected` with that sentence.
+
+Two defects in this page's own registration, corrected below rather than edited above: the
+line-value cell named Hard Rock's strict close while the code graded against the centred
+consensus; and the frozen sd 1.714 was week 2's value alone — week 3 read 0.984.
+
+## Clock 2 — H-STOP-2, registered 2026-09-22, before its first observation
+
+**What is tested:** the H-PCT rule — the top 20% of the slate by gap (`slate_bar`), on the
+corrected model — every qualifying game, on paper, one flat unit, uncapped, from the first
+card build on the corrected model (week 5, the 2026-09-29 `tue_pm` build) onward. One
+canonical observation per decision, in placed order; real tickets attach as adherence.
+
+**Design:** SPRT, total false-stop 5% (2.5% per clock), power 80%, bounds
+**A = +3.466 / B = −1.584** — unchanged.
+
+| clock | observation | H0 | H1 (frozen) | sd (frozen, treated as known) |
+|---|---|---|---|---|
+| profit | units won per 1u risked at the pick's own price; **priced picks only** | mean 0 | **per pick: μ₁ᵢ = 0.04 / bᵢ**, bᵢ = the pick's break-even implied by its price (a 4-pp edge over that price's break-even; at −110 this is +0.0731, at −180 +0.0622) | **0.929** |
+| line value | favourable line value = −(consensus close − bet), **consensus close inside `REAL_1H_CLOSE_WINDOW_H` (2 h) of kickoff**; a pick with no close inside the window is excluded and counted; **unpriced picks are included** | mean 0 | **+0.50 pts** (carried over) | **1.371** |
+
+Both sds are the sample sds of the **55 graded 2026 paper picks as stored on 2026-09-22**
+(weeks 2-3; week 2 alone 0.924 / 1.714, week 3 alone 0.944 / 0.984). They are not
+re-estimated during the test. σ-as-known is a stated limitation of the SPRT here, as is the
+within-week dependence of picks that share one fitted model.
+
+**LLR with a per-pick alternative:** `LLR_n = Σᵢ (μ₁ᵢ·xᵢ − μ₁ᵢ²/2) / σ²`. At a constant price
+this reduces to the Clock-1 formula.
+
+**What a stop does:** unchanged — failure on either clock pauses real money
+(`scripts/rule_pause.py on`); success on either is a finding for Tate and changes no stake.
+
+Constants: `beatvegas/backtest/stopping.py::REGISTERED_2`; the weekly position is
+`scripts/stopping_rule_position.py --clock 2`. Registry row **H-STOP-2**.

@@ -105,3 +105,13 @@ def test_recorded_value_matches_the_doc():
         f"{B.RECORDED_INTERCEPT:.4f}".replace("-", "−") in doc
         or f"{B.RECORDED_INTERCEPT:.4f}" in doc
     )
+
+
+def test_compare_stored_reads_a_constant_offset_as_the_intercept_difference():
+    stored = {1: 24.0, 2: 25.5, 3: 30.0}
+    same = B.compare_stored({1: 24.0, 2: 25.5, 3: 30.0, 9: 1.0}, stored)
+    assert same["n"] == 3 and same["mean_signed"] == 0.0 and same["within_0_01"] == 3
+    shifted = B.compare_stored({1: 24.57, 2: 26.07, 3: 30.57}, stored)
+    assert shifted["mean_signed"] == pytest.approx(0.57)
+    assert shifted["max_abs"] == pytest.approx(0.57) and shifted["within_0_01"] == 0
+    assert B.compare_stored({}, stored) == {"n": 0}

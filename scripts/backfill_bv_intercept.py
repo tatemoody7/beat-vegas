@@ -31,14 +31,14 @@ the runner's pins are what wrote the rows being repaired.
 from __future__ import annotations
 
 import argparse
-from typing import Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from sqlalchemy import func
 
 from beatvegas.db.models import Game, Prediction
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import apply_min_games, build_feature_frame, training_frame
-from beatvegas.model.bv_line import bias_corrections
+from beatvegas.model.bv_line import bias_corrections, bv_line_for_slate
 from beatvegas.model.score import MODEL_VERSION
 
 # The intercept the live board applied all season (docs/MODEL_LEVEL_2026.md,
@@ -47,6 +47,61 @@ from beatvegas.model.score import MODEL_VERSION
 # and the "raw" predictions recovered from it would be wrong by the difference.
 RECORDED_INTERCEPT = -1.8092
 TOLERANCE = 0.001
+
+
+def compare_stored(recomputed: Dict[int, float], stored: Dict[int, float]) -> Dict[str, Any]:
+    """recomputed - stored over the games both carry. A mean near zero with a
+    tiny max says the runner reproduces the rows (same model, same intercept);
+    a mean sitting at a constant offset says the intercept the rows were scored
+    with differs from today's by exactly that much."""
+    ids = sorted(set(recomputed) & set(stored))
+    diffs = [float(recomputed[i]) - float(stored[i]) for i in ids]
+    if not diffs:
+        return {"n": 0}
+    absd = [abs(d) for d in diffs]
+    return {
+        "n": len(diffs),
+        "mean_signed": round(sum(diffs) / len(diffs), 4),
+        "mean_abs": round(sum(absd) / len(absd), 4),
+        "max_abs": round(max(absd), 4),
+        "within_0_01": sum(1 for a in absd if a <= 0.01),
+    }
+
+
+def verify_against_stored(
+    session, season: int, frame, model_version: str = MODEL_VERSION
+) -> Dict[int, Dict[str, Any]]:
+    """Per week: recompute `bv_line_for_slate` for the season's STORED rows on
+    today's frame and compare. Week 1's features are prior-season priors only and
+    never change, so week 1 must reproduce to rounding if the intercept the rows
+    carry is the one this platform computes; later weeks pick up season-to-date
+    feature drift and are context only."""
+    df = apply_min_games(frame, 0)
+    train = training_frame(df[df["season"] < int(season)])
+    stored_rows = (
+        session.query(Prediction.game_id, Prediction.bv_line, Game.week)
+        .join(Game, Game.id == Prediction.game_id)
+        .filter(
+            Game.season == int(season),
+            Prediction.model_version == model_version,
+            Prediction.bv_line.isnot(None),
+        )
+        .all()
+    )
+    by_week: Dict[int, Dict[int, float]] = {}
+    for gid, bv, wk in stored_rows:
+        by_week.setdefault(int(wk), {})[int(gid)] = float(bv)
+    out: Dict[int, Dict[str, Any]] = {}
+    target_all = df[df["season"] == int(season)]
+    for wk in sorted(by_week):
+        target = target_all[target_all["id"].isin(list(by_week[wk]))]
+        if target.empty:
+            out[wk] = {"n": 0}
+            continue
+        pred = bv_line_for_slate(train, target)
+        recomputed = {int(g): round(float(v), 2) for g, v in zip(target["id"], pred)}
+        out[wk] = compare_stored(recomputed, by_week[wk])
+    return out
 
 
 def compute_intercept(season: int, frame=None) -> tuple:
@@ -128,6 +183,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument(
+        "--verify",
+        action="store_true",
+        help="also recompute bv_line for the season's stored rows on this platform and print "
+        "the per-week difference (week 1 must reproduce; it settles which intercept the rows "
+        "were scored with). Read-only.",
+    )
+    ap.add_argument(
         "--write",
         action="store_true",
         help="apply the UPDATE; without it the script only reports what it would do",
@@ -140,8 +202,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not try_init_db():
         print("[backfill_bv_intercept] DB unreachable — skipped.")
         return 1
-    c, n_train = compute_intercept(args.season)
+    frame = build_feature_frame(min_games=0)
+    c, n_train = compute_intercept(args.season, frame)
     print(f"[backfill_bv_intercept] recomputed intercept {c:+.6f} from {n_train} training rows")
+    if args.verify:
+        with session_scope() as s:
+            per_week = verify_against_stored(s, args.season, frame)
+        for wk, r in per_week.items():
+            print(f"[backfill_bv_intercept] verify week {wk}: {r}")
     print(
         f"[backfill_bv_intercept] recorded live value {RECORDED_INTERCEPT:+.4f}; "
         f"difference {c - RECORDED_INTERCEPT:+.6f} (tolerance {TOLERANCE})"

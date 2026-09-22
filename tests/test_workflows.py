@@ -425,6 +425,7 @@ FEATURE_FRAME_SCRIPTS = (
     "scripts/post_derived_lines.py",
     "scripts/residual_gate.py",
     "scripts/level_anchor_gate.py",
+    "scripts/backfill_bv_intercept.py",
 )
 CACHE_RESTORE = "./.github/actions/cfbd-cache"
 CACHE_SAVE = "./.github/actions/cfbd-cache-save"

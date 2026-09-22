@@ -51,6 +51,16 @@ but different sets, which is the point.
 
 Collection starts at the first card build after this row merges.
 
+**Data note (2026-09-22).** `Prediction.bv_intercept` is written only by `score_slate`, and a
+scoring run rewrites only its target week, so every 2026 row scored before PR #201 merged
+(weeks 1-4, 214 rows) carried NULL — and `completed_season_rows` requires the column, so the
+arms would have logged nothing and `c_season` could only ever have seen week 5 on. Those
+rows were backfilled with the season's one intercept, recomputed on the runner the way
+`score_slate` computes it (`scripts/backfill_bv_intercept.py`, `backfill_intercept.yml`) and
+required to match the recorded live value **−1.8092** within 0.001 before writing. Only the
+new column moved; `bv_line` is checksummed unchanged. The as-of rule is unaffected: it is
+SQL on `start_date` and `first_half_total`, not on when the column was filled.
+
 ## The rule — two clocks per arm, Bonferroni across arms
 
 Both clocks are **absolute** quantities, the same two the champion is measured on, so an

@@ -1,4 +1,5 @@
-import { cardBuilds } from "@/lib/nextBuild";
+import { CRON_JOBS } from "@/lib/cronJobs";
+import { cardBuilds, type BuildSlot } from "@/lib/nextBuild";
 import { etMinutesOfDay, etParts } from "@/lib/et";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -127,7 +128,15 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 export function lastClosedWindow(
   now: Date,
 ): { day: string; openedAt: Date } | null {
-  const slots = cardBuilds();
+  return lastClosedSlot(cardBuilds(), now);
+}
+
+/** Pure: of these ET day/minute windows, the one that closed most recently at
+ *  or before `now` (walking back at most a week), with the instant it opened. */
+export function lastClosedSlot(
+  slots: readonly BuildSlot[],
+  now: Date,
+): { day: string; openedAt: Date } | null {
   if (slots.length === 0) return null;
   const nowMin = etMinutesOfDay(now);
   const nowDow = DAYS.indexOf(etParts(now).weekday as (typeof DAYS)[number]);
@@ -179,13 +188,28 @@ export async function getBuildHealth(
 // exited green having graded nothing. Each is one `app_settings` row written
 // where it is learned; this reads them and turns them into a banner.
 
-export const GAUGE_KEYS = [
+export const BASE_GAUGE_KEYS = [
   "cfbd_calls_remaining",
   "odds_credits_remaining",
   "last_close_capture_at",
   "last_close_capture_events",
   "last_grade_completed_at",
 ] as const;
+
+// One more per cron job, written by app/api/cron/[job]/route.ts rather than by
+// Python: the last time a Vercel tick ACTED inside that job's window (dispatched
+// a build, or found one already there). GitHub's crons are the backup and a
+// manual run looks identical in the runs API, so without this row the primary
+// trigger can die and every build still "happen" (beatvegas/ops.py::
+// last_dispatch_key). Derived from CRON_JOBS so a renamed job cannot leave a
+// gauge nobody writes.
+export const DISPATCH_GAUGE_PREFIX = "last_dispatch_";
+export const DISPATCH_JOB_IDS: readonly string[] = Object.keys(CRON_JOBS);
+
+export const GAUGE_KEYS: readonly string[] = [
+  ...BASE_GAUGE_KEYS,
+  ...DISPATCH_JOB_IDS.map((id) => `${DISPATCH_GAUGE_PREFIX}${id}`),
+];
 
 export type GaugeRow = {
   key: string;
@@ -199,8 +223,10 @@ export type Gauges = {
   lastCloseCaptureAt: Date | null;
   lastCloseCaptureEvents: number | null;
   lastGradeCompletedAt: Date | null;
+  /** Per cron job id: the last in-window Vercel tick, or null if never seen. */
+  lastDispatch: Record<string, Date | null>;
   /** When each gauge was last written (naive UTC in the DB). */
-  updatedAt: Partial<Record<(typeof GAUGE_KEYS)[number], Date | null>>;
+  updatedAt: Partial<Record<string, Date | null>>;
 };
 
 /** CFBD Academic tier is 3,000 calls a month; under this it is days, not weeks. */
@@ -216,12 +242,28 @@ const numOrNull = (v: string | undefined): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** A gauge VALUE that is a timestamp: naive UTC like the rest, but tolerate a
+ *  trailing Z or offset so a writer that used toISOString() is not read as
+ *  invalid. */
+const utcValue = (s: string | undefined): Date | null => {
+  if (!s) return null;
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return utc(s);
+};
+
 /** Pure: rows -> gauges. */
 export function gaugesFrom(rows: GaugeRow[]): Gauges {
   const by = new Map(rows.map((r) => [r.key, r]));
   const at = (k: string): Date | null => utc(by.get(k)?.updated_at ?? null);
   const updatedAt: Gauges["updatedAt"] = {};
   for (const k of GAUGE_KEYS) updatedAt[k] = at(k);
+  const lastDispatch: Record<string, Date | null> = {};
+  for (const id of DISPATCH_JOB_IDS) {
+    lastDispatch[id] = utcValue(by.get(`${DISPATCH_GAUGE_PREFIX}${id}`)?.value);
+  }
   return {
     cfbdCallsRemaining: numOrNull(by.get("cfbd_calls_remaining")?.value),
     oddsCreditsRemaining: numOrNull(by.get("odds_credits_remaining")?.value),
@@ -230,6 +272,7 @@ export function gaugesFrom(rows: GaugeRow[]): Gauges {
       by.get("last_close_capture_events")?.value,
     ),
     lastGradeCompletedAt: utc(by.get("last_grade_completed_at")?.value ?? null),
+    lastDispatch,
     updatedAt,
   };
 }
@@ -281,6 +324,32 @@ export function opsWarnings(
       out.push({
         key: "close",
         text: `No pre-kickoff close captured for ${Math.floor(ageH / 24)} days. Every line-value number since then is graded against a sweep quote, not a close.`,
+      });
+    }
+  }
+  // The primary trigger. A job whose most recent window has CLOSED without an
+  // in-window Vercel tick is running on the backup (GitHub's cron, or a hand
+  // dispatch) -- which is invisible everywhere else, because the build itself
+  // looks the same. A job never seen is unknown, not wrong: the row appears the
+  // first time a tick acts, so it cannot alarm on a fresh deploy. A window that
+  // is still open never warns (the tick may be minutes away).
+  for (const id of DISPATCH_JOB_IDS) {
+    const last = g.lastDispatch[id] ?? null;
+    if (last === null) continue;
+    const job = CRON_JOBS[id];
+    const days = job.days ?? DAYS;
+    const win = lastClosedSlot(
+      days.map((day) => ({
+        day,
+        openMin: job.dispatchOpenMin,
+        closeMin: job.dispatchCloseMin,
+      })),
+      now,
+    );
+    if (win !== null && last.getTime() < win.openedAt.getTime()) {
+      out.push({
+        key: `dispatch:${id}`,
+        text: `Vercel did not trigger ${id} in its ${win.day} window (last in-window tick ${last.toISOString().slice(0, 10)}). Whatever ran came from GitHub's backup cron or a hand dispatch; if it repeats, check the Vercel cron list, CRON_SECRET and GITHUB_DISPATCH_TOKEN (docs/OPS_ACCOUNTS.md).`,
       });
     }
   }

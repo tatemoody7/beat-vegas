@@ -34,6 +34,19 @@ GAUGE_KEYS = (
     LAST_GRADE_COMPLETED_AT,
 )
 
+# One more per Vercel cron job, written by web/app/api/cron/[job]/route.ts (not
+# by Python): the last time a tick ACTED inside its window -- dispatched a build
+# or found one already there. GitHub's crons are the backup and a hand dispatch
+# is indistinguishable in the runs API, so this is the only row that says the
+# primary trigger is alive. Same naive-UTC-to-the-second value shape as the
+# gauges above; read by web/lib/boardHealth.ts::opsWarnings.
+LAST_DISPATCH_PREFIX = "last_dispatch_"
+
+
+def last_dispatch_key(job_id: str) -> str:
+    """`app_settings.key` for one cron job's trigger gauge (fits String(32))."""
+    return f"{LAST_DISPATCH_PREFIX}{job_id}"
+
 
 def gauges_enabled() -> bool:
     return bool(os.environ.get("DATABASE_URL"))

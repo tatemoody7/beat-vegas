@@ -40,7 +40,12 @@ Research only — it never places bets or automates gambling.
   nothing defaults a price to −110. **Monitoring (#219):** `beatvegas/ops.py` gauges in
   `app_settings` (CFBD calls, Odds credits, last close capture, last completed grade, last
   Vercel dispatch per job) → `OpsBanner` on the board + `/api/health`; the grade probe keys on
-  the completed-grade gauge. **GitHub Actions stopped starting jobs at ~17:29Z (billing hold /
+  the completed-grade gauge. **The dispatch gauge was write-only until the evening's follow-up:**
+  the cron route wrote `last_dispatch_<job>` and nothing read it, and a hand dispatch by Tate is
+  indistinguishable from a Vercel one in the runs API (same actor). Now the route records every
+  in-window tick that acts (`dispatched` or `already_ran`), `boardHealth.ts` derives one gauge per
+  `CRON_JOBS` entry and warns when a job's last CLOSED window saw no tick (an open window and a
+  never-written row are silent), `/api/health` carries `gauges.lastDispatch`. **GitHub Actions stopped starting jobs at ~17:29Z (billing hold /
   spending limit) — every scheduled job is blocked until Tate fixes billing; see
   `docs/OPS_ACCOUNTS.md`.** **Site honesty pass (#220):** Wilson interval on the money column and
   a "modelled from the ledger, not reconciled" label on the bankroll; the Track record headline

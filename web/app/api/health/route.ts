@@ -73,6 +73,13 @@ export async function GET() {
         lastCloseCaptureEvents: gauges.lastCloseCaptureEvents,
         lastGradeCompletedAt:
           gauges.lastGradeCompletedAt?.toISOString() ?? null,
+        // Per cron job: the last Vercel tick that acted inside its window.
+        lastDispatch: Object.fromEntries(
+          Object.entries(gauges.lastDispatch).map(([id, d]) => [
+            id,
+            d?.toISOString() ?? null,
+          ]),
+        ),
       },
       warnings: warnings.map((w) => w.text),
     });

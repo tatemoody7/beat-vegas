@@ -70,6 +70,32 @@ async function recentRuns(
   return data.workflow_runs ?? [];
 }
 
+// The gauge that says the primary trigger is alive. GitHub's own crons are the
+// backup, and if this route stops firing the system degrades to them invisibly
+// -- or to Tate dispatching by hand, which the runs API cannot tell apart from a
+// Vercel dispatch (same actor, same event; 2026-09-22). So the row records the
+// last time a Vercel tick ACTED inside its window: dispatched a build, or found
+// one already there. A refused tick (wrong day, outside the window) writes
+// nothing -- that is the case lib/boardHealth.ts turns into a banner. One
+// app_settings row per job (beatvegas/ops.py::last_dispatch_key); the value is
+// naive UTC to the second, the shape every other gauge uses. Never fails the
+// dispatch.
+async function recordTriggerGauge(id: string, now: Date, note: string) {
+  try {
+    const value = now.toISOString().slice(0, 19);
+    await prisma.$executeRaw`
+      INSERT INTO app_settings (key, value, note, updated_at)
+      VALUES (${`last_dispatch_${id}`}, ${value}, ${note}, ${now}::timestamp)
+      ON CONFLICT (key) DO UPDATE
+        SET value = EXCLUDED.value, note = EXCLUDED.note, updated_at = EXCLUDED.updated_at`;
+  } catch (e) {
+    console.error(
+      "[cron] dispatch gauge not recorded:",
+      String((e as Error)?.message ?? e),
+    );
+  }
+}
+
 function json(status: number, body: Result, req: NextRequest, id: string) {
   console.log(
     JSON.stringify({
@@ -146,6 +172,9 @@ export async function GET(
   try {
     const dupe = suppressedBy(await recentRuns(job, now, token), job, now);
     if (dupe !== null) {
+      // The tick arrived in its window and the build exists: the trigger is
+      // alive even though it dispatched nothing.
+      await recordTriggerGauge(id, now, `already_ran:${dupe}`);
       return json(200, { ...named, reason: `already_ran:${dupe}` }, req, id);
     }
   } catch (e) {
@@ -182,21 +211,7 @@ export async function GET(
     );
   }
   if (resp.status === 204 || resp.status === 200) {
-    // The gauge that says the primary trigger is alive: GitHub's own crons
-    // are the backup, and if this route stops firing the system degrades to
-    // them invisibly. One app_settings row per job (beatvegas/ops.py shape).
-    // Never fails the dispatch.
-    try {
-      await prisma.$executeRaw`
-        INSERT INTO app_settings (key, value, updated_at)
-        VALUES (${`last_dispatch_${id}`}, ${now.toISOString()}, ${now}::timestamp)
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`;
-    } catch (e) {
-      console.error(
-        "[cron] dispatch gauge not recorded:",
-        String((e as Error)?.message ?? e),
-      );
-    }
+    await recordTriggerGauge(id, now, "dispatched");
   }
   if (resp.status !== 204 && resp.status !== 200) {
     // A 404 here means bad token permissions or a missing workflow on `main`,

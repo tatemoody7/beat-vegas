@@ -40,6 +40,10 @@ date; the board cannot see any of these until the change is made.
 
 `beatvegas/ops.py` writes `cfbd_calls_remaining`, `odds_credits_remaining`,
 `last_close_capture_at` and `last_grade_completed_at` into `app_settings`; the board's
-ops banner and `/api/health` read them (`web/lib/boardHealth.ts::opsWarnings`). GitHub's
-own billing state is the one thing none of them can see: if every gauge stops updating at
-once, that is what it looks like.
+ops banner and `/api/health` read them (`web/lib/boardHealth.ts::opsWarnings`). The cron
+route adds one row per job, `last_dispatch_<job>`: the last time a Vercel tick acted inside
+its window (dispatched, or found the build already there). A job whose window closed without
+one raises a banner line — the build may still have happened, on GitHub's backup cron or by
+hand, but the primary trigger did not fire; check the Vercel cron list, `CRON_SECRET` and
+`GITHUB_DISPATCH_TOKEN`. GitHub's own billing state is the one thing none of them can see: if
+every gauge stops updating at once, that is what it looks like.

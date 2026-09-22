@@ -216,3 +216,102 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
     expect(opsWarnings(g, now)).toEqual([]);
   });
 });
+
+import {
+  DISPATCH_GAUGE_PREFIX,
+  DISPATCH_JOB_IDS,
+  GAUGE_KEYS,
+  lastClosedSlot,
+} from "@/lib/boardHealth";
+import { CRON_JOBS } from "@/lib/cronJobs";
+
+describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => {
+  // Tuesday 2026-09-22, 2:00pm ET: no card window is open (tue_pm opens 3:45pm).
+  const tue2pm = new Date("2026-09-22T18:00:00Z");
+  const row = (id: string, value: string) => ({
+    key: `${DISPATCH_GAUGE_PREFIX}${id}`,
+    value,
+    updated_at: value,
+  });
+
+  it("reads one gauge per cron job, derived from CRON_JOBS", () => {
+    expect([...DISPATCH_JOB_IDS].sort()).toEqual(Object.keys(CRON_JOBS).sort());
+    for (const id of DISPATCH_JOB_IDS) {
+      expect(GAUGE_KEYS).toContain(`last_dispatch_${id}`);
+      // app_settings.key is String(32) in beatvegas/db/models.py.
+      expect(`last_dispatch_${id}`.length).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("parses the value as naive UTC, and tolerates a trailing Z", () => {
+    const g = gaugesFrom([
+      row("card-sat-am", "2026-09-19T11:05:00"),
+      row("grade", "2026-09-22T10:20:00.000Z"),
+    ]);
+    expect(g.lastDispatch["card-sat-am"]?.toISOString()).toBe(
+      "2026-09-19T11:05:00.000Z",
+    );
+    expect(g.lastDispatch["grade"]?.toISOString()).toBe(
+      "2026-09-22T10:20:00.000Z",
+    );
+    expect(g.lastDispatch["card-tue-pm"]).toBeNull();
+  });
+
+  it("is quiet when every job's last closed window saw a tick", () => {
+    const g = gaugesFrom([
+      row("card-tue-pm", "2026-09-15T20:10:00"), // last Tue, in window
+      row("card-thu-pm", "2026-09-17T20:05:00"),
+      row("card-fri-pm", "2026-09-18T20:11:00"),
+      row("card-sat-am", "2026-09-19T11:05:00"), // Sat 7:05am ET
+      row("sunday", "2026-09-20T18:30:00"),
+      row("grade", "2026-09-22T10:20:00"), // this morning
+    ]);
+    expect(opsWarnings(g, tue2pm)).toEqual([]);
+  });
+
+  it("warns for the job whose window closed without a tick, naming the day", () => {
+    const g = gaugesFrom([
+      row("card-sat-am", "2026-09-12T11:05:00"), // the Saturday BEFORE last
+      row("card-fri-pm", "2026-09-18T20:11:00"),
+    ]);
+    const w = opsWarnings(g, tue2pm);
+    expect(w.map((x) => x.key)).toEqual(["dispatch:card-sat-am"]);
+    expect(w[0].text).toContain("Sat window");
+    expect(w[0].text).toContain("2026-09-12");
+  });
+
+  it("never warns while the job's window is still open", () => {
+    // Tuesday 4:00pm ET: tue_pm's window (3:45-5:15) is open, no tick yet.
+    const tue4pm = new Date("2026-09-22T20:00:00Z");
+    const g = gaugesFrom([row("card-tue-pm", "2026-09-15T20:10:00")]);
+    expect(opsWarnings(g, tue4pm)).toEqual([]);
+    // ...and does warn once it has closed with no tick (Tuesday 6:00pm ET).
+    const tue6pm = new Date("2026-09-22T22:00:00Z");
+    expect(opsWarnings(g, tue6pm).map((x) => x.key)).toEqual([
+      "dispatch:card-tue-pm",
+    ]);
+  });
+
+  it("a daily job (grade) is judged against yesterday's window", () => {
+    const g = gaugesFrom([row("grade", "2026-09-20T10:20:00")]);
+    expect(opsWarnings(g, tue2pm).map((x) => x.key)).toEqual([
+      "dispatch:grade",
+    ]);
+    const ok = gaugesFrom([row("grade", "2026-09-21T10:20:00")]);
+    expect(opsWarnings(ok, tue2pm)).toEqual([]);
+  });
+
+  it("a job never seen is unknown, not wrong", () => {
+    expect(opsWarnings(gaugesFrom([]), tue2pm)).toEqual([]);
+  });
+
+  it("lastClosedSlot walks back at most a week and reports the opening instant", () => {
+    const win = lastClosedSlot(
+      [{ day: "Sat", openMin: 7 * 60, closeMin: 8 * 60 + 15 }],
+      tue2pm,
+    );
+    // Sat 2026-09-19 7:00am EDT = 11:00Z
+    expect(win?.day).toBe("Sat");
+    expect(win?.openedAt.toISOString()).toBe("2026-09-19T11:00:00.000Z");
+  });
+});

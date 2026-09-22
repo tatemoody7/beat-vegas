@@ -29,6 +29,7 @@ import PmFlags from "@/app/components/PmFlags";
 import PmLiveNotes from "@/app/components/PmLiveNotes";
 import RecordTable from "@/app/components/RecordTable";
 import { EmptyLine } from "@/app/components/Section";
+import type { Record3 } from "@/lib/record";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,15 @@ export default async function ProofPage({
   const mc = flagsFrom(hist).find((f) => f.code === "multiple_comparisons");
 
   const lead = headline(buckets, HIST_SCOPE, "fbs_only", "real", "cap5");
+  // The rule as lived -- no cap applied afterwards -- with its interval, so the
+  // page never shows a win rate without the range that contains break-even.
+  const ruleReal = headline(buckets, HIST_SCOPE, "fbs_only", "real", "gap175");
+  const pctOf = (v: number | null) =>
+    v === null ? "—" : `${(100 * v).toFixed(1)}%`;
+  const beInside = (r: Record3 | null) =>
+    r !== null && r.hitLo !== null && r.hitHi !== null
+      ? 100 * r.hitLo <= BREAKEVEN_PCT && BREAKEVEN_PCT <= 100 * r.hitHi
+      : null;
   const cov = coverage(buckets, HIST_SCOPE, "fbs_only");
   const gapReal = bandTable(
     buckets,
@@ -174,8 +184,13 @@ export default async function ProofPage({
               {` · ROI ${lead.roi}`}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
-              {`${lead.n} bets. Hard Rock did not exist in these seasons and the cap was applied afterwards, not lived — what the method would have returned, not money won.`}
+              {`${lead.n} bets, plausibly ${pctOf(lead.hitLo)}–${pctOf(lead.hitHi)}. Hard Rock did not exist in these seasons and the cap was applied afterwards, not lived — what the method would have returned, not money won.`}
             </p>
+            {ruleReal !== null && (
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
+                {`Without the cap — every game the rule qualified — it won ${ruleReal.hit} of ${ruleReal.n}, plausibly ${pctOf(ruleReal.hitLo)}–${pctOf(ruleReal.hitHi)}. Break-even at −110 is ${BREAKEVEN_PCT.toFixed(1)}%, which is ${beInside(ruleReal) === false ? "outside" : "inside"} that range.`}
+              </p>
+            )}
           </div>
         )}
         <div>

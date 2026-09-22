@@ -201,14 +201,25 @@ export type DecisionQuality = {
   n: number;
 };
 
+export type Ledger = "real" | "paper";
+
+/**
+ * One ledger at a time. Until 2026-09-22 this pooled paper and real rows into
+ * a panel headed "Your decisions" -- ~75% of which were the card's paper
+ * picks. The two ledgers are split everywhere else in the app; they are split
+ * here too.
+ */
 export async function getDecisionQuality(
   season: number,
+  which: Ledger = "real",
 ): Promise<DecisionQuality> {
+  const isPaper = which === "paper";
   const picks = await prisma.$queryRaw<DqPickRow[]>`
     SELECT result, line, model_line_at_pick, opening_line, closing_line, clv,
            clv_prob, factors_json_at_pick
     FROM manual_picks
     WHERE season = ${season} AND graded = true
+      AND COALESCE(is_paper, false) = ${isPaper}
   `;
   // factor_ledger may not exist yet (created by the Phase-3 Python jobs on
   // their next Neon write). Degrade to no ledger rather than throwing.

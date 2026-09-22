@@ -42,7 +42,17 @@ Research only — it never places bets or automates gambling.
   Vercel dispatch per job) → `OpsBanner` on the board + `/api/health`; the grade probe keys on
   the completed-grade gauge. **GitHub Actions stopped starting jobs at ~17:29Z (billing hold /
   spending limit) — every scheduled job is blocked until Tate fixes billing; see
-  `docs/OPS_ACCOUNTS.md`.** Still to ship: the site honesty pass.
+  `docs/OPS_ACCOUNTS.md`.** **Site honesty pass (#220):** Wilson interval on the money column and
+  a "modelled from the ledger, not reconciled" label on the bankroll; the Track record headline
+  and the uncapped rule carry their intervals with break-even placed inside or outside; the
+  board states this week's bar, its universe and how many clear it; Results' "Your decisions"
+  is real-money only, with the paper ledger's decisions in their own labelled section.
+  **The repository is PUBLIC since 2026-09-22 ~18:20Z (Tate):** GitHub's Payment information
+  form returned the unicorn timeout on every save, so no card could be added and no Actions
+  budget set; a Billing support ticket is filed; public repos have no Actions minute cap, so
+  every job resumed. Pre-flip scan: no emails, phones, addresses or secret files in the tracked
+  tree; commit-author emails in history are the usual public-repo exposure. Flipping back to
+  private restores the 2,000-minute cap, so the card must be on file first.
 - **2026-09-22 (ONE FROZEN GATE, TWO VERDICTS: THE INPUTS WERE NOT FROZEN. H-INSEASON
   TESTED-NULL, CHALLENGER FAMILY WITHDRAWN; PRs #203-#213).** Picking up the handoff's
   check ("the first build after #201 writes `bv_intercept` and logs four `challenger_picks`

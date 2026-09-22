@@ -250,3 +250,30 @@ def test_the_bounds_formula_reproduces_h_stops_published_numbers():
     assert b["A"] == pytest.approx(3.466, abs=5e-4)
     assert b["B"] == pytest.approx(-1.584, abs=5e-4)
     assert not math.isnan(b["A"])
+
+
+def test_challenger_collection_is_paused_by_default(monkeypatch):
+    """PAUSED 2026-09-22 before the first pick: the licensing gate read Holm p
+    0.004 on the Mac and 0.056 on the runner, and until the two are reconciled
+    no challenger row may be written. The switch is an explicit env flag the
+    workflows do not set; the source guard below keeps the call behind it."""
+    import importlib.util
+    from pathlib import Path as _P
+
+    path = _P(__file__).resolve().parent.parent / "scripts" / "build_card.py"
+    spec = importlib.util.spec_from_file_location("build_card_pause", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.delenv("CHALLENGER_COLLECT", raising=False)
+    assert mod.challenger_collection_enabled() is False
+    monkeypatch.setenv("CHALLENGER_COLLECT", "true")
+    assert mod.challenger_collection_enabled() is False, "only the literal 1 turns it on"
+    monkeypatch.setenv("CHALLENGER_COLLECT", "1")
+    assert mod.challenger_collection_enabled() is True
+    src = path.read_text()
+    guard = src.index("if not challenger_collection_enabled():")
+    call = src.index("challenger_added = log_challenger_picks(")
+    assert guard < call, "the logging call must sit behind the pause switch"
+    assert "CHALLENGER_COLLECT" not in _P(path).resolve().parent.parent.joinpath(
+        ".github", "workflows", "card.yml"
+    ).read_text(), "card.yml must not turn collection on"

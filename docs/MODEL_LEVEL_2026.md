@@ -416,3 +416,53 @@ The prospective phase is deliberately judged on measures that are **not** mechan
 to the correction: paper profit at actually available prices and CLV against the closing
 market, with prediction error and level bias demoted to secondary diagnostics. Its rule
 lives in its own registry row, written before its first pick.
+
+## Runner results (2026-09-22) — the same two gates on the platform that scores the board
+
+Both gate workflows were dispatched on the GitHub runner the day the platform discrepancy
+was found (`intercept_gate.yml` run 35747758294, `inseason_gate.yml` run 35747948770;
+walk-forward, `min_games=0`, FBS-only, 2,000 draws, criteria unchanged). The runner's
+incumbent intercept is **−1.2360** for 2026 and **−0.9927** for 2025 (Mac: −1.8092 /
+−1.31 applied), and it reproduces the stored week-4 `bv_line` rows exactly, so these are
+the production numbers.
+
+**H-INTERCEPT on the runner — still NO ARM ADOPTED, for the same two reasons.**
+
+| λ | 2024 | 2025 | 2026 | mean \|bias\| | worst |
+|---|---|---|---|---|---|
+| 0.0 | +0.99 | +1.48 | −1.01 | 1.159 | 1.475 |
+| 0.25 | +0.99 | +1.23 | −1.32 | 1.179 | 1.319 |
+| 0.5 | +0.99 | +0.98 | −1.63 | 1.200 | 1.628 |
+| 0.75 | +0.99 | +0.73 | −1.94 | 1.220 | 1.937 |
+| 1.0 (incumbent) | +0.99 | +0.48 | −2.25 | 1.240 | 2.246 |
+
+2024 is structurally tied (no scorable fold) and 2025 wants the opposite fix at every λ.
+The 2026 level deficit under the incumbent is **−2.25**, of which the intercept accounts
+for 1.24 points (raw −1.01), not the 2.90 / 1.81 split the Mac run gave. The share of
+priced 2026 games clearing the 1.75 bar is 49.2% under the incumbent and 36.1% with no
+intercept (Mac: 60.7% / 42.6%).
+
+**H-INSEASON on the runner — DOES NOT CLEAR THE REGISTERED CRITERION.** Every arm beats
+the incumbent on mean and worst |bias| with the 95% interval entirely below zero, and no
+season is worse — but the **Holm-adjusted p is 0.0560 on all four arms, against the
+row's 0.05**. The Mac run read 0.0040. The estimator behaves the same way (mean |bias|
+1.240 → 0.622 at k=25, worst 2.246 → 1.438, selection 2025 17.2 → 19.1%, 2026 49.2 →
+44.3%); what changed is that the runner's incumbent is closer to the truth, so the
+improvement is smaller and the multiplicity-corrected test lands on the wrong side of the
+line.
+
+| arm | 2024 | 2025 | 2026 | mean \|bias\| | worst | Holm p |
+|---|---|---|---|---|---|---|
+| k25 | +0.26 | +0.17 | −1.44 | 0.622 | 1.438 | 0.0560 |
+| k50 | +0.33 | +0.21 | −1.60 | 0.716 | 1.604 | 0.0560 |
+| k100 | +0.43 | +0.26 | −1.79 | 0.825 | 1.788 | 0.0560 |
+| k200 | +0.54 | +0.31 | −1.95 | 0.935 | 1.953 | 0.0560 |
+| incumbent | +0.99 | +0.48 | −2.25 | 1.240 | 2.246 | — |
+
+This is the "partly mechanical" caveat above showing up in the arithmetic: the runner's
+incumbent removes more of the level error on its own, so the estimator has less to
+subtract. **Disposition (Tate, 2026-09-22): neither run is authoritative yet.** Two supposedly
+equivalent runs of one frozen test disagree on pass/fail, and the source of the difference
+(library, data, bootstrap, precision, configuration) is to be identified from inputs through
+final statistics before the criterion is applied to the reconciled result. H-INSEASON's
+status is unchanged meanwhile and H-INSEASON-P collection is paused before its first pick.

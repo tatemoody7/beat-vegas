@@ -4,6 +4,19 @@ Registry row **H-INSEASON-P**. Written before the first challenger pick was logg
 the rule H-INSEASON's own row set. `docs/MODEL_LEVEL_2026.md` holds the developmental
 result this follows from.
 
+> **STATUS 2026-09-22 — COLLECTION PAUSED BEFORE THE FIRST PICK. No challenger row has
+> been written.** The developmental gate that licensed this family was run on this
+> project's Mac (scikit-learn 1.6.1) and read Holm-adjusted p 0.004; the same frozen gate
+> run on the GitHub runner (1.9.1, the platform that scores the board) reads **0.056**,
+> which does not clear the row's 0.05, with every arm still beating the incumbent on both
+> primaries (`docs/MODEL_LEVEL_2026.md`, "Runner results"). Tate's direction: reconcile the
+> two runs from inputs through final statistics, re-run the frozen analysis once both
+> environments agree, apply the registered criterion to THAT result, and only then decide
+> H-INSEASON's status and whether this family is licensed. Until then H-INSEASON stays
+> `tested-positive` on the record of the registered run and this row stays
+> `pre-registered`; `scripts/build_card.py` writes no challenger row unless
+> `CHALLENGER_COLLECT=1`, which no workflow sets. Nothing live changes.
+
 ## What licensed this, and what did not
 
 H-INSEASON passed its **developmental** gate. That gate's primary measure was level bias,

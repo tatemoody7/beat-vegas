@@ -31,6 +31,7 @@ import argparse
 import json
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from beatvegas.backtest.level_anchor import (
@@ -43,6 +44,12 @@ from beatvegas.db.models import Game
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame
 from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
+
+# Run as `python scripts/<name>.py` (the workflows do), sys.path holds scripts/
+# and not the repo root, so `from scripts.x import` fails with
+# ModuleNotFoundError -- which is how intercept_gate.yml died on the runner on
+# 2026-09-22 without anyone noticing the study had only ever run on a laptop.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Reuse the residual gate's output plumbing rather than restating it -- same
 # stamped triple, same step-summary behaviour, so the two reports are siblings.

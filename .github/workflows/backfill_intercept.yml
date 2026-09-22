@@ -74,7 +74,10 @@ jobs:
           IN_SEASON: ${{ inputs.season }}
           IN_WRITE: ${{ inputs.write }}
         run: |
-          extra=""
+          # A dry run also recomputes the season's stored rows on this platform
+          # (--verify): week 1 must reproduce to rounding if today's intercept is
+          # the one the rows carry. The write run does not repeat it.
+          extra="--verify"
           if [ "$IN_WRITE" = "true" ]; then extra="--write"; fi
           python scripts/backfill_bv_intercept.py --season "$IN_SEASON" $extra
       - name: Save CFBD reference cache (only when this run populated it)

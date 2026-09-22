@@ -95,7 +95,7 @@ jobs:
         # day for one useful pass, measured over 09-20/09-21. Same idea as
         # card.yml's `cards`-row probe and sunday.yml's `captured` step: a
         # POSITIVE fact from the database, not a run-list lookup. The fact here
-        # is a `postmortem_runs` row with scope=live -- the post-mortem is this
+        # is a `postmortem_runs` row with scope live_<season> -- the post-mortem is this
         # job's LAST step, so its row proves the whole run completed. A
         # four-hour window (not "today") keeps the deliberate second daily pass
         # for late finals while collapsing the 10:30Z-cron / 10:52Z-dispatch
@@ -113,8 +113,11 @@ jobs:
           with session_scope() as s:
               recent = s.execute(
                   text(
+                      # post_mortem.py writes the live scope as live_<season>
+                      # (beatvegas/postmortem.py), delete-then-rewrite, so the
+                      # one row per scope carries the LAST completed run's time.
                       "SELECT count(*) FROM postmortem_runs "
-                      "WHERE scope = 'live' AND computed_at >= :since"
+                      "WHERE scope LIKE 'live\\_%' AND computed_at >= :since"
                   ),
                   {"since": since},
               ).scalar() or 0

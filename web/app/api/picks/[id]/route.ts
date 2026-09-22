@@ -55,7 +55,10 @@ export async function PATCH(
   }
   if (!ok) {
     return NextResponse.json(
-      { error: "pick not found or already graded (immutable)" },
+      {
+        error:
+          "pick not found, already graded, or its game has kicked off — the ledger is frozen from kickoff",
+      },
       { status: 409 },
     );
   }
@@ -82,7 +85,10 @@ export async function DELETE(
   }
   if (!ok) {
     return NextResponse.json(
-      { error: "pick not found or already graded (immutable)" },
+      {
+        error:
+          "pick not found, already graded, or its game has kicked off — the ledger is frozen from kickoff",
+      },
       { status: 409 },
     );
   }

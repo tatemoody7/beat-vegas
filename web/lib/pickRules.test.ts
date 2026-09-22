@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkPolicy,
   parsePickBody,
+  serverVerdict,
   type PickRequest,
   type PolicyContext,
 } from "./pickRules";
@@ -596,5 +597,39 @@ describe("PRICE MISSING: every real ticket carries its price", () => {
       livePrice: { ok: true, killPrice: -110 },
     });
     expect(priced).toEqual({ ok: true });
+  });
+});
+
+describe("serverVerdict (the client's word is not consulted)", () => {
+  const live = {
+    bvLine: 24,
+    bar: null,
+    hrLine: 27,
+    hrUnderPrice: -110,
+    hrCentred: true,
+    ev: 0.01,
+    marketLine: 27,
+    qbOut: false,
+    minGamesPlayed: 5,
+  };
+  it("rates a clean in-band game BET", () => {
+    expect(serverVerdict(live)).toBe("BET");
+  });
+  it("no model read is PASS; below the watch gap is PASS", () => {
+    expect(serverVerdict({ ...live, bvLine: null })).toBe("PASS");
+    expect(serverVerdict({ ...live, bvLine: 26.5 })).toBe("PASS");
+  });
+  it("each gate turns a BET into WATCH, in the card's order", () => {
+    expect(serverVerdict({ ...live, hrLine: null })).toBe("WATCH");
+    expect(serverVerdict({ ...live, bar: 3.5 })).toBe("WATCH");
+    expect(serverVerdict({ ...live, hrCentred: false })).toBe("WATCH");
+    expect(serverVerdict({ ...live, marketLine: 28 })).toBe("WATCH");
+    expect(serverVerdict({ ...live, qbOut: true })).toBe("WATCH");
+    expect(serverVerdict({ ...live, ev: -0.08 })).toBe("WATCH");
+    expect(serverVerdict({ ...live, hrUnderPrice: null })).toBe("WATCH");
+    expect(serverVerdict({ ...live, minGamesPlayed: 1 })).toBe("WATCH");
+  });
+  it("a slate bar of exactly the gap is in the band", () => {
+    expect(serverVerdict({ ...live, bar: 3 })).toBe("BET");
   });
 });

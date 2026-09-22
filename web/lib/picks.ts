@@ -412,9 +412,10 @@ export async function createPick(
 }
 
 /**
- * Apply an edit to a PENDING pick. Returns false when the pick is missing or
- * already graded — a graded row is immutable, because a ledger you can rewrite
- * after the result is known is not evidence of anything.
+ * Apply an edit to a PENDING pick whose game has NOT kicked off. Returns false
+ * when the pick is missing, already graded, or its game has started — a ledger
+ * you can rewrite once the result is known (or being decided) is not evidence
+ * of anything.
  *
  * Only the fields present in `edit` are written. `note` replaces rather than
  * appends; the caller composes the text it wants kept.
@@ -434,9 +435,19 @@ export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
   // grading job landing in that window would have let an edit through onto a
   // row that had just been graded — precisely what the rule exists to stop.
   // The rowcount is the answer: 0 means missing or already graded.
+  // ...and FROZEN FROM KICKOFF, not from grading. Grading runs the next
+  // morning, so "ungraded" left a 4-7 hour window after a Saturday final in
+  // which a losing real ticket could be deleted, flipped to bonus (its loss
+  // books 0) or restaked to the whole roll. A price typo is correctable before
+  // the whistle; nothing is correctable after it (2026-09-22). start_date is
+  // naive UTC, so the clock is compared in UTC.
   const changed = await prisma.$executeRaw`
     UPDATE manual_picks SET ${Prisma.join(sets, ", ")}
     WHERE id = ${id} AND COALESCE(graded, false) = false
+      AND (game_id IS NULL OR game_id IN (
+        SELECT id FROM games
+        WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')
+      ))
   `;
   return changed > 0;
 }
@@ -447,6 +458,10 @@ export async function deletePick(id: number): Promise<boolean> {
   const changed = await prisma.$executeRaw`
     DELETE FROM manual_picks
     WHERE id = ${id} AND COALESCE(graded, false) = false
+      AND (game_id IS NULL OR game_id IN (
+        SELECT id FROM games
+        WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')
+      ))
   `;
   return changed > 0;
 }

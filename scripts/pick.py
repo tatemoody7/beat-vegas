@@ -54,6 +54,18 @@ def _default_season(now: Optional[datetime] = None) -> int:
 
 
 def cmd_add(args) -> None:
+    # PAPER ONLY (2026-09-22). Real money is logged on the site, where
+    # POST /api/picks runs every policy gate -- the cap, the kill numbers, the
+    # live-price check, early season, the pause -- and decides the verdict
+    # itself. This command ran none of them and defaulted a missing price to
+    # -110, the fabrication removed from the web writer two days earlier.
+    if not getattr(args, "paper", False):
+        print(
+            "REFUSED: real-money picks are logged on the site (the game page's log button, "
+            "POST /api/picks), where the policy gates run. `pick.py add` is paper-only: "
+            "pass --paper."
+        )
+        return
     season = args.season or _default_season()
     market = "full" if args.market == "full" else "1H"
     with session_scope() as s:
@@ -257,7 +269,12 @@ def main() -> None:
     a.add_argument("--home", required=True)
     a.add_argument("--away", required=True)
     a.add_argument("--line", type=float, required=True)
-    a.add_argument("--price", type=int, default=-110)
+    a.add_argument(
+        "--price",
+        type=int,
+        default=None,
+        help="American odds on the ticket; omitted = stored NULL (never an invented -110)",
+    )
     a.add_argument("--stake", type=float, default=1.0)
     a.add_argument("--book")
     a.add_argument("--season", type=int)

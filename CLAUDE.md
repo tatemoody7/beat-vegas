@@ -26,7 +26,7 @@ Research only — it never places bets or automates gambling.
   `grade_pick` stores it; `stopping_rule_position.py --clock 2` is the default. The
   challenger `family_verdict` compared against `"SUCCESS"` while the verdicts are lowercase —
   no arm could ever pass; fixed with a real crossing test. The 2023-25 real-close set is
-  declared exhausted for rule selection. **H-PCT shipped the same evening (#218):** `slate_bar` = the k-th largest gap, k =
+  declared exhausted for rule selection. **H-PCT shipped the same evening (#217):** `slate_bar` = the k-th largest gap, k =
   max(1, round(0.2 × N)) over the slate's Hard-Rock-priced games with a CENTRED quote and a
   model read (`beatvegas/model/score.py::slate_bar`, mirrored by `verdict.ts::slateBar`, both
   pinned to `tests/fixtures/slate_bar_vectors.json` — the repo's first shared golden vector);
@@ -35,8 +35,14 @@ Research only — it never places bets or automates gambling.
   computes the same bar over the week's rows (`HomeBoard.slate`) and the card payload carries
   `slate`; `BET_GAP_PTS` stays only as the empty-slate fallback (docs parity test rewritten);
   gate-focused tests hold the bar fixed via `build_card(bar=…)`, the slate has its own tests.
-  Still to ship from the review: the money-path holes (PATCH/DELETE after kickoff, `pick.py add`,
-  server-side verdict), budget/close monitoring on the board, the site honesty pass.
+  **Money path (#218):** picks are frozen from kickoff (PATCH/DELETE), `POST /api/picks`
+  decides the verdict server-side (`pickRules.serverVerdict`), `pick.py add` is paper-only and
+  nothing defaults a price to −110. **Monitoring (#219):** `beatvegas/ops.py` gauges in
+  `app_settings` (CFBD calls, Odds credits, last close capture, last completed grade, last
+  Vercel dispatch per job) → `OpsBanner` on the board + `/api/health`; the grade probe keys on
+  the completed-grade gauge. **GitHub Actions stopped starting jobs at ~17:29Z (billing hold /
+  spending limit) — every scheduled job is blocked until Tate fixes billing; see
+  `docs/OPS_ACCOUNTS.md`.** Still to ship: the site honesty pass.
 - **2026-09-22 (ONE FROZEN GATE, TWO VERDICTS: THE INPUTS WERE NOT FROZEN. H-INSEASON
   TESTED-NULL, CHALLENGER FAMILY WITHDRAWN; PRs #203-#213).** Picking up the handoff's
   check ("the first build after #201 writes `bv_intercept` and logs four `challenger_picks`

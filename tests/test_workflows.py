@@ -292,8 +292,18 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     probe = next(s for s in steps if s.get("id") == "probe")
     # The live scope is written as live_<season> (beatvegas/postmortem.py); a probe
     # on scope = 'live' matched nothing and never skipped (caught 2026-09-22).
-    assert "postmortem_runs" in probe["run"] and "scope LIKE 'live" in probe["run"]
-    assert "scope = 'live'" not in probe["run"]
+    # The probe keys on the gauge grade.yml writes after its FATAL steps, not on
+    # the post-mortem row (written even when four continue-on-error steps failed).
+    assert "app_settings" in probe["run"] and "last_grade_completed_at" in probe["run"]
+    assert "postmortem_runs" not in probe["run"]
+    marker = next(
+        s for s in steps if "record_gauge.py --key last_grade_completed_at" in (s.get("run") or "")
+    )
+    names = [s.get("name", "") for s in steps]
+    assert names.index(marker["name"]) > names.index("Grade frozen game records")
+    assert names.index(marker["name"]) < names.index(
+        "Post-mortem (rated games vs outcomes -> postmortem_* tables)"
+    )
     assert "timedelta(hours=4)" in probe["run"]
     assert probe["env"]["IN_HIST"] == "${{ inputs.hist }}"
     assert 'os.environ.get("IN_HIST") == "true"' in probe["run"]

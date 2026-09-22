@@ -95,7 +95,7 @@ jobs:
         # day for one useful pass, measured over 09-20/09-21. Same idea as
         # card.yml's `cards`-row probe and sunday.yml's `captured` step: a
         # POSITIVE fact from the database, not a run-list lookup. The fact here
-        # is a `postmortem_runs` row with scope live_<season> -- the post-mortem is this
+        # is the `last_grade_completed_at` gauge, written after every fatal grading
         # job's LAST step, so its row proves the whole run completed. A
         # four-hour window (not "today") keeps the deliberate second daily pass
         # for late finals while collapsing the 10:30Z-cron / 10:52Z-dispatch
@@ -113,11 +113,13 @@ jobs:
           with session_scope() as s:
               recent = s.execute(
                   text(
-                      # post_mortem.py writes the live scope as live_<season>
-                      # (beatvegas/postmortem.py), delete-then-rewrite, so the
-                      # one row per scope carries the LAST completed run's time.
-                      "SELECT count(*) FROM postmortem_runs "
-                      "WHERE scope LIKE 'live\\_%' AND computed_at >= :since"
+                      # The gauge the "Mark grading complete" step below writes
+                      # AFTER every fatal grading step (beatvegas/ops.py). The
+                      # post-mortem row this used to read is written even when
+                      # four earlier continue-on-error steps all failed, so it
+                      # could vouch for a run that graded nothing.
+                      "SELECT count(*) FROM app_settings "
+                      "WHERE key = 'last_grade_completed_at' AND updated_at >= :since"
                   ),
                   {"since": since},
               ).scalar() or 0
@@ -172,6 +174,11 @@ jobs:
       - name: Grade frozen game records
         if: steps.probe.outputs.need_grade == 'true'
         run: python scripts/grade_records.py
+      - name: Mark grading complete (the probe's positive fact)
+        if: steps.probe.outputs.need_grade == 'true'
+        # Reached only when the fatal grading steps above succeeded; the
+        # continue-on-error enrichment below cannot fake it.
+        run: python scripts/record_gauge.py --key last_grade_completed_at --now
       - name: Grade factor credibility ledger (real lines only)
         if: steps.probe.outputs.need_grade == 'true'
         # Display chips only -- nothing downstream reads this to decide a bet,

@@ -443,6 +443,14 @@ def main() -> None:
         credits_spent=spent,
         unpolled_game_ids=_unpolled_game_ids(in_window, ctx, polled),
     )
+    # A pre-kickoff close poll that reached at least one event is the positive
+    # fact every CLV number rests on; the board's gauge says when it last
+    # happened (beatvegas/ops.py). Whole-week sweeps are not closes.
+    if getattr(args, "kickoff_within_min", None) and polled > 0:
+        from beatvegas.ops import LAST_CLOSE_CAPTURE_AT, LAST_CLOSE_CAPTURE_EVENTS, record_gauge
+
+        record_gauge(LAST_CLOSE_CAPTURE_AT, datetime.utcnow().isoformat(timespec="seconds"))
+        record_gauge(LAST_CLOSE_CAPTURE_EVENTS, polled)
     hr_rows = sum(1 for r in rows if normalize_book(r.get("book") or "") == HR_BOOK_KEY)
     print(
         f"events_total={len(all_events)} in_window={len(in_window)} "

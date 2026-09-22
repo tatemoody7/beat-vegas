@@ -1,5 +1,6 @@
 import { cardBuilds } from "@/lib/nextBuild";
 import { etMinutesOfDay, etParts } from "@/lib/et";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // Is anything broken? The board is the only place that can say so.
@@ -169,4 +170,119 @@ export async function getBuildHealth(
     lastWindowDay: win?.day ?? null,
     lastWindowOpenedAt: win?.openedAt ?? null,
   };
+}
+
+// --------------------------------------------------------------------------
+// Operational gauges (beatvegas/ops.py) -- the numbers whose silence produced
+// eleven of the fourteen failures of 2026-08/09: an API budget nobody read
+// until it hit zero, a close poll that stopped firing, a grading run that
+// exited green having graded nothing. Each is one `app_settings` row written
+// where it is learned; this reads them and turns them into a banner.
+
+export const GAUGE_KEYS = [
+  "cfbd_calls_remaining",
+  "odds_credits_remaining",
+  "last_close_capture_at",
+  "last_close_capture_events",
+  "last_grade_completed_at",
+] as const;
+
+export type GaugeRow = {
+  key: string;
+  value: string;
+  updated_at: string | null;
+};
+
+export type Gauges = {
+  cfbdCallsRemaining: number | null;
+  oddsCreditsRemaining: number | null;
+  lastCloseCaptureAt: Date | null;
+  lastCloseCaptureEvents: number | null;
+  lastGradeCompletedAt: Date | null;
+  /** When each gauge was last written (naive UTC in the DB). */
+  updatedAt: Partial<Record<(typeof GAUGE_KEYS)[number], Date | null>>;
+};
+
+/** CFBD Academic tier is 3,000 calls a month; under this it is days, not weeks. */
+export const CFBD_LOW_CALLS = 300;
+/** A week of card builds + closes is ~600 Odds credits; under this the month is at risk. */
+export const ODDS_LOW_CREDITS = 2000;
+/** Longest gap between pre-kickoff close captures during the season (Sat to Sat plus slack). */
+export const CLOSE_CAPTURE_MAX_AGE_H = 8 * 24;
+
+const numOrNull = (v: string | undefined): number | null => {
+  if (v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Pure: rows -> gauges. */
+export function gaugesFrom(rows: GaugeRow[]): Gauges {
+  const by = new Map(rows.map((r) => [r.key, r]));
+  const at = (k: string): Date | null => utc(by.get(k)?.updated_at ?? null);
+  const updatedAt: Gauges["updatedAt"] = {};
+  for (const k of GAUGE_KEYS) updatedAt[k] = at(k);
+  return {
+    cfbdCallsRemaining: numOrNull(by.get("cfbd_calls_remaining")?.value),
+    oddsCreditsRemaining: numOrNull(by.get("odds_credits_remaining")?.value),
+    lastCloseCaptureAt: utc(by.get("last_close_capture_at")?.value ?? null),
+    lastCloseCaptureEvents: numOrNull(
+      by.get("last_close_capture_events")?.value,
+    ),
+    lastGradeCompletedAt: utc(by.get("last_grade_completed_at")?.value ?? null),
+    updatedAt,
+  };
+}
+
+export async function getGauges(): Promise<Gauges> {
+  try {
+    const rows = await prisma.$queryRaw<GaugeRow[]>`
+      SELECT key, value, to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updated_at
+        FROM app_settings
+       WHERE key IN (${Prisma.join([...GAUGE_KEYS])})`;
+    return gaugesFrom(rows);
+  } catch (e) {
+    console.error(
+      "[boardHealth] gauges unreadable:",
+      String((e as Error)?.message ?? e),
+    );
+    return gaugesFrom([]);
+  }
+}
+
+export type OpsWarning = { key: string; text: string };
+
+/** Pure: which gauges are in a state Tate would act on. `inSeason` keeps the
+ *  close-capture check quiet in the off-season, when no close is expected. */
+export function opsWarnings(
+  g: Gauges,
+  now: Date = new Date(),
+  inSeason: boolean = true,
+): OpsWarning[] {
+  const out: OpsWarning[] = [];
+  if (g.cfbdCallsRemaining !== null && g.cfbdCallsRemaining < CFBD_LOW_CALLS) {
+    out.push({
+      key: "cfbd",
+      text: `CFBD budget low: ${g.cfbdCallsRemaining} calls left this month. At zero, grading and the weekly frame stop (it happened 2026-09-12).`,
+    });
+  }
+  if (
+    g.oddsCreditsRemaining !== null &&
+    g.oddsCreditsRemaining < ODDS_LOW_CREDITS
+  ) {
+    out.push({
+      key: "odds",
+      text: `Odds API credits low: ${g.oddsCreditsRemaining} left this cycle. Each card build spends ~80; the close polls stop first.`,
+    });
+  }
+  if (inSeason && g.lastCloseCaptureAt !== null) {
+    const ageH = (now.getTime() - g.lastCloseCaptureAt.getTime()) / 3_600_000;
+    if (ageH > CLOSE_CAPTURE_MAX_AGE_H) {
+      out.push({
+        key: "close",
+        text: `No pre-kickoff close captured for ${Math.floor(ageH / 24)} days. Every line-value number since then is graded against a sweep quote, not a close.`,
+      });
+    }
+  }
+  return out;
 }

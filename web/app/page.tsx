@@ -21,6 +21,7 @@ import { resolveSeason } from "@/lib/season";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import AnswerBar from "@/app/components/AnswerBar";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
+import OpsBanner from "@/app/components/OpsBanner";
 import BoardFilters from "@/app/components/BoardFilters";
 import GameRow from "@/app/components/GameRow";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -114,6 +115,8 @@ export default async function BoardPage({
       </div>
 
       <CardStatusBanner card={card} />
+
+      <OpsBanner />
 
       {pause.paused === true && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">

@@ -89,10 +89,12 @@ def test_a_second_write_is_a_no_op():
 
 
 def test_tolerance_guard_refuses_a_mismatched_intercept():
-    B.check_tolerance(-1.8092)
-    B.check_tolerance(-1.8089)  # inside 0.001
+    B.check_tolerance(-1.2360)
+    B.check_tolerance(-1.236020)  # what the runner prints, inside 0.001
     with pytest.raises(SystemExit):
-        B.check_tolerance(-1.81 - 0.002)
+        B.check_tolerance(-1.2360 - 0.002)
+    with pytest.raises(SystemExit):
+        B.check_tolerance(-1.8092)  # the Mac's number: refused on the runner
     with pytest.raises(SystemExit):
         B.check_tolerance(0.0)
 

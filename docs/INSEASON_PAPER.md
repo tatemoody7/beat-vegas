@@ -57,7 +57,7 @@ scoring run rewrites only its target week, so every 2026 row scored before PR #2
 arms would have logged nothing and `c_season` could only ever have seen week 5 on. Those
 rows were backfilled with the season's one intercept, recomputed on the runner the way
 `score_slate` computes it (`scripts/backfill_bv_intercept.py`, `backfill_intercept.yml`) and
-required to match the recorded live value **−1.8092** within 0.001 before writing. Only the
+required to match the value the runner demonstrably applied, **−1.2360**, within 0.001 before writing (the −1.8092 in `MODEL_LEVEL_2026.md` is a Mac-platform number; see its correction note). Only the
 new column moved; `bv_line` is checksummed unchanged. The as-of rule is unaffected: it is
 SQL on `start_date` and `first_half_total`, not on when the column was filled.
 

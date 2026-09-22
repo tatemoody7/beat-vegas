@@ -1,5 +1,24 @@
 # The model's level in 2026 — the diagnosis, and the test it licenses
 
+> **Platform correction (2026-09-22).** Every number in this document that depends on a
+> fitted model — the incumbent intercept **−1.8092**, the per-fold 2024/2025 values −1.15 /
+> −2.46, the raw-vs-calibrated bias split, and the H-INTERCEPT and H-INSEASON gate tables —
+> was computed on this project's Mac (scikit-learn 1.6.1, Python 3.9). **The live board runs
+> on the GitHub runner (scikit-learn 1.9.1, Python 3.11), and HistGradientBoosting output is
+> not pinned across platforms.** On 2026-09-22 the runner recomputed the same 2,212 training
+> rows to an intercept of **−1.2360**, and recomputing `bv_line_for_slate` for the 58 stored
+> week-4 rows reproduced every one to 0.01 at that value (`backfill_intercept.yml` run
+> 35746685925) — so **−1.236, not −1.81, is what the board applied**, and the 2026 level
+> deficit attributable to the intercept is correspondingly smaller than the 2.90 points
+> stated below. The qualitative findings (the prior-season intercept does not transfer; the
+> in-season estimator's primary metric is partly mechanical) do not depend on which forest
+> was fitted, but the figures do, and `intercept_gate.yml` had never actually run on the
+> runner (a `from scripts.*` import failed there; fixed the same day). The runner's own gate
+> table is to be appended below once the workflow has run; until then treat the numbers in
+> this file as **Mac numbers**. Rows scored before `bv_intercept` existed were backfilled
+> with −1.2360 (`scripts/backfill_bv_intercept.py`).
+
+
 **Written 2026-09-20, BEFORE the gate was run.** Registry rows: **H-LEVEL** (the test) and
 **R04** (`docs/LEVEL_ANCHOR.md`, the MAE question, rejected). The measurements below are
 descriptive reads of data the project already holds; the confirmation set (2025) is

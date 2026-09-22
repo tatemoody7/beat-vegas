@@ -54,9 +54,22 @@ the negative side** — the gap carries about 3.5× more information when it say
 → 58.8%); the over side is not (55.7 → 48.4 → 51.9 → 48.3%): only the ≤ −3 band
 beats break-even, and the band next to it loses 7.5%.
 
-**Live 2026 (weeks 1–2, Hard Rock's number, n=49):** 8 of 8 over at gap ≤ −1.75
-(Wilson 67.6–100%). Read it as the picture that prompted the question, not as a
-result — the history above is the answer.
+**Live 2026 (weeks 1–3, Hard Rock's number, n=105; `scripts/two_sided_study.py`
+against the live post-mortem, read 2026-09-22):** every negative band went over —
+≤ −3: 7 of 7, −3..−1.75: 6 of 7, −1.75..−1: 5 of 7, −1..0: 5 of 5 — so the whole
+negative side is **23 over of 26** (3 under; 88.5%, Wilson 71.0–96.0%), and at
+gap ≤ −1.75 it is 13 of 14 (Wilson 68.5–98.7%). The positive side above the bar
+went under 28 of 51 (54.9%, Wilson 41.4–67.7%). The history above says 52.7% over
+on 692 games, so the live band is NOT in the history; it is registered as
+**H-NEGGAP** (`live-tracking`, measurement only) in `docs/HYPOTHESES.md`, and this
+paragraph is refreshed weekly from the study's output. Two things the live number
+carries that the history did not: the model's number runs ~1.8 points below the
+market this season (`docs/MODEL_LEVEL_2026.md`), which moves games INTO the
+negative band, and first halves run hot in weeks 1-3 of every season. Whether the
+band survives once the level deficit is removed is **H-NEGGAP-L**
+(`scripts/neggap_level_study.py`: the same games under each H-INSEASON arm's
+intercept, from stored rows, measurement only). Read all of it as the picture that
+prompted the question, not as a result — the history above is the answer.
 
 **One more thing the table says.** The **0 .. 1** band — a small positive gap —
 went under only **44.5%** (Wilson 38.8–50.4%). That is the model's level bias

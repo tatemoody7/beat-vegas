@@ -313,7 +313,7 @@ trains on `season < target_season` strictly, so 2026's own 153 graded games are 
 nothing — not the fit, not the intercept. Shrinking a number estimated from the wrong
 seasons cannot fix it; re-estimating it from the right ones might.
 
-## H-INSEASON — result. PASSED ITS DEVELOPMENTAL GATE. NOT a betting-value finding.
+## H-INSEASON — result. PASSED ITS DEVELOPMENTAL GATE *on June-2026 reference data*; TESTED-NULL on the run of record (see Reconciliation below). NOT a betting-value finding.
 
 **What this result is, stated before any number** (Tate, 2026-09-20): H-INSEASON passed
 its registered **developmental** gate. The primary level-bias metric is **partly mechanical
@@ -466,3 +466,60 @@ equivalent runs of one frozen test disagree on pass/fail, and the source of the 
 (library, data, bootstrap, precision, configuration) is to be identified from inputs through
 final statistics before the criterion is applied to the reconciled result. H-INSEASON's
 status is unchanged meanwhile and H-INSEASON-P collection is paused before its first pick.
+
+## Reconciliation (2026-09-22) — the two runs disagree because the DATA differs, not the code
+
+Tate's direction was to reconcile the Mac and runner runs from inputs through final
+statistics before either result is allowed to decide anything. Done the same afternoon,
+read-only, by crossing the two frames with the two libraries:
+
+- **Frames.** The Mac's frame was rebuilt fresh against Neon (`min_games=0`, 2,477 rows,
+  identical ids to the runner's); the runner's frame was dumped by `scripts/frame_snapshot.py`
+  (study.yml run 35750576666, Linux x86_64, Python 3.11, scikit-learn 1.9.1). **40 of 196
+  columns differ**, every one a CFBD reference feature: advanced-stat PPA / explosiveness /
+  success rate (all seasons, max |Δ| 0.25), roster experience and upperclass share (**every
+  2023-25 row**, max |Δ| 1.0), returning-production PPA (2023 and 2025). Everything else —
+  scores, lines, pace, weather, PBP aggregates — is byte-identical.
+- **Why.** `season_stats._cached` has no expiry. This Mac's `data/cache/` holds the 2022-25
+  reference files fetched **2026-06-02/03**; the runner's weekly ISO-week cache re-fetches
+  them, and CFBD revised those tables between June and September. The registered "frozen"
+  test therefore had un-frozen inputs, and which snapshot a run saw depended on the machine.
+- **Libraries.** Homebrew Python 3.12 with the runner's exact pins (scikit-learn 1.9.1,
+  numpy 2.4.6, pandas 2.3.3, scipy 1.17.1) beside this Mac's Python 3.9 / scikit-learn 1.6.1.
+  OpenMP thread count (1 / 2 / 4) changes nothing on either.
+
+| frame (reference-data snapshot) | library | intercept 2025 / 2026 | incumbent bias 2024 / 2025 / 2026 | k25 mean \|bias\| vs incumbent | Holm p (all four arms) | H-INSEASON |
+|---|---|---|---|---|---|---|
+| June cache (Mac) | 1.6.1 | −1.1508 / **−1.8092** | +1.15 / +1.31 / −2.90 | 0.810 vs 1.784 | **0.0040** | pass |
+| June cache (Mac) | 1.9.1 | −1.0950 / −1.9117 | +1.09 / +1.62 / −2.99 | 0.831 vs 1.901 | **0.0040** | pass |
+| September cache (runner) | 1.9.1 (runner itself) | −0.9927 / **−1.2360** | +0.99 / +0.48 / −2.25 | 0.622 vs 1.240 | **0.0560** | fail |
+| September cache (runner) | 1.9.1 (Mac, runner's pins) | −0.9927 / −1.2360 (to 6 dp) | +0.99 / +0.48 / −2.25 | 0.622 vs 1.240 | **0.0560** | fail |
+| September cache (runner) | 1.6.1 | −0.9052 / −1.1385 | +0.91 / +0.46 / −2.32 | 0.635 vs 1.231 | **0.0560** | fail |
+
+**What this settles.**
+
+1. **Platform is not a factor.** Given the runner's frame, a Mac running the runner's pins
+   reproduces the runner to six decimals, and thread count is irrelevant. The earlier
+   "Mac numbers vs runner numbers" framing in the correction note above was right about the
+   symptom and wrong about the cause: the machines differed because their *caches* differed.
+2. **The library version moves the intercept by ~0.1 and never the verdict.** Same frame,
+   same verdict, under 1.6.1 and 1.9.1 alike.
+3. **The reference-data snapshot moves the verdict.** With CFBD's June tables the frozen
+   H-INSEASON gate passes at Holm 0.004 in both libraries; with its September tables it fails
+   at 0.056 in both. The estimator's direction is the same on every row of the table (every
+   arm beats the incumbent on both primaries); the size of the improvement is smaller on the
+   September data because the incumbent's own bias is smaller there (2026 −2.25 vs −2.90).
+4. **H-INTERCEPT is unaffected**: ADOPT none on every row of the table, for the same two
+   reasons (2024 structurally tied; 2025 wants the opposite fix).
+
+**What it implies for the process.** A registered run must pin its inputs. From here, every
+`*_gate.yml` and `study.yml` run should write the frame fingerprint
+(`scripts/frame_snapshot.py::fingerprint`) beside its report, and a registry result cell
+should name the snapshot it was judged on. The live board's model also inherits this: it is
+re-fitted each Sunday on whatever CFBD serves that week, so a CFBD revision of 2023-25
+statistics changes the champion's number without any code change.
+
+**Disposition (Tate, 2026-09-22): the criterion is applied to the September data — the tables the
+runner refetches weekly and the live board is fitted on. H-INSEASON is `tested-null`; H-INSEASON-P is
+withdrawn before its first pick, with zero rows ever logged. This Mac's June cache is refreshed so local
+studies read the same tables as the runner, and every gate run now writes its frame fingerprint.**

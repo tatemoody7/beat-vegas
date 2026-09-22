@@ -329,10 +329,10 @@ def _status_line(card: Dict) -> str:
 
 
 def challenger_collection_enabled() -> bool:
-    """H-INSEASON-P collection is PAUSED (2026-09-22) pending the Mac/runner
-    reconciliation of the gate that licensed it. Off unless CHALLENGER_COLLECT=1
-    is set; the workflows do not set it. Turning it on is a registry decision,
-    not a deploy."""
+    """H-INSEASON-P was WITHDRAWN before its first pick (2026-09-22): its licensing
+    gate is tested-null on the run of record. Off unless CHALLENGER_COLLECT=1 is
+    set; the workflows do not set it. Turning it on is a registry decision (a new
+    row that earns it), not a deploy."""
     return os.environ.get("CHALLENGER_COLLECT") == "1"
 
 
@@ -567,12 +567,14 @@ def run(
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
-                # PAUSED 2026-09-22 before the first pick (Tate): the gate that
-                # licensed this family read Holm p 0.004 on the Mac and 0.056 on
-                # the runner, and the two must be reconciled before either result
-                # is allowed to decide anything. Collection is OFF unless
-                # CHALLENGER_COLLECT=1 is set in the environment; card.yml does
-                # not set it. docs/INSEASON_PAPER.md carries the status.
+                # WITHDRAWN 2026-09-22 before the first pick (Tate): the gate
+                # that would have licensed this family (H-INSEASON) is
+                # tested-null on the run of record -- it passed only on a frame
+                # built from June-2026 CFBD reference tables, and fails on the
+                # September tables the board is actually fitted on. Collection
+                # is OFF unless CHALLENGER_COLLECT=1 is set in the environment;
+                # no workflow sets it, and turning it on needs a new registry
+                # row first. docs/INSEASON_PAPER.md carries the status.
                 if not challenger_collection_enabled():
                     challenger_paused = True
                 else:
@@ -608,8 +610,8 @@ def run(
     lines = summary_lines(card, len(games), picks_added)
     if challenger_paused:
         lines.append(
-            "  CHALLENGER (H-INSEASON family): collection PAUSED pending the Mac/runner "
-            "reconciliation (docs/INSEASON_PAPER.md); no row written"
+            "  CHALLENGER (H-INSEASON family): WITHDRAWN before its first pick "
+            "(docs/INSEASON_PAPER.md); no row written"
         )
     if challenger_added:
         lines.append(

@@ -274,6 +274,10 @@ def test_challenger_collection_is_paused_by_default(monkeypatch):
     guard = src.index("if not challenger_collection_enabled():")
     call = src.index("challenger_added = log_challenger_picks(")
     assert guard < call, "the logging call must sit behind the pause switch"
-    assert "CHALLENGER_COLLECT" not in _P(path).resolve().parent.parent.joinpath(
-        ".github", "workflows", "card.yml"
-    ).read_text(), "card.yml must not turn collection on"
+    assert (
+        "CHALLENGER_COLLECT"
+        not in _P(path)
+        .resolve()
+        .parent.parent.joinpath(".github", "workflows", "card.yml")
+        .read_text()
+    ), "card.yml must not turn collection on"

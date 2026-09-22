@@ -242,6 +242,24 @@ def test_a_family_verdict_needs_both_clocks():
     pos = challenger_position({"k25": {"units": [0.9, -1.0], "clv": [0.1, 0.2]}})
     assert pos["arms"]["k25"]["family_verdict"] == "accruing"
     assert pos["passers"] == [] and pos["may_name_k"] is False
+    # Both clocks past A -> PASS; one arm -> a k may be named. Until 2026-09-22 the
+    # comparison was against "SUCCESS", so this could never be anything but
+    # "accruing" and the test above pinned the bug.
+    pos = challenger_position({"k25": {"units": [0.9] * 80, "clv": [1.0] * 80}})
+    assert pos["arms"]["k25"]["clocks"]["profit"]["verdict"] == "success"
+    assert pos["arms"]["k25"]["family_verdict"] == "PASS"
+    assert pos["passers"] == ["k25"] and pos["may_name_k"] is True
+    # One clock crossing B drops the arm.
+    pos = challenger_position({"k50": {"units": [-1.0] * 60, "clv": [1.0] * 60}})
+    assert pos["arms"]["k50"]["family_verdict"] == "DROPPED"
+    # Two passers: no k is chosen here.
+    pos = challenger_position(
+        {
+            "k25": {"units": [0.9] * 80, "clv": [1.0] * 80},
+            "k50": {"units": [0.9] * 80, "clv": [1.0] * 80},
+        }
+    )
+    assert pos["passers"] == ["k25", "k50"] and pos["may_name_k"] is False
 
 
 def test_the_bounds_formula_reproduces_h_stops_published_numbers():

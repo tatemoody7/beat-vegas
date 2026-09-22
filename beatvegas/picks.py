@@ -218,9 +218,10 @@ def grade_pick(session, pick, game) -> bool:
       1H total (`grading.trusted_first_half_total`);
     - opening/closing come from PRE-KICKOFF snapshots only (a poll that ran
       after kickoff must not pollute the closing line / CLV);
-    - a Hard Rock ticket grades against Hard Rock's OWN pre-kick close when the
-      per-game close polls captured one (the number you could have bet), else
-      the consensus close;
+    - the closing LINE is the centred CONSENSUS close from pre-kickoff snapshots
+      (never a single book's rung -- see the comment below), and the time that
+      close was last confirmed is stored in `closing_captured_at` so a stale
+      "close" can be told from one inside lines.REAL_1H_CLOSE_WINDOW_H;
     - a pick logged on an unpriced Hard Rock line (price NULL) takes HR's own
       pre-kick closing price when one was captured; if none was, it grades for
       the record only (units stay None) rather than raising."""
@@ -256,7 +257,7 @@ def grade_pick(session, pick, game) -> bool:
     #
     # consensus_open_close already drops non-centred quotes (lines.centred_snaps),
     # so a book still contributes its last real number.
-    opening, closing, _closing_at = closing_before_kickoff(snaps, game.start_date)
+    opening, closing, closing_at = closing_before_kickoff(snaps, game.start_date)
     # THE CLOSING PRICE GOES IN ITS OWN COLUMN. It used to be written into
     # `pick.price` whenever a Hard Rock ticket had none, which silently turned the
     # price at the DECISION into the price at the CLOSE. Any price-based CLV over
@@ -287,6 +288,9 @@ def grade_pick(session, pick, game) -> bool:
         closing_price=closing_price,
     ).items():
         setattr(pick, k, v)
+    # The age of the close is a fact about the close, stored beside it. A dropped
+    # pre-kick poll makes Friday's sweep quote "the close" silently otherwise.
+    pick.closing_captured_at = closing_at
     pick.graded = True
     return True
 

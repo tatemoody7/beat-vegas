@@ -30,7 +30,12 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from ..etl.features import BANNED_LINE_COLS, FEATURE_COLS, MARKET_COLS
+from ..etl.features import (
+    BANNED_LINE_COLS,
+    FEATURE_COLS,
+    MARKET_COLS,
+    SERVE_UNAVAILABLE_COLS,
+)
 
 TARGET = "first_half_total"
 ERA_COL = "era_post2023"
@@ -39,7 +44,11 @@ _MIN_SEGMENT = 200  # min rows to report a segment residual
 # The BV line is MARKET-BLIND: it sees none of the Vegas-derived inputs. This is
 # the whole point — an independent number to compare against Vegas, so the gap
 # isn't circular. (The classifier in score.py keeps FEATURE_COLS by design.)
-BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS]
+# ...and it never sees the first-half PBP season-to-date columns: they are NaN
+# on every row the live model scores and present on every row it trains on
+# (features.SERVE_UNAVAILABLE_COLS, B-SERVE 2026-09-22).
+_SERVE_UNAVAILABLE = set(SERVE_UNAVAILABLE_COLS)
+BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _SERVE_UNAVAILABLE]
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:

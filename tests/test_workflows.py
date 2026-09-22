@@ -290,7 +290,10 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     data = _load(WF_DIR / "grade.yml")
     steps = data["jobs"]["grade"]["steps"]
     probe = next(s for s in steps if s.get("id") == "probe")
-    assert "postmortem_runs" in probe["run"] and "scope = 'live'" in probe["run"]
+    # The live scope is written as live_<season> (beatvegas/postmortem.py); a probe
+    # on scope = 'live' matched nothing and never skipped (caught 2026-09-22).
+    assert "postmortem_runs" in probe["run"] and "scope LIKE 'live" in probe["run"]
+    assert "scope = 'live'" not in probe["run"]
     assert "timedelta(hours=4)" in probe["run"]
     assert probe["env"]["IN_HIST"] == "${{ inputs.hist }}"
     assert 'os.environ.get("IN_HIST") == "true"' in probe["run"]

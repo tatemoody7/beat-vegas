@@ -328,6 +328,14 @@ def _status_line(card: Dict) -> str:
     return line
 
 
+def challenger_collection_enabled() -> bool:
+    """H-INSEASON-P collection is PAUSED (2026-09-22) pending the Mac/runner
+    reconciliation of the gate that licensed it. Off unless CHALLENGER_COLLECT=1
+    is set; the workflows do not set it. Turning it on is a registry decision,
+    not a deploy."""
+    return os.environ.get("CHALLENGER_COLLECT") == "1"
+
+
 def log_challenger_picks(
     session,
     *,
@@ -558,24 +566,37 @@ def run(
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table. A failure here must
                 # never cost the real card -- the challenger is a measurement.
-                try:
-                    challenger_added = log_challenger_picks(
-                        s,
-                        games=games,
-                        snaps=snaps,
-                        preds=preds,
-                        previews=previews,
-                        season=season,
-                        week=week,
-                        now=now,
-                        slot=slot,
-                        held=held,
-                        real=real,
-                        degraded=degraded,
-                        window_hours=paper_window_hours,
+                #
+                # PAUSED 2026-09-22 before the first pick (Tate): the gate that
+                # licensed this family read Holm p 0.004 on the Mac and 0.056 on
+                # the runner, and the two must be reconciled before either result
+                # is allowed to decide anything. Collection is OFF unless
+                # CHALLENGER_COLLECT=1 is set in the environment; card.yml does
+                # not set it. docs/INSEASON_PAPER.md carries the status.
+                if not challenger_collection_enabled():
+                    print(
+                        "[card] challenger family: collection PAUSED pending the "
+                        "Mac/runner reconciliation (docs/INSEASON_PAPER.md); no row written"
                     )
-                except Exception as e:  # noqa: BLE001 - never break the card
-                    print(f"[card] WARNING: challenger family not logged: {e}")
+                else:
+                    try:
+                        challenger_added = log_challenger_picks(
+                            s,
+                            games=games,
+                            snaps=snaps,
+                            preds=preds,
+                            previews=previews,
+                            season=season,
+                            week=week,
+                            now=now,
+                            slot=slot,
+                            held=held,
+                            real=real,
+                            degraded=degraded,
+                            window_hours=paper_window_hours,
+                        )
+                    except Exception as e:  # noqa: BLE001 - never break the card
+                        print(f"[card] WARNING: challenger family not logged: {e}")
             s.add(
                 Card(
                     season=season,

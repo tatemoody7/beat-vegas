@@ -1,0 +1,84 @@
+name: Backfill predictions.bv_intercept (one-off, manual)
+
+# `Prediction.bv_intercept` (PR #201) is written only by score_slate, which
+# rewrites only the target week -- so every 2026 row scored before the column
+# existed carries NULL and never stops. That starves the H-INSEASON challenger
+# family: with no completed rows carrying the intercept it logs nothing, and
+# c_season could only ever be estimated from week 5 on (not the registered
+# estimator). This recomputes the season's one intercept the way score_slate
+# does, refuses to write unless it matches the recorded live value (-1.8092,
+# docs/MODEL_LEVEL_2026.md), and fills ONLY the NULL rows. bv_line is untouched.
+#
+# Runs on the runner, not a laptop, on purpose: HistGradientBoosting output is
+# not pinned across platforms and the runner's pins are what scored the rows.
+
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'season whose model rows get the intercept (four digits)'
+        default: '2026'
+      write:
+        description: 'apply the UPDATE (false = dry run: report only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/lock.txt
+      - name: Install
+        # Hash-pinned: requirements/lock.txt names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
+      - name: Validate inputs
+        env:
+          IN_SEASON: ${{ inputs.season }}
+        run: |
+          if ! [[ "$IN_SEASON" =~ ^[0-9]{4}$ ]]; then
+            echo "::error::season input must be a four-digit year, got '$IN_SEASON'"; exit 1
+          fi
+      - name: Recompute the intercept and fill the NULL rows
+        env:
+          IN_SEASON: ${{ inputs.season }}
+          IN_WRITE: ${{ inputs.write }}
+        run: |
+          extra=""
+          if [ "$IN_WRITE" = "true" ]; then extra="--write"; fi
+          python scripts/backfill_bv_intercept.py --season "$IN_SEASON" $extra
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

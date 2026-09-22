@@ -578,3 +578,25 @@ the target rows against the training rows and fails if any column is >90% NaN on
 and <10% on training — the guard for the class, not the instance. The level, the selection
 share and the intercept are then re-derived on the runner and appended here. H-INTERCEPT and
 H-INSEASON are not reopened: they studied a symptom.
+
+## The corrected model on the intercept gate (2026-09-22, after B-SERVE)
+
+Run under the runner's exact pins (scikit-learn 1.9.1, numpy 2.4.6) on this Mac against a
+freshly refetched CFBD reference cache — the setup that reproduced the runner to six
+decimals earlier the same day; the runner itself could not start jobs that afternoon
+(GitHub Actions billing hold, `docs/OPS_ACCOUNTS.md`). `BV_FEATURE_COLS` without the 57
+serve-unavailable columns:
+
+| season | incumbent intercept | incumbent bias (played rows) | share clearing 1.75 |
+|---|---|---|---|
+| 2024 | +0.0000 (no scorable fold) | +0.91 (was +0.99) | 21.2% |
+| 2025 | −0.9131 (was −0.9927) | +0.64 (was +0.48) | 17.8% |
+| 2026 | −1.2341 (was −1.2360) | **−2.67 (was −2.25)** | 55.7% |
+
+ADOPT: none, as before. **Read this correctly:** the gate scores PLAYED rows, where the 57
+columns were always present, so it cannot see the serving gain. On played rows the model
+without those columns sits 0.4 pts lower; at serving the OLD model sat ~2.0 pts lower than
+its own played-row bias (the masking table above: −2.52 → −4.51), so the corrected model's
+serving level is about **1.8 pts higher** than what the board carried all season — the
+number the week-5 refit will show directly (`predictions.bv_line` for week 5 against Hard
+Rock's mean). The share clearing 1.75 is now moot: H-PCT makes the bar a percentile.

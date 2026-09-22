@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma";
 import {
   buildStatus,
   getBuildHealth,
+  getGauges,
   getGradeHealth,
+  opsWarnings,
   staleness,
 } from "@/lib/boardHealth";
 import { getRulePause } from "@/lib/rulePause";
@@ -38,6 +40,8 @@ export async function GET() {
     const grading = staleness(await getGradeHealth(currentCfbSeason()));
     const build = buildStatus(await getBuildHealth());
     const pause = await getRulePause();
+    const gauges = await getGauges();
+    const warnings = opsWarnings(gauges);
     return NextResponse.json({
       ok: true,
       // The real-money pause (docs/STOPPING_RULE.md): thrown, or unreadable —
@@ -59,6 +63,18 @@ export async function GET() {
       // the games figure is the one that says "the slate was captured".
       fullGameSnapshotsLast24h: Number(r?.fg_last_24h ?? 0),
       fullGameGamesLast24h: Number(r?.fg_games_last_24h ?? 0),
+      // Operational gauges (beatvegas/ops.py): the API budgets, the last
+      // pre-kickoff close capture, the last completed grading run. `warnings`
+      // is what the board's banner shows.
+      gauges: {
+        cfbdCallsRemaining: gauges.cfbdCallsRemaining,
+        oddsCreditsRemaining: gauges.oddsCreditsRemaining,
+        lastCloseCaptureAt: gauges.lastCloseCaptureAt?.toISOString() ?? null,
+        lastCloseCaptureEvents: gauges.lastCloseCaptureEvents,
+        lastGradeCompletedAt:
+          gauges.lastGradeCompletedAt?.toISOString() ?? null,
+      },
+      warnings: warnings.map((w) => w.text),
     });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });

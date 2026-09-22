@@ -181,6 +181,13 @@ class OddsAPIClient:
             last_cost=_int("x-requests-last"),
         )
         self.last_credits = c
+        # The board's gauge (beatvegas/ops.py), recorded on the first priced
+        # response of a run: the month's balance, where a reader will see it.
+        if c.remaining is not None and not getattr(self, "_gauge_recorded", False):
+            self._gauge_recorded = True
+            from ..ops import ODDS_CREDITS_REMAINING, record_gauge
+
+            record_gauge(ODDS_CREDITS_REMAINING, c.remaining)
         return c
 
     def credits_low(self, floor: int) -> bool:

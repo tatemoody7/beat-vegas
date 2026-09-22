@@ -12,6 +12,7 @@ import {
 } from "@/lib/cronJobs";
 import { safeEqual } from "@/lib/auth";
 import { etClock12 } from "@/lib/et";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -179,6 +180,23 @@ export async function GET(
       req,
       id,
     );
+  }
+  if (resp.status === 204 || resp.status === 200) {
+    // The gauge that says the primary trigger is alive: GitHub's own crons
+    // are the backup, and if this route stops firing the system degrades to
+    // them invisibly. One app_settings row per job (beatvegas/ops.py shape).
+    // Never fails the dispatch.
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO app_settings (key, value, updated_at)
+        VALUES (${`last_dispatch_${id}`}, ${now.toISOString()}, ${now}::timestamp)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`;
+    } catch (e) {
+      console.error(
+        "[cron] dispatch gauge not recorded:",
+        String((e as Error)?.message ?? e),
+      );
+    }
   }
   if (resp.status !== 204 && resp.status !== 200) {
     // A 404 here means bad token permissions or a missing workflow on `main`,

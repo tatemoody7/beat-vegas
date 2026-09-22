@@ -124,3 +124,95 @@ describe("buildStatus", () => {
     ).toEqual({ missed: false });
   });
 });
+
+import {
+  CFBD_LOW_CALLS,
+  CLOSE_CAPTURE_MAX_AGE_H,
+  gaugesFrom,
+  ODDS_LOW_CREDITS,
+  opsWarnings,
+} from "@/lib/boardHealth";
+
+describe("operational gauges (beatvegas/ops.py -> the board)", () => {
+  const now = new Date("2026-09-22T18:00:00Z");
+  const rows = [
+    {
+      key: "cfbd_calls_remaining",
+      value: "1974",
+      updated_at: "2026-09-22T10:52:00",
+    },
+    {
+      key: "odds_credits_remaining",
+      value: "53946",
+      updated_at: "2026-09-22T10:52:00",
+    },
+    {
+      key: "last_close_capture_at",
+      value: "2026-09-19T23:30:00",
+      updated_at: "2026-09-19T23:30:00",
+    },
+    {
+      key: "last_close_capture_events",
+      value: "3",
+      updated_at: "2026-09-19T23:30:00",
+    },
+    {
+      key: "last_grade_completed_at",
+      value: "2026-09-22T10:58:00",
+      updated_at: "2026-09-22T10:58:00",
+    },
+  ];
+  it("parses the rows and is quiet when everything is healthy", () => {
+    const g = gaugesFrom(rows);
+    expect(g.cfbdCallsRemaining).toBe(1974);
+    expect(g.oddsCreditsRemaining).toBe(53946);
+    expect(g.lastCloseCaptureAt?.toISOString()).toBe(
+      "2026-09-19T23:30:00.000Z",
+    );
+    expect(g.lastGradeCompletedAt?.toISOString()).toBe(
+      "2026-09-22T10:58:00.000Z",
+    );
+    expect(opsWarnings(g, now)).toEqual([]);
+  });
+  it("warns on a low CFBD budget, low Odds credits, and a stale close", () => {
+    const g = gaugesFrom([
+      {
+        key: "cfbd_calls_remaining",
+        value: String(CFBD_LOW_CALLS - 1),
+        updated_at: null,
+      },
+      {
+        key: "odds_credits_remaining",
+        value: String(ODDS_LOW_CREDITS - 1),
+        updated_at: null,
+      },
+      {
+        key: "last_close_capture_at",
+        value: "2026-09-01T00:00:00",
+        updated_at: null,
+      },
+    ]);
+    const keys = opsWarnings(g, now).map((w) => w.key);
+    expect(keys).toEqual(["cfbd", "odds", "close"]);
+    expect(CLOSE_CAPTURE_MAX_AGE_H).toBe(192);
+  });
+  it("says nothing it does not know: missing gauges never warn, and the close check sleeps off-season", () => {
+    expect(opsWarnings(gaugesFrom([]), now)).toEqual([]);
+    const g = gaugesFrom([
+      {
+        key: "last_close_capture_at",
+        value: "2026-01-10T00:00:00",
+        updated_at: null,
+      },
+    ]);
+    expect(opsWarnings(g, now, false)).toEqual([]);
+    expect(opsWarnings(g, now, true).map((w) => w.key)).toEqual(["close"]);
+  });
+  it("a non-numeric value reads as unknown, not as zero", () => {
+    const g = gaugesFrom([
+      { key: "cfbd_calls_remaining", value: "n/a", updated_at: null },
+    ]);
+    expect(g.cfbdCallsRemaining).toBeNull();
+    expect(opsWarnings(g, now)).toEqual([]);
+  });
+});

@@ -111,6 +111,11 @@ class CFBDClient:
             return
         self._reported_calls = True
         print(f"[cfbd] {remaining} calls left in this month's budget")
+        # The board's gauge (beatvegas/ops.py): the number nobody read for two
+        # days in September 2026. Fail-silent, and only where DATABASE_URL is set.
+        from ..ops import CFBD_CALLS_REMAINING, record_gauge
+
+        record_gauge(CFBD_CALLS_REMAINING, remaining)
         if remaining <= _LOW_CALLS_WARN:
             from ..ci import warn
 

@@ -27,6 +27,8 @@ _CARD_PY = Path(__file__).resolve().parent.parent / "beatvegas" / "card.py"
 
 PARITY = {
     "BET_GAP_PTS": score.BET_GAP_PTS,
+    # H-PCT: the per-slate share the bar is read at (2026-09-22); BET_GAP_PTS is the fallback.
+    "PCT_SHARE": score.PCT_SHARE,
     "STRONG_GAP_PTS": score.STRONG_GAP_PTS,
     "WATCH_GAP_PTS": score.WATCH_GAP_PTS,
     "MODEL_BET_THRESHOLD": score.MODEL_BET_THRESHOLD,

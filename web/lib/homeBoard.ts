@@ -25,7 +25,13 @@ import {
 import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
 import type { Record3 } from "@/lib/record";
 import type { BoardFactor, Factors } from "@/lib/score";
-import { priceSentence, WEEKLY_BET_CAP } from "@/lib/verdict";
+import {
+  BET_GAP_PTS,
+  PCT_SHARE,
+  priceSentence,
+  slateBar,
+  WEEKLY_BET_CAP,
+} from "@/lib/verdict";
 import { defaultWeek, weeksOf } from "@/lib/week";
 
 // The home board data layer: one ranked list of every game on the week, each
@@ -345,6 +351,13 @@ export type HomeGame = {
   overCap: boolean;
 };
 
+export type SlateBar = {
+  bar: number;
+  n: number;
+  share: number;
+  basis: "slate" | "fallback";
+};
+
 export type HomeBoard = {
   season: number;
   week: number | null;
@@ -356,6 +369,8 @@ export type HomeBoard = {
   noHrLine: boolean;
   games: HomeGame[];
   counts: { bet: number; edge: number; pass: number };
+  /** H-PCT: this week's bar, how many games set it, and whether it fell back to the constant. */
+  slate: SlateBar;
   bankroll: Bankroll;
   /** Real-money 1H picks logged on this week (the bet slip's "logged" state). */
   weekPicks: WeekPick[];
@@ -518,6 +533,22 @@ export async function getHomeBoard(
     getMovements(rows.map((r) => r.gameId)),
   ]);
   const checkById = new Map(checks.map((c) => [c.gameId, c]));
+  // H-PCT: the bar is a property of the SLATE. Read it over the week's rows
+  // with a centred Hard Rock quote and a model read -- the same universe the
+  // card uses -- before any row is judged. BET_GAP_PTS only when none qualify.
+  const slateGaps = rows.map((row) => {
+    const c = checkById.get(row.gameId);
+    if (!c || c.hrLine === null || row.bvLine === null || c.hrCentred === false)
+      return null;
+    return round2(c.hrLine - row.bvLine);
+  });
+  const barValue = slateBar(slateGaps);
+  const slate: SlateBar = {
+    bar: barValue ?? BET_GAP_PTS,
+    n: slateGaps.filter((g) => g !== null).length,
+    share: PCT_SHARE,
+    basis: barValue === null ? "fallback" : "slate",
+  };
   const noModel = rows.length > 0 && rows.every((r) => !lineState(r).hasModel);
 
   // Only real-money FIRST-HALF picks count toward the record, the bankroll and
@@ -553,6 +584,8 @@ export async function getHomeBoard(
       bestLine: check?.best ?? null,
       marketFairUnder: check?.marketFairUnder ?? null,
       context: edgeContext(row.factors),
+      bar: slate.bar,
+      hrCentred: check?.hrCentred ?? null,
     };
     const edge = edgeScore(input);
     // edge.ts names the basis (`edge.lineBasis`: Hard Rock, else the market,
@@ -621,6 +654,7 @@ export async function getHomeBoard(
     noHrLine: rows.length > 0 && sorted.every((g) => g.check?.hrLine == null),
     games: sorted,
     counts: tierCounts(sorted),
+    slate,
     bankroll: {
       startUsd,
       unitUsd,

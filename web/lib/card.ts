@@ -98,8 +98,12 @@ export type CardItem = {
   action: string;
   why: string[];
   paperLogged: boolean;
-  /** Hard Rock's 1H line sits BET_GAP_PTS+ above ours (any tier): on the paper ledger. */
+  /** In the band -- Hard Rock's gap at or above this slate's bar on a centred quote (any tier): on the paper ledger. */
   qualifies: boolean;
+  /** H-PCT: the bar this item was judged against (null on cards built before 2026-09-22). */
+  bar: number | null;
+  /** Both of Hard Rock's sides priced like a main number; false = a rung, which never qualifies. */
+  hrCentred: boolean | null;
   /** The gate that blocked a real bet on a qualifying game (null = it was a BET). */
   paperBlocker: string | null;
   /** 1-based rank among the week's BETs by gap; null on non-BETs. */
@@ -120,9 +124,18 @@ export type CardItem = {
   gateBlocker: string | null;
 };
 
+export type CardSlate = {
+  bar: number;
+  n: number;
+  share: number;
+  basis: "slate" | "fallback";
+};
+
 export type Card = {
   season: number;
   week: number;
+  /** H-PCT: the bar every item was judged against; null on cards built before 2026-09-22. */
+  slate: CardSlate | null;
   /** When the card was built, UTC ISO; null when the payload did not say. */
   builtAt: string | null;
   modelRead: boolean;
@@ -234,6 +247,9 @@ function parseItem(raw: unknown): CardItem | null {
     why: strList(raw.why),
     paperLogged: raw.paper_logged === true || raw.paper_logged === 1,
     qualifies: raw.qualifies === true || raw.qualifies === 1,
+    bar: num(raw.bar),
+    hrCentred:
+      raw.hr_centred === true ? true : raw.hr_centred === false ? false : null,
     paperBlocker: str(raw.paper_blocker),
     capRank: int(raw.cap_rank),
     overCap: raw.over_cap === true || raw.over_cap === 1,
@@ -329,6 +345,17 @@ export function parseCard(raw: unknown): Card | null {
     : STATUSES.includes(obj.status as CardStatus)
       ? (obj.status as CardStatus)
       : "final";
+  const sl = isObj(obj.slate) ? obj.slate : null;
+  const slateBarValue = sl ? num(sl.bar) : null;
+  const slate: CardSlate | null =
+    sl && slateBarValue !== null
+      ? {
+          bar: slateBarValue,
+          n: int(sl.n) ?? 0,
+          share: num(sl.share) ?? 0.2,
+          basis: sl.basis === "fallback" ? "fallback" : "slate",
+        }
+      : null;
   const pp = isObj(obj.paper) ? obj.paper : {};
   const paper = {
     qualifying: int(pp.qualifying) ?? items.filter((i) => i.qualifies).length,
@@ -339,6 +366,7 @@ export function parseCard(raw: unknown): Card | null {
   return {
     season,
     week,
+    slate,
     builtAt: asIso(obj.built_at),
     modelRead: obj.model_read === true || obj.model_read === 1,
     slot,

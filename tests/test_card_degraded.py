@@ -502,6 +502,7 @@ def test_a_degraded_bet_takes_no_cap_slot_and_the_rest_rank_one_to_five():
 
 def _degraded_card(**kw):
     deg = [{"input": "sweep", "detail": "stopped early (credit_cap)", "game_ids": [1]}]
+    kw.setdefault("bar", 1.75)  # gates and status at a fixed bar; H-PCT has its own tests
     return build_card(
         [game(1)],
         bet_snaps(1),
@@ -677,10 +678,13 @@ def test_payload_keys_match_the_web_contract():
         "degraded",
         "counts",
         "paper",
+        "slate",
         "items",
         "notes",
     }
     assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap", "degraded"}
+    assert set(c["slate"]) == {"bar", "n", "share", "basis"}
+    assert "bar" in c["items"][0] and "hr_centred" in c["items"][0]
     assert set(c["degraded"][0]) == {"input", "detail", "game_ids"}
     assert "degraded_inputs" in c["items"][0] and "gate_blocker" in c["items"][0]
     # strict JSON, as the cards row is written

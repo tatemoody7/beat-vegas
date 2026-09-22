@@ -49,7 +49,19 @@ MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
 # top-20%-by-gap selection rule — never in sigmas: bv_sigma (~12 pts) is the
 # per-GAME outcome noise, so a 1-sigma gap never occurs. Mirrored by
 # web/lib/verdict.ts; tests/test_gate_parity.py keeps the two in lock-step.
-BET_GAP_PTS = 1.75  # ~ the season's top-20% gap cutoff -> BET
+BET_GAP_PTS = (
+    1.75  # the constant the rule was DEPLOYED as (2026-09-08..09-27); now the FALLBACK bar only
+)
+# H-PCT (registered 2026-09-22, effective the week-5 refit): the bar is a PER-SLATE
+# PERCENTILE, not a constant. The rule was validated as "the top 20% of games by
+# gap"; deployed as 1.75 it selected 47-51% of Hard-Rock-priced games once the
+# model's level moved (docs/MODEL_LEVEL_2026.md). `slate_bar` is the k-th largest
+# gap, k = max(1, round(PCT_SHARE * N)), over the slate's Hard-Rock-priced games
+# with a CENTRED Hard Rock quote and a model read; a game qualifies at gap >=
+# slate_bar with gap > 0. BET_GAP_PTS stands in only when a slate has no such
+# game. Mirrored by web/lib/verdict.ts (slateBar); tests/fixtures/slate_bar_vectors.json
+# is read by BOTH test suites so the two cannot drift.
+PCT_SHARE = 0.20
 STRONG_GAP_PTS = 3.0  # ~ top-10% -> "high" confidence (gap alone; under_score no longer gates it)
 WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
 WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
@@ -124,6 +136,21 @@ BREAK_EVEN_EV = 0.0
 def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:
     """Whether the model's score is a positive-EV under lean worth grading."""
     return under_score is not None and under_score >= threshold
+
+
+def slate_bar(gaps, share: float = PCT_SHARE):
+    """The gap at the top-`share` cutoff of a slate: the k-th largest gap with
+    k = max(1, round(share * N)); None on an empty slate. Ties at the bar all
+    qualify. `round` never meets an exact .5 here (share * N is never x.5 for
+    integer N at share 0.2), so Python's and JavaScript's rounding agree."""
+    vals = sorted(
+        (float(g) for g in gaps if g is not None and not (isinstance(g, float) and g != g)),
+        reverse=True,
+    )
+    if not vals:
+        return None
+    k = max(1, int(round(share * len(vals))))
+    return vals[k - 1]
 
 
 def under_score(prob: float) -> int:

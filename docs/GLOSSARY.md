@@ -44,8 +44,9 @@
   80% band (`bv_lo`–`bv_hi`) and reports each gap in σ (`bv_gap_z`). σ is the
   noise of a single game's outcome — no gap ever reaches 1σ — so it is context
   ("any one game is near a coin flip"), **not** the bet gate.
-- **Gap selection threshold** — the frozen 2026 policy threshold `bv_gap ≥ 1.75`,
-  approximately the historical top 20% of games by model–market disagreement
+- **Gap selection threshold** — this week's bar: the gap of the top 20% of the slate's
+  Hard-Rock-priced games (`slate_bar`, H-PCT, 2026-09-22); the constant `bv_gap ≥ 1.75` it
+  replaced stands in only for a slate with no priced game. Historically the top 20% of games by model–market disagreement
   (≥ 3.0 pts ≈ top 10%). It decides which disagreements get **tracked**; it is
   **not a proven profitable threshold** — the profitability that first motivated
   it did not survive replacing the flat proxy with the fair step proxy. Frozen on

@@ -70,6 +70,9 @@ def card(games, snaps, preds=(), previews=(), **kw):
     kw.setdefault("season", 2026)
     kw.setdefault("week", 3)
     kw.setdefault("now", NOW)
+    # These tests exercise gates, caps, wording and logging at a FIXED bar; the
+    # per-slate bar (H-PCT) has its own tests below and in tests/test_slate_bar.py.
+    kw.setdefault("bar", BET_GAP_PTS)
     return build_card(games, snaps, list(preds), list(previews), **kw)
 
 
@@ -637,6 +640,8 @@ ITEM_KEYS = {
     "total_band",
     "hook_side",
     "key_dist",
+    "bar",
+    "hr_centred",
 }
 
 
@@ -657,6 +662,7 @@ def test_payload_contract_and_strict_json_round_trip():
         "paper",
         "items",
         "notes",
+        "slate",
     }
     assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap", "degraded"}
     it = only(c)
@@ -955,3 +961,74 @@ def test_a_prediction_without_games_played_is_not_early_season():
     snaps = [snap(1, "hardrockbet", 24.5, -110, -110)] + market(1, 24.5)
     it = only(card([game()], snaps, [model(1, 22.4)]))
     assert it["tier"] == "BET" and it["games_played"] is None
+
+
+def test_build_card_bar_is_the_slates_top_20_percent_on_centred_quotes():
+    """H-PCT: the bar is read over the slate first (Hard-Rock-priced, centred,
+    model read), every item is judged against it, and a -180 rung is out of the
+    universe and never qualifies however big its gap looks."""
+    from datetime import datetime, timedelta
+
+    from beatvegas.card import build_card, round_half_up
+
+    now = datetime(2026, 9, 29, 20, 0)
+    kick = now + timedelta(days=4)
+    games, snaps, preds = [], [], []
+    # ten games with gaps 0.5 .. 5.0 at a centred -110 quote
+    for i in range(10):
+        gid = 100 + i
+        hr_line = 30.0
+        bv = round(hr_line - 0.5 * (i + 1), 2)
+        games.append({"game_id": gid, "away": f"A{i}", "home": f"H{i}", "kick": kick})
+        for book in ("hardrockbet", "draftkings", "fanduel"):
+            snaps.append(
+                {
+                    "game_id": gid,
+                    "book": book,
+                    "line": hr_line,
+                    "over_price": -110,
+                    "under_price": -110,
+                    "captured_at": now - timedelta(hours=1),
+                }
+            )
+        preds.append(
+            {
+                "game_id": gid,
+                "model_version": "gbm_v1",
+                "bv_line": bv,
+                "under_score": 60,
+                "line_used": hr_line,
+            }
+        )
+    # an eleventh game: gap 6.0 but Hard Rock's under is a -180 rung
+    games.append({"game_id": 200, "away": "R", "home": "S", "kick": kick})
+    for book, up in (("hardrockbet", -180), ("draftkings", -110), ("fanduel", -110)):
+        snaps.append(
+            {
+                "game_id": 200,
+                "book": book,
+                "line": 30.0,
+                "over_price": -110 if up == -110 else 140,
+                "under_price": up,
+                "captured_at": now - timedelta(hours=1),
+            }
+        )
+    preds.append(
+        {
+            "game_id": 200,
+            "model_version": "gbm_v1",
+            "bv_line": 24.0,
+            "under_score": 60,
+            "line_used": 30.0,
+        }
+    )
+    card = build_card(games, snaps, preds, [], season=2026, week=5, now=now)
+    assert card["slate"] == {"bar": 4.5, "n": 10, "share": 0.2, "basis": "slate"}
+    by_id = {it["game_id"]: it for it in card["items"]}
+    assert all(it["bar"] == 4.5 for it in card["items"])
+    qualifying = sorted(g for g, it in by_id.items() if it["qualifies"])
+    assert qualifying == [108, 109], "gaps 4.5 and 5.0 clear a 4.5 bar; nothing else does"
+    assert by_id[108]["kill_line"] == round_half_up(by_id[108]["bv_line"] + 4.5)
+    assert by_id[200]["hr_centred"] is False and by_id[200]["qualifies"] is False
+    assert by_id[200]["gap"] == 6.0, "the rung's gap is still displayed; it just cannot qualify"
+    assert by_id[100]["hr_centred"] is True

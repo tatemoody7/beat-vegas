@@ -40,18 +40,24 @@ def _text(p: Path) -> str:
 # --------------------------------------------------------------------------- #
 # Numbers the docs quote
 # --------------------------------------------------------------------------- #
-def test_the_gap_threshold_in_the_docs_is_the_one_in_the_code():
+def test_the_gap_rule_in_the_docs_is_the_one_in_the_code():
+    """H-PCT (2026-09-22): the bar is the slate's top-PCT_SHARE by gap; the old
+    constant is only the empty-slate fallback. Both docs must say the share the
+    code uses and the fallback the code uses -- and neither may still present
+    the constant as THE rule."""
+    share_pct = int(round(score.PCT_SHARE * 100))
     for doc in (POLICY, GLOSSARY):
         body = _text(doc)
-        quoted = {
-            float(m)
-            for m in re.findall(r"bv_gap ≥ ([0-9.]+)|≥ ([0-9.]+) points above", body)
-            for m in m
-            if m
+        shares = {int(m) for m in re.findall(r"top ([0-9]+)%", body)}
+        assert share_pct in shares, f"{doc.name} should state the top-{share_pct}% share"
+        fallback = {
+            float(m) for m in re.findall(r"bv_gap ≥ ([0-9.]+)|is ([0-9.]+)\.", body) for m in m if m
         }
-        assert quoted, f"{doc.name} should state the gap threshold"
-        assert quoted == {score.BET_GAP_PTS}, (
-            f"{doc.name} quotes {quoted}, code says {score.BET_GAP_PTS}"
+        assert score.BET_GAP_PTS in fallback, (
+            f"{doc.name} should name the fallback bar {score.BET_GAP_PTS}"
+        )
+        assert "≥ 1.75 points above" not in body, (
+            f"{doc.name} still presents the constant as the rule"
         )
 
 

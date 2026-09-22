@@ -2,7 +2,12 @@ import { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { EV_FLOOR } from "@/lib/verdict";
 import { isExchange, isSynthetic } from "@/lib/books";
-import { devigTwoWay, evUnder, SKEW_REJECT_PRICE } from "@/lib/devig";
+import {
+  devigTwoWay,
+  evUnder,
+  isCentredQuote,
+  SKEW_REJECT_PRICE,
+} from "@/lib/devig";
 import { median } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -47,6 +52,9 @@ export type LineCheckRow = {
   verdict: Verdict;
   // Devig / EV layer:
   hrUnderPrice: number | null;
+  hrOverPrice?: number | null;
+  /** Both of Hard Rock's sides priced like a main number (devig.isCentredQuote); a rung never qualifies (H-PCT). */
+  hrCentred?: boolean;
   marketFairUnder: number | null; // consensus no-vig fair-under at HR's line
   ev: number | null; // per-$1 EV of HR's under vs marketFairUnder
   evVerdict: EvVerdict;
@@ -329,6 +337,8 @@ export const getLineCheck = cache(async function getLineCheck(
     // No `now`: this page renders whole seasons, so each game's own newest
     // snapshot is the instant its exchange quotes are aged against.
     const hrUnderPrice = hrObs?.underPrice ?? null;
+    const hrOverPrice = hrObs?.overPrice ?? null;
+    const hrCentred = hrObs ? isCentredQuote(hrOverPrice, hrUnderPrice) : false;
     const marketFairUnder = marketFairUnderAt(hrLine, g.byBook).fairUnder;
     const ev =
       marketFairUnder !== null && hrUnderPrice !== null
@@ -345,6 +355,8 @@ export const getLineCheck = cache(async function getLineCheck(
       delta: hrLine === null ? null : Number((hrLine - best).toFixed(2)),
       verdict: verdictFor(hrLine, best),
       hrUnderPrice,
+      hrOverPrice,
+      hrCentred,
       marketFairUnder,
       ev,
       evVerdict: evVerdictFor(ev),

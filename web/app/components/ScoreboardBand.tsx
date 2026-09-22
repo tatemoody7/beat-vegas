@@ -97,6 +97,13 @@ export default function ScoreboardBand({
             {realBets === 0
               ? "no real-money bets yet"
               : `${againstVerdict} against the verdict`}
+            {b.real && b.real.hitLo !== null && b.real.hitHi !== null
+              ? ` · plausibly ${pct(b.real.hitLo)}–${pct(b.real.hitHi)}`
+              : ""}
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-dim)]">
+            modelled from the ledger ({usd(b.startUsd)} + units ×{" "}
+            {usd(b.unitUsd)}), not reconciled with the Hard Rock account
           </p>
         </div>
 

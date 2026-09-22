@@ -58,10 +58,11 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq, allPicks, board] = await Promise.all([
+  const [ledger, review, dq, dqPaper, allPicks, board] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
-    getDecisionQuality(season),
+    getDecisionQuality(season, "real"),
+    getDecisionQuality(season, "paper"),
     loadPicks(season),
     // Still needed for the bankroll (cap, unit size, the real record).
     getHomeBoard(season),
@@ -224,8 +225,8 @@ export default async function ResultsPage({
 
       <Section
         title="Your decisions"
-        caption={dq.n > 0 ? `${dq.n} graded picks` : undefined}
-        empty={dq.n === 0 ? "nothing graded yet." : null}
+        caption={dq.n > 0 ? `${dq.n} graded real-money picks` : undefined}
+        empty={dq.n === 0 ? "no real-money pick graded yet." : null}
       >
         <DecisionsStrip
           dq={dq}
@@ -267,6 +268,18 @@ export default async function ResultsPage({
             </table>
           </div>
         )}
+      </Section>
+
+      <Section
+        title="The rule’s decisions, on paper"
+        caption={
+          dqPaper.n > 0
+            ? `${dqPaper.n} graded paper picks — every game the card qualified, one flat unit, never money`
+            : undefined
+        }
+        empty={dqPaper.n === 0 ? "nothing graded yet." : null}
+      >
+        <DecisionsStrip dq={dqPaper} realBets={0} againstVerdict={0} />
       </Section>
     </div>
   );

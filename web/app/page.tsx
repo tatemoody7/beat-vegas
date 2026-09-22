@@ -60,6 +60,15 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
+  // H-PCT: how many of the week's priced games sit at or above this week's bar.
+  const clearing = board.games.filter(
+    (g) =>
+      g.gapBasis === "hardrock" &&
+      g.gap !== null &&
+      g.gap > 0 &&
+      g.gap >= board.slate.bar &&
+      g.check?.hrCentred !== false,
+  ).length;
   const results = staleness(await getGradeHealth(season));
   const buildHealth = buildStatus(await getBuildHealth());
   // The card's own health — "paper only, some inputs are missing", "built by
@@ -109,6 +118,12 @@ export default async function BoardPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       <AnswerBar answer={answer} nextBuild={build?.label ?? null} />
+
+      {board.slate.n > 0 && (
+        <p className="mb-3 text-xs text-[var(--text-dim)]">
+          {`This week’s bar: ${board.slate.bar.toFixed(2)} pts — the gap of the top ${Math.round(100 * board.slate.share)}% of ${board.slate.n} priced games; ${clearing} clear it${board.slate.basis === "fallback" ? " (fallback bar: no priced game had a centred quote)" : ""}. A game must also pass the price, market and news gates to be a bet.`}
+        </p>
+      )}
 
       <div className="mb-3">
         <BoardFilters current={filters} />

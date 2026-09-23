@@ -6,6 +6,8 @@ name: Study (manual, read-only report)
 # the Mac. Every script here is a REPORT: exits 0 whatever the numbers say, writes
 # no table, spends no Odds API credits. The blend's --freeze writes data/blend.json
 # into the RUNNER's checkout only; the committed copy comes from the artifact.
+# harness_report is the shared measurement harness (docs/HARNESS.md): it refuses any
+# --row that is not a runnable registry row (exit 2) and runs ONCE per row.
 
 permissions:
   contents: read
@@ -23,6 +25,7 @@ on:
           - stopping_rule_position
           - neggap_level_study
           - frame_snapshot
+          - harness_report
         default: blend_gate
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
@@ -66,7 +69,7 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot) ;;
+            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"

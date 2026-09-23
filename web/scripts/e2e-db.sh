@@ -17,7 +17,9 @@ set -euo pipefail
 WEB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="$(cd "$WEB_DIR/.." && pwd)"
 # The venv lives in the MAIN checkout even when this is a worktree.
-MAIN="$(cd "$(git -C "$ROOT" rev-parse --git-common-dir)/.." && pwd)"
+# `--git-common-dir` answers RELATIVE to the cwd of the git process ("`.git`"
+# from the main checkout), so resolve it from $ROOT, not from wherever npm ran us.
+MAIN="$(cd "$ROOT" && cd "$(git rev-parse --git-common-dir)/.." && pwd)"
 PY="${BV_PYTHON:-$MAIN/.venv/bin/python}"
 if [ ! -x "$PY" ]; then
   echo "e2e-db: no python at $PY (set BV_PYTHON to the venv's interpreter)" >&2

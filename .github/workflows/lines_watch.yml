@@ -112,6 +112,9 @@ jobs:
           esac
           echo "market=$market" >> "$GITHUB_OUTPUT"
           echo "resolved market=$market (schedule='$SCHEDULE')"
+          # The run's clock for the health contract (last step): every fact it
+          # checks must have been written after this instant.
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
       - name: Close slot pre-check (free /events call; skip when nothing kicks off soon)
         id: precheck
         if: steps.resolve.outputs.market == '1h_close'
@@ -148,8 +151,29 @@ jobs:
         if: steps.resolve.outputs.market == '1h_open'
         run: python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
       - name: 1H per-game close (games kicking off within 75 minutes)
+        id: close
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
-        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 75 --hours-back 0
+        # --status-file records the poll's COVERAGE (events in the window,
+        # events polled, credits) for the health contract below.
+        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 75 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3
+      - name: Health contract (docs/HEALTH.md; writes last_health_lines_watch)
+        id: health
+        # Did this close poll leave behind what it was for? beatvegas/health.py
+        # checks the positive facts (the status file says events were polled or
+        # none were due; a Hard Rock 1H row was written or re-seen after
+        # `started`; the close gauge moved) and writes the verdict + note to
+        # `last_health_lines_watch` for the board banner and /api/health. No
+        # failed-severity check here (the board's `close` gauge warning covers
+        # a dead run of slots), so this never reddens the run. Only the
+        # scheduled market (1h_close) is judged: a dispatched 1h / 1h_open
+        # refresh is SKIPPED, no verdict. Runs on always() once python is
+        # installed (the pre-check skip installs nothing).
+        if: always() && steps.precheck.outputs.skip != 'true' && steps.resolve.outcome == 'success'
+        env:
+          SKIPPED: ${{ steps.resolve.outputs.market != '1h_close' }}
+          RUN_STARTED_AT: ${{ steps.resolve.outputs.started }}
+          MARKET: ${{ steps.resolve.outputs.market }}
+        run: python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json"

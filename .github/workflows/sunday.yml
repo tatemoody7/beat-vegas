@@ -82,6 +82,9 @@ jobs:
           read -r SEASON WEEK <<< "$(python -c 'from beatvegas.season import active; s, w = active(); print(s, w if w is not None else "")')"
           echo "season=$SEASON" >> "$GITHUB_OUTPUT"
           echo "week=$WEEK" >> "$GITHUB_OUTPUT"
+          # The run's clock for the health contract (last step): every fact it
+          # checks must have been written after this instant.
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
       - name: Already captured / scored today? (ET; the credit AND minutes guard)
         id: captured
         if: steps.active.outputs.week != ''
@@ -220,3 +223,25 @@ jobs:
         uses: ./.github/actions/cfbd-cache-save
         with:
           key: ${{ steps.cfbd_cache.outputs.key }}
+      - name: Health contract (docs/HEALTH.md; writes last_health_sunday)
+        id: health
+        # Did this run leave behind what it was for? beatvegas/health.py checks
+        # the DAY's positive facts (a full-game snapshot and model predictions
+        # for the week since ET midnight -- so a tick the probes correctly
+        # skipped still passes -- plus the derived lines, pace and weather
+        # coverage of the FBS slate, the CFBD reference cache) and writes the
+        # verdict + note to `last_health_sunday` for the board banner and
+        # /api/health. `failed` exits 1 (email); `degraded` is board-only.
+        # always() so a red run still gets a verdict; no active week (off-season)
+        # is SKIPPED, no verdict.
+        if: always() && steps.active.outcome == 'success'
+        env:
+          SKIPPED: ${{ steps.active.outputs.week == '' }}
+          RUN_STARTED_AT: ${{ steps.active.outputs.started }}
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+          NEED_CAPTURE: ${{ steps.captured.outputs.need_capture }}
+          NEED_SCORE: ${{ steps.captured.outputs.need_score }}
+          OUTCOME_PACE: ${{ steps.pace.outcome }}
+          OUTCOME_WEATHER: ${{ steps.weather.outcome }}
+        run: python scripts/health_check.py --job sunday

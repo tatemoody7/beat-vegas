@@ -6,10 +6,13 @@
 //   node scripts/shots.mjs --base http://localhost:3200 --label after
 //
 // Writes shots/<label>/<page>_<width>.png (+ _fold.png) and shots/<label>/report.json.
-// Compare two labels with `node scripts/shots.mjs --diff before after`.
+// Compare two labels with `node scripts/shots.mjs --diff before after` (the
+// numbers) or `--pixdiff before after` (the pixels, via odiff; diff PNGs land in
+// shots/<after>/diff_<page>_<width>.png only where something changed).
 // The local dev server has no password gate (APP_PASSWORD unset), so no cookie.
 
 import { chromium, devices } from "playwright";
+import { compare } from "odiff-bin";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -181,9 +184,67 @@ function diff(a, b) {
   }
 }
 
+// Pixel comparison of the full-page captures two labels share. The metric diff
+// above says whether the page got taller; this says whether anything the eye
+// would see moved. A diff PNG is written only when pixels differ, so an empty
+// listing of diff_*.png after a run is itself the "nothing changed" evidence.
+// It is a report, not a gate: it always exits 0.
+async function pixdiff(a, b) {
+  const dirA = path.resolve("shots", a);
+  const dirB = path.resolve("shots", b);
+  // Full-page files are <name>_<width>.png; the _fold.png crops are the same
+  // pixels cut short, and diff_*.png are our own output from an earlier run.
+  const files = fs
+    .readdirSync(dirA)
+    .filter((f) => /_\d+\.png$/.test(f) && !f.startsWith("diff_"))
+    .filter((f) => fs.existsSync(path.join(dirB, f)))
+    .sort();
+  const rows = [];
+  for (const f of files) {
+    const m = f.match(/^(.*)_(\d+)\.png$/);
+    const diffPath = path.join(dirB, `diff_${f}`);
+    const r = await compare(
+      path.join(dirA, f),
+      path.join(dirB, f),
+      diffPath,
+      // antialiasing: font hinting differs run to run at glyph edges and is not
+      // a change. threshold 0.1: odiff's per-pixel colour distance, loose enough
+      // to swallow a gradient's rounding. failOnLayoutDiff: a page that grew is
+      // reported as such rather than diffed against a shifted copy of itself.
+      { antialiasing: true, threshold: 0.1, failOnLayoutDiff: true },
+    );
+    let verdict;
+    if (r.match) {
+      verdict = "same";
+      // odiff does not write on a match, but never leave a stale diff behind.
+      if (fs.existsSync(diffPath)) fs.rmSync(diffPath);
+    } else if (r.reason === "layout-diff") {
+      verdict = "layout";
+    } else if (r.reason === "pixel-diff") {
+      verdict = `pixels ${r.diffCount} (${r.diffPercentage.toFixed(1)}%)`;
+    } else {
+      verdict = `error ${r.reason}`;
+    }
+    rows.push({ page: m[1], viewport: m[2], verdict });
+  }
+  const pad = (s, n) => String(s).padEnd(n);
+  console.log(pad("page", 24) + pad("vp", 6) + "verdict");
+  for (const r of rows) {
+    console.log(pad(r.page, 24) + pad(r.viewport, 6) + r.verdict);
+  }
+  if (rows.length === 0) {
+    console.log(
+      `(no <page>_<width>.png present in both shots/${a} and shots/${b})`,
+    );
+  }
+}
+
 if (args.diff) {
   const [a, b] = String(args.diff).split(/\s+/);
   diff(a, b);
+} else if (args.pixdiff) {
+  const [a, b] = String(args.pixdiff).split(/\s+/);
+  await pixdiff(a, b);
 } else {
   await capture();
 }

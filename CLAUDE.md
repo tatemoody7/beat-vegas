@@ -1064,7 +1064,8 @@ picks**) at https://beat-vegas.vercel.app.
   header / tap-target metrics), then `--diff before after`. **Never the Browser pane for captures**
   (it caps at 800x500); its `javascript_tool` is still the right way to measure the DOM.
 - A worktree verifies against **its own dev server on its own port with a clean `.next`**:
-  `bash web/scripts/dev-worktree.sh start` (prints the base URL; `stop` when done). Never point
+  `bash web/scripts/dev-worktree.sh start` (refuses a Neon URL without `--allow-neon`; prints the
+  base URL; `stop` when done). Never point
   shots at the main checkout's server on 3000 — the preview pane serves main even from a worktree.
 - A phone layout is confirmed by measurement (`scrollWidth - clientWidth` must be 0), never by eye;
   see the Chrome-headless gotcha below.

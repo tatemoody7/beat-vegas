@@ -60,3 +60,18 @@ def test_the_trigger_gauge_is_written_by_the_route_and_read_by_the_board():
     for job_id in ("card-tue-pm", "card-thu-pm", "card-fri-pm", "card-sat-am", "sunday", "grade"):
         assert job_id in cron
         assert len(ops.last_dispatch_key(job_id)) <= 32
+
+
+def test_the_health_gauge_is_written_by_the_step_and_fits_the_key():
+    """last_health_<job> (beatvegas/health.py): written by scripts/health_check.py
+    as every scheduled job's last step. Kept out of GAUGE_KEYS like the dispatch
+    keys; the board derives the four keys from the prefix + job ids itself."""
+    root = os.path.join(os.path.dirname(__file__), "..")
+    script = open(os.path.join(root, "scripts", "health_check.py")).read()
+    assert "health_key" in script and "record_gauge" in script
+    for job in ops.HEALTH_JOBS:
+        key = ops.health_key(job)
+        assert key == f"{ops.HEALTH_PREFIX}{job}"
+        # app_settings.key is String(32) in beatvegas/db/models.py.
+        assert len(key) <= 32
+        assert key not in ops.GAUGE_KEYS

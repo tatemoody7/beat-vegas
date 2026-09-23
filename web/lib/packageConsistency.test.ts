@@ -24,6 +24,15 @@ const MUST_MATCH: [string, string, string][] = [
     "@types/react-dom",
     "the two type packages describe one API and drift produces phantom type errors",
   ],
+  // 2026-09-23: scripts/shots.mjs drives `playwright` and the e2e lane runs on
+  // `@playwright/test`; the runner bundles its own copy of the library and a
+  // version skew between the two means two browser downloads and two different
+  // Chromiums answering for one suite.
+  [
+    "playwright",
+    "@playwright/test",
+    "the runner and the library ship as one release; a skew installs two browsers",
+  ],
 ];
 
 const declared = (name: string): string | undefined =>

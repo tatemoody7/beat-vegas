@@ -48,3 +48,10 @@ next-env.d.ts
 
 # The example is documentation, not a secret: keep it tracked.
 !.env.example
+
+# playwright e2e lane (playwright.config.ts): runs, reports, the setup cookie,
+# and the local-only screenshot baselines (no baseline is committed)
+/test-results/
+/playwright-report/
+/e2e/.auth/
+/e2e/__screenshots__/

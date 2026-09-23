@@ -73,3 +73,76 @@ jobs:
         run: python -m ruff check .
       - name: Unit tests (pytest, no DB)
         run: python -m pytest -q -m "not integration"
+
+  # The Playwright lane (web/playwright.config.ts): the production build served
+  # by `next start`, a real Chromium, a real Postgres holding the synthetic
+  # fixture week (web/e2e/fixture/). No secrets: the database is a service
+  # container with a throwaway password, the app password is the fixture's own
+  # constant, and nothing here can reach Neon (seed.mjs refuses a neon.tech URL).
+  # The schema is the committed dump (tests/test_e2e_schema_parity.py keeps it
+  # current), so the job needs no Python.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beatvegas_e2e
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54329/beatvegas_e2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      # The browser download is ~150 MB; keyed on the exact Playwright version
+      # because each release wants its own Chromium build. Split restore/save
+      # like the CFBD cache, so a failed run never saves a half-written cache.
+      - id: pw_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium (and its OS dependencies)
+        run: npx playwright install --with-deps chromium
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.pw_cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f e2e/fixture/schema.sql
+      - name: Seed the fixture week
+        run: node e2e/fixture/seed.mjs
+      - name: Build
+        run: npm run build
+      - name: Playwright
+        run: npx playwright test
+      - name: Report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7

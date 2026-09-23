@@ -14,6 +14,20 @@ skill's logic here.**
 - Stack: Next.js 16 App Router, Prisma → Neon Postgres (`DATABASE_URL`).
 - State file: `.deploy-verify/last-verified.json` (gitignored).
 
+## Local verification (before the deploy, from a worktree)
+
+- `bash web/scripts/dev-worktree.sh start` runs THIS checkout's dev server on
+  its own port (3100-3199, written to `web/.next-dev.port`) with a clean
+  `.next`; it refuses a Neon `DATABASE_URL` without `--allow-neon`, and proves
+  via `ps` that the server was launched from the worktree. `stop` when done.
+  The Browser pane's preview always serves the main checkout, so never verify a
+  worktree through it.
+- `cd web && node scripts/shots.mjs --base http://localhost:<port> --label
+<before|after>` captures every route at 1440 and 390; `--diff before after`
+  compares the metrics (height, overflow, header, tap targets) and
+  `--pixdiff before after` compares the pixels, writing
+  `shots/<after>/diff_<page>_<width>.png` only where something changed.
+
 ## 0. Should we even run?
 
 1. `list_deployments` (projectId/teamId above) → newest **production** deploy with
@@ -28,28 +42,36 @@ skill's logic here.**
 - Browser pages: list `web/app/**/page.tsx`; map dir → URL path
   (`web/app/results/page.tsx` → `/results`, `web/app/page.tsx` → `/`). Current
   set (3 tabs + a game page + records + login): `/` (Board), `/results`,
-  `/proof`, `/proof/records`, `/game/[id]`, `/login`. The retired pages
-  `/board`, `/preview`, `/line-check`, `/movement`, `/ledger`,
-  `/weekly-review`, `/picks`, `/line-study`, `/research`, `/research/records`,
-  `/glossary` are `redirect()` stubs — check each returns a 307 to its new
-  home (`/` ×4, `/results` ×3, then `/proof`, `/proof`, `/proof/records`,
-  `/proof#glossary`) and nothing else. If you cap the list, say so.
+  `/proof`, `/proof/records`, `/game/[id]`, `/login`. The eleven retired pages
+  are `next.config.ts` redirects with `permanent: true` (`movedRoutes`), so
+  each returns a **308** — not the 307 a `redirect()` stub sent — to its new
+  home: `/board`, `/preview`, `/line-check`, `/movement` → `/`; `/ledger`,
+  `/picks`, `/weekly-review` → `/results`; `/line-study`, `/research` →
+  `/proof`; `/research/records` → `/proof/records`; `/glossary` →
+  `/proof#glossary`. The query string is forwarded. Check the status code and
+  the `location` header and nothing else. If you cap the list, say so.
 - `web/app/api/**/route.ts` for context: `POST /api/picks`,
-  `DELETE /api/picks/[id]`, `GET /api/records?season=` (CSV), `GET /api/health`
-  (public), `POST /api/login`, `POST /api/logout`. There are no GET data APIs
+  `PATCH`/`DELETE /api/picks/[id]`, `GET /api/records?season=` (CSV),
+  `GET /api/health` (public), `POST /api/login`, `POST /api/logout`,
+  `GET /api/cron/[job]` (Vercel cron, `CRON_SECRET`). There are no GET data APIs
   any more — pages read the `lib/*` loaders directly, so data is checked via the
   pages plus the network panel.
 
 ## 2. Auth
 
-`web/middleware.ts` locks the app when `APP_PASSWORD` is set: pages redirect to
-`/login`, APIs return 401. Exempt: `/login`, `/api/login`, `/api/health`, static assets.
+Since 2026-09-16 every page and every GET is public; `APP_PASSWORD` guards
+WRITES only (`lib/gate.ts::gateDecision` in `web/middleware.ts`, plus
+`requireAuth` inside every pick route): an unsigned `POST /api/picks` or
+`PATCH`/`DELETE /api/picks/[id]` returns 401, a form POST elsewhere redirects
+to `/login`. Vercel without `APP_PASSWORD` set 503s everything.
 
-- Detect: load `/` on the live URL. If redirected to `/login`, the gate is **on**.
-- Log in: read `APP_PASSWORD` from local `web/.env`. With the `Claude_in_Chrome`
-  MCP, open `/login`, fill the password field, submit (or POST `/api/login`).
-  Confirm the auth cookie is set and `/` now renders. Then sweep gated routes.
-- If `APP_PASSWORD` is unset, routes are public — skip login.
+- Detect: load `/` on the live URL — it must render signed out, with **Unlock**
+  in the header. If it redirects to `/login`, something is wrong (report it).
+- Log in only to check the signed-in state: read `APP_PASSWORD` from local
+  `web/.env`. With the `Claude_in_Chrome` MCP, open `/login`, fill the password
+  field, submit (or POST `/api/login`). Confirm the cookie is set, the header
+  shows **Lock**, and a game page shows the log button instead of the unlock
+  link. `POST /api/login` is throttled (10 per IP per 15 min).
 - If Vercel **deployment protection** (not the app gate) returns 401/403, mint
   access with `get_access_to_vercel_url` and retry.
 
@@ -72,21 +94,22 @@ shows. Each data page renders what its API returns; each API wraps a Prisma lib.
 At run time, read the lib to get the exact query, then verify the displayed
 number against Neon via the **`postgres`** MCP (HTTPS — per memory). Map:
 
-| Page             | lib                                                                               | Cross-check against Neon                                                                                                                                                                                                                                                          |
-| ---------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/` (This Week)  | `lib/thisWeek.ts` → `board.ts`, `lineCheck.ts`, `preview.ts`, `picks.ts`          | card count = `predictions` rows for the default week (latest week with a game still to kick off); Hard Rock line/price per card matches the latest `odds_snapshots` row for `hardrockbet*` + `1H_total`; bankroll strip = `manual_picks` where `is_paper=false` and `market='1H'` |
-| `/game/[id]`     | `lib/homeBoard.ts`, `lib/movement.ts`, `lib/lineCheck.ts`, `lib/preview.ts`       | the gap bar's line and our number match the board row; the movement chart matches that game's `odds_snapshots` (`1H_total`) history                                                                                                                                               |
-| `/results`       | `lib/ledger.ts`, `lib/weeklyReview.ts`, `lib/decision-quality.ts`, `lib/picks.ts` | Market/Model cards = `results` rows by `model_version` ('market', 'market_fg', `lib/model.ts::MODEL_VERSION`); You = graded `manual_picks` (real 1H vs paper); week-by-week + by-reason totals sum to the pick count                                                              |
-| `/proof`         | `lib/postmortem.ts`, `lib/proof.ts`, `lib/lineStudy.ts`, `lib/glossary.ts`        | headline = `postmortem_buckets` (`hist_2023_25`/`fbs_only`/`real`/`cap5`); **no green or red number anywhere below the "estimated line" heading**; the line-study chart draws BARS, not an empty plot; the glossary `<details>` opens                                             |
-| `/proof/records` | `lib/records.ts` (`GET /api/records` CSV)                                         | row count = `games` for the season; CSV downloads and row count matches the grid                                                                                                                                                                                                  |
+| Page             | lib                                                                                                                                                                   | Cross-check against Neon                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/` (Board)      | `lib/homeBoard.ts` → `board.ts`, `lineCheck.ts`, `preview.ts`, `picks.ts`, `movement.ts`; `lib/card.ts`, `lib/answerBar.ts`, `lib/boardHealth.ts`, `lib/rulePause.ts` | row count = `predictions` rows for the default week (`lib/week.ts::defaultWeek`, the latest week with a game still to kick off) inside `boardUniverse`; Hard Rock line/price per row matches the latest `odds_snapshots` row for `hardrockbet` + `1H_total`; "This week's bar" sentence = the latest `cards.payload.slate`; the answer bar's live bets = `manual_picks` where `is_paper=false` and `market='1H'`; no OpsBanner / missed-build / stale-results banner unless `/api/health` says so |
+| `/game/[id]`     | `lib/homeBoard.ts::getHomeGame` (same chain), `lib/session.ts`                                                                                                        | the three decision tiles (Hard Rock's number, our number, gap) match the board row; the per-book lines list matches that game's latest `odds_snapshots` (`1H_total`) per book; signed out shows "Unlock to log a pick", signed in shows the log button                                                                                                                                                                                                                                            |
+| `/results`       | `lib/ledger.ts`, `lib/weeklyReview.ts`, `lib/decision-quality.ts`, `lib/picks.ts`, `lib/homeBoard.ts` (bankroll)                                                      | Scoreboard band / record table = `results` rows by `model_version` ('market', 'market_fg', `lib/model.ts::MODEL_VERSION`); "Your decisions" = graded REAL `manual_picks` (paper in its own labelled section); breakdown toggles (by week / reason / blocker) each sum to the pick count; line value shown with the favourable sign (+ means the market came toward us)                                                                                                                            |
+| `/proof`         | `lib/postmortem.ts`, `lib/proof.ts`, `lib/lineStudy.ts`, `lib/glossary.ts`, `lib/records.ts`                                                                          | headline = `postmortem_buckets` (`hist_2023_25`/`fbs_only`/`real`/`cap5`) with its Wilson interval; the gap ladder draws BARS with games and units under each; **no green or red number anywhere below the "estimated line" heading**; the folds (`<details>`) open                                                                                                                                                                                                                               |
+| `/proof/records` | `lib/records.ts` (`GET /api/records` CSV)                                                                                                                             | opens on the latest week with a graded outcome (`latestGradedWeek`); the week's row count = `games` rows for that season-week (LEFT JOIN `predictions` on `MODEL_VERSION`, so a game with no model row still lists); CSV downloads and its row count matches the season's `games` count                                                                                                                                                                                                           |
 
 Tables (from `web/prisma/schema.prisma`): `games`, `predictions`, `results`,
 `manual_picks` (incl. the tracking columns `verdict_at_pick`, `reason`,
 `gap_at_pick`, `ev_at_pick`, `hr_line_at_pick` — the pages degrade to
 "untagged" if the migration has not run), `bv_adjustments`, `odds_snapshots`,
 `model_runs`, `teams`, `team_tempo`, `team_week_features`, `venues`, `weather`.
-Not in the schema but read defensively: `game_previews`, `factor_scores`,
-`factor_ledger` (absent table → empty state, never a 500).
+Not in the schema but read defensively (raw SQL): `cards`, `app_settings`,
+`game_records`, `game_previews`, `postmortem_runs`/`postmortem_buckets`,
+`factor_scores`, `factor_ledger` (absent table → empty state, never a 500).
 
 Flag mismatches, empty-when-should-have-data, stale (last `model_runs` timestamp
 far behind today), and wrong-season data.

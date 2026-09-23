@@ -14,6 +14,10 @@
 /coverage
 # screenshot captures from scripts/shots.mjs
 /shots/
+# scripts/dev-worktree.sh state for this checkout's dev server
+.next-dev.pid
+.next-dev.port
+.next-dev.log
 
 # next.js
 /.next/

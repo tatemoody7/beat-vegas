@@ -48,6 +48,22 @@ def last_dispatch_key(job_id: str) -> str:
     return f"{LAST_DISPATCH_PREFIX}{job_id}"
 
 
+# One more per scheduled Neon-writing job, written by scripts/health_check.py as
+# the job's LAST step (beatvegas/health.py): value = the verdict (ok / degraded /
+# failed), note = run id, trigger, slot and every missed check. The gauges above
+# say whether the system can keep running; this one says whether the run that
+# just finished left behind what it was for. Kept out of GAUGE_KEYS like the
+# dispatch keys: the board derives the four keys from HEALTH_JOBS itself
+# (web/lib/boardHealth.ts HEALTH_JOB_IDS, parity-tested).
+HEALTH_PREFIX = "last_health_"
+HEALTH_JOBS = ("card", "grade", "sunday", "lines_watch")
+
+
+def health_key(job: str) -> str:
+    """`app_settings.key` for one job's health verdict (fits String(32))."""
+    return f"{HEALTH_PREFIX}{job}"
+
+
 def gauges_enabled() -> bool:
     return bool(os.environ.get("DATABASE_URL"))
 

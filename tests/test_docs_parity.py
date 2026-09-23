@@ -29,12 +29,43 @@ from beatvegas.model import score
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 POLICY = DOCS / "BETTING_POLICY.md"
 GLOSSARY = DOCS / "GLOSSARY.md"
+HEALTH_DOC = DOCS / "HEALTH.md"
+WEB_LIB = DOCS.parent / "web" / "lib"
 
 
 def _text(p: Path) -> str:
     if not p.exists():  # pragma: no cover - the docs are checked in
         pytest.skip(f"{p.name} not present in this checkout")
     return p.read_text()
+
+
+# --------------------------------------------------------------------------- #
+# docs/HEALTH.md is prose plus a block generated from beatvegas/health.py
+# --------------------------------------------------------------------------- #
+def test_health_doc_block_is_the_rendered_contracts():
+    """`python -m beatvegas.health --render-md docs/HEALTH.md` regenerates the
+    block between the markers; a contract edited without re-rendering fails here."""
+    from beatvegas import health
+
+    body = _text(HEALTH_DOC)
+    start = body.index(health.CONTRACTS_BEGIN)
+    end = body.index(health.CONTRACTS_END) + len(health.CONTRACTS_END)
+    assert body[start:end] + "\n" == health.render_contracts()
+    # The prose names every job's runbook (the board links docs/HEALTH.md#<job>).
+    for job in health.CONTRACTS:
+        assert f"When {job} is degraded" in body, job
+
+
+def test_the_stale_hours_the_health_check_uses_are_the_boards():
+    """grade.finals_landed is the board's stale-results predicate
+    (web/lib/boardHealth.ts getGradeHealth); the two thresholds must agree or
+    the banner and the verdict disagree about the same fact."""
+    from beatvegas import health
+
+    web = _text(WEB_LIB / "boardHealth.ts")
+    m = re.search(r"export const STALE_AFTER_HOURS = (\d+);", web)
+    assert m, "boardHealth.ts no longer declares STALE_AFTER_HOURS"
+    assert int(m.group(1)) == health.STALE_AFTER_HOURS
 
 
 # --------------------------------------------------------------------------- #

@@ -89,7 +89,10 @@ PR and takes effect at the week-5 Sunday refit (2026-09-27).
 ## How to add a row
 
 1. Write the row — question, data, the exact criterion — and commit it.
-2. Then write the script. The commit with the row precedes the commit with the script.
+2. Then write the script. It imports `beatvegas/backtest/harness.py` for the frame, the
+   folds, the real closes and the record (`docs/HARNESS.md`), names its `--row <id>`, and
+   runs ONCE on the runner via `study.yml`; no unattended iteration. The commit with the
+   row precedes the commit with the script.
 3. When the result is in, change `status`, fill `n` and `comparisons run`, and point
    `result doc` at the committed document. Never edit the criterion cell after the run;
    if the criterion was wrong, add a new row.

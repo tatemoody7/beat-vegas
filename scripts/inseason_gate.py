@@ -32,11 +32,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Sequence
 
+from beatvegas.backtest.harness import HarnessSpec, incumbent_arm, load_frame
 from beatvegas.backtest.inseason import K_GRID, TEST_SEASONS, evaluate, render_markdown
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.db.store import try_init_db
-from beatvegas.etl.features import build_feature_frame
-from beatvegas.etl.frame_fingerprint import write_fingerprint
+from beatvegas.etl.features import apply_min_games
+from beatvegas.registry import HarnessRefusal
 
 # Run as `python scripts/<name>.py` (the workflows do), sys.path holds scripts/
 # and not the repo root, so `from scripts.x import` fails with
@@ -65,6 +66,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     # The live board scores from a min_games=0 frame (scripts/weekly_update.py),
     # and build_feature_frame's own default is 2. This gate follows the board.
     p.add_argument("--min-games", type=int, default=0)
+    p.add_argument(
+        "--frame",
+        default=None,
+        help="a scripts/frame_snapshot.py pickle (carrying attrs['build']) to re-cut at "
+        "--min-games instead of building the frame",
+    )
     p.add_argument("--out", default="reports/inseason")
     p.add_argument("--all-divisions", action="store_true", help="drop the FBS-vs-FBS filter")
     p.add_argument(
@@ -79,12 +86,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     try_init_db()
 
-    frame = build_feature_frame(min_games=args.min_games, fbs_only=not args.all_divisions)
-    # Pin the inputs: which snapshot of CFBD's reference tables this run was judged
-    # on (docs/MODEL_LEVEL_2026.md, Reconciliation -- the same frozen gate gave two
-    # verdicts on two snapshots). Written beside the report as <stem>_frame.json.
+    # The frame comes through the shared harness loader (beatvegas/backtest/harness.py):
+    # built at --min-games as before, or a --frame snapshot (scripts/frame_snapshot.py,
+    # with attrs["build"]) re-cut at it. Either way the fingerprint -- WHICH snapshot
+    # of CFBD's reference tables this run was judged on (docs/MODEL_LEVEL_2026.md,
+    # Reconciliation) -- is written beside the report as <stem>_frame.json before
+    # anything is scored.
     md_path, _json_path, _csv = report_paths(args.out)
-    fp = write_fingerprint(frame, md_path.with_name(md_path.stem + "_frame.json"))
+    spec = HarnessSpec(
+        row_id="H-INSEASON",
+        arms=(incumbent_arm(),),
+        test_seasons=tuple(int(s) for s in args.test_seasons),
+        min_games_train=args.min_games,
+        min_games_score=args.min_games,
+        fbs_only=not args.all_divisions,
+    )
+    try:
+        frame, fp = load_frame(
+            Path(args.frame) if args.frame else None,
+            spec,
+            md_path.with_name(md_path.stem + "_frame.json"),
+        )
+    except HarnessRefusal as e:
+        print(f"::error::{e}", file=sys.stderr)
+        return 2
+    # A snapshot may be finer than --min-games; a built frame is already at it (no-op).
+    frame = apply_min_games(frame, args.min_games).reset_index(drop=True)
     print(
         f"[gate] frame fingerprint: rows={fp['rows']} by_season={fp['by_season']} sklearn={fp['sklearn']}"
     )

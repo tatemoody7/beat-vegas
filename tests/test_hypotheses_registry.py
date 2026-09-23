@@ -155,3 +155,15 @@ def test_exploratory_rows_promise_no_adoption():
         if r["status"] == "exploratory" and not r["criterion"].startswith("None")
     ]
     assert not bad, bad
+
+
+def test_the_how_to_names_the_harness_and_its_doc_exists():
+    """Since 2026-09-23 a study script imports the shared harness and runs once on
+    the runner (docs/HARNESS.md). HARNESS.md is a how-to, not a result document,
+    so it is deliberately NOT in STUDY_DOCS."""
+    assert (ROOT / "docs" / "HARNESS.md").exists()
+    text = REGISTRY.read_text()
+    how_to = text[text.index("## How to add a row") :]
+    assert "harness" in how_to and "docs/HARNESS.md" in how_to
+    assert "no unattended iteration" in how_to
+    assert "docs/HARNESS.md" not in STUDY_DOCS

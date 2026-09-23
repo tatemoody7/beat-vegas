@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..challenger import PAPER_ARMS, arm_label, blend
-from .censoring import wilson
+from .stats import wilson
 
 CHAMPION = "champion"
 

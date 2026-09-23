@@ -80,6 +80,19 @@ export async function GET() {
             d?.toISOString() ?? null,
           ]),
         ),
+        // Per scheduled job: the last health-contract verdict the job wrote
+        // about its own run (docs/HEALTH.md), with the note naming the run
+        // and every missed check.
+        health: Object.fromEntries(
+          Object.entries(gauges.health).map(([id, h]) => [
+            id,
+            {
+              verdict: h.verdict,
+              at: h.at?.toISOString() ?? null,
+              note: h.note,
+            },
+          ]),
+        ),
       },
       warnings: warnings.map((w) => w.text),
     });

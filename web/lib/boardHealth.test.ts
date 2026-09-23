@@ -140,26 +140,31 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
       key: "cfbd_calls_remaining",
       value: "1974",
       updated_at: "2026-09-22T10:52:00",
+      note: null,
     },
     {
       key: "odds_credits_remaining",
       value: "53946",
       updated_at: "2026-09-22T10:52:00",
+      note: null,
     },
     {
       key: "last_close_capture_at",
       value: "2026-09-19T23:30:00",
       updated_at: "2026-09-19T23:30:00",
+      note: null,
     },
     {
       key: "last_close_capture_events",
       value: "3",
       updated_at: "2026-09-19T23:30:00",
+      note: null,
     },
     {
       key: "last_grade_completed_at",
       value: "2026-09-22T10:58:00",
       updated_at: "2026-09-22T10:58:00",
+      note: null,
     },
   ];
   it("parses the rows and is quiet when everything is healthy", () => {
@@ -180,16 +185,19 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
         key: "cfbd_calls_remaining",
         value: String(CFBD_LOW_CALLS - 1),
         updated_at: null,
+        note: null,
       },
       {
         key: "odds_credits_remaining",
         value: String(ODDS_LOW_CREDITS - 1),
         updated_at: null,
+        note: null,
       },
       {
         key: "last_close_capture_at",
         value: "2026-09-01T00:00:00",
         updated_at: null,
+        note: null,
       },
     ]);
     const keys = opsWarnings(g, now).map((w) => w.key);
@@ -203,6 +211,7 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
         key: "last_close_capture_at",
         value: "2026-01-10T00:00:00",
         updated_at: null,
+        note: null,
       },
     ]);
     expect(opsWarnings(g, now, false)).toEqual([]);
@@ -210,7 +219,12 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
   });
   it("a non-numeric value reads as unknown, not as zero", () => {
     const g = gaugesFrom([
-      { key: "cfbd_calls_remaining", value: "n/a", updated_at: null },
+      {
+        key: "cfbd_calls_remaining",
+        value: "n/a",
+        updated_at: null,
+        note: null,
+      },
     ]);
     expect(g.cfbdCallsRemaining).toBeNull();
     expect(opsWarnings(g, now)).toEqual([]);
@@ -232,6 +246,7 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
     key: `${DISPATCH_GAUGE_PREFIX}${id}`,
     value,
     updated_at: value,
+    note: null,
   });
 
   it("reads one gauge per cron job, derived from CRON_JOBS", () => {
@@ -313,5 +328,130 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
     // Sat 2026-09-19 7:00am EDT = 11:00Z
     expect(win?.day).toBe("Sat");
     expect(win?.openedAt.toISOString()).toBe("2026-09-19T11:00:00.000Z");
+  });
+});
+
+import {
+  HEALTH_GAUGE_PREFIX,
+  HEALTH_JOB_IDS,
+  healthRunUrl,
+  healthWarningText,
+  parseHealthNote,
+} from "@/lib/boardHealth";
+import { GITHUB_REPO } from "@/lib/cronJobs";
+
+describe("the health contracts (scripts/health_check.py -> last_health_<job>)", () => {
+  // Friday 2026-09-25, 4:20pm ET: the fri_pm card just built.
+  const now = new Date("2026-09-25T20:20:00Z");
+  const hrow = (id: string, value: string, note: string | null) => ({
+    key: `${HEALTH_GAUGE_PREFIX}${id}`,
+    value,
+    updated_at: "2026-09-25T20:14:00",
+    note,
+  });
+  const degradedNote =
+    "run=18012345678 event=workflow_dispatch slot=fri_pm miss=card.hr_priced_floor(6 Hard Rock-priced items (floor 10));card.status_clean(status=degraded (slot wants final) degraded=1 [sweep]) info=bets=0 early_season_held=3 preview=success sweep=failure";
+
+  it("reads one gauge per job and the keys fit app_settings.key", () => {
+    expect([...HEALTH_JOB_IDS]).toEqual([
+      "card",
+      "grade",
+      "sunday",
+      "lines_watch",
+    ]);
+    for (const id of HEALTH_JOB_IDS) {
+      expect(GAUGE_KEYS).toContain(`last_health_${id}`);
+      expect(`last_health_${id}`.length).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("parses verdict, note and time; a missing row is unknown", () => {
+    const g = gaugesFrom([hrow("card", "degraded", degradedNote)]);
+    expect(g.health.card.verdict).toBe("degraded");
+    expect(g.health.card.note).toBe(degradedNote);
+    expect(g.health.card.at?.toISOString()).toBe("2026-09-25T20:14:00.000Z");
+    expect(g.health.grade).toEqual({ verdict: null, note: null, at: null });
+  });
+
+  it("parses the note into run, event, slot and the misses", () => {
+    const n = parseHealthNote(degradedNote);
+    expect(n.run).toBe("18012345678");
+    expect(n.event).toBe("workflow_dispatch");
+    expect(n.slot).toBe("fri_pm");
+    expect(n.misses).toEqual([
+      {
+        id: "card.hr_priced_floor",
+        detail: "6 Hard Rock-priced items (floor 10)",
+      },
+      {
+        id: "card.status_clean",
+        detail: "status=degraded (slot wants final) degraded=1 [sweep]",
+      },
+    ]);
+    expect(healthRunUrl(n)).toBe(
+      `https://github.com/${GITHUB_REPO}/actions/runs/18012345678`,
+    );
+    // A clean note has no misses; a local run ("run=-") has no link.
+    const clean = parseHealthNote("run=- event=- slot=manual info=bets=1");
+    expect(clean.misses).toEqual([]);
+    expect(healthRunUrl(clean)).toBeNull();
+    expect(parseHealthNote(null).misses).toEqual([]);
+  });
+
+  it("a degraded verdict warns, naming the job, the ET time, the misses, the runbook and the run", () => {
+    const g = gaugesFrom([hrow("card", "degraded", degradedNote)]);
+    const w = opsWarnings(g, now);
+    expect(w.map((x) => x.key)).toEqual(["health:card"]);
+    expect(w[0].text).toContain(
+      "card ran with something missing (DEGRADED at 2026-09-25 Fri 4:14pm ET)",
+    );
+    expect(w[0].text).toContain(
+      "card.hr_priced_floor (6 Hard Rock-priced items (floor 10))",
+    );
+    expect(w[0].text).toContain("card.status_clean (");
+    expect(w[0].text).toContain("docs/HEALTH.md#card");
+    expect(w[0].text).toContain(
+      `https://github.com/${GITHUB_REPO}/actions/runs/18012345678`,
+    );
+  });
+
+  it("failed sorts before degraded, whatever order the jobs are declared in", () => {
+    const g = gaugesFrom([
+      hrow("card", "degraded", degradedNote),
+      hrow(
+        "sunday",
+        "failed",
+        "run=5 event=schedule miss=sunday.predictions_today(0 model predictions for 2026 w5 since ET midnight)",
+      ),
+    ]);
+    const w = opsWarnings(g, now);
+    expect(w.map((x) => x.key)).toEqual(["health:sunday", "health:card"]);
+    expect(w[0].text).toContain("sunday did not do its job (FAILED at");
+    expect(w[0].text).toContain("docs/HEALTH.md#sunday");
+    expect(w[0].text).toContain("/actions/runs/5");
+  });
+
+  it("ok is silent, a missing row is silent, an unknown verdict is silent", () => {
+    expect(
+      opsWarnings(
+        gaugesFrom([hrow("grade", "ok", "run=1 event=schedule")]),
+        now,
+      ),
+    ).toEqual([]);
+    expect(opsWarnings(gaugesFrom([]), now)).toEqual([]);
+    const odd = gaugesFrom([hrow("grade", "on-fire", "run=1 event=schedule")]);
+    expect(odd.health.grade.verdict).toBeNull();
+    expect(opsWarnings(odd, now)).toEqual([]);
+  });
+
+  it("a verdict without a note or a time still reads sensibly", () => {
+    const text = healthWarningText("lines_watch", {
+      verdict: "degraded",
+      note: null,
+      at: null,
+    });
+    expect(text).toBe(
+      "lines_watch ran with something missing (DEGRADED at unknown time): no check named. Runbook: docs/HEALTH.md#lines_watch.",
+    );
   });
 });

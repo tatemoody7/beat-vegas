@@ -1,6 +1,6 @@
-import { CRON_JOBS } from "@/lib/cronJobs";
+import { CRON_JOBS, GITHUB_REPO } from "@/lib/cronJobs";
 import { cardBuilds, type BuildSlot } from "@/lib/nextBuild";
-import { etMinutesOfDay, etParts } from "@/lib/et";
+import { etClock12, etDay, etMinutesOfDay, etParts } from "@/lib/et";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -206,15 +206,44 @@ export const BASE_GAUGE_KEYS = [
 export const DISPATCH_GAUGE_PREFIX = "last_dispatch_";
 export const DISPATCH_JOB_IDS: readonly string[] = Object.keys(CRON_JOBS);
 
+// One more per scheduled Neon-writing job, written by scripts/health_check.py as
+// that job's LAST step (beatvegas/health.py, docs/HEALTH.md): value = the
+// verdict, note = `run=<id> event=<trigger> slot=<slot> miss=<check>(<detail>);...
+// info=k=v`. The gauges above say whether the system can keep running; this one
+// says whether the run that just finished left behind what it was for. Prefix
+// and job ids mirror beatvegas/ops.py HEALTH_PREFIX / HEALTH_JOBS
+// (tests/test_ops_gauges.py reads them out of this file).
+export const HEALTH_GAUGE_PREFIX = "last_health_";
+export const HEALTH_JOB_IDS = [
+  "card",
+  "grade",
+  "sunday",
+  "lines_watch",
+] as const;
+export type HealthJobId = (typeof HEALTH_JOB_IDS)[number];
+
 export const GAUGE_KEYS: readonly string[] = [
   ...BASE_GAUGE_KEYS,
   ...DISPATCH_JOB_IDS.map((id) => `${DISPATCH_GAUGE_PREFIX}${id}`),
+  ...HEALTH_JOB_IDS.map((id) => `${HEALTH_GAUGE_PREFIX}${id}`),
 ];
 
 export type GaugeRow = {
   key: string;
   value: string;
   updated_at: string | null;
+  note: string | null;
+};
+
+export type HealthVerdict = "ok" | "degraded" | "failed";
+const HEALTH_VERDICTS: readonly HealthVerdict[] = ["ok", "degraded", "failed"];
+
+export type HealthGauge = {
+  /** null when no row exists or the value is not a verdict this build knows. */
+  verdict: HealthVerdict | null;
+  note: string | null;
+  /** When the verdict was written (naive UTC in the DB). */
+  at: Date | null;
 };
 
 export type Gauges = {
@@ -225,6 +254,8 @@ export type Gauges = {
   lastGradeCompletedAt: Date | null;
   /** Per cron job id: the last in-window Vercel tick, or null if never seen. */
   lastDispatch: Record<string, Date | null>;
+  /** Per scheduled job: the last health-contract verdict (docs/HEALTH.md). */
+  health: Record<HealthJobId, HealthGauge>;
   /** When each gauge was last written (naive UTC in the DB). */
   updatedAt: Partial<Record<string, Date | null>>;
 };
@@ -264,6 +295,19 @@ export function gaugesFrom(rows: GaugeRow[]): Gauges {
   for (const id of DISPATCH_JOB_IDS) {
     lastDispatch[id] = utcValue(by.get(`${DISPATCH_GAUGE_PREFIX}${id}`)?.value);
   }
+  const health = {} as Record<HealthJobId, HealthGauge>;
+  for (const id of HEALTH_JOB_IDS) {
+    const row = by.get(`${HEALTH_GAUGE_PREFIX}${id}`);
+    const v = row?.value;
+    health[id] = {
+      // A value this build does not know is unknown, never a warning.
+      verdict: HEALTH_VERDICTS.includes(v as HealthVerdict)
+        ? (v as HealthVerdict)
+        : null,
+      note: row?.note ?? null,
+      at: utc(row?.updated_at ?? null),
+    };
+  }
   return {
     cfbdCallsRemaining: numOrNull(by.get("cfbd_calls_remaining")?.value),
     oddsCreditsRemaining: numOrNull(by.get("odds_credits_remaining")?.value),
@@ -273,14 +317,57 @@ export function gaugesFrom(rows: GaugeRow[]): Gauges {
     ),
     lastGradeCompletedAt: utc(by.get("last_grade_completed_at")?.value ?? null),
     lastDispatch,
+    health,
     updatedAt,
   };
+}
+
+export type HealthNote = {
+  /** GITHUB_RUN_ID, for the link to the Actions run. */
+  run: string | null;
+  /** GITHUB_EVENT_NAME: schedule (GitHub's backup cron) or workflow_dispatch. */
+  event: string | null;
+  slot: string | null;
+  misses: { id: string; detail: string }[];
+};
+
+/** Pure: the note scripts/health_check.py writes -> its parts. The format is
+ *  `run=<id> event=<name> [slot=<slot>] [market=<m>] [miss=<id>(<detail>);...]
+ *  [info=k=v ...]`; a detail never carries `;` (health.py strips it), so the
+ *  miss list splits on it. */
+export function parseHealthNote(note: string | null): HealthNote {
+  const out: HealthNote = { run: null, event: null, slot: null, misses: [] };
+  if (!note) return out;
+  const field = (name: string): string | null => {
+    const m = note.match(new RegExp(`(?:^|\\s)${name}=(\\S+)`));
+    return m ? m[1] : null;
+  };
+  out.run = field("run");
+  out.event = field("event");
+  out.slot = field("slot");
+  const m = note.match(/(?:^|\s)miss=(.*?)(?=\s+info=|$)/);
+  if (m) {
+    for (const seg of m[1].split(";")) {
+      const item = seg.match(/^([A-Za-z0-9_.]+)\((.*)\)$/);
+      if (item) out.misses.push({ id: item[1], detail: item[2] });
+      else if (seg.trim()) out.misses.push({ id: seg.trim(), detail: "" });
+    }
+  }
+  return out;
+}
+
+/** The Actions run a health note points at, or null without a run id. */
+export function healthRunUrl(note: HealthNote): string | null {
+  return note.run && /^\d+$/.test(note.run)
+    ? `https://github.com/${GITHUB_REPO}/actions/runs/${note.run}`
+    : null;
 }
 
 export async function getGauges(): Promise<Gauges> {
   try {
     const rows = await prisma.$queryRaw<GaugeRow[]>`
-      SELECT key, value, to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updated_at
+      SELECT key, value, note,
+             to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updated_at
         FROM app_settings
        WHERE key IN (${Prisma.join([...GAUGE_KEYS])})`;
     return gaugesFrom(rows);
@@ -353,5 +440,42 @@ export function opsWarnings(
       });
     }
   }
-  return out;
+  // The health contracts (docs/HEALTH.md): the last verdict each scheduled job
+  // wrote about its own run. `ok` is silent, a job never seen is unknown, a
+  // value this build does not know is unknown too. `failed` (the run did not
+  // do its job) sorts before `degraded` (it did, with something missing).
+  const health: OpsWarning[] = [];
+  for (const id of HEALTH_JOB_IDS) {
+    const h = g.health[id];
+    if (h.verdict !== "failed" && h.verdict !== "degraded") continue;
+    health.push({ key: `health:${id}`, text: healthWarningText(id, h) });
+  }
+  const rank = (w: OpsWarning) =>
+    g.health[w.key.slice("health:".length) as HealthJobId].verdict === "failed"
+      ? 0
+      : 1;
+  health.sort((a, b) => rank(a) - rank(b));
+  return [...out, ...health];
+}
+
+/** Pure: one banner line for a degraded/failed health verdict. */
+export function healthWarningText(id: string, h: HealthGauge): string {
+  const note = parseHealthNote(h.note);
+  const when = h.at ? `${etDay(h.at)} ${etClock12(h.at)} ET` : "unknown time";
+  const what =
+    h.verdict === "failed"
+      ? "did not do its job"
+      : "ran with something missing";
+  const misses =
+    note.misses.length > 0
+      ? note.misses
+          .map((m) => (m.detail ? `${m.id} (${m.detail})` : m.id))
+          .join("; ")
+      : "no check named";
+  const run = healthRunUrl(note);
+  return (
+    `${id} ${what} (${h.verdict?.toUpperCase()} at ${when}): ${misses}. ` +
+    `Runbook: docs/HEALTH.md#${id}.` +
+    (run ? ` Run: ${run}` : "")
+  );
 }

@@ -85,6 +85,9 @@ jobs:
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
           # ISO weekday in Eastern time (1 = Monday): the weekly full pass.
           echo "et_dow=$(TZ=America/New_York date +%u)" >> "$GITHUB_OUTPUT"
+          # The run's clock for the health contract (last step): every fact it
+          # checks must have been written after this instant.
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
       - name: Already graded in the last four hours? (the minutes guard)
         id: probe
         env:
@@ -129,6 +132,7 @@ jobs:
           PY
           cat "$GITHUB_OUTPUT"
       - name: Refresh schedule, lines and scores (CFBD)
+        id: backfill
         if: steps.probe.outputs.need_grade == 'true'
         # Primary source: this is also what creates new games and refreshes
         # lines, so it runs first. continue-on-error because ESPN below covers
@@ -139,6 +143,7 @@ jobs:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/backfill.py --season "$SEASON"
       - name: Backfill any missing final scores (ESPN, no key, no quota)
+        id: espn
         if: steps.probe.outputs.need_grade == 'true'
         # Scores only, onto games the step above already created, keyed by id
         # (ESPN's event ids are the ids we store). Second source for the one
@@ -149,6 +154,7 @@ jobs:
         continue-on-error: true
         run: python scripts/backfill_scores_espn.py --days-back 4
       - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
+        id: pbp
         if: steps.probe.outputs.need_grade == 'true'
         # fh_team_game feeds the season-to-date FH factors the Sunday scorer
         # reads; without this the current season never accrues PBP rows.
@@ -180,6 +186,7 @@ jobs:
         # continue-on-error enrichment below cannot fake it.
         run: python scripts/record_gauge.py --key last_grade_completed_at --now
       - name: Grade factor credibility ledger (real lines only)
+        id: ledger
         if: steps.probe.outputs.need_grade == 'true'
         # Display chips only -- nothing downstream reads this to decide a bet,
         # and it calls CFBD /ratings/sp, which 429'd and skipped the post-mortem
@@ -187,6 +194,7 @@ jobs:
         continue-on-error: true
         run: python scripts/grade_factor_ledger.py
       - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
+        id: pm
         if: steps.probe.outputs.need_grade == 'true'
         # Regrades the season's cards at Hard Rock's numbers (scope live) every
         # run; the stored 2023-25 ratings under the flat and fair proxies (scope
@@ -208,3 +216,24 @@ jobs:
         uses: ./.github/actions/cfbd-cache-save
         with:
           key: ${{ steps.cfbd_cache.outputs.key }}
+      - name: Health contract (docs/HEALTH.md; writes last_health_grade)
+        id: health
+        # Did this run leave behind what it was for? beatvegas/health.py checks
+        # the positive facts (the completed-grade gauge moved after `started`,
+        # no rated game >18h old without a final, records and picks on played
+        # games graded, the live post-mortem row, the CFBD reference cache) and
+        # writes the verdict + note to `last_health_grade` for the board banner
+        # and /api/health. `failed` exits 1 (email); `degraded` is board-only.
+        # always() so a red run still gets a verdict; a run the four-hour probe
+        # skipped is SKIPPED (no verdict) -- it was not a run of the job.
+        if: always() && steps.probe.outcome == 'success'
+        env:
+          SKIPPED: ${{ steps.probe.outputs.need_grade != 'true' }}
+          RUN_STARTED_AT: ${{ steps.season.outputs.started }}
+          SEASON: ${{ steps.season.outputs.season }}
+          OUTCOME_BACKFILL: ${{ steps.backfill.outcome }}
+          OUTCOME_ESPN: ${{ steps.espn.outcome }}
+          OUTCOME_PBP: ${{ steps.pbp.outcome }}
+          OUTCOME_LEDGER: ${{ steps.ledger.outcome }}
+          OUTCOME_PM: ${{ steps.pm.outcome }}
+        run: python scripts/health_check.py --job grade

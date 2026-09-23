@@ -183,9 +183,15 @@ def test_a_failed_sweep_still_publishes_a_card_and_still_reddens_the_run():
     assert steps["sweep"]["continue-on-error"] is True
     # The build is NOT gated on the sweep succeeding.
     assert "sweep" not in steps["build"]["if"]
-    guard = _card_steps()[-1]
-    assert guard["if"] == "always() && steps.sweep.outcome == 'failure'"
+    # Located by its condition, not by position: the health contract is the
+    # last step since 2026-09-23, and the guard sits right before it.
+    guards = [
+        s for s in _card_steps() if s.get("if") == "always() && steps.sweep.outcome == 'failure'"
+    ]
+    assert len(guards) == 1, "expected exactly one sweep-failure guard"
+    guard = guards[0]
     assert "exit 1" in guard["run"] and "::error::" in guard["run"]
+    assert _card_steps().index(guard) == len(_card_steps()) - 2
 
 
 def test_card_yml_can_rehearse_a_degraded_card_on_demand():
@@ -234,10 +240,20 @@ def test_card_yml_gates_on_the_eastern_clock_before_installing_anything():
     # Every step after the resolve is gated on it (directly or via a derived output).
     for s in steps[resolve + 1 :]:
         assert s.get("if"), f"step {s.get('name')!r} is not gated on the slot"
-    # The build is the last SLOT-GATED step; only the sweep-failure guard, which
-    # runs on always(), may follow it.
+    # The build is the last SLOT-GATED step; only the always() steps -- the cache
+    # save, the sweep-failure guard and the health contract -- may follow it,
+    # and the health contract is last (it judges everything before it).
     assert _card_steps_by_id()["build"]["if"] == "steps.slot.outputs.slot != 'skip'"
-    assert steps[-1]["if"].startswith("always()")
+    build_idx = next(i for i, s in enumerate(steps) if s.get("id") == "build")
+    for s in steps[build_idx + 1 :]:
+        assert s["if"].startswith("always()"), s.get("name")
+    assert steps[-1].get("id") == "health"
+    # The health step needs python, so it is exempt only for the gate-skip tick;
+    # the probe's skip and a no-week tick reach it as SKIPPED (no verdict).
+    assert steps[-1]["if"] == "always() && steps.gate.outputs.slot != 'skip'"
+    assert "steps.slot.outputs.slot == 'skip'" in steps[-1]["env"]["SKIPPED"]
+    assert "steps.active.outputs.week == ''" in steps[-1]["env"]["SKIPPED"]
+    assert "started=$(date -u" in gate["run"]
     inputs = _on(_load(WF_DIR / "card.yml"))["workflow_dispatch"]["inputs"]
     assert inputs["slot"]["description"].startswith("tue_pm | thu_pm | fri_pm | sat_am | manual")
     # `force` is what lets a deliberate rebuild past the built-today probe that
@@ -314,6 +330,13 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     for s in steps[idx + 1 :]:
         if s.get("uses") == CACHE_SAVE:
             assert (s.get("if") or "").startswith("always()")
+            continue
+        if s.get("id") == "health":
+            # The health contract runs on always() (a red run still gets a
+            # verdict) and reads the probe's answer as SKIPPED: a run the
+            # four-hour guard skipped writes no verdict.
+            assert (s.get("if") or "").startswith("always()")
+            assert "need_grade" in s["env"]["SKIPPED"]
             continue
         assert s.get("if") == gate, f"{s.get('name')} is not gated on the probe"
     assert any("scripts/post_mortem.py" in (s.get("run") or "") for s in steps[idx + 1 :])
@@ -726,3 +749,74 @@ def test_the_lock_covers_requirements_and_carries_a_hash_for_every_pin():
     assert len(pinned_blocks) == len(pins)
     for b in pinned_blocks:
         assert "--hash=sha256:" in b, b.splitlines()[0]
+
+
+# --- Health contracts (2026-09-23, docs/HEALTH.md). Every scheduled Neon-writing
+# workflow ends with `scripts/health_check.py --job <job>`, which judges the run
+# against beatvegas/health.py's contract and writes the verdict to the gauge
+# the board reads. Both directions are pinned: a scheduled writer without a
+# contract, and a contract whose workflow no longer runs on a schedule.
+
+
+def _health_step(data: dict):
+    job = next(iter(data["jobs"].values()))
+    steps = job["steps"]
+    return steps, steps[-1]
+
+
+def test_every_scheduled_neon_writer_ends_with_its_health_contract():
+    from beatvegas import health
+
+    seen = set()
+    for p in _workflows():
+        data = _load(p)
+        if not _cron_strings(data) or not _writes_neon(data):
+            continue
+        steps, last = _health_step(data)
+        assert last.get("id") == "health", f"{p.name}: the last step must be the health contract"
+        assert str(last.get("if", "")).startswith("always()"), (
+            f"{p.name}: the health step must run on always() so a red run gets a verdict"
+        )
+        m = re.search(r"scripts/health_check\.py --job (\w+)", last["run"])
+        assert m, f"{p.name}: the health step does not run scripts/health_check.py --job"
+        job = m.group(1)
+        assert job in health.CONTRACTS, f"{p.name}: no contract for job {job!r}"
+        assert health.CONTRACTS[job].workflow == p.name, (
+            f"{p.name}: contract {job!r} names workflow {health.CONTRACTS[job].workflow!r}"
+        )
+        env = last.get("env") or {}
+        wanted = {"SKIPPED", "RUN_STARTED_AT"} | set(health.CONTRACTS[job].inputs)
+        assert wanted <= set(env), f"{p.name}: health env is missing {sorted(wanted - set(env))}"
+        # Every value crosses via env: (the injection rule), and RUN_STARTED_AT is
+        # the gate/probe step's own clock, written by that step.
+        assert not INLINE_EXPR.search(last["run"]), p.name
+        started = re.fullmatch(r"\$\{\{ steps\.(\w+)\.outputs\.started \}\}", env["RUN_STARTED_AT"])
+        assert started, f"{p.name}: RUN_STARTED_AT must be a step's `started` output"
+        clock = next(s for s in steps if s.get("id") == started.group(1))
+        assert "started=$(date -u" in clock["run"], (
+            f"{p.name}: step {started.group(1)!r} does not write started=$(date -u ...)"
+        )
+        # The status file a contract reads is passed as an argument, not env.
+        if job == "card":
+            assert '--sweep-status "$RUNNER_TEMP/sweep_status.json"' in last["run"]
+        if job == "lines_watch":
+            assert '--close-status "$RUNNER_TEMP/close_status.json"' in last["run"]
+        seen.add(job)
+    # The other direction: every contract names a workflow that runs on a schedule.
+    for job, c in health.CONTRACTS.items():
+        assert job in seen, (
+            f"contract {job!r} names {c.workflow}, which has no scheduled health step"
+        )
+        assert (WF_DIR / c.workflow).exists(), c.workflow
+
+
+def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
+    data = _load(WF_DIR / "lines_watch.yml")
+    steps = data["jobs"]["watch"]["steps"]
+    close = next(s for s in steps if s.get("id") == "close")
+    assert "--kickoff-within-min 75" in close["run"]
+    assert '--status-file "$RUNNER_TEMP/close_status.json"' in close["run"]
+    health = steps[-1]
+    # Only the scheduled market is judged; a dispatched refresh writes no verdict.
+    assert health["env"]["SKIPPED"] == "${{ steps.resolve.outputs.market != '1h_close' }}"
+    assert "steps.precheck.outputs.skip != 'true'" in health["if"]

@@ -54,12 +54,13 @@ random sample -- they are the games nobody wanted to price.
 from __future__ import annotations
 
 import statistics
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Sequence
 
 import numpy as np
 import pandas as pd
 
 from ..devig import devig_two_way, is_centred_quote
+from .stats import wilson as _wilson
 
 # Spread buckets. Coarse on purpose: the whole sample is 1,902 games and the
 # tail is thin, so finer cuts buy resolution the n cannot support.
@@ -103,16 +104,9 @@ def brier_multi(p: np.ndarray, y_onehot: np.ndarray) -> float:
     return float(np.mean(np.sum((p - y) ** 2, axis=1)))
 
 
-def wilson(hits: int, n: int, z: float = 1.959963985) -> Tuple[Optional[float], Optional[float]]:
-    """Wilson score interval. Correct in the tails where normal approximation
-    is not, which matters: the 28+ bucket holds 65 games."""
-    if n <= 0:
-        return None, None
-    ph = hits / n
-    denom = 1 + z * z / n
-    centre = ph + z * z / (2 * n)
-    half = z * np.sqrt((ph * (1 - ph) + z * z / (4 * n)) / n)
-    return float((centre - half) / denom), float((centre + half) / denom)
+# The Wilson interval lives in backtest/stats.py since 2026-09-23; kept here as a
+# re-export because the study scripts and neggap_level import it from this module.
+wilson = _wilson
 
 
 def reliability(

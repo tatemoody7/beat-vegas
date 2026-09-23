@@ -60,6 +60,7 @@ reports/sharp_books_*
 reports/stopping_*
 reports/neggap_level_*
 reports/frame_snapshot_*
+reports/harness_*
 # Weekly review reports (bv-weekly-review): the finding is committed to docs/, the file is not.
 reports/weekly/
 

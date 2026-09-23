@@ -9,9 +9,31 @@ series against zero) and Holm's step-down correction across a family.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence
+import math
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+
+
+def wilson(hits: int, n: int, z: float = 1.959963985) -> Tuple[Optional[float], Optional[float]]:
+    """Wilson score interval for a rate, (None, None) when n <= 0. Correct in the
+    tails where the normal approximation is not, which matters at the sizes a
+    gap band or a capped ledger reaches (the 28+ bucket holds 65 games).
+
+    The ONE Wilson in the repo since 2026-09-23: backtest/censoring.py re-exports
+    it and postmortem.wilson_ci delegates to it at its own z = 1.96, so every
+    published interval is the same arithmetic. Bounds are clamped to [0, 1]
+    against floating-point drift."""
+    if n <= 0:
+        return None, None
+    ph = hits / n
+    denom = 1 + z * z / n
+    centre = ph + z * z / (2 * n)
+    half = z * math.sqrt((ph * (1 - ph) + z * z / (4 * n)) / n)
+    return (
+        max(0.0, float((centre - half) / denom)),
+        min(1.0, float((centre + half) / denom)),
+    )
 
 
 def paired_bootstrap_mean(

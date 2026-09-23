@@ -820,3 +820,22 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     # Only the scheduled market is judged; a dispatched refresh writes no verdict.
     assert health["env"]["SKIPPED"] == "${{ steps.resolve.outputs.market != '1h_close' }}"
     assert "steps.precheck.outputs.skip != 'true'" in health["if"]
+
+
+def test_every_study_choice_is_in_the_case_line():
+    """study.yml: every `script` option the dispatch form offers must appear in the
+    run step's `case` pattern, or choosing it fails the run with "unknown script"
+    after the install and the CFBD cache restore have already been paid for."""
+    data = _load(WF_DIR / "study.yml")
+    options = _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
+    assert "harness_report" in options
+    runs = [r for r in _run_blocks(data) if 'case "$IN_SCRIPT" in' in r]
+    assert len(runs) == 1, "expected exactly one case dispatch over $IN_SCRIPT"
+    pattern_line = next(
+        line for line in runs[0].splitlines() if line.strip().endswith(") ;;") and "|" in line
+    )
+    accepted = set(pattern_line.strip()[: -len(") ;;")].split("|"))
+    missing = [o for o in options if o not in accepted]
+    assert not missing, f"study.yml options absent from the case pattern: {missing}"
+    extra = accepted - set(options)
+    assert not extra, f"case pattern accepts scripts the form does not offer: {extra}"

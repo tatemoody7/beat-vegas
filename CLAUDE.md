@@ -5,6 +5,50 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-23 (THE INSIGHTS-REPORT PLAN SHIPPED: TEN PRs #223-#232, ONE DAY).** Plan file
+  `i-want-everything-that-smooth-lake.md`; every fork was Tate's call. **Rules + hooks (#223):**
+  `## Visual Verification` and `## Analysis Rules` below; `.claude/settings.json` is now TRACKED
+  (`.gitignore` says `.claude/*` with exceptions — git cannot re-include a file under an excluded
+  directory) and carries two hooks: `scripts/hooks/post_edit.sh` (ruff + the matching
+  `tests/test_<name>*.py` or `lib/<name>.test.ts` + tsc on every Edit/Write, exit 2 feeds the
+  failure back) and `scripts/hooks/on_stop.sh` (full pytest + vitest + tsc once per turn, blocks the
+  FIRST stop on red, never twice; a HEAD+worktree fingerprint stamp makes an unchanged turn 0.2 s).
+  **Health contracts (#225-#227):** `beatvegas/health.py` holds one contract per scheduled job
+  (card / grade / sunday / lines_watch) as data — positive facts with `failed`/`degraded` severity,
+  named defaults `HR_PRICED_FLOOR=10`, `STALE_AFTER_HOURS=18` (parity-tested with `boardHealth.ts`),
+  `PACE_COVERAGE_MIN=WX_COVERAGE_MIN=0.8`; `scripts/health_check.py --job` is the LAST step of each
+  workflow (`always()`, values via `env:`), writes `last_health_<job>` = ok|degraded|failed with a
+  `run=… event=… miss=… info=…` note, exits 1 on failed (email) and 0 on degraded (board-only);
+  `docs/HEALTH.md` has a generated block parity-tested against `render_contracts()`; the board
+  banner + `/api/health.gauges.health` read it. **First live verdict: grade run 35879470656 wrote
+  `ok`.** No LLM, no texts (Tate). **Tooling (#224):** `web/scripts/dev-worktree.sh` (own port
+  3100-3199, clean `.next`, REFUSES a Neon URL without `--allow-neon`; `--link-modules` is a named
+  refusal — Turbopack rejects an out-of-tree node_modules symlink), `shots.mjs --pixdiff` via odiff,
+  runbook says 308, sandbox port 54329. **Playwright e2e lane (#229, #232):** `web/playwright.config.ts`,
+  a SYNTHETIC time-shifted fixture (`web/e2e/fixture/{schema.sql,week.mjs,seed.mjs,expected.mjs}`;
+  14 fictional games ids 900001-900014, season = `currentCfbSeason(now)`, refuses `neon.tech`;
+  `schema.sql` is dumped from `models.py` by `scripts/dump_e2e_schema.py` and parity-tested by
+  `tests/test_e2e_schema_parity.py`), specs per route + `web/e2e/FEATURE_PARITY.md` two-way
+  parity-tested, CI job `e2e` (postgres:16 service, `next build && next start`, ~3 min); locally
+  `npm run e2e:db && npm run e2e` (203 tests, ~2 min; `E2E_PROD=1` for the production lane). Two
+  defects pinned as `test.fail()`, not fixed: signed-out phone header is 87 px (the Unlock `<a>`
+  has no `display`), and several tap targets under 24 px (allow-listed by name). **Measurement
+  harness (#228, #230, #231):** `beatvegas/backtest/harness.py` + `scripts/harness_report.py --row
+  <id>` — refuses (exit 2, before the DB) any row not `pre-registered`/`exploratory` or with an
+  empty criterion (`beatvegas/registry.py`); real closes only at exactly `REAL_1H_CLOSE_WINDOW_H`;
+  min_games 0/0 declared; 2023-25 uses the consensus close AS a declared stand-in for Hard Rock
+  (our history has ZERO `hardrockbet` 1H rows before 2026 — the book existed, the purchased feed
+  did not carry it); candidate CLV clock = consensus as of the `fri_pm` build; verdict quotes the
+  registry criterion VERBATIM and an exploratory row refuses a criterion function; never writes
+  `model_runs`, `score.py` or the registry. `stats.wilson` is the one Wilson (`postmortem.wilson_ci`
+  delegates at z=1.96, numbers unchanged); `load_closes` in two gates wrap `snapshots`;
+  `intercept_gate`/`inseason_gate` load frames through `harness.load_frame` (`--frame` snapshots
+  need `attrs["build"]`; pre-#230 pickles are refused). `docs/HARNESS.md`; `study.yml` dispatches
+  `harness_report`. **Skills (private, `~/.claude/skills/bv-*`):** `bv-weekly-review`,
+  `bv-card-check` (both smoke-run on week 3/4 data), `bv-ship`, `bv-site-check`. **Findings for
+  Tate, not fixed:** no real-money ticket has `price_provenance='logged'` (week 2 `unknown`, week 3
+  NULL) so price CLV is off for all ten; the live post-mortem scope writes no `postmortem_buckets`
+  rows (the weekly review computes the live ladder from `postmortem_games`).
 - **2026-09-22 evening (THE SERVING SKEW — B-SERVE; H-PCT and H-STOP-2 registered; PRs
   #215-#217).** The full system review (plan file `lets-get-all-the-vast-nautilus.md`) found
   the live model scoring every upcoming game with **57 of 115 inputs NaN that are present on

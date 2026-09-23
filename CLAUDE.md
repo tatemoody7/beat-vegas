@@ -766,7 +766,6 @@ Research only — it never places bets or automates gambling.
   so every old bookmark still resolves.
   Audit, per-page layouts and every decision: `~/.claude/plans/i-like-a-lot-cuddly-dusk.md`
   and `~/.claude/plans/session-handoff-beat-staged-sutton.md`.
-  **Screenshot with headless Chrome, never the Browser pane** (it caps captures at 800x500).
 - **2026-09-10 later (Results reorganised + `/proof` built, same branch):** the nav is now
   **three tabs — Board / Results / Track record — plus `/game/[id]` and `/proof/records`**.
   `/research`, `/research/records` and `/glossary` are redirect stubs; `lib/research.ts` is
@@ -1058,6 +1057,33 @@ picks**) at https://beat-vegas.vercel.app.
   Neon:5432 (campus) set `NEON_HTTP=1` in `web/.env` — `lib/prisma.ts` then uses the Prisma
   Neon adapter over HTTPS/WebSockets (443). `npm run lint` / `npm run format`
   before committing. Deploy is automatic from `main` (Vercel).
+
+## Visual Verification
+- Captures come from headless Chrome via Playwright: `cd web && node scripts/shots.mjs --base
+  http://localhost:<port> --label <name>` (every route at 1440 and 390 with height / overflow /
+  header / tap-target metrics), then `--diff before after`. **Never the Browser pane for captures**
+  (it caps at 800x500); its `javascript_tool` is still the right way to measure the DOM.
+- A worktree verifies against **its own dev server on its own port with a clean `.next`**:
+  `bash web/scripts/dev-worktree.sh start` (prints the base URL; `stop` when done). Never point
+  shots at the main checkout's server on 3000 — the preview pane serves main even from a worktree.
+- A phone layout is confirmed by measurement (`scrollWidth - clientWidth` must be 0), never by eye;
+  see the Chrome-headless gotcha below.
+- Never run a capture pass against production Neon (metered egress; it tripped the 5 GB cap once).
+
+## Analysis Rules
+Before any CLV, win-rate, hit-rate or model recommendation is reported, state, in this order:
+- The data source (table + filter) and n; the grading rule (which first-half total, which guard).
+- The line source — consensus vs one book, first half vs full game — and the price provenance
+  (`manual_picks.price_provenance`: `logged` / `backfilled_close` / `unknown`; only `logged` may
+  feed price CLV; a price is never assumed to be −110).
+- Whether any row is proxy-graded. A proxy number is never presented as a real-line number; every
+  table is split on `line_real IS NOT NULL` with both n stated.
+- The sign convention, checked against one hand-worked pick: stored `clv` is `closing − bet`, so
+  **negative is the good direction for an under** and the site displays `−clv`.
+- Any number about the LIVE model comes from a runner dispatch and names its frame fingerprint
+  (this Mac's CFBD cache has disagreed with the runner's before).
+Nothing in an analysis changes a gate, a model constant or a registry row; fixes are proposed as a
+list and land through their own registered row or PR.
 
 ## Gotchas
 - **Open-Meteo's free tier weights a request by variables x days, and the cap is per

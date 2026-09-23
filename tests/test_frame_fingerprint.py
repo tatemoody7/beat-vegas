@@ -51,9 +51,11 @@ def test_write_and_diff(tmp_path):
 def test_every_gate_that_builds_a_frame_writes_its_fingerprint():
     """The registry now requires a run to name its inputs (docs/MODEL_LEVEL_2026.md,
     Reconciliation). Source-level: the two gates that produced the disagreeing
-    verdicts call write_fingerprint right after building their frame."""
+    verdicts load their frame through harness.load_frame, which ALWAYS writes
+    the fingerprint (beatvegas/backtest/harness.py), beside the report as
+    <stem>_frame.json."""
     for name in ("intercept_gate", "inseason_gate"):
         src = (ROOT / "scripts" / f"{name}.py").read_text()
-        build = src.index("build_feature_frame(")
-        assert "write_fingerprint(frame" in src[build : build + 900], name
+        assert "load_frame(" in src, name
+        assert "build_feature_frame(" not in src, f"{name}: build the frame through the harness"
         assert re.search(r"_frame\.json", src), name

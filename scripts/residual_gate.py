@@ -36,13 +36,14 @@ from beatvegas.backtest import residual_gate as G
 # inseason_gate, blend_gate and censoring_study import them from this module.
 from beatvegas.backtest.reporting import append_step_summary, report_paths
 from beatvegas.backtest.residual_gate import GateNotEvaluable
-from beatvegas.db.models import Game, ModelRun, Prediction
+from beatvegas.db.models import ModelRun, Prediction
 from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame, training_frame
-from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
+from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H
 from beatvegas.model.residual import ResidualFitError
 from beatvegas.model.score import MODEL_VERSION
 from beatvegas.postmortem import created_order, engine_of
+from beatvegas.snapshots import consensus_closes, kickoffs_for
 
 RUN_VERSION = "resid_gate"  # model_runs.version for --write-model-run
 # Only these are data-coverage states worth a soft "NOT EVALUATED" report and
@@ -94,17 +95,11 @@ def load_played_frame(fbs_only: bool = True):
 
 
 def load_closes(session, game_ids: Sequence[int]) -> Dict[int, float]:
-    """game_id -> real pre-kick 1H close inside the 2-hour window, kickoffs
-    from the games table (the same lookup the post-mortem uses)."""
+    """game_id -> real pre-kick 1H close inside the 2-hour window
+    (snapshots.consensus_closes over snapshots.kickoffs_for -- the same lookup
+    the post-mortem and the harness use)."""
     ids = [int(g) for g in game_ids]
-    kicks: Dict[int, datetime] = {}
-    for i in range(0, len(ids), 1000):
-        for gid, start in (
-            session.query(Game.id, Game.start_date).filter(Game.id.in_(ids[i : i + 1000])).all()
-        ):
-            if start is not None:
-                kicks[gid] = start
-    return real_closes(session, ids, kicks, within_hours=REAL_1H_CLOSE_WINDOW_H)
+    return consensus_closes(session, ids, kickoffs_for(session, ids))
 
 
 def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:

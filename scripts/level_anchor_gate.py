@@ -40,10 +40,9 @@ from beatvegas.backtest.level_anchor import (
     render_markdown,
 )
 from beatvegas.backtest.residual_gate import GateNotEvaluable
-from beatvegas.db.models import Game
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame
-from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
+from beatvegas.snapshots import consensus_closes, kickoffs_for
 
 # Run as `python scripts/<name>.py` (the workflows do), sys.path holds scripts/
 # and not the repo root, so `from scripts.x import` fails with
@@ -81,20 +80,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def load_closes(game_ids: Sequence[int]) -> Dict[int, float]:
-    """Real captured pre-kick 1H closes for the test season's games.
+    """Real captured pre-kick 1H closes for the test season's games
+    (snapshots.consensus_closes: the consensus inside REAL_1H_CLOSE_WINDOW_H).
 
     Only for the SELECTION table: how a level shift moves games across
     BET_GAP_PTS. Never used to grade a prediction, and games without one are
     absent rather than filled with a proxy."""
     if not game_ids:
         return {}
+    ids = [int(g) for g in game_ids]
     with session_scope() as s:
-        kicks = {
-            g.id: g.start_date for g in s.query(Game).filter(Game.id.in_(list(game_ids))).all()
-        }
-        return real_closes(
-            s, list(game_ids), kicks, market="1H_total", within_hours=REAL_1H_CLOSE_WINDOW_H
-        )
+        return consensus_closes(s, ids, kickoffs_for(s, ids))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

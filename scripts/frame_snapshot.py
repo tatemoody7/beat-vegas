@@ -18,7 +18,11 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from beatvegas.etl.features import build_feature_frame
+from beatvegas.etl.features import (
+    PRIOR_SEASON_WEIGHT,
+    WEATHER_OBS_LEAD_HOURS,
+    build_feature_frame,
+)
 from beatvegas.etl.frame_fingerprint import fingerprint
 
 
@@ -34,6 +38,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     df = build_feature_frame(min_games=args.min_games)
+    # Declare the cut so a consumer (harness.load_frame) can verify it instead of
+    # inferring it from the rows; a pickle without this is refused there.
+    df.attrs["build"] = {
+        "fbs_only": True,
+        "min_games": int(args.min_games),
+        "prior_weight": PRIOR_SEASON_WEIGHT,
+        "weather_lead": WEATHER_OBS_LEAD_HOURS,
+    }
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     from pathlib import Path
 

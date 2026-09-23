@@ -25,15 +25,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence
 
 from beatvegas.backtest import residual_gate as G
+
+# report_paths / append_step_summary moved to beatvegas/backtest/reporting.py
+# (2026-09-23); re-exported from here because level_anchor_gate, intercept_gate,
+# inseason_gate, blend_gate and censoring_study import them from this module.
+from beatvegas.backtest.reporting import append_step_summary, report_paths
 from beatvegas.backtest.residual_gate import GateNotEvaluable
-from beatvegas.config import REPO_ROOT
 from beatvegas.db.models import Game, ModelRun, Prediction
 from beatvegas.db.store import resync_table_sequence, session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame, training_frame
@@ -47,6 +49,8 @@ RUN_VERSION = "resid_gate"  # model_runs.version for --write-model-run
 # exit 0. Anything else (a NaN season, a length mismatch) is a defect and must
 # fail the run with its traceback, not be blamed on coverage.
 SOFT_FAILURES = (ResidualFitError, GateNotEvaluable)
+
+__all__ = ["append_step_summary", "main", "parse_args", "report_paths"]
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -126,23 +130,6 @@ def load_stored_bv(session, game_ids: Sequence[int]) -> Dict[int, float]:
 
 
 # ---------------------------------------------------------------- outputs
-
-
-def report_paths(out: str, stamp: Optional[str] = None) -> Tuple[Path, Path, Path]:
-    """(markdown, json, per-game csv) for one run, sharing a UTC stamp."""
-    stamp = stamp or datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    base = Path(out)
-    if not base.is_absolute():
-        base = REPO_ROOT / base
-    return tuple(base.with_name(f"{base.name}_{stamp}.{ext}") for ext in ("md", "json", "csv"))
-
-
-def append_step_summary(md: str) -> None:
-    path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not path:
-        return
-    with open(path, "a", encoding="utf-8") as fh:
-        fh.write(md if md.endswith("\n") else md + "\n")
 
 
 def write_model_run(session, report: Dict, args: argparse.Namespace) -> None:

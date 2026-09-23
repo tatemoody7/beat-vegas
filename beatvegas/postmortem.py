@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .backtest.stats import wilson as _wilson
 from .card import KEY_NUMBERS_1H, hook_side
 from .etl.fbs import FbsMap
 from .etl.proxy_line import DEFAULT_SHARE, proxy_total
@@ -811,13 +812,11 @@ def assign_dimensions(df: pd.DataFrame, proxy: str) -> pd.DataFrame:
 
 
 def wilson_ci(hits: int, n: int, z: float = 1.96) -> Tuple[Optional[float], Optional[float]]:
+    """The post-mortem's Wilson interval at z = 1.96 (its published numbers were
+    computed at that z and stay). Delegates to backtest.stats.wilson."""
     if not n:
         return (None, None)
-    p = hits / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return _wilson(hits, n, z=z)
 
 
 def tally(outcomes: pd.Series, units: pd.Series) -> Dict[str, Any]:

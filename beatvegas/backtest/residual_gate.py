@@ -141,12 +141,19 @@ def walk_forward_split(df: pd.DataFrame, train_seasons: Sequence[int], test_seas
 # ---------------------------------------------------------------- arithmetic
 
 
-def record(per_game: pd.DataFrame, mask: pd.Series) -> Dict[str, Any]:
+def record(
+    per_game: pd.DataFrame,
+    mask: pd.Series,
+    outcome_col: str = "outcome",
+    units_col: str = "units",
+) -> Dict[str, Any]:
     """n / wins / losses / pushes / hit rate / units / ROI / Wilson 95% for the
     under at the close over `mask`. Pushes are staked but excluded from the
-    rate, as postmortem.tally does."""
+    rate, as postmortem.tally does. `outcome_col` / `units_col` let the harness
+    grade the same rows on a second basis (Hard Rock's own close beside the
+    consensus); the defaults keep every existing caller identical."""
     sub = per_game[mask.reindex(per_game.index, fill_value=False).astype(bool)]
-    o = sub["outcome"]
+    o = sub[outcome_col]
     n = int(len(sub))
     wins, losses, pushes = (
         int((o == "under").sum()),
@@ -154,7 +161,7 @@ def record(per_game: pd.DataFrame, mask: pd.Series) -> Dict[str, Any]:
         int((o == "push").sum()),
     )
     decided = wins + losses
-    units = float(pd.to_numeric(sub["units"], errors="coerce").fillna(0.0).sum()) if n else 0.0
+    units = float(pd.to_numeric(sub[units_col], errors="coerce").fillna(0.0).sum()) if n else 0.0
     lo, hi = pm.wilson_ci(wins, decided)
     return {
         "n": n,

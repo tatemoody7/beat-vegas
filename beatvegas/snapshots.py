@@ -13,16 +13,24 @@ is worth a table (docs/HYPOTHESES.md).
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import re
+from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
 from sqlalchemy import text
 
+from .ci import ET, SLOT_BUILD_ET, SLOT_GATE_ET
 from .db.models import Card, Game, OddsSnapshot
 from .grading import trusted_first_half_total
 from .hardrock import HR_BOOK_KEY
-from .lines import REAL_1H_CLOSE_WINDOW_H, book_closing_before_kickoff, real_closes
+from .lines import (
+    REAL_1H_CLOSE_WINDOW_H,
+    book_closing_before_kickoff,
+    book_closing_price_before_kickoff,
+    consensus_as_of,
+    real_closes,
+)
 
 # The four whole-week decision builds (beatvegas/ci.py). Anything else is labelled
 # so a study can keep it out of a comparison of the four: the retired week-1 morning
@@ -115,6 +123,120 @@ def consensus_closes(
     """game_id -> the consensus 1H close inside REAL_1H_CLOSE_WINDOW_H of kickoff
     (lines.real_closes); absent when no book closed the game. Never proxied."""
     return real_closes(session, game_ids, kickoffs, within_hours=REAL_1H_CLOSE_WINDOW_H)
+
+
+def kickoffs_for(session, game_ids: Sequence[int]) -> Dict[int, datetime]:
+    """game_id -> `games.start_date` (naive UTC) for every id that has one. The
+    lookup every close reader needs first; a game without a kickoff is absent,
+    and the readers treat an absent kickoff as 'no window can be proved'."""
+    ids = [int(g) for g in game_ids]
+    out: Dict[int, datetime] = {}
+    for i in range(0, len(ids), 1000):
+        for gid, start in (
+            session.query(Game.id, Game.start_date).filter(Game.id.in_(ids[i : i + 1000])).all()
+        ):
+            if start is not None:
+                out[int(gid)] = start
+    return out
+
+
+def _snaps_1h_by_game(session, game_ids: Sequence[int], book: Optional[str] = None):
+    by_game: Dict[int, List] = {}
+    ids = [int(g) for g in game_ids]
+    for i in range(0, len(ids), 1000):
+        q = session.query(OddsSnapshot).filter(
+            OddsSnapshot.market == "1H_total", OddsSnapshot.game_id.in_(ids[i : i + 1000])
+        )
+        if book is not None:
+            q = q.filter(OddsSnapshot.book == book)
+        for snap in q.all():
+            by_game.setdefault(snap.game_id, []).append(snap)
+    return by_game
+
+
+def hr_close_prices(
+    session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]
+) -> Dict[int, int]:
+    """game_id -> Hard Rock's closing UNDER price (American), strict centring,
+    latest priced pre-kick snapshot (lines.book_closing_price_before_kickoff).
+    Absent when Hard Rock has no priced centred pre-kick row -- never -110."""
+    if not game_ids:
+        return {}
+    out: Dict[int, int] = {}
+    for gid, snaps in _snaps_1h_by_game(session, game_ids, book=HR_BOOK_KEY).items():
+        price = book_closing_price_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
+        if price is not None:
+            out[gid] = int(price)
+    return out
+
+
+# ---------------------------------------------------------------- decision lines
+
+# The candidate CLV clock (owner's decision, 2026-09-23): a candidate's bet line
+# on a game is the consensus 1H line as it stood when that week's Friday
+# `fri_pm` build window OPENED (beatvegas/ci.py::SLOT_GATE_ET, 3:45pm ET), the
+# look Tate takes before the weekend. The rule string names the slot so a
+# report can say which clock it used; any slot in SLOT_GATE_ET is accepted, the
+# default is Friday.
+DEFAULT_DECISION_RULE = "consensus_as_of(fri_pm)"
+_RULE = re.compile(r"^consensus_as_of\((?P<slot>[a-z_]+)\)$")
+
+
+def parse_decision_rule(rule: str) -> str:
+    """The slot named by a `consensus_as_of(<slot>)` rule string; ValueError on
+    anything else, so a typo cannot silently become a different clock."""
+    m = _RULE.match(rule.strip())
+    if not m or m.group("slot") not in SLOT_GATE_ET:
+        raise ValueError(
+            f"unknown decision rule {rule!r}; expected consensus_as_of(<slot>) with slot in "
+            f"{sorted(SLOT_GATE_ET)}"
+        )
+    return m.group("slot")
+
+
+def decision_instant(kickoff: datetime, slot: str = "fri_pm") -> Optional[datetime]:
+    """The naive-UTC instant a `slot` build window opened in the game's week: the
+    most recent occurrence of the slot's weekday on or before the kickoff's ET
+    date, at the window's ET open (SLOT_GATE_ET[slot][0]). None when that
+    instant is not strictly before kickoff (a Thursday game against the Friday
+    clock, a Friday noon kickoff) -- there was no such decision to grade."""
+    if kickoff is None:
+        return None
+    iso_weekday, _build_time = SLOT_BUILD_ET[slot]
+    open_et: time = SLOT_GATE_ET[slot][0]
+    kick_utc = kickoff.replace(tzinfo=timezone.utc) if kickoff.tzinfo is None else kickoff
+    kick_et = kick_utc.astimezone(ET)
+    back = (kick_et.isoweekday() - iso_weekday) % 7
+    day = kick_et.date() - timedelta(days=back)
+    instant_et = datetime.combine(day, open_et, tzinfo=ET)
+    instant = instant_et.astimezone(timezone.utc).replace(tzinfo=None)
+    kick_naive = kick_utc.replace(tzinfo=None)
+    return instant if instant < kick_naive else None
+
+
+def decision_lines(
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    rule: str = DEFAULT_DECISION_RULE,
+) -> Dict[int, float]:
+    """game_id -> the consensus 1H line as of the build-window instant `rule`
+    names (lines.consensus_as_of over every 1H snapshot: last centred quote per
+    book at or before the instant, median across books). Absent when the market
+    had not posted by then or the instant does not precede kickoff. This is the
+    CANDIDATE's bet line for CLV; it exists only where the snapshots do (2026+)."""
+    slot = parse_decision_rule(rule)
+    if not game_ids:
+        return {}
+    out: Dict[int, float] = {}
+    for gid, snaps in _snaps_1h_by_game(session, game_ids).items():
+        t = decision_instant(kickoffs.get(gid), slot)
+        if t is None:
+            continue
+        line, _spread = consensus_as_of(snaps, t)
+        if line is not None:
+            out[gid] = float(line)
+    return out
 
 
 def _payload(card: Card) -> Optional[Dict[str, Any]]:

@@ -2,6 +2,7 @@
 learned, never raising, and only where DATABASE_URL is set."""
 
 import os
+import re
 
 from sqlalchemy.orm import Session
 
@@ -69,6 +70,11 @@ def test_the_health_gauge_is_written_by_the_step_and_fits_the_key():
     root = os.path.join(os.path.dirname(__file__), "..")
     script = open(os.path.join(root, "scripts", "health_check.py")).read()
     assert "health_key" in script and "record_gauge" in script
+    board = open(os.path.join(root, "web", "lib", "boardHealth.ts")).read()
+    assert f'HEALTH_GAUGE_PREFIX = "{ops.HEALTH_PREFIX}"' in board
+    ids = re.search(r"HEALTH_JOB_IDS = \[([^\]]*)\] as const", board)
+    assert ids, "boardHealth.ts no longer declares HEALTH_JOB_IDS"
+    assert tuple(re.findall(r'"([a-z_]+)"', ids.group(1))) == ops.HEALTH_JOBS
     for job in ops.HEALTH_JOBS:
         key = ops.health_key(job)
         assert key == f"{ops.HEALTH_PREFIX}{job}"

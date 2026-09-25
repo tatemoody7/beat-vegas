@@ -5,6 +5,13 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-25 (HARD ROCK ALTERNATE LINES, PR #236, registry row H-PCT-U).** The Odds API
+  sends Hard Rock alternate lines alone as its first-half total (Texas @ Tennessee: 30.5 at
+  −160 against 27.5 in the app). The old −160 check missed 33 of them on 31 games.
+  `devig.is_hr_rung` now flags a quote at −140 or worse, or 2+ points off the other books in
+  the same sweep. The card and the board then show Hard Rock's last real line with its time
+  (`hr_alt_line`), and it can never be bet. The 12 paper picks already logged on alternate
+  lines stand as logged.
 - **2026-09-23 (THE INSIGHTS-REPORT PLAN SHIPPED: TEN PRs #223-#232, ONE DAY).** Plan file
   `i-want-everything-that-smooth-lake.md`; every fork was Tate's call. **Rules + hooks (#223):**
   `## Visual Verification` and `## Analysis Rules` below; `.claude/settings.json` is now TRACKED

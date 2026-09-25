@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { american, capitalize, fmt } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
+import { hrQuoteText } from "@/lib/labels";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import ScoreBadge from "@/app/components/ScoreBadge";
 import TeamLogo from "@/app/components/TeamLogo";
@@ -22,10 +23,7 @@ import TeamLogo from "@/app/components/TeamLogo";
 
 export default function GameRow({ g }: { g: HomeGame }) {
   const { row, edge, check } = g;
-  const hr =
-    check?.hrLine == null
-      ? "no line yet"
-      : `u${fmt(check.hrLine)}${check.hrUnderPrice == null ? "" : ` ${american(check.hrUnderPrice)}`}`;
+  const hr = hrQuoteText(check);
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null

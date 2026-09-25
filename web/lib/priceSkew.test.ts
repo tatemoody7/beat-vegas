@@ -1,5 +1,14 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { isCentredQuote, SKEW_REJECT_PRICE } from "@/lib/devig";
+import {
+  HR_RUNG_DISTANCE_PTS,
+  HR_RUNG_MIN_BOOKS,
+  HR_RUNG_PRICE,
+  isCentredQuote,
+  isHrRung,
+  SKEW_REJECT_PRICE,
+} from "@/lib/devig";
 import { summarizeMarket, type MoveSnap } from "@/lib/movement";
 
 // Mirrors tests/test_price_skew_filter.py. A book's MAIN total prices both sides
@@ -79,5 +88,36 @@ describe("summarizeMarket", () => {
     ]);
     expect(m?.cur).toBe(28.5);
     expect(m?.books.length).toBe(3);
+  });
+});
+
+// The same vectors beatvegas/devig.py::is_hr_rung is pinned to
+// (tests/test_price_skew_filter.py), so the card and the site cannot drift.
+describe("isHrRung (Hard Rock alternate lines, 2026-09-25)", () => {
+  it("matches the golden vectors shared with the Python side", () => {
+    const v = JSON.parse(
+      readFileSync(
+        path.resolve(__dirname, "../../tests/fixtures/hr_rung_vectors.json"),
+        "utf8",
+      ),
+    ) as {
+      price: number;
+      distance: number;
+      min_books: number;
+      cases: {
+        name: string;
+        over: number | null;
+        under: number | null;
+        line: number;
+        others: (number | null)[];
+        rung: boolean;
+      }[];
+    };
+    expect(v.price).toBe(HR_RUNG_PRICE);
+    expect(v.distance).toBe(HR_RUNG_DISTANCE_PTS);
+    expect(v.min_books).toBe(HR_RUNG_MIN_BOOKS);
+    for (const c of v.cases) {
+      expect(isHrRung(c.over, c.under, c.line, c.others), c.name).toBe(c.rung);
+    }
   });
 });

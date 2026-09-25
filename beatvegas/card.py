@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 from .ci import CARD_STATUS_BY_SLOT
 from .devig import devig_two_way, ev_under, is_centred_quote
 from .hardrock import HR_BOOK_KEY, normalize_book
+from .lines import hr_rung_flags
 from .model.score import (
     BET_GAP_PTS,
     BET_MIN_EV,
@@ -364,6 +365,39 @@ def _latest_by_book(snaps: Sequence[Dict]) -> Dict[str, Dict]:
     return out
 
 
+def _hr_main_quote(snaps: Sequence[Dict]):
+    """(hr, hr_live, hr_alt) -- Hard Rock's newest MAIN-line quote, whether it is
+    also Hard Rock's newest quote of all, and the alternate line that displaced
+    it (None when the newest quote is the main line). Quotes in the
+    _latest_by_book shape; `hr` None when Hard Rock never posted a main line."""
+    cap = lambda s: _naive_utc(s.get("captured_at")) or datetime.min  # noqa: E731
+    flags = [
+        (s, rung)
+        for s, rung in hr_rung_flags(snaps, HR_BOOK_KEY, cap=cap)
+        if _num(s.get("line")) is not None
+    ]
+    if not flags:
+        return None, False, None
+
+    def obs(s: Dict) -> Dict:
+        return {
+            "line": _num(s["line"]),
+            "over_price": _int(s.get("over_price")),
+            "under_price": _int(s.get("under_price")),
+            "_cap": _naive_utc(s.get("captured_at")),
+        }
+
+    # max() keeps the FIRST of equal keys; _latest_by_book keeps the last (>=).
+    # Reverse so a tie on captured_at resolves the same way in both.
+    newest, newest_rung = max(reversed(flags), key=lambda f: cap(f[0]))
+    if not newest_rung:
+        return obs(newest), True, None
+    main = [s for s, rung in flags if not rung]
+    if not main:
+        return None, False, obs(newest)
+    return obs(max(reversed(main), key=cap)), False, obs(newest)
+
+
 def _hr_open(snaps: Sequence[Dict]) -> Optional[float]:
     """Hard Rock's FIRST captured 1H line (the number it opened at)."""
     first: Optional[Dict] = None
@@ -432,15 +466,23 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     age out exchange quotes; defaults to the newest snapshot in `snaps`."""
     by_book = _latest_by_book(snaps)
     ref_now = _reference_now(snaps, now)
-    hr = by_book.get(HR_BOOK_KEY)
+    # Hard Rock's quote is its newest MAIN line (lines.hr_rung_flags: devig.is_hr_rung
+    # against the other books in the same sweep). The Odds API sometimes serves
+    # one of Hard Rock's alternate lines alone as its totals_h1 -- Texas @
+    # Tennessee 2026-09-25 read 30.5 at -160 while the app and six books said
+    # 27.5 -- and that number must never be shown as Hard Rock's or judged as
+    # one. When the newest quote is an alternate, `hr` is the last main line on
+    # file, for DISPLAY ONLY: `hr_live` is False, so it never enters the slate
+    # bar, never qualifies and never logs a paper pick (Tate, 2026-09-25).
+    hr, hr_live, hr_alt = _hr_main_quote(snaps)
     hr_line = hr["line"] if hr else None
     # Every MARKET aggregate below is built from centred quotes only: a feed that
     # serves an off-centre rung of the alternate ladder as the main total drags
     # the median (BetMGM alone moved it on 13 of 63 week-2 games by up to 0.5,
     # which is exactly HR_OFF_MARKET_PTS and enough to flip the off-market gate).
-    # `hr` is deliberately NOT filtered -- Hard Rock's posted number is the one
-    # Tate would actually bet, and the price and no_fair_price gates are what
-    # should refuse a rung, not a silent substitution.
+    # These still read Hard Rock's raw latest quote through that general filter,
+    # exactly as web/lib/board.ts does, so the card and the site keep one
+    # consensus.
     centred = {
         b: o for b, o in by_book.items() if is_centred_quote(o["over_price"], o["under_price"])
     }
@@ -491,10 +533,18 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     return {
         "hr_line": hr_line,
         "hr_price": hr_price,
-        # Both of Hard Rock's sides priced like a main number (devig.is_centred_quote).
-        # Display keeps the raw quote; H-PCT's qualification universe does not:
-        # a -180 rung can no longer manufacture a qualifying gap (2026-09-22).
-        "hr_centred": bool(hr) and is_centred_quote(hr.get("over_price"), hr.get("under_price")),
+        # Hard Rock's newest quote is its main line (H-PCT's universe: an
+        # alternate line never manufactures a qualifying gap). False when `hr` is
+        # the last main line held over for display (hr_live False) or absent.
+        "hr_centred": hr is not None and hr_live,
+        "hr_live": hr_live,
+        # When the shown quote was captured (naive UTC ISO); the web shows its age
+        # whenever hr_live is False.
+        "hr_as_of": hr["_cap"].isoformat() if hr and hr.get("_cap") else None,
+        # The alternate line the feed served instead (None when it served the
+        # main line) -- for the build log, never for a decision.
+        "hr_alt_line": hr_alt["line"] if hr_alt else None,
+        "hr_alt_price": hr_alt["under_price"] if hr_alt else None,
         "hr_open": _hr_open(snaps),
         "hr_hold": _hold_of(hr) if hr else None,
         "market_line": _median(lines),
@@ -721,6 +771,10 @@ def build_item(
         tier = "EDGE"
         if hr_line is None:
             blocker = "no_hr_line"
+        elif not hr_centred:
+            # The feed served one of Hard Rock's alternate lines; hr_line is the
+            # last main line on file, shown but never judged (market_read).
+            blocker = "hr_alt_line"
         elif off_market:
             blocker = "off_market"
         elif ev is None:
@@ -761,6 +815,11 @@ def build_item(
                 "Not yet — Hard Rock has no first-half line. It becomes a bet at under "
                 f"{fmt(k_line)} or higher{at}."
             )
+    elif blocker == "hr_alt_line":
+        action = (
+            "Not yet — Hard Rock’s feed is showing an alternate line, not its main number. "
+            f"The last main line on file is under {fmt(hr_line)}; check the app."
+        )
     elif blocker == "off_market":
         diff = round2(market_line - hr_line)
         action = (
@@ -871,6 +930,11 @@ def build_item(
         # quote was centred (a rung never qualifies). 2026-09-22.
         "bar": round2(bar_pts),
         "hr_centred": hr_centred,
+        # Hard Rock's shown quote is its newest (False = held over while the feed
+        # serves an alternate line), when it was captured, and the alternate.
+        "hr_live": m["hr_live"],
+        "hr_as_of": m["hr_as_of"],
+        "hr_alt_line": m["hr_alt_line"],
         "paper_blocker": paper_blocker,
         "cap_rank": None,
         "over_cap": False,

@@ -26,6 +26,9 @@ export const SCORE_WATCH_MIN = 55;
 export const WEEKLY_BET_CAP = 5;
 export const MIN_GAMES_FOR_REAL_MONEY = 2;
 export const SKEW_REJECT_PRICE = -160;
+export const HR_RUNG_PRICE = -140;
+export const HR_RUNG_DISTANCE_PTS = 2.0;
+export const HR_RUNG_MIN_BOOKS = 3;
 export const FAIR_PRICE_LINE_WINDOW = 0.5;
 export const FAIR_PRICE_WIDE_WINDOW = 1.5;
 export const PRICE_EDGE_EV = 0.005;
@@ -100,12 +103,46 @@ export function evVerdictFor(ev) {
   return "fair";
 }
 
+/** lib/devig.ts::isHrRung. */
+export function isHrRung(over, under, line, others) {
+  for (const p of [over, under]) {
+    if (p != null && p <= HR_RUNG_PRICE) return true;
+  }
+  const xs = others.filter((x) => x != null);
+  if (line == null || xs.length < HR_RUNG_MIN_BOOKS) return false;
+  return Math.abs(line - median(xs)) >= HR_RUNG_DISTANCE_PTS;
+}
+
+/**
+ * lib/lineCheck.ts's Hard Rock pick, one game: the newest capture that is its
+ * MAIN line (isHrRung against the other books' centred lines in the same sweep
+ * -- seed.mjs writes every book at each Hard Rock capture), whether that is
+ * also the newest capture, and the alternate line when it is not.
+ */
+export function hrPickFor(g) {
+  if (!g.hr || !g.hr.length) return null;
+  const others = Object.values(g.books)
+    .filter(([, over, under]) => isCentredQuote(over, under))
+    .map(([line]) => line);
+  const judged = [...g.hr]
+    .reverse()
+    .map((c) => ({ c, rung: isHrRung(c.over, c.under, c.line, others) }));
+  const main = judged.find((j) => !j.rung) ?? null;
+  const live = !judged[0].rung;
+  return {
+    quote: main ? main.c : null,
+    live,
+    altLine: live ? null : judged[0].c.line,
+  };
+}
+
 /** Latest 1H quote per book for a game: {book: {line, over, under}}. */
 export function latestByBook(g) {
   const out = new Map();
-  if (g.hr && g.hr.length) {
-    const last = g.hr[g.hr.length - 1];
-    out.set(HR, { line: last.line, over: last.over, under: last.under });
+  const pick = hrPickFor(g);
+  if (pick && pick.quote) {
+    const q = pick.quote;
+    out.set(HR, { line: q.line, over: q.over, under: q.under });
   }
   for (const [book, [line, over, under]] of Object.entries(g.books)) {
     // lineCheck's SQL drops an off-centre rung from every book but Hard Rock.
@@ -155,6 +192,8 @@ export function lineCheckFor(g) {
   const lines = [...byBook.values()].map((o) => o.line);
   const hrUnderPrice = hr ? hr.under : null;
   const hrOverPrice = hr ? hr.over : null;
+  const pick = hrPickFor(g);
+  const hrLive = pick ? pick.live : false;
   const marketFairUnder = marketFairUnderAt(hrLine, byBook);
   const ev =
     marketFairUnder !== null && hrUnderPrice !== null
@@ -164,7 +203,10 @@ export function lineCheckFor(g) {
     hrLine,
     hrUnderPrice,
     hrOverPrice,
-    hrCentred: hr ? isCentredQuote(hrOverPrice, hrUnderPrice) : false,
+    hrCentred: hr !== null && hrLive,
+    hrLive,
+    hrAsOf: pick && pick.quote ? pick.quote.capturedAt : null,
+    hrAltLine: pick ? pick.altLine : null,
     best: Math.max(...lines),
     median: median(lines),
     marketFairUnder,
@@ -288,6 +330,7 @@ export function edgeFor(
   const fallbackLine = lineUsedFor(g);
   const marketFairUnder = check ? check.marketFairUnder : null;
   const hrCentred = check ? check.hrCentred : null;
+  const hrLive = check ? check.hrLive : null;
   const minGamesPlayed = Math.min(g.gamesPlayed.home, g.gamesPlayed.away);
   const qbOut = false;
 
@@ -360,6 +403,7 @@ export function edgeFor(
   else if (score >= SCORE_WATCH_MIN) {
     tier = "EDGE";
     if (hrLine === null) blocker = "no_hr_line";
+    else if (hrLive === false) blocker = "hr_alt_line";
     else if (offMarket) blocker = "off_market";
     else if (ev === null) blocker = "no_fair_price";
     else if (ev < BET_MIN_EV) blocker = "price";
@@ -384,6 +428,8 @@ export function edgeFor(
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
       action = `Not yet — Hard Rock has no first-half line. It becomes a bet at under ${fmt(killLine)} or higher${at}.`;
     }
+  } else if (blocker === "hr_alt_line") {
+    action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(hrLine)}; check the app.`;
   } else if (blocker === "off_market") {
     const diff = round2(marketLine - hrLine);
     action = `Not yet — Hard Rock’s ${fmt(hrLine)} is ${fmt(diff)} below the market line of ${fmt(marketLine)}. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to ${fmt(marketLine - HR_OFF_MARKET_PTS)} or higher.`;
@@ -437,6 +483,7 @@ export function edgeFor(
       fallbackLine,
       marketFairUnder,
       hrCentred,
+      hrLive,
       minGamesPlayed,
       bestLine: check ? check.best : null,
     },

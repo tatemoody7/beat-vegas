@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hrQuoteText,
   basisPhrase,
   BLOCKER_SHORT,
   blockerTag,
@@ -76,5 +77,35 @@ describe("basisPhrase", () => {
       "vs our reference line (from the full-game total)",
     );
     expect(basisPhrase(null)).toBe("");
+  });
+});
+
+describe("hrQuoteText", () => {
+  it("shows a live Hard Rock number plainly", () => {
+    expect(
+      hrQuoteText({
+        hrLine: 27.5,
+        hrUnderPrice: -105,
+        hrLive: true,
+        hrAsOf: "2026-09-24 20:07:23",
+      }),
+    ).toBe("u27.5 -105");
+  });
+  it("dates a held-over main line in ET (naive UTC in, Eastern out)", () => {
+    // 20:07 UTC on Thu 2026-09-24 is 4:07pm EDT.
+    expect(
+      hrQuoteText({
+        hrLine: 27.5,
+        hrUnderPrice: -105,
+        hrLive: false,
+        hrAsOf: "2026-09-24 20:07:23.5",
+      }),
+    ).toBe("u27.5 -105 · as of Thu 4:07pm");
+  });
+  it("says so when there is no line", () => {
+    expect(hrQuoteText(null)).toBe("no line yet");
+    expect(hrQuoteText({ hrLine: null, hrUnderPrice: null })).toBe(
+      "no line yet",
+    );
   });
 });

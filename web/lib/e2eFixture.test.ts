@@ -106,6 +106,7 @@ describe("the e2e fixture port agrees with the TypeScript rules", () => {
         },
         bar: expected.bar,
         hrCentred: check?.hrCentred ?? null,
+        hrLive: check?.hrLive ?? null,
       };
       const ts = edgeScore(input);
       expect(ported.tier).toBe(ts.tier);
@@ -128,11 +129,11 @@ describe("the e2e fixture port agrees with the TypeScript rules", () => {
 
   it("lays the week out as the specs assume", () => {
     expect(expected.bar).toBe(3.5);
-    expect(expected.counts).toEqual({ bet: 2, edge: 3, pass: 7 });
-    expect(expected.card.counts).toMatchObject({ bet: 2, edge: 3, pass: 6 });
+    expect(expected.counts).toEqual({ bet: 2, edge: 4, pass: 7 });
+    expect(expected.card.counts).toMatchObject({ bet: 2, edge: 4, pass: 6 });
     expect(expected.betIds).toEqual([900001, 900002]);
     expect(expected.playedIds).toEqual([900012]);
-    expect(expected.rankOrder).toHaveLength(11);
+    expect(expected.rankOrder).toHaveLength(12);
     expect(expected.barLine).toMatch(/^This week’s bar: 3\.50 pts — /);
     // Every upcoming game is still upcoming for at least the lead the week promises.
     const soonest = Math.min(

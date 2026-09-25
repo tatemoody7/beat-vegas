@@ -51,6 +51,8 @@ export type LineBasis = "hardrock" | "market" | "reference";
 /** Why an EDGE is not a BET — the first failing policy gate, in gate order. */
 export type EdgeBlocker =
   | "no_hr_line"
+  /** The feed's newest Hard Rock quote is an alternate line; hrLine is the last main line (display only). */
+  | "hr_alt_line"
   | "off_market"
   | "price"
   | "no_fair_price"
@@ -232,6 +234,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     // here would make a raised bar report the blocker as "gap", i.e. blame the
     // model for a price problem.
     if (i.hrLine === null) blocker = "no_hr_line";
+    else if (i.hrLive === false) blocker = "hr_alt_line";
     else if (offMarket) blocker = "off_market";
     else if (i.ev === null) blocker = "no_fair_price";
     else if (i.ev < BET_MIN_EV) blocker = "price";
@@ -266,6 +269,8 @@ export function edgeScore(i: EdgeInput): EdgeResult {
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
       action = `Not yet — Hard Rock has no first-half line. It becomes a bet at under ${fmt(killLine)} or higher${at}.`;
     }
+  } else if (blocker === "hr_alt_line") {
+    action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(i.hrLine)}; check the app.`;
   } else if (blocker === "off_market") {
     const diff = round2(i.marketLine! - i.hrLine!);
     action = `Not yet — Hard Rock’s ${fmt(i.hrLine)} is ${fmt(diff)} below the market line of ${fmt(i.marketLine)}. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to ${fmt(i.marketLine! - HR_OFF_MARKET_PTS)} or higher.`;

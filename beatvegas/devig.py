@@ -19,7 +19,8 @@ regressor. Used only for CLV, line-check EV, staking, and backtest grading.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+import statistics
+from typing import Optional, Sequence, Tuple
 
 from .grading import american_to_decimal
 
@@ -156,3 +157,47 @@ def is_centred_quote(over_price: Optional[int], under_price: Optional[int]) -> b
         if price < SKEW_REJECT_PRICE:
             return False
     return True
+
+
+# --- is this HARD ROCK quote its main line? ----------------------------------
+#
+# SKEW_REJECT_PRICE is tuned to BetMGM's ladder and is too loose for Hard Rock:
+# Hard Rock prices a 2-point alternate at about -145/-150 and a 3-point one at
+# EXACTLY -160, and the Odds API sometimes serves one of those ALONE as Hard
+# Rock's totals_h1 (confirmed live 2026-09-25 on Texas @ Tennessee: one pair,
+# 30.5 over +125 / under -160, while the app and six books showed 27.5). Twenty
+# such quotes passed is_centred_quote in 2026 weeks 1-4 and twelve paper picks
+# were logged on them.
+#
+# Measured on every 2026 Hard Rock 1H snapshot against the other books' median
+# in the same sweep: all 487 within 2 points of the field have their worst side
+# at -135 or better; every alternate 2+ points off runs -145 or worse, except
+# three at normal juice. Other books DO post real main lines at -140..-159 (22 in
+# 2026, 37 in 2023-25), so this is a HARD ROCK rule and SKEW_REJECT_PRICE stays.
+# Two checks, either one enough (Tate, 2026-09-25): the price, and the distance
+# from the field -- the second needs no price and so survives a re-priced ladder.
+HR_RUNG_PRICE = -140
+HR_RUNG_DISTANCE_PTS = 2.0
+HR_RUNG_MIN_BOOKS = 3
+
+
+def is_hr_rung(
+    over_price: Optional[int],
+    under_price: Optional[int],
+    line: Optional[float],
+    other_lines: Sequence[Optional[float]],
+) -> bool:
+    """True when a Hard Rock quote is an alternate line, not its main number.
+
+    `other_lines`: the OTHER books' main lines as of the same moment (each
+    book's latest centred quote at or before this capture; no exchanges, no
+    synthetic consensus). The distance check needs HR_RUNG_MIN_BOOKS of them,
+    so a thin field falls back to the price check alone.
+    """
+    for price in (over_price, under_price):
+        if price is not None and price <= HR_RUNG_PRICE:
+            return True
+    others = [float(x) for x in other_lines if x is not None]
+    if line is None or len(others) < HR_RUNG_MIN_BOOKS:
+        return False
+    return abs(float(line) - statistics.median(others)) >= HR_RUNG_DISTANCE_PTS

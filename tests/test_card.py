@@ -421,7 +421,11 @@ def test_hard_rock_above_the_market_is_priced_by_the_books_a_point_below():
 
 
 def test_a_book_two_points_below_hard_rock_is_still_no_fair_price():
-    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(1, 23.5)
+    # Two other books only: with three or more, a Hard Rock quote 2 points off
+    # the field is an alternate line (devig.is_hr_rung), not a number to price.
+    snaps = [snap(1, "hardrockbet", 25.5, -110, -110)] + market(
+        1, 23.5, books=("draftkings", "fanduel")
+    )
     it = only(card([game()], snaps, [model(1, 23.0)]))
     assert it["hr_vs_market"] == 2.0
     assert it["fair_under"] is None and it["fair_source"] is None
@@ -642,6 +646,9 @@ ITEM_KEYS = {
     "key_dist",
     "bar",
     "hr_centred",
+    "hr_live",
+    "hr_as_of",
+    "hr_alt_line",
 }
 
 
@@ -1032,3 +1039,56 @@ def test_build_card_bar_is_the_slates_top_20_percent_on_centred_quotes():
     assert by_id[200]["hr_centred"] is False and by_id[200]["qualifies"] is False
     assert by_id[200]["gap"] == 6.0, "the rung's gap is still displayed; it just cannot qualify"
     assert by_id[100]["hr_centred"] is True
+
+
+# --- Hard Rock alternate lines (2026-09-25) -------------------------------------
+
+
+def _alt_week(gid=1):
+    """Hard Rock 27.5 at 25 h, then its feed serves 30.5 at -160 (an alternate
+    line) at 1 h while three books sit at 27.5 in both sweeps."""
+    return [
+        snap(gid, "hardrockbet", 27.5, -115, -105, hours_ago=25),
+        *[
+            snap(gid, b, 27.5, -108, -112, hours_ago=25)
+            for b in ("draftkings", "fanduel", "espnbet")
+        ],
+        snap(gid, "hardrockbet", 30.5, 125, -160, hours_ago=1),
+        *[
+            snap(gid, b, 27.5, -108, -112, hours_ago=1)
+            for b in ("draftkings", "fanduel", "espnbet")
+        ],
+    ]
+
+
+def test_an_alternate_line_shows_the_last_main_line_and_never_qualifies():
+    it = only(card([game()], _alt_week(), [model(1, 21.0)]))
+    assert it["hr_line"] == 27.5 and it["hr_price"] == -105  # the last main line
+    assert it["hr_live"] is False and it["hr_centred"] is False
+    assert it["hr_alt_line"] == 30.5
+    assert it["hr_as_of"] == (NOW - timedelta(hours=25)).isoformat()
+    assert it["qualifies"] is False and it["tier"] == "EDGE" and it["blocker"] == "hr_alt_line"
+    assert "alternate line" in it["action"] and "27.5" in it["action"]
+
+
+def test_an_alternate_line_is_out_of_the_slate_bar():
+    games = [game(1), game(2, "Texas", "Tennessee")]
+    snaps = _alt_week(1) + [
+        snap(2, "hardrockbet", 27.5, -115, -105),
+        *market(2, 27.5),
+    ]
+    c = build_card(games, snaps, [model(1, 21.0), model(2, 24.0)], [], season=2026, week=3, now=NOW)
+    assert c["slate"]["n"] == 1
+
+
+def test_a_live_main_line_is_unchanged():
+    snaps = [snap(1, "hardrockbet", 27.5, -115, -105)] + market(1, 27.5)
+    m = market_read(snaps, NOW)
+    assert m["hr_live"] is True and m["hr_centred"] is True and m["hr_alt_line"] is None
+
+
+def test_only_alternates_on_file_means_no_hard_rock_line():
+    snaps = [snap(1, "hardrockbet", 30.5, 125, -160)] + market(1, 27.5)
+    it = only(card([game()], snaps, [model(1, 21.0)]))
+    assert it["hr_line"] is None and it["hr_alt_line"] == 30.5
+    assert it["blocker"] == "no_hr_line" and it["qualifies"] is False

@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .db.models import OddsSnapshot
-from .devig import devig_two_way, is_centred_quote
+from .devig import devig_two_way, is_centred_quote, is_hr_rung
+from .hardrock import HR_BOOK_KEY, normalize_book
 
 # A "real" close is a snapshot captured this close to kickoff. The 48-hour
 # Sunday opener alone must never grade as a close: the 1H market posts on game
@@ -52,6 +53,73 @@ def centred_snaps(snaps: Sequence, strict: bool = False) -> list:
     if strict:
         return ok
     return ok or list(snaps)
+
+
+# Books that are no main-line opinion to judge Hard Rock against: the synthetic
+# consensus and the exchanges (they quote any line at a price). Must equal
+# card.SYNTHETIC_BOOKS | card.EXCHANGE_BOOKS -- tests/test_price_skew_filter.py
+# asserts it; card.py is not imported here to keep this module light.
+RUNG_REFERENCE_EXCLUDED = frozenset(
+    {"consensus", "kalshi", "polymarket", "novig", "prophetx", "betopenly"}
+)
+
+
+def _field(s, key):
+    return s.get(key) if isinstance(s, dict) else getattr(s, key, None)
+
+
+def hr_rung_flags(snaps: Sequence, book: str = HR_BOOK_KEY, cap=None) -> List[Tuple[Any, bool]]:
+    """[(snapshot, is_rung)] for each of `book`'s snapshots in `snaps`.
+
+    Each one is judged by devig.is_hr_rung against the OTHER books as of its own
+    capture: every reference book's latest centred quote at or before it (a
+    sweep stamps every book with the same captured_at, so that is the same
+    sweep). `snaps` must therefore carry the other books too; with none, only
+    the price check can fire. `cap` reads a snapshot's capture time (default
+    its `captured_at`); a snapshot with no time is judged on price alone.
+    Works on ORM rows and on dicts alike."""
+    cap = cap or (lambda s: _field(s, "captured_at"))
+    mine: list = []
+    refs: Dict[str, list] = {}
+    for s in snaps:
+        b = normalize_book(_field(s, "book"))
+        if b == book:
+            mine.append(s)
+            continue
+        if not b or b in RUNG_REFERENCE_EXCLUDED or _field(s, "line") is None or cap(s) is None:
+            continue
+        if not is_centred_quote(_field(s, "over_price"), _field(s, "under_price")):
+            continue
+        refs.setdefault(b, []).append(s)
+    out: List[Tuple[Any, bool]] = []
+    for s in mine:
+        t = cap(s)
+        others: List[float] = []
+        if t is not None:
+            for quotes in refs.values():
+                seen = [q for q in quotes if cap(q) <= t]
+                if seen:
+                    others.append(float(_field(max(seen, key=cap), "line")))
+        line = _field(s, "line")
+        rung = is_hr_rung(
+            _field(s, "over_price"),
+            _field(s, "under_price"),
+            None if line is None else float(line),
+            others,
+        )
+        out.append((s, rung))
+    return out
+
+
+def _first_half(snaps: Sequence) -> bool:
+    """True unless a snapshot says it is another market (a snapshot-like object
+    with no `market` is taken as 1H, which every caller of the rule reads)."""
+    return all(_field(s, "market") in (None, "1H_total") for s in snaps)
+
+
+def hr_main_snaps(snaps: Sequence, book: str = HR_BOOK_KEY, cap=None) -> list:
+    """`book`'s snapshots that are its MAIN line (hr_rung_flags), in input order."""
+    return [s for s, rung in hr_rung_flags(snaps, book, cap) if not rung]
 
 
 def consensus_open_close(snaps: Sequence) -> Tuple[Optional[float], Optional[float]]:
@@ -253,6 +321,13 @@ def book_closing_before_kickoff(
     if not mine:
         return None, None, None
     mine = centred_snaps(mine, strict=True)
+    if book == HR_BOOK_KEY and _first_half(mine):
+        # Hard Rock's own 1H alternate lines pass the general price bar (they run
+        # -145..-160), so its reads also go through the Hard Rock rule, judged
+        # against the other books in `snaps` (devig.is_hr_rung). Measured on 1H
+        # quotes only, so a full-game read keeps the general rule.
+        keep = {id(s) for s in hr_main_snaps(snaps, book)}
+        mine = [s for s in mine if id(s) in keep]
     if not mine:
         return None, None, None
     return closing_before_kickoff(mine, kickoff)
@@ -311,6 +386,9 @@ def book_closing_price_before_kickoff(snaps: Sequence, kickoff, book: str) -> Op
     if not mine:
         return None
     mine = centred_snaps(mine, strict=True)
+    if book == HR_BOOK_KEY and _first_half(mine):
+        keep = {id(s) for s in hr_main_snaps(snaps, book)}  # see book_closing_before_kickoff
+        mine = [s for s in mine if id(s) in keep]
     if not mine:
         return None
     priced = [s for s in pre_kickoff(mine, kickoff) if getattr(s, "under_price", None) is not None]

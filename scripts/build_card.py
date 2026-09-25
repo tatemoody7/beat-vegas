@@ -477,6 +477,17 @@ def summary_lines(card: Dict, universe: int, picks_added: int) -> List[str]:
             out.append(
                 f"    [{b}] {it['away']} @ {it['home']} u{it['hr_line']} gap {it['gap']:+.2f}"
             )
+    alt = [it for it in card["items"] if it.get("hr_alt_line") is not None]
+    if alt:
+        out.append(
+            f"  HR ALT LINES IGNORED: {len(alt)} ("
+            + "; ".join(
+                f"{it['away']} @ {it['home']}: feed {it['hr_alt_line']}, "
+                f"shown {it['hr_line'] if it['hr_line'] is not None else 'none'}"
+                for it in alt
+            )
+            + ")"
+        )
     for n in card["notes"]:
         out.append(f"  note: {n}")
     sl = card.get("slate") or {}

@@ -40,6 +40,7 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 export type CardTier = "BET" | "EDGE" | "PASS";
 export type CardBlocker =
   | "no_hr_line"
+  | "hr_alt_line"
   | "off_market"
   | "price"
   | "no_fair_price"
@@ -161,6 +162,7 @@ export type Card = {
 const TIERS: readonly CardTier[] = ["BET", "EDGE", "PASS"];
 const BLOCKERS: readonly CardBlocker[] = [
   "no_hr_line",
+  "hr_alt_line",
   "off_market",
   "price",
   "no_fair_price",

@@ -355,3 +355,38 @@ def test_oddsapi_normalize_is_over_first_and_skips_split_rungs():
     assert rows["fanduel"]["line"] == 55.5
     assert rows["fanduel"]["over_price"] == -108 and rows["fanduel"]["under_price"] == -112
     assert rows["kalshi"]["line"] == 55.5 and rows["kalshi"]["over_price"] is None
+
+
+def test_oddsapi_normalize_keeps_the_most_balanced_of_several_pairs(capsys):
+    """A book sending its main line AND an alternate in one market: the line is
+    the balanced pair, never whichever came last (the old last-outcome-wins
+    parse would have kept 30.5 here), and the run log says so."""
+    from beatvegas.sources.odds import normalize_first_half
+
+    events = [
+        {
+            "id": "evt10",
+            "commence_time": "2026-09-26T16:00:00Z",
+            "home_team": "Tennessee",
+            "away_team": "Texas",
+            "bookmakers": [
+                {
+                    "key": "hardrockbet",
+                    "markets": [
+                        {
+                            "key": "totals_h1",
+                            "outcomes": [
+                                {"name": "Over", "price": -115, "point": 27.5},
+                                {"name": "Under", "price": -105, "point": 27.5},
+                                {"name": "Over", "price": 125, "point": 30.5},
+                                {"name": "Under", "price": -160, "point": 30.5},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    (row,) = normalize_first_half(events)
+    assert row["line"] == 27.5 and row["over_price"] == -115 and row["under_price"] == -105
+    assert "::warning::odds: hardrockbet sent 2 totals_h1 point pairs" in capsys.readouterr().out

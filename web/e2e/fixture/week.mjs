@@ -3,7 +3,7 @@
 // defaultWeek, boardHealth.staleness/buildStatus, nextBuild, GameRow.kickedOff,
 // the dispatch gauges) sees a live season whenever the suite runs.
 //
-// Layout: eleven upcoming games (900001-900011) on the Thursday, Friday and
+// Layout: twelve upcoming games (900001-900011, 900015) on the Thursday, Friday and
 // Saturday of the first weekend whose Thursday evening is at least twelve hours
 // away, one game played three days ago in the same week (900012), and two
 // played ten days ago in the previous week (900013-900014) so the real-money
@@ -139,6 +139,9 @@ export const TEAM_NAMES = [
   "Westmark",
   // The one real name: lib/homeBoard.ts MY_TEAMS, so ?mine=1 has a row.
   "Kansas State",
+  // Appended (2026-09-25) so earlier ids stay put: the alternate-line game.
+  "Yarrow Glen",
+  "Zephyr Bay",
 ];
 
 export const TEAMS = TEAM_NAMES.map((school, i) => ({
@@ -342,6 +345,26 @@ export function buildWeek(now = new Date()) {
       fg: { total: 61.5, spread: -4.5 },
       ref: 30.5,
       scenario: "PASS, right on our number",
+    },
+    {
+      id: 900015,
+      away: "Yarrow Glen",
+      home: "Zephyr Bay",
+      kick: at(sat, 15, 30),
+      bv: 44.0,
+      underScore: 70,
+      // The late sweep's Hard Rock quote is an ALTERNATE line (3 pts off every
+      // other book at -160, the Texas @ Tennessee shape of 2026-09-25).
+      hr: [hrRow(cap1, 47.5), hrRow(cap2, 50.5, 125, -160)],
+      books: {
+        draftkings: std(47.5),
+        fanduel: std(47.5),
+        betmgm: std(47.5),
+      },
+      fg: { total: 58.5, spread: -6.5 },
+      ref: 29.0,
+      scenario:
+        "EDGE hr_alt_line: the feed's newest Hard Rock quote is an alternate; the board shows the last main line (47.5) with its time; never a bet",
     },
     {
       id: 900010,

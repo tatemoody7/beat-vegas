@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { bookLabel } from "@/lib/books";
+import { hrQuoteText } from "@/lib/labels";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
 import type { MarketMovement } from "@/lib/movement";
@@ -459,14 +460,7 @@ export default function GameDetail({
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Stat
-            label="Hard Rock"
-            value={
-              check?.hrLine == null
-                ? "no line yet"
-                : `u${fmt(check.hrLine)}${check.hrUnderPrice == null ? "" : ` ${american(check.hrUnderPrice)}`}`
-            }
-          />
+          <Stat label="Hard Rock" value={hrQuoteText(check)} />
           <Stat
             label="Market"
             value={row.curLine === null ? "—" : `u${fmt(row.curLine)}`}

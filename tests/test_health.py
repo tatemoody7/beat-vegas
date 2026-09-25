@@ -275,6 +275,7 @@ class TestCard:
             "preview": "failure",
             "early_season_held": "2",
             "bets": "3",
+            "hr_alt_ignored": "0",
         }
 
 

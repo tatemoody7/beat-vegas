@@ -26,7 +26,7 @@ setup("seed the fixture and sign in once", async ({ request }) => {
         encoding: "utf8",
       },
     );
-    expect(out).toContain('card {"bet":2,"edge":3,"pass":6');
+    expect(out).toContain('card {"bet":2,"edge":4,"pass":6');
   }
 
   const res = await request.post("/api/login", {

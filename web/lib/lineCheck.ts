@@ -1,11 +1,17 @@
 import { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { EV_FLOOR } from "@/lib/verdict";
-import { isExchange, isSynthetic } from "@/lib/books";
+import {
+  EXCHANGE_KEYS,
+  isExchange,
+  isSynthetic,
+  SYNTHETIC_KEYS,
+} from "@/lib/books";
 import {
   devigTwoWay,
   evUnder,
   isCentredQuote,
+  isHrRung,
   SKEW_REJECT_PRICE,
 } from "@/lib/devig";
 import { median } from "@/lib/format";
@@ -53,8 +59,18 @@ export type LineCheckRow = {
   // Devig / EV layer:
   hrUnderPrice: number | null;
   hrOverPrice?: number | null;
-  /** Both of Hard Rock's sides priced like a main number (devig.isCentredQuote); a rung never qualifies (H-PCT). */
+  /** Hard Rock's shown quote is its newest AND its main line (card.py hr_centred); an alternate line never qualifies (H-PCT). */
   hrCentred?: boolean;
+  /**
+   * False when the feed's newest Hard Rock quote is an alternate line
+   * (devig.isHrRung) and hrLine/prices are the last main line held over for
+   * DISPLAY: never a live price, never a bet (card.py hr_live).
+   */
+  hrLive?: boolean;
+  /** When the shown Hard Rock quote was captured (naive UTC text). */
+  hrAsOf?: string | null;
+  /** The alternate line the feed served instead, when it did. */
+  hrAltLine?: number | null;
   marketFairUnder: number | null; // consensus no-vig fair-under at HR's line
   ev: number | null; // per-$1 EV of HR's under vs marketFairUnder
   evVerdict: EvVerdict;
@@ -259,10 +275,9 @@ export const getLineCheck = cache(async function getLineCheck(
       AND (g.start_date IS NULL OR o.captured_at <= g.start_date)
       -- Off-centre rungs of the alternate ladder are not this book's main
       -- number, so they must not become the market it is compared against.
-      -- Hard Rock is EXEMPT on purpose: this row is what Tate matches against a
-      -- real ticket, and quietly showing him a number the app is not offering
-      -- would be worse than showing him an odd one. The price and off-market
-      -- gates are what refuse a rung. See lib/devig.ts::isCentredQuote.
+      -- Hard Rock is exempt HERE because its 1H quote is chosen separately
+      -- below (devig.isHrRung: its newest MAIN line, against the same-sweep
+      -- field); the full-game read keeps its raw quote. See lib/devig.ts.
       AND (LOWER(o.book) = 'hardrockbet'
            OR ((o.over_price IS NULL OR o.over_price >= ${SKEW_REJECT_PRICE})
            AND (o.under_price IS NULL OR o.under_price >= ${SKEW_REJECT_PRICE})))
@@ -309,8 +324,98 @@ export const getLineCheck = cache(async function getLineCheck(
     games.set(gid, g);
   }
 
+  // Hard Rock's 1H quote is its newest MAIN line (devig.isHrRung, mirroring
+  // beatvegas/lines.py::hr_rung_flags + card.py::market_read): each Hard Rock
+  // snapshot is judged against every other book's latest centred line at or
+  // before it -- a sweep stamps every book alike, so that is the same sweep.
+  // Measured on 1H only, so the full-game read keeps Hard Rock's raw quote.
+  const hrPick = new Map<
+    number,
+    { obs: BookObs | null; live: boolean; altLine: number | null }
+  >();
+  if (market === "1h") {
+    const notReference = [...HR_KEYS, ...SYNTHETIC_KEYS, ...EXCHANGE_KEYS, ""];
+    const hrRows = await prisma.$queryRaw<
+      {
+        game_id: number | bigint;
+        line: number;
+        over_price: number | bigint | null;
+        under_price: number | bigint | null;
+        captured_at: string;
+        others: number[] | null;
+      }[]
+    >`
+      SELECT h.game_id, h.line, h.over_price, h.under_price,
+        CAST(h.captured_at AS TEXT) AS captured_at,
+        ARRAY(
+          SELECT x.line FROM (
+            SELECT DISTINCT ON (LOWER(o.book)) o.line
+            FROM odds_snapshots o
+            WHERE o.game_id = h.game_id AND o.market = h.market
+              AND LOWER(COALESCE(o.book, '')) NOT IN (${Prisma.join(notReference)})
+              AND o.line IS NOT NULL
+              AND o.captured_at <= h.captured_at
+              AND (o.over_price IS NULL OR o.over_price >= ${SKEW_REJECT_PRICE})
+              AND (o.under_price IS NULL OR o.under_price >= ${SKEW_REJECT_PRICE})
+            ORDER BY LOWER(o.book), o.captured_at DESC
+          ) x
+        ) AS others
+      FROM odds_snapshots h JOIN games g ON g.id = h.game_id
+      WHERE g.season = ${season} AND h.market = ${dbMarket}
+        ${weekClause}
+        AND LOWER(h.book) IN (${Prisma.join(HR_KEYS)})
+        AND h.line IS NOT NULL AND h.captured_at IS NOT NULL
+        AND (g.start_date IS NULL OR h.captured_at <= g.start_date)
+      ORDER BY h.game_id, h.captured_at DESC
+    `;
+    const byGame = new Map<number, typeof hrRows>();
+    for (const r of hrRows) {
+      const gid = Number(r.game_id);
+      byGame.set(gid, [...(byGame.get(gid) ?? []), r]);
+    }
+    for (const [gid, quotes] of byGame) {
+      // Newest first (ORDER BY above).
+      const judged = quotes.map((q) => ({
+        q,
+        rung: isHrRung(
+          q.over_price === null ? null : Number(q.over_price),
+          q.under_price === null ? null : Number(q.under_price),
+          q.line,
+          (q.others ?? []).map(Number),
+        ),
+      }));
+      const main = judged.find((j) => !j.rung) ?? null;
+      const live = !judged[0].rung;
+      hrPick.set(gid, {
+        obs:
+          main === null
+            ? null
+            : {
+                line: main.q.line,
+                overPrice:
+                  main.q.over_price === null ? null : Number(main.q.over_price),
+                underPrice:
+                  main.q.under_price === null
+                    ? null
+                    : Number(main.q.under_price),
+                capturedAt: main.q.captured_at,
+              },
+        live,
+        altLine: live ? null : judged[0].q.line,
+      });
+    }
+  }
+
   const out: LineCheckRow[] = [];
   for (const [gameId, g] of games) {
+    // Swap Hard Rock's raw latest quote for its newest main line (or drop it
+    // when it only ever served alternates), so the book table, best/median
+    // and every price read below see the number the app is really offering.
+    const pick = hrPick.get(gameId);
+    if (pick !== undefined) {
+      for (const k of HR_KEYS) g.byBook.delete(k);
+      if (pick.obs !== null) g.byBook.set(HR_KEYS[0], pick.obs);
+    }
     const books: BookLine[] = [...g.byBook.entries()].map(([book, v]) => ({
       book,
       line: v.line,
@@ -338,7 +443,15 @@ export const getLineCheck = cache(async function getLineCheck(
     // snapshot is the instant its exchange quotes are aged against.
     const hrUnderPrice = hrObs?.underPrice ?? null;
     const hrOverPrice = hrObs?.overPrice ?? null;
-    const hrCentred = hrObs ? isCentredQuote(hrOverPrice, hrUnderPrice) : false;
+    // 1H: the Hard Rock rule above. Full game: the raw quote is shown and the
+    // general price bar decides centring, as before.
+    const hrLive = pick !== undefined ? pick.live : hrObs !== undefined;
+    const hrCentred =
+      pick !== undefined
+        ? hrObs !== undefined && pick.live
+        : hrObs
+          ? isCentredQuote(hrOverPrice, hrUnderPrice)
+          : false;
     const marketFairUnder = marketFairUnderAt(hrLine, g.byBook).fairUnder;
     const ev =
       marketFairUnder !== null && hrUnderPrice !== null
@@ -357,6 +470,9 @@ export const getLineCheck = cache(async function getLineCheck(
       hrUnderPrice,
       hrOverPrice,
       hrCentred,
+      hrLive,
+      hrAsOf: hrObs?.capturedAt ?? null,
+      hrAltLine: pick?.altLine ?? null,
       marketFairUnder,
       ev,
       evVerdict: evVerdictFor(ev),

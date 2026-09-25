@@ -127,6 +127,14 @@ export async function POST(req: NextRequest) {
   let livePrice: PolicyContext["livePrice"];
   if (row === null) {
     livePrice = { ok: false, reason: "no live line read for this game" };
+  } else if (row.hrLive === false) {
+    // hrLine/hrUnderPrice are Hard Rock's last MAIN line, held over while the
+    // feed serves an alternate: shown on the board, never a live price.
+    livePrice = {
+      ok: false,
+      reason:
+        "Hard Rock’s feed is showing an alternate line, so its live price cannot be verified",
+    };
   } else if (row.hrUnderPrice === null) {
     livePrice = { ok: false, reason: "Hard Rock has not priced its under" };
   } else if (row.marketFairUnder === null) {

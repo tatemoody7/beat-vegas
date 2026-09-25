@@ -83,6 +83,10 @@ export type LineCheck = {
   hrLine: number | null;
   hrUnderPrice: number | null;
   hrCentred: boolean;
+  /** False when the newest Hard Rock quote is an alternate line (expected.mjs::hrPickFor). */
+  hrLive: boolean;
+  /** Capture instant of the Hard Rock quote shown. */
+  hrAsOf: Date | null;
   best: number;
   median: number | null;
   ev: number | null;

@@ -371,6 +371,9 @@ def card_info(ctx: Ctx) -> Dict[str, str]:
             )
         )
         out["bets"] = str((p.get("counts") or {}).get("bet", "?"))
+        # Games whose newest Hard Rock quote was an alternate line, shown at the
+        # last main line and kept out of every gate (card.market_read).
+        out["hr_alt_ignored"] = str(sum(1 for it in items if it.get("hr_alt_line") is not None))
     return out
 
 
@@ -695,6 +698,11 @@ CONTRACTS: Dict[str, Contract] = {
             FailureMode(
                 "2026-09-20",
                 "`early_season` held 10 games on the Friday card (an FCS opener leaves a team at 1 FBS game). Correct behaviour, so it is info (`early_season_held=N`), never a miss.",
+                (),
+            ),
+            FailureMode(
+                "2026-09-25",
+                "the Odds API served Hard Rock alternate lines (2-3 pts off the field at -145..-160) as its 1H total; 20 passed the general -160 price bar and 12 paper picks were logged on them. The card now keeps them out of every gate (`devig.is_hr_rung`); a count is info (`hr_alt_ignored=N`), never a miss.",
                 (),
             ),
         ),

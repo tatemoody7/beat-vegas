@@ -7,6 +7,7 @@
 // line value · Watch (never "EDGE" on screen) · kill line / kill price ·
 // paper pick · weekly cap.
 
+import { etClock12 } from "@/lib/et";
 import { american, fmt } from "@/lib/format";
 import type { EdgeBlocker, EdgeTier } from "@/lib/edge";
 import type { LineBasis } from "@/lib/edge";
@@ -58,6 +59,7 @@ export type AnyBlocker = EdgeBlocker | CardBlocker;
 /** Table-cell form. */
 export const BLOCKER_SHORT: Record<AnyBlocker, string> = {
   no_hr_line: "Waiting on Hard Rock's line",
+  hr_alt_line: "Hard Rock's feed shows an alternate line",
   off_market: "Hard Rock's line is below the market",
   price: "Price too short",
   no_fair_price: "Price can't be compared",
@@ -73,6 +75,7 @@ export const BLOCKER_SHORT: Record<AnyBlocker, string> = {
 export const GATE_TEXT: Record<AnyBlocker | "none" | "untagged", string> = {
   none: "Bet — nothing blocked it",
   no_hr_line: "Hard Rock had no first-half line",
+  hr_alt_line: "Hard Rock's feed showed an alternate line",
   off_market: "Hard Rock's line was below the market",
   price: "Hard Rock's price was too short",
   no_fair_price: "Hard Rock's price could not be compared",
@@ -105,6 +108,8 @@ export function blockerTag(
   switch (blocker) {
     case "no_hr_line":
       return "Not yet — Hard Rock has no first-half line";
+    case "hr_alt_line":
+      return "Not yet — Hard Rock's feed shows an alternate line; check the app";
     case "off_market": {
       const diff =
         ctx.marketLine != null && ctx.hrLine != null
@@ -283,3 +288,27 @@ export const CALIB_SEGMENT_TEXT: Record<string, string> = {
   dome: "Indoors",
   outdoor: "Outdoors",
 };
+
+// --- Hard Rock's number -------------------------------------------------------
+
+export type HrQuote = {
+  hrLine: number | null;
+  hrUnderPrice: number | null;
+  hrLive?: boolean;
+  hrAsOf?: string | null;
+};
+
+/**
+ * Hard Rock's number as the board shows it: "u27.5 -105". When the feed's
+ * newest quote is an alternate line (lineCheck.hrLive false), the number shown
+ * is the last MAIN line on file, so it carries its capture time in ET:
+ * "u27.5 -105 · as of Thu 4:07pm". `hrAsOf` is naive UTC text from Postgres.
+ */
+export function hrQuoteText(q: HrQuote | null | undefined): string {
+  if (q == null || q.hrLine == null) return "no line yet";
+  const price = q.hrUnderPrice == null ? "" : ` ${american(q.hrUnderPrice)}`;
+  const base = `u${fmt(q.hrLine)}${price}`;
+  if (q.hrLive !== false || !q.hrAsOf) return base;
+  const t = new Date(`${q.hrAsOf.trim().replace(" ", "T")}Z`);
+  return Number.isNaN(t.getTime()) ? base : `${base} · as of ${etClock12(t)}`;
+}

@@ -318,6 +318,49 @@ def _unwrap_historical(payload: Dict[str, Any]):
     return payload.get("data")
 
 
+def _implied(price) -> Optional[float]:
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
+        return None
+    if p == 0:
+        return None
+    return 100.0 / (p + 100.0) if p > 0 else -p / (-p + 100.0)
+
+
+def _main_pair(outcomes) -> Optional[Tuple[float, Any, Any, int]]:
+    """(line, over_price, under_price, n_complete_pairs) for one book's totals
+    market, or None when no honest line can be read.
+
+    Outcomes are grouped by point. One complete Over/Under pair is the line.
+    Several complete pairs are a ladder: keep the most BALANCED one (smallest
+    gap between the two implied probabilities -- a main line sits near -110 on
+    both sides), never whichever came last, which is what this did until
+    2026-09-25. With no complete pair, a single one-sided point still yields
+    its line; an Over and an Under at DIFFERENT points are alternate rungs, and
+    pairing their prices would make a number up, so the book is skipped."""
+    by_pt: Dict[float, Dict[str, Any]] = {}
+    for oc in outcomes:
+        name = (oc.get("name") or "").lower()
+        pt = oc.get("point")
+        if name not in ("over", "under") or pt is None:
+            continue
+        by_pt.setdefault(float(pt), {})[name] = oc.get("price")
+    complete = {pt: d for pt, d in by_pt.items() if "over" in d and "under" in d}
+    if complete:
+
+        def skew(pt: float) -> float:
+            o, u = _implied(complete[pt]["over"]), _implied(complete[pt]["under"])
+            return abs(o - u) if o is not None and u is not None else float("inf")
+
+        pt = min(sorted(complete), key=skew)
+        return pt, complete[pt]["over"], complete[pt]["under"], len(complete)
+    if len(by_pt) == 1:
+        pt, d = next(iter(by_pt.items()))
+        return pt, d.get("over"), d.get("under"), 0
+    return None
+
+
 def _rows_for_market(
     events: List[Dict[str, Any]], market_key: str, books: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
@@ -339,28 +382,18 @@ def _rows_for_market(
             for mkt in bm.get("markets", []):
                 if mkt.get("key") != market_key:
                     continue
-                over_price = under_price = None
-                over_pt = under_pt = None
-                for oc in mkt.get("outcomes", []):
-                    name = (oc.get("name") or "").lower()
-                    if name == "over":
-                        over_price, over_pt = oc.get("price"), oc.get("point")
-                    elif name == "under":
-                        under_price, under_pt = oc.get("price"), oc.get("point")
-                # One line per book, over-first (the same tie-break as
-                # sources/draftkings.py). A market whose two outcomes sit at
-                # DIFFERENT points is alternate rungs, not a centred line, and
-                # pairing an over price from one rung with an under price from
-                # another would make a number up — skip it rather than guess.
-                if (
-                    over_pt is not None
-                    and under_pt is not None
-                    and float(over_pt) != float(under_pt)
-                ):
+                picked = _main_pair(mkt.get("outcomes", []))
+                if picked is None:
                     continue
-                line = over_pt if over_pt is not None else under_pt
-                if line is None:
-                    continue
+                line, over_price, under_price, n_pairs = picked
+                if n_pairs > 1:
+                    # Every book returned ONE point pair when this was written
+                    # (Hard Rock's alternate on 2026-09-25 came alone), so more
+                    # than one is new behaviour worth seeing in the run log.
+                    print(
+                        f"::warning::odds: {bm.get('key')} sent {n_pairs} {market_key} point "
+                        f"pairs for event {ev.get('id')}; kept the most balanced ({line})"
+                    )
                 row = {
                     "event_id": ev.get("id"),
                     "commence_time": ev.get("commence_time"),

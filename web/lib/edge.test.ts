@@ -114,6 +114,17 @@ describe("edgeScore — model rows", () => {
       "No longer a bet below u24.0, or at a worse price than -120.",
     );
   });
+  it("an alternate line in the feed → the held-over main line never bets (hr_alt_line)", () => {
+    // Same row as the BET above, but lineCheck says the feed's newest Hard Rock
+    // quote was an alternate line, so hrLine is the last main line on file.
+    const e = edgeScore({ ...base, hrLive: false, hrCentred: false });
+    expect(e.tier).toBe("EDGE");
+    expect(e.blocker).toBe("hr_alt_line");
+    expect(e.verdict.verdict).not.toBe("BET");
+    expect(e.action).toBe(
+      `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${base.hrLine!.toFixed(1)}; check the app.`,
+    );
+  });
   it("no Hard Rock line + big market gap → EDGE / no_hr_line, action names the line to take", () => {
     const e = edgeScore({
       ...base,

@@ -198,6 +198,7 @@ Failure modes on record:
 - **2026-09-13** -- the paper window gave each slot the gap to the next build, so Friday's three clean BETs were never logged and the Saturday build claimed the whole slate; and a `manual` refresh logging paper picks would freeze the week at that moment's lines. Caught by: `card.paper_logged_iff_window`.
 - **2026-09-09** -- a Vercel tick outside its window, or a GitHub cron running the build instead of the Vercel dispatch: invisible in the runs API. The board's `dispatch:<job>` warning covers it; the note carries `event=` so the trigger is on record. Caught by: info only.
 - **2026-09-20** -- `early_season` held 10 games on the Friday card (an FCS opener leaves a team at 1 FBS game). Correct behaviour, so it is info (`early_season_held=N`), never a miss. Caught by: info only.
+- **2026-09-25** -- the Odds API served Hard Rock alternate lines (2-3 pts off the field at -145..-160) as its 1H total; 20 passed the general -160 price bar and 12 paper picks were logged on them. The card now keeps them out of every gate (`devig.is_hr_rung`); a count is info (`hr_alt_ignored=N`), never a miss. Caught by: info only.
 
 ### grade
 

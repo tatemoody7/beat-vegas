@@ -30,6 +30,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 - [game] For a logged BET, an open BET, a price-blocked Watch, a gap-short Watch and a played game: the Hard Rock / Market / Our number tiles, the rank badge and the sentence equal the board row's — game.spec.ts › "${id}: the three tiles, the rank and the sentence match the board row"
 - [game] The sentence names the kill line on a gap-short game and the kill price on a dear one — game.spec.ts › "names the kill number for a game short of the bar and the kill price for a dear one"
+- [game] When the feed's newest Hard Rock quote is an alternate line, the Hard Rock tile shows the last main line with `· as of <ET time>`, the sentence says so, and only a paper pick is offered — game.spec.ts › "a Hard Rock alternate line: the tile shows the last main line with its time, paper only"
 - [game] The ticketed BET carries `bet logged` and its `cap slot N` chip — game.spec.ts › "carries the cap slot and the logged chip on the ticketed BET"
 - [game] Signed in: `Log this bet` on an open BET, `Log as paper pick` on a Watch — game.spec.ts › "offers 'Log this bet' on an open BET and 'Log as paper pick' on a Watch"
 - [game] Signed in: a ticketed game says already logged; a played game says kicked off; neither offers a log button — game.spec.ts › "says a ticketed game is already logged and a played one has kicked off"

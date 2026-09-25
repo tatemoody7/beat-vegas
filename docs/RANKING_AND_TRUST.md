@@ -339,6 +339,52 @@ Either way the Lines table should label or drop it rather than showing it plain.
 
 **Owner decision (2026-09-12): record for a future build.**
 
+## 9b. Hard Rock's own alternate lines — FIXED 2026-09-25 (H-PCT-U)
+
+On Friday's card (2026-09-25, `fri_pm`) Texas @ Tennessee read Hard Rock **30.5,
+over +125 / under -160** while six books and the Hard Rock app said **27.5**. A live
+call the same evening showed the Odds API returning that alternate **alone** as
+Hard Rock's `totals_h1` (one Over/Under pair), so it was not our parser. Liberty @
+Coastal had done the same the day before (21.5 at -160 vs 24.5).
+
+**Why it kept happening.** The only guard was `is_centred_quote`, which rejects a
+side worse than -160. That bar was set from BetMGM's rungs (-235 average skew).
+Hard Rock prices a 2-point alternate at about -145/-150 and a 3-point one at
+exactly -160, so they passed. Nothing compared Hard Rock with the other books,
+and Hard Rock was deliberately exempt from every centring filter so the board would
+show the number Tate bets.
+
+**The rule (Tate's choice).** `devig.is_hr_rung` / `devig.ts::isHrRung`: a Hard
+Rock 1H quote is an alternate if either side is **-140 or worse**, OR it sits
+**2.0+ points** from the median of the other books' centred lines in the same sweep
+(needs 3+ books; exchanges and the synthetic consensus never count). The golden
+vectors in `tests/fixtures/hr_rung_vectors.json` pin both languages. The general
+-160 bar is unchanged, because other books post real main lines at -140..-159.
+
+**What it does.** When Hard Rock's newest quote is an alternate, the card and the
+board show its **last main line with its capture time** ("u27.5 -105 · as of Thu
+4:07pm") under blocker `hr_alt_line`. That line is display only: it is out of the
+slate bar, never qualifies, never logs a paper pick, and `POST /api/picks`
+refuses a real ticket (`PRICE UNAVAILABLE`) until a sweep serves the main line.
+Hard Rock's closing line and price (`lines.book_closing_*`, 1H only) skip
+alternates too. The card log prints `HR ALT LINES IGNORED: n (...)` and the card
+health note carries `hr_alt_ignored=n`.
+
+**Measured** (read-only replay over all 747 pre-kickoff 2026 Hard Rock 1H
+snapshots): the old bar let **33 alternates through on 31 games** (27 priced
+-140..-160, 6 at normal juice 2+ points off the field). **0 of 563** Hard Rock
+quotes within 2 points of a 3+ book field are rejected. The 6 normal-juice
+rejections may include real Hard Rock disagreements (Ole Miss @ Florida 28.5 vs
+30.5 on 09-25; South Florida @ Bowling Green 26.5 vs 24.5 on 09-22). Tate accepted
+that trade for a check that does not depend on Hard Rock's price ladder. Replaying
+Friday's card as of its build: the same 3 BETs, Texas @ Tennessee shown at 27.5 and
+no longer qualifying (8 qualify, not 9), the bar still 5.54 over 40 games instead
+of 46, and 15 games whose newest Hard Rock quote was an alternate.
+
+**Not changed:** the 12 paper picks already logged on alternates (weeks 2-4) stand
+as logged (Tate). `sources/odds.py` now keeps the most balanced pair when a book
+sends several, instead of the last one, and warns. No book has done that yet.
+
 ## 10. What is still open
 
 - Build the two-section board (§1).

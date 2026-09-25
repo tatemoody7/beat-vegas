@@ -1219,11 +1219,22 @@ list and land through their own registered row or PR.
   the close-poll window — so the fallback fired EVERY TIME the filter mattered. Pass
   **`strict=True`** from any single-book read; `book_closing_before_kickoff` and
   `book_closing_price_before_kickoff` now do (the latter had no filter at all). PR #123.
-- `sources/odds.py::_normalize_totals` takes the **LAST** outcome in a market
-  (`for oc in outcomes: ... over_price, line = ...`). Every book returns one point pair
-  today so it is currently harmless, but a book returning alternate rungs would silently
-  yield an arbitrary line — and could mix an over price from one rung with an under from
-  another. Fix it before trusting any new book.
+- **The Odds API serves Hard Rock's ALTERNATE lines as its 1H total, and -160 did not
+  catch them** (fixed 2026-09-25, registry row H-PCT-U, `docs/RANKING_AND_TRUST.md` §9b).
+  Texas @ Tennessee read 30.5 at -160 while the app and six books said 27.5; a live call
+  showed that alternate arriving ALONE as the one Over/Under pair, so it is the feed, not
+  our parser. Hard Rock prices a 2-pt alternate at ~-145/-150 and a 3-pt one at exactly
+  -160, which `is_centred_quote` (tuned to BetMGM) passes: 33 on 31 games in weeks 1-4.
+  `devig.is_hr_rung` (mirrored `devig.ts::isHrRung`, golden vectors in
+  `tests/fixtures/hr_rung_vectors.json`) calls a Hard Rock 1H quote an alternate at -140 or
+  worse OR 2+ pts from the other books' median in the same sweep (3+ books). The card
+  (`market_read` → `hr_live`/`hr_as_of`/`hr_alt_line`) and `lineCheck.ts` then show the LAST
+  MAIN line with its time, blocker `hr_alt_line`, display only — never the bar, never a
+  paper pick, never a real ticket (`PRICE UNAVAILABLE`). Hard Rock's 1H closes skip
+  alternates too, which means `snapshots.hr_closes` now loads every book. The general
+  -160 bar is unchanged (other books post real lines at -140..-159). `sources/odds.py`
+  keeps the most balanced pair when a book sends several (it used to keep the LAST) and
+  prints a `::warning::`.
 - **A `web/lib/` export with no TypeScript caller may still be LOAD-BEARING.**
   `tests/test_gate_parity.py` reads constants OUT of `verdict.ts`, `grade.ts`, `edge.ts`,
   `lineCheck.ts`, `books.ts` and `card.ts` **by regex** and compares them to

@@ -101,9 +101,10 @@ def hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) -
     for i in range(0, len(ids), 1000):
         for snap in (
             session.query(OddsSnapshot)
+            # Every book, not just Hard Rock: its alternate lines are told apart
+            # by the distance from the other books (lines.hr_rung_flags).
             .filter(
                 OddsSnapshot.market == "1H_total",
-                OddsSnapshot.book == HR_BOOK_KEY,
                 OddsSnapshot.game_id.in_(ids[i : i + 1000]),
             )
             .all()
@@ -163,7 +164,8 @@ def hr_close_prices(
     if not game_ids:
         return {}
     out: Dict[int, int] = {}
-    for gid, snaps in _snaps_1h_by_game(session, game_ids, book=HR_BOOK_KEY).items():
+    # Every book: the Hard Rock rule needs the field (lines.hr_rung_flags).
+    for gid, snaps in _snaps_1h_by_game(session, game_ids).items():
         price = book_closing_price_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
         if price is not None:
             out[gid] = int(price)

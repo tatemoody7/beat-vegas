@@ -115,6 +115,7 @@ _ORDER: Dict[str, List[str]] = {
         "cap",
         "gap",
         "no_hr_line",
+        "hr_alt_line",
         "no_model",
     ],
     # which 1H engine wrote the stored prediction (factors_json.engine); rows

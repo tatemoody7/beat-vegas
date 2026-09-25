@@ -148,6 +148,8 @@ export type VerdictInput = {
   bar?: number | null;
   /** Both of Hard Rock's sides priced like a main number; false = an off-centre rung, which never qualifies. */
   hrCentred?: boolean | null;
+  /** False = the feed's newest Hard Rock quote is an alternate line and hrLine is the last main line, shown for display only (lineCheck.hrLive). */
+  hrLive?: boolean | null;
 };
 
 export type VerdictResult = {

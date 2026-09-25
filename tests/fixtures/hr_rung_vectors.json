@@ -1,0 +1,20 @@
+{
+  "_about": "Golden vectors for devig.is_hr_rung / devig.ts isHrRung, read by tests/test_price_skew_filter.py and web/lib/priceSkew.test.ts. `others` = the other books' main lines as of the same sweep.",
+  "price": -140,
+  "distance": 2.0,
+  "min_books": 3,
+  "cases": [
+    {"name": "Texas @ Tennessee 2026-09-25: 30.5 at -160 vs six books at 27.5", "over": 125, "under": -160, "line": 30.5, "others": [27.5, 27.5, 27.5, 27.5, 27.5, 31.5], "rung": true},
+    {"name": "Liberty @ Coastal 2026-09-24: 21.5 over -160 vs the field at 24.5", "over": -160, "under": 125, "line": 21.5, "others": [24.5, 24.5, 24.5, 24.5], "rung": true},
+    {"name": "a real Hard Rock line at the worst price seen (-135)", "over": 100, "under": -135, "line": 27.5, "others": [27.5, 27.5, 28.5], "rung": false},
+    {"name": "the mildest alternate seen: 2 pts off at -145", "over": 115, "under": -145, "line": 29.5, "others": [27.5, 27.5, 27.5], "rung": true},
+    {"name": "price bar is inclusive: -140 is an alternate", "over": 110, "under": -140, "line": 27.5, "others": [], "rung": true},
+    {"name": "-139 on its own is not", "over": 110, "under": -139, "line": 27.5, "others": [], "rung": false},
+    {"name": "2 pts off at normal juice: an alternate by distance", "over": -105, "under": -115, "line": 29.5, "others": [27.5, 27.5, 27.5], "rung": true},
+    {"name": "1.5 pts off at normal juice: a real disagreement", "over": -105, "under": -115, "line": 29.0, "others": [27.5, 27.5, 27.5], "rung": false},
+    {"name": "2 pts off but only two other books: price check only", "over": -105, "under": -115, "line": 29.5, "others": [27.5, 27.5], "rung": false},
+    {"name": "distance is to the median of an even field", "over": -110, "under": -110, "line": 30.0, "others": [27.5, 28.0, 28.0, 28.5], "rung": true},
+    {"name": "missing prices, on the field: kept", "over": null, "under": null, "line": 27.5, "others": [27.5, 27.5, 27.5], "rung": false},
+    {"name": "missing others entries are ignored", "over": -110, "under": -110, "line": 27.5, "others": [27.5, null, 27.5, 28.0], "rung": false}
+  ]
+}

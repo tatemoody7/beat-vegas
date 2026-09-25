@@ -15,6 +15,7 @@ const BET_LOGGED = 900001; // BET #1, a real ticket already on it
 const BET_OPEN = 900002; // BET #2, nothing logged
 const PRICE_BLOCKED = 900003; // EDGE, blocker price
 const GAP_SHORT = 900005; // EDGE, blocker gap
+const HR_ALT = 900015; // EDGE, blocker hr_alt_line: the feed's newest HR quote is an alternate
 const PLAYED = 900012;
 
 test.describe("the game page", () => {
@@ -79,6 +80,41 @@ test.describe("the game page", () => {
     await page.goto(`/game/${BET_LOGGED}`);
     const chips = page.locator("section.bv-card").first().locator(".bv-badge");
     await expect(chips).toContainText(["bet logged", `cap slot ${r.capRank}`]);
+  });
+
+  test("a Hard Rock alternate line: the tile shows the last main line with its time, paper only", async ({
+    page,
+  }) => {
+    const r = rowById.get(HR_ALT)!;
+    expect(r.edge.blocker).toBe("hr_alt_line");
+    expect(r.check!.hrLive).toBe(false);
+    // lib/labels.ts::hrQuoteText: the held-over quote carries its ET capture time.
+    const t = new Date(r.check!.hrAsOf!);
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(t)
+        .map((x) => [x.type, x.value]),
+    );
+    const h = Number(p.hour) % 24;
+    const when = `${p.weekday} ${h % 12 === 0 ? 12 : h % 12}:${p.minute}${h >= 12 ? "pm" : "am"}`;
+    await page.goto(`/game/${HR_ALT}`);
+    const tiles = page.locator("section.bv-card").first();
+    await expect(tiles).toContainText(
+      `Hard Rocku${fmt(r.check!.hrLine)} ${american(r.check!.hrUnderPrice!)} · as of ${when}`,
+    );
+    await expect(tiles.locator("p.text-base")).toHaveText(r.edge.action);
+    await expect(
+      page.getByRole("button", { name: "Log as paper pick" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Log this bet" }),
+    ).toHaveCount(0);
   });
 
   test.describe("the log control, signed in", () => {

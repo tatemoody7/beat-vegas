@@ -586,6 +586,7 @@ export async function getHomeBoard(
       context: edgeContext(row.factors),
       bar: slate.bar,
       hrCentred: check?.hrCentred ?? null,
+      hrLive: check?.hrLive ?? null,
     };
     const edge = edgeScore(input);
     // edge.ts names the basis (`edge.lineBasis`: Hard Rock, else the market,

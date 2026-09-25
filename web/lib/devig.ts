@@ -112,3 +112,38 @@ export function isCentredQuote(
   }
   return true;
 }
+
+// --- is this HARD ROCK quote its main line? -------------------------------
+//
+// Mirrors beatvegas/devig.py::is_hr_rung -- see there for the measurement.
+// Hard Rock prices a 2-point alternate at about -145/-150 and a 3-point one at
+// exactly -160, which SKEW_REJECT_PRICE lets through, and the Odds API has
+// served one alone as Hard Rock's 1H total (Texas @ Tennessee 2026-09-25: 30.5
+// at -160 while the app said 27.5). Either check is enough: the price, or the
+// distance from the other books' median in the same sweep.
+export const HR_RUNG_PRICE = -140;
+export const HR_RUNG_DISTANCE_PTS = 2.0;
+export const HR_RUNG_MIN_BOOKS = 3;
+
+/**
+ * True when a Hard Rock quote is an alternate line, not its main number.
+ * `otherLines`: the other books' main lines as of the same moment; the
+ * distance check needs HR_RUNG_MIN_BOOKS of them, else only the price counts.
+ */
+export function isHrRung(
+  overPrice: number | null | undefined,
+  underPrice: number | null | undefined,
+  line: number | null | undefined,
+  otherLines: readonly (number | null | undefined)[],
+): boolean {
+  for (const price of [overPrice, underPrice]) {
+    if (price != null && price <= HR_RUNG_PRICE) return true;
+  }
+  const others = otherLines.filter((x): x is number => x != null);
+  if (line == null || others.length < HR_RUNG_MIN_BOOKS) return false;
+  const sorted = [...others].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const med =
+    sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  return Math.abs(line - med) >= HR_RUNG_DISTANCE_PTS;
+}

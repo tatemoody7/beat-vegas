@@ -159,7 +159,7 @@ def test_a_clean_card_run_writes_ok_and_exits_0(mod, tmp_path, capsys):
     assert row.value == "ok"
     assert (
         row.note
-        == "run=777 event=schedule slot=fri_pm info=bets=1 early_season_held=0 preview=skipped sweep=success"
+        == "run=777 event=schedule slot=fri_pm info=bets=1 early_season_held=0 hr_alt_ignored=0 preview=skipped sweep=success"
     )
     out = capsys.readouterr().out
     assert "ok   card.row_this_run" in out and "::warning::" not in out

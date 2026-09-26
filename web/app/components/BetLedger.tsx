@@ -263,8 +263,13 @@ function LedgerRowView({
         <td className="whitespace-nowrap text-[var(--text-muted)]">
           {p.placedAt ? etStamp(new Date(p.placedAt)) : "—"}
         </td>
-        <td className="whitespace-nowrap text-[var(--text)]">
-          {p.away} <span className="text-[var(--text-dim)]">@</span> {p.home}
+        <td className="text-[var(--text)]">
+          {/* The names stay on one line; a badge may wrap under them. A
+              fully unwrappable cell pushed the week's table past its box at
+              1440 and hid the details toggle (seen on production, 09-26). */}
+          <span className="whitespace-nowrap">
+            {p.away} <span className="text-[var(--text-dim)]">@</span> {p.home}
+          </span>
           {p.market === "full" && (
             <span className="bv-badge ml-1">
               {labelOf(MARKET_TEXT, p.market, "Full game")}

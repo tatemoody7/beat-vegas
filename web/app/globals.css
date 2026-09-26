@@ -386,6 +386,22 @@ body {
   .bv-table tbody tr:hover {
     background: rgba(56, 189, 248, 0.04);
   }
+  /* A settled bet wears its outcome as a row wash (Tate 2026-09-26): the same
+     --good-bg the lit BET card uses, --bad-bg for a loss, --push-bg for a push.
+     Pending rows stay bare. Colour is the grade language, so the hover tint
+     above must not wash it out. */
+  .bv-table tbody tr.bv-row--won,
+  .bv-table tbody tr.bv-row--won:hover {
+    background: var(--good-bg);
+  }
+  .bv-table tbody tr.bv-row--lost,
+  .bv-table tbody tr.bv-row--lost:hover {
+    background: var(--bad-bg);
+  }
+  .bv-table tbody tr.bv-row--push,
+  .bv-table tbody tr.bv-row--push:hover {
+    background: var(--push-bg);
+  }
 
   /* Form input */
   .bv-input {

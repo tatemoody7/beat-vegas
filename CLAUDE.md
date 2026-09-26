@@ -5,6 +5,23 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-26 (EVERY BET WE'VE PLACED — the ledger at the top of Track record).** Prompted
+  by the Paramount Sports teardown (Lee Sterling's most-cited proof is one long self-graded
+  list of picks; ours is stronger but was one week at a time inside Results). `/proof` now
+  opens on `BetLedger` (`lib/betLedger.ts` pure grouping/CSV + `lib/betLedgerDb.ts` ONE
+  query joined to `games` for the kickoff and both teams' first-half points): real money
+  first with Paper / All one click away, a summary strip (win rate, W-L-P, units, ROI, Wilson
+  interval, line value), weeks newest first each with its own record, a **running units**
+  column, **whole-row tint** (`.bv-row--won|--lost|--push` = `--good-bg`/`--bad-bg`/
+  `--push-bg`, pending rows bare), the score as `away–home · total`, no logos, and a proof
+  row per bet (our number then, the frozen decision sentence from the new shared
+  `lib/loggedAs.ts`, posted ET + hours before kickoff, book + `PROVENANCE_TEXT`, closing
+  line/price/capture time, note). `GET /api/bets?season=` streams the 30-column CSV with the
+  stored clv beside its displayed negation. The ledger renders even when the post-mortem has
+  never run. The e2e fixture gained a paper PUSH pick (id 7) so the push tint and `-1P`
+  record are pinned; `csvCell` moved to `lib/format.ts`. Every fork was Tate's call. **A
+  sticky panel inside a table cell pins to the VIEWPORT in Chrome, not the scrolling
+  table** (measured): the details toggle scrolls the wrap back to its left edge instead.
 - **2026-09-25 (HARD ROCK ALTERNATE LINES, PR #236, registry row H-PCT-U).** The Odds API
   sends Hard Rock alternate lines alone as its first-half total (Texas @ Tennessee: 30.5 at
   −160 against 27.5 in the app). The old −160 check missed 33 of them on 31 games.

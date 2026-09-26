@@ -1047,6 +1047,36 @@ export function buildExpected(week) {
       placedAt: new Date(g13.kick.getTime() - 40 * 3_600_000),
       scenario: "paper, sixth BET by gap that week (cap)",
     },
+    {
+      // A whole-number line that landed exactly: the push case the ledger
+      // must render (grey wash, 0 units, out of the win rate, in the count).
+      id: 7,
+      game: g14,
+      week: week.prevWeek,
+      line: 58,
+      price: -110,
+      isPaper: true,
+      verdict: "BET",
+      reason: "model_gap",
+      gap: round2(58 - g14.bv),
+      ev: -0.0455,
+      hrLine: 58,
+      modelLine: g14.bv,
+      modelScore: g14.underScore,
+      graded: true,
+      actualFh: 58,
+      result: "push",
+      units: 0,
+      openingLine: 58.5,
+      closingLine: 57,
+      closingPrice: -110,
+      clv: -1.0,
+      clvProb: 0.012,
+      blocker: "cap",
+      note: null,
+      placedAt: new Date(g14.kick.getTime() - 30 * 3_600_000),
+      scenario: "paper, PUSH on a whole-number line",
+    },
   ];
 
   const ledger = {
@@ -1057,9 +1087,15 @@ export function buildExpected(week) {
       n: 2,
     },
     // ...and the graded paper picks
-    paper: { record: "1-0", units: `+${unit.toFixed(2)}`, n: 1, hit: "100.0%" },
+    // ...and the graded paper picks: one win and one push (decided by nobody).
+    paper: {
+      record: "1-0-1P",
+      units: `+${unit.toFixed(2)}`,
+      n: 2,
+      hit: "100.0%",
+    },
     realBets: 3,
-    paperPicks: 3,
+    paperPicks: 4,
     // lib/decision-quality.ts::clvSummary on the two graded real picks:
     // stored clv -1.0 and +0.5 -> displayed (negated) +1.00 and -0.50.
     clvDisplayed: ["+1.00", "-0.50"],

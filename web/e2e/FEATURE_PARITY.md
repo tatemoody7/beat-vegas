@@ -62,6 +62,10 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [proof] Method and sanity checks opens on a click, holds the estimated-line records and band table, and nothing below that heading is coloured `--good` / `--bad` — proof.spec.ts › "method and sanity checks open on a click and nothing inside is coloured"
 - [proof] The glossary sits at `#glossary` (where `/glossary` redirects) with its terms — proof.spec.ts › "the glossary is where /glossary lands"
 - [proof] The header button links to `/proof/records` — proof.spec.ts › "links to every game we have rated"
+- [proof] Every bet: the strip opens on the real ledger with its record, ROI, interval, line value and CSV link; one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — proof.spec.ts › "every bet: the summary strip, the week groups and the running units"
+- [proof] Every bet: exactly one `tr.bv-row--won` (--good-bg) and one `tr.bv-row--lost` (--bad-bg) in the real ledger, the pending row bare; the paper ledger's push row is `tr.bv-row--push` with +0.00 and a `-1P` record — proof.spec.ts › "every bet: won rows are tinted green and lost rows red, pending rows are not"
+- [proof] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — proof.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
+- [proof] `GET /api/bets?season=` streams every pick as CSV with the documented 30 columns, the stored clv beside its displayed negation; a bad season is a 400 — proof.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
 
 ## Every game we have rated
 

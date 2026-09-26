@@ -246,6 +246,14 @@ export const RESULT_COLOR: Record<string, string> = {
   push: "var(--push)",
 };
 
+/** Where a ticket's price came from (`manual_picks.price_provenance`). Only a
+ *  price logged at the time may feed price CLV; the ledger says which it was. */
+export const PROVENANCE_TEXT: Record<string, string> = {
+  logged: "price logged at the time",
+  backfilled_close: "price filled in from the close",
+  unknown: "price not verified",
+};
+
 /** Punctuation- and case-insensitive form, so a comparison is not defeated by a
  *  curly apostrophe or a trailing full stop. */
 function loose(s: string): string {

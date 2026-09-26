@@ -18,6 +18,7 @@ const PUBLIC_GETS = [
   "/proof/records",
   "/game/900001",
   "/api/health",
+  "/api/bets?season=2026",
 ];
 
 test.describe("signed out", () => {

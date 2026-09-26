@@ -55,6 +55,7 @@ const DB_BACKED = [
   "prisma",
   "ledger",
   "weeklyReview",
+  "betLedgerDb",
 ];
 
 function tsxFiles(dir: string): string[] {

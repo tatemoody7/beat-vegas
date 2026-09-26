@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { ET_ZONE, etClock12, etDay, etMinutesOfDay, etParts, pad2 } from "./et";
+import {
+  ET_ZONE,
+  etClock12,
+  etDay,
+  etMinutesOfDay,
+  etParts,
+  pad2,
+  etStamp,
+} from "./et";
 
 describe("etParts", () => {
   it("names the zone the whole site runs on", () => {
@@ -87,5 +95,16 @@ describe("pad2", () => {
   it("zero-pads a single digit and leaves two digits alone", () => {
     expect(pad2(7)).toBe("07");
     expect(pad2(12)).toBe("12");
+  });
+});
+
+describe("etStamp", () => {
+  it("renders the ledger's posted stamp: Fri Sep 18 2026 20:12Z is Fri 9/18 4:12pm ET", () => {
+    expect(etStamp(new Date("2026-09-18T20:12:00Z"))).toBe("Fri 9/18 4:12pm");
+  });
+
+  it("keeps the ET calendar day across the UTC midnight and reads 12 at noon", () => {
+    expect(etStamp(new Date("2026-09-13T02:05:00Z"))).toBe("Sat 9/12 10:05pm");
+    expect(etStamp(new Date("2026-11-17T17:00:00Z"))).toBe("Tue 11/17 12:00pm");
   });
 });

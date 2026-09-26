@@ -204,7 +204,7 @@ export default function BetLedger({
             </h3>
             <div className="bv-table-wrap">
               <table
-                className="bv-table"
+                className="bv-table bv-table--dense"
                 aria-label={`Week ${g.week ?? "?"} bets`}
               >
                 <thead>

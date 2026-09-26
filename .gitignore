@@ -38,6 +38,7 @@ config.yaml
 
 # Deploy-and-verify poller state (local, per-machine)
 /.deploy-verify/
+/web/.deploy-verify/
 .vercel
 .env*
 

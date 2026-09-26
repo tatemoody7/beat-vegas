@@ -18,8 +18,11 @@ import {
 import { CALIB_SEGMENT_TEXT, labelOf } from "@/lib/labels";
 import { getBvCalibration, getEdgeStats } from "@/lib/proof";
 import { getRecordSeasons } from "@/lib/records";
+import { getBetLedger, getBetSeasons } from "@/lib/betLedgerDb";
+import { currentCfbSeason } from "@/lib/season";
 import { BET_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
 import BandTable from "@/app/components/BandTable";
+import BetLedger from "@/app/components/BetLedger";
 import Fold from "@/app/components/Fold";
 import GapLadderChart from "@/app/components/GapLadderChart";
 import Glossary from "@/app/components/Glossary";
@@ -69,22 +72,49 @@ export default async function ProofPage({
   const studySeasons = one !== null ? [one] : seasons;
   const scopeLabel = one !== null ? `${one}` : "all seasons";
 
-  const [pm, edge, calib, study] = await Promise.all([
+  // The ledger's season: the one asked for, else the current CFB season, else
+  // the latest season that holds a pick (the off-season, or a fresh database).
+  const betSeasons = await getBetSeasons();
+  const current = currentCfbSeason();
+  const ledgerSeason =
+    one ??
+    (betSeasons.includes(current) ? current : (betSeasons[0] ?? current));
+
+  const [pm, edge, calib, study, bets] = await Promise.all([
     loadPostMortem(),
     getEdgeStats(one ?? undefined),
     getBvCalibration(),
     studySeasons.length > 0
       ? getLineStudy(studySeasons, minGames)
       : Promise.resolve(null),
+    getBetLedger(ledgerSeason),
   ]);
+
+  // The ledger leads (Tate 2026-09-26): every bet, as logged, before the
+  // 2023-25 finding. It renders even when the post-mortem has never run.
+  const header = (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="bv-page-title">Track record</h1>
+        <p className="bv-page-sub">
+          {`Every bet since ${ledgerSeason} at Hard Rock’s number, then 2023–25 at real closing lines.`}
+        </p>
+      </div>
+      <Link href="/proof/records" className="bv-btn">
+        Every game we have rated →
+      </Link>
+    </div>
+  );
+  const ledger = <BetLedger rows={bets} season={ledgerSeason} />;
 
   if (!pm || pm.runs.length === 0) {
     return (
       <div className="mx-auto max-w-5xl">
-        <h1 className="bv-page-title">Track record</h1>
-        <p className="bv-page-sub">Whether the edge is real.</p>
+        {header}
+        {ledger}
         <EmptyLine className="mt-6">
-          Not computed yet. It runs after each morning’s grading.
+          The 2023–25 finding is not computed yet. It runs after each morning’s
+          grading.
         </EmptyLine>
       </div>
     );
@@ -145,17 +175,8 @@ export default async function ProofPage({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="bv-page-title">Track record</h1>
-          <p className="bv-page-sub">
-            {`2023–25 at real closing lines${liveSeason ? `, plus ${liveSeason} at Hard Rock’s number` : ""}.`}
-          </p>
-        </div>
-        <Link href="/proof/records" className="bv-btn">
-          Every game we have rated →
-        </Link>
-      </div>
+      {header}
+      {ledger}
 
       {/* 1 — the finding: the one honest number and the picture that explains
           it, in one card. */}

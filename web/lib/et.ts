@@ -70,3 +70,11 @@ export function etClock12(
   const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
   return `${p.weekday} ${hour12}:${pad2(p.minute)}${p.hour >= 12 ? suffix[1] : suffix[0]}`;
 }
+
+/** Weekday, calendar day and 12-hour clock in ET: "Fri 9/18 4:12pm". The
+ *  ledger's "posted" stamp, where the day matters as much as the hour. */
+export function etStamp(d: Date): string {
+  const p = etParts(d);
+  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  return `${p.weekday} ${p.month}/${p.day} ${hour12}:${pad2(p.minute)}${p.hour >= 12 ? "pm" : "am"}`;
+}

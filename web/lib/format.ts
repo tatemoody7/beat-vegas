@@ -55,3 +55,11 @@ export const unitColor = (s: string | undefined | null): string =>
     : s.startsWith("-")
       ? "var(--bad)"
       : "var(--good)";
+
+/** One CSV cell: quoted (with doubled quotes) only when it needs to be; null
+ *  and undefined are empty. Shared by every CSV export so they quote alike. */
+export function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}

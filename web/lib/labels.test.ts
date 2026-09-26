@@ -8,6 +8,7 @@ import {
   GATE_TEXT,
   labelOf,
   PROXY_TEXT,
+  PROVENANCE_TEXT,
   REASON_TEXT,
   RULE_TEXT,
   TIER_TEXT,
@@ -29,6 +30,7 @@ describe("every enum member has text", () => {
       CARD_INPUT_TEXT,
       RULE_TEXT,
       PROXY_TEXT,
+      PROVENANCE_TEXT,
     ]) {
       for (const [k, v] of Object.entries(m)) {
         expect(v, k).toMatch(/\S/);

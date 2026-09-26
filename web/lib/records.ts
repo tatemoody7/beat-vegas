@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { csvCell } from "@/lib/format";
 import { MODEL_VERSION } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 
@@ -167,12 +168,6 @@ const CSV_COLUMNS: { key: keyof RecordRow; header: string }[] = [
   { key: "outcome", header: "outcome" },
   { key: "scoredAfterKickoff", header: "scored_after_kickoff" },
 ];
-
-function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 export function recordsToCsv(rows: RecordRow[]): string {
   const head = CSV_COLUMNS.map((c) => c.header).join(",");

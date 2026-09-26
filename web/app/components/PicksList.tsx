@@ -3,44 +3,22 @@
 import { displayLineValue } from "@/lib/clvDirection";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { american, signed } from "@/lib/format";
+import { american } from "@/lib/format";
 import {
-  BLOCKER_SHORT,
   labelOf,
   MARKET_TEXT,
-  REASON_TEXT,
   RESULT_COLOR,
   RESULT_PENDING,
   RESULT_TEXT,
-  VERDICT_TEXT,
 } from "@/lib/labels";
+import { loggedAs } from "@/lib/loggedAs";
 import type { PickFull } from "@/lib/picks";
-import { isOffPolicy } from "@/lib/pickRules";
 import { EmptyLine } from "@/app/components/Section";
 
 // Every logged pick, with the decision frozen at log time. Nothing here is
 // explained in a `title=` tooltip (a phone never shows one) — the caption under
-// the table carries it, and every enum goes through lib/labels.
-
-// "Bet · model gap · +2.2 vs our number · real money on a Watch · blocked by
-// price". Legacy picks (logged before the tracking columns) show a dash.
-function loggedAs(p: PickFull): string {
-  if (!p.verdictAtPick && !p.reason) return "—";
-  const parts: (string | null)[] = [
-    p.verdictAtPick ? labelOf(VERDICT_TEXT, p.verdictAtPick, "Pass") : null,
-    p.reason ? REASON_TEXT[p.reason].short : null,
-  ];
-  if (p.gapAtPick !== null) {
-    parts.push(`${signed(p.gapAtPick, 1)} vs our number`);
-  }
-  if (isOffPolicy(p)) parts.push("real money on a Watch");
-  if (p.isPaper && p.blocker && p.blocker !== "none") {
-    parts.push(
-      `blocked by ${labelOf(BLOCKER_SHORT, p.blocker, "an input").toLowerCase()}`,
-    );
-  }
-  return parts.filter(Boolean).join(" · ");
-}
+// the table carries it, and every enum goes through lib/labels. The frozen
+// decision sentence is lib/loggedAs, shared with the Track record ledger.
 
 // The table opens on MY BETS — the real-money rows — with Paper and All one
 // click away (Tate 2026-09-16: "my picks vs the paper picks, with my picks the

@@ -119,6 +119,11 @@ export type ExpectedPick = {
   result?: "under" | "over" | "push";
   units?: number;
   clv?: number;
+  closingLine?: number;
+  closingPrice?: number;
+  modelLine: number;
+  note: string | null;
+  placedAt: Date;
   blocker: string | null;
   scenario: string;
 };

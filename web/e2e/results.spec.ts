@@ -224,9 +224,11 @@ test.describe("results", () => {
     await expect(won).toContainText("+0.91");
     await expect(won).toContainText(L.clvDisplayed[0]);
     // The graded real LOSS: -115, Over, -1.00u, and the stored clv of +0.5 shown as -0.50.
+    // (The same matchup also carries the paper PUSH row; keep to the ticket.)
     const lost = rows
       .filter({ hasText: "Thornbury" })
-      .filter({ hasText: "Kestrel Point" });
+      .filter({ hasText: "Kestrel Point" })
+      .filter({ hasNotText: "paper" });
     await expect(lost).toContainText("-115");
     await expect(lost).toContainText("Over");
     await expect(lost).toContainText("-1.00");

@@ -47,3 +47,9 @@ one raises a banner line — the build may still have happened, on GitHub's back
 hand, but the primary trigger did not fire; check the Vercel cron list, `CRON_SECRET` and
 `GITHUB_DISPATCH_TOKEN`. GitHub's own billing state is the one thing none of them can see: if
 every gauge stops updating at once, that is what it looks like.
+
+Since 2026-09-28 the Saturday close poll is also Vercel-dispatched (`lines-close`, one entry
+per UTC hour 15Z–03Z, every tick dispatching): GitHub's own 30-minute crons fired 3 of 18
+Saturday slots in week 4, and only about a third of Hard-Rock-priced games had any 1H snapshot
+inside the registered 2-hour close window. `last_dispatch_lines-close` should advance hourly on
+a Saturday.

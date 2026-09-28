@@ -143,6 +143,42 @@ describe("dispatchBody", () => {
   });
 });
 
+describe("lines-close (the Saturday close-poll backup)", () => {
+  const job = CRON_JOBS["lines-close"];
+
+  it("dispatches lines_watch.yml in close mode, every tick", () => {
+    expect(job.workflow).toBe("lines_watch.yml");
+    expect(dispatchBody(job).inputs).toEqual({ market: "1h_close" });
+    expect(job.everyTick).toBe(true);
+    // Only this job may skip the duplicate probe: a card build that ran twice
+    // spends a whole sweep, a close poll that ran twice re-sees the same lines.
+    for (const [id, j] of Object.entries(CRON_JOBS)) {
+      if (id !== "lines-close") expect(j.everyTick ?? false).toBe(false);
+    }
+  });
+
+  it("covers Saturday from 10am ET to midnight ET in both DST regimes", () => {
+    // 15Z is 11am EDT / 10am EST; 03Z next day is 11pm EDT / 10pm EST.
+    expect(dispatchDecision(job, at("2026-09-26T15:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-19T15:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-09-27T03:50:00Z")).allowed).toBe(
+      true,
+    );
+    // 04Z in summer is Sunday 00:00 EDT: wrong day, not listed in vercel.json.
+    expect(dispatchDecision(job, at("2026-09-27T04:05:00Z")).reason).toContain(
+      "wrong_day",
+    );
+    // A weekday tick never dispatches.
+    expect(dispatchDecision(job, at("2026-09-29T15:05:00Z")).reason).toContain(
+      "wrong_day",
+    );
+  });
+});
+
 describe("windowOpenInstant", () => {
   it("is the same ET wall clock in both DST regimes", () => {
     const job = CRON_JOBS["card-sat-am"];

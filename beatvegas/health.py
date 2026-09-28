@@ -886,7 +886,7 @@ CONTRACTS: Dict[str, Contract] = {
         failure_modes=(
             FailureMode(
                 "2026-08-28",
-                "GitHub's cron fired 2 of 19 scheduled close slots; a dead run of them is what the board's `close` gauge warning (CLOSE_CAPTURE_MAX_AGE_H) covers, which is why no check here is failed-severity.",
+                "GitHub's cron fired 2 of 19 scheduled close slots (and 3 of 18 Saturday slots in 2026 week 4); a dead run of them is what the board's `close` gauge warning (CLOSE_CAPTURE_MAX_AGE_H) and, since 2026-09-28, the Vercel `lines-close` dispatch cover, which is why no check here is failed-severity.",
                 ("lines_watch.close_polled", "lines_watch.close_gauge_written"),
             ),
             FailureMode(

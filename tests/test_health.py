@@ -886,3 +886,61 @@ def test_health_key_fits_app_settings_key():
         assert ops.health_key(job) == f"last_health_{job}"
         assert len(ops.health_key(job)) <= 32
     assert not any(k.startswith(ops.HEALTH_PREFIX) for k in ops.GAUGE_KEYS)
+
+
+def test_sunday_model_run_recorded_reads_the_refit_row_by_content():
+    """2026-09-28: the refit's run-log row for THIS season/week since ET
+    midnight; retrain's rows and last week's row do not count."""
+    import json
+
+    from beatvegas.db.models import ModelRun
+
+    eng, scope = _sqlite_scope()
+    sunday_now = datetime(2026, 9, 27, 19, 10)  # Sunday 3:10pm ET
+    fn = _check("sunday", "sunday.model_run_recorded").fn
+    with scope() as s:
+        r = fn(_ctx(s, "sunday", now=sunday_now, week=5))
+        assert not r.ok and "no weekly-refit" in r.detail
+    with Session(eng) as s:
+        s.add(
+            ModelRun(
+                version="gbm_v1",
+                notes="weekly refit",
+                metrics_json=json.dumps({"kind": "weekly_refit", "season": SEASON, "week": 4}),
+                created_at=sunday_now - timedelta(minutes=30),
+            )
+        )
+        s.add(
+            ModelRun(
+                version="gbm_v1",
+                notes="market-blind BV + interval (live)",
+                metrics_json=json.dumps({"bv_residual": {"n": 1}}),
+                created_at=sunday_now - timedelta(minutes=20),
+            )
+        )
+        s.commit()
+    with scope() as s:
+        assert not fn(_ctx(s, "sunday", now=sunday_now, week=5)).ok
+    with Session(eng) as s:
+        s.add(
+            ModelRun(
+                version="gbm_v1",
+                notes="weekly refit",
+                metrics_json=json.dumps(
+                    {
+                        "kind": "weekly_refit",
+                        "season": SEASON,
+                        "week": 5,
+                        "n_inputs": 58,
+                        "intercept": -1.23,
+                        "train_rows": 2212,
+                        "frame_fingerprint": "abc",
+                    }
+                ),
+                created_at=sunday_now - timedelta(minutes=10),
+            )
+        )
+        s.commit()
+    with scope() as s:
+        r = fn(_ctx(s, "sunday", now=sunday_now, week=5))
+        assert r.ok and "inputs=58" in r.detail and "frame=abc" in r.detail

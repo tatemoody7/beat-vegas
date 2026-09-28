@@ -52,6 +52,18 @@ def fingerprint(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
+def fingerprint_hash(fp: Dict[str, Any]) -> str:
+    """A short, data-only digest of a fingerprint: sha256 over rows, by_season and
+    the per-column stats, so two frames built from the same data hash alike on
+    any machine (platform, library versions and generated_at are left out --
+    they are what the full fingerprint is for). Weekly refits record it in
+    model_runs (2026-09-28)."""
+    import hashlib
+
+    body = {k: fp.get(k) for k in ("rows", "by_season", "columns")}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
 def write_fingerprint(df: pd.DataFrame, path: Path) -> Dict[str, Any]:
     """Write the fingerprint JSON to `path` and return it. Gate scripts call this
     right after building their frame, with `<report stem>_frame.json`."""

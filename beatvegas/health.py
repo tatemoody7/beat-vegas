@@ -514,6 +514,40 @@ def sunday_predictions_today(ctx: Ctx) -> Result:
     return Result(n > 0, f"{n} model predictions for {ctx.season} w{ctx.week} since ET midnight")
 
 
+def sunday_model_run_recorded(ctx: Ctx) -> Result:
+    """The refit left its run-log row (scripts/weekly_update.py::record_weekly_refit):
+    a model_runs row noted `weekly refit` for SEASON/WEEK created since ET
+    midnight. Reads the metrics by content, not by position."""
+    import json
+
+    from .db.models import ModelRun
+
+    since = et_midnight_as_naive_utc(ctx.now)
+    rows = (
+        ctx.session.query(ModelRun.metrics_json)
+        .filter(ModelRun.notes == "weekly refit", ModelRun.created_at >= since)
+        .all()
+    )
+    hit = None
+    for (mj,) in rows:
+        try:
+            m = json.loads(mj or "{}")
+        except ValueError:
+            continue
+        if m.get("season") == ctx.season and m.get("week") == ctx.week:
+            hit = m
+            break
+    if hit is None:
+        return Result(
+            False, f"no weekly-refit model_runs row for {ctx.season} w{ctx.week} since ET midnight"
+        )
+    return Result(
+        True,
+        f"model_runs row for {ctx.season} w{ctx.week}: inputs={hit.get('n_inputs')} "
+        f"intercept={hit.get('intercept')} train_rows={hit.get('train_rows')} frame={hit.get('frame_fingerprint')}",
+    )
+
+
 def sunday_derived_lines_posted(ctx: Ctx) -> Result:
     n = _predictions_today(ctx, derived=True)
     return Result(n > 0, f"{n} derived_lines rows for {ctx.season} w{ctx.week} since ET midnight")
@@ -850,6 +884,12 @@ CONTRACTS: Dict[str, Contract] = {
                 sunday_derived_lines_posted,
             ),
             Check(
+                "sunday.model_run_recorded",
+                "degraded",
+                "a model_runs row noted `weekly refit` whose metrics name SEASON and WEEK, created since ET midnight (inputs, intercept, train rows, frame fingerprint)",
+                sunday_model_run_recorded,
+            ),
+            Check(
                 "sunday.pace_coverage",
                 "degraded",
                 "share of the week's FBS slate teams with a team_tempo(SEASON, WEEK) row carrying seconds_per_play >= PACE_COVERAGE_MIN [0.8]",
@@ -883,6 +923,11 @@ CONTRACTS: Dict[str, Contract] = {
                 "2026-09-16",
                 "the CFBD reference cache saved an empty payload all season.",
                 ("sunday.reference_cache_populated",),
+            ),
+            FailureMode(
+                "2026-09-28",
+                "the refit left no record of itself: confirming the week-5 refit ran on the corrected 58 inputs meant reading the run log, while model_runs held only retrain.py's June rows.",
+                ("sunday.model_run_recorded",),
             ),
         ),
         info=sunday_info,

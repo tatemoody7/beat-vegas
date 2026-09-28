@@ -17,6 +17,9 @@ export type EdgeStats = { games: number; mean: number; median: number } | null;
 // the under closed at a softer number).
 // --- BV-line calibration audit: the per-segment OOF residual table emitted by
 // scripts/retrain.py into the latest model_runs row (metrics_json.bv_residual).
+// Filtered by content: since 2026-09-28 every weekly refit also writes a
+// model_runs row (kind=weekly_refit, no bv_residual), which would otherwise
+// push retrain's row out of the newest five within a month.
 export type BvCalibration = {
   n: number;
   overall: number | null;
@@ -26,7 +29,7 @@ export type BvCalibration = {
 async function getBvCalibrationUncached(): Promise<BvCalibration> {
   const rows = await prisma.$queryRaw<{ metrics_json: string | null }[]>`
     SELECT metrics_json FROM model_runs
-    WHERE metrics_json IS NOT NULL
+    WHERE metrics_json IS NOT NULL AND metrics_json LIKE '%bv_residual%'
     ORDER BY created_at DESC LIMIT 5
   `;
   for (const row of rows) {

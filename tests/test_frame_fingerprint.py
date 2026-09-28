@@ -59,3 +59,21 @@ def test_every_gate_that_builds_a_frame_writes_its_fingerprint():
         assert "load_frame(" in src, name
         assert "build_feature_frame(" not in src, f"{name}: build the frame through the harness"
         assert re.search(r"_frame\.json", src), name
+
+
+def test_fingerprint_hash_is_data_only_and_stable():
+    """Same data, same digest on any machine; a changed cell changes it; the
+    generated_at / platform fields do not (weekly refits store it in model_runs)."""
+    import pandas as pd
+
+    from beatvegas.etl.frame_fingerprint import fingerprint, fingerprint_hash
+
+    df = pd.DataFrame({"season": [2024, 2025], "x": [1.0, 2.5]})
+    a, b = fingerprint(df), fingerprint(df)
+    b["generated_at"] = "1999-01-01T00:00:00+00:00"
+    b["platform"] = "elsewhere"
+    assert fingerprint_hash(a) == fingerprint_hash(b)
+    assert len(fingerprint_hash(a)) == 16
+    df2 = df.copy()
+    df2.loc[0, "x"] = 1.5
+    assert fingerprint_hash(fingerprint(df2)) != fingerprint_hash(a)

@@ -132,6 +132,11 @@ carries `HEALTH: <verdict> <note>`.
 3. `sunday.derived_lines_posted` missed -> `post_derived_lines.py` wrote no
    rows (it exits 1 on zero); the display-only derived lines are missing from
    the board, the model rows are fine.
+3b. `sunday.model_run_recorded` missed -> the board was scored but the refit's
+   run-log row (`model_runs`, note `weekly refit`: inputs, intercept, train
+   rows, frame fingerprint) was not written; the step log carries
+   `[model_runs] weekly refit NOT recorded: ...`. The predictions are fine; the
+   record of what produced them is missing.
 4. `sunday.pace_coverage` / `sunday.weather_coverage` missed -> TeamRankings or
    Open-Meteo was down (both steps are `continue-on-error`). The week scored
    with pace/weather NaN for the uncovered teams; re-run the enrichment step
@@ -242,6 +247,7 @@ Failure modes on record:
 | `sunday.fg_snapshot_today` | failed | at least one odds_snapshots row with market full_game_total captured since ET midnight |
 | `sunday.predictions_today` | failed | at least one predictions row for the week's games with model_version != derived_lines created since ET midnight |
 | `sunday.derived_lines_posted` | degraded | at least one predictions row for the week's games with model_version == derived_lines created since ET midnight |
+| `sunday.model_run_recorded` | degraded | a model_runs row noted `weekly refit` whose metrics name SEASON and WEEK, created since ET midnight (inputs, intercept, train rows, frame fingerprint) |
 | `sunday.pace_coverage` | degraded | share of the week's FBS slate teams with a team_tempo(SEASON, WEEK) row carrying seconds_per_play >= PACE_COVERAGE_MIN [0.8] |
 | `sunday.weather_coverage` | degraded | share of the week's FBS games with a weather row >= WX_COVERAGE_MIN [0.8] |
 | `sunday.reference_cache_populated` | degraded | the five CFBD reference files for SEASON-1 exist in data/cache/ at > REFERENCE_CACHE_MIN_BYTES [1024] bytes |
@@ -251,6 +257,7 @@ Failure modes on record:
 - **2026-09-22** -- B-SERVE: the live model scored every upcoming game with 57 of 115 inputs NaN. weekly_update.py now FAILS a scoring run whose target rows are >90% NaN on a column training has, which leaves no prediction row for the day. Caught by: `sunday.predictions_today`.
 - **2026-09-13** -- four Sunday ticks each re-ran the whole job for one capture (~1,150 Open-Meteo calls). The need_capture / need_score probes fixed the spend; the checks read the day's facts, not this run's, so a correctly skipped tick still passes. Caught by: `sunday.fg_snapshot_today`, `sunday.predictions_today`.
 - **2026-09-16** -- the CFBD reference cache saved an empty payload all season. Caught by: `sunday.reference_cache_populated`.
+- **2026-09-28** -- the refit left no record of itself: confirming the week-5 refit ran on the corrected 58 inputs meant reading the run log, while model_runs held only retrain.py's June rows. Caught by: `sunday.model_run_recorded`.
 
 ### lines_watch
 

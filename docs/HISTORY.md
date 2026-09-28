@@ -9,7 +9,8 @@ hold the rest.
 
 ## 2026-09-28
 
-- **2026-09-28 (PUBLIC-SITE RESTRUCTURE BUILT — one PR, per-page commits).** Tate's go the
+- **2026-09-28 (PUBLIC-SITE RESTRUCTURE BUILT — PR #260, merged and verified on production the
+  same evening; one PR, per-page commits).** Tate's go the
   same evening as the review (PR #258). The site is now **Board / Results / How it works**:
   the Board keeps everything and gains a two-line strip; Results opens on the bet ledger (our
   bets in units, a "could plausibly be" interval, the units curve, every bet as logged, the

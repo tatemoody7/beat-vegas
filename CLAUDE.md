@@ -72,6 +72,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and
   registered, not built; a pass of its gate licenses a paper arm, not promotion.
 - **Registry vocabulary**: add `superseded` (H-STOP, H-INSEASON-P currently read `rejected`).
+- **Vercel `DATABASE_URL`**: the pg driver warns at every cold start that `sslmode=require` changes
+  meaning in pg v9; set `sslmode=verify-full` explicitly (same behaviour as today). Seen 2026-09-28.
 
 ## Decision calendar (all times ET; GitHub crons are the backup, Vercel is the trigger)
 | When | Job | What |

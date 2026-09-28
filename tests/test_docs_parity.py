@@ -68,6 +68,17 @@ def test_the_stale_hours_the_health_check_uses_are_the_boards():
     assert int(m.group(1)) == health.STALE_AFTER_HOURS
 
 
+def test_the_close_coverage_floor_the_health_check_uses_is_the_boards():
+    """lines_watch.close_window_coverage and the board's `close_coverage` warning
+    judge the same share against the same floor (2026-09-28)."""
+    from beatvegas import health
+
+    web = _text(WEB_LIB / "boardHealth.ts")
+    m = re.search(r"export const CLOSE_COVERAGE_MIN = ([0-9.]+);", web)
+    assert m, "boardHealth.ts no longer declares CLOSE_COVERAGE_MIN"
+    assert float(m.group(1)) == health.CLOSE_COVERAGE_MIN
+
+
 # --------------------------------------------------------------------------- #
 # Numbers the docs quote
 # --------------------------------------------------------------------------- #

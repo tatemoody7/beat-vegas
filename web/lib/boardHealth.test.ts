@@ -128,6 +128,7 @@ describe("buildStatus", () => {
 import {
   CFBD_LOW_CALLS,
   CLOSE_CAPTURE_MAX_AGE_H,
+  CLOSE_COVERAGE_MIN,
   gaugesFrom,
   ODDS_LOW_CREDITS,
   opsWarnings,
@@ -166,9 +167,17 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
       updated_at: "2026-09-22T10:58:00",
       note: null,
     },
+    {
+      key: "close_coverage_pct",
+      value: "0.930",
+      updated_at: "2026-09-20T04:10:00",
+      note: "sat=2026-09-19 games=72 covered=67",
+    },
   ];
   it("parses the rows and is quiet when everything is healthy", () => {
     const g = gaugesFrom(rows);
+    expect(g.closeCoveragePct).toBe(0.93);
+    expect(g.closeCoverageNote).toBe("sat=2026-09-19 games=72 covered=67");
     expect(g.cfbdCallsRemaining).toBe(1974);
     expect(g.oddsCreditsRemaining).toBe(53946);
     expect(g.lastCloseCaptureAt?.toISOString()).toBe(
@@ -203,6 +212,35 @@ describe("operational gauges (beatvegas/ops.py -> the board)", () => {
     const keys = opsWarnings(g, now).map((w) => w.key);
     expect(keys).toEqual(["cfbd", "odds", "close"]);
     expect(CLOSE_CAPTURE_MAX_AGE_H).toBe(192);
+  });
+  it("warns when last Saturday's close polls reached too few games, naming the count", () => {
+    // 2026 week 4 as measured: 18 of 57 Hard-Rock-priced games had any 1H
+    // snapshot inside 2 h of kickoff (GitHub fired 3 of 18 close slots).
+    const g = gaugesFrom([
+      {
+        key: "close_coverage_pct",
+        value: "0.316",
+        updated_at: "2026-09-27T04:10:00",
+        note: "sat=2026-09-26 games=57 covered=18",
+      },
+    ]);
+    const w = opsWarnings(g, now);
+    expect(w.map((x) => x.key)).toEqual(["close_coverage"]);
+    expect(w[0].text).toContain("18 of 57");
+    expect(w[0].text).toContain("2026-09-26");
+    expect(CLOSE_COVERAGE_MIN).toBe(0.8);
+    // Off-season the share is stale by construction and must stay quiet.
+    expect(opsWarnings(g, now, false)).toEqual([]);
+    // A note the parser does not recognise still warns, with the share.
+    const g2 = gaugesFrom([
+      {
+        key: "close_coverage_pct",
+        value: "0.5",
+        updated_at: null,
+        note: null,
+      },
+    ]);
+    expect(opsWarnings(g2, now)[0].text).toContain("50%");
   });
   it("says nothing it does not know: missing gauges never warn, and the close check sleeps off-season", () => {
     expect(opsWarnings(gaugesFrom([]), now)).toEqual([]);

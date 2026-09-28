@@ -134,7 +134,18 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert (row.season, row.week, row.built_at) == (SEASON, WEEK, NOW)
     payload = json.loads(row.payload)
     assert payload["season"] == SEASON and payload["week"] == WEEK
-    assert payload["counts"] == {"bet": 1, "edge": 2, "pass": 1, "over_cap": 0, "degraded": 0}
+    assert {k: payload["counts"][k] for k in ("bet", "edge", "pass", "over_cap", "degraded")} == {
+        "bet": 1,
+        "edge": 2,
+        "pass": 1,
+        "over_cap": 0,
+        "degraded": 0,
+    }
+    # H-PCT-U counts ride along: every item here is Hard Rock-priced on its main line.
+    assert payload["counts"]["hr_alt"] == 0
+    assert payload["counts"]["hr_priced"] == sum(
+        1 for it in payload["items"] if it.get("hr_line") is not None
+    )
     assert payload["paper"] == {"qualifying": 2, "over_cap": 0, "cap": 5}
     ids = [it["game_id"] for it in payload["items"]]
     # BET; EDGE by gap (3: 2.6 no_hr_line, 5: 2.0 price); PASS. Outside-universe 4 dropped.

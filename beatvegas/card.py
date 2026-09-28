@@ -1396,6 +1396,15 @@ def build_card(
         "pass": sum(1 for it in public if it["tier"] == "PASS"),
         "over_cap": sum(1 for it in public if it["over_cap"]),
         "degraded": sum(1 for it in public if it["blocker"] == DEGRADED_BLOCKER),
+        # H-PCT-U (2026-09-25): how many Hard Rock quotes this build read as an
+        # alternate line (held over, never qualifying). 14 of 52 at the week-4
+        # sat_am build; the weekly review reports the share per build.
+        "hr_priced": sum(1 for it in public if it.get("hr_line") is not None),
+        "hr_alt": sum(
+            1
+            for it in public
+            if it.get("hr_centred") is False and it.get("hr_alt_line") is not None
+        ),
     }
     paper = {
         "qualifying": sum(1 for it in public if it["qualifies"]),

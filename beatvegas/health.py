@@ -42,6 +42,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
 from .ci import CARD_STATUS_BY_SLOT, PAPER_WINDOW_HOURS, SCHEDULED_SLOTS, et_midnight_as_naive_utc
 from .hardrock import HR_BOOK_KEY
+from .lines import REAL_1H_CLOSE_WINDOW_H
 from .ops import LAST_CLOSE_CAPTURE_AT, LAST_GRADE_COMPLETED_AT, read_gauge
 
 # Literal["failed", "degraded"] / Literal["ok", "degraded", "failed"] -- kept as
@@ -64,6 +65,10 @@ STALE_AFTER_HOURS = 18
 # Share of the week's FBS slate that must carry a pace row / a weather row.
 PACE_COVERAGE_MIN = 0.8
 WX_COVERAGE_MIN = 0.8
+# Share of last Saturday's Hard-Rock-priced games with a 1H snapshot inside the
+# registered close window (beatvegas/coverage.py). MUST equal
+# web/lib/boardHealth.ts CLOSE_COVERAGE_MIN (parity-tested). 2026 week 4 read 32%.
+CLOSE_COVERAGE_MIN = 0.8
 # The rule .github/actions/cfbd-cache-save applies: a reference file under this
 # is the 2-byte empty payload season_stats._cached used to leave behind.
 REFERENCE_CACHE_MIN_BYTES = 1024
@@ -76,6 +81,7 @@ PARAMETERS: Dict[str, Any] = {
     "STALE_AFTER_HOURS": STALE_AFTER_HOURS,
     "PACE_COVERAGE_MIN": PACE_COVERAGE_MIN,
     "WX_COVERAGE_MIN": WX_COVERAGE_MIN,
+    "CLOSE_COVERAGE_MIN": CLOSE_COVERAGE_MIN,
     "REFERENCE_CACHE_MIN_BYTES": REFERENCE_CACHE_MIN_BYTES,
 }
 
@@ -619,6 +625,30 @@ def lines_watch_close_gauge_written(ctx: Ctx) -> Result:
     return Result(ok, f"{LAST_CLOSE_CAPTURE_AT} updated_at={_iso(at)}")
 
 
+def lines_watch_close_window_coverage(ctx: Ctx) -> Result:
+    """On a Saturday (ET) run: the share of that Saturday's Hard-Rock-priced games
+    that have kicked off with a 1H snapshot inside the close window. The other
+    checks judge this run; this one judges the day, because a run that never
+    fired leaves no run to judge (3 of 18 slots fired, 2026 week 4). Weekday runs
+    answer n/a so a bad Saturday does not colour the whole week's verdicts -- the
+    board's `close_coverage` gauge carries it until the next Saturday."""
+    from datetime import timezone
+
+    from .coverage import ET, close_window_coverage
+
+    if ctx.now.replace(tzinfo=timezone.utc).astimezone(ET).weekday() != 5:
+        return Result(True, "n/a, not a Saturday run")
+    r = close_window_coverage(ctx.session, ctx.now)
+    if r is None:
+        return Result(True, "n/a, no Hard-Rock-priced game has kicked off yet")
+    detail = (
+        f"{r['covered']}/{r['games']} Hard-Rock-priced games kicked off Sat {r['date']} with a "
+        f"1H snapshot inside {REAL_1H_CLOSE_WINDOW_H:g} h of kickoff ({r['share']:.0%}, "
+        f"floor {CLOSE_COVERAGE_MIN:.0%})"
+    )
+    return Result(r["share"] >= CLOSE_COVERAGE_MIN, detail)
+
+
 def lines_watch_info(ctx: Ctx) -> Dict[str, str]:
     st = ctx.status_files.get("close")
     out: Dict[str, str] = {}
@@ -860,7 +890,7 @@ CONTRACTS: Dict[str, Contract] = {
     "lines_watch": Contract(
         job="lines_watch",
         workflow="lines_watch.yml",
-        window="every 30 min in the kickoff windows (1h_close); the free /events pre-check skips a slot with nothing kicking off in 75 min",
+        window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check skips a slot with nothing kicking off in 75 min, the poll itself looks 120 min ahead",
         artifacts=("odds_snapshots 1H rows or last_seen_at stamps", "last_close_capture_at gauge"),
         inputs=("MARKET",),
         checks=(
@@ -882,12 +912,22 @@ CONTRACTS: Dict[str, Contract] = {
                 "when events were polled: the `last_close_capture_at` gauge was written after RUN_STARTED_AT",
                 lines_watch_close_gauge_written,
             ),
+            Check(
+                "lines_watch.close_window_coverage",
+                "degraded",
+                "on a Saturday (ET) run: share of that Saturday's kicked-off Hard-Rock-priced games with a 1H_total snapshot captured or re-seen inside REAL_1H_CLOSE_WINDOW_H of kickoff >= CLOSE_COVERAGE_MIN [0.8]",
+                lines_watch_close_window_coverage,
+            ),
         ),
         failure_modes=(
             FailureMode(
                 "2026-08-28",
-                "GitHub's cron fired 2 of 19 scheduled close slots (and 3 of 18 Saturday slots in 2026 week 4); a dead run of them is what the board's `close` gauge warning (CLOSE_CAPTURE_MAX_AGE_H) and, since 2026-09-28, the Vercel `lines-close` dispatch cover, which is why no check here is failed-severity.",
-                ("lines_watch.close_polled", "lines_watch.close_gauge_written"),
+                "GitHub's cron fired 2 of 19 scheduled close slots (and 3 of 18 Saturday slots in 2026 week 4, leaving 18 of 57 Hard-Rock-priced games with a close inside the window while the `close` gauge stayed fresh); since 2026-09-28 the Vercel `lines-close` dispatch is the cover, `close_window_coverage` and the board's `close_coverage` gauge are the alarm, and the board's `close` gauge (CLOSE_CAPTURE_MAX_AGE_H) still catches a dead week. No check here is failed-severity: the run that never fired cannot email.",
+                (
+                    "lines_watch.close_polled",
+                    "lines_watch.close_gauge_written",
+                    "lines_watch.close_window_coverage",
+                ),
             ),
             FailureMode(
                 "2026-09-09",

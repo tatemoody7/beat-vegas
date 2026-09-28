@@ -1,7 +1,7 @@
 # Beat Vegas — The "BV line" (independent number vs Vegas, ranked by gap)
 
 > Upload this file as **knowledge** in the claude.ai Project alongside
-> `PROJECT_BRIEF.md`, `GLOSSARY.md`, and `README.md`. It documents the BV-line
+> `GLOSSARY.md` and `README.md`. It documents the BV-line
 > feature: what it is, why it's built this way, how to operate it, and how to read
 > it honestly. Research / decision-support only — it never places bets.
 

@@ -128,9 +128,10 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // games ever had a 1H snapshot inside the registered 2-hour close window
     // (wk2 25/72, wk3 27/72, wk4 18/57) -- and H-STOP-2's line-value clock
     // takes only those. This is the backup: one Hobby entry per UTC hour from
-    // 15Z Saturday to 03Z Sunday, each firing once within its hour, every tick
-    // dispatching (everyTick). With --kickoff-within-min 120 in the workflow,
-    // ticks up to 119 minutes apart still reach every kickoff inside 2 h.
+    // 15Z Saturday to 04Z Sunday, each firing once within its hour, every tick
+    // dispatching (everyTick); 14 entries, 15Z Saturday to 04Z Sunday. With
+    // CLOSE_LOOKAHEAD_MIN=120 in the workflow, ticks up to 119 minutes apart
+    // still reach every kickoff inside 2 h.
     // Window: 10:00am ET to midnight ET Saturday. The 04Z Sunday entry is
     // 11pm EST Saturday (in window from November) and 00:00 EDT Sunday in
     // summer, when this route refuses it as wrong_day at no cost.

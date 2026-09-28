@@ -34,7 +34,8 @@ proxy_line:
   default_ratio: 0.52
 
 odds_api:
-  # Paid 100K-credit plan since 2026-09-06 (was the free 500/mo key): https://the-odds-api.com/  (or export ODDS_API_KEY)
+  # Paid plan since 2026-09-06 (was the free 500/mo key): 100K until the 2026-10-06 renewal,
+  # then the 20K plan (docs/OPS_ACCOUNTS.md). https://the-odds-api.com/  (or export ODDS_API_KEY)
   api_key: ""
   base_url: "https://api.the-odds-api.com/v4"
   sport: "americanfootball_ncaaf"

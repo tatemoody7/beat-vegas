@@ -27,7 +27,7 @@ plan; nothing here has been changed yet.
 | Model ledger | `scripts/grade.py::is_model_bet`, `grade_model`, `MODEL_BET_THRESHOLD` | retire the "Model 1H" `Result` rows; the Results page's Model card goes with them |
 | Parity constants | `model/score.py::MODEL_BET_THRESHOLD`, `web/lib/verdict.ts::MODEL_BET_THRESHOLD`, `tests/test_gate_parity.py` | delete on both sides in one PR (the parity test enumerates every numeric export in `verdict.ts`) |
 | Web | `verdict.ts` (`underScore` input), `homeBoard.ts`, `records.ts` (`under_score` column + CSV), `proof.ts`, `GLOSSARY.md` "Under Score" entry | remove the input and the column; the records CSV loses `under_score` |
-| Docs | `BV_LINE.md`, `PROJECT_BRIEF.md`, `GLOSSARY.md`, `BETTING_POLICY.md` | strike "secondary lean" and the 0–100 index |
+| Docs | `BV_LINE.md`, `GLOSSARY.md`, `BETTING_POLICY.md` | strike "secondary lean" and the 0–100 index |
 
 ## What stays
 

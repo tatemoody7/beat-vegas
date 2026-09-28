@@ -13,8 +13,9 @@ modes, driven by lines_watch.yml / card.yml:
     # opener sweep: Hard Rock-priced games in the next 6 days that have no HR
     # 1H line yet (a game stops being paid for once it is captured)
     python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
-    # per-game close: only games kicking off within the next 75 minutes
-    python scripts/poll_lines.py --hr-universe --kickoff-within-min 75 --hours-back 0
+    # per-game close: only games kicking off within CLOSE_LOOKAHEAD_MIN (120, one
+    # env in lines_watch.yml shared by the free pre-check and this poll)
+    python scripts/poll_lines.py --hr-universe --kickoff-within-min 120 --hours-back 0
     # full refresh of the rolling week (the Tue-Sat morning card, beatvegas/ci.py SWEEP_ARGS)
     python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 6
 

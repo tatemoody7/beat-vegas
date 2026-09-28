@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { glossaryTerms } from "./glossary";
-import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "./grade";
 import {
   BET_GAP_PTS,
   EV_FLOOR_PCT,
@@ -12,7 +11,8 @@ describe("glossary", () => {
   const terms = glossaryTerms(10);
 
   it("defines every term with a body", () => {
-    expect(terms.length).toBeGreaterThanOrEqual(15);
+    // Ten since 2026-09-28: one line per word a visitor-facing page uses.
+    expect(terms.length).toBe(10);
     for (const t of terms) {
       expect(t.term.trim()).not.toBe("");
       expect(t.body.trim().length).toBeGreaterThan(20);
@@ -30,8 +30,6 @@ describe("glossary", () => {
       EV_FLOOR_PCT,
       STRONG_GAP_PTS,
       WEEKLY_BET_CAP,
-      SCORE_BET_MIN,
-      SCORE_WATCH_MIN,
     ]) {
       expect(all).toContain(String(n));
     }

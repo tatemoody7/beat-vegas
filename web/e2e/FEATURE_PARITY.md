@@ -69,6 +69,17 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [proof] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp (the bet time, with the log time when the ticket was logged later) with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — proof.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
 - [proof] `GET /api/bets?season=` streams every pick as CSV with the documented 31 columns (bet_at_utc beside placed_at_utc), the stored clv beside its displayed negation; a bad season is a 400 — proof.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
 
+## How it works
+
+- [how] The page opens on what this is, the three-colour key for the Board (with the best time to look) and where bets are priced — how-it-works.spec.ts › "says what this is, how to read the Board and where bets are priced"
+- [how] The (hist_2023_25, fbs_only, real, cap5, all) bucket is headed `Backtest, 2023–25 (not money bet)`: win rate, W-L-P, units, ROI, a "could plausibly be" interval, no "Without the cap" sentence — how-it-works.spec.ts › "the backtest is headed as a backtest and carries the cap-5 record"
+- [how] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — how-it-works.spec.ts › "the gap ladder draws one bar per band and the break-even line"
+- [how] The real-close records table is the one uncapped 2023–25 row with its interval — how-it-works.spec.ts › "the real-close records table is the one uncapped row"
+- [how] The glossary sits at `#glossary` (where `/glossary` redirects) with exactly the ten visitor terms in order — how-it-works.spec.ts › "the glossary is where /glossary lands, with the visitor's ten terms"
+- [how] The page links to `/records` and names 1-800-GAMBLER — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
+- [how] Signed in: the `<season> so far` panel, the flags with the multiple-comparisons note, and the Method fold (opens on a click, estimated-line table, nothing coloured) — how-it-works.spec.ts › "signed in, the live season panel, the flags and the method fold follow"
+- [how] Signed out: the backtest shows, the research section does not — how-it-works.spec.ts › "a visitor reads the page without the research section"
+
 ## Every game we have rated
 
 - [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — proof-records.spec.ts › "opens on the latest graded week and shows only its rows"

@@ -55,18 +55,17 @@ test.describe("signed out", () => {
     await expect(page.getByRole("button", { name: "Lock" })).toHaveCount(0);
   });
 
-  test("the game page offers the way in, and remembers the game", async ({
+  test("the game page offers no way to log; the footer's Unlock is the way in", async ({
     page,
   }) => {
     await page.goto("/game/900002");
-    const link = page.getByRole("link", { name: "Unlock to log a pick" });
-    await expect(link).toBeVisible();
-    expect(await link.getAttribute("href")).toBe(
-      `/login?next=${encodeURIComponent("/game/900002")}`,
-    );
+    await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Log this bet/ }),
     ).toHaveCount(0);
+    await expect(
+      page.locator("footer").getByRole("link", { name: "Unlock" }),
+    ).toHaveAttribute("href", "/login");
   });
 
   test("a wrong password is a 401 and the form says so", async ({

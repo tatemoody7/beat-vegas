@@ -476,27 +476,37 @@ export default function GameDetail({
         >
           {resultLine ?? edge.action}
         </p>
+        {/* Said once on the page a visitor acts from (site review 2026-09-28):
+            the number is a Florida book's. */}
+        {!played && (
+          <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
+            Priced at Hard Rock Bet (Florida). Your book’s first-half total may
+            differ; the line and price to beat are the ones shown.
+          </p>
+        )}
 
-        <div className="mt-4 border-t border-[var(--border)] pt-3">
-          <LogPickButton
-            authed={authed}
-            unitUsd={unitUsd}
-            prefill={{
-              gameId: row.gameId,
-              away: row.away,
-              home: row.home,
-              line: check?.hrLine ?? line,
-              price: check?.hrUnderPrice ?? null,
-              verdict: edge.verdict.verdict,
-              reason: edge.verdict.reason,
-              gap: edge.verdict.hrGap,
-              ev: check?.ev ?? null,
-              hrLine: check?.hrLine ?? null,
-            }}
-            picked={g.picked}
-            kickedOff={g.kickedOff}
-          />
-        </div>
+        {authed && (
+          <div className="mt-4 border-t border-[var(--border)] pt-3">
+            <LogPickButton
+              authed={authed}
+              unitUsd={unitUsd}
+              prefill={{
+                gameId: row.gameId,
+                away: row.away,
+                home: row.home,
+                line: check?.hrLine ?? line,
+                price: check?.hrUnderPrice ?? null,
+                verdict: edge.verdict.verdict,
+                reason: edge.verdict.reason,
+                gap: edge.verdict.hrGap,
+                ev: check?.ev ?? null,
+                hrLine: check?.hrLine ?? null,
+              }}
+              picked={g.picked}
+              kickedOff={g.kickedOff}
+            />
+          </div>
+        )}
       </section>
 
       <LinesSection g={g} />

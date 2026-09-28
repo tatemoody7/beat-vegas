@@ -170,16 +170,16 @@ test.describe("the game page", () => {
   test.describe("signed out", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("offers 'Unlock to log a pick' pointing back at the game", async ({
+    test("a visitor reads the decision and the Hard Rock note, with no way to log", async ({
       page,
     }) => {
       await page.goto(`/game/${BET_OPEN}`);
-      const link = page.getByRole("link", { name: "Unlock to log a pick" });
-      await expect(link).toBeVisible();
-      await expect(link).toHaveAttribute(
-        "href",
-        `/login?next=${encodeURIComponent(`/game/${BET_OPEN}`)}`,
+      const card = page.locator("section.bv-card").first();
+      await expect(card).toContainText(
+        "Priced at Hard Rock Bet (Florida). Your book’s first-half total may differ; the line and price to beat are the ones shown.",
       );
+      await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
     });
   });
 
@@ -216,7 +216,11 @@ test.describe("the game page", () => {
         "No sportsbook has posted a first-half total for this game yet.",
       ),
     ).toBeVisible();
-    await expect(page.getByText("Our reference line")).toBeVisible();
+    // The sentence now names the basis too ("our reference line is 0.4
+    // above"), so the Lines row is matched exactly.
+    await expect(
+      page.getByText("Our reference line", { exact: true }),
+    ).toBeVisible();
   });
 
   test("a non-numeric id and an unknown id are 404s", async ({

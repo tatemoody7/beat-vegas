@@ -250,6 +250,24 @@ def test_model_pass_leans_over_wording():
     )
 
 
+def test_pass_sentence_names_the_market_line_when_hard_rock_has_none():
+    # Site review 2026-09-28: a row that reads "no line yet" must not then say
+    # "the line is 0.2 above our number". The noun follows gap_basis.
+    snaps = market(1, 22.2)
+    it = only(card([game()], snaps, [model(1, 22.0)]))
+    assert it["gap_basis"] == "market" and it["tier"] == "PASS"
+    assert it["action"] == (
+        "Pass: the market line is 0.2 above our number. It needs 24.0 or higher."
+    )
+
+
+def test_pass_sentence_on_our_number_says_so():
+    snaps = [snap(1, "hardrockbet", 22.0)] + market(1, 22.0)
+    it = only(card([game()], snaps, [model(1, 22.0)]))
+    assert it["gap"] == 0.0 and it["tier"] == "PASS"
+    assert it["action"] == "Pass: the line sits on our number. Nothing to bet."
+
+
 def test_hard_rock_gap_gates_the_bet_not_the_consensus_gap():
     # Market clears the bar, Hard Rock's own number is lower but within 0.5.
     snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 24.5)

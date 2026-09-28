@@ -8,7 +8,7 @@ import {
 } from "./verdict";
 
 describe("glossary", () => {
-  const terms = glossaryTerms(10);
+  const terms = glossaryTerms();
 
   it("defines every term with a body", () => {
     // Ten since 2026-09-28: one line per word a visitor-facing page uses.
@@ -35,16 +35,7 @@ describe("glossary", () => {
     }
   });
 
-  it("reads the unit size from the bankroll rather than hard-coding it", () => {
-    const at10 = glossaryTerms(10);
-    const at25 = glossaryTerms(25);
-    const differing = at10.filter((t, i) => t.body !== at25[i].body);
-    // At least one entry moves with the unit, and every entry that moves does
-    // so only where the money appears.
-    expect(differing.length).toBeGreaterThan(0);
-    for (const t of differing) {
-      expect(t.body).toContain("$10");
-    }
-    expect(at25.some((t) => t.body.includes("$25"))).toBe(true);
+  it("prints no dollar figure (no stake size is public since 2026-09-28)", () => {
+    for (const t of terms) expect(t.body).not.toMatch(/\$\d/);
   });
 });

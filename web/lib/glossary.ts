@@ -1,4 +1,3 @@
-import { usd } from "@/lib/format";
 import {
   BET_GAP_PTS,
   EV_FLOOR_PCT,
@@ -17,11 +16,12 @@ import {
 // Copy rule (spec §26): NO NUMBER IS TYPED HERE. Every threshold is read from
 // the constant that enforces it, so the copy cannot drift from the rules —
 // which is exactly how the old entry came to claim "2% of vig" when the price
-// floor was 5%. lib/glossary.test.ts enforces that rule.
+// floor was 5%. lib/glossary.test.ts enforces that rule. No dollar figure is
+// public since 2026-09-28, so the unit size is not printed either.
 
 export type GlossaryTerm = { term: string; body: string };
 
-export function glossaryTerms(unitUsd: number): GlossaryTerm[] {
+export function glossaryTerms(): GlossaryTerm[] {
   return [
     {
       term: "Gap",
@@ -49,7 +49,7 @@ export function glossaryTerms(unitUsd: number): GlossaryTerm[] {
     },
     {
       term: "Unit",
-      body: `One bet, always ${usd(unitUsd)}. Results read in units so they compare whatever the dollars are; ROI is units won over units risked.`,
+      body: "One bet, always the same size. Results read in units so they compare whatever the dollars are; ROI is units won over units risked.",
     },
     {
       term: "Paper pick",

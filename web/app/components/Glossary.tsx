@@ -1,5 +1,4 @@
 import { glossaryTerms } from "@/lib/glossary";
-import { bankrollEnv } from "@/lib/homeBoard";
 
 // The terms, at the foot of the evidence page, next to the numbers they
 // define. Two columns of one-liners, no cards and no fold: 16 boxes were the
@@ -7,8 +6,7 @@ import { bankrollEnv } from "@/lib/homeBoard";
 // (2026-09-16). The `#glossary` anchor is what /glossary redirects to.
 
 export default function Glossary() {
-  const { unitUsd } = bankrollEnv();
-  const terms = glossaryTerms(unitUsd);
+  const terms = glossaryTerms();
   return (
     <section id="glossary" className="mt-10">
       <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">

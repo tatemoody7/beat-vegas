@@ -539,6 +539,102 @@ CHALLENGER: Dict[str, Any] = {
 }
 
 
+# ------------------------------------------------- H-NEGGAP-P: paper OVERS (2026-09-28)
+#
+# The negative-gap "overs" band: Hard Rock's MAIN first-half line sitting BELOW our
+# number. 2026 weeks 2-4 went 26 over of 38, but 23 of the 38 were Hard Rock
+# alternate lines the feed served as the main total (H-PCT-U); on main lines it is
+# 10 of 15 and 0 of 4 in week 4 (docs/TWO_SIDED.md, live section). Registered as a
+# prospective PAPER-ONLY family of three nested arms, judged on the same two clocks
+# as the champion with the champion's own sigmas (H-STOP-2's, reused deliberately:
+# the arm is held to the champion's bar in the champion's units, not to a sigma
+# estimated on 15 rows). Budget 5% split /3 arms (Bonferroni) then /2 clocks.
+#
+# SIGN: stored clv is closing - bet for every row; for an OVER the favourable
+# direction is a RISING line, so favourable line value is +(closing - bet) -- the
+# reverse of the under ledger. scripts/neggap_position.py applies it.
+#
+# docs/NEGGAP_PAPER.md quotes these; tests/test_stopping.py pins it.
+NEGGAP: Dict[str, Any] = {
+    "registered_on": "2026-09-28",
+    "design": "sprt",
+    "arms": ["neggap_lt0", "neggap_le175", "neggap_le3"],
+    "arm_gap_max": {"neggap_lt0": 0.0, "neggap_le175": -1.75, "neggap_le3": -3.0},
+    "side": "over",
+    "alpha_total": 0.05,
+    "multiplicity": "bonferroni",
+    "alpha_arm": 0.05 / 3,  # 1.667% per arm
+    "alpha_clock": 0.05 / 3 / 2,  # 0.833% per arm-clock
+    "power": 0.80,
+    "edge": REGISTERED_2[
+        "edge"
+    ],  # 4 pp over EACH pick's own break-even (mu1_for_price on the OVER price)
+    "sigma": REGISTERED_2["sigma"],  # 0.929 / 1.371, the champion's, treated as known
+    "mu1": {
+        "profit": "0.04 / break-even, per pick (mu1_for_price)",
+        "clv": REGISTERED_2["mu1"]["clv"],
+    },
+    "clv_sign": +1,  # favourable line value for an OVER = +(closing - bet)
+    "close_window_h": REGISTERED_2["close_window_h"],
+    "universe": (
+        "H-PCT-U: Hard-Rock-priced games whose NEWEST Hard Rock quote is its main line "
+        "(hr_live), with a model read and a Hard Rock OVER price, at the Friday-anchored "
+        "decision build with the champion's paper windows; gap = hr_line - bv_line"
+    ),
+    "observation": "one paper OVER per game per arm (challenger_picks, side=over) -- never manual_picks",
+    "profit_clock": "priced picks only, at Hard Rock's OVER price as captured at the build",
+    "clv_clock": "every pick whose consensus close was confirmed inside the window",
+    "pass": "BOTH clocks cross A",
+    "drop": "EITHER clock crosses B",
+    "on_pass": (
+        "a finding for Tate; if more than one arm passes no threshold is chosen here -- "
+        "that needs its own registered row; real money on overs is licensed by nothing"
+    ),
+    "touches": "nothing live -- no real-money selection, no model edit, H-STOP-2 unchanged",
+}
+
+
+def neggap_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, Any]:
+    """The running position of every NEGGAP arm. `arms` maps an arm label to
+    {"units": [...], "prices": [...], "clv": [...], "clv_in_window": [...]} in
+    placed order, where clv is ALREADY favourable for an over (+(closing - bet)).
+    Same clock shape as registered_position_2 (per-pick profit alternative from
+    the OVER price, closes outside the window excluded and counted), the family
+    verdict shape of challenger_position."""
+    c = NEGGAP
+    out: Dict[str, Any] = {"registered": {k: v for k, v in c.items()}, "arms": {}}
+    for label, obs in sorted(arms.items()):
+        u = np.asarray(obs.get("units", []), float)
+        pr = np.asarray(obs.get("prices", []), float)
+        keep = ~np.isnan(u) & ~np.isnan(pr) if len(u) else np.zeros(0, bool)
+        mu_profit = np.array([mu1_for_price(p, c["edge"]) for p in pr[keep]])
+        profit = sprt_clock(u[keep], mu_profit, c["sigma"]["profit"], c["alpha_clock"], c["power"])
+        cl = np.asarray(obs.get("clv", []), float)
+        ok = np.asarray(obs.get("clv_in_window", [True] * len(cl)), bool)
+        c_ok = cl[ok]
+        clv_clock = sprt_clock(
+            c_ok,
+            np.full(len(c_ok), c["mu1"]["clv"]),
+            c["sigma"]["clv"],
+            c["alpha_clock"],
+            c["power"],
+        )
+        clv_clock["excluded_no_close_in_window"] = int((~ok).sum())
+        pos: Dict[str, Any] = {
+            "design": c["design"],
+            "clocks": {"profit": profit, "clv": clv_clock},
+        }
+        verdicts = {k: v.get("verdict") for k, v in pos["clocks"].items()}
+        passed = bool(verdicts) and all(v == "success" for v in verdicts.values())
+        dropped = any(v == "failure" for v in verdicts.values())
+        pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
+        out["arms"][label] = pos
+    passers = [a for a, p in out["arms"].items() if p["family_verdict"] == "PASS"]
+    out["passers"] = passers
+    out["may_name_threshold"] = len(passers) == 1
+    return out
+
+
 def challenger_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, Any]:
     """The running position of every arm, under the challenger's own budget.
 

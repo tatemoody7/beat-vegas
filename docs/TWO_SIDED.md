@@ -73,7 +73,9 @@ distinguish from noise. Two other things the live number carried: the pre-B-SERV
 ran ~2 points below the market (`docs/MODEL_LEVEL_2026.md`), which moved games INTO the
 negative band, and first halves run hot in weeks 1–3 of every season (week 4's slate went
 56% under). Whether the band survives the corrected level is what the weeks from 5 on
-measure. Read all of it as the picture that prompted the question, not as a result — the
+measure, and **H-NEGGAP-P** (`docs/NEGGAP_PAPER.md`, registered 2026-09-28) is the
+prospective paper-only test of the over side on main lines: three nested arms, the
+champion's clocks and sigmas, nothing at real money. Read all of it as the picture that prompted the question, not as a result — the
 history above is the answer.
 
 **One more thing the table says.** The **0 .. 1** band — a small positive gap —

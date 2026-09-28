@@ -229,3 +229,56 @@ def test_clock_2_failure_boundary_pauses_real_money():
     pos = S.registered_position_2([-1.0] * 40, [-110] * 40, [], [])
     assert pos["clocks"]["profit"]["verdict"] == "failure"
     assert pos["real_money"] == "PAUSE"
+
+
+def test_neggap_is_registered_as_written_and_the_doc_quotes_it():
+    """H-NEGGAP-P (2026-09-28): paper OVERS on the negative-gap band, three nested
+    arms, the champion's clocks and sigmas, Bonferroni across the arms."""
+    n = S.NEGGAP
+    assert n["design"] == "sprt" and n["side"] == "over" and n["clv_sign"] == +1
+    assert n["arms"] == ["neggap_lt0", "neggap_le175", "neggap_le3"]
+    assert n["arm_gap_max"] == {"neggap_lt0": 0.0, "neggap_le175": -1.75, "neggap_le3": -3.0}
+    assert n["alpha_clock"] == pytest.approx(0.05 / 6) and n["power"] == 0.80
+    assert n["sigma"] == S.REGISTERED_2["sigma"] == {"profit": 0.929, "clv": 1.371}
+    assert n["edge"] == 0.04 and n["mu1"]["clv"] == 0.50
+    b = S.sprt_bounds(n["alpha_clock"], 1 - n["power"])
+    doc = (ROOT / "docs" / "NEGGAP_PAPER.md").read_text()
+    for token in (
+        f"+{b['A']:.4f}",
+        f"−{abs(b['B']):.4f}",
+        "0.929",
+        "1.371",
+        "0.833%",
+        "0.04 / b",
+        "10 over of 15",
+        "23 of the 38",
+    ):
+        assert token in doc, token
+    low = " ".join(doc.lower().split())  # the doc wraps at 90 columns
+    assert "licenses nothing at real money" in low
+    assert "if more than one arm passes no threshold is chosen" in low
+    assert "reverse of the under ledger" in low
+    # The champion's clock is untouched.
+    assert S.REGISTERED_2["alpha_clock"] == 0.025
+
+
+def test_neggap_position_uses_the_over_price_and_excludes_stale_closes():
+    pos = S.neggap_position(
+        {
+            "neggap_lt0": {
+                "units": [0.625, -1.0, float("nan")],
+                "prices": [-160, -110, float("nan")],
+                "clv": [1.0, -0.5, 2.0, 0.0],
+                "clv_in_window": [True, False, True, True],
+            },
+            "neggap_le3": {"units": [], "prices": [], "clv": [], "clv_in_window": []},
+        }
+    )
+    a = pos["arms"]["neggap_lt0"]
+    assert a["clocks"]["profit"]["n"] == 2  # the unpriced row leaves the profit clock
+    assert a["clocks"]["clv"]["n"] == 3 and a["clocks"]["clv"]["excluded_no_close_in_window"] == 1
+    assert a["family_verdict"] == "accruing" and a["clocks"]["profit"]["bounds"][
+        "A"
+    ] == pytest.approx(S.sprt_bounds(0.05 / 6, 0.2)["A"])
+    assert pos["arms"]["neggap_le3"]["clocks"]["profit"]["status"] == "no observations"
+    assert pos["passers"] == [] and pos["may_name_threshold"] is False

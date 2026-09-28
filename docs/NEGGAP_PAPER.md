@@ -80,7 +80,13 @@ pins the numbers to this document.
 
 No real-money selection, no model edit, no change to `BET_GAP_PTS`, the slate bar, the
 price gate or H-STOP-2. The collection is switched on by `NEGGAP_COLLECT=1` in `card.yml`
-and off by unsetting it.
+(the build step's env, decision builds only — a `--no-paper` manual build logs nothing) and
+off by unsetting it. Code: `beatvegas/neggap.py` (arms, universe, the writer),
+`beatvegas/grading.py` / `beatvegas/picks.py` graded side-aware (`result` stays the
+outcome; units pay the over; the no-vig price CLV flips sign), `lines.book_closing_price_
+before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (also
+`study.yml` → `neggap_position`). `challenger_picks.closing_captured_at` is new: run
+`migrate.yml` before the first grade of an over row.
 
 ## Data note
 

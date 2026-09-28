@@ -317,6 +317,9 @@ jobs:
           SLOT: ${{ steps.slot.outputs.slot }}
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
           NO_PAPER: ${{ steps.slot.outputs.no_paper }}
+          # H-NEGGAP-P (docs/NEGGAP_PAPER.md): the paper OVER arms log beside the
+          # champion's paper picks. Unset to switch the collection off.
+          NEGGAP_COLLECT: "1"
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |

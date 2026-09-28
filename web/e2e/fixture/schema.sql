@@ -133,6 +133,7 @@ CREATE TABLE public.challenger_picks (
     in_season_n integer,
     in_season_weight double precision,
     gap_at_pick double precision,
+    closing_captured_at timestamp without time zone,
     graded boolean,
     actual_first_half_total integer,
     result character varying,

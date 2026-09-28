@@ -54,6 +54,11 @@ _MIGRATIONS = {
         "over_cap": "BOOLEAN",
         "cap_rank": "FLOAT",
     },
+    # The over arms' ledger (H-NEGGAP-P, 2026-09-28): the close's age, which
+    # grade_pick has always written and this table never had a column for.
+    "challenger_picks": {
+        "closing_captured_at": "TIMESTAMP",
+    },
     "manual_picks": {
         # The close price, kept apart from the price at the DECISION -- see the
         # column comment on ManualPick.closing_price for why that matters.

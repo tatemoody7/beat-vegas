@@ -176,9 +176,14 @@ def graded_pick_fields(
     fair_close=None,
     is_bonus: bool = False,
     closing_price=None,
+    side: str = "under",
 ) -> dict:
     """Pure: the graded ManualPick fields for one pick + its line snapshots.
     `price` None (an unpriced line) grades the result and CLV but no units.
+    `side` is "under" for every ledger row real money can hold; the H-NEGGAP-P
+    paper OVERS (challenger_picks, 2026-09-28) pass "over": `result` stays the
+    OUTCOME, units pay the over, and the no-vig price CLV flips sign (the over's
+    fair price is one minus the under's). Stored `clv` is closing - bet for both.
 
     A BONUS bet is floored at zero units: the book funded the stake, so a loss
     costs nothing. The win side needs no adjustment - `units_won` already
@@ -186,9 +191,12 @@ def graded_pick_fields(
     not returned). Without the floor a losing $20 bonus would book -2 units
     against a bankroll that never lost them, and the whole point of this ledger
     is that the bankroll curve is true."""
-    units = None if price is None else stake * units_won(actual_first_half, line, price)
+    units = None if price is None else stake * units_won(actual_first_half, line, price, side)
     if units is not None and is_bonus:
         units = max(0.0, units)
+    clv_prob = price_clv_under(fair_open, fair_close)
+    if clv_prob is not None and side == "over":
+        clv_prob = -clv_prob
     return {
         "actual_first_half_total": actual_first_half,
         "result": under_result(actual_first_half, line),
@@ -196,7 +204,7 @@ def graded_pick_fields(
         "opening_line": opening,
         "closing_line": closing,
         "clv": clv_under(line, closing) if closing is not None else None,
-        "clv_prob": price_clv_under(fair_open, fair_close),
+        "clv_prob": clv_prob,
         # Stored beside `price`, never into it. See the ManualPick column comment.
         "closing_price": closing_price,
     }
@@ -271,8 +279,9 @@ def grade_pick(session, pick, game) -> bool:
     # an off-centre rung on 26 of 28 late quotes), the closing PRICE is correctly
     # the book's own: it is what you could have taken at that book at the close.
     book = normalize_book(pick.book)
+    side = (getattr(pick, "side", None) or "under").lower()
     closing_price = (
-        book_closing_price_before_kickoff(snaps, game.start_date, book) if book else None
+        book_closing_price_before_kickoff(snaps, game.start_date, book, side=side) if book else None
     )
     fair_open, fair_close = fair_under_before_kickoff(snaps, game.start_date)
     for k, v in graded_pick_fields(
@@ -286,6 +295,7 @@ def grade_pick(session, pick, game) -> bool:
         fair_close,
         is_bonus=bool(getattr(pick, "is_bonus", False)),
         closing_price=closing_price,
+        side=side,
     ).items():
         setattr(pick, k, v)
     # The age of the close is a fact about the close, stored beside it. A dropped

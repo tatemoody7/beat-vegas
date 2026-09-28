@@ -851,12 +851,27 @@ def test_every_vercel_cron_job_input_is_declared_by_its_workflow():
     green no-op forever. Read the table out of the TypeScript by regex (the
     `lines-close` job added 2026-09-28 is the first to carry a non-slot input)."""
     ts = (Path(__file__).resolve().parent.parent / "web" / "lib" / "cronJobs.ts").read_text()
-    entries = re.findall(
-        r'workflow:\s*"([a-z_]+\.yml)",(.*?)inputs:\s*\{([^}]*)\}', ts, flags=re.S
-    )
+    entries = re.findall(r'workflow:\s*"([a-z_]+\.yml)",(.*?)inputs:\s*\{([^}]*)\}', ts, flags=re.S)
     assert entries, "no CRON_JOBS entries parsed from cronJobs.ts"
     for workflow, _between, inputs in entries:
         keys = re.findall(r"([a-zA-Z_]+)\s*:", inputs)
-        declared = (_on(_load(WF_DIR / workflow)).get("workflow_dispatch") or {}).get("inputs") or {}
+        declared = (_on(_load(WF_DIR / workflow)).get("workflow_dispatch") or {}).get(
+            "inputs"
+        ) or {}
         for k in keys:
-            assert k in declared, f"cronJobs.ts sends input {k!r} to {workflow}, which does not declare it"
+            assert k in declared, (
+                f"cronJobs.ts sends input {k!r} to {workflow}, which does not declare it"
+            )
+
+
+def test_neggap_collection_is_switched_on_only_in_the_card_build():
+    """H-NEGGAP-P (2026-09-28): the paper over arms log from the decision builds;
+    no other workflow may set NEGGAP_COLLECT."""
+    for p in _workflows():
+        text = p.read_text()
+        if p.name == "card.yml":
+            assert 'NEGGAP_COLLECT: "1"' in text
+        else:
+            assert "NEGGAP_COLLECT" not in text, p.name
+    data = _load(WF_DIR / "study.yml")
+    assert "neggap_position" in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]

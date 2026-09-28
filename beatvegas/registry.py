@@ -47,6 +47,7 @@ STATUSES = frozenset(
         "tested-positive",
         "live-tracking",
         "rejected",
+        "superseded",
         "adopted",
     }
 )

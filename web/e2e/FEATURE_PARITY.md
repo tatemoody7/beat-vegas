@@ -16,15 +16,17 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
 - [board] The `N bet · N watch · N pass` counts line matches the derived tiers — board.spec.ts › "states the tier counts"
-- [board] The H-PCT bar sentence (U+2019 apostrophe, two-decimal bar, share, universe, clearing count) is exact — board.spec.ts › "states this week’s bar exactly"
-- [board] The answer bar names the live bet, the placed one (muted, `bet logged`), the three closest with their `needs …` clause, and a `Next build <window> ET` line — board.spec.ts › "the answer bar names the live bet, the placed one, the closest three and the next build"
+- [board] The H-PCT bar sentence (`Bar this week: <bar> pts (top <share>% of <n> priced games).`, one decimal, no gate clause since 2026-09-28) is exact — board.spec.ts › "states this week’s bar exactly"
+- [board] The two-line strip (what this is, green means bet, the record is on Results) opens the page and links to How it works — board.spec.ts › "opens with the two-line strip that says what this is"
+- [board] The answer bar names the live bet, the placed one (muted, `bet logged`), the three closest with their `needs …` clause, and a `Next update <window> ET` line — board.spec.ts › "the answer bar names the live bet, the placed one, the closest three and the next update"
 - [board] A game with a real ticket carries the `bet logged` chip and no other row does — board.spec.ts › "marks the game with a logged ticket"
 - [board] The Hard Rock chip sets `?hr=1`, reads `aria-pressed`, hides games without a Hard Rock line and states the pre-filter count — board.spec.ts › "the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line"
-- [board] My teams sets `?mine=1`, clears `hr`, shows only MY_TEAMS rows; clicking the active chip clears it — board.spec.ts › "My teams shows only the followed program, one filter at a time"
+- [board] My teams (signed in) sets `?mine=1`, clears `hr`, shows only MY_TEAMS rows; clicking the active chip clears it — board.spec.ts › "My teams shows only the followed program, one filter at a time"
+- [board] Signed out, the Hard Rock chip shows and the My teams chip does not — board.spec.ts › "a visitor gets the Hard Rock filter but not the My teams chip"
 - [board] `?days=sat` (parsed, no UI) keeps only Saturday's games and heading — board.spec.ts › "?days=sat keeps only Saturday’s games"
 - [board] On the clean fixture no banner renders: no `role=status`, no missed build, no stale results, no pause, no no-model, no no-HR-line — board.spec.ts › "every banner is silent in the clean state"
-- [board] `odds_credits_remaining` under the floor lights the OpsBanner with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
-- [board] `rule_paused=true` shows the paused banner copy and `/api/health.rulePaused`; restored afterwards — board.spec.ts › "the real-money pause shows its banner and /api/health reports it"
+- [board] `odds_credits_remaining` under the floor lights the OpsBanner (signed in only; a visitor sees none) with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
+- [board] `rule_paused=true` shows the `Our bets are paused.` banner and `/api/health.rulePaused`; restored afterwards — board.spec.ts › "the real-money pause shows its banner and /api/health reports it"
 
 ## Game page
 

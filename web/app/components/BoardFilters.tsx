@@ -7,7 +7,15 @@ import type { BoardFilters as Filters } from "@/lib/homeBoard";
 // (?mine=1&hr=1) so a filtered board is a shareable link and the server does
 // the filtering. The explainer line under the chips went on 2026-09-16: the
 // chip labels say what they do, and the teams are the ones you follow.
-export default function BoardFilters({ current }: { current: Filters }) {
+export default function BoardFilters({
+  current,
+  showMine = true,
+}: {
+  current: Filters;
+  /** "My teams" is the owner's chip (Tate's four programs); visitors get only
+   *  the Hard Rock filter (site review 2026-09-28). `?mine=1` still parses. */
+  showMine?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -32,14 +40,16 @@ export default function BoardFilters({ current }: { current: Filters }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => toggleFlag("mine", current.myTeams)}
-        aria-pressed={current.myTeams}
-        className="bv-chip"
-      >
-        My teams
-      </button>
+      {showMine && (
+        <button
+          type="button"
+          onClick={() => toggleFlag("mine", current.myTeams)}
+          aria-pressed={current.myTeams}
+          className="bv-chip"
+        >
+          My teams
+        </button>
+      )}
       <button
         type="button"
         onClick={() => toggleFlag("hr", current.hrOnly)}

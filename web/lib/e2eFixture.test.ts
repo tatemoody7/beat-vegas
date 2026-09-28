@@ -136,7 +136,9 @@ describe("the e2e fixture port agrees with the TypeScript rules", () => {
     expect(expected.betIds).toEqual([900001, 900002]);
     expect(expected.playedIds).toEqual([900012]);
     expect(expected.rankOrder).toHaveLength(12);
-    expect(expected.barLine).toMatch(/^This week’s bar: 3\.50 pts — /);
+    expect(expected.barLine).toBe(
+      "Bar this week: 3.5 pts (top 20% of 10 priced games).",
+    );
     // Every upcoming game is still upcoming for at least the lead the week promises.
     const soonest = Math.min(
       ...week.games.filter((g) => !g.played).map((g) => g.kick.getTime()),

@@ -18,7 +18,9 @@ import { nextBuild } from "@/lib/nextBuild";
 import { getLatestCard } from "@/lib/card";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
+import { viewerIsAuthed } from "@/lib/session";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import Link from "next/link";
 import AnswerBar from "@/app/components/AnswerBar";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import OpsBanner from "@/app/components/OpsBanner";
@@ -52,6 +54,10 @@ export default async function BoardPage({
     hr?: string;
   }>;
 }) {
+  // The owner's instruments (ops warnings, the My-teams chip, the pause
+  // switch's reason) render only behind the cookie; a visitor sees the board
+  // and the banners about the numbers on it (site review 2026-09-28).
+  const authed = await viewerIsAuthed();
   const seasons = await getSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
@@ -60,15 +66,6 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
-  // H-PCT: how many of the week's priced games sit at or above this week's bar.
-  const clearing = board.games.filter(
-    (g) =>
-      g.gapBasis === "hardrock" &&
-      g.gap !== null &&
-      g.gap > 0 &&
-      g.gap >= board.slate.bar &&
-      g.check?.hrCentred !== false,
-  ).length;
   const results = staleness(await getGradeHealth(season));
   const buildHealth = buildStatus(await getBuildHealth());
   // The card's own health — "paper only, some inputs are missing", "built by
@@ -101,6 +98,22 @@ export default async function BoardPage({
 
   return (
     <div className="mx-auto max-w-5xl">
+      {/* Two lines for a first-time visitor, always shown (Tate 2026-09-28):
+          what this is, what green means, where the record lives. */}
+      <p
+        className="mb-5 border-l-2 border-[var(--accent)] bg-[var(--accent-soft)] py-2.5 pl-3.5 pr-3 text-sm leading-snug text-[var(--text)]"
+        aria-label="What this is"
+      >
+        Beat Vegas rates college football first-half unders, priced at Hard Rock
+        Bet. Green means bet. Every bet we place is on Results.{" "}
+        <Link
+          href="/how-it-works"
+          className="whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
+        >
+          How it works →
+        </Link>
+      </p>
+
       <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
         <h1 className="bv-page-title">
           {board.week !== null ? `Board · Week ${board.week}` : "Board"}
@@ -121,31 +134,31 @@ export default async function BoardPage({
 
       {board.slate.n > 0 && (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
-          {`This week’s bar: ${board.slate.bar.toFixed(2)} pts — the gap of the top ${Math.round(100 * board.slate.share)}% of ${board.slate.n} priced games; ${clearing} clear it${board.slate.basis === "fallback" ? " (fallback bar: no priced game had a centred quote)" : ""}. A game must also pass the price, market and news gates to be a bet.`}
+          {/* Shortened 2026-09-28 (Tate): the rows already say why a game is
+              not a bet, so the gate clause and the clearing count went. */}
+          {`Bar this week: ${board.slate.bar.toFixed(1)} pts (top ${Math.round(100 * board.slate.share)}% of ${board.slate.n} priced games).`}
         </p>
       )}
 
       <div className="mb-3">
-        <BoardFilters current={filters} />
+        <BoardFilters current={filters} showMine={authed} />
       </div>
 
       <CardStatusBanner card={card} />
 
-      <OpsBanner />
+      {authed && <OpsBanner />}
 
       {pause.paused === true && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--text)]">
-            Real money is paused.
-          </p>
+          <p className="font-medium text-[var(--text)]">Our bets are paused.</p>
           <p className="mt-1">
-            {pause.note ? `${pause.note}. ` : ""}
+            {authed && pause.note ? `${pause.note}. ` : ""}
             {`Every real-money first-half pick is refused until the rule has been reviewed. Paper picks still log and count toward the record.`}
           </p>
         </div>
       )}
 
-      {pause.paused === "unreadable" && (
+      {authed && pause.paused === "unreadable" && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
             Real money is off until the pause switch can be read.

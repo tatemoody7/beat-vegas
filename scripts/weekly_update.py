@@ -38,7 +38,7 @@ from typing import Dict, Optional, Tuple
 import pandas as pd
 
 from beatvegas.config import engine_name
-from beatvegas.db.models import Game, OddsSnapshot
+from beatvegas.db.models import Game, ModelRun, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import (
     apply_min_games,
@@ -46,6 +46,7 @@ from beatvegas.etl.features import (
     serve_skew_report,
     serve_skew_violations,
 )
+from beatvegas.etl.frame_fingerprint import fingerprint, fingerprint_hash
 from beatvegas.etl.proxy_line import proxy_total
 from beatvegas.factors.board import factor_references, save_references
 from beatvegas.hardrock import HR_BOOK_KEY
@@ -61,7 +62,7 @@ from beatvegas.model.artifacts import (
     persist_artifact,
 )
 from beatvegas.model.bv_line import BV_FEATURE_COLS
-from beatvegas.model.score import score_slate, store_predictions
+from beatvegas.model.score import MODEL_VERSION, score_slate, store_predictions
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
 
@@ -202,6 +203,79 @@ def training_real_closes(frame: pd.DataFrame, season: int) -> Dict[int, float]:
         )
 
 
+WEEKLY_REFIT_NOTE = "weekly refit"
+
+
+def record_weekly_refit(
+    scored: pd.DataFrame,
+    df: pd.DataFrame,
+    *,
+    season: int,
+    week: int,
+    engine: str,
+    skew: pd.DataFrame,
+    n: int,
+) -> Optional[dict]:
+    """One `model_runs` row per scoring run (2026-09-28): what the champion was
+    fitted on THIS time. Until now the weekly refit left no record of itself --
+    confirming that the week-5 refit ran on the corrected inputs meant reading
+    the run log -- while `model_runs` held only retrain.py's June rows.
+
+    metrics_json: kind=weekly_refit, season/week, engine, n_inputs (the
+    BV_FEATURE_COLS the fit used), intercept (the calibration intercept applied,
+    `Prediction.bv_intercept`), train_rows / target_rows (the serve-skew
+    check's counts), scored_rows, serve_skew_violations (always 0 here: a
+    violation exits before scoring), frame_fingerprint (data-only digest,
+    `frame_fingerprint.fingerprint_hash`), run_id (GITHUB_RUN_ID). Never fails
+    the run: a run log is a courtesy to the reader. Returns the metrics dict, or
+    None when nothing was written."""
+    import json
+    import os
+
+    try:
+        train = df[df["season"] < season] if "season" in df else df
+        seasons = (
+            sorted(int(x) for x in train["season"].dropna().unique()) if "season" in df else []
+        )
+        intercept = None
+        if "bv_intercept" in scored and len(scored):
+            v = scored["bv_intercept"].iloc[0]
+            intercept = None if pd.isna(v) else float(v)
+        metrics = {
+            "kind": "weekly_refit",
+            "season": int(season),
+            "week": int(week),
+            "engine": engine,
+            "n_inputs": int(len(BV_FEATURE_COLS)),
+            "intercept": intercept,
+            "train_rows": int(skew.attrs.get("n_train", 0) or 0),
+            "target_rows": int(skew.attrs.get("n_target", 0) or 0),
+            "scored_rows": int(n),
+            "serve_skew_violations": 0,
+            "frame_fingerprint": fingerprint_hash(fingerprint(df)),
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+        }
+        with session_scope() as s:
+            s.add(
+                ModelRun(
+                    version=MODEL_VERSION,
+                    train_window=f"{seasons[0]}-{seasons[-1]}" if seasons else None,
+                    test_window=f"{season} wk{week}",
+                    metrics_json=json.dumps(metrics),
+                    notes=WEEKLY_REFIT_NOTE,
+                    created_at=datetime.utcnow(),
+                )
+            )
+        print(
+            f"[model_runs] weekly refit recorded: {season} wk{week} inputs={metrics['n_inputs']} "
+            f"intercept={intercept} train_rows={metrics['train_rows']} frame={metrics['frame_fingerprint']}"
+        )
+        return metrics
+    except Exception as e:  # noqa: BLE001 - the run log must never take down the run
+        print(f"[model_runs] weekly refit NOT recorded: {e}")
+        return None
+
+
 def persist_engine_artifact(
     scored: pd.DataFrame, *, engine: str, season: int, week: int, now: Optional[datetime] = None
 ) -> Optional[str]:
@@ -214,14 +288,9 @@ def persist_engine_artifact(
     as last time). Returns None (and writes NOTHING) when the frame carries no
     artifact: the incumbent engine, or a demoted residual run.
 
-    No model_runs row is written. model_runs is retrain.py's run log; the
-    Research page (web/lib/research.ts) reads the NEWEST FIVE rows looking for
-    `bv_residual` calibration metrics, so a per-scoring-run row without them
-    would blank that panel within a week of the engine being on and pad the
-    "Model runs over time" table. Everything a run-log row would have carried
-    (fingerprint, sigma, n_train, fallback) sits on the artifact row —
-    fingerprint_json + metrics_json — and each game's factors_json carries the
-    fingerprint too."""
+    The weekly refit's own model_runs row is written by `record_weekly_refit`
+    (2026-09-28), not here; web/lib/proof.ts reads model_runs for retrain.py's
+    `bv_residual` rows by content, so the refit rows do not crowd it out."""
     artifact = scored.attrs.get("engine_artifact") or {}
     model = artifact.get("model")
     if model is None:
@@ -405,6 +474,7 @@ def main() -> None:
         sys.exit(1)
     _enrich_qb_out(scored)
     n = store_predictions(scored, snapshot=not args.no_snapshot)
+    record_weekly_refit(scored, df, season=args.season, week=week, engine=engine, skew=skew, n=n)
     fp_line = persist_engine_artifact(scored, engine=engine, season=args.season, week=week)
     if fp_line:
         print(fp_line)

@@ -402,3 +402,47 @@ def test_main_snapshots_by_default(monkeypatch, wu):
     got = _capture_store(monkeypatch, wu)
     wu.main()
     assert got["snapshot"] is True
+
+
+def test_main_records_the_weekly_refit_in_model_runs(monkeypatch, wu, capsys):
+    """2026-09-28: every scoring run leaves a model_runs row saying what it fitted
+    on -- inputs, intercept, train/target rows, a data-only frame digest -- so
+    the next 'did the refit run on the corrected inputs?' is a query, not a log
+    read. The row is noted `weekly refit`; web/lib/proof.ts filters retrain's
+    rows by content, so this never crowds the calibration panel."""
+    import json
+
+    from beatvegas.db.models import ModelRun
+    from beatvegas.model.bv_line import BV_FEATURE_COLS
+
+    _wire(monkeypatch, wu, "bv_line")
+    monkeypatch.setenv("GITHUB_RUN_ID", "4242")
+    wu.main()
+    with wu.session_scope() as s:
+        rows = s.query(ModelRun).all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.notes == wu.WEEKLY_REFIT_NOTE == "weekly refit"
+        assert row.test_window == f"{SEASON} wk{WEEK}"
+        assert row.train_window == "2024-2025"
+        m = json.loads(row.metrics_json)
+    assert m["kind"] == "weekly_refit" and m["season"] == SEASON and m["week"] == WEEK
+    assert m["n_inputs"] == len(BV_FEATURE_COLS)
+    assert m["scored_rows"] == 1 and m["serve_skew_violations"] == 0
+    assert m["run_id"] == "4242"
+    assert m["intercept"] is None  # the fake scorer carries no bv_intercept column
+    assert len(m["frame_fingerprint"]) == 16
+    assert "[model_runs] weekly refit recorded" in capsys.readouterr().out
+
+
+def test_a_failed_run_log_write_never_fails_scoring(monkeypatch, wu, capsys):
+    _wire(monkeypatch, wu, "bv_line")
+
+    @contextmanager
+    def boom():
+        raise RuntimeError("neon blip")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(wu, "session_scope", boom)
+    wu.main()  # store_predictions is mocked; the scoring path completes
+    assert "[model_runs] weekly refit NOT recorded: neon blip" in capsys.readouterr().out

@@ -82,6 +82,14 @@ def mem():
 # --- joblib round trip -----------------------------------------------------------
 
 
+def _only_the_refit_row(s: Session) -> None:
+    """The artifact path writes no model_runs row of its own; the one row a
+    scoring run leaves is the weekly-refit run log (2026-09-28, noted
+    `weekly refit`), and exactly one of those."""
+    assert s.query(ModelRun).filter(ModelRun.notes != "weekly refit").count() == 0
+    assert s.query(ModelRun).filter(ModelRun.notes == "weekly refit").count() == 1
+
+
 def test_dump_load_round_trip_predicts_identically():
     model, X = _fitted()
     blob = dump_model(model)
@@ -332,7 +340,7 @@ def test_weekly_update_persists_one_artifact_and_prints_the_fingerprint(monkeypa
         assert metrics["n_train"] == 60
         assert metrics["fallback"] is None
         assert (metrics["n_rows_residual"], metrics["n_rows_fallback"]) == (2, 0)
-        assert s.query(ModelRun).count() == 0
+        _only_the_refit_row(s)
 
 
 def test_weekly_update_same_history_as_last_fit_prints_an_empty_change_list(
@@ -354,7 +362,7 @@ def test_weekly_update_same_history_as_last_fit_prints_an_empty_change_list(
     assert line.endswith("changed=[]"), line
     with Session(eng) as s:
         assert s.query(ModelArtifact).count() == 2
-        assert s.query(ModelRun).count() == 0
+        _only_the_refit_row(s)
 
 
 def test_weekly_update_names_what_moved_since_the_last_fit(monkeypatch, mem, capsys):
@@ -386,7 +394,7 @@ def test_weekly_update_persists_nothing_under_the_incumbent(monkeypatch, mem, ca
     assert "fingerprint " not in out
     with Session(eng) as s:
         assert s.query(ModelArtifact).count() == 0
-        assert s.query(ModelRun).count() == 0
+        _only_the_refit_row(s)
 
 
 def test_weekly_update_persists_nothing_when_the_residual_fell_back(monkeypatch, mem, capsys):
@@ -401,7 +409,7 @@ def test_weekly_update_persists_nothing_when_the_residual_fell_back(monkeypatch,
     assert "fingerprint " not in out
     with Session(eng) as s:
         assert s.query(ModelArtifact).count() == 0
-        assert s.query(ModelRun).count() == 0
+        _only_the_refit_row(s)
 
 
 # --- single transaction ----------------------------------------------------------------
@@ -422,7 +430,7 @@ def test_dump_failure_mid_persist_writes_no_artifact_row(monkeypatch, mem):
         wu.main()
     with Session(eng) as s:
         assert s.query(ModelArtifact).count() == 0
-        assert s.query(ModelRun).count() == 0
+        _only_the_refit_row(s)
 
 
 def test_persist_artifact_only_flushes_so_the_caller_owns_the_commit(mem):

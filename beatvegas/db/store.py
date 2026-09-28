@@ -155,6 +155,22 @@ _DATA_MIGRATIONS = [
         "UPDATE manual_picks SET book = 'hardrockbet' "
         "WHERE book IS NULL AND COALESCE(is_paper, FALSE) = FALSE AND season >= 2026",
     ),
+    # 2026 week 4, tickets 85 and 86 (Texas A&M @ LSU u26.5 +100, Houston @ Georgia
+    # Southern u29.5 -105): bet Friday 2026-09-25 at the fri_pm card's numbers (both
+    # BET on that card) and logged on the site the next morning, when the server
+    # judged the LIVE Saturday read and stamped WATCH -- so Results flagged two
+    # on-policy Friday bets as overrides. Tate's call (2026-09-28): verdict = what
+    # the card said when the bet was made, the note carries the timing, placed_at
+    # stays the true log time. The id list + WATCH guard make a re-run a no-op.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET verdict_at_pick = 'BET', "
+        "note = CASE WHEN note IS NULL OR note = '' THEN "
+        "'bet Fri 2026-09-25 at the fri_pm card numbers; logged Sat' "
+        "ELSE note || ' | bet Fri 2026-09-25 at the fri_pm card numbers; logged Sat' END "
+        "WHERE id IN (85, 86) AND season = 2026 AND week = 4 "
+        "AND verdict_at_pick = 'WATCH' AND COALESCE(is_paper, FALSE) = FALSE",
+    ),
 ]
 
 _engine = None

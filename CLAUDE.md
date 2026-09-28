@@ -5,6 +5,28 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-28 (WEEK 4 REVIEWED — `reports/weekly/2026-w4.md`, gitignored).** Real money
+  **3-2, +0.83u** (season **9-6, +2.84u**, Wilson 35.7–80.2%); every card BET placed, nothing
+  else; first week every real ticket carries `price_provenance='logged'`. Paper 6-5, +0.41u on
+  11 picks — only 11 because **H-PCT's slate bar was already live on every week-4 build** (bar
+  4.9–5.5 vs the old 1.75; 6-11 qualifying per build vs 27-31) on the OLD model; H-STOP-2's
+  observations start at the 2026-09-29 `tue_pm` build. Tickets 85/86 were bet Friday and logged
+  Saturday (server stamped WATCH): repaired to BET + note by a guarded `_DATA_MIGRATIONS` entry,
+  `placed_at` kept. **Week-5 refit is the first on the B-SERVE model** (run 36342602323: 58
+  inputs, `serve-skew ... 0 column(s) NaN at serving`, mean bv_line 25.85 vs 24.41 in week 4,
+  intercept −1.230); the refit writes no `model_runs` row. Model beat Hard Rock on the 43
+  close-spread games (bias +0.50 vs −1.29, MAE 7.70 vs 7.83). **The "overs" band (H-NEGGAP)
+  REVERSED: week 4 went 3 over / 9 under, cumulative 26 of 38** (Wilson 52.5–80.9) — and 23 of
+  the 38 were Hard Rock ALTERNATE lines (2-4 pts under the field, over at −160..−325), the
+  H-PCT-U feed defect; on main lines it is **10 of 15, 0 of 4 in week 4**. Measurement only;
+  a draft paper-only row (H-NEGGAP-P, three arms, Bonferroni) sits in the report for Tate.
+  **Ops finding: the Saturday close poll fires 3 of 18 GitHub cron slots** (5 in week 3), so
+  Hard-Rock-priced games with any 1H snapshot inside the registered 2 h are wk2 25/72, wk3
+  27/72, wk4 18/57; `lines_watch` health only judges runs that ran and the board's close gauge
+  stays green on three sweeps. Fix chosen (Tate): a Vercel `lines-close` cron backup (14
+  once-a-day Saturday entries — the account is verified **Hobby**: each entry fires once a day,
+  within the hour) with `--kickoff-within-min 120`, GitHub crons kept. Everything else ran
+  clean (all 40 recent runs green, Sunday's six contract facts ok, CFBD 1,808 / Odds 53,609).
 - **2026-09-26 (EVERY BET WE'VE PLACED — the ledger at the top of Track record).** Prompted
   by the Paramount Sports teardown (Lee Sterling's most-cited proof is one long self-graded
   list of picks; ours is stronger but was one week at a time inside Results). `/proof` now

@@ -1,5 +1,6 @@
 from beatvegas.grading import (
     american_to_decimal,
+    bet_won,
     clv_under,
     price_clv_under,
     trusted_first_half_total,
@@ -56,3 +57,15 @@ def test_trusted_first_half_total_guards_false_zeros():
     # Normal values pass through; missing stays missing.
     assert trusted_first_half_total(21, 45, 17) == 21
     assert trusted_first_half_total(None, 45, 17) is None
+
+
+def test_units_won_for_an_over_bet_pays_the_over_side():
+    """H-NEGGAP-P (2026-09-28): the paper over arms are graded by the same
+    function with side="over". The outcome is the same word either way."""
+    assert bet_won("over", "over") is True and bet_won("under", "over") is False
+    assert bet_won("push", "over") is None and bet_won("under") is True
+    assert round(units_won(47, 21.5, -325, side="over"), 4) == 0.3077  # JMU @ ODU wk4
+    assert units_won(14, 23.5, -125, side="over") == -1.0  # Army @ Temple wk4
+    assert units_won(24, 24.0, -110, side="over") == 0.0
+    # The under caller is unchanged.
+    assert round(units_won(20, 24.5), 4) == 0.9091

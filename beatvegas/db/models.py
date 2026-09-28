@@ -561,6 +561,9 @@ class ChallengerPick(Base):
     in_season_n = Column(Integer)  # completed games the arm could see
     in_season_weight = Column(Float)  # w = n / (n + k)
     gap_at_pick = Column(Float)
+    # When the consensus close was last confirmed pre-kick (grade_pick writes it
+    # for every ledger); the H-NEGGAP-P line-value clock cuts on its age. 2026-09-28.
+    closing_captured_at = Column(DateTime)
 
     # Every field `picks.graded_pick_fields` returns, under the same names, so
     # `picks.grade_pick` grades an arm's observation with the champion's own code

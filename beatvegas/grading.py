@@ -1,7 +1,10 @@
 """Pure grading math: outcomes, CLV, and units for first-half under bets.
 
 Kept dependency-free and unit-tested so the money logic is never in doubt.
-Convention: we only ever bet the UNDER (the project's market).
+Convention: real money only ever bets the UNDER (the project's market); the
+paper OVER arms of H-NEGGAP-P (2026-09-28) pass `side="over"` and are graded by
+the same functions. `clv_under` is closing - bet for EVERY row -- for an over
+the favourable direction is the reverse, and the reader flips it.
 """
 
 from __future__ import annotations
@@ -22,12 +25,25 @@ def under_result(actual_first_half_total: float, line: float) -> str:
     return "push"
 
 
-def units_won(actual_first_half_total: float, line: float, under_price: int = -110) -> float:
-    """Profit in units for a 1-unit UNDER bet (push = 0, loss = -1)."""
-    res = under_result(actual_first_half_total, line)
-    if res == "push":
+def bet_won(outcome: str, side: str = "under") -> Optional[bool]:
+    """Did a bet on `side` win this OUTCOME ('under' / 'over' / 'push')? None on a push.
+    The stored `result` column is the outcome, never the win/loss, so it reads the
+    same whichever side was taken (H-NEGGAP-P's paper overs, 2026-09-28)."""
+    if outcome == "push":
+        return None
+    return outcome == side
+
+
+def units_won(
+    actual_first_half_total: float, line: float, under_price: int = -110, side: str = "under"
+) -> float:
+    """Profit in units for a 1-unit bet on `side` at `under_price` -- the price of
+    THAT side, despite the parameter's name (kept for the under-only callers).
+    Push = 0, loss = -1."""
+    won = bet_won(under_result(actual_first_half_total, line), side)
+    if won is None:
         return 0.0
-    if res == "under":
+    if won:
         return american_to_decimal(under_price) - 1.0
     return -1.0
 

@@ -533,6 +533,9 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     return {
         "hr_line": hr_line,
         "hr_price": hr_price,
+        # Hard Rock's OVER price on the same quote, for the H-NEGGAP-P paper
+        # over arms (2026-09-28). Display never reads it; no gate reads it.
+        "hr_over_price": hr["over_price"] if hr else None,
         # Hard Rock's newest quote is its main line (H-PCT's universe: an
         # alternate line never manufactures a qualifying gap). False when `hr` is
         # the last main line held over for display (hr_live False) or absent.
@@ -903,6 +906,7 @@ def build_item(
         "blocker": blocker,
         "hr_line": hr_line,
         "hr_price": hr_price,
+        "hr_over_price": m["hr_over_price"],
         "hr_open": m["hr_open"],
         "market_line": market_line,
         "fair_under": None if fair_under is None else round(fair_under, 4),

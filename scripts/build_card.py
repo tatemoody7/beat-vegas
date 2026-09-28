@@ -60,6 +60,9 @@ from beatvegas.db.models import (
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
 from beatvegas.model.score import MODEL_VERSION
+from beatvegas.neggap import collection_enabled as neggap_enabled
+from beatvegas.neggap import log_neggap_picks
+from beatvegas.neggap import summary_line as neggap_summary_line
 from beatvegas.picks import add_pick, existing_pick
 
 
@@ -578,9 +581,21 @@ def run(
         picks_added = 0
         challenger_added: Dict[str, int] = {}
         challenger_paused = False
+        neggap_added: Dict[str, int] = {}
+        neggap_on = neggap_enabled()
         if not dry_run and card["items"]:
             if not no_paper:
                 picks_added = log_paper_picks(s, card, now, window_hours=paper_window_hours)
+                # H-NEGGAP-P (2026-09-28): the paper OVER arms log beside the
+                # champion from the same build into challenger_picks, never
+                # manual_picks. A failure here must never cost the real card.
+                if neggap_on:
+                    try:
+                        neggap_added = log_neggap_picks(
+                            s, card, now, window_hours=paper_window_hours
+                        )
+                    except Exception as e:  # noqa: BLE001 - never break the card
+                        print(f"[card] WARNING: H-NEGGAP-P arms not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -635,6 +650,10 @@ def run(
             "  CHALLENGER (H-INSEASON family, paper only): "
             + ", ".join(f"{a} +{n}" for a, n in sorted(challenger_added.items()))
         )
+    if not dry_run and card["items"] and not no_paper:
+        neggap_line = neggap_summary_line(neggap_added, neggap_on)
+        if neggap_line:
+            lines.append(neggap_line)
     print("\n".join(lines))
     if dry_run:
         print(json.dumps(card, indent=2, ensure_ascii=False, allow_nan=False))

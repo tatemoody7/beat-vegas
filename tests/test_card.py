@@ -655,6 +655,9 @@ ITEM_KEYS = {
     "hr_live",
     "hr_as_of",
     "hr_alt_line",
+    # Hard Rock's over price on the same quote, for the H-NEGGAP-P paper over
+    # arms (2026-09-28); display and every gate ignore it.
+    "hr_over_price",
 }
 
 

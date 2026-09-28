@@ -9,6 +9,25 @@ hold the rest.
 
 ## 2026-09-28
 
+- **2026-09-28 (PUBLIC-SITE REVIEW — what a stranger sees, and the structure if anyone could
+  follow the picks).** Tate walked the question "if Beat Vegas were a product anyone could open,
+  how should the site be structured?" through four rounds of questions; the review and every
+  decision are in `docs/superpowers/specs/2026-09-28-public-site-review.md`, the mockups (390 and
+  1440 side by side, live numbers, a visitor / signed-in switch) at
+  https://claude.ai/artifact/GRXmeADGb7PCGQRtfq4qRG. **Findings:** nothing on `/` says what the
+  site is; `/results` and `/proof` headline the same record; the Monday-review tables, the ops
+  warnings (with `docs/HEALTH.md` paths), "My teams", real dollars and an UNLOCK button all face
+  visitors; two glossary terms describe a score no page shows. **Decisions (Tate):** audience is
+  anyone, mostly US bettors; read-only "follow our picks", no sign-up yet; the Board's core is
+  untouched and gets a two-line intro strip; Results and Track record merge into one Results page
+  that opens on the ledger; a new **How it works** page takes the pitch, the Board legend, the
+  Hard Rock (Florida) note, the backtest headed "Backtest, 2023–25 (not money bet)", the trust
+  copy from 2026-09-08, nine terms (from 16) and a 21+ / not-advice line; ops warnings, My teams,
+  the Monday tables and the research flags render only when signed in; "My money" → "Our bets";
+  dollars leave the public site (units and ROI only); Unlock moves to the footer; `/proof` →
+  `/results`, `/proof/records` → `/records`. Game page structure was out of scope (two owner-only
+  fixes noted). **Nothing ships mid-season without a separate go**; the build plan waits.
+
 - **2026-09-28 (WEEK-5 STACK CLEANUP, PR #249 — the `/code-review` + `/simplify` passes over
   #241-#247, applied; every fork Tate's call).** **Correctness:** `lines_watch.yml`'s free
   `/events` pre-check gated on 75 min while the poll looked 120 ahead, so a slot whose only

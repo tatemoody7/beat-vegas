@@ -72,6 +72,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and
   registered, not built; a pass of its gate licenses a paper arm, not promotion.
 - **Registry vocabulary**: add `superseded` (H-STOP, H-INSEASON-P currently read `rejected`).
+- **Public-site restructure** (reviewed 2026-09-28; `docs/superpowers/specs/2026-09-28-public-site-review.md`):
+  Board / Results / How it works, ledger-first Results, owner-only content behind the cookie.
+  Build waits for Tate's go; nothing ships mid-season.
 
 ## Decision calendar (all times ET; GitHub crons are the backup, Vercel is the trigger)
 | When | Job | What |

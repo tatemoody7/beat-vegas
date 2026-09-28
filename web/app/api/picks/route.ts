@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCardAsOf, getLatestCard } from "@/lib/card";
+import { getLatestCard } from "@/lib/card";
 import { breakEvenPrice } from "@/lib/edge";
 import { getLineCheck } from "@/lib/lineCheck";
 import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
@@ -16,6 +16,7 @@ import { getRulePause, NOT_PAUSED } from "@/lib/rulePause";
 import { requireAuth } from "@/lib/session";
 import type { PolicyContext } from "@/lib/pickRules";
 import type { RulePause } from "@/lib/rulePause";
+import type { Verdict } from "@/lib/verdict";
 
 // POST /api/picks — log a pick on a current-slate game. Validation and the
 // betting policy (1H-only real money, flat 1 unit, 5-bet weekly cap, the
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
   // price moved would leave the ledger wrong.
   const betAt = pick.betAt ?? null;
   const backdated = isBackdated(betAt, now);
+  const betAtDate = betAt === null ? null : new Date(betAt);
 
   // Everything from here down touches the database. A Neon blip used to return
   // a bare framework 500 with no JSON body, which the client rendered as
@@ -74,6 +76,12 @@ export async function POST(req: NextRequest) {
     minGamesPlayed = row?.minGamesPlayed ?? null;
   } catch (e) {
     return dbError("slate lookup", e);
+  }
+  // The bet time needs only the kickoff: refuse a future, stale or post-kickoff
+  // one here, before the policy queries are spent on it.
+  const when = betAtCheck(betAt, now, game?.start_date ?? null);
+  if (!when.ok) {
+    return NextResponse.json({ error: when.error }, { status: when.status });
   }
 
   // One pick per game/market PER LEDGER: a double-click must not double the
@@ -102,16 +110,21 @@ export async function POST(req: NextRequest) {
   // The week's card, for this game's kill numbers (null without a card row);
   // for a backdated log, the card in force when the ticket was written.
   const cardQ = game
-    ? backdated && betAt !== null
-      ? getCardAsOf(game.season, game.week, new Date(betAt))
-      : getLatestCard(game.season, game.week)
+    ? getLatestCard(
+        game.season,
+        game.week,
+        backdated ? (betAtDate ?? undefined) : undefined,
+      )
     : Promise.resolve(null);
   // The LIVE market read — the same loader the board renders from, so the gate
   // and the screen cannot disagree. The card is built on a Tuesday; the bet is
-  // placed on a Saturday, and marketFairUnder moves in between.
-  const checkQ = game
-    ? getLineCheck(game.season, "1h")
-    : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
+  // placed on a Saturday, and marketFairUnder moves in between. A backdated
+  // log never reads it (the live read is not the read the bet saw), so the
+  // three season-wide snapshot queries are not spent on one.
+  const checkQ =
+    game && !backdated
+      ? getLineCheck(game.season, "1h")
+      : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
   // The real-money pause (docs/STOPPING_RULE.md). Read ONLY for a real-money
   // pick, so a settings read can never touch a paper pick; getRulePause never
   // throws — a failed read comes back as the UNREADABLE state, which
@@ -136,22 +149,26 @@ export async function POST(req: NextRequest) {
   }
   const item = card?.items.find((i) => i.gameId === pick.gameId) ?? null;
 
-  const when = betAtCheck(betAt, now, game?.start_date ?? null);
-  if (!when.ok) {
-    return NextResponse.json({ error: when.error }, { status: when.status });
-  }
-
-  // Fail closed: every branch that cannot produce a checkable price returns
-  // { ok: false }, and checkPolicy refuses the real-money BET rather than
-  // falling back to the card's cached number. Mirrors verdict.ts, where the BET
-  // branch requires a non-null ev and otherwise reads WATCH — so a game the
-  // board will not colour green is also a game the API will not log.
+  // THE VERDICT IS DECIDED HERE, not by the client. A request that says
+  // "WATCH" on a game the server rates BET is gated as a BET; a request that
+  // says "BET" on a game the server rates WATCH is logged as the off-policy
+  // WATCH it is. The read that decides it is one of two, chosen once:
+  //  - a BACKDATED log is judged by the card in force at bet time -- its tier
+  //    is the verdict and its kill numbers judge the logged line and price
+  //    (checkPolicy falls back to ctx.killLine / killPrice when the live
+  //    killPrice is null). The live read is not the read the bet saw.
+  //  - otherwise the LIVE Hard Rock line/price/centring and consensus, with
+  //    the card's model read, slate bar and QB-out flag and the season's games
+  //    played -- the same gates the card and the board apply. Fail closed:
+  //    every branch that cannot produce a checkable price returns
+  //    { ok: false }, and checkPolicy refuses the real-money BET rather than
+  //    falling back to the card's cached number. Mirrors verdict.ts, where
+  //    the BET branch requires a non-null ev and otherwise reads WATCH -- so a
+  //    game the board will not colour green is also a game the API will not
+  //    log.
   const row = checks.find((c) => c.gameId === pick.gameId) ?? null;
   let livePrice: PolicyContext["livePrice"];
   if (backdated) {
-    // The kill numbers of the card in force at bet time judge the logged line
-    // and price (checkPolicy falls back to ctx.killLine / killPrice when the
-    // live killPrice is null). No live read: it is not the read the bet saw.
     livePrice = { ok: true, killPrice: null };
   } else if (row === null) {
     livePrice = { ok: false, reason: "no live line read for this game" };
@@ -173,14 +190,7 @@ export async function POST(req: NextRequest) {
   } else {
     livePrice = { ok: true, killPrice: breakEvenPrice(row.marketFairUnder) };
   }
-
-  // THE VERDICT IS DECIDED HERE, not by the client. The card's model read and
-  // slate bar, the live Hard Rock line/price/centring and consensus, the card's
-  // QB-out flag and the season's games played -- the same gates the card and the
-  // board apply. A request that says "WATCH" on a game the server rates BET is
-  // gated as a BET; a request that says "BET" on a game the server rates WATCH
-  // is logged as the off-policy WATCH it is.
-  const verdict = backdated
+  const verdict: Verdict = backdated
     ? verdictAtBetTime(item)
     : serverVerdict({
         bvLine: item?.bvLine ?? null,

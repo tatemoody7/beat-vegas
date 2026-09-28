@@ -224,8 +224,8 @@ def record_weekly_refit(
     metrics_json: kind=weekly_refit, season/week, engine, n_inputs (the
     BV_FEATURE_COLS the fit used), intercept (the calibration intercept applied,
     `Prediction.bv_intercept`), train_rows / target_rows (the serve-skew
-    check's counts), scored_rows, serve_skew_violations (always 0 here: a
-    violation exits before scoring), frame_fingerprint (data-only digest,
+    check's counts), scored_rows (a serve-skew violation never reaches this
+    row: it exits before scoring), frame_fingerprint (data-only digest,
     `frame_fingerprint.fingerprint_hash`), run_id (GITHUB_RUN_ID). Never fails
     the run: a run log is a courtesy to the reader. Returns the metrics dict, or
     None when nothing was written."""
@@ -233,9 +233,10 @@ def record_weekly_refit(
     import os
 
     try:
-        train = df[df["season"] < season] if "season" in df else df
         seasons = (
-            sorted(int(x) for x in train["season"].dropna().unique()) if "season" in df else []
+            sorted(int(x) for x in df.loc[df["season"] < season, "season"].dropna().unique())
+            if "season" in df
+            else []
         )
         intercept = None
         if "bv_intercept" in scored and len(scored):
@@ -251,7 +252,6 @@ def record_weekly_refit(
             "train_rows": int(skew.attrs.get("n_train", 0) or 0),
             "target_rows": int(skew.attrs.get("n_target", 0) or 0),
             "scored_rows": int(n),
-            "serve_skew_violations": 0,
             "frame_fingerprint": fingerprint_hash(fingerprint(df)),
             "run_id": os.environ.get("GITHUB_RUN_ID"),
         }

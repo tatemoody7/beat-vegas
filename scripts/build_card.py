@@ -35,7 +35,13 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
-from beatvegas.card import REFERENCE_MODEL_VERSION, build_card, card_games, degraded_inputs
+from beatvegas.card import (
+    REFERENCE_MODEL_VERSION,
+    build_card,
+    card_games,
+    degraded_inputs,
+    parse_kick,
+)
 from beatvegas.challenger import (
     PAPER_ARMS,
     arm_context,
@@ -235,8 +241,8 @@ def log_paper_picks(
     for it in card["items"]:
         if not it.get("qualifies"):
             continue
-        if window_hours is not None and it.get("kick"):
-            kick = datetime.fromisoformat(it["kick"].replace("Z", "+00:00")).replace(tzinfo=None)
+        kick = parse_kick(it.get("kick"))
+        if window_hours is not None and kick is not None:
             if kick - now > timedelta(hours=window_hours):
                 continue
         gid = it["game_id"]
@@ -398,10 +404,8 @@ def log_challenger_picks(
         for it in arm_card["items"]:
             if not it.get("qualifies"):
                 continue
-            if window_hours is not None and it.get("kick"):
-                kick = datetime.fromisoformat(it["kick"].replace("Z", "+00:00")).replace(
-                    tzinfo=None
-                )
+            kick = parse_kick(it.get("kick"))
+            if window_hours is not None and kick is not None:
                 if kick - now > timedelta(hours=window_hours):
                     continue
             gid = it["game_id"]
@@ -651,9 +655,7 @@ def run(
             + ", ".join(f"{a} +{n}" for a, n in sorted(challenger_added.items()))
         )
     if not dry_run and card["items"] and not no_paper:
-        neggap_line = neggap_summary_line(neggap_added, neggap_on)
-        if neggap_line:
-            lines.append(neggap_line)
+        lines.append(neggap_summary_line(neggap_added, neggap_on))
     print("\n".join(lines))
     if dry_run:
         print(json.dumps(card, indent=2, ensure_ascii=False, allow_nan=False))

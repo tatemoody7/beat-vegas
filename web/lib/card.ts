@@ -652,15 +652,21 @@ export function summarizeCard(card: Card): CardSummary {
 type CardRowRaw = { payload: string | null; built_at: Date | string | null };
 
 /**
- * The most recent card for a season and week — or, with no week, the most
- * recent card of the season (the caller checks `card.week` against the board's
- * week). Null when there is no row, the table does not exist yet, or the
- * payload does not parse.
+ * The newest card for a season (or a week of it), or -- with `asOf` -- the card
+ * IN FORCE at that instant: the newest build at or before it. A ticket logged
+ * after it was written is judged by that card, not by the live read at log
+ * time (lib/pickRules.ts verdictAtBetTime, 2026-09-28). `built_at` is naive
+ * UTC, so the instant crosses as its naive text. null without a matching row.
  */
 export async function getLatestCard(
   season: number,
   week?: number,
+  asOf?: Date,
 ): Promise<Card | null> {
+  const naive =
+    asOf === undefined
+      ? null
+      : asOf.toISOString().slice(0, 19).replace("T", " ");
   let rows: CardRowRaw[];
   try {
     rows =
@@ -670,42 +676,18 @@ export async function getLatestCard(
             WHERE season = ${season}
             ORDER BY built_at DESC LIMIT 1
           `
-        : await prisma.$queryRaw<CardRowRaw[]>`
+        : naive === null
+          ? await prisma.$queryRaw<CardRowRaw[]>`
             SELECT payload, built_at FROM cards
             WHERE season = ${season} AND week = ${week}
             ORDER BY built_at DESC LIMIT 1
+          `
+          : await prisma.$queryRaw<CardRowRaw[]>`
+            SELECT payload, built_at FROM cards
+            WHERE season = ${season} AND week = ${week}
+              AND built_at <= ${naive}::timestamp
+            ORDER BY built_at DESC LIMIT 1
           `;
-  } catch (e) {
-    console.warn("cards unavailable:", (e as Error)?.message ?? e);
-    return null;
-  }
-  const row = rows[0];
-  if (!row) return null;
-  const card = parseCard(row.payload);
-  if (card === null) return null;
-  return { ...card, builtAt: card.builtAt ?? asIso(row.built_at) };
-}
-
-/**
- * The card IN FORCE at an instant: the newest build for the week at or before
- * `asOf`. A ticket logged after it was written is judged by this card, not by
- * the live read at log time (lib/pickRules.ts verdictAtBetTime, 2026-09-28).
- * `built_at` is naive UTC, so the instant is passed as its naive text.
- */
-export async function getCardAsOf(
-  season: number,
-  week: number,
-  asOf: Date,
-): Promise<Card | null> {
-  const naive = asOf.toISOString().slice(0, 19).replace("T", " ");
-  let rows: CardRowRaw[];
-  try {
-    rows = await prisma.$queryRaw<CardRowRaw[]>`
-      SELECT payload, built_at FROM cards
-      WHERE season = ${season} AND week = ${week}
-        AND built_at <= ${naive}::timestamp
-      ORDER BY built_at DESC LIMIT 1
-    `;
   } catch (e) {
     console.warn("cards unavailable:", (e as Error)?.message ?? e);
     return null;

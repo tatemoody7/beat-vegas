@@ -34,7 +34,7 @@ and do not drift with later prices.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 from scipy import stats
@@ -358,6 +358,28 @@ def registered_position_2(
     that pick's close was confirmed inside the registered window -- picks outside
     it are excluded from the clv clock and counted."""
     r = REGISTERED_2
+    out: Dict[str, Any] = {
+        "design": r["design"],
+        "clocks": two_clocks(units, prices, clv, clv_in_window, r),
+        "registered": {k: v for k, v in r.items()},
+    }
+    verdicts = [cl.get("verdict") for cl in out["clocks"].values()]
+    out["real_money"] = "PAUSE" if "failure" in verdicts else "unchanged"
+    return out
+
+
+def two_clocks(
+    units: Sequence[float],
+    prices: Sequence[float],
+    clv: Sequence[float],
+    clv_in_window: Sequence[bool],
+    r: Mapping[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    """Clock 2's two clocks under the constants in `r` (REGISTERED_2 or NEGGAP):
+    profit on the priced picks with a per-pick alternative from each price, line
+    value on the picks whose close was confirmed inside the window, the rest
+    counted. One implementation for the champion and the over arms, so a fix to
+    the clock lands once."""
     u = np.asarray(units, float)
     pr = np.asarray(prices, float)
     keep = ~np.isnan(u) & ~np.isnan(pr)
@@ -370,14 +392,23 @@ def registered_position_2(
         c_ok, np.full(len(c_ok), r["mu1"]["clv"]), r["sigma"]["clv"], r["alpha_clock"], r["power"]
     )
     clv_clock["excluded_no_close_in_window"] = int((~ok).sum())
-    out: Dict[str, Any] = {
-        "design": r["design"],
-        "clocks": {"profit": profit, "clv": clv_clock},
-        "registered": {k: v for k, v in r.items()},
-    }
-    verdicts = [cl.get("verdict") for cl in out["clocks"].values()]
-    out["real_money"] = "PAUSE" if "failure" in verdicts else "unchanged"
-    return out
+    return {"profit": profit, "clv": clv_clock}
+
+
+def family_verdicts(arms: Dict[str, Dict[str, Any]]) -> List[str]:
+    """Stamp each arm's `family_verdict` (PASS when every clock reads success,
+    DROPPED when any reads failure, else accruing) and return the passers. The
+    one fold both paper families use (H-INSEASON's challenger_position and
+    H-NEGGAP-P's neggap_position)."""
+    for pos in arms.values():
+        verdicts = {k: v.get("verdict") for k, v in pos.get("clocks", {}).items()}
+        # sprt/running_position emit LOWERCASE verdicts; until 2026-09-22 this
+        # compared against "SUCCESS"/"FAILURE", so no arm could ever pass or be
+        # dropped and the one test covering it asserted "accruing".
+        passed = bool(verdicts) and all(v == "success" for v in verdicts.values())
+        dropped = any(v == "failure" for v in verdicts.values())
+        pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
+    return [a for a, p in arms.items() if p["family_verdict"] == "PASS"]
 
 
 def render_position_2(pos: Dict[str, Any]) -> str:
@@ -604,32 +635,18 @@ def neggap_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, An
     c = NEGGAP
     out: Dict[str, Any] = {"registered": {k: v for k, v in c.items()}, "arms": {}}
     for label, obs in sorted(arms.items()):
-        u = np.asarray(obs.get("units", []), float)
-        pr = np.asarray(obs.get("prices", []), float)
-        keep = ~np.isnan(u) & ~np.isnan(pr) if len(u) else np.zeros(0, bool)
-        mu_profit = np.array([mu1_for_price(p, c["edge"]) for p in pr[keep]])
-        profit = sprt_clock(u[keep], mu_profit, c["sigma"]["profit"], c["alpha_clock"], c["power"])
-        cl = np.asarray(obs.get("clv", []), float)
-        ok = np.asarray(obs.get("clv_in_window", [True] * len(cl)), bool)
-        c_ok = cl[ok]
-        clv_clock = sprt_clock(
-            c_ok,
-            np.full(len(c_ok), c["mu1"]["clv"]),
-            c["sigma"]["clv"],
-            c["alpha_clock"],
-            c["power"],
-        )
-        clv_clock["excluded_no_close_in_window"] = int((~ok).sum())
-        pos: Dict[str, Any] = {
+        clv = obs.get("clv", [])
+        out["arms"][label] = {
             "design": c["design"],
-            "clocks": {"profit": profit, "clv": clv_clock},
+            "clocks": two_clocks(
+                obs.get("units", []),
+                obs.get("prices", []),
+                clv,
+                obs.get("clv_in_window", [True] * len(clv)),
+                c,
+            ),
         }
-        verdicts = {k: v.get("verdict") for k, v in pos["clocks"].items()}
-        passed = bool(verdicts) and all(v == "success" for v in verdicts.values())
-        dropped = any(v == "failure" for v in verdicts.values())
-        pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
-        out["arms"][label] = pos
-    passers = [a for a, p in out["arms"].items() if p["family_verdict"] == "PASS"]
+    passers = family_verdicts(out["arms"])
     out["passers"] = passers
     out["may_name_threshold"] = len(passers) == 1
     return out
@@ -658,16 +675,7 @@ def challenger_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str
             for label, obs in sorted(arms.items())
         },
     }
-    for pos in out["arms"].values():
-        clocks = pos.get("clocks", {})
-        verdicts = {k: v.get("verdict") for k, v in clocks.items()}
-        # running_position emits lowercase verdicts; until 2026-09-22 this compared
-        # against "SUCCESS"/"FAILURE", so no arm could ever pass or be dropped and
-        # the one test covering it asserted "accruing" -- pinning the bug.
-        passed = bool(verdicts) and all(v == "success" for v in verdicts.values())
-        dropped = any(v == "failure" for v in verdicts.values())
-        pos["family_verdict"] = "PASS" if passed else ("DROPPED" if dropped else "accruing")
-    passers = [a for a, p in out["arms"].items() if p["family_verdict"] == "PASS"]
+    passers = family_verdicts(out["arms"])
     out["passers"] = passers
     out["may_name_k"] = len(passers) == 1
     return out

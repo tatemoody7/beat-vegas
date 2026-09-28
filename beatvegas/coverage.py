@@ -21,21 +21,19 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_
-
+from .ci import ET
 from .db.models import Game, OddsSnapshot
 from .hardrock import HR_BOOK_KEY
 from .lines import REAL_1H_CLOSE_WINDOW_H
 
-ET = ZoneInfo("America/New_York")
 FIRST_HALF_MARKET = "1H_total"
 LOOKBACK_DAYS = 8
 SATURDAY = 5  # datetime.weekday()
 
 
-def _et_date(naive_utc: datetime) -> date:
+def et_date(naive_utc: datetime) -> date:
+    """The Eastern calendar date of a naive-UTC instant."""
     return naive_utc.replace(tzinfo=timezone.utc).astimezone(ET).date()
 
 
@@ -52,7 +50,7 @@ def last_saturday_games(
     )
     by_date: Dict[date, List[Tuple[int, datetime]]] = {}
     for gid, kick in rows:
-        d = _et_date(kick)
+        d = et_date(kick)
         if d.weekday() == SATURDAY:
             by_date.setdefault(d, []).append((int(gid), kick))
     if not by_date:
@@ -86,26 +84,25 @@ def close_window_coverage(session, now: Optional[datetime] = None) -> Optional[D
     }
     if not priced:
         return None
+    # One read of the priced games' 1H rows, judged in Python: the window is
+    # per game (its own kickoff), which is a join on Postgres and a loop here,
+    # and the loop is one round-trip instead of one per game.
     window = timedelta(hours=REAL_1H_CLOSE_WINDOW_H)
-    covered = 0
-    for gid, kick in games:
-        if gid not in priced:
-            continue
-        lo = kick - window
-        n = (
-            session.query(OddsSnapshot.id)
-            .filter(
-                OddsSnapshot.game_id == gid,
-                OddsSnapshot.market == FIRST_HALF_MARKET,
-                or_(
-                    (OddsSnapshot.captured_at >= lo) & (OddsSnapshot.captured_at < kick),
-                    (OddsSnapshot.last_seen_at >= lo) & (OddsSnapshot.last_seen_at < kick),
-                ),
-            )
-            .count()
+    kick_of = {gid: kick for gid, kick in games if gid in priced}
+    covered_ids = set()
+    for gid, captured, seen in (
+        session.query(OddsSnapshot.game_id, OddsSnapshot.captured_at, OddsSnapshot.last_seen_at)
+        .filter(
+            OddsSnapshot.game_id.in_(list(kick_of)),
+            OddsSnapshot.market == FIRST_HALF_MARKET,
         )
-        if n > 0:
-            covered += 1
+        .all()
+    ):
+        kick = kick_of[int(gid)]
+        lo = kick - window
+        if any(t is not None and lo <= t < kick for t in (captured, seen)):
+            covered_ids.add(int(gid))
+    covered = len(covered_ids)
     return {
         "date": d.isoformat(),
         "games": len(priced),

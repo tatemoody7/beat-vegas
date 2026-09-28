@@ -41,6 +41,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
+def _this_family():
+    """The H-INSEASON arms only. `challenger_picks` also holds the H-NEGGAP-P
+    paper OVERS (side='over', arms neggap_*, 2026-09-28), whose favourable line
+    value has the opposite sign; they have their own budget and their own
+    script (scripts/neggap_position.py) and must never enter this one."""
+    return ChallengerPick.arm.in_(list(S.CHALLENGER["arms"])) & (ChallengerPick.side == "under")
+
+
 def load_observations(session) -> Dict[str, Dict[str, list]]:
     """Per arm: (units, favourable clv) in placed order.
 
@@ -51,7 +59,7 @@ def load_observations(session) -> Dict[str, Dict[str, list]]:
     """
     rows = (
         session.query(ChallengerPick)
-        .filter(ChallengerPick.graded.is_(True))
+        .filter(ChallengerPick.graded.is_(True), _this_family())
         .order_by(ChallengerPick.placed_at, ChallengerPick.id)
         .all()
     )
@@ -74,12 +82,12 @@ def latest_build_context(session) -> Dict[str, Any]:
     completed row carried `bv_intercept`, see scripts/backfill_bv_intercept.py),
     not that the season has said nothing.
     """
-    latest = session.query(func.max(ChallengerPick.placed_at)).scalar()
+    latest = session.query(func.max(ChallengerPick.placed_at)).filter(_this_family()).scalar()
     if latest is None:
         return {"placed_at": None, "arms": {}}
     rows = (
         session.query(ChallengerPick)
-        .filter(ChallengerPick.placed_at == latest)
+        .filter(ChallengerPick.placed_at == latest, _this_family())
         .order_by(ChallengerPick.arm, ChallengerPick.id)
         .all()
     )
@@ -97,7 +105,7 @@ def latest_build_context(session) -> Dict[str, Any]:
             },
         )
         a["rows"] += 1
-    total = session.query(func.count(ChallengerPick.id)).scalar() or 0
+    total = session.query(func.count(ChallengerPick.id)).filter(_this_family()).scalar() or 0
     return {"placed_at": latest, "arms": arms, "rows_total": int(total)}
 
 

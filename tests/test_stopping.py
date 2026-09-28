@@ -282,3 +282,62 @@ def test_neggap_position_uses_the_over_price_and_excludes_stale_closes():
     ] == pytest.approx(S.sprt_bounds(0.05 / 6, 0.2)["A"])
     assert pos["arms"]["neggap_le3"]["clocks"]["profit"]["status"] == "no observations"
     assert pos["passers"] == [] and pos["may_name_threshold"] is False
+
+
+def test_challenger_position_never_reads_the_over_arms():
+    """challenger_picks holds two families since 2026-09-28: H-INSEASON's under
+    arms and H-NEGGAP-P's over arms, whose favourable line value has the opposite
+    sign. The challenger script must read only its own (it read every graded row
+    until the week-5 cleanup)."""
+    from contextlib import contextmanager
+    from datetime import datetime
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import Base, ChallengerPick
+    from tests.conftest import _load_script
+
+    mod = _load_script("challenger_position")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add_all(
+            [
+                ChallengerPick(
+                    arm="k25",
+                    side="under",
+                    season=2026,
+                    week=5,
+                    market="1H",
+                    graded=True,
+                    units=-1.0,
+                    clv=0.5,
+                    placed_at=datetime(2026, 10, 2),
+                ),
+                ChallengerPick(
+                    arm="neggap_lt0",
+                    side="over",
+                    season=2026,
+                    week=5,
+                    market="1H",
+                    graded=True,
+                    units=0.9,
+                    clv=1.0,
+                    placed_at=datetime(2026, 10, 3),  # the newer build
+                ),
+            ]
+        )
+        s.commit()
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+
+    with scope() as s:
+        obs = mod.load_observations(s)
+        ctx = mod.latest_build_context(s)
+    assert list(obs) == ["k25"] and obs["k25"]["clv"] == [-0.5]
+    assert ctx["placed_at"] == datetime(2026, 10, 2)
+    assert list(ctx["arms"]) == ["k25"] and ctx["rows_total"] == 1

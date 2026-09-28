@@ -307,6 +307,18 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def parse_kick(raw: Optional[str]) -> Optional[datetime]:
+    """A card item's `kick` (ISO with a trailing Z, what `_iso` writes) back to
+    naive UTC; None for a missing or malformed value. The one parse every reader
+    of the payload applies (build_card's paper loggers, neggap, health)."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
 def _naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
         return None
@@ -1404,11 +1416,8 @@ def build_card(
         # alternate line (held over, never qualifying). 14 of 52 at the week-4
         # sat_am build; the weekly review reports the share per build.
         "hr_priced": sum(1 for it in public if it.get("hr_line") is not None),
-        "hr_alt": sum(
-            1
-            for it in public
-            if it.get("hr_centred") is False and it.get("hr_alt_line") is not None
-        ),
+        # (an item carries hr_alt_line only when its newest quote is an alternate)
+        "hr_alt": sum(1 for it in public if it.get("hr_alt_line") is not None),
     }
     paper = {
         "qualifying": sum(1 for it in public if it["qualifies"]),

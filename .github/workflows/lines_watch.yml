@@ -90,6 +90,15 @@ concurrency:
   group: neon-writers
   cancel-in-progress: false
 
+# The close look-ahead, in minutes: the free /events pre-check skips a slot with
+# nothing kicking off inside it, and the poll prices the games kicking off inside
+# it. ONE number (2026-09-28: it was 75 in the pre-check and 120 in the poll for a
+# day, so a slot whose only kickoffs sat 76-119 min out was skipped by the check
+# the widening existed for). Vercel Hobby ticks can be 119 min apart; 120 still
+# reaches every kickoff inside the registered 2 h close window, 130 would not.
+env:
+  CLOSE_LOOKAHEAD_MIN: 120
+
 jobs:
   watch:
     runs-on: ubuntu-latest
@@ -134,11 +143,11 @@ jobs:
           KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           now=$(date -u +%s)
-          until=$(( now + 75*60 ))
+          until=$(( now + CLOSE_LOOKAHEAD_MIN*60 ))
           n=$(curl -sf "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events?apiKey=$KEY&dateFormat=unix" \
             | jq --argjson lo "$now" --argjson hi "$until" \
                  '[.[] | select(.commence_time >= $lo and .commence_time <= $hi)] | length' 2>/dev/null || echo unknown)
-          echo "events kicking off in the next 75 min: $n"
+          echo "events kicking off in the next $CLOSE_LOOKAHEAD_MIN min: $n"
           if [ "$n" = "0" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.precheck.outputs.skip != 'true'
@@ -162,12 +171,12 @@ jobs:
       - name: 1H opener sweep (Hard Rock universe, games without an HR 1H line yet)
         if: steps.resolve.outputs.market == '1h_open'
         run: python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
-      - name: 1H per-game close (games kicking off within 120 minutes)
+      - name: 1H per-game close (games kicking off within CLOSE_LOOKAHEAD_MIN)
         id: close
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
         # --status-file records the poll's COVERAGE (events in the window,
         # events polled, credits) for the health contract below.
-        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 120 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
+        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min "$CLOSE_LOOKAHEAD_MIN" --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
       - name: Close-window coverage gauge (this Saturday so far; docs/HEALTH.md)
         # After each close poll: the share of today's kicked-off Hard-Rock-priced
         # games with a snapshot inside the 2-hour window, for the board banner

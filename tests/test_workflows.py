@@ -818,7 +818,13 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     # UTC hour (Hobby, within the hour), so consecutive ticks can be 119 min apart;
     # a 120-minute look-ahead still reaches every kickoff inside the registered
     # 2-hour close window (lines.REAL_1H_CLOSE_WINDOW_H), a longer one would not.
-    assert "--kickoff-within-min 120" in close["run"]
+    # One number, read by the free pre-check AND the poll (it was 75 in one and
+    # 120 in the other for a day: a slot whose only kickoffs sat 76-119 min out
+    # was skipped by the pre-check the widening existed for).
+    assert data["env"]["CLOSE_LOOKAHEAD_MIN"] == 120
+    assert '--kickoff-within-min "$CLOSE_LOOKAHEAD_MIN"' in close["run"]
+    precheck = next(s for s in steps if s.get("id") == "precheck")
+    assert "CLOSE_LOOKAHEAD_MIN" in precheck["run"] and "75" not in precheck["run"]
     assert '--status-file "$RUNNER_TEMP/close_status.json"' in close["run"]
     health = steps[-1]
     # Only the scheduled market is judged; a dispatched refresh writes no verdict.

@@ -40,6 +40,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
+from .card import parse_kick
 from .ci import CARD_STATUS_BY_SLOT, PAPER_WINDOW_HOURS, SCHEDULED_SLOTS, et_midnight_as_naive_utc
 from .hardrock import HR_BOOK_KEY
 from .lines import REAL_1H_CLOSE_WINDOW_H
@@ -169,17 +170,6 @@ def _clean(detail: str) -> str:
 
 def _iso(d: Optional[datetime]) -> str:
     return "none" if d is None else d.replace(microsecond=0).isoformat()
-
-
-def _parse_kick(raw: Optional[str]) -> Optional[datetime]:
-    """A card item's `kick` (ISO, trailing Z) as naive UTC -- the same parse
-    scripts/build_card.py::log_paper_picks applies."""
-    if not raw:
-        return None
-    try:
-        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).replace(tzinfo=None)
-    except ValueError:
-        return None
 
 
 def _fbs_slate(ctx: Ctx) -> List[Tuple[int, str, str]]:
@@ -330,7 +320,7 @@ def card_paper_logged_iff_window(ctx: Ctx) -> Result:
     for it in p.get("items") or []:
         if not it.get("qualifies"):
             continue
-        kick = _parse_kick(it.get("kick"))
+        kick = parse_kick(it.get("kick"))
         if window is not None and kick is not None:
             if kick - ctx.run_started_at > timedelta(hours=window):
                 continue
@@ -518,8 +508,6 @@ def sunday_model_run_recorded(ctx: Ctx) -> Result:
     """The refit left its run-log row (scripts/weekly_update.py::record_weekly_refit):
     a model_runs row noted `weekly refit` for SEASON/WEEK created since ET
     midnight. Reads the metrics by content, not by position."""
-    import json
-
     from .db.models import ModelRun
 
     since = et_midnight_as_naive_utc(ctx.now)
@@ -666,11 +654,9 @@ def lines_watch_close_window_coverage(ctx: Ctx) -> Result:
     fired leaves no run to judge (3 of 18 slots fired, 2026 week 4). Weekday runs
     answer n/a so a bad Saturday does not colour the whole week's verdicts -- the
     board's `close_coverage` gauge carries it until the next Saturday."""
-    from datetime import timezone
+    from .coverage import SATURDAY, close_window_coverage, et_date
 
-    from .coverage import ET, close_window_coverage
-
-    if ctx.now.replace(tzinfo=timezone.utc).astimezone(ET).weekday() != 5:
+    if et_date(ctx.now).weekday() != SATURDAY:
         return Result(True, "n/a, not a Saturday run")
     r = close_window_coverage(ctx.session, ctx.now)
     if r is None:
@@ -935,7 +921,7 @@ CONTRACTS: Dict[str, Contract] = {
     "lines_watch": Contract(
         job="lines_watch",
         workflow="lines_watch.yml",
-        window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check skips a slot with nothing kicking off in 75 min, the poll itself looks 120 min ahead",
+        window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN (120) min ahead",
         artifacts=("odds_snapshots 1H rows or last_seen_at stamps", "last_close_capture_at gauge"),
         inputs=("MARKET",),
         checks=(

@@ -20,7 +20,7 @@ Research only — it never places bets or automates gambling.
   content; `sunday.model_run_recorded`. **bet_at (#245):** `manual_picks.bet_at` (when the
   ticket was WRITTEN; `placed_at` stays the log time), the log form's "Placed at" field
   (`et.etLocalToUtc`, DST-safe), `pick.py add --bet-at`; a log more than 30 min after the bet is
-  BACKDATED and judged by **the card in force at bet time** (`card.ts::getCardAsOf`,
+  BACKDATED and judged by **the card in force at bet time** (`card.ts::getLatestCard(season, week, asOf)`,
   `pickRules.verdictAtBetTime`, that card's kill numbers, no live read — the money is on the
   table); `betAtCheck` refuses future / >7 d / post-kickoff; the ledger's hours-before-kickoff
   and the CSV (`bet_at_utc`, 31 columns) use the bet time. **H-NEGGAP-P (#246, #247):** paper

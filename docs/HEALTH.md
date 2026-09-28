@@ -262,7 +262,7 @@ Failure modes on record:
 ### lines_watch
 
 - Workflow: `.github/workflows/lines_watch.yml`
-- Window: every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check skips a slot with nothing kicking off in 75 min, the poll itself looks 120 min ahead
+- Window: every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN (120) min ahead
 - Artifacts: `odds_snapshots 1H rows or last_seen_at stamps`, `last_close_capture_at gauge`
 - Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `MARKET`
 

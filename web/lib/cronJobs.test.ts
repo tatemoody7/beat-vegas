@@ -168,9 +168,16 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     expect(dispatchDecision(job, at("2026-09-27T03:50:00Z")).allowed).toBe(
       true,
     );
-    // 04Z in summer is Sunday 00:00 EDT: wrong day, not listed in vercel.json.
+    // 04Z is Saturday 11pm EST (in window) but Sunday 00:00 EDT (wrong day):
+    // listed in vercel.json for the winter, refused by the route in summer.
     expect(dispatchDecision(job, at("2026-09-27T04:05:00Z")).reason).toContain(
       "wrong_day",
+    );
+    expect(dispatchDecision(job, at("2026-12-20T04:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-20T04:59:00Z")).allowed).toBe(
+      true,
     );
     // A weekday tick never dispatches.
     expect(dispatchDecision(job, at("2026-09-29T15:05:00Z")).reason).toContain(

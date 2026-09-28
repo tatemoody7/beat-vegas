@@ -10,7 +10,7 @@ hold the rest.
 ## 2026-09-28
 
 - **2026-09-28 (PUBLIC-SITE REVIEW — what a stranger sees, and the structure if anyone could
-  follow the picks).** Tate walked the question "if Beat Vegas were a product anyone could open,
+  follow the picks; PR #258, merged 2026-09-28).** Tate walked the question "if Beat Vegas were a product anyone could open,
   how should the site be structured?" through four rounds of questions; the review and every
   decision are in `docs/superpowers/specs/2026-09-28-public-site-review.md`, the mockups (390 and
   1440 side by side, live numbers, a visitor / signed-in switch) at

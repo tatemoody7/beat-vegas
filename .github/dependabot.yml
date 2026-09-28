@@ -76,7 +76,7 @@ updates:
     #                  usedPropTypes and `eslint .` exits 2 (measured 2026-09-20).
     #   typescript 7 -- the Go compiler rewrite; typescript-eslint and
     #                  eslint-config-next compatibility is unproven here.
-    #   vitest 5    -- 450 tests and a config this repo's parity guards read.
+    #   vitest 5    -- ~540 web tests and a config this repo's parity guards read.
     # Take each on its own when there is time to watch it.
     ignore:
       - dependency-name: "eslint"

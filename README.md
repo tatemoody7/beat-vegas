@@ -1,7 +1,8 @@
 # Beat Vegas
 
-Research & analysis system for **college football full-game + first-half (1H)
-unders**, built around **Hard Rock Bet** (the only book bettable from Florida).
+Research & analysis system for **college football first-half (1H) unders**, built
+around **Hard Rock Bet** (the only book bettable from Florida). Full-game lines are
+captured and graded as a reference market; real money is 1H unders only.
 It pulls the week's slate + news, captures Hard Rock vs the rest of the market,
 logs your bets, and reviews each week (market vs model vs you, with CLV). Decision-support — you pick the games.
 
@@ -96,8 +97,8 @@ as ONE region and overrides `regions`, so a 1H poll costs **1 credit per game**
 priced per region, which is why the bulk pull still uses `regions`.
 `poll_lines.py` captures EVERY Hard Rock-priced game (`--hr-universe`): opener
 sweeps stop paying for a game once its Hard Rock 1H line is in (`--missing-hr-only`),
-per-game closes poll only games kicking off within 75 minutes
-(`--kickoff-within-min`), `--max-credits-per-run` is the runaway guard and
+per-game closes poll only games kicking off inside the 120-minute close
+look-ahead (`--kickoff-within-min`, `CLOSE_LOOKAHEAD_MIN` in `lines_watch.yml`), `--max-credits-per-run` is the runaway guard and
 `--credit-floor` the month-end reserve. Expected **~567 credits/week (~2,450/month),
 worst ~774** across four whole-week builds and the per-game closes, on a basis of 82
 Hard Rock-priced games (budget comment in `.github/workflows/lines_watch.yml`).

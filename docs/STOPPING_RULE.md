@@ -105,8 +105,8 @@ boundary. The clock did not decide anything; it was **superseded** because the c
 measured changes at the week-5 refit (B-SERVE: 57 inputs the model never saw missing in
 training were missing on every row it scored, worth about two points of level) and its
 constant 1.75 bar is replaced by a per-slate percentile (H-PCT). The 30 observations stay in
-`manual_picks` as history and are never mixed into Clock 2. Registry rows H-STOP and R10 are
-`rejected` with that sentence.
+`manual_picks` as history and are never mixed into Clock 2. Registry row H-STOP is
+`superseded` with that sentence; R10 (the constant bar) is `rejected`.
 
 Two defects in this page's own registration, corrected below rather than edited above: the
 line-value cell named Hard Rock's strict close while the code graded against the centred

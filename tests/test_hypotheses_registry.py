@@ -24,6 +24,7 @@ STATUSES = {
     "tested-positive",
     "live-tracking",
     "rejected",
+    "superseded",
     "adopted",
 }
 

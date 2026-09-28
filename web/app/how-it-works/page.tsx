@@ -295,7 +295,7 @@ export default async function HowItWorksPage({
             on{" "}
             <Link
               href="/results"
-              className="text-[var(--accent)] hover:underline"
+              className="inline-flex min-h-6 items-center text-[var(--accent)] hover:underline"
             >
               Results
             </Link>

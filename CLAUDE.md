@@ -72,9 +72,6 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and
   registered, not built; a pass of its gate licenses a paper arm, not promotion.
 - **Registry vocabulary**: add `superseded` (H-STOP, H-INSEASON-P currently read `rejected`).
-- **Public-site restructure** (reviewed 2026-09-28; `docs/superpowers/specs/2026-09-28-public-site-review.md`):
-  Board / Results / How it works, ledger-first Results, owner-only content behind the cookie.
-  Build waits for Tate's go; nothing ships mid-season.
 
 ## Decision calendar (all times ET; GitHub crons are the backup, Vercel is the trigger)
 | When | Job | What |
@@ -104,13 +101,16 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   generate`, then deploy.
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
   `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`),
-  Results (`/results`, read-only), Track record (`/proof`, opens on the bet ledger) — plus
-  `/game/[id]` (the only place a pick is logged) and `/proof/records`. Eleven legacy routes are
-  308 redirects in `next.config.ts`. API: `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column
-  CSV), `/api/records`, `/api/health`, `/api/login`, `/api/logout`, `/api/cron/[job]`.
-  Reads are public; writes need the `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in
-  `middleware.ts` AND `lib/session.ts::requireAuth` inside every pick route). `/api/cron`
-  authenticates on `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
+  Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
+  plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
+  (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
+  the cookie** (`viewerIsAuthed()`): ops warnings, the My-teams chip, the Monday review on
+  Results, the research section on How it works, the log control. No dollars are public. API:
+  `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
+  `/api/login`, `/api/logout`, `/api/cron/[job]`. Reads are public; writes need the
+  `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
+  `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on
+  `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
   − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
   `data/fbs_teams.json`), global calibration intercept, re-fitted every Sunday. `score_slate`

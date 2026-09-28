@@ -9,6 +9,29 @@ hold the rest.
 
 ## 2026-09-28
 
+- **2026-09-28 (PUBLIC-SITE RESTRUCTURE BUILT — one PR, per-page commits).** Tate's go the
+  same evening as the review (PR #258). The site is now **Board / Results / How it works**:
+  the Board keeps everything and gains a two-line strip; Results opens on the bet ledger (our
+  bets in units, a "could plausibly be" interval, the units curve, every bet as logged, the
+  CSV) with a three-row comparison; How it works holds the pitch, the Board key, the Hard Rock
+  (Florida) note, the backtest headed "Backtest, 2023–25 (not money bet)", the gap ladder,
+  what we don't know, ten terms (Plausibly in; Rank, Score, Line basis, Reference line, Kill
+  line, Early season, Graded and pending out), the `/records` link and the helpline. **Owner-
+  only behind the cookie** (`viewerIsAuthed()`): ops warnings, the My-teams chip, the pause
+  reason, the Monday review (picks table with edit/delete, breakdown, decisions, factor read)
+  and the model / full-game comparison rows on Results, the research section (live notes,
+  flags, method fold) on How it works, the log control on the game page. Lock and Unlock moved
+  to the footer beside "21+. Not financial advice." — which also ended the 87px phone header
+  the layout spec had pinned as a known failure. `/proof` → `/results`, `/proof/records` →
+  `/records`, `/glossary` → `/how-it-works#glossary` (thirteen 308s). **Board core fixes in
+  `edge.ts` and `card.py` alike:** the row sentence names its basis ("the market line is 0.2
+  above our number" when Hard Rock has no line; "sits on our number" instead of "0.0 below");
+  the bar sentence is `Bar this week: 2.1 pts (top 20% of 41 priced games).`; "0 of 5 bets
+  this week" and "Next update" replace slots and build. Decisions Tate made for the build:
+  bar sentence shortened, one PR with one Vercel preview, Lock in the footer. Every
+  FEATURE_PARITY line was kept, renamed or retired with its reason; the e2e fixture's port of
+  the action templates changed in lockstep (`lib/e2eFixture.test.ts` holds them together).
+
 - **2026-09-28 (PUBLIC-SITE REVIEW — what a stranger sees, and the structure if anyone could
   follow the picks; PR #258, merged 2026-09-28).** Tate walked the question "if Beat Vegas were a product anyone could open,
   how should the site be structured?" through four rounds of questions; the review and every

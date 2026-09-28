@@ -78,7 +78,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 ## Health and records API
 
 - [health] `/api/health` answers 200 with exactly the documented top-level and gauge keys — health.spec.ts › "answers 200 with exactly the documented keys"
-- [health] On the clean fixture: ok, not paused, not stale, no missed build, no warnings, the seeded gauge values, UTC timestamps — health.spec.ts › "reports the clean fixture as healthy"
+- [health] On the clean fixture: ok, not paused, not stale, no missed build, no warnings, the seeded gauge values (incl. close-window coverage 67 of 72), UTC timestamps — health.spec.ts › "reports the clean fixture as healthy"
 - [health] One `lastDispatch` gauge per CRON_JOBS id, each a past instant — health.spec.ts › "carries one dispatch gauge per cron job, each inside its last window"
 - [health] One `health` verdict per scheduled job (card, grade, sunday, lines_watch), each `{verdict, at, note}` and ok — health.spec.ts › "carries one health verdict per scheduled job, each ok with its run note"
 - [health] The five security headers from `next.config.ts` are on every response — health.spec.ts › "sends the security headers next.config.ts declares"

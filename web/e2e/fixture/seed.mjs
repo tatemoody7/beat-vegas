@@ -45,6 +45,13 @@ export const TABLES = [
 /** Naive UTC text for a timestamp column. */
 export const ts = (d) => d.toISOString().slice(0, 19).replace("T", " ");
 
+/** ISO date of the most recent Saturday at or before `now` (a fixture label only). */
+function lastSaturdayIso(now) {
+  const d = new Date(now.getTime());
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
 export function refuseNeon(url) {
   if (/neon\.tech/i.test(url)) {
     throw new Error(
@@ -828,6 +835,15 @@ export function fixtureRows(week, expected) {
       value: hourAgo,
       note: null,
       updated_at: hourAgo,
+    },
+    // Close-window coverage (beatvegas/coverage.py -> scripts/close_coverage.py):
+    // the share of last Saturday's Hard-Rock-priced games with a 1H snapshot
+    // inside the 2-hour close window. 67 of 72 keeps the banner quiet.
+    {
+      key: "close_coverage_pct",
+      value: "0.930",
+      note: `sat=${lastSaturdayIso(now)} games=72 covered=67`,
+      updated_at: ts(new Date(now.getTime() - 2 * 24 * 3_600_000)),
     },
     ...Object.entries(expected.lastDispatch).map(([job, at]) => ({
       key: `last_dispatch_${job}`,

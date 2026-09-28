@@ -560,7 +560,13 @@ def test_counts_bet_excludes_a_degraded_bet():
     by_id = {it["game_id"]: it for it in c["items"]}
     assert by_id[1]["tier"] == by_id[2]["tier"] == "BET"
     assert by_id[1]["blocker"] is None and by_id[2]["blocker"] == "degraded"
-    assert c["counts"] == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 1}
+    assert {k: c["counts"][k] for k in ("bet", "edge", "pass", "over_cap", "degraded")} == {
+        "bet": 1,
+        "edge": 0,
+        "pass": 0,
+        "over_cap": 0,
+        "degraded": 1,
+    }
 
 
 def test_card_status_inputs_are_the_build_wide_ones():
@@ -682,7 +688,15 @@ def test_payload_keys_match_the_web_contract():
         "items",
         "notes",
     }
-    assert set(c["counts"]) == {"bet", "edge", "pass", "over_cap", "degraded"}
+    assert set(c["counts"]) == {
+        "bet",
+        "edge",
+        "pass",
+        "over_cap",
+        "degraded",
+        "hr_priced",
+        "hr_alt",
+    }
     assert set(c["slate"]) == {"bar", "n", "share", "basis"}
     assert "bar" in c["items"][0] and "hr_centred" in c["items"][0]
     assert set(c["degraded"][0]) == {"input", "detail", "game_ids"}

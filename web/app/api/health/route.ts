@@ -73,6 +73,10 @@ export async function GET() {
         lastCloseCaptureEvents: gauges.lastCloseCaptureEvents,
         lastGradeCompletedAt:
           gauges.lastGradeCompletedAt?.toISOString() ?? null,
+        // Share of last Saturday's Hard-Rock-priced games with a 1H snapshot
+        // inside the 2-hour close window, and the writer's note.
+        closeCoveragePct: gauges.closeCoveragePct,
+        closeCoverage: gauges.closeCoverageNote,
         // Per cron job: the last Vercel tick that acted inside its window.
         lastDispatch: Object.fromEntries(
           Object.entries(gauges.lastDispatch).map(([id, d]) => [

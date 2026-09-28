@@ -25,6 +25,13 @@ ODDS_CREDITS_REMAINING = "odds_credits_remaining"
 LAST_CLOSE_CAPTURE_AT = "last_close_capture_at"
 LAST_CLOSE_CAPTURE_EVENTS = "last_close_capture_events"
 LAST_GRADE_COMPLETED_AT = "last_grade_completed_at"
+# Share of the Hard-Rock-priced games that kicked off on the most recent Saturday
+# (ET) with a 1H snapshot inside the registered close window
+# (beatvegas/coverage.py; written by scripts/close_coverage.py). The close gauge
+# above stays fresh on three sweeps a Saturday; this one says how many games
+# those sweeps actually reached (wk2 25/72, wk3 27/72, wk4 18/57 -- 2026-09-28).
+# Value = the share as a decimal string; note = `sat=<date> games=<n> covered=<k>`.
+CLOSE_COVERAGE_PCT = "close_coverage_pct"
 
 GAUGE_KEYS = (
     CFBD_CALLS_REMAINING,
@@ -32,6 +39,7 @@ GAUGE_KEYS = (
     LAST_CLOSE_CAPTURE_AT,
     LAST_CLOSE_CAPTURE_EVENTS,
     LAST_GRADE_COMPLETED_AT,
+    CLOSE_COVERAGE_PCT,
 )
 
 # One more per Vercel cron job, written by web/app/api/cron/[job]/route.ts (not

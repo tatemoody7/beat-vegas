@@ -162,12 +162,19 @@ jobs:
       - name: 1H opener sweep (Hard Rock universe, games without an HR 1H line yet)
         if: steps.resolve.outputs.market == '1h_open'
         run: python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
-      - name: 1H per-game close (games kicking off within 75 minutes)
+      - name: 1H per-game close (games kicking off within 120 minutes)
         id: close
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
         # --status-file records the poll's COVERAGE (events in the window,
         # events polled, credits) for the health contract below.
         run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 120 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
+      - name: Close-window coverage gauge (this Saturday so far; docs/HEALTH.md)
+        # After each close poll: the share of today's kicked-off Hard-Rock-priced
+        # games with a snapshot inside the 2-hour window, for the board banner
+        # (close_coverage_pct). Never fails the run.
+        if: steps.close.outcome == 'success'
+        continue-on-error: true
+        run: python scripts/close_coverage.py
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3

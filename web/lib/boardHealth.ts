@@ -194,6 +194,7 @@ export const BASE_GAUGE_KEYS = [
   "last_close_capture_at",
   "last_close_capture_events",
   "last_grade_completed_at",
+  "close_coverage_pct",
 ] as const;
 
 // One more per cron job, written by app/api/cron/[job]/route.ts rather than by
@@ -252,6 +253,11 @@ export type Gauges = {
   lastCloseCaptureAt: Date | null;
   lastCloseCaptureEvents: number | null;
   lastGradeCompletedAt: Date | null;
+  /** Share (0-1) of last Saturday's Hard-Rock-priced games with a 1H snapshot
+   *  inside the registered 2-hour close window (beatvegas/coverage.py), and
+   *  the writer's note `sat=<date> games=<n> covered=<k>`. */
+  closeCoveragePct: number | null;
+  closeCoverageNote: string | null;
   /** Per cron job id: the last in-window Vercel tick, or null if never seen. */
   lastDispatch: Record<string, Date | null>;
   /** Per scheduled job: the last health-contract verdict (docs/HEALTH.md). */
@@ -266,6 +272,11 @@ export const CFBD_LOW_CALLS = 300;
 export const ODDS_LOW_CREDITS = 2000;
 /** Longest gap between pre-kickoff close captures during the season (Sat to Sat plus slack). */
 export const CLOSE_CAPTURE_MAX_AGE_H = 8 * 24;
+/** Under this share of last Saturday's Hard-Rock-priced games with a close inside
+ *  the 2-hour window, the close poll is not doing its job (GitHub's cron fired 3
+ *  of 18 Saturday slots in 2026 week 4 and coverage read 32%). MUST equal
+ *  beatvegas/health.py CLOSE_COVERAGE_MIN (parity-tested). */
+export const CLOSE_COVERAGE_MIN = 0.8;
 
 const numOrNull = (v: string | undefined): number | null => {
   if (v === undefined) return null;
@@ -316,6 +327,8 @@ export function gaugesFrom(rows: GaugeRow[]): Gauges {
       by.get("last_close_capture_events")?.value,
     ),
     lastGradeCompletedAt: utc(by.get("last_grade_completed_at")?.value ?? null),
+    closeCoveragePct: numOrNull(by.get("close_coverage_pct")?.value),
+    closeCoverageNote: by.get("close_coverage_pct")?.note ?? null,
     lastDispatch,
     health,
     updatedAt,
@@ -413,6 +426,25 @@ export function opsWarnings(
         text: `No pre-kickoff close captured for ${Math.floor(ageH / 24)} days. Every line-value number since then is graded against a sweep quote, not a close.`,
       });
     }
+  }
+  // How many of last Saturday's games the close polls actually reached. The
+  // `close` gauge above stays fresh on three sweeps a Saturday, which is
+  // exactly the failure this one was written for (2026-09-28).
+  if (
+    inSeason &&
+    g.closeCoveragePct !== null &&
+    g.closeCoveragePct < CLOSE_COVERAGE_MIN
+  ) {
+    const m = /sat=(\S+) games=(\d+) covered=(\d+)/.exec(
+      g.closeCoverageNote ?? "",
+    );
+    const where = m
+      ? `${m[3]} of ${m[2]} Hard-Rock-priced games on Sat ${m[1]}`
+      : `${Math.round(g.closeCoveragePct * 100)}% of last Saturday's Hard-Rock-priced games`;
+    out.push({
+      key: "close_coverage",
+      text: `Only ${where} had a close captured inside 2 h of kickoff (floor ${Math.round(CLOSE_COVERAGE_MIN * 100)}%). Line value on the rest is graded against an earlier sweep, not a close; the Saturday close poll is not reaching its games (docs/HEALTH.md#lines_watch).`,
+    });
   }
   // The primary trigger. A job whose most recent window has CLOSED without an
   // in-window Vercel tick is running on the backup (GitHub's cron, or a hand

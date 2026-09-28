@@ -211,6 +211,14 @@ jobs:
           if [ "$ET_DOW" = "1" ] || [ "$IN_HIST" = "true" ]; then scope=both; fi
           echo "post-mortem scope=$scope (et_dow=$ET_DOW hist=$IN_HIST event=$GITHUB_EVENT_NAME)"
           python scripts/post_mortem.py --write --md "" --scope "$scope"
+      - name: Close-window coverage gauge (last Saturday; docs/HEALTH.md)
+        # How many of last Saturday's Hard-Rock-priced games the close polls
+        # reached (beatvegas/coverage.py -> close_coverage_pct, board banner).
+        # Daily so the gauge exists all week; the Saturday close runs refresh it
+        # live. A courtesy to the reader: never fails the run.
+        if: steps.probe.outputs.need_grade == 'true'
+        continue-on-error: true
+        run: python scripts/close_coverage.py
       - name: Save CFBD reference cache (only when this run populated it)
         if: always() && steps.cfbd_cache.outputs.hit != 'true'
         uses: ./.github/actions/cfbd-cache-save

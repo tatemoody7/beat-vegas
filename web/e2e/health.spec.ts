@@ -28,6 +28,8 @@ const GAUGE_KEYS = [
   "lastCloseCaptureAt",
   "lastCloseCaptureEvents",
   "lastGradeCompletedAt",
+  "closeCoveragePct",
+  "closeCoverage",
   "lastDispatch",
   "health",
 ].sort();
@@ -54,6 +56,11 @@ test.describe("GET /api/health", () => {
     expect(body.gauges.cfbdCallsRemaining).toBe(2500);
     expect(body.gauges.oddsCreditsRemaining).toBe(15000);
     expect(body.gauges.lastCloseCaptureEvents).toBe(40);
+    // Last Saturday's close polls reached 67 of 72 games: above the 80% floor.
+    expect(body.gauges.closeCoveragePct).toBe(0.93);
+    expect(body.gauges.closeCoverage).toMatch(
+      /^sat=\d{4}-\d{2}-\d{2} games=72 covered=67$/,
+    );
     // The seed wrote every timestamp as naive UTC; the route appends the Z.
     expect(body.gauges.lastCloseCaptureAt).toMatch(/Z$/);
     expect(body.gauges.lastGradeCompletedAt).toMatch(/Z$/);

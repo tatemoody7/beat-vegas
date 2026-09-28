@@ -17,7 +17,7 @@ import { REASONS, WEEKLY_BET_CAP, type PickReason } from "@/lib/verdict";
 // Payload contract (exact, from the Python side):
 //   {season, week, built_at, model_read, slot, status,
 //    degraded:[{input, detail, game_ids?}],
-//    counts:{bet,edge,pass,over_cap,degraded},
+//    counts:{bet,edge,pass,over_cap,degraded,hr_priced,hr_alt},
 //    paper:{qualifying, over_cap, cap},
 //    items:[{game_id, away, home, kick, tier, blocker, hr_line, hr_price,
 //            hr_open, market_line, fair_under, fair_source, hr_vs_market, ev,

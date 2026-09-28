@@ -56,7 +56,10 @@ def test_the_universe_is_hard_rocks_main_line_with_an_over_price():
     assert not neggap.in_universe(_item(1, -2.0, hr_centred=False))
     assert not neggap.in_universe(_item(1, -2.0, hr_over_price=None))
     assert not neggap.in_universe(_item(1, -2.0, bv_line=None))
-    assert not neggap.in_universe(_item(1, -2.0, gap_basis="market"))
+    # No Hard Rock line: card.py then leaves hr_centred False and the gap unset.
+    no_hr = _item(1, -2.0, hr_line=None, hr_centred=False, gap_basis=None)
+    no_hr["gap"] = None
+    assert not neggap.in_universe(no_hr)
 
 
 def test_collection_is_off_unless_switched_on(monkeypatch):

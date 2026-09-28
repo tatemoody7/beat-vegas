@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from .backtest.stopping import NEGGAP
-from .challenger_picks import add_challenger_pick, existing_challenger_pick
+from .card import parse_kick
+from .challenger_picks import add_challenger_pick
+from .db.models import ChallengerPick
 from .hardrock import HR_BOOK_KEY
 
 ARMS: Tuple[Tuple[str, float], ...] = tuple(
@@ -47,16 +49,31 @@ def arm_hits(gap: Optional[float]) -> List[str]:
 
 def in_universe(it: Dict) -> bool:
     """H-PCT-U's universe with an over price: Hard Rock's NEWEST quote is its
-    main line, the model read the game, and the over side is priced."""
+    main line, the model read the game, and the over side is priced. (An item
+    with `hr_centred` always carries `hr_line`, and its gap is then on the
+    hardrock basis -- card.py::build_item -- so neither is re-checked.)"""
     return bool(
         it.get("hr_centred")
         and it.get("hr_live")
-        and it.get("hr_line") is not None
         and it.get("bv_line") is not None
-        and it.get("hr_over_price") is not None
-        and it.get("gap_basis") == "hardrock"
         and it.get("gap") is not None
+        and it.get("hr_over_price") is not None
     )
+
+
+def _logged(session) -> Set[Tuple[int, str]]:
+    """(game_id, arm) of every over observation already on file -- one read per
+    build instead of one per game per arm (one observation per game per arm,
+    whichever build first saw it, exactly as existing_challenger_pick rules)."""
+    rows = (
+        session.query(ChallengerPick.game_id, ChallengerPick.arm)
+        .filter(
+            ChallengerPick.arm.in_([a for a, _ in ARMS]),
+            (ChallengerPick.market == "1H") | (ChallengerPick.market.is_(None)),
+        )
+        .all()
+    )
+    return {(int(g), a) for g, a in rows}
 
 
 def log_neggap_picks(
@@ -65,14 +82,15 @@ def log_neggap_picks(
     """Insert the arms' paper OVERS for this build. Mirrors
     scripts/build_card.py::log_paper_picks: the same paper window (a game
     kicking off beyond `window_hours` waits for the next build), one row per
-    game per arm, deduplicated per arm by existing_challenger_pick. Returns
+    game per arm (a row already on file is skipped). Returns
     {arm: rows inserted}. Never touches `manual_picks`."""
     added: Dict[str, int] = {}
+    logged = _logged(session)
     for it in card.get("items", []):
         if not in_universe(it):
             continue
-        if window_hours is not None and it.get("kick"):
-            kick = datetime.fromisoformat(it["kick"].replace("Z", "+00:00")).replace(tzinfo=None)
+        kick = parse_kick(it.get("kick"))
+        if window_hours is not None and kick is not None:
             if kick - now > timedelta(hours=window_hours):
                 continue
         arms = arm_hits(float(it["gap"]))
@@ -80,7 +98,7 @@ def log_neggap_picks(
             continue
         gid = int(it["game_id"])
         for arm in arms:
-            if existing_challenger_pick(session, gid, arm) is not None:
+            if (gid, arm) in logged:
                 continue
             add_challenger_pick(
                 session,
@@ -103,10 +121,11 @@ def log_neggap_picks(
                 gap_at_pick=float(it["gap"]),
             )
             added[arm] = added.get(arm, 0) + 1
+            logged.add((gid, arm))
     return added
 
 
-def summary_line(added: Dict[str, int], enabled: bool) -> Optional[str]:
+def summary_line(added: Dict[str, int], enabled: bool) -> str:
     """The card summary's one line about the arms."""
     if not enabled:
         return "  NEGGAP (H-NEGGAP-P, paper overs): off (NEGGAP_COLLECT unset); no row written"

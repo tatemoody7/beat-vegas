@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import {
+  betTime,
   groupByWeek,
   hoursBeforeKickoff,
   ledgerSummary,
@@ -11,6 +12,7 @@ import {
   type LedgerView,
   type RunningRow,
 } from "@/lib/betLedger";
+import { BACKDATE_MIN_MINUTES } from "@/lib/pickRules";
 import { displayLineValue } from "@/lib/clvDirection";
 import { etStamp } from "@/lib/et";
 import { american, signed, unitColor } from "@/lib/format";
@@ -255,16 +257,16 @@ function LedgerRowView({
   open: boolean;
   toggle: () => void;
 }) {
-  const posted = et(p.placedAt);
-  // A ticket written before it was logged: the bet time leads, the log time
-  // follows when they differ by more than an hour.
-  const bet = p.betAt ? et(p.betAt) : null;
+  // When the bet was made (the bet time when one was recorded, else the log
+  // time). A ticket logged long enough after it was written that the server
+  // judged it by the card in force at bet time (BACKDATE_MIN_MINUTES) also
+  // shows when it was logged.
+  const posted = et(betTime(p));
   const loggedLater =
-    bet !== null &&
-    posted !== null &&
-    p.betAt &&
-    p.placedAt &&
-    Date.parse(p.placedAt) - Date.parse(p.betAt) > 3_600_000;
+    p.betAt !== null &&
+    p.placedAt !== null &&
+    Date.parse(p.placedAt) - Date.parse(p.betAt) >
+      BACKDATE_MIN_MINUTES * 60_000;
   const lead = beforeKickoff(p);
   return (
     <>
@@ -388,9 +390,9 @@ function LedgerRowView({
               <dd className="text-[var(--text-muted)]">{loggedAs(p)}</dd>
               <dt className="text-[var(--text-dim)]">Posted</dt>
               <dd className="text-[var(--text-muted)]">
-                {bet ?? posted ?? "—"}
+                {posted ?? "—"}
                 {lead ? ` · ${lead}` : ""}
-                {loggedLater ? ` · logged ${posted}` : ""}
+                {loggedLater ? ` · logged ${et(p.placedAt)}` : ""}
               </dd>
               <dt className="text-[var(--text-dim)]">Price</dt>
               <dd className="text-[var(--text-muted)]">

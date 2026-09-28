@@ -131,8 +131,9 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // 15Z Saturday to 03Z Sunday, each firing once within its hour, every tick
     // dispatching (everyTick). With --kickoff-within-min 120 in the workflow,
     // ticks up to 119 minutes apart still reach every kickoff inside 2 h.
-    // Window: 10:00am ET to midnight ET Saturday; the 04Z entry would be
-    // 00:00 EDT Sunday (wrong_day), so it is not listed.
+    // Window: 10:00am ET to midnight ET Saturday. The 04Z Sunday entry is
+    // 11pm EST Saturday (in window from November) and 00:00 EDT Sunday in
+    // summer, when this route refuses it as wrong_day at no cost.
     dispatchOpenMin: 10 * 60,
     dispatchCloseMin: 24 * 60 - 1,
     gateOpenMin: null,

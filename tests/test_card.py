@@ -1109,3 +1109,15 @@ def test_only_alternates_on_file_means_no_hard_rock_line():
     it = only(card([game()], snaps, [model(1, 21.0)]))
     assert it["hr_line"] is None and it["hr_alt_line"] == 30.5
     assert it["blocker"] == "no_hr_line" and it["qualifies"] is False
+
+
+def test_parse_kick_is_the_inverse_of_the_payload_stamp():
+    """One parse for every reader of a card item's `kick` (the paper loggers,
+    the over arms, the health contract); a missing or malformed value is None
+    rather than a raise in the middle of a build."""
+    from beatvegas.card import _iso, parse_kick
+
+    kick = datetime(2026, 10, 3, 19, 30)
+    assert parse_kick(_iso(kick)) == kick
+    assert parse_kick(None) is None and parse_kick("") is None
+    assert parse_kick("Saturday") is None

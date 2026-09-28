@@ -19,9 +19,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -30,7 +29,7 @@ from residual_gate import append_step_summary, report_paths  # noqa: E402
 from beatvegas.backtest import stopping as S  # noqa: E402
 from beatvegas.db.models import ChallengerPick, Game  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
-from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H  # noqa: E402
+from beatvegas.lines import close_in_window  # noqa: E402
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -41,52 +40,36 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
-def close_in_window(closing_captured_at, kickoff) -> bool:
-    if closing_captured_at is None or kickoff is None:
-        return False
-    return kickoff - closing_captured_at <= timedelta(hours=REAL_1H_CLOSE_WINDOW_H)
-
-
-def load_observations(session) -> Dict[str, Dict[str, list]]:
-    """Per arm: units, prices, favourable clv (+clv for an over) and whether the
-    close was inside the window, in placed order. Only graded over rows of the
-    registered arms; the H-INSEASON arms (side under) never enter."""
+def load_observations(
+    session,
+) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, list]]]:
+    """One pass over the arms' over rows: (tallies per arm, graded observations
+    per arm). Observations are units, prices, favourable clv (+clv for an over)
+    and whether the close was inside the window (lines.close_in_window, the same
+    rule the champion's clock applies), in placed order. Only the registered
+    over arms; the H-INSEASON arms (side under) never enter."""
     rows = (
         session.query(ChallengerPick, Game.start_date)
         .outerjoin(Game, Game.id == ChallengerPick.game_id)
-        .filter(ChallengerPick.graded.is_(True), ChallengerPick.side == "over")
-        .filter(ChallengerPick.arm.in_(list(S.NEGGAP["arms"])))
+        .filter(ChallengerPick.side == "over", ChallengerPick.arm.in_(list(S.NEGGAP["arms"])))
         .order_by(ChallengerPick.placed_at, ChallengerPick.id)
         .all()
     )
-    out: Dict[str, Dict[str, list]] = {}
+    tallies: Dict[str, Dict[str, int]] = {}
+    obs: Dict[str, Dict[str, list]] = {}
     for p, kickoff in rows:
-        if (p.market or "1H") != "1H":
+        t = tallies.setdefault(p.arm, {"logged": 0, "graded": 0, "won": 0})
+        t["logged"] += 1
+        if not p.graded:
             continue
-        obs = out.setdefault(p.arm, {"units": [], "prices": [], "clv": [], "clv_in_window": []})
-        obs["units"].append(float("nan") if p.units is None else float(p.units))
-        obs["prices"].append(float("nan") if p.price is None else float(p.price))
-        obs["clv"].append(float("nan") if p.clv is None else S.NEGGAP["clv_sign"] * float(p.clv))
-        obs["clv_in_window"].append(
-            close_in_window(getattr(p, "closing_captured_at", None), kickoff)
-        )
-    return out
-
-
-def counts(session) -> Dict[str, Dict[str, int]]:
-    out: Dict[str, Dict[str, int]] = {}
-    for p in (
-        session.query(ChallengerPick)
-        .filter(ChallengerPick.side == "over", ChallengerPick.arm.in_(list(S.NEGGAP["arms"])))
-        .all()
-    ):
-        c = out.setdefault(p.arm, {"logged": 0, "graded": 0, "won": 0})
-        c["logged"] += 1
-        if p.graded:
-            c["graded"] += 1
-            if p.result == "over":
-                c["won"] += 1
-    return out
+        t["graded"] += 1
+        t["won"] += int(p.result == "over")
+        o = obs.setdefault(p.arm, {"units": [], "prices": [], "clv": [], "clv_in_window": []})
+        o["units"].append(float("nan") if p.units is None else float(p.units))
+        o["prices"].append(float("nan") if p.price is None else float(p.price))
+        o["clv"].append(float("nan") if p.clv is None else S.NEGGAP["clv_sign"] * float(p.clv))
+        o["clv_in_window"].append(close_in_window(p.closing_captured_at, kickoff))
+    return tallies, obs
 
 
 def render(pos: Dict[str, Any], tallies: Dict[str, Dict[str, int]]) -> str:
@@ -149,8 +132,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("[neggap] DB unreachable — skipped.")
         return 0
     with session_scope() as s:
-        tallies = counts(s)
-        arms = load_observations(s)
+        tallies, arms = load_observations(s)
     if not arms:
         print("[neggap] no graded over observations yet — no clock to report.")
         print(json.dumps(tallies, indent=1))

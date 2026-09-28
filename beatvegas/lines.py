@@ -17,6 +17,18 @@ REAL_1H_CLOSE_WINDOW_H = 2.0
 REAL_FG_CLOSE_WINDOW_H = 3.0
 
 
+def close_in_window(closing_captured_at, kickoff, hours: float = REAL_1H_CLOSE_WINDOW_H) -> bool:
+    """Was a pick's close confirmed INSIDE the window: at most `hours` before
+    kickoff and never after it? The admission rule of every line-value clock
+    (H-STOP-2 in scripts/stopping_rule_position.py, H-NEGGAP-P in
+    scripts/neggap_position.py); False when either time is unknown."""
+    if closing_captured_at is None or kickoff is None:
+        return False
+    return closing_captured_at <= kickoff and (kickoff - closing_captured_at) <= timedelta(
+        hours=hours
+    )
+
+
 def centred_snaps(snaps: Sequence, strict: bool = False) -> list:
     """Snapshots whose prices look like a book's MAIN number.
 

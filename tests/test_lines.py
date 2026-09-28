@@ -371,3 +371,21 @@ def test_an_as_of_read_never_sees_a_snapshot_from_after_the_decision_time():
     for label, t in decision_times(kick).items():
         for sn in as_of(snaps, t):
             assert sn.captured_at <= t, label
+
+
+def test_close_in_window_is_at_most_two_hours_before_and_never_after_kickoff():
+    """The one admission rule of every line-value clock (H-STOP-2 and the
+    H-NEGGAP-P over arms). The over arms' own copy accepted a close stamped
+    AFTER kickoff until the week-5 cleanup."""
+    from datetime import timedelta
+
+    from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, close_in_window
+
+    kick = datetime(2026, 10, 3, 19, 30)
+    assert close_in_window(kick - timedelta(minutes=90), kick)
+    assert close_in_window(kick - timedelta(hours=REAL_1H_CLOSE_WINDOW_H), kick)
+    assert not close_in_window(kick - timedelta(hours=2, minutes=1), kick)
+    assert not close_in_window(kick + timedelta(minutes=1), kick)
+    assert not close_in_window(None, kick) and not close_in_window(kick, None)
+    # A wider registered window is the caller's to state.
+    assert close_in_window(kick - timedelta(hours=3), kick, hours=3.0)

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { etLocalToUtc, etLocalValue } from "@/lib/et";
+import { etLocalToUtc } from "@/lib/et";
 import { usd } from "@/lib/format";
 import { labelOf, REASON_TEXT, VERDICT_TEXT } from "@/lib/labels";
 import type { PickReason, Verdict } from "@/lib/verdict";
@@ -54,10 +54,13 @@ export default function LogPickForm({
     prefill.price === null ? "" : String(prefill.price),
   );
   const [isPaper, setIsPaper] = useState(prefill.verdict !== "BET");
-  // When the ticket was written, ET wall clock; defaults to now. Sent for real
-  // money only, as a UTC instant. A log more than 30 minutes after the bet is
-  // judged by the card in force at bet time (docs/BETTING_POLICY.md).
-  const [betAt, setBetAt] = useState<string>(() => etLocalValue(new Date()));
+  // When the ticket was written, ET wall clock, BLANK unless the ticket was
+  // written earlier: blank means "now", and the server judges the live read.
+  // Sent for real money only, as a UTC instant; a bet time more than 30
+  // minutes before the log makes it a backdated log, judged by the card in
+  // force then (docs/BETTING_POLICY.md). A pre-filled "now" would turn a form
+  // left open half an hour into a backdated log with no live price check.
+  const [betAt, setBetAt] = useState<string>("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -84,10 +87,12 @@ export default function LogPickForm({
       return;
     }
     let betAtIso: string | undefined;
-    if (!isPaper) {
+    if (!isPaper && betAt.trim() !== "") {
       const t = etLocalToUtc(betAt);
       if (t === null) {
-        setErr("Enter when you placed the ticket (Eastern time).");
+        setErr(
+          "Enter when you placed the ticket (Eastern time), or leave it blank.",
+        );
         return;
       }
       betAtIso = t.toISOString();
@@ -184,7 +189,7 @@ export default function LogPickForm({
 
         {!isPaper && (
           <label className={`${labelCls} sm:col-span-3`}>
-            Placed at (Eastern time)
+            Placed at (Eastern time) — leave blank if now
             <input
               type="datetime-local"
               value={betAt}
@@ -192,8 +197,9 @@ export default function LogPickForm({
               className={field}
             />
             <span className={hintCls}>
-              Change it if you wrote the ticket earlier. A late log is judged by
-              the card that was in force then, not by today&apos;s line.
+              Fill it in only if you wrote the ticket earlier. A late log is
+              judged by the card that was in force then, not by today&apos;s
+              line.
             </span>
           </label>
         )}

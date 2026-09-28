@@ -428,7 +428,7 @@ def test_main_records_the_weekly_refit_in_model_runs(monkeypatch, wu, capsys):
         m = json.loads(row.metrics_json)
     assert m["kind"] == "weekly_refit" and m["season"] == SEASON and m["week"] == WEEK
     assert m["n_inputs"] == len(BV_FEATURE_COLS)
-    assert m["scored_rows"] == 1 and m["serve_skew_violations"] == 0
+    assert m["scored_rows"] == 1 and "serve_skew_violations" not in m
     assert m["run_id"] == "4242"
     assert m["intercept"] is None  # the fake scorer carries no bv_intercept column
     assert len(m["frame_fingerprint"]) == 16

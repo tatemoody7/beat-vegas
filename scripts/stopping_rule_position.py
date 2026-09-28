@@ -78,12 +78,11 @@ def load_observations_2(session):
     line-value clock excludes and counts the rest. Unpriced picks stay in the
     clv series (H-STOP dropped them from both clocks; that was a silent
     conditioning of a sequential test)."""
-    from datetime import timedelta
-
     from beatvegas.db.models import Game
+    from beatvegas.lines import close_in_window
 
     start = S.REGISTERED_2["start"]
-    window = timedelta(hours=float(S.REGISTERED_2["close_window_h"]))
+    window_h = float(S.REGISTERED_2["close_window_h"])
     rows = (
         session.query(ManualPick, Game.start_date)
         .join(Game, Game.id == ManualPick.game_id)
@@ -106,13 +105,7 @@ def load_observations_2(session):
             prices.append(float(p.price))
         if p.clv is not None:
             clv.append(-float(p.clv))
-            ok = (
-                p.closing_captured_at is not None
-                and kick is not None
-                and (kick - p.closing_captured_at) <= window
-                and p.closing_captured_at <= kick
-            )
-            in_window.append(bool(ok))
+            in_window.append(close_in_window(p.closing_captured_at, kick, window_h))
     return units, prices, clv, in_window
 
 

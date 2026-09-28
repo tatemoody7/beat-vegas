@@ -11,14 +11,25 @@ name: Hard Rock 1H line capture
 #                6 days that have NO Hard Rock 1H line yet. A game stops being
 #                paid for once its opener is captured (--missing-hr-only).
 #                Wed 2pm, Thu 10am/4pm, Fri 8am/noon/4pm ET-ish (UTC below).
-#   - 1h_close — per-game close: only games kicking off within the next 75 min
-#                (--kickoff-within-min 75). Every 30 min across the Saturday
-#                kickoff window and the Tue-Fri / Sun-Mon evening windows, so
-#                each game is covered by 2-3 slots and a dropped or late slot
-#                still yields a pre-kick close. An unchanged number writes no
-#                row; it stamps odds_snapshots.last_seen_at (the close time).
-#                Slots with no game in the window skip before checkout (the
-#                free /events call), spending 0 credits and ~0 minutes.
+#   - 1h_close — per-game close: only games kicking off within the next 120
+#                min (--kickoff-within-min 120; was 75 until 2026-09-28). Every
+#                30 min across the Saturday kickoff window and the Tue-Fri /
+#                Sun-Mon evening windows, so each game is covered by several
+#                slots and a dropped or late slot still yields a pre-kick close.
+#                An unchanged number writes no row; it stamps
+#                odds_snapshots.last_seen_at (the close time). Slots with no
+#                game in the window skip before checkout (the free /events
+#                call), spending 0 credits and ~0 minutes.
+#                SATURDAY IS ALSO DISPATCHED BY A VERCEL CRON (web/vercel.json
+#                -> /api/cron/lines-close, table in web/lib/cronJobs.ts): GitHub
+#                fired 3 of the 18 Saturday slots in 2026 week 4 and 5 in week
+#                3, leaving ~a third of Hard-Rock-priced games with any snapshot
+#                inside the registered 2-hour close window. One Hobby entry per
+#                UTC hour 15Z-03Z, each firing once within its hour and always
+#                dispatching; the 120-minute look-ahead is what makes ticks up
+#                to 119 minutes apart still reach every kickoff inside 2 h.
+#                Both triggers stay: a duplicate poll of an unchanged line
+#                writes no row and costs 1 credit per game.
 # The FULL sweeps live in card.yml (one job = sweep then build): four whole-week
 # decision builds, Tue/Thu/Fri ~4:05pm ET and Sat ~8:05am ET.
 # `market=1h` (full refresh) is workflow_dispatch only.
@@ -31,6 +42,7 @@ name: Hard Rock 1H line capture
 #   - card.yml whole-week sweeps (4 builds x ~82 x 1)  ~= 328/wk (cap 150/run)
 #   - card.yml full-game refresh (4 x 4)               ~=  16/wk
 #   - closes: ~2.5 polls/game x 82 x 1                 ~= 205/wk (worst 246)
+#     + the Saturday Vercel backup: ~2 more polls/game    ~= +150/wk worst
 #   - sunday.yml full-game openers (3 runs x 6)        ~=  18/wk
 #   Expected ~567/wk (~2,450/mo), worst ~774/wk. Was ~1,308/wk at 2 credits
 #   with five morning builds. poll_lines.py prints credits_spent=, hr_rows= and
@@ -155,7 +167,7 @@ jobs:
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
         # --status-file records the poll's COVERAGE (events in the window,
         # events polled, credits) for the health contract below.
-        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 75 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
+        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min 120 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3

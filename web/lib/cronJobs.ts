@@ -48,6 +48,13 @@ export type CronJob = {
    */
   gateOpenMin: number | null;
   gateCloseMin: number | null;
+  /**
+   * Dispatch on EVERY in-window tick instead of once per window. For a job
+   * whose runs are cheap and idempotent and whose value is in repetition (the
+   * Saturday close poll: each run covers only the games kicking off in the next
+   * two hours), "already ran this window" is the wrong question. Default false.
+   */
+  everyTick?: boolean;
 };
 
 export const GITHUB_REPO = "tatemoody7/beat-vegas";
@@ -108,6 +115,29 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     dispatchCloseMin: 17 * 60,
     gateOpenMin: null,
     gateCloseMin: null,
+  },
+  "lines-close": {
+    workflow: "lines_watch.yml",
+    // lines_watch.yml's resolve step maps an EMPTY schedule to the `market`
+    // input, so a dispatch carrying market=1h_close runs the per-game close
+    // poll exactly as the scheduled slot does (2026-09-28).
+    inputs: { market: "1h_close" },
+    days: ["Sat"],
+    // Measured 2026-09-28: GitHub's 30-minute Saturday close crons fired 3 of
+    // 18 slots in week 4 and 5 in week 3, so only ~a third of Hard-Rock-priced
+    // games ever had a 1H snapshot inside the registered 2-hour close window
+    // (wk2 25/72, wk3 27/72, wk4 18/57) -- and H-STOP-2's line-value clock
+    // takes only those. This is the backup: one Hobby entry per UTC hour from
+    // 15Z Saturday to 03Z Sunday, each firing once within its hour, every tick
+    // dispatching (everyTick). With --kickoff-within-min 120 in the workflow,
+    // ticks up to 119 minutes apart still reach every kickoff inside 2 h.
+    // Window: 10:00am ET to midnight ET Saturday; the 04Z entry would be
+    // 00:00 EDT Sunday (wrong_day), so it is not listed.
+    dispatchOpenMin: 10 * 60,
+    dispatchCloseMin: 24 * 60 - 1,
+    gateOpenMin: null,
+    gateCloseMin: null,
+    everyTick: true,
   },
   grade: {
     workflow: "grade.yml",

@@ -814,7 +814,11 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     data = _load(WF_DIR / "lines_watch.yml")
     steps = data["jobs"]["watch"]["steps"]
     close = next(s for s in steps if s.get("id") == "close")
-    assert "--kickoff-within-min 75" in close["run"]
+    # 120, not 75, since 2026-09-28: the Vercel `lines-close` backup fires once per
+    # UTC hour (Hobby, within the hour), so consecutive ticks can be 119 min apart;
+    # a 120-minute look-ahead still reaches every kickoff inside the registered
+    # 2-hour close window (lines.REAL_1H_CLOSE_WINDOW_H), a longer one would not.
+    assert "--kickoff-within-min 120" in close["run"]
     assert '--status-file "$RUNNER_TEMP/close_status.json"' in close["run"]
     health = steps[-1]
     # Only the scheduled market is judged; a dispatched refresh writes no verdict.
@@ -839,3 +843,20 @@ def test_every_study_choice_is_in_the_case_line():
     assert not missing, f"study.yml options absent from the case pattern: {missing}"
     extra = accepted - set(options)
     assert not extra, f"case pattern accepts scripts the form does not offer: {extra}"
+
+
+def test_every_vercel_cron_job_input_is_declared_by_its_workflow():
+    """web/lib/cronJobs.ts dispatches a workflow with `inputs`; GitHub answers 422
+    to any input the workflow does not declare, and the cron route would log a
+    green no-op forever. Read the table out of the TypeScript by regex (the
+    `lines-close` job added 2026-09-28 is the first to carry a non-slot input)."""
+    ts = (Path(__file__).resolve().parent.parent / "web" / "lib" / "cronJobs.ts").read_text()
+    entries = re.findall(
+        r'workflow:\s*"([a-z_]+\.yml)",(.*?)inputs:\s*\{([^}]*)\}', ts, flags=re.S
+    )
+    assert entries, "no CRON_JOBS entries parsed from cronJobs.ts"
+    for workflow, _between, inputs in entries:
+        keys = re.findall(r"([a-zA-Z_]+)\s*:", inputs)
+        declared = (_on(_load(WF_DIR / workflow)).get("workflow_dispatch") or {}).get("inputs") or {}
+        for k in keys:
+            assert k in declared, f"cronJobs.ts sends input {k!r} to {workflow}, which does not declare it"

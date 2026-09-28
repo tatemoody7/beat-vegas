@@ -169,8 +169,13 @@ export async function GET(
 
   // 4. Has this window already been built? Vercel firing twice, or GitHub's
   //    backup cron having got there first, must not spend a second sweep.
+  //    An everyTick job (the Saturday close poll) skips the probe: each of
+  //    its runs covers only the next two hours of kickoffs, so a run that
+  //    already happened this window is no reason not to run again.
   try {
-    const dupe = suppressedBy(await recentRuns(job, now, token), job, now);
+    const dupe = job.everyTick
+      ? null
+      : suppressedBy(await recentRuns(job, now, token), job, now);
     if (dupe !== null) {
       // The tick arrived in its window and the build exists: the trigger is
       // alive even though it dispatched nothing.

@@ -122,9 +122,9 @@ The 11 existing redirects in `web/next.config.ts` re-point (`/line-study`, `/res
 ### Board `/` — refine only
 | Element | Verdict | Detail |
 |---|---|---|
-| Intro strip | **add** | Two lines, always shown, no dismiss: *Beat Vegas rates every college football first-half under, priced at Hard Rock Bet. Green means bet one unit; every bet we place is on Results.* → "How it works" |
+| Intro strip | **add** | Two lines, always shown, no dismiss: *Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet. Every bet we place is on Results.* → "How it works" |
 | Title, Week / Season selectors | keep | |
-| Answer box | keep | "Next build …" stays. The best-look windows (Friday after 5:30pm ET, Saturday morning) are said on How it works |
+| Answer box | keep, four words change | "0 of 5 slots used" → "0 of 5 bets this week"; "Next build" → "Next update"; the three "closest to a bet" lines trim to their need clause ("needs under 19.0 or higher") since the banner above already says Hard Rock has no line. The best-look windows are said on How it works |
 | "This week's bar" sentence | **Tate picks** | (a) keep verbatim, or (b) *Bar this week: 2.1 pts (top 20% of 41 priced games).* with the gate clause dropped — the row sentences already say why a game is not a bet |
 | "My teams" chip | **signed-in only** | visitors see "Hard Rock line posted" only |
 | Ops warnings (`OpsBanner`) | **signed-in only** | quota, cron, close-poll, health-contract lines |
@@ -132,7 +132,7 @@ The 11 existing redirects in `web/next.config.ts` re-point (`/line-study`, `/res
 | Pause banner | keep, reword | "Real money is paused" → *Our bets are paused.* + one sentence; drop "app_settings" reasons for visitors |
 | Missed build / results behind | keep | visitor-relevant |
 | No model / no Hard Rock lines | keep | |
-| Tier counts, day groups, rows, Played | keep | the core |
+| Tier counts, day groups, rows, Played | keep | the core. Two row-sentence fixes in `lib/edge.ts`: a row that reads "no line yet" then "the line is 0.2 above our number" must say "the market line"; "the line is 0.0 below our number, so this leans over" must read "the market line sits on our number" |
 
 ### Game page `/game/[id]` — two fixes, otherwise observations
 - "Unlock to log a pick" renders only when signed in (the same rule as the header).
@@ -145,10 +145,10 @@ The 11 existing redirects in `web/next.config.ts` re-point (`/line-study`, `/res
 | Section | Verdict | Detail |
 |---|---|---|
 | Season / Week selectors | keep | "All weeks" default |
-| Record band | **rename, trim** | *Our bets* 60.0% · 9-6 · +2.84u · ROI +17.8% · plausibly 36–80% / *Line value* +0.27, "33% of 15 lines moved our way" / *Every qualifying game, on paper* 51.5% · 34-32 · −3.35u. No dollars, no "not reconciled" line |
+| Record band | **rename, trim** | Two numbers: *Our bets* 60.0% · 9-6 · +2.84u · ROI +17.8% · "could plausibly be 36–80%" / *Line value* +0.27, "33% of 15 lines moved our way". The paper record leaves the band for the comparison table. No dollars, no "not reconciled" line |
 | Bankroll curve | **units** | y-axis in units, dashed line at 0 |
-| Every bet, as logged (`BetLedger`) | **move up, rename chips** | *Our bets / Paper / All*; Running in units; CSV stays |
-| Season comparison | **trim to three public rows** | *Every first-half under at the close* (the baseline), *Every qualifying game, on paper*, *Our bets*. "Model — first half" and "Market — full game" show when signed in (option: drop them) |
+| Every bet, as logged (`BetLedger`) | **move up, rename chips** | *Our bets / Paper / All*; column "Running units"; caption "Every row was logged before kickoff at Hard Rock's line and price. Open one for our number at the time and the closing line."; CSV stays |
+| Season comparison | **trim to three public rows** | *Every first-half under at the close* (the baseline), *Every game that cleared the bar, on paper* (note: no 5-a-week cap, tracked with no money), *Our bets*. "Model — first half" and "Market — full game" show when signed in (option: drop them) |
 | Breakdown (by week / reason / blocker) | **signed-in only** | |
 | Your decisions, factor table | **signed-in only** | |
 | The rule's decisions, on paper | **signed-in only** | |
@@ -162,25 +162,27 @@ The 11 existing redirects in `web/next.config.ts` re-point (`/line-study`, `/res
    publish every one.*
 2. **How to read the Board.** Green = bet one unit. Amber = close, one thing missing. Red =
    pass. The sentence on every row says what would make it a bet. "Not yet" means a line or
-   price is missing; "Pass" means the numbers do not disagree enough. The kill line is where
-   a bet stops being the bet we rated. Best time to look: Friday after 5:30pm ET, Saturday
-   morning.
+   price is missing; "Pass" means the numbers do not disagree enough. Best time to look:
+   Friday after 5:30pm ET, Saturday morning. (No kill-line paragraph: no visitor row shows one.)
 3. **Where bets are priced.** Hard Rock Bet, the only book in Florida. Your book's
    first-half total may differ; the number and price to beat are the ones shown.
-4. **Backtest, 2023–25 (not money bet).** The 60.8% block with its record, units, ROI and
-   interval; the gap-ladder chart ("The wider the gap, the more often the under wins"); the
-   real-closes table trimmed to two rows (2023–25 every gap 1.75+ · 2026 bets at Hard Rock's
-   line). The heading carries the label so the number cannot be read as live.
-5. **What we don't know.** The 2026-09-08 trust copy, reused: one first half is close to a
-   coin flip; our number misses a typical game by about 8 points; the model reads about 2
-   points under the market; we cannot prove the gap makes money; the live ledger on Results
-   is the real test.
+4. **Backtest, 2023–25 (not money bet).** The 60.8% block with its record, units, ROI and one
+   caption ("169 bets, could plausibly be 53–68%. Hard Rock did not exist in these seasons.
+   This is what the method would have returned, not money won."); the gap-ladder chart; the
+   real-closes table trimmed to one row (2023–25 every gap 1.75+, no cap). The 2026 "4-3" row
+   is dropped: it is a different cut from the 9-6 on Results and reads as a contradiction.
+5. **What we don't know.** The 2026-09-08 trust copy, starting at "One first half is close
+   to a coin flip" (its first paragraph restated the backtest numbers): our number misses a
+   typical game by about 8 points; the model reads about 2 points under the market; the live
+   ledger on Results is the real test.
 6. **Terms** (9, from 16): Gap, Our number, Hard Rock line, Market line, Line value, Unit,
-   Paper pick, Weekly cap, Kill line and kill price. Cut with reasons: Rank and Score (a
-   number no page shows), Line basis and Reference line (game-page internals), Early season
-   and Graded and pending (states the row already spells out).
+   Paper pick, Weekly cap, Plausibly (new: "plausibly 36–80%" sits under every big number and
+   was defined nowhere). Cut with reasons: Rank and Score (a number no page shows), Line basis
+   and Reference line (game-page internals), Early season and Graded and pending (states the
+   row already spells out), Kill line (no visitor row shows one).
 7. **Every game we have rated** → `/records`.
-8. **Disclaimer.** 21+. Not financial advice. This site never places a bet.
+8. **Helpline.** "If gambling is a problem for you or someone you know, call 1-800-GAMBLER."
+   The 21+ / not-advice / never-places-a-bet line is the footer on every page, not repeated here.
 9. **Signed in only**, at the bottom: "2026 so far" strip, "What to change" flags, the
    Method fold (estimated-line grade, band table, calibration, line study).
 

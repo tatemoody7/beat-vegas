@@ -5,6 +5,40 @@ system, focused on **Hard Rock Bet** (the only book bettable from Florida).
 Research only — it never places bets or automates gambling.
 
 ## Current state (read this, then the pointers — don't restate history from memory)
+- **2026-09-28 (THE WEEK-5 FIX STACK: SEVEN PRs #241-#247, ONE DAY, every fork Tate's call).**
+  Plan file `pasted-content-id-74ed-how-did-functional-bee.md`. **Close poll (#242):** a Vercel
+  `lines-close` job (`cronJobs.ts`, `everyTick` skips the already-ran probe; 13 once-a-day
+  Saturday entries 15Z-03Z — the account is verified Hobby, each fires within its hour) dispatches
+  `lines_watch.yml` with `market=1h_close`; the close look-ahead is **120 min** (ticks up to 119
+  min apart still reach every kickoff inside the registered 2 h; 130 would not). GitHub's crons
+  stay. **Coverage gauge (#243):** `beatvegas/coverage.py` → `close_coverage_pct` (written after
+  each Saturday close poll and daily after grading), board warning under `CLOSE_COVERAGE_MIN =
+  0.8` (parity-pinned with `health.py`), `lines_watch.close_window_coverage` judged on Saturday
+  runs only; `counts.hr_priced` / `hr_alt` on the card. **Run log (#244):** every weekly refit
+  writes a `model_runs` row (`weekly refit`: inputs, intercept, train/target rows, a data-only
+  frame digest `frame_fingerprint.fingerprint_hash`, run id); `proof.ts` reads retrain's rows by
+  content; `sunday.model_run_recorded`. **bet_at (#245):** `manual_picks.bet_at` (when the
+  ticket was WRITTEN; `placed_at` stays the log time), the log form's "Placed at" field
+  (`et.etLocalToUtc`, DST-safe), `pick.py add --bet-at`; a log more than 30 min after the bet is
+  BACKDATED and judged by **the card in force at bet time** (`card.ts::getCardAsOf`,
+  `pickRules.verdictAtBetTime`, that card's kill numbers, no live read — the money is on the
+  table); `betAtCheck` refuses future / >7 d / post-kickoff; the ledger's hours-before-kickoff
+  and the CSV (`bet_at_utc`, 31 columns) use the bet time. **H-NEGGAP-P (#246, #247):** paper
+  OVERS on the negative-gap band, three nested arms (gap < 0 / ≤ −1.75 / ≤ −3) on Hard Rock's
+  MAIN line in H-PCT-U's universe, one row per game per arm at Hard Rock's over price into
+  `challenger_picks` (`side='over'`, never `manual_picks`), the champion's two clocks with the
+  champion's sigmas (0.929 / 1.371) at 5% / 3 / 2 = 0.833% per arm-clock (A +4.5643 / B −1.6011),
+  favourable line value for an over = **+(closing − bet)**; `NEGGAP_COLLECT=1` in `card.yml`, so
+  **the 2026-09-29 `tue_pm` build is the first that logs** (write its `cards.id` into
+  `docs/NEGGAP_PAPER.md`); grading is side-aware in one place (`grading.units_won(side)`,
+  `picks.graded_pick_fields(side)`, `lines.book_closing_price_before_kickoff(side)`), the under
+  path byte-identical; `challenger_picks.closing_captured_at` is new. A pass licenses nothing
+  at real money. Migrations ran on each branch before its merge; production verified after
+  each deploy (health ok, every route 200, shots metrics unchanged). **Two things not done:**
+  the week-sandbox replay for #247 (this Mac's SQLite is a June snapshot — the first live
+  build is the check, `bv-card-check` expects `neggap_*` rows) and Tate's two account tasks
+  (Odds API 100K → 20K on Oct 6; CFBD Tier 2). **Pitfall, met twice today:** `pytest | tail -1`
+  masks the exit code and let a red suite push once — check `$?` before pushing.
 - **2026-09-28 (WEEK 4 REVIEWED — `reports/weekly/2026-w4.md`, gitignored).** Real money
   **3-2, +0.83u** (season **9-6, +2.84u**, Wilson 35.7–80.2%); every card BET placed, nothing
   else; first week every real ticket carries `price_provenance='logged'`. Paper 6-5, +0.41u on

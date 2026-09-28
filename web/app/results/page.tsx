@@ -1,17 +1,19 @@
 import { getSeasons } from "@/lib/board";
+import { getBetLedger } from "@/lib/betLedgerDb";
 import { getDecisionQuality } from "@/lib/decision-quality";
-import { bankrollCurve, bankrollEnv, getHomeBoard } from "@/lib/homeBoard";
+import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
 import { GATE_TEXT, labelOf, REASON_TEXT } from "@/lib/labels";
 import { getLedger } from "@/lib/ledger";
 import { isOffPolicy, isRealFirstHalf, loadPicks } from "@/lib/picks";
 import { resolveSeason } from "@/lib/season";
+import { viewerIsAuthed } from "@/lib/session";
 import { getWeeklyReview } from "@/lib/weeklyReview";
+import type { RecordTableRow } from "@/app/components/RecordTable";
+import BetLedger from "@/app/components/BetLedger";
 import Breakdown from "@/app/components/Breakdown";
 import DecisionsStrip from "@/app/components/DecisionsStrip";
 import PicksList from "@/app/components/PicksList";
-import { viewerIsAuthed } from "@/lib/session";
 import RecordTable from "@/app/components/RecordTable";
-import ScoreboardBand from "@/app/components/ScoreboardBand";
 import Section from "@/app/components/Section";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
@@ -22,13 +24,13 @@ export const dynamic = "force-dynamic";
 // Results is READ-ONLY (Tate 2026-09-13: "all the logging should happen on the
 // board page. The results is just to see what I picked and how it turned out").
 //
-// Concept A "Scoreboard" (Tate 2026-09-16): one band with the three numbers
-// that answer the page — the rule's paper record, my money, line value — with
-// the bankroll curve inside it; then every comparison as a TABLE (market,
-// model, the rule, you, the full game), the breakdown toggle, the decisions
-// strip, the factor read, and the picks ledger. Cards that only held numbers
-// are gone; so is every caption a returning reader does not need. A definition
-// lives once, in the glossary on Track record.
+// One page since 2026-09-28 (site review): Results and Track record both
+// headlined the same record, so they merged, ledger first. A visitor sees the
+// bet ledger (our bets in units, the curve, every bet as logged, the CSV) and
+// a three-row season comparison. The Monday review -- the picks table with its
+// edit and delete controls, the breakdown, the decisions strip, the factor
+// read -- renders only behind the cookie, together with the two comparison
+// rows (the model, the full game) that need a paragraph to explain.
 //
 // The kill numbers are enforced server-side for every path by
 // lib/pickRules.ts::checkPolicy; nothing on this page gates a bet.
@@ -58,14 +60,14 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, dq, dqPaper, allPicks, board] = await Promise.all([
+  const [ledger, review, allPicks, bets, dq, dqPaper] = await Promise.all([
     getLedger(season),
     getWeeklyReview(season, wantWeek),
-    getDecisionQuality(season, "real"),
-    getDecisionQuality(season, "paper"),
     loadPicks(season),
-    // Still needed for the bankroll (cap, unit size, the real record).
-    getHomeBoard(season),
+    getBetLedger(season),
+    // The decisions strip is the owner's; a visitor's page never loads it.
+    authed ? getDecisionQuality(season, "real") : Promise.resolve(null),
+    authed ? getDecisionQuality(season, "paper") : Promise.resolve(null),
   ]);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const { startUsd, unitUsd } = bankrollEnv();
@@ -78,6 +80,50 @@ export default async function ResultsPage({
     ledger.you !== null ||
     ledger.paper !== null ||
     ledger.marketFull !== null;
+
+  // Three rows a visitor can read without a paragraph; the model and the
+  // full-game market are the owner's baselines.
+  const comparison: RecordTableRow[] = [
+    {
+      key: "market",
+      label: "Every first-half under at the close",
+      note: "the baseline to beat",
+      rec: ledger.market,
+      empty: "nothing graded yet",
+    },
+    {
+      key: "paper",
+      label: "Every game that cleared the bar, on paper",
+      note: "no 5-a-week cap · tracked with no money",
+      rec: ledger.paper,
+      empty: "no paper picks graded yet",
+    },
+    {
+      key: "you",
+      label: "Our bets",
+      lead: true,
+      rec: ledger.you,
+      empty: "no real bets graded yet",
+    },
+    ...(authed
+      ? ([
+          {
+            key: "model",
+            label: "Model — first half",
+            rec: ledger.model,
+            empty: "nothing graded yet",
+          },
+          {
+            key: "fg",
+            label: "Market — full game",
+            note: "context only",
+            rec: ledger.marketFull,
+            dim: true,
+            empty: "nothing graded yet",
+          },
+        ] satisfies RecordTableRow[])
+      : []),
+  ];
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -102,185 +148,148 @@ export default async function ResultsPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <ScoreboardBand
-        paper={ledger.paper}
-        bankroll={board.bankroll}
-        points={curve}
-        realBets={realBets}
-        againstVerdict={againstVerdict}
-        linesMoved={{ n: dq.clv.n, pctFavourable: dq.clv.pctFavourable }}
-      />
-
-      {/* The ledger sits right under the scoreboard (Tate 2026-09-16): what I
-          bet and how it landed is the second thing on the page, before the
-          comparisons. It opens on real money; Paper and All are one click. */}
-      <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
-        Your picks
-        <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-          {weekLabel}
-        </span>
-      </h2>
-      <PicksList
-        picks={review.picks}
-        showWeek={review.week === null}
-        authed={authed}
-      />
+      {/* The ledger leads: our bets, in units, then every bet as logged. */}
+      <BetLedger rows={bets} season={season} curve={curve} />
 
       <Section
-        title={`Season summary · ${season}`}
+        title={`Season comparison · ${season}`}
         empty={
           hasRecord
             ? null
             : "nothing has settled yet. It fills in as games are graded."
         }
       >
-        <RecordTable
-          ariaLabel="Season summary"
-          showClv
-          rows={[
-            {
-              key: "market",
-              label: "Market — first half",
-              note: "the baseline to beat",
-              rec: ledger.market,
-              empty: "nothing graded yet",
-            },
-            {
-              key: "model",
-              label: "Model — first half",
-              rec: ledger.model,
-              empty: "nothing graded yet",
-            },
-            {
-              key: "paper",
-              label: "The rule — paper",
-              rec: ledger.paper,
-              empty: "no paper picks graded yet",
-            },
-            {
-              key: "you",
-              label: "You — real money",
-              lead: true,
-              rec: ledger.you,
-              empty: "no real bets graded yet",
-            },
-            {
-              key: "fg",
-              label: "Market — full game",
-              note: "context only",
-              rec: ledger.marketFull,
-              dim: true,
-              empty: "nothing graded yet",
-            },
-          ]}
-        />
+        <RecordTable ariaLabel="Season summary" showClv rows={comparison} />
       </Section>
 
-      <Breakdown
-        views={[
-          {
-            id: "week",
-            tab: "By week",
-            head: "Week",
-            empty: `No picks logged for ${season} yet. Log bets from the board.`,
-            rows: review.byWeek.map((w) => ({
-              key: String(w.week),
-              label: String(w.week),
-              realBets: w.realBets,
-              real: w.real,
-              paperBets: w.paperBets,
-              paper: w.paper,
-            })),
-          },
-          {
-            id: "reason",
-            tab: "By reason",
-            head: "Reason",
-            empty: "No picks logged yet.",
-            rows: review.byReason.map((r) => ({
-              key: r.reason,
-              label: REASON_TEXT[r.reason].long,
-              realBets: r.realBets,
-              real: r.real,
-              paperBets: r.paperBets,
-              paper: r.paper,
-            })),
-          },
-          {
-            id: "blocker",
-            tab: "By blocker",
-            head: "What blocked it",
-            empty: "Nothing logged yet.",
-            rows: review.byBlocker.map((r) => ({
-              key: r.blocker,
-              label: labelOf(GATE_TEXT, r.blocker, "An input failed"),
-              realBets: null,
-              real: null,
-              paperBets: r.paperBets,
-              paper: r.paper,
-            })),
-          },
-        ]}
-      />
+      {authed && dq && dqPaper && (
+        <section
+          aria-label="The Monday review, signed in"
+          className="mt-12 border-t border-dashed border-[var(--border-strong)] pt-6"
+        >
+          <p className="mb-4 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">
+            Signed in only · the Monday review
+          </p>
 
-      <Section
-        title="Your decisions"
-        caption={dq.n > 0 ? `${dq.n} graded real-money picks` : undefined}
-        empty={dq.n === 0 ? "no real-money pick graded yet." : null}
-      >
-        <DecisionsStrip
-          dq={dq}
-          realBets={realBets}
-          againstVerdict={againstVerdict}
-        />
-        {dq.factors.length > 0 && (
-          <div className="bv-table-wrap mt-3">
-            <table className="bv-table" aria-label="Factors you leaned on">
-              <thead>
-                <tr>
-                  <th>Factor you leaned on</th>
-                  <th className="bv-num">Picks</th>
-                  <th className="bv-num">Your win rate</th>
-                  <th className="bv-num">All games</th>
-                  <th>Read</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dq.factors.map((f) => {
-                  const read = READ_WORD[f.weight] ?? READ_WORD.even;
-                  return (
-                    <tr key={f.key}>
-                      <td className="text-[var(--text)]">{f.label}</td>
-                      <td className="bv-num font-mono text-[var(--text-muted)]">
-                        {f.n}
-                      </td>
-                      <td className="bv-num font-mono text-[var(--text-muted)]">
-                        {pct(f.yourHitPct)}
-                      </td>
-                      <td className="bv-num font-mono text-[var(--text-muted)]">
-                        {f.ledgerHitPct == null ? "—" : pct(f.ledgerHitPct)}
-                      </td>
-                      <td style={{ color: read.color }}>{read.text}</td>
+          <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
+            Your picks
+            <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
+              {weekLabel}
+            </span>
+          </h2>
+          <PicksList
+            picks={review.picks}
+            showWeek={review.week === null}
+            authed={authed}
+          />
+
+          <Breakdown
+            views={[
+              {
+                id: "week",
+                tab: "By week",
+                head: "Week",
+                empty: `No picks logged for ${season} yet. Log bets from the board.`,
+                rows: review.byWeek.map((w) => ({
+                  key: String(w.week),
+                  label: String(w.week),
+                  realBets: w.realBets,
+                  real: w.real,
+                  paperBets: w.paperBets,
+                  paper: w.paper,
+                })),
+              },
+              {
+                id: "reason",
+                tab: "By reason",
+                head: "Reason",
+                empty: "No picks logged yet.",
+                rows: review.byReason.map((r) => ({
+                  key: r.reason,
+                  label: REASON_TEXT[r.reason].long,
+                  realBets: r.realBets,
+                  real: r.real,
+                  paperBets: r.paperBets,
+                  paper: r.paper,
+                })),
+              },
+              {
+                id: "blocker",
+                tab: "By blocker",
+                head: "What blocked it",
+                empty: "Nothing logged yet.",
+                rows: review.byBlocker.map((r) => ({
+                  key: r.blocker,
+                  label: labelOf(GATE_TEXT, r.blocker, "An input failed"),
+                  realBets: null,
+                  real: null,
+                  paperBets: r.paperBets,
+                  paper: r.paper,
+                })),
+              },
+            ]}
+          />
+
+          <Section
+            title="Your decisions"
+            caption={dq.n > 0 ? `${dq.n} graded real-money picks` : undefined}
+            empty={dq.n === 0 ? "no real-money pick graded yet." : null}
+          >
+            <DecisionsStrip
+              dq={dq}
+              realBets={realBets}
+              againstVerdict={againstVerdict}
+            />
+            {dq.factors.length > 0 && (
+              <div className="bv-table-wrap mt-3">
+                <table className="bv-table" aria-label="Factors you leaned on">
+                  <thead>
+                    <tr>
+                      <th>Factor you leaned on</th>
+                      <th className="bv-num">Picks</th>
+                      <th className="bv-num">Your win rate</th>
+                      <th className="bv-num">All games</th>
+                      <th>Read</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
+                  </thead>
+                  <tbody>
+                    {dq.factors.map((f) => {
+                      const read = READ_WORD[f.weight] ?? READ_WORD.even;
+                      return (
+                        <tr key={f.key}>
+                          <td className="text-[var(--text)]">{f.label}</td>
+                          <td className="bv-num font-mono text-[var(--text-muted)]">
+                            {f.n}
+                          </td>
+                          <td className="bv-num font-mono text-[var(--text-muted)]">
+                            {pct(f.yourHitPct)}
+                          </td>
+                          <td className="bv-num font-mono text-[var(--text-muted)]">
+                            {f.ledgerHitPct == null ? "—" : pct(f.ledgerHitPct)}
+                          </td>
+                          <td style={{ color: read.color }}>{read.text}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
 
-      <Section
-        title="The rule’s decisions, on paper"
-        caption={
-          dqPaper.n > 0
-            ? `${dqPaper.n} graded paper picks — every game the card qualified, one flat unit, never money`
-            : undefined
-        }
-        empty={dqPaper.n === 0 ? "nothing graded yet." : null}
-      >
-        <DecisionsStrip dq={dqPaper} realBets={0} againstVerdict={0} />
-      </Section>
+          <Section
+            title="The rule’s decisions, on paper"
+            caption={
+              dqPaper.n > 0
+                ? `${dqPaper.n} graded paper picks — every game the card qualified, one flat unit, never money`
+                : undefined
+            }
+            empty={dqPaper.n === 0 ? "nothing graded yet." : null}
+          >
+            <DecisionsStrip dq={dqPaper} realBets={0} againstVerdict={0} />
+          </Section>
+        </section>
+      )}
     </div>
   );
 }

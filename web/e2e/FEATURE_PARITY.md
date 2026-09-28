@@ -45,14 +45,17 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Results
 
-- [results] The scoreboard: the rule's paper record and interval, my money with the ledger-modelled bankroll and discipline count, line value — results.spec.ts › "the scoreboard: the rule on paper, my money, line value"
-- [results] The season summary table: market 1H, model, the rule on paper, you (with negated line value), market full game — results.spec.ts › "the season summary compares market, model, the rule, you and the full game"
-- [results] The breakdown toggle: by week, by reason and by blocker each sum to the pick count; the blocker view is paper-only with GATE_TEXT labels — results.spec.ts › "the breakdown's three views each account for every pick"
-- [results] The decisions strip reads the graded real tickets with stored clv negated (+0.25 from −1.0 and +0.5) — results.spec.ts › "the decisions strip reads the graded real tickets with the favourable sign"
-- [results] The picks ledger: every pick, prices, results, units, negated line value, badges, and the frozen decision labels under details — results.spec.ts › "the picks ledger: every pick, the labels, and line value negated"
+- [results] Every bet: the strip opens on our bets with the record, ROI, "could plausibly be" interval, line value, the units curve with its zero line, and the CSV link; one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — results.spec.ts › "every bet: the summary strip, the week groups and the running units"
+- [results] Every bet: exactly one `tr.bv-row--won` (--good-bg) and one `tr.bv-row--lost` (--bad-bg) in the real ledger, the pending row bare; the paper ledger's push row is `tr.bv-row--push` with +0.00 and a `-1P` record — results.spec.ts › "every bet: won rows are tinted green and lost rows red, pending rows are not"
+- [results] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp (the bet time, with the log time when the ticket was logged later) with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — results.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
+- [results] `GET /api/bets?season=` streams every pick as CSV with the documented 31 columns (bet_at_utc beside placed_at_utc), the stored clv beside its displayed negation; a bad season is a 400 — results.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
+- [results] The season comparison: every first-half under at the close, every game that cleared the bar on paper, our bets (with negated line value); signed in, the model and the full-game market rows follow (five rows) — results.spec.ts › "the season comparison: every under, the paper rule, our bets, and signed in the model and the full game"
+- [results] Signed in (the Monday review): the breakdown toggle by week, by reason and by blocker each sum to the pick count; the blocker view is paper-only with GATE_TEXT labels — results.spec.ts › "the breakdown's three views each account for every pick"
+- [results] Signed in: the decisions strip reads the graded real tickets with stored clv negated (+0.25 from −1.0 and +0.5) — results.spec.ts › "the decisions strip reads the graded real tickets with the favourable sign"
+- [results] Signed in: the picks table: every pick, prices, results, units, negated line value, badges, and the frozen decision labels under details — results.spec.ts › "the picks ledger: every pick, the labels, and line value negated"
 - [results] Signed in, pending picks offer edit and delete; graded picks offer neither — results.spec.ts › "signed in, pending picks can be edited or deleted; graded ones cannot"
-- [results] Signed out, the ledger reads but offers no edit or delete — results.spec.ts › "the ledger is readable but nothing can be edited or deleted"
-- [results] `/results` opens on the latest week with a pick and drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
+- [results] Signed out: the bet ledger reads with details and no edit or delete, the comparison has three rows, and the Monday review is absent — results.spec.ts › "a visitor gets the ledger and three comparison rows, not the Monday review"
+- [results] `/results` opens on the latest week with a pick and the signed-in picks table drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
 
 ## Track record
 
@@ -64,10 +67,6 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [proof] Method and sanity checks opens on a click, holds the estimated-line records and band table, and nothing below that heading is coloured `--good` / `--bad` — proof.spec.ts › "method and sanity checks open on a click and nothing inside is coloured"
 - [proof] The glossary sits at `#glossary` (where `/glossary` redirects) with its terms — proof.spec.ts › "the glossary is where /glossary lands"
 - [proof] The header button links to `/proof/records` — proof.spec.ts › "links to every game we have rated"
-- [proof] Every bet: the strip opens on the real ledger with its record, ROI, interval, line value and CSV link; one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — proof.spec.ts › "every bet: the summary strip, the week groups and the running units"
-- [proof] Every bet: exactly one `tr.bv-row--won` (--good-bg) and one `tr.bv-row--lost` (--bad-bg) in the real ledger, the pending row bare; the paper ledger's push row is `tr.bv-row--push` with +0.00 and a `-1P` record — proof.spec.ts › "every bet: won rows are tinted green and lost rows red, pending rows are not"
-- [proof] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp (the bet time, with the log time when the ticket was logged later) with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — proof.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
-- [proof] `GET /api/bets?season=` streams every pick as CSV with the documented 31 columns (bet_at_utc beside placed_at_utc), the stored clv beside its displayed negation; a bad season is a 400 — proof.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
 
 ## How it works
 

@@ -108,7 +108,7 @@ export default async function BoardPage({
         Bet. Green means bet. Every bet we place is on Results.{" "}
         <Link
           href="/how-it-works"
-          className="whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
+          className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
         >
           How it works →
         </Link>

@@ -97,11 +97,11 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 - [login] Every page and every GET is public — login.spec.ts › "every page and every GET is public"
 - [login] POST/PATCH/DELETE on the pick routes and POST /api/logout are 401 without the cookie — login.spec.ts › "writes are refused with a 401 before any body is read"
-- [login] Signed out, the header offers Unlock and no Lock — login.spec.ts › "the header offers Unlock"
+- [login] Signed out, the footer offers Unlock, the header does not, and there is no Lock — login.spec.ts › "the footer offers Unlock"
 - [login] Signed out, the game page offers `Unlock to log a pick` with `?next=` and no log button — login.spec.ts › "the game page offers the way in, and remembers the game"
 - [login] A wrong password is a 401 and the form says `Wrong password.` — login.spec.ts › "a wrong password is a 401 and the form says so"
 - [login] The right password returns to `?next=`, shows Lock and the log button; Lock signs out and writes are refused again — login.spec.ts › "the right password returns to ?next=, Lock appears, and Lock signs out"
-- [login] Signed in, the header offers Lock and the game page the log button — login.spec.ts › "the header offers Lock and the game page offers the log button"
+- [login] Signed in, the footer offers Lock and the game page the log button — login.spec.ts › "the footer offers Lock and the game page offers the log button"
 - [login] Signed in, a write reaches validation (400) rather than the gate — login.spec.ts › "a write reaches validation instead of the gate"
 
 ## Layout and silence (every page, both widths)
@@ -110,7 +110,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [layout] Every page has no horizontal scroll and exactly one h1 — a11y-layout.spec.ts › "has no horizontal scroll and exactly one h1"
 - [layout] No tap target under 24px beyond the named known ones — a11y-layout.spec.ts › "adds no tap target under 24px beyond the known ones"
 - [layout] The sticky header is 69px on every page but login, signed in — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px"
-- [layout] Signed out the header is 69px with the Unlock link showing (KNOWN to fail at phone width: the link renders 14×68) — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px with the Unlock link showing"
+- [layout] Signed out the header is 69px at both widths, with Unlock in the footer and not the header — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px with Unlock in the footer"
 
 ## Visual (opt-in, local baselines only)
 

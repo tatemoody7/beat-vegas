@@ -46,9 +46,12 @@ test.describe("signed out", () => {
     expect((await request.post("/api/logout")).status()).toBe(401);
   });
 
-  test("the header offers Unlock", async ({ page }) => {
+  test("the footer offers Unlock", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Unlock" })).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("link", { name: "Unlock" }),
+    ).toBeVisible();
+    await expect(page.locator("header")).not.toContainText("Unlock");
     await expect(page.getByRole("button", { name: "Lock" })).toHaveCount(0);
   });
 
@@ -112,11 +115,13 @@ test.describe("signed out", () => {
 });
 
 test.describe("signed in (the setup project's cookie)", () => {
-  test("the header offers Lock and the game page offers the log button", async ({
+  test("the footer offers Lock and the game page offers the log button", async ({
     page,
   }) => {
     await page.goto("/game/900002");
-    await expect(page.getByRole("button", { name: "Lock" })).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("button", { name: "Lock" }),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Unlock" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Log this bet" }),

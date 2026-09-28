@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildWeek } from "../e2e/fixture/week.mjs";
+import { seededNow } from "../e2e/helpers/fixture";
 import {
   breakEvenPrice as portedBreakEvenPrice,
   buildExpected,
@@ -146,5 +148,38 @@ describe("the e2e fixture port agrees with the TypeScript rules", () => {
     expect(["tue_pm", "thu_pm", "fri_pm", "sat_am"]).toContain(
       expected.card.slot,
     );
+  });
+});
+
+describe("the seed instant is shared between seed.mjs and the specs", () => {
+  // Seen on CI 2026-09-28: seed.mjs ran at 17:59Z, the spec imported at 18:01Z,
+  // and the game page read "as of Fri 1:00pm" where the spec expected 2:00pm.
+  it("a whole-hour boundary between seed and spec shifts every capture by an hour", () => {
+    const a = buildWeek(new Date("2026-09-25T17:59:30Z"));
+    const b = buildWeek(new Date("2026-09-25T18:00:30Z"));
+    const diffs = a.games
+      .filter((g) => g.hr)
+      .map((g, i) => {
+        const other = b.games.filter((x) => x.hr)[i];
+        return (
+          other.hr![0].capturedAt.getTime() - g.hr![0].capturedAt.getTime()
+        );
+      });
+    expect(diffs).toContain(3_600_000);
+    expect(new Set(diffs).size).toBeLessThanOrEqual(2);
+  });
+
+  it("seededNow reads the file the seed wrote, or E2E_NOW, before falling back to now", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "bv-seed-now-"));
+    const file = path.join(dir, ".seed-now");
+    writeFileSync(file, "2026-09-25T17:59:30.000Z\n");
+    expect(seededNow({}, file).toISOString()).toBe("2026-09-25T17:59:30.000Z");
+    expect(
+      seededNow({ E2E_NOW: "2026-09-26T00:00:00Z" }, file).toISOString(),
+    ).toBe("2026-09-26T00:00:00.000Z");
+    const before = Date.now();
+    expect(
+      seededNow({}, path.join(dir, "missing")).getTime(),
+    ).toBeGreaterThanOrEqual(before);
   });
 });

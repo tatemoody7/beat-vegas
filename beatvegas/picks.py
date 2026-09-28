@@ -12,7 +12,7 @@ unpriced-ticket rules live in exactly one place too.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from .db.models import AppSetting, ManualPick, OddsSnapshot
@@ -31,6 +31,18 @@ from .lines import (
 )
 
 PAPER_STAKE = 1.0  # paper picks stake one flat unit so they grade as +/-1u
+
+
+def bet_at_from_et(text: Optional[str]) -> Optional[datetime]:
+    """`--bet-at "2026-09-25T16:10"` (Eastern wall clock, minute precision) to the
+    naive-UTC value manual_picks.bet_at stores. None for None/blank; ValueError
+    on a malformed string. Mirrors web/lib/et.ts etLocalToUtc."""
+    if text is None or not str(text).strip():
+        return None
+    from .ci import ET  # local: picks.py must not depend on the CI module at import
+
+    local = datetime.strptime(str(text).strip(), "%Y-%m-%dT%H:%M").replace(tzinfo=ET)
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def existing_pick(
@@ -116,6 +128,7 @@ def add_pick(
     factors_json: Optional[str] = None,
     model_line: Optional[float] = None,
     model_score: Optional[int] = None,
+    bet_at: Optional[datetime] = None,
 ) -> ManualPick:
     """Insert (and flush) one under pick. A paper pick always stakes
     `PAPER_STAKE` regardless of `stake` — nothing is at risk, and a flat unit
@@ -148,6 +161,9 @@ def add_pick(
         is_bonus=bool(is_bonus),
         book=book,
         placed_at=placed_at or datetime.utcnow(),
+        # When the ticket was written, if that is not now (naive UTC; None =
+        # logged at bet time). See the ManualPick.bet_at column comment.
+        bet_at=bet_at,
         note=note,
         graded=False,
         reason=reason or "manual",

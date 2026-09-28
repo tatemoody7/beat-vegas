@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  BACKDATE_MIN_MINUTES,
+  BET_AT_MAX_AGE_DAYS,
+  betAtCheck,
   checkPolicy,
+  isBackdated,
   parsePickBody,
   serverVerdict,
+  verdictAtBetTime,
   type PickRequest,
   type PolicyContext,
 } from "./pickRules";
@@ -631,5 +636,62 @@ describe("serverVerdict (the client's word is not consulted)", () => {
   });
   it("a slate bar of exactly the gap is in the band", () => {
     expect(serverVerdict({ ...live, bar: 3 })).toBe("BET");
+  });
+});
+
+describe("a ticket logged after it was written (bet_at, 2026-09-28)", () => {
+  const now = new Date("2026-09-26T14:31:00Z"); // Sat 10:31am ET, the two late logs
+  const friday = "2026-09-25T20:16:58.000Z"; // the fri_pm card build
+  const kickoff = new Date("2026-09-26T23:30:00Z");
+
+  it("parses betAt as a UTC instant and leaves it null when absent", () => {
+    expect(parsePickBody(good)).toMatchObject({
+      ok: true,
+      pick: { betAt: null },
+    });
+    const r = parsePickBody({ ...good, betAt: friday });
+    expect(r.ok && r.pick.betAt).toBe(friday);
+    expect(parsePickBody({ ...good, betAt: "Friday" })).toMatchObject({
+      ok: false,
+    });
+    expect(parsePickBody({ ...good, betAt: 5 })).toMatchObject({ ok: false });
+  });
+
+  it("is backdated only past the grace window", () => {
+    expect(isBackdated(null, now)).toBe(false);
+    expect(isBackdated(friday, now)).toBe(true);
+    const recent = new Date(
+      now.getTime() - (BACKDATE_MIN_MINUTES - 1) * 60_000,
+    );
+    expect(isBackdated(recent.toISOString(), now)).toBe(false);
+  });
+
+  it("refuses a future, stale or post-kickoff bet time", () => {
+    expect(betAtCheck(null, now, kickoff)).toEqual({ ok: true });
+    expect(betAtCheck(friday, now, kickoff)).toEqual({ ok: true });
+    const future = new Date(now.getTime() + 3_600_000).toISOString();
+    expect(betAtCheck(future, now, kickoff)).toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    const stale = new Date(
+      now.getTime() - (BET_AT_MAX_AGE_DAYS + 1) * 86_400_000,
+    ).toISOString();
+    expect(betAtCheck(stale, now, kickoff)).toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    const late = new Date(kickoff.getTime() + 60_000).toISOString();
+    expect(
+      betAtCheck(late, new Date(kickoff.getTime() + 120_000), kickoff),
+    ).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("takes the verdict from the card in force at bet time", () => {
+    // Texas A&M @ LSU and Houston @ Georgia Southern were BET on the fri_pm card.
+    expect(verdictAtBetTime({ tier: "BET" })).toBe("BET");
+    expect(verdictAtBetTime({ tier: "EDGE" })).toBe("WATCH");
+    expect(verdictAtBetTime({ tier: "PASS" })).toBe("PASS");
+    expect(verdictAtBetTime(null)).toBe("WATCH");
   });
 });

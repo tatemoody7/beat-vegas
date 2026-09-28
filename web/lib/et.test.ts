@@ -4,6 +4,8 @@ import {
   ET_ZONE,
   etClock12,
   etDay,
+  etLocalToUtc,
+  etLocalValue,
   etMinutesOfDay,
   etParts,
   pad2,
@@ -106,5 +108,26 @@ describe("etStamp", () => {
   it("keeps the ET calendar day across the UTC midnight and reads 12 at noon", () => {
     expect(etStamp(new Date("2026-09-13T02:05:00Z"))).toBe("Sat 9/12 10:05pm");
     expect(etStamp(new Date("2026-11-17T17:00:00Z"))).toBe("Tue 11/17 12:00pm");
+  });
+});
+
+describe("etLocalToUtc / etLocalValue (the log form's Placed at field)", () => {
+  it("reads an EDT and an EST wall clock to the right instant", () => {
+    expect(etLocalToUtc("2026-09-25T16:10")?.toISOString()).toBe(
+      "2026-09-25T20:10:00.000Z",
+    );
+    expect(etLocalToUtc("2026-12-04T16:10")?.toISOString()).toBe(
+      "2026-12-04T21:10:00.000Z",
+    );
+    expect(etLocalToUtc("Friday")).toBeNull();
+  });
+  it("round-trips through the datetime-local value", () => {
+    const d = new Date("2026-11-01T05:30:00Z"); // 1:30am EDT, the DST morning
+    expect(etLocalValue(d)).toBe("2026-11-01T01:30");
+    expect(
+      etLocalToUtc(
+        etLocalValue(new Date("2026-09-26T14:31:00Z")),
+      )?.toISOString(),
+    ).toBe("2026-09-26T14:31:00.000Z");
   });
 });

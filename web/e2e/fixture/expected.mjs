@@ -931,6 +931,9 @@ export function buildExpected(week) {
       blocker: null,
       note: "slow pace, both defenses top-25",
       placedAt: new Date(g13.kick.getTime() - 20 * 3_600_000),
+      // Written a day before it was logged (bet_at, 2026-09-28): the ledger
+      // leads with the bet time and says when it was logged.
+      betAt: new Date(g13.kick.getTime() - 44 * 3_600_000),
       scenario: "real, WON",
     },
     {

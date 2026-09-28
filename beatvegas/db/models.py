@@ -357,7 +357,14 @@ class ManualPick(Base):
     # not consume one of the week's five real-money cap slots.
     is_bonus = Column(Boolean, default=False)
     book = Column(String)
-    placed_at = Column(DateTime)
+    placed_at = Column(DateTime)  # when the row was LOGGED (the server's clock)
+    # When the ticket was WRITTEN, when that is not the log time (2026-09-28).
+    # Two week-4 tickets were bet Friday at the card's numbers and logged the
+    # next morning, when the server judged the live Saturday read and stamped
+    # WATCH -- two on-policy bets read as overrides. NULL = logged at bet time.
+    # The ledger's hours-before-kickoff and the verdict snapshot use this when
+    # set (web/lib/pickRules.ts verdictAtBetTime); placed_at stays the log time.
+    bet_at = Column(DateTime)
     note = Column(String)  # your reason — for later review
 
     # Snapshot of the model's read at log time (frozen; survives re-scoring).

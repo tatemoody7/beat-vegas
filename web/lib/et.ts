@@ -71,6 +71,38 @@ export function etClock12(
   return `${p.weekday} ${hour12}:${pad2(p.minute)}${p.hour >= 12 ? suffix[1] : suffix[0]}`;
 }
 
+/** The ET wall clock of an instant as a `datetime-local` value, "2026-09-25T16:10"
+ *  (minute precision): the log form's default "Placed at". */
+export function etLocalValue(d: Date): string {
+  const p = etParts(d);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}T${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+/**
+ * An ET wall-clock string "YYYY-MM-DDTHH:MM" (what a `datetime-local` input
+ * gives) to the instant it names, DST included; null when malformed. Solved by
+ * one fixed-point step on the offset: guess the instant as if the wall clock
+ * were UTC, read the ET parts of that guess, correct by the difference, and
+ * check. Mirrors beatvegas/picks.py bet_at_from_et.
+ */
+export function etLocalToUtc(local: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local.trim());
+  if (!m) return null;
+  const [y, mo, d, h, mi] = m.slice(1).map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  const asWall = (t: Date) => {
+    const p = etParts(t);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  };
+  let guess = new Date(wall);
+  for (let i = 0; i < 3; i++) {
+    const diff = asWall(guess) - wall;
+    if (diff === 0) return guess;
+    guess = new Date(guess.getTime() - diff);
+  }
+  return Number.isNaN(guess.getTime()) ? null : guess;
+}
+
 /** Weekday, calendar day and 12-hour clock in ET: "Fri 9/18 4:12pm". The
  *  ledger's "posted" stamp, where the day matters as much as the hour. */
 export function etStamp(d: Date): string {

@@ -32,6 +32,11 @@ export type PickRequest = {
    *  checkPolicy (PRICE MISSING); paper may be logged priceless. */
   price: number | null;
   isPaper: boolean;
+  /** When the ticket was WRITTEN, as a UTC ISO instant, when that is not now
+   *  (2026-09-28). null = logged at bet time. Validated against the clock and
+   *  the kickoff by betAtCheck; a value more than BACKDATE_MIN_MINUTES old
+   *  makes the log BACKDATED, judged by the card in force then. */
+  betAt?: string | null;
   note?: string;
   // Tracking (shared contract with scripts/pick.py add --verdict/--reason/...):
   verdict?: Verdict;
@@ -127,6 +132,17 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
   const note =
     typeof b.note === "string" && b.note.trim() ? b.note.trim() : undefined;
 
+  // When the ticket was written, if the client says it was not now. A UTC ISO
+  // instant (the form converts its ET wall clock before sending).
+  let betAt: string | null = null;
+  if (b.betAt !== undefined && b.betAt !== null && b.betAt !== "") {
+    if (typeof b.betAt !== "string") return reject("betAt must be a time.");
+    const t = new Date(b.betAt);
+    if (Number.isNaN(t.getTime()))
+      return reject("Enter when the ticket was placed as a valid time.");
+    betAt = t.toISOString();
+  }
+
   let verdict: Verdict | undefined;
   if (b.verdict !== undefined && b.verdict !== null) {
     if (!VERDICTS.includes(b.verdict as Verdict)) {
@@ -157,6 +173,7 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
       stake,
       price,
       isPaper,
+      betAt,
       note,
       verdict,
       reason,
@@ -165,6 +182,64 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
       hrLine: hrLine.value,
     },
   };
+}
+
+// --- a ticket logged after it was written (2026-09-28) ------------------------
+
+/** A bet_at more than this many minutes before the log is a BACKDATED log:
+ *  the live read at log time is not the read the bet was made on. */
+export const BACKDATE_MIN_MINUTES = 30;
+/** A bet_at older than this is a mistyped date, not a late log. */
+export const BET_AT_MAX_AGE_DAYS = 7;
+/** Clock slack for "not in the future". */
+const BET_AT_FUTURE_SLACK_MS = 5 * 60_000;
+
+/** Is a logged bet time far enough before now that the live read is the wrong judge? */
+export function isBackdated(betAt: string | null, now: Date): boolean {
+  if (betAt === null) return false;
+  const t = Date.parse(betAt);
+  return (
+    Number.isFinite(t) && now.getTime() - t > BACKDATE_MIN_MINUTES * 60_000
+  );
+}
+
+/** The bet time must be in the past, not more than a week old, and before
+ *  kickoff (a ticket cannot be written after the game started). */
+export function betAtCheck(
+  betAt: string | null,
+  now: Date,
+  kickoff: Date | null,
+): { ok: true } | Rejection {
+  if (betAt === null) return { ok: true };
+  const t = Date.parse(betAt);
+  if (!Number.isFinite(t))
+    return reject("Enter when the ticket was placed as a valid time.");
+  if (t > now.getTime() + BET_AT_FUTURE_SLACK_MS)
+    return reject(
+      "The bet time is in the future. Enter when the ticket was placed.",
+    );
+  if (now.getTime() - t > BET_AT_MAX_AGE_DAYS * 86_400_000)
+    return reject(
+      `The bet time is more than ${BET_AT_MAX_AGE_DAYS} days ago. Check the date.`,
+    );
+  if (kickoff !== null && t >= kickoff.getTime())
+    return reject(
+      "The bet time is after kickoff. A ticket written after the game started is not a pre-game bet.",
+      409,
+    );
+  return { ok: true };
+}
+
+/** The tier of the card in force when the ticket was written, as the verdict
+ *  the ledger records (PAPER_VERDICT in scripts/build_card.py: BET / EDGE ->
+ *  WATCH / PASS). No card item for the game -> WATCH, as a live log with no
+ *  line read would be. Used only for a BACKDATED log: the card that existed at
+ *  bet time is the read the bet was made on; the live read at log time is not. */
+export function verdictAtBetTime(
+  item: { tier: "BET" | "EDGE" | "PASS" } | null,
+): Verdict {
+  if (item === null) return "WATCH";
+  return item.tier === "BET" ? "BET" : item.tier === "PASS" ? "PASS" : "WATCH";
 }
 
 export type PolicyContext = {

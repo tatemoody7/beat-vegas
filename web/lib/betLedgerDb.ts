@@ -22,6 +22,7 @@ type Raw = {
   note: string | null;
   book: string | null;
   placed_at: string | null;
+  bet_at?: string | null;
   kickoff: string | null;
   is_paper: number | boolean | null;
   is_bonus?: number | boolean | null;
@@ -77,7 +78,8 @@ async function selectRows(season: number): Promise<Raw[]> {
     return await prisma.$queryRaw<Raw[]>`
       SELECT mp.id, mp.game_id, mp.week, mp.away_team, mp.home_team, mp.market,
              mp.line, mp.price, mp.stake, mp.note, mp.book,
-             mp.placed_at::text AS placed_at, g.start_date::text AS kickoff,
+             mp.placed_at::text AS placed_at, mp.bet_at::text AS bet_at,
+             g.start_date::text AS kickoff,
              mp.is_paper, mp.is_bonus, mp.graded, mp.result, mp.units,
              g.away_first_half_points AS away_fh, g.home_first_half_points AS home_fh,
              mp.actual_first_half_total, mp.model_line_at_pick, mp.model_score_at_pick,
@@ -125,6 +127,7 @@ async function getBetLedgerUncached(season: number): Promise<LedgerRow[]> {
       note: r.note,
       book: r.book,
       placedAt: isoFromNaive(r.placed_at),
+      betAt: isoFromNaive(r.bet_at ?? null),
       kickoff: isoFromNaive(r.kickoff),
       isPaper: truthy(r.is_paper),
       isBonus: truthy(r.is_bonus),

@@ -294,6 +294,8 @@ export type CreatePickInput = {
   price?: number | null;
   note?: string;
   isPaper?: boolean;
+  /** When the ticket was written (UTC ISO), when that is not now; stored as bet_at. */
+  betAt?: string | null;
   verdict?: Verdict;
   reason?: PickReason;
   gap?: number | null;
@@ -360,6 +362,9 @@ export async function createPick(
   const book = HR_BOOK_KEY;
   const note = input.note ?? null;
   const placedAt = new Date().toISOString();
+  // When the ticket was written, if the caller said it was not now (the
+  // ManualPick.bet_at column comment). Naive UTC like placed_at.
+  const betAt = input.betAt ?? null;
   const verdict = input.verdict ?? null;
   const reason = input.reason ?? null;
   const gap = input.gap ?? null;
@@ -373,14 +378,14 @@ export async function createPick(
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
          book, price_provenance,
-         stake, is_paper, placed_at, note, model_score_at_pick, model_line_at_pick,
+         stake, is_paper, placed_at, bet_at, note, model_score_at_pick, model_line_at_pick,
          factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
          ev_at_pick, hr_line_at_pick)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
          ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
          ${book}, ${priceProvenance}, ${stake},
-         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+         ${isPaper}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
          ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine})
     `;
     return { tracked: true };

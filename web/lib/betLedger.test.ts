@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BETS_CSV_HEADER,
   betsToCsv,
+  betTime,
   groupByWeek,
   hoursBeforeKickoff,
   ledgerSummary,
@@ -27,6 +28,7 @@ function row(over: Partial<LedgerRow> = {}): LedgerRow {
     note: null,
     book: "hardrockbet",
     placedAt: "2026-09-18T20:12:00.000Z",
+    betAt: null,
     kickoff: "2026-09-19T19:30:00.000Z",
     isPaper: false,
     isBonus: false,
@@ -169,11 +171,11 @@ describe("betsToCsv", () => {
     ]);
     const lines = csv.trim().split("\n");
     expect(lines[0]).toBe(BETS_CSV_HEADER);
-    expect(BETS_CSV_HEADER.split(",")).toHaveLength(30);
+    expect(BETS_CSV_HEADER.split(",")).toHaveLength(31);
     const cells = lines[1];
     expect(
       cells.startsWith(
-        "2026,3,2026-09-18T20:12:00.000Z,2026-09-19T19:30:00.000Z,real,Stanford,Duke,1H,under,26.5,-110,1,false,hardrockbet,logged,BET,model_gap,3.45,23.05,7,10,17,under,0.91,26.5,-112,-1,1,0.01,",
+        "2026,3,2026-09-18T20:12:00.000Z,,2026-09-19T19:30:00.000Z,real,Stanford,Duke,1H,under,26.5,-110,1,false,hardrockbet,logged,BET,model_gap,3.45,23.05,7,10,17,under,0.91,26.5,-112,-1,1,0.01,",
       ),
     ).toBe(true);
     expect(cells.endsWith('"slow pace, ""both"" defenses"')).toBe(true);
@@ -191,8 +193,32 @@ describe("betsToCsv", () => {
       }),
     ]);
     const cells = csv.trim().split("\n")[1].split(",");
-    expect(cells[4]).toBe("paper");
-    expect(cells[22]).toBe("pending");
-    expect(cells[27]).toBe("");
+    expect(cells[5]).toBe("paper");
+    expect(cells[23]).toBe("pending");
+    expect(cells[28]).toBe("");
+  });
+});
+
+describe("bet_at: when the ticket was written (2026-09-28)", () => {
+  it("hours before kickoff counts from the bet time when one is recorded", () => {
+    const r = row({
+      placedAt: "2026-09-26T14:31:00.000Z", // logged Saturday morning
+      betAt: "2026-09-25T20:16:00.000Z", // written Friday at the card build
+      kickoff: "2026-09-26T23:30:00.000Z",
+    });
+    expect(betTime(r)).toBe("2026-09-25T20:16:00.000Z");
+    expect(hoursBeforeKickoff(r)).toBe(27);
+    expect(hoursBeforeKickoff(row({ ...r, betAt: null }))).toBe(9);
+  });
+  it("the CSV carries both instants side by side", () => {
+    expect(BETS_CSV_HEADER.split(",").slice(2, 5)).toEqual([
+      "placed_at_utc",
+      "bet_at_utc",
+      "kickoff_utc",
+    ]);
+    const csv = betsToCsv(2026, [row({ betAt: "2026-09-25T20:16:00.000Z" })]);
+    expect(csv.split("\n")[1]).toContain(
+      "2026-09-18T20:12:00.000Z,2026-09-25T20:16:00.000Z,2026-09-19T19:30:00.000Z",
+    );
   });
 });

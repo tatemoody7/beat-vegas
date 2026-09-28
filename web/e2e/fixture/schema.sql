@@ -434,6 +434,7 @@ CREATE TABLE public.manual_picks (
     is_bonus boolean,
     book character varying,
     placed_at timestamp without time zone,
+    bet_at timestamp without time zone,
     note character varying,
     model_score_at_pick integer,
     model_line_at_pick double precision,

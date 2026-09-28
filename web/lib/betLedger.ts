@@ -24,8 +24,10 @@ export type LedgerRow = {
   stake: number | null;
   note: string | null;
   book: string | null;
-  /** UTC ISO; null on a legacy row with no placed_at. */
+  /** UTC ISO; null on a legacy row with no placed_at. When the row was LOGGED. */
   placedAt: string | null;
+  /** UTC ISO; when the ticket was WRITTEN, if not the log time (2026-09-28). */
+  betAt: string | null;
   /** UTC ISO kickoff from `games`; null when the game row is missing. */
   kickoff: string | null;
   isPaper: boolean;
@@ -141,12 +143,18 @@ export function ledgerSummary(rows: LedgerRow[]): LedgerSummary {
   };
 }
 
-/** Whole hours from posting to kickoff; null when either is unknown, and
+/** When the bet was made: the bet time when one was recorded, else the log time. */
+export function betTime(r: LedgerRow): string | null {
+  return r.betAt ?? r.placedAt;
+}
+
+/** Whole hours from the bet to kickoff; null when either is unknown, and
  *  negative when the pick was logged after kickoff (which the API refuses,
  *  so a negative number is itself a finding). */
 export function hoursBeforeKickoff(r: LedgerRow): number | null {
-  if (!r.placedAt || !r.kickoff) return null;
-  const ms = Date.parse(r.kickoff) - Date.parse(r.placedAt);
+  const at = betTime(r);
+  if (!at || !r.kickoff) return null;
+  const ms = Date.parse(r.kickoff) - Date.parse(at);
   return Number.isNaN(ms) ? null : Math.round(ms / 3_600_000) || 0;
 }
 
@@ -156,6 +164,7 @@ export const BETS_CSV_HEADER = [
   "season",
   "week",
   "placed_at_utc",
+  "bet_at_utc",
   "kickoff_utc",
   "ledger",
   "away",
@@ -193,6 +202,7 @@ export function betsToCsv(season: number, rows: LedgerRow[]): string {
       season,
       r.week,
       r.placedAt,
+      r.betAt,
       r.kickoff,
       r.isPaper ? "paper" : "real",
       r.away,

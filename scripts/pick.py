@@ -26,6 +26,7 @@ from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import resolve_game
 from beatvegas.picks import (
     add_pick,
+    bet_at_from_et,
     existing_pick,
     grade_pick,
     graded_pick_fields,
@@ -152,6 +153,7 @@ def cmd_add(args) -> None:
             hr_line=args.hr_line,
             model_line=model_line,
             model_score=model_score,
+            bet_at=bet_at_from_et(getattr(args, "bet_at", None)),
         )
         why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
         print(
@@ -306,6 +308,11 @@ def main() -> None:
     a.add_argument("--gap", type=float, help="bv_gap in points shown at log time")
     a.add_argument("--ev", type=float, help="no-vig EV of the under at log time")
     a.add_argument("--hr-line", type=float, dest="hr_line", help="Hard Rock's line at log time")
+    a.add_argument(
+        "--bet-at",
+        dest="bet_at",
+        help="when the ticket was WRITTEN if not now, Eastern wall clock: 2026-09-25T16:10",
+    )
     a.add_argument(
         "--force",
         action="store_true",

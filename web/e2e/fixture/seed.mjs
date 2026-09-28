@@ -366,6 +366,7 @@ export function fixtureRows(week, expected) {
     is_bonus: false,
     book: HR,
     placed_at: ts(p.placedAt),
+    bet_at: p.betAt ? ts(p.betAt) : null,
     note: p.note,
     model_score_at_pick: p.modelScore,
     model_line_at_pick: p.modelLine,

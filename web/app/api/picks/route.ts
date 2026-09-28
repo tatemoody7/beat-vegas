@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLatestCard } from "@/lib/card";
+import { getCardAsOf, getLatestCard } from "@/lib/card";
 import { breakEvenPrice } from "@/lib/edge";
 import { getLineCheck } from "@/lib/lineCheck";
 import { createPick, DuplicatePickError, getSlate } from "@/lib/picks";
-import { checkPolicy, parsePickBody, serverVerdict } from "@/lib/pickRules";
+import {
+  betAtCheck,
+  checkPolicy,
+  isBackdated,
+  parsePickBody,
+  serverVerdict,
+  verdictAtBetTime,
+} from "@/lib/pickRules";
 import { prisma } from "@/lib/prisma";
 import { getRulePause, NOT_PAUSED } from "@/lib/rulePause";
 import { requireAuth } from "@/lib/session";
@@ -41,6 +48,14 @@ export async function POST(req: NextRequest) {
     );
   }
   const { pick } = parsed;
+  const now = new Date();
+  // A ticket written well before it is logged (2026-09-28): the read the bet
+  // was made on is the card in force THEN, so the verdict and the kill numbers
+  // come from that build and the live price is not consulted -- the money is
+  // already on the table, and refusing to record a real bet because today's
+  // price moved would leave the ledger wrong.
+  const betAt = pick.betAt ?? null;
+  const backdated = isBackdated(betAt, now);
 
   // Everything from here down touches the database. A Neon blip used to return
   // a bare framework 500 with no JSON body, which the client rendered as
@@ -84,9 +99,12 @@ export async function POST(req: NextRequest) {
           AND COALESCE(market, '1H') = '1H'
       `
     : Promise.resolve([]);
-  // The week's card, for this game's kill numbers (null without a card row).
+  // The week's card, for this game's kill numbers (null without a card row);
+  // for a backdated log, the card in force when the ticket was written.
   const cardQ = game
-    ? getLatestCard(game.season, game.week)
+    ? backdated && betAt !== null
+      ? getCardAsOf(game.season, game.week, new Date(betAt))
+      : getLatestCard(game.season, game.week)
     : Promise.resolve(null);
   // The LIVE market read — the same loader the board renders from, so the gate
   // and the screen cannot disagree. The card is built on a Tuesday; the bet is
@@ -118,6 +136,11 @@ export async function POST(req: NextRequest) {
   }
   const item = card?.items.find((i) => i.gameId === pick.gameId) ?? null;
 
+  const when = betAtCheck(betAt, now, game?.start_date ?? null);
+  if (!when.ok) {
+    return NextResponse.json({ error: when.error }, { status: when.status });
+  }
+
   // Fail closed: every branch that cannot produce a checkable price returns
   // { ok: false }, and checkPolicy refuses the real-money BET rather than
   // falling back to the card's cached number. Mirrors verdict.ts, where the BET
@@ -125,7 +148,12 @@ export async function POST(req: NextRequest) {
   // board will not colour green is also a game the API will not log.
   const row = checks.find((c) => c.gameId === pick.gameId) ?? null;
   let livePrice: PolicyContext["livePrice"];
-  if (row === null) {
+  if (backdated) {
+    // The kill numbers of the card in force at bet time judge the logged line
+    // and price (checkPolicy falls back to ctx.killLine / killPrice when the
+    // live killPrice is null). No live read: it is not the read the bet saw.
+    livePrice = { ok: true, killPrice: null };
+  } else if (row === null) {
     livePrice = { ok: false, reason: "no live line read for this game" };
   } else if (row.hrLive === false) {
     // hrLine/hrUnderPrice are Hard Rock's last MAIN line, held over while the
@@ -152,23 +180,25 @@ export async function POST(req: NextRequest) {
   // board apply. A request that says "WATCH" on a game the server rates BET is
   // gated as a BET; a request that says "BET" on a game the server rates WATCH
   // is logged as the off-policy WATCH it is.
-  const verdict = serverVerdict({
-    bvLine: item?.bvLine ?? null,
-    bar: item?.bar ?? null,
-    hrLine: row?.hrLine ?? null,
-    hrUnderPrice: row?.hrUnderPrice ?? null,
-    hrCentred: row?.hrCentred ?? null,
-    ev: row?.ev ?? null,
-    marketLine: row?.median ?? null,
-    qbOut: item?.blocker === "qb_out" || item?.paperBlocker === "qb_out",
-    minGamesPlayed,
-  });
+  const verdict = backdated
+    ? verdictAtBetTime(item)
+    : serverVerdict({
+        bvLine: item?.bvLine ?? null,
+        bar: item?.bar ?? null,
+        hrLine: row?.hrLine ?? null,
+        hrUnderPrice: row?.hrUnderPrice ?? null,
+        hrCentred: row?.hrCentred ?? null,
+        ev: row?.ev ?? null,
+        marketLine: row?.median ?? null,
+        qbOut: item?.blocker === "qb_out" || item?.paperBlocker === "qb_out",
+        minGamesPlayed,
+      });
   const judged = { ...pick, verdict };
 
   const policy = checkPolicy(judged, {
     inSlate,
     // A pick after kickoff isn't a real bet (start_date is naive UTC).
-    kickedOff: !!game?.start_date && game.start_date <= new Date(),
+    kickedOff: !!game?.start_date && game.start_date <= now,
     duplicate: dup.length > 0,
     realWeekCount: Number(cap[0]?.n ?? 0),
     week: game?.week ?? null,

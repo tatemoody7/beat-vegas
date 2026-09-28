@@ -61,6 +61,8 @@ _MIGRATIONS = {
         # When the consensus close was last confirmed pre-kick (H-STOP-2's
         # line-value clock cuts on its age). 2026-09-22.
         "closing_captured_at": "TIMESTAMP",
+        # When the ticket was written, when that is not the log time. 2026-09-28.
+        "bet_at": "TIMESTAMP",
         "price_provenance": "VARCHAR(24)",
         "model_score_at_pick": "INTEGER",
         "model_line_at_pick": "FLOAT",

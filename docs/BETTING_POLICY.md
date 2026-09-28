@@ -204,7 +204,7 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
 | Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 
-| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) | you |
+| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) **when it is written**. Logging later is allowed: enter the time the ticket was written ("Placed at"), and the row is judged by the card in force at that moment, not by the live read at log time (2026-09-28) | you |
 | Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 

@@ -256,6 +256,15 @@ function LedgerRowView({
   toggle: () => void;
 }) {
   const posted = et(p.placedAt);
+  // A ticket written before it was logged: the bet time leads, the log time
+  // follows when they differ by more than an hour.
+  const bet = p.betAt ? et(p.betAt) : null;
+  const loggedLater =
+    bet !== null &&
+    posted !== null &&
+    p.betAt &&
+    p.placedAt &&
+    Date.parse(p.placedAt) - Date.parse(p.betAt) > 3_600_000;
   const lead = beforeKickoff(p);
   return (
     <>
@@ -379,8 +388,9 @@ function LedgerRowView({
               <dd className="text-[var(--text-muted)]">{loggedAs(p)}</dd>
               <dt className="text-[var(--text-dim)]">Posted</dt>
               <dd className="text-[var(--text-muted)]">
-                {posted ?? "—"}
+                {bet ?? posted ?? "—"}
                 {lead ? ` · ${lead}` : ""}
+                {loggedLater ? ` · logged ${posted}` : ""}
               </dd>
               <dt className="text-[var(--text-dim)]">Price</dt>
               <dd className="text-[var(--text-muted)]">

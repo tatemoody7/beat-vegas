@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { fixture } from "./helpers/fixture";
 
-// /proof/records (app/proof/records/page.tsx): one week at a time, opening on
+// /records (app/records/page.tsx; /records until 2026-09-28): one week at a time, opening on
 // the latest week with a graded game; the gap to one decimal with its sign;
 // the CSV link that hands over the whole season.
 
@@ -12,7 +12,7 @@ test.describe("every game we have rated", () => {
   test("opens on the latest graded week and shows only its rows", async ({
     page,
   }) => {
-    await page.goto("/proof/records");
+    await page.goto("/records");
     await expect(page.locator("h1.bv-page-title")).toHaveText(
       "Every game we have rated",
     );
@@ -23,7 +23,7 @@ test.describe("every game we have rated", () => {
     await expect(active).toHaveCount(1);
     await expect(active).toHaveAttribute(
       "href",
-      `/proof/records?season=${week.season}&week=${week.week}`,
+      `/records?season=${week.season}&week=${week.week}`,
     );
     await expect(
       page.getByText(`${thisWeek.length} of ${week.games.length} games`),
@@ -36,7 +36,7 @@ test.describe("every game we have rated", () => {
   test("shows each game's line, our number and the gap to one decimal, signed", async ({
     page,
   }) => {
-    await page.goto(`/proof/records?season=${week.season}&week=${week.week}`);
+    await page.goto(`/records?season=${week.season}&week=${week.week}`);
     const rows = page.locator("table.bv-table tbody tr");
     const cells = await rows.evaluateAll((trs) =>
       trs.map((tr) =>
@@ -80,12 +80,12 @@ test.describe("every game we have rated", () => {
   test("the previous week is one click away and holds its two graded games", async ({
     page,
   }) => {
-    await page.goto("/proof/records");
+    await page.goto("/records");
     await page
       .getByRole("link", { name: String(week.prevWeek), exact: true })
       .click();
     await page.waitForURL(
-      `**/proof/records?season=${week.season}&week=${week.prevWeek}`,
+      `**/records?season=${week.season}&week=${week.prevWeek}`,
     );
     const rows = page.locator("table.bv-table tbody tr");
     const prev = week.games.filter((g) => g.week === week.prevWeek);
@@ -98,7 +98,7 @@ test.describe("every game we have rated", () => {
     page,
     request,
   }) => {
-    await page.goto("/proof/records");
+    await page.goto("/records");
     const link = page.getByRole("link", {
       name: `Download all of ${week.season}`,
     });
@@ -117,7 +117,7 @@ test.describe("every game we have rated", () => {
   test("the legend explains the columns without a tooltip", async ({
     page,
   }) => {
-    await page.goto("/proof/records");
+    await page.goto("/records");
     for (const term of [
       "Full game",
       "Line",

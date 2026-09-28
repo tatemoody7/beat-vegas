@@ -84,7 +84,7 @@ export default async function RecordsPage({
         {seasons.map((s) => (
           <Link
             key={s}
-            href={`/proof/records?season=${s}`}
+            href={`/records?season=${s}`}
             className={`bv-pill ${s === season ? "ring-1 ring-[var(--accent)]" : ""}`}
           >
             <span className="bv-pill-value">{s}</span>
@@ -105,7 +105,7 @@ export default async function RecordsPage({
           {weeks.map((w) => (
             <Link
               key={w}
-              href={`/proof/records?season=${season}&week=${w}`}
+              href={`/records?season=${season}&week=${w}`}
               className={`bv-pill ${w === week ? "ring-1 ring-[var(--accent)]" : ""}`}
             >
               <span className="bv-pill-value">{w}</span>

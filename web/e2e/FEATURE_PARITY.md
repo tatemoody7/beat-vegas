@@ -57,17 +57,6 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [results] Signed out: the bet ledger reads with details and no edit or delete, the comparison has three rows, and the Monday review is absent — results.spec.ts › "a visitor gets the ledger and three comparison rows, not the Monday review"
 - [results] `/results` opens on the latest week with a pick and the signed-in picks table drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
 
-## Track record
-
-- [proof] The headline is the (hist_2023_25, fbs_only, real, cap5, all) bucket: win rate, W-L-P, units, ROI, interval, the uncapped rule and break-even placement — proof.spec.ts › "the headline is the cap-5 record at real closing lines"
-- [proof] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — proof.spec.ts › "the gap ladder draws one bar per band and the break-even line"
-- [proof] The real-close records table: the uncapped rule with its interval, the live season's bets / good prices / every Hard Rock number, `too few` under 30 — proof.spec.ts › "the real-close records table and its intervals"
-- [proof] The live season panel is named `<season> so far` from `live_<season>` and carries the misses, price bands and HR-vs-market rows — proof.spec.ts › "the live season is one panel named after its scope"
-- [proof] What to change: the multiple-comparisons note, the acted flags, the watched flags folded — proof.spec.ts › "what to change: the flags, with the watched ones folded"
-- [proof] Method and sanity checks opens on a click, holds the estimated-line records and band table, and nothing below that heading is coloured `--good` / `--bad` — proof.spec.ts › "method and sanity checks open on a click and nothing inside is coloured"
-- [proof] The glossary sits at `#glossary` (where `/glossary` redirects) with its terms — proof.spec.ts › "the glossary is where /glossary lands"
-- [proof] The header button links to `/proof/records` — proof.spec.ts › "links to every game we have rated"
-
 ## How it works
 
 - [how] The page opens on what this is, the three-colour key for the Board (with the best time to look) and where bets are priced — how-it-works.spec.ts › "says what this is, how to read the Board and where bets are priced"
@@ -81,11 +70,11 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Every game we have rated
 
-- [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — proof-records.spec.ts › "opens on the latest graded week and shows only its rows"
-- [records] Each row: full game, line, our number, gap to one decimal with its sign, actual first half and result or Pending — proof-records.spec.ts › "shows each game's line, our number and the gap to one decimal, signed"
-- [records] The previous week's pill filters to its two graded games — proof-records.spec.ts › "the previous week is one click away and holds its two graded games"
-- [records] `Download all of <season>` links to the CSV export, which holds every game — proof-records.spec.ts › "offers the whole season as a CSV download"
-- [records] The legend explains the columns; no header carries a `title=` tooltip — proof-records.spec.ts › "the legend explains the columns without a tooltip"
+- [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — records.spec.ts › "opens on the latest graded week and shows only its rows"
+- [records] Each row: full game, line, our number, gap to one decimal with its sign, actual first half and result or Pending — records.spec.ts › "shows each game's line, our number and the gap to one decimal, signed"
+- [records] The previous week's pill filters to its two graded games — records.spec.ts › "the previous week is one click away and holds its two graded games"
+- [records] `Download all of <season>` links to the CSV export, which holds every game — records.spec.ts › "offers the whole season as a CSV download"
+- [records] The legend explains the columns; no header carries a `title=` tooltip — records.spec.ts › "the legend explains the columns without a tooltip"
 
 ## Health and records API
 
@@ -99,9 +88,9 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Redirects
 
-- [redirects] Each of the eleven moved routes is a 308 to its destination — redirects.spec.ts › "${from} → ${to} is a 308"
+- [redirects] Each of the thirteen moved routes (incl. `/proof` → `/results`, `/proof/records` → `/records`, `/glossary` → `/how-it-works#glossary`) is a 308 to its destination — redirects.spec.ts › "${from} → ${to} is a 308"
 - [redirects] A moved route carries its query string across — redirects.spec.ts › "a moved route keeps its query string"
-- [redirects] The three tabs, the records page and login are 200s, not redirects — redirects.spec.ts › "the three tabs and the game route are not redirects"
+- [redirects] The three tabs (Board, Results, How it works), the records page and login are 200s, not redirects — redirects.spec.ts › "the three tabs and the game route are not redirects"
 
 ## Gate
 
@@ -124,4 +113,4 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Visual (opt-in, local baselines only)
 
-- [visual] The board, results, proof and a game page match their local full-page baselines — visual.spec.ts › "${name} matches its local baseline"
+- [visual] The board, results, how it works and a game page match their local full-page baselines — visual.spec.ts › "${name} matches its local baseline"

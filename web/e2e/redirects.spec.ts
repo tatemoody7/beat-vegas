@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// The eleven routes the 2026-09-10 restructure moved are `next.config.ts`
+// The thirteen routes the 2026-09-10 and 2026-09-28 restructures moved are `next.config.ts`
 // redirects with `permanent: true`: a 308 (never a 307 -- that is what a
 // redirect() page body sends, and browsers do not cache it), the destination
 // in `location`, and the query string carried across because none of the rules
@@ -14,10 +14,12 @@ const MOVED: [string, string][] = [
   ["/ledger", "/results"],
   ["/picks", "/results"],
   ["/weekly-review", "/results"],
-  ["/line-study", "/proof"],
-  ["/research", "/proof"],
-  ["/research/records", "/proof/records"],
-  ["/glossary", "/proof#glossary"],
+  ["/line-study", "/how-it-works"],
+  ["/research", "/how-it-works"],
+  ["/glossary", "/how-it-works#glossary"],
+  ["/research/records", "/records"],
+  ["/proof/records", "/records"],
+  ["/proof", "/results"],
 ];
 
 const pathOf = (location: string): string => {
@@ -48,7 +50,7 @@ test("a moved route keeps its query string", async ({ request }) => {
 test("the three tabs and the game route are not redirects", async ({
   request,
 }) => {
-  for (const path of ["/", "/results", "/proof", "/proof/records", "/login"]) {
+  for (const path of ["/", "/results", "/how-it-works", "/records", "/login"]) {
     const res = await request.get(path, { maxRedirects: 0 });
     expect(res.status(), path).toBe(200);
   }

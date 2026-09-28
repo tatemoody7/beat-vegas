@@ -27,6 +27,20 @@ async function rows(page: Page) {
 }
 
 test.describe("the board", () => {
+  test("opens with the two-line strip that says what this is", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const strip = page.locator('p[aria-label="What this is"]');
+    await expect(strip).toHaveText(
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet. Every bet we place is on Results. How it works →",
+    );
+    await expect(strip.getByRole("link")).toHaveAttribute(
+      "href",
+      "/how-it-works",
+    );
+  });
+
   test("every row links to its game page and the ids are the fixture's week", async ({
     page,
   }) => {
@@ -116,7 +130,7 @@ test.describe("the board", () => {
     ).toBeVisible();
   });
 
-  test("the answer bar names the live bet, the placed one, the closest three and the next build", async ({
+  test("the answer bar names the live bet, the placed one, the closest three and the next update", async ({
     page,
   }) => {
     await page.goto("/");
@@ -149,7 +163,7 @@ test.describe("the board", () => {
       await expect(near.nth(i)).toContainText(c.needs);
     }
     await expect(bar).toContainText(
-      /Next build (Tue|Thu|Fri|Sat) \d{1,2}:\d{2}(am|pm)?–\d{1,2}:\d{2}(am|pm) ET/,
+      /Next update (Tue|Thu|Fri|Sat) \d{1,2}:\d{2}(am|pm)?–\d{1,2}:\d{2}(am|pm) ET/,
     );
   });
 
@@ -223,7 +237,7 @@ test.describe("the board", () => {
     for (const text of [
       "did not run.",
       "Results are",
-      "Real money is paused.",
+      "Our bets are paused.",
       "Real money is off until the pause switch can be read.",
       "No model number this week.",
       "Hard Rock has not posted first-half lines yet.",
@@ -234,6 +248,20 @@ test.describe("the board", () => {
   });
 });
 
+test.describe("the board, signed out", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("a visitor gets the Hard Rock filter but not the My teams chip", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: "Hard Rock line posted" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
+  });
+});
+
 // The two banners the clean fixture never shows, by putting the gauges into the
 // state that raises them and putting them back. Serial, and the only place the
 // suite writes to the database after the seed.
@@ -241,6 +269,7 @@ test.describe.serial("banners driven by app_settings", () => {
   test("a low Odds API budget lights the ops banner and /api/health warns", async ({
     page,
     request,
+    browser,
   }) => {
     const before = await setSetting("odds_credits_remaining", "100");
     try {
@@ -254,6 +283,14 @@ test.describe.serial("banners driven by app_settings", () => {
       const health = await (await request.get("/api/health")).json();
       expect(health.warnings).toHaveLength(1);
       expect(health.warnings[0]).toContain("Odds API credits low: 100");
+      // The ops warning is the owner's: a visitor never sees it (2026-09-28).
+      const visitor = await browser.newContext({
+        storageState: { cookies: [], origins: [] },
+      });
+      const vp = await visitor.newPage();
+      await vp.goto("/");
+      await expect(vp.locator("div[role=status]")).toHaveCount(0);
+      await visitor.close();
     } finally {
       await restoreSetting("odds_credits_remaining", before);
     }
@@ -268,7 +305,7 @@ test.describe.serial("banners driven by app_settings", () => {
     const before = await setSetting("rule_paused", "true");
     try {
       await page.goto("/");
-      await expect(page.getByText("Real money is paused.")).toBeVisible();
+      await expect(page.getByText("Our bets are paused.")).toBeVisible();
       await expect(
         page.getByText(
           "Every real-money first-half pick is refused until the rule has been reviewed. Paper picks still log and count toward the record.",
@@ -281,6 +318,6 @@ test.describe.serial("banners driven by app_settings", () => {
       await restoreSetting("rule_paused", before);
     }
     await page.goto("/");
-    await expect(page.getByText("Real money is paused.")).toHaveCount(0);
+    await expect(page.getByText("Our bets are paused.")).toHaveCount(0);
   });
 });

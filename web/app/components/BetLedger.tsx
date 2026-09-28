@@ -27,8 +27,11 @@ import {
 import { loggedAs } from "@/lib/loggedAs";
 import { isOffPolicy } from "@/lib/pickRules";
 import { EmptyLine } from "@/app/components/Section";
+import BankrollCurve from "@/app/components/BankrollCurve";
+import type { BankrollPoint } from "@/lib/homeBoard";
 
-// Every bet we have placed, at the top of Track record (Tate 2026-09-26): the
+// Every bet we have placed, at the top of Results (Track record until
+// 2026-09-28, when the two pages merged): the
 // real-money ledger first with the paper ledger one click away, grouped by
 // week newest first, each week carrying its own record, each graded row
 // washed in its outcome colour, a running units column so the curve can be
@@ -37,8 +40,8 @@ import { EmptyLine } from "@/app/components/Section";
 // logged. Nothing here is a tooltip: a phone never shows one.
 
 const VIEW_LABEL: Record<LedgerView, string> = {
-  real: "My money",
-  paper: "The rule, on paper",
+  real: "Our bets",
+  paper: "Every game that cleared the bar, on paper",
   all: "Both ledgers",
 };
 
@@ -74,9 +77,13 @@ function beforeKickoff(r: LedgerRow): string | null {
 export default function BetLedger({
   rows,
   season,
+  curve = [],
 }: {
   rows: LedgerRow[];
   season: number;
+  /** Cumulative settled units on our bets, week by week; drawn under the
+   *  strip when the real ledger is showing. */
+  curve?: BankrollPoint[];
 }) {
   const realCount = rows.filter((r) => !r.isPaper).length;
   const paperCount = rows.length - realCount;
@@ -89,11 +96,11 @@ export default function BetLedger({
   const rec = summary.record;
   const interval =
     rec && rec.hitLo !== null && rec.hitHi !== null
-      ? `plausibly ${pct(rec.hitLo)}–${pct(rec.hitHi)}`
+      ? `could plausibly be ${pct(rec.hitLo)}–${pct(rec.hitHi)}`
       : "nothing decided yet";
 
   const VIEWS: { id: LedgerView; label: string; n: number }[] = [
-    { id: "real", label: "My bets", n: realCount },
+    { id: "real", label: "Our bets", n: realCount },
     { id: "paper", label: "Paper", n: paperCount },
     { id: "all", label: "All", n: rows.length },
   ];
@@ -145,9 +152,8 @@ export default function BetLedger({
           <div>
             <span className="bv-stat-label">Every bet, as logged</span>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Each row was posted before kickoff with Hard Rock’s line and
-              price. Open a row for our number at the time, the closing line and
-              when it was posted.
+              Every row was logged before kickoff at Hard Rock’s line and price.
+              Open one for our number at the time and the closing line.
             </p>
             <a
               href={`/api/bets?season=${season}`}
@@ -157,6 +163,11 @@ export default function BetLedger({
             </a>
           </div>
         </div>
+        {view === "real" && curve.length >= 2 && (
+          <div className="mt-6">
+            <BankrollCurve points={curve} />
+          </div>
+        )}
       </div>
 
       <div
@@ -219,7 +230,7 @@ export default function BetLedger({
                     <th className="bv-num">1H score</th>
                     <th>Result</th>
                     <th className="bv-num">Units</th>
-                    <th className="bv-num">Running</th>
+                    <th className="bv-num">Running units</th>
                     <th className="bv-num">Line value</th>
                     <th></th>
                   </tr>
@@ -240,9 +251,8 @@ export default function BetLedger({
         ))
       )}
       <p className="mt-3 text-xs text-[var(--text-dim)]">
-        Frozen when the pick was logged. Running is the ledger’s units after
-        that bet; a line value of +1.00 means the market came a point toward us
-        by the close.
+        Frozen when the pick was logged. A line value of +1.00 means the market
+        came a point toward us by the close.
       </p>
     </section>
   );

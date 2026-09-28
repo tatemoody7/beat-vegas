@@ -8,13 +8,9 @@ import { collectSilence, layoutMetrics } from "./helpers/metrics";
 // Two things are pinned as KNOWN rather than asserted clean, because they are
 // true of production today (measured 2026-09-23 on beat-vegas.vercel.app):
 //
-//  * SIGNED OUT at phone width -- what every public reader on a phone sees --
-//    the Unlock link renders 14x68: `.bv-btn` sets no `display`, the <a> is
-//    inline, and its block SVG collapses the width and stretches the height,
-//    pushing the header to 87px instead of 69. Signed in, the Lock control is a
-//    <button> (inline-block) and the header is 69 at both widths. test.fail()
-//    marks the signed-out expectation: the day the link is fixed, the test
-//    reports an unexpected pass and the annotation comes off.
+//  * (Retired 2026-09-28.) Signed out at phone width the header's Unlock link
+//    used to render 14x68 and push the header to 87px; Unlock now lives in the
+//    footer, so the signed-out header is measured like every other.
 //  * A handful of text links and buttons are under 24px tall: the answer bar's
 //    matchup links (20px), PicksList's "details" / "edit" / "delete" (16px),
 //    the game page's "Back to the board" (16px) and, on a phone, the wordmark
@@ -24,8 +20,8 @@ import { collectSilence, layoutMetrics } from "./helpers/metrics";
 const PAGES: [string, string][] = [
   ["board", "/"],
   ["results", "/results?week=all"],
-  ["proof", "/proof"],
-  ["records", "/proof/records"],
+  ["how", "/how-it-works"],
+  ["records", "/records"],
   ["game", "/game/900001"],
   ["login", "/login"],
 ];
@@ -40,7 +36,6 @@ const KNOWN_SMALL_TARGETS: RegExp[] = [
   /^button\S* "(edit|delete)" \d+x16$/, // PicksList controls (signed in)
   /^a\S* "← Back to the board" \d+x16$/, // game page
   /^a\.shrink-0\S* "BEAT VEGAS/, // the wordmark at phone width
-  /^a\.bv-btn\.bv-btn--ghost "Unlock" 14x68$/, // the collapsed Unlock control
 ];
 
 for (const [name, path] of PAGES) {
@@ -87,16 +82,16 @@ for (const [name, path] of PAGES) {
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test(`keeps the header at ${HEADER_PX}px with the Unlock link showing`, async ({
+  test(`keeps the header at ${HEADER_PX}px with Unlock in the footer`, async ({
     page,
-    isMobile,
   }) => {
-    test.fail(
-      isMobile,
-      "known: signed out at phone width the Unlock link renders 14x68 and the header measures 87px (production too, 2026-09-23)",
-    );
+    // Unlock left the header for the footer on 2026-09-28, which is also what
+    // ended the 87px phone header the old test marked as a known failure.
     await page.goto("/", { waitUntil: "networkidle" });
-    await expect(page.getByRole("link", { name: "Unlock" })).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("link", { name: "Unlock" }),
+    ).toBeVisible();
+    await expect(page.locator("header")).not.toContainText("Unlock");
     const m = await layoutMetrics(page);
     expect(m.headerHeight).toBe(HEADER_PX);
   });

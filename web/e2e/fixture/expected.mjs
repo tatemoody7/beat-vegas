@@ -388,6 +388,13 @@ export function edgeFor(
           ? "reference"
           : null;
   const gap = basis !== null ? round2(basis - bv) : null;
+  // edge.ts::basisNoun -- the line the sentence names.
+  const noun =
+    lineBasis === "market"
+      ? "the market line"
+      : lineBasis === "reference"
+        ? "our reference line"
+        : "the line";
   const killLine = roundHalfUp(bv + bar);
   const killPrice =
     marketFairUnder !== null ? breakEvenPrice(marketFairUnder) : null;
@@ -449,13 +456,15 @@ export function edgeFor(
     const n = minGamesPlayed ?? 0;
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
-    action = `Not yet — the line is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
+    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
   } else {
     const gg = gap ?? 0;
     action =
       gg > 0
-        ? `Pass: the line is ${fmt(gg)} above our number. It needs ${fmt(killLine)} or higher.`
-        : `Pass: the line is ${fmt(Math.abs(gg))} below our number, so this leans over. We only bet unders.`;
+        ? `Pass: ${noun} is ${fmt(gg)} above our number. It needs ${fmt(killLine)} or higher.`
+        : Math.abs(gg) < 0.05
+          ? `Pass: ${noun} sits on our number. Nothing to bet.`
+          : `Pass: ${noun} is ${fmt(Math.abs(gg))} below our number, so this leans over. We only bet unders.`;
   }
 
   return {
@@ -718,7 +727,8 @@ export function buildExpected(week) {
       r.edge.gap >= bar &&
       (r.check ? r.check.hrCentred : null) !== false,
   ).length;
-  const barLine = `This week’s bar: ${bar.toFixed(2)} pts — the gap of the top ${Math.round(100 * slate.share)}% of ${slate.n} priced games; ${clearing} clear it. A game must also pass the price, market and news gates to be a bet.`;
+  // app/page.tsx: shortened 2026-09-28 (site review); `clearing` is no longer printed.
+  const barLine = `Bar this week: ${bar.toFixed(1)} pts (top ${Math.round(100 * slate.share)}% of ${slate.n} priced games).`;
 
   // lib/answerBar.ts::buildAnswer
   const live = rows.filter((r) => !r.kickedOff);
@@ -758,7 +768,7 @@ export function buildExpected(week) {
         : placed > 0
           ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
           : "No bets yet this week",
-    slotsLine: `${usedSlots} of ${WEEKLY_BET_CAP} slots used`,
+    slotsLine: `${usedSlots} of ${WEEKLY_BET_CAP} bets this week`,
   };
 
   // --- the card (beatvegas/card.py::build_card), built ten minutes ago ---

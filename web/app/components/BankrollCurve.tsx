@@ -18,24 +18,21 @@ const AXIS = "#aab6cc"; // --text-muted
 const GRID = "#3a4a6b"; // --border
 const ACCENT = "#38bdf8"; // --accent
 
-// Where the real money actually went, week by week: cumulative settled units
-// on real first-half bets. Cyan is the brand accent (green/red stay reserved
-// for under/over outcomes); the dashed line is the starting bankroll.
-export default function BankrollCurve({
-  points,
-  startUsd,
-}: {
-  points: BankrollPoint[];
-  startUsd: number;
-}) {
-  const usd = points.map((p) => p.usd);
-  const lo = Math.min(startUsd, ...usd);
-  const hi = Math.max(startUsd, ...usd);
-  const pad = Math.max(5, (hi - lo) * 0.15);
+const signedU = (v: number) => `${v > 0 ? "+" : ""}${v}u`;
+
+// Where our bets actually went, week by week: cumulative settled units on real
+// first-half bets. In units, not dollars, since 2026-09-28 (the public site
+// shows no stake size). Cyan is the brand accent (green/red stay reserved for
+// under/over outcomes); the dashed line is zero, where the season started.
+export default function BankrollCurve({ points }: { points: BankrollPoint[] }) {
+  const units = points.map((p) => p.units);
+  const lo = Math.min(0, ...units);
+  const hi = Math.max(0, ...units);
+  const pad = Math.max(0.5, (hi - lo) * 0.15);
 
   return (
-    // No frame of its own: it sits inside the scoreboard card, and a box in a
-    // box is the "too many boxes" Tate named (2026-09-16).
+    // No frame of its own: it sits inside the ledger card, and a box in a box
+    // is the "too many boxes" Tate named (2026-09-16).
     <div className="h-52 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
@@ -61,9 +58,10 @@ export default function BankrollCurve({
             tick={{ fill: AXIS, fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: GRID }}
-            tickFormatter={(v: number) => `$${v}`}
+            tickFormatter={(v: number) => signedU(v)}
           />
           <Tooltip
+            formatter={(v) => [signedU(Number(v)), "units"]}
             contentStyle={{
               background: "var(--bg-2)",
               border: "1px solid var(--border)",
@@ -73,14 +71,14 @@ export default function BankrollCurve({
             }}
           />
           <ReferenceLine
-            y={startUsd}
+            y={0}
             stroke={AXIS}
             strokeDasharray="4 4"
             ifOverflow="extendDomain"
           />
           <Line
             type="monotone"
-            dataKey="usd"
+            dataKey="units"
             stroke={ACCENT}
             strokeWidth={2}
             dot={{ r: 3 }}

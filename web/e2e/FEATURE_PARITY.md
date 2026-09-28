@@ -16,15 +16,17 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
 - [board] The `N bet · N watch · N pass` counts line matches the derived tiers — board.spec.ts › "states the tier counts"
-- [board] The H-PCT bar sentence (U+2019 apostrophe, two-decimal bar, share, universe, clearing count) is exact — board.spec.ts › "states this week’s bar exactly"
-- [board] The answer bar names the live bet, the placed one (muted, `bet logged`), the three closest with their `needs …` clause, and a `Next build <window> ET` line — board.spec.ts › "the answer bar names the live bet, the placed one, the closest three and the next build"
+- [board] The H-PCT bar sentence (`Bar this week: <bar> pts (top <share>% of <n> priced games).`, one decimal, no gate clause since 2026-09-28) is exact — board.spec.ts › "states this week’s bar exactly"
+- [board] The two-line strip (what this is, green means bet, the record is on Results) opens the page and links to How it works — board.spec.ts › "opens with the two-line strip that says what this is"
+- [board] The answer bar names the live bet, the placed one (muted, `bet logged`), the three closest with their `needs …` clause, and a `Next update <window> ET` line — board.spec.ts › "the answer bar names the live bet, the placed one, the closest three and the next update"
 - [board] A game with a real ticket carries the `bet logged` chip and no other row does — board.spec.ts › "marks the game with a logged ticket"
 - [board] The Hard Rock chip sets `?hr=1`, reads `aria-pressed`, hides games without a Hard Rock line and states the pre-filter count — board.spec.ts › "the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line"
-- [board] My teams sets `?mine=1`, clears `hr`, shows only MY_TEAMS rows; clicking the active chip clears it — board.spec.ts › "My teams shows only the followed program, one filter at a time"
+- [board] My teams (signed in) sets `?mine=1`, clears `hr`, shows only MY_TEAMS rows; clicking the active chip clears it — board.spec.ts › "My teams shows only the followed program, one filter at a time"
+- [board] Signed out, the Hard Rock chip shows and the My teams chip does not — board.spec.ts › "a visitor gets the Hard Rock filter but not the My teams chip"
 - [board] `?days=sat` (parsed, no UI) keeps only Saturday's games and heading — board.spec.ts › "?days=sat keeps only Saturday’s games"
 - [board] On the clean fixture no banner renders: no `role=status`, no missed build, no stale results, no pause, no no-model, no no-HR-line — board.spec.ts › "every banner is silent in the clean state"
-- [board] `odds_credits_remaining` under the floor lights the OpsBanner with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
-- [board] `rule_paused=true` shows the paused banner copy and `/api/health.rulePaused`; restored afterwards — board.spec.ts › "the real-money pause shows its banner and /api/health reports it"
+- [board] `odds_credits_remaining` under the floor lights the OpsBanner (signed in only; a visitor sees none) with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
+- [board] `rule_paused=true` shows the `Our bets are paused.` banner and `/api/health.rulePaused`; restored afterwards — board.spec.ts › "the real-money pause shows its banner and /api/health reports it"
 
 ## Game page
 
@@ -35,7 +37,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [game] Signed in: `Log this bet` on an open BET, `Log as paper pick` on a Watch — game.spec.ts › "offers 'Log this bet' on an open BET and 'Log as paper pick' on a Watch"
 - [game] Signed in: a ticketed game says already logged; a played game says kicked off; neither offers a log button — game.spec.ts › "says a ticketed game is already logged and a played one has kicked off"
 - [game] The log form opens pre-filled with Hard Rock's line and price, offers `Log bet ($10)` and cancels — game.spec.ts › "opens the pre-filled form with Hard Rock's line and price"
-- [game] Signed out: `Unlock to log a pick` links to `/login?next=/game/<id>` — game.spec.ts › "offers 'Unlock to log a pick' pointing back at the game"
+- [game] Signed out: the decision block carries the Hard Rock (Florida) note and offers no log control at all — game.spec.ts › "a visitor reads the decision and the Hard Rock note, with no way to log"
 - [game] Lines: the market open → now line and one row per book with open, now and move, Hard Rock's move included — game.spec.ts › "lists every book's open and current line, Hard Rock's move included"
 - [game] With no first-half line anywhere the Lines section says so and shows our reference line — game.spec.ts › "says when no book has posted a first half yet"
 - [game] `/game/abc`, an unknown id and a negative id are 404s with the styled not-found page — game.spec.ts › "a non-numeric id and an unknown id are 404s"
@@ -43,37 +45,36 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Results
 
-- [results] The scoreboard: the rule's paper record and interval, my money with the ledger-modelled bankroll and discipline count, line value — results.spec.ts › "the scoreboard: the rule on paper, my money, line value"
-- [results] The season summary table: market 1H, model, the rule on paper, you (with negated line value), market full game — results.spec.ts › "the season summary compares market, model, the rule, you and the full game"
-- [results] The breakdown toggle: by week, by reason and by blocker each sum to the pick count; the blocker view is paper-only with GATE_TEXT labels — results.spec.ts › "the breakdown's three views each account for every pick"
-- [results] The decisions strip reads the graded real tickets with stored clv negated (+0.25 from −1.0 and +0.5) — results.spec.ts › "the decisions strip reads the graded real tickets with the favourable sign"
-- [results] The picks ledger: every pick, prices, results, units, negated line value, badges, and the frozen decision labels under details — results.spec.ts › "the picks ledger: every pick, the labels, and line value negated"
+- [results] Every bet: the strip opens on our bets with the record, ROI, "could plausibly be" interval, line value, the units curve with its zero line, and the CSV link; one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — results.spec.ts › "every bet: the summary strip, the week groups and the running units"
+- [results] Every bet: exactly one `tr.bv-row--won` (--good-bg) and one `tr.bv-row--lost` (--bad-bg) in the real ledger, the pending row bare; the paper ledger's push row is `tr.bv-row--push` with +0.00 and a `-1P` record — results.spec.ts › "every bet: won rows are tinted green and lost rows red, pending rows are not"
+- [results] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp (the bet time, with the log time when the ticket was logged later) with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — results.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
+- [results] `GET /api/bets?season=` streams every pick as CSV with the documented 31 columns (bet_at_utc beside placed_at_utc), the stored clv beside its displayed negation; a bad season is a 400 — results.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
+- [results] The season comparison: every first-half under at the close, every game that cleared the bar on paper, our bets (with negated line value); signed in, the model and the full-game market rows follow (five rows) — results.spec.ts › "the season comparison: every under, the paper rule, our bets, and signed in the model and the full game"
+- [results] Signed in (the Monday review): the breakdown toggle by week, by reason and by blocker each sum to the pick count; the blocker view is paper-only with GATE_TEXT labels — results.spec.ts › "the breakdown's three views each account for every pick"
+- [results] Signed in: the decisions strip reads the graded real tickets with stored clv negated (+0.25 from −1.0 and +0.5) — results.spec.ts › "the decisions strip reads the graded real tickets with the favourable sign"
+- [results] Signed in: the picks table: every pick, prices, results, units, negated line value, badges, and the frozen decision labels under details — results.spec.ts › "the picks ledger: every pick, the labels, and line value negated"
 - [results] Signed in, pending picks offer edit and delete; graded picks offer neither — results.spec.ts › "signed in, pending picks can be edited or deleted; graded ones cannot"
-- [results] Signed out, the ledger reads but offers no edit or delete — results.spec.ts › "the ledger is readable but nothing can be edited or deleted"
-- [results] `/results` opens on the latest week with a pick and drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
+- [results] Signed out: the bet ledger reads with details and no edit or delete, the comparison has three rows, and the Monday review is absent — results.spec.ts › "a visitor gets the ledger and three comparison rows, not the Monday review"
+- [results] `/results` opens on the latest week with a pick and the signed-in picks table drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
 
-## Track record
+## How it works
 
-- [proof] The headline is the (hist_2023_25, fbs_only, real, cap5, all) bucket: win rate, W-L-P, units, ROI, interval, the uncapped rule and break-even placement — proof.spec.ts › "the headline is the cap-5 record at real closing lines"
-- [proof] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — proof.spec.ts › "the gap ladder draws one bar per band and the break-even line"
-- [proof] The real-close records table: the uncapped rule with its interval, the live season's bets / good prices / every Hard Rock number, `too few` under 30 — proof.spec.ts › "the real-close records table and its intervals"
-- [proof] The live season panel is named `<season> so far` from `live_<season>` and carries the misses, price bands and HR-vs-market rows — proof.spec.ts › "the live season is one panel named after its scope"
-- [proof] What to change: the multiple-comparisons note, the acted flags, the watched flags folded — proof.spec.ts › "what to change: the flags, with the watched ones folded"
-- [proof] Method and sanity checks opens on a click, holds the estimated-line records and band table, and nothing below that heading is coloured `--good` / `--bad` — proof.spec.ts › "method and sanity checks open on a click and nothing inside is coloured"
-- [proof] The glossary sits at `#glossary` (where `/glossary` redirects) with its terms — proof.spec.ts › "the glossary is where /glossary lands"
-- [proof] The header button links to `/proof/records` — proof.spec.ts › "links to every game we have rated"
-- [proof] Every bet: the strip opens on the real ledger with its record, ROI, interval, line value and CSV link; one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — proof.spec.ts › "every bet: the summary strip, the week groups and the running units"
-- [proof] Every bet: exactly one `tr.bv-row--won` (--good-bg) and one `tr.bv-row--lost` (--bad-bg) in the real ledger, the pending row bare; the paper ledger's push row is `tr.bv-row--push` with +0.00 and a `-1P` record — proof.spec.ts › "every bet: won rows are tinted green and lost rows red, pending rows are not"
-- [proof] Every bet: `details` opens `tr#bet-detail-<id>` with our number then, the frozen decision sentence, the posted ET stamp (the bet time, with the log time when the ticket was logged later) with hours before kickoff, the book and price provenance, the closing line, price and capture time, and the note; `hide` closes it — proof.spec.ts › "every bet: the proof row shows the posted time, our number and the closing line"
-- [proof] `GET /api/bets?season=` streams every pick as CSV with the documented 31 columns (bet_at_utc beside placed_at_utc), the stored clv beside its displayed negation; a bad season is a 400 — proof.spec.ts › "every bet: the CSV holds every pick with the stored clv beside its display"
+- [how] The page opens on what this is, the three-colour key for the Board (with the best time to look) and where bets are priced — how-it-works.spec.ts › "says what this is, how to read the Board and where bets are priced"
+- [how] The (hist_2023_25, fbs_only, real, cap5, all) bucket is headed `Backtest, 2023–25 (not money bet)`: win rate, W-L-P, units, ROI, a "could plausibly be" interval, no "Without the cap" sentence — how-it-works.spec.ts › "the backtest is headed as a backtest and carries the cap-5 record"
+- [how] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — how-it-works.spec.ts › "the gap ladder draws one bar per band and the break-even line"
+- [how] The real-close records table is the one uncapped 2023–25 row with its interval — how-it-works.spec.ts › "the real-close records table is the one uncapped row"
+- [how] The glossary sits at `#glossary` (where `/glossary` redirects) with exactly the ten visitor terms in order — how-it-works.spec.ts › "the glossary is where /glossary lands, with the visitor's ten terms"
+- [how] The page links to `/records` and names 1-800-GAMBLER — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
+- [how] Signed in: the `<season> so far` panel, the flags with the multiple-comparisons note, and the Method fold (opens on a click, estimated-line table, nothing coloured) — how-it-works.spec.ts › "signed in, the live season panel, the flags and the method fold follow"
+- [how] Signed out: the backtest shows, the research section does not — how-it-works.spec.ts › "a visitor reads the page without the research section"
 
 ## Every game we have rated
 
-- [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — proof-records.spec.ts › "opens on the latest graded week and shows only its rows"
-- [records] Each row: full game, line, our number, gap to one decimal with its sign, actual first half and result or Pending — proof-records.spec.ts › "shows each game's line, our number and the gap to one decimal, signed"
-- [records] The previous week's pill filters to its two graded games — proof-records.spec.ts › "the previous week is one click away and holds its two graded games"
-- [records] `Download all of <season>` links to the CSV export, which holds every game — proof-records.spec.ts › "offers the whole season as a CSV download"
-- [records] The legend explains the columns; no header carries a `title=` tooltip — proof-records.spec.ts › "the legend explains the columns without a tooltip"
+- [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — records.spec.ts › "opens on the latest graded week and shows only its rows"
+- [records] Each row: full game, line, our number, gap to one decimal with its sign, actual first half and result or Pending — records.spec.ts › "shows each game's line, our number and the gap to one decimal, signed"
+- [records] The previous week's pill filters to its two graded games — records.spec.ts › "the previous week is one click away and holds its two graded games"
+- [records] `Download all of <season>` links to the CSV export, which holds every game — records.spec.ts › "offers the whole season as a CSV download"
+- [records] The legend explains the columns; no header carries a `title=` tooltip — records.spec.ts › "the legend explains the columns without a tooltip"
 
 ## Health and records API
 
@@ -87,19 +88,19 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Redirects
 
-- [redirects] Each of the eleven moved routes is a 308 to its destination — redirects.spec.ts › "${from} → ${to} is a 308"
+- [redirects] Each of the thirteen moved routes (incl. `/proof` → `/results`, `/proof/records` → `/records`, `/glossary` → `/how-it-works#glossary`) is a 308 to its destination — redirects.spec.ts › "${from} → ${to} is a 308"
 - [redirects] A moved route carries its query string across — redirects.spec.ts › "a moved route keeps its query string"
-- [redirects] The three tabs, the records page and login are 200s, not redirects — redirects.spec.ts › "the three tabs and the game route are not redirects"
+- [redirects] The three tabs (Board, Results, How it works), the records page and login are 200s, not redirects — redirects.spec.ts › "the three tabs and the game route are not redirects"
 
 ## Gate
 
 - [login] Every page and every GET is public — login.spec.ts › "every page and every GET is public"
 - [login] POST/PATCH/DELETE on the pick routes and POST /api/logout are 401 without the cookie — login.spec.ts › "writes are refused with a 401 before any body is read"
-- [login] Signed out, the header offers Unlock and no Lock — login.spec.ts › "the header offers Unlock"
-- [login] Signed out, the game page offers `Unlock to log a pick` with `?next=` and no log button — login.spec.ts › "the game page offers the way in, and remembers the game"
+- [login] Signed out, the footer offers Unlock, the header does not, and there is no Lock — login.spec.ts › "the footer offers Unlock"
+- [login] Signed out, the game page offers no log button and no Unlock; the footer's Unlock links to `/login` — login.spec.ts › "the game page offers no way to log; the footer's Unlock is the way in"
 - [login] A wrong password is a 401 and the form says `Wrong password.` — login.spec.ts › "a wrong password is a 401 and the form says so"
 - [login] The right password returns to `?next=`, shows Lock and the log button; Lock signs out and writes are refused again — login.spec.ts › "the right password returns to ?next=, Lock appears, and Lock signs out"
-- [login] Signed in, the header offers Lock and the game page the log button — login.spec.ts › "the header offers Lock and the game page offers the log button"
+- [login] Signed in, the footer offers Lock and the game page the log button — login.spec.ts › "the footer offers Lock and the game page offers the log button"
 - [login] Signed in, a write reaches validation (400) rather than the gate — login.spec.ts › "a write reaches validation instead of the gate"
 
 ## Layout and silence (every page, both widths)
@@ -108,8 +109,8 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [layout] Every page has no horizontal scroll and exactly one h1 — a11y-layout.spec.ts › "has no horizontal scroll and exactly one h1"
 - [layout] No tap target under 24px beyond the named known ones — a11y-layout.spec.ts › "adds no tap target under 24px beyond the known ones"
 - [layout] The sticky header is 69px on every page but login, signed in — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px"
-- [layout] Signed out the header is 69px with the Unlock link showing (KNOWN to fail at phone width: the link renders 14×68) — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px with the Unlock link showing"
+- [layout] Signed out the header is 69px at both widths, with Unlock in the footer and not the header — a11y-layout.spec.ts › "keeps the header at ${HEADER_PX}px with Unlock in the footer"
 
 ## Visual (opt-in, local baselines only)
 
-- [visual] The board, results, proof and a game page match their local full-page baselines — visual.spec.ts › "${name} matches its local baseline"
+- [visual] The board, results, how it works and a game page match their local full-page baselines — visual.spec.ts › "${name} matches its local baseline"

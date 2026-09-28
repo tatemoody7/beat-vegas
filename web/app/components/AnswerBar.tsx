@@ -40,7 +40,7 @@ export default function AnswerBar({
           {headline}
         </span>
         <span className="font-mono text-sm text-[var(--text-muted)]">
-          {`${used} of ${cap} slots used`}
+          {`${used} of ${cap} bets this week`}
         </span>
       </div>
 
@@ -98,7 +98,7 @@ export default function AnswerBar({
 
       {nextBuild !== null && (
         <p className="mt-3 text-xs text-[var(--text-dim)]">
-          {`Next build ${nextBuild}`}
+          {`Next update ${nextBuild}`}
         </p>
       )}
     </div>

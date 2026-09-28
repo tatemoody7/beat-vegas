@@ -57,11 +57,15 @@ const movedRoutes: { source: string; destination: string }[] = [
   { source: "/ledger", destination: "/results" },
   { source: "/picks", destination: "/results" },
   { source: "/weekly-review", destination: "/results" },
-  // -> the track record
-  { source: "/line-study", destination: "/proof" },
-  { source: "/research", destination: "/proof" },
-  { source: "/research/records", destination: "/proof/records" },
-  { source: "/glossary", destination: "/proof#glossary" },
+  // -> how it works (Track record's research half, 2026-09-28)
+  { source: "/line-study", destination: "/how-it-works" },
+  { source: "/research", destination: "/how-it-works" },
+  { source: "/glossary", destination: "/how-it-works#glossary" },
+  // -> every game we have rated
+  { source: "/research/records", destination: "/records" },
+  { source: "/proof/records", destination: "/records" },
+  // Track record merged into Results (its ledger half) on 2026-09-28.
+  { source: "/proof", destination: "/results" },
 ];
 
 const nextConfig: NextConfig = {

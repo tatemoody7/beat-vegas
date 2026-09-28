@@ -171,6 +171,16 @@ function killText(line: number | null, price: number | null): string {
   return "No kill numbers without a model number.";
 }
 
+/** The line the gap is measured against, as the row sentence names it. Hard
+ *  Rock's number stays "the line" (it is the one you can bet); the market's and
+ *  the reference line are named, so a row that shows "no line yet" never then
+ *  says "the line is 0.2 above our number". */
+export function basisNoun(basis: LineBasis | null): string {
+  if (basis === "market") return "the market line";
+  if (basis === "reference") return "our reference line";
+  return "the line";
+}
+
 export function edgeScore(i: EdgeInput): EdgeResult {
   const verdict = verdictFor(i);
   const hasModel = i.underScore !== null && i.bvLine !== null;
@@ -195,6 +205,8 @@ export function edgeScore(i: EdgeInput): EdgeResult {
           ? "reference"
           : null;
   const gap = bvLine !== null && basis !== null ? round2(basis - bvLine) : null;
+  // What the gap is measured against, in words (mirrors card.py::_basis_noun).
+  const noun = basisNoun(lineBasis);
 
   // H-PCT: the kill line and the score scale stretch with this slate's bar.
   const bar = i.bar ?? BET_GAP_PTS;
@@ -294,14 +306,18 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
     // blocker "gap": the amber band — a model row short of the bar.
-    action = `Not yet — the line is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
+    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
   } else {
-    // PASS on a model row: the line is short of the bar, or below our number.
+    // PASS on a model row: the line is short of the bar, on our number, or
+    // below it. The noun names the basis: a row that reads "no line yet" and
+    // then "the line is 0.2 above" contradicted itself (site review 2026-09-28).
     const g = gap ?? 0;
     action =
       g > 0
-        ? `Pass: the line is ${fmt(g)} above our number. It needs ${fmt(killLine)} or higher.`
-        : `Pass: the line is ${fmt(Math.abs(g))} below our number, so this leans over. We only bet unders.`;
+        ? `Pass: ${noun} is ${fmt(g)} above our number. It needs ${fmt(killLine)} or higher.`
+        : Math.abs(g) < 0.05
+          ? `Pass: ${noun} sits on our number. Nothing to bet.`
+          : `Pass: ${noun} is ${fmt(Math.abs(g))} below our number, so this leans over. We only bet unders.`;
   }
 
   return { score, tier, blocker, action, kill, gap, lineBasis, verdict };

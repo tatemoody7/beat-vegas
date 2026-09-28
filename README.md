@@ -84,7 +84,8 @@ python scripts/pick.py summary                 # your hit rate, units, CLV
 ```
 
 **Line Study** — how often the under cashed by opening-line value (real opening
-lines where captured, else proxy). On the site it sits folded under Track record;
+lines where captured, else proxy). On the site it sits in the signed-in research
+section of How it works;
 the CLI is the full version:
 ```bash
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
@@ -142,9 +143,11 @@ plus a game page: **Board** (the home page — one rolling week grouped by day, 
 game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and one
 line saying what to do; each row links to **`/game/[id]`**, where the decision, the
 lines, the reasons, the news and the Log-pick button live), **Results** (read-only:
-bankroll, the real and paper ledgers, your decisions, line value), **Track record**
-(`/proof`: the real-close gap ladder, post-mortem bands, calibration, line study,
-glossary; `/proof/records` is every rated game by week, with a CSV). Plain-English,
+every bet as logged with its record in units, line value and the CSV; the Monday
+review tables only when signed in), **How it works** (`/how-it-works`: what this is,
+how to read the Board, the 2023–25 backtest headed as a backtest, the gap ladder,
+the terms; the research flags and method fold only when signed in; `/records` is
+every rated game by week, with a CSV). Plain-English,
 modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` classes
 in `web/app/globals.css`).
 

@@ -14,8 +14,8 @@ import { E2E_PASSWORD } from "./helpers/env";
 const PUBLIC_GETS = [
   "/",
   "/results",
-  "/proof",
-  "/proof/records",
+  "/how-it-works",
+  "/records",
   "/game/900001",
   "/api/health",
   "/api/bets?season=2026",
@@ -46,24 +46,26 @@ test.describe("signed out", () => {
     expect((await request.post("/api/logout")).status()).toBe(401);
   });
 
-  test("the header offers Unlock", async ({ page }) => {
+  test("the footer offers Unlock", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Unlock" })).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("link", { name: "Unlock" }),
+    ).toBeVisible();
+    await expect(page.locator("header")).not.toContainText("Unlock");
     await expect(page.getByRole("button", { name: "Lock" })).toHaveCount(0);
   });
 
-  test("the game page offers the way in, and remembers the game", async ({
+  test("the game page offers no way to log; the footer's Unlock is the way in", async ({
     page,
   }) => {
     await page.goto("/game/900002");
-    const link = page.getByRole("link", { name: "Unlock to log a pick" });
-    await expect(link).toBeVisible();
-    expect(await link.getAttribute("href")).toBe(
-      `/login?next=${encodeURIComponent("/game/900002")}`,
-    );
+    await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Log this bet/ }),
     ).toHaveCount(0);
+    await expect(
+      page.locator("footer").getByRole("link", { name: "Unlock" }),
+    ).toHaveAttribute("href", "/login");
   });
 
   test("a wrong password is a 401 and the form says so", async ({
@@ -112,11 +114,13 @@ test.describe("signed out", () => {
 });
 
 test.describe("signed in (the setup project's cookie)", () => {
-  test("the header offers Lock and the game page offers the log button", async ({
+  test("the footer offers Lock and the game page offers the log button", async ({
     page,
   }) => {
     await page.goto("/game/900002");
-    await expect(page.getByRole("button", { name: "Lock" })).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("button", { name: "Lock" }),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Unlock" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Log this bet" }),

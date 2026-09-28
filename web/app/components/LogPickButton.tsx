@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import LogPickForm, { type PickPrefill } from "@/app/components/LogPickForm";
 
-// "Log this bet" on a This Week card: opens the pre-filled pick form in place.
-// The site reads publicly; only the password holder logs. A reader without
-// the cookie gets the way in, and comes back to this game afterwards.
+// "Log this bet" on a game page: opens the pre-filled pick form in place. The
+// site reads publicly; only the password holder logs, and a visitor is shown
+// nothing here (2026-09-28) — the way in is the footer's Unlock.
 export default function LogPickButton({
   prefill,
   picked,
@@ -20,11 +19,12 @@ export default function LogPickButton({
   kickedOff: boolean;
   /** The flat stake, passed down from the server page. */
   unitUsd: number;
-  /** Signed in (or the gate is off). False = show the way to /login. */
+  /** Signed in (or the gate is off). False = render nothing. */
   authed: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
+  if (!authed) return null;
   if (kickedOff) {
     return (
       <span className="text-xs text-[var(--text-dim)]">
@@ -37,16 +37,6 @@ export default function LogPickButton({
       <span className="text-xs text-[var(--text-dim)]">
         Already logged. It is on Results.
       </span>
-    );
-  }
-  if (!authed) {
-    return (
-      <Link
-        href={`/login?next=${encodeURIComponent(`/game/${prefill.gameId}`)}`}
-        className="bv-btn bv-btn--ghost text-xs"
-      >
-        Unlock to log a pick
-      </Link>
     );
   }
   if (!open) {

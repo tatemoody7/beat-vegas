@@ -9,7 +9,7 @@ import { expect, test } from "@playwright/test";
 const ROUTES: [string, string][] = [
   ["board", "/"],
   ["results", "/results?week=all"],
-  ["proof", "/proof"],
+  ["how", "/how-it-works"],
   ["game", "/game/900001"],
 ];
 

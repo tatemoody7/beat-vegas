@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Three tabs, one job each: scan the week, see the money, check the evidence.
+// Three tabs, one job each: scan the week, see the money, learn how it works.
 // The retired routes (/board, /preview, /line-check, /line-study, /movement,
-// /ledger, /weekly-review, /picks, /research, /glossary) redirect into these.
-//
-// `startsWith` is what makes /proof/records light up Track record.
+// /ledger, /weekly-review, /picks, /research, /proof, /glossary) redirect
+// into these. /records (every game rated) lights no tab; it is reached from
+// How it works and Results.
 const LINKS = [
   { href: "/", label: "Board" },
   { href: "/results", label: "Results" },
-  { href: "/proof", label: "Track record" },
+  { href: "/how-it-works", label: "How it works" },
 ];
 
 export default function MainNav() {

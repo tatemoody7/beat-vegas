@@ -485,6 +485,57 @@ describe("edgeScore — model rows", () => {
       "Not yet — the line is 0.7 above our number. It becomes a bet at 24.0 or higher.",
     );
   });
+  it("with no Hard Rock line the sentence names the market line (site review 2026-09-28)", () => {
+    const e = edgeScore({
+      ...base,
+      hrLine: null,
+      hrUnderPrice: null,
+      liveLine: 22.0,
+      marketLine: 22.0,
+      bestLine: 22.0,
+      gap: 0.2,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(e.lineBasis).toBe("market");
+    expect(e.tier).toBe("PASS");
+    expect(e.action).toBe(
+      "Pass: the market line is 0.2 above our number. It needs 24.0 or higher.",
+    );
+    const ref = edgeScore({
+      ...base,
+      hrLine: null,
+      hrUnderPrice: null,
+      liveLine: null,
+      marketLine: null,
+      bestLine: null,
+      fallbackLine: 20.5,
+      gap: -1.3,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(ref.lineBasis).toBe("reference");
+    expect(ref.action).toBe(
+      "Pass: our reference line is 1.3 below our number, so this leans over. We only bet unders.",
+    );
+  });
+  it("a line on our number says so instead of '0.0 below'", () => {
+    const e = edgeScore({
+      ...base,
+      hrLine: 21.8,
+      liveLine: 21.8,
+      marketLine: 21.8,
+      bestLine: 21.8,
+      gap: 0,
+      ev: null,
+      evVerdict: "na",
+      marketFairUnder: null,
+    });
+    expect(e.tier).toBe("PASS");
+    expect(e.action).toBe("Pass: the line sits on our number. Nothing to bet.");
+  });
   it("line below our number reads as an over lean", () => {
     const e = edgeScore({
       ...base,

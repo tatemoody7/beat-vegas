@@ -136,7 +136,7 @@ export default function PicksList({
     n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(dp)}`;
 
   const VIEWS: { id: typeof view; label: string; n: number }[] = [
-    { id: "real", label: "My bets", n: realCount },
+    { id: "real", label: "Our bets", n: realCount },
     { id: "paper", label: "Paper", n: paperCount },
     { id: "all", label: "All", n: picks.length },
   ];

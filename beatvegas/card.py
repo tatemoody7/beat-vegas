@@ -227,6 +227,16 @@ def round2(x: float) -> float:
     return math.floor(x * 100 + 0.5) / 100
 
 
+def _basis_noun(gap_basis: Optional[str]) -> str:
+    """The line the gap is measured against, as the row sentence names it
+    (mirrors web/lib/edge.ts::basisNoun). Hard Rock's number stays "the line"."""
+    if gap_basis == "market":
+        return "the market line"
+    if gap_basis == "reference":
+        return "our reference line"
+    return "the line"
+
+
 def fmt(n: Optional[float], dp: int = 1) -> str:
     """Fixed-decimal number, '—' for None (format.ts fmt)."""
     return "—" if n is None else f"{n:.{dp}f}"
@@ -871,19 +881,27 @@ def build_item(
         )
     elif tier == "EDGE":
         # blocker "gap": the amber band — a model row short of the bar.
+        noun = _basis_noun(gap_basis)
         action = (
-            f"Not yet — the line is {fmt(gap or 0)} above our number. It becomes a bet at "
+            f"Not yet — {noun} is {fmt(gap or 0)} above our number. It becomes a bet at "
             f"{fmt(k_line)} or higher."
         )
     else:
-        # PASS on a model row: the line is short of the bar, or below our number.
+        # PASS on a model row: the line is short of the bar, on our number, or
+        # below it. The noun names the basis (edge.ts::basisNoun): a row that
+        # reads "no line yet" and then "the line is 0.2 above" contradicted
+        # itself (site review 2026-09-28).
         g = gap or 0
-        action = (
-            f"Pass: the line is {fmt(g)} above our number. It needs {fmt(k_line)} or higher."
-            if g > 0
-            else f"Pass: the line is {fmt(abs(g))} below our number, so this leans over. "
-            "We only bet unders."
-        )
+        noun = _basis_noun(gap_basis)
+        if g > 0:
+            action = f"Pass: {noun} is {fmt(g)} above our number. It needs {fmt(k_line)} or higher."
+        elif abs(g) < 0.05:
+            action = f"Pass: {noun} sits on our number. Nothing to bet."
+        else:
+            action = (
+                f"Pass: {noun} is {fmt(abs(g))} below our number, so this leans over. "
+                "We only bet unders."
+            )
 
     # --- why (2-4 plain sentences) ---------------------------------------------
     why: List[str] = [

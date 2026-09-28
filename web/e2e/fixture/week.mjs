@@ -100,7 +100,11 @@ export function anchorSaturday(now) {
   throw new Error("no anchor Saturday found in the next two weeks");
 }
 
-/** Whole-hour instant `hours` before now (so a re-seed minutes later lands on the same row values). */
+/**
+ * Whole-hour instant `hours` before now, so a re-seed minutes later lands on
+ * the same row values -- EXCEPT across an hour boundary, which is why seed.mjs
+ * persists its instant and the specs read it back (helpers/fixture.ts::seededNow).
+ */
 function hoursAgo(now, hours) {
   const t = new Date(now.getTime() - hours * 3_600_000);
   t.setUTCMinutes(0, 0, 0);

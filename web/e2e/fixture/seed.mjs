@@ -15,6 +15,7 @@
 // pgserver sandbox (scripts/e2e-db.sh) or a CI service container only.
 
 import pg from "pg";
+import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { buildWeek, HR } from "./week.mjs";
 import { buildExpected, lineUsedFor, round2 } from "./expected.mjs";
@@ -866,12 +867,32 @@ export function fixtureRows(week, expected) {
   return rows;
 }
 
+/**
+ * Where the seed records the instant it built the week from, so the specs
+ * rebuild the SAME week. `hoursAgo` truncates to the whole hour: a seed at
+ * 17:59Z and a spec import at 18:01Z would otherwise disagree on every capture
+ * time by an hour (seen 2026-09-28 on CI: "as of Fri 2:00pm" vs "1:00pm").
+ */
+export const SEED_INSTANT_FILE = new URL(".seed-now", import.meta.url);
+
+/** The instant to build from: `E2E_NOW` (an ISO string) when set, else now. */
+export function seedInstant(env = process.env) {
+  if (env.E2E_NOW) {
+    const d = new Date(env.E2E_NOW);
+    if (Number.isNaN(d.getTime()))
+      throw new Error(`E2E_NOW is not a date: ${env.E2E_NOW}`);
+    return d;
+  }
+  return new Date();
+}
+
 export async function seed(
   url = process.env.DATABASE_URL ?? DEFAULT_URL,
-  now = new Date(),
+  now = seedInstant(),
 ) {
   refuseNeon(url);
   const week = buildWeek(now);
+  writeFileSync(SEED_INSTANT_FILE, now.toISOString() + "\n");
   const expected = buildExpected(week);
   const rows = fixtureRows(week, expected);
   const client = new pg.Client({ connectionString: url });

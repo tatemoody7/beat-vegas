@@ -4,6 +4,9 @@
 // them. lib/e2eFixture.test.ts is what checks the VALUES against the site's
 // own rules; this file only names their types.
 
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import {
   buildWeek as buildWeekJs,
   etParts as etPartsJs,
@@ -203,8 +206,39 @@ export const etParts = etPartsJs as unknown as (d: Date) => {
 };
 export const CRON_JOBS = CRON_JOBS_JS as unknown as Record<string, unknown>;
 
+// Resolved from the cwd, not import.meta (Playwright compiles the specs to
+// CommonJS): both `npx playwright test` and `npx vitest` run from web/.
+export const SEED_INSTANT_PATH = (() => {
+  for (const rel of ["e2e/fixture/.seed-now", "web/e2e/fixture/.seed-now"]) {
+    const p = path.resolve(process.cwd(), rel);
+    if (existsSync(path.dirname(p))) return p;
+  }
+  return path.resolve(process.cwd(), "e2e/fixture/.seed-now");
+})();
+
+/**
+ * The instant seed.mjs built the week from: `E2E_NOW` when set, else the file
+ * the seed wrote beside the fixture, else now. Rebuilding from a fresh `new
+ * Date()` is wrong whenever the seed and the spec straddle a whole hour --
+ * `hoursAgo` truncates to the hour, so every capture time shifts by one.
+ */
+export function seededNow(
+  env: Record<string, string | undefined> = process.env,
+  file: string = SEED_INSTANT_PATH,
+): Date {
+  if (env.E2E_NOW) return new Date(env.E2E_NOW);
+  try {
+    const iso = readFileSync(file, "utf8").trim();
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  } catch {
+    // no seed on this checkout (E2E_PROD, or the lane was never seeded)
+  }
+  return new Date();
+}
+
 /** The week and its expectations, built once per spec file at import time. */
-export function fixture(now: Date = new Date()) {
+export function fixture(now: Date = seededNow()) {
   const week = buildWeek(now);
   const expected = buildExpected(week);
   const thisWeek = week.games.filter((g) => g.week === week.week);

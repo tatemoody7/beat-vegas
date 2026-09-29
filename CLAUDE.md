@@ -54,9 +54,12 @@ disagree, **this file wins**; memory files hold lessons and point here.
   they barely move, so **the best look is Friday after 5:30pm ET**, then Saturday after 8:30am.
 
 ## Open items (the only place pending work lives; date each)
-- **2026-09-29 `tue_pm` build**: first H-NEGGAP-P logging build — write its `cards.id` into
-  `docs/NEGGAP_PAPER.md` (still "REGISTERED, NOT YET LOGGING"); `bv-card-check` expects
-  `neggap_*` rows in `challenger_picks`. First H-STOP-2 observations.
+- **Record the first H-NEGGAP-P build with rows** in `docs/NEGGAP_PAPER.md` the evening it
+  happens (`thu_pm` 2026-10-01 or `fri_pm` 2026-10-02), before that Friday's 10Z grade. Card 22
+  (2026-09-29 `tue_pm`) switched collection on but logged 0 rows — the 48 h paper window.
+- **Sat 2026-10-03 is the first live run of the Vercel `lines-close` backup** (PR #242; a
+  dry-run dispatch on 2026-09-29 proved the path). Watch `last_dispatch_lines-close` advance
+  hourly; Sunday's grade must lift `close_coverage_pct` past 0.8 (17 of 53 for week 4).
 - **2026-10-06**: The Odds API renewal — downgrade 100K ($59) → 20K ($30); then update the
   comment in `config.example.yaml`. No smaller paid tier exists.
 - **CFBD Tier 2** ($5/mo, 30,000 calls) still to buy; free Academic 3,000 until then.
@@ -80,10 +83,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
 |---|---|---|
 | Tue / Thu / Fri, gate 3:45–5:15pm | `card.yml` slots `tue_pm` `thu_pm` `fri_pm` | whole-week 1H sweep + injuries → FINAL card; paper windows 48 h / 24 h / rest of week |
 | Sat, dispatch 7:00–8:15am, gate 7:45–9:15am | `card.yml` slot `sat_am` | same sweep before the morning sitting; paper window rest of week |
-| Sat 10:00am–11:59pm, one tick per UTC hour (14 entries, 15Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, `CLOSE_LOOKAHEAD_MIN=120`; GitHub's every-30-min crons stay |
+| Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, `CLOSE_LOOKAHEAD_MIN=120`; GitHub's every-30-min crons stay |
 | Weeknights (GitHub cron only) | `lines_watch.yml` | opener/close sweeps 22Z–03Z |
 | Sun 1–5pm (ticks 18/19/20Z) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
-| Daily 10Z (GitHub 10:30Z + 16:00Z) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
+| Daily 10Z (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
 in `web/lib/cronJobs.ts` (mirrored by `web/vercel.json`, which **must live in `web/`**). A

@@ -761,7 +761,7 @@ CONTRACTS: Dict[str, Contract] = {
     "grade": Contract(
         job="grade",
         workflow="grade.yml",
-        window="daily, 10:30Z and 16:00Z crons plus the Vercel dispatch; skipped when a run completed in the last 4 h",
+        window="daily, 10:30Z cron plus the Vercel dispatch, and a 16:00Z cron Sun-Fri; skipped when a run completed in the last 4 h",
         artifacts=(
             "games finals",
             "results / manual_picks graded",

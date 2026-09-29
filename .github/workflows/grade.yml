@@ -34,9 +34,13 @@ on:
     # 10:30 UTC daily = 6:30am EDT / 5:30am EST, well ahead of card.yml's
     # 12:05Z morning build in the shared neon-writers group (GitHub cancels the
     # older PENDING run when a third arrives). 16:00Z is the retry / late-finals
-    # pass. GitHub cron is best-effort; grading spends no Odds API credits.
+    # pass, Sun-Fri only: on Saturday it queued against the lines-close poll
+    # in the same group at noon ET (one running + one pending, the older
+    # pending cancelled), and Saturday's grade is the 10:30Z cron plus the
+    # Vercel dispatch anyway (2026-09-29). GitHub cron is best-effort; grading
+    # spends no Odds API credits.
     - cron: '30 10 * * *'
-    - cron: '0 16 * * *'
+    - cron: '0 16 * * 0-5'
   workflow_dispatch:
     inputs:
       hist:

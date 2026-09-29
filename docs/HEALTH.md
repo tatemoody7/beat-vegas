@@ -146,7 +146,8 @@ carries `HEALTH: <verdict> <note>`.
 ### When lines_watch is degraded
 
 1. `lines_watch.close_polled` missed -> the close poll found events in its
-   75-minute window and polled none of them (credit floor, API error). The
+   `CLOSE_LOOKAHEAD_MIN` (120-minute) window and polled none of them (credit
+   floor, API error). The
    next slot re-covers each game; if it repeats, check Odds credits.
 2. `lines_watch.hr_rows_touched` missed -> events were polled and no Hard Rock
    1H row was written or re-seen: the `hardrockbet` key drifted or Hard Rock
@@ -215,7 +216,7 @@ Failure modes on record:
 ### grade
 
 - Workflow: `.github/workflows/grade.yml`
-- Window: daily, 10:30Z and 16:00Z crons plus the Vercel dispatch; skipped when a run completed in the last 4 h
+- Window: daily, 10:30Z cron plus the Vercel dispatch, and a 16:00Z cron Sun-Fri; skipped when a run completed in the last 4 h
 - Artifacts: `games finals`, `results / manual_picks graded`, `game_records graded`, `postmortem_runs live_<season>`, `last_grade_completed_at gauge`
 - Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SEASON`, `OUTCOME_BACKFILL`, `OUTCOME_ESPN`, `OUTCOME_PBP`, `OUTCOME_LEDGER`, `OUTCOME_PM`
 

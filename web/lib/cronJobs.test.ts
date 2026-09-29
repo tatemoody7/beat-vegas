@@ -162,6 +162,17 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     expect(dispatchDecision(job, at("2026-09-26T15:05:00Z")).allowed).toBe(
       true,
     );
+    // 14Z is 10:00 EDT -- the window's first minute is IN (the noon slate's
+    // guaranteed look, 2026-09-29) -- and 9am EST, refused before_window.
+    expect(dispatchDecision(job, at("2026-09-26T14:00:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-09-26T14:59:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-19T14:05:00Z")).reason).toContain(
+      "before_window",
+    );
     expect(dispatchDecision(job, at("2026-12-19T15:05:00Z")).allowed).toBe(
       true,
     );

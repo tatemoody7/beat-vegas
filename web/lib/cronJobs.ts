@@ -128,12 +128,16 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // games ever had a 1H snapshot inside the registered 2-hour close window
     // (wk2 25/72, wk3 27/72, wk4 18/57) -- and H-STOP-2's line-value clock
     // takes only those. This is the backup: one Hobby entry per UTC hour from
-    // 15Z Saturday to 04Z Sunday, each firing once within its hour, every tick
-    // dispatching (everyTick); 14 entries, 15Z Saturday to 04Z Sunday. With
-    // CLOSE_LOOKAHEAD_MIN=120 in the workflow, ticks up to 119 minutes apart
-    // still reach every kickoff inside 2 h.
-    // Window: 10:00am ET to midnight ET Saturday. The 04Z Sunday entry is
-    // 11pm EST Saturday (in window from November) and 00:00 EDT Sunday in
+    // 14Z Saturday to 04Z Sunday, each firing once within its hour, every tick
+    // dispatching (everyTick); 15 entries. With CLOSE_LOOKAHEAD_MIN=120 in the
+    // workflow, ticks up to 119 minutes apart still reach every kickoff inside
+    // 2 h. The 14Z entry (added 2026-09-29) is 10:00-10:59 EDT: the noon
+    // slate's guaranteed look. Without it the first tick (15Z) could land at
+    // 11:59 and, after runner start-up, capture the noon games at 12:0x --
+    // outside their 2-hour window -- leaving them to GitHub's own cron.
+    // Window: 10:00am ET to midnight ET Saturday. The 14Z entry is 9am EST
+    // from November, refused as before_window at no cost; the 04Z Sunday entry
+    // is 11pm EST Saturday (in window from November) and 00:00 EDT Sunday in
     // summer, when this route refuses it as wrong_day at no cost.
     dispatchOpenMin: 10 * 60,
     dispatchCloseMin: 24 * 60 - 1,

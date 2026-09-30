@@ -10,7 +10,8 @@ hold the rest.
 ## 2026-09-29
 
 - **2026-09-29 (WEEK 5 `tue_pm` CARD CLEAN; THE CLOSE-POLL BACKUP PROVED BEFORE ITS FIRST
-  SATURDAY; H-NEGGAP-P RECORDS CARD 22).** The first build on the B-SERVE model (run
+  SATURDAY; H-NEGGAP-P RECORDS CARD 22 — PR #262, merged and verified on production
+  2026-09-30).** The first build on the B-SERVE model (run
   36627103104, card 22, 11 min, 55 credits): 4 BET / 24 EDGE / 27 PASS, bar 2.6 pts = top 20%
   of 46 priced games, 9 Hard Rock alternates ignored, health ok. All four BETs (Penn State @
   Northwestern u23.5, Florida @ Missouri u28.5, Kentucky @ South Carolina u27.5, Washington @

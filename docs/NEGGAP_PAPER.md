@@ -5,9 +5,10 @@ observation. Measurement only on the real-money side: **nothing here licenses a 
 bet on an over.** `docs/BETTING_POLICY.md` is first-half unders and this row does not
 amend it.
 
-> **STATUS 2026-09-28 — REGISTERED, NOT YET LOGGING.** The collection code lands in its
-> own PR after this row; the first card build that logs an arm is recorded below, with
-> its `cards.id`, before any result is read.
+> **STATUS 2026-09-29 — COLLECTING, NO ROWS YET.** Collection switched on with card 22
+> (`cards.id` 22, `tue_pm`, 2026-09-29, 0 rows: the 48 h paper window held every week-5
+> game). The first build that writes a row is recorded below the evening it happens, before
+> that Friday's 10Z grade reads any result.
 
 ## What prompted it, stated so it is not mistaken for support
 
@@ -90,7 +91,10 @@ before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (
 
 ## Data note
 
-- First logging build: _to be recorded_ (`cards.id`, slot, date), before any result is read.
+- Collection on: card 22 (`tue_pm`, 2026-09-29), 0 rows (the 48 h window).
+- First build with rows: _to be recorded_ (`cards.id`, slot, date, rows per arm) the evening
+  it happens — expected `thu_pm` 2026-10-01 (Thursday-night games only) or `fri_pm`
+  2026-10-02 — before any result is read.
 - Weekly: per arm, n logged, n graded, hit rate, units at price, favourable line value,
   excluded-no-close share, both LLRs against A/B.
 

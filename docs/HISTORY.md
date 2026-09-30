@@ -7,6 +7,34 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-09-29
+
+- **2026-09-29 (WEEK 5 `tue_pm` CARD CLEAN; THE CLOSE-POLL BACKUP PROVED BEFORE ITS FIRST
+  SATURDAY; H-NEGGAP-P RECORDS CARD 22).** The first build on the B-SERVE model (run
+  36627103104, card 22, 11 min, 55 credits): 4 BET / 24 EDGE / 27 PASS, bar 2.6 pts = top 20%
+  of 46 priced games, 9 Hard Rock alternates ignored, health ok. All four BETs (Penn State @
+  Northwestern u23.5, Florida @ Missouri u28.5, Kentucky @ South Carolina u27.5, Washington @
+  USC u30.5) sit exactly at their kill price. **H-NEGGAP-P logged 0 rows** — the 09-28 entry
+  below says "the 2026-09-29 `tue_pm` build is the first that logs", which overlooked the 48 h
+  paper window (`ci.PAPER_WINDOW_HOURS`): a Tuesday build logs nothing for a Saturday slate.
+  `docs/NEGGAP_PAPER.md` now records card 22 as the build that switched collection on, and
+  keeps a "first build with rows" line for the `thu_pm` or `fri_pm` build (Tate's call: card 22
+  now, first rows later). **The 17-of-53 close-coverage warning on the board is week 4**
+  (Sat 09-26): 1H snapshots landed in three UTC hours (18Z, 21Z, 23Z) because only GitHub's
+  cron existed; the Vercel `lines-close` backup (#242) merged 09-28 and has never run —
+  `last_dispatch_lines-close` is null for that reason, not a fault. A hand dispatch of
+  `lines_watch.yml` with `market=1h_close` (run 36633701647, 10 s, zero credits) proved the
+  path: the resolve step took the market from the dispatch input, the free pre-check found 0
+  events inside 120 min and every paid step was skipped. Three loose ends closed, each Tate's
+  call: a **14Z Saturday `lines-close` entry** (10:00–10:59 EDT — without it a 15Z tick at
+  11:59 plus runner start-up captures the noon slate at 12:0x, outside its 2-hour window; 9am
+  EST from November, refused free; 15 entries 14Z–04Z); **`grade.yml`'s 16:00Z cron is
+  Sun–Fri** (on Saturday it queued against the close poll in `neon-writers`, where a third
+  arrival cancels the older pending run; Saturday's grade is 10:30Z plus the Vercel dispatch);
+  the `HEALTH.md` runbook said "75-minute window" (120 since #249). Sat 2026-10-03 is the
+  first live test of the backup: `last_dispatch_lines-close` advancing hourly and Sunday's
+  grade lifting `close_coverage_pct` past 0.8.
+
 ## 2026-09-28
 
 - **2026-09-28 (PUBLIC-SITE RESTRUCTURE BUILT — PR #260, merged and verified on production the

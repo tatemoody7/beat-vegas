@@ -18,7 +18,6 @@ const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   bvLine: 25.1,
   bvGap: 2.4,
   bvGapZ: 0.2,
-  underScore: 74,
   rank: 3,
   firstHalfTotal: 24,
   outcome: "under",
@@ -45,11 +44,11 @@ describe("recordsToCsv", () => {
     const csv = recordsToCsv([row(), row({ week: 4 })]);
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome,scored_after_kickoff",
+      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,rank,first_half_total_actual,outcome,scored_after_kickoff",
     );
     expect(lines).toHaveLength(4); // header + 2 rows + trailing ""
     expect(lines[3]).toBe("");
-    expect(lines[1].split(",")).toHaveLength(15);
+    expect(lines[1].split(",")).toHaveLength(14);
   });
 
   it("leaves a missing value as an empty cell, never a literal null", () => {
@@ -58,7 +57,7 @@ describe("recordsToCsv", () => {
     ]);
     expect(csv).not.toContain("null");
     expect(csv.split("\n")[1]).toBe(
-      "2025,3,Kansas,Missouri,52.5,-7,,,2.4,0.2,74,3,,,",
+      "2025,3,Kansas,Missouri,52.5,-7,,,2.4,0.2,3,,,",
     );
   });
 
@@ -66,7 +65,7 @@ describe("recordsToCsv", () => {
     const csv = recordsToCsv([row({ home: "Texas A&M, College Station" })]);
     const body = csv.split("\n")[1];
     expect(body).toContain('"Texas A&M, College Station"');
-    // Still 15 fields once the quoted comma is respected.
+    // Still 14 fields once the quoted comma is respected.
     expect(body.match(/"/g)).toHaveLength(2);
   });
 
@@ -75,7 +74,7 @@ describe("recordsToCsv", () => {
     // one empty line. Harmless in every spreadsheet we have opened it in;
     // pinned so it is a known shape rather than a surprise.
     expect(recordsToCsv([])).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,under_score,rank,first_half_total_actual,outcome,scored_after_kickoff\n\n",
+      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,rank,first_half_total_actual,outcome,scored_after_kickoff\n\n",
     );
   });
 });

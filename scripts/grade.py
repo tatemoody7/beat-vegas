@@ -16,7 +16,7 @@ import argparse
 import statistics
 from typing import Optional
 
-from beatvegas.db.models import Game, OddsSnapshot, Prediction, Result
+from beatvegas.db.models import Game, OddsSnapshot, Result
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.grading import (
     clv_under,
@@ -26,10 +26,13 @@ from beatvegas.grading import (
     units_won,
 )
 from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
-from beatvegas.model.score import MODEL_VERSION, is_model_bet
 
 MODEL_MARKET = "market"  # tag for the pure market-vs-result grade (1H)
 MODEL_MARKET_FG = "market_fg"  # full-game market-vs-result grade
+# The "Model 1H" ledger (results.model_version='gbm_v1', one row per prediction
+# with under_score >= 53) was retired on 2026-10-04 with the classifier
+# (docs/CLASSIFIER_RETIREMENT.md). Its rows stay in `results` as history; nothing
+# writes, re-grades or summarises them any more.
 
 
 def _closings(session, season: int):
@@ -86,7 +89,7 @@ def grade_market_fg(session, closings_fg) -> int:
     """Full-game market ledger: consensus open/close vs the realized total."""
     n = 0
     for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings_fg.items():
-        # Delete BEFORE the skip, as grade_market/grade_model do: a game whose
+        # Delete BEFORE the skip, as grade_market does: a game whose
         # close later fails the window (or was a rung) must lose its stale
         # graded row on re-grade, not keep it forever.
         (
@@ -154,60 +157,6 @@ def grade_market(session, closings) -> int:
     return n
 
 
-def grade_model(session, season: int, closings) -> int:
-    """Grade the model's bets (under_score >= threshold) at the line it picked.
-    Season-scoped through games.season (predictions carry no season column)."""
-    preds = (
-        session.query(Prediction)
-        .join(Game, Game.id == Prediction.game_id)
-        .filter(Prediction.model_version == MODEL_VERSION, Game.season == season)
-        .all()
-    )
-    n = 0
-    for p in preds:
-        entry = closings.get(p.game_id)
-        if entry is None:
-            continue
-        # Delete BEFORE any skip check, exactly as grade_market does. This used
-        # to sit below the is_model_bet / line_used guards, so a re-score that
-        # dropped a game under the threshold left its old graded row in the
-        # ledger forever -- the row stopped being a model bet but never stopped
-        # counting as one. Delete-then-rewrite is only idempotent if the delete
-        # is unconditional.
-        (
-            session.query(Result)
-            .filter(Result.game_id == p.game_id, Result.model_version == MODEL_VERSION)
-            .delete()
-        )
-        if not is_model_bet(p.under_score) or p.line_used is None:
-            continue
-        g, (_open, closing), closing_at, (fair_open, fair_close) = entry
-        bet_line = p.line_used
-        actual = trusted_first_half_total(
-            g.first_half_total, g.home_points, g.away_points, g.first_half_source
-        )
-        if actual is None:
-            continue
-        session.add(
-            Result(
-                game_id=p.game_id,
-                model_version=MODEL_VERSION,
-                market="1H",
-                actual_first_half_total=actual,
-                line_used=bet_line,
-                line_kind="real" if closing is not None else "proxy",
-                under_hit=under_result(actual, bet_line) == "under",
-                closing_line=closing,
-                closing_captured_at=closing_at,
-                clv=clv_under(bet_line, closing),
-                clv_prob=price_clv_under(fair_open, fair_close),
-                units=units_won(actual, bet_line),
-            )
-        )
-        n += 1
-    return n
-
-
 def _summary(session, model_version: str, label: str, season: Optional[int] = None) -> None:
     """Print one ledger line; scoped to `season` via games.season when given."""
     q = session.query(Result).filter(Result.model_version == model_version)
@@ -247,12 +196,10 @@ def main() -> None:
         closings = _closings(s, args.season)
         closings_fg = _closings_fg(s, args.season)
         m = grade_market(s, closings)
-        mdl = grade_model(s, args.season, closings)
         mfg = grade_market_fg(s, closings_fg)
-    print(f"graded {m} market(1H) + {mdl} model(1H) + {mfg} market(FG) bets for {args.season}")
+    print(f"graded {m} market(1H) + {mfg} market(FG) bets for {args.season}")
     with session_scope() as s:
         _summary(s, MODEL_MARKET, "MARKET 1H", season=args.season)
-        _summary(s, MODEL_VERSION, "MODEL  1H", season=args.season)
         _summary(s, MODEL_MARKET_FG, "MARKET FG", season=args.season)
 
 

@@ -29,8 +29,8 @@ export const dynamic = "force-dynamic";
 // bet ledger (our bets in units, the curve, every bet as logged, the CSV) and
 // a three-row season comparison. The Monday review -- the picks table with its
 // edit and delete controls, the breakdown, the decisions strip, the factor
-// read -- renders only behind the cookie, together with the two comparison
-// rows (the model, the full game) that need a paragraph to explain.
+// read -- renders only behind the cookie, together with the full-game
+// comparison row that needs a paragraph to explain.
 //
 // The kill numbers are enforced server-side for every path by
 // lib/pickRules.ts::checkPolicy; nothing on this page gates a bet.
@@ -76,13 +76,12 @@ export default async function ResultsPage({
   const againstVerdict = allPicks.filter(isOffPolicy).length;
   const hasRecord =
     ledger.market !== null ||
-    ledger.model !== null ||
     ledger.you !== null ||
     ledger.paper !== null ||
     ledger.marketFull !== null;
 
-  // Three rows a visitor can read without a paragraph; the model and the
-  // full-game market are the owner's baselines.
+  // Three rows a visitor can read without a paragraph; the full-game market
+  // is the owner's baseline.
   const comparison: RecordTableRow[] = [
     {
       key: "market",
@@ -107,12 +106,6 @@ export default async function ResultsPage({
     },
     ...(authed
       ? ([
-          {
-            key: "model",
-            label: "Model — first half",
-            rec: ledger.model,
-            empty: "nothing graded yet",
-          },
           {
             key: "fg",
             label: "Market — full game",

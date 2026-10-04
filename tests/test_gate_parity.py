@@ -31,7 +31,6 @@ PARITY = {
     "PCT_SHARE": score.PCT_SHARE,
     "STRONG_GAP_PTS": score.STRONG_GAP_PTS,
     "WATCH_GAP_PTS": score.WATCH_GAP_PTS,
-    "MODEL_BET_THRESHOLD": score.MODEL_BET_THRESHOLD,
     "WEEKLY_BET_CAP": score.WEEKLY_BET_CAP,
     "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
     "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
@@ -96,6 +95,17 @@ def test_score_is_gap_only_on_both_sides():
 def test_gates_are_ordered_points_not_sigmas():
     assert score.WATCH_GAP_PTS < score.BET_GAP_PTS < score.STRONG_GAP_PTS
     assert not hasattr(score, "OPPORTUNITY_Z")  # the sigma gate is gone for good
+
+
+def test_the_classifier_threshold_is_gone_on_both_sides():
+    """MODEL_BET_THRESHOLD (under_score >= 53 = a "model bet") was retired with
+    the classifier on 2026-10-04 (docs/CLASSIFIER_RETIREMENT.md). Neither side
+    may grow it back: there is no score to threshold any more."""
+    assert not hasattr(score, "MODEL_BET_THRESHOLD")
+    assert not hasattr(score, "is_model_bet")
+    assert not hasattr(score, "under_score")
+    if _TS.exists():
+        assert "MODEL_BET_THRESHOLD" not in _TS.read_text()
 
 
 def test_every_numeric_gate_in_verdict_ts_is_mirrored():

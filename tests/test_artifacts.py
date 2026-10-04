@@ -266,7 +266,7 @@ def _scored(with_artifact: bool, fp: Optional[dict] = None) -> pd.DataFrame:
         {
             "id": [1, 2],
             "rank": [1, 2],
-            "under_score": [70, 40],
+            "bv_gap": [2.1, -0.4],
             "away_team": ["Kansas", "Missouri"],
             "home_team": ["Kansas State", "Florida"],
             "line": [24.5, 27.0],

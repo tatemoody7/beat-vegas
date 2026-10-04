@@ -24,6 +24,7 @@ from beatvegas.etl.features import build_feature_frame
 from beatvegas.factors.ledger import grade_ledger
 
 LEDGER_MARKET = "1H"  # the market grade.py stamps on first-half Result rows
+LEDGER_VERSION = "market"  # grade.py's consensus-close ledger tag (MODEL_MARKET)
 
 
 def real_1h_outcomes(session) -> Dict[int, int]:
@@ -31,11 +32,17 @@ def real_1h_outcomes(session) -> Dict[int, int]:
 
     results also holds the full-game ledger (model_version='market_fg',
     market='full'); without the market filter its outcome overwrote the 1H one
-    for the same game. Rows with a NULL market predate the column and are 1H."""
+    for the same game. Rows with a NULL market predate the column and are 1H.
+
+    It also still holds the retired "Model 1H" ledger (model_version='gbm_v1',
+    graded at the line the model picked, not the close); without the
+    model_version filter a stale gbm_v1 row could overwrite the market row for
+    the same game. Only the consensus-close ledger feeds the factor grades."""
     real = (
         session.query(Result)
         .filter(
             Result.line_kind == "real",
+            Result.model_version == LEDGER_VERSION,
             (Result.market == LEDGER_MARKET) | (Result.market.is_(None)),
         )
         .all()

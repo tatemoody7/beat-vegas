@@ -20,7 +20,6 @@ export type RecordRow = {
   bvLine: number | null; // our market-blind number
   bvGap: number | null; // line - bvLine (under direction)
   bvGapZ: number | null; // gap in residual sigmas
-  underScore: number | null;
   rank: number | null;
   firstHalfTotal: number | null; // real 1H result
   outcome: "under" | "over" | "push" | null;
@@ -101,7 +100,6 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
       bv_line: number | null;
       bv_gap: number | null;
       bv_sigma: number | null;
-      under_score: number | bigint | null;
       rank: number | bigint | null;
       created_at: Date | string | null;
       start_date: Date | string | null;
@@ -109,7 +107,7 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
   >`
     SELECT g.season, g.week, g.away_team, g.home_team, g.full_game_total, g.spread,
            g.first_half_total, p.line_used, p.bv_line, p.bv_gap, p.bv_sigma,
-           p.under_score, p.rank, p.created_at, g.start_date
+           p.rank, p.created_at, g.start_date
     FROM games g
     LEFT JOIN predictions p
       ON p.game_id = g.id AND p.model_version = ${MODEL_VERSION}
@@ -135,7 +133,6 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
         bvGap !== null && bvSigma
           ? Math.round((bvGap / bvSigma) * 100) / 100
           : null,
-      underScore: num(r.under_score),
       rank: num(r.rank),
       firstHalfTotal: fh,
       outcome: outcome(fh, line),
@@ -162,7 +159,7 @@ const CSV_COLUMNS: { key: keyof RecordRow; header: string }[] = [
   { key: "bvLine", header: "bv_line" },
   { key: "bvGap", header: "bv_gap" },
   { key: "bvGapZ", header: "bv_gap_z" },
-  { key: "underScore", header: "under_score" },
+  // under_score left the CSV on 2026-10-04 with the classifier (docs/CLASSIFIER_RETIREMENT.md).
   { key: "rank", header: "rank" },
   { key: "firstHalfTotal", header: "first_half_total_actual" },
   { key: "outcome", header: "outcome" },

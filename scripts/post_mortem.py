@@ -122,7 +122,6 @@ def load_hist_predictions(session, seasons: Sequence[int], model_version: str) -
                 "home_points": g.home_points,
                 "away_points": g.away_points,
                 "bv_line": p.bv_line,
-                "under_score": p.under_score,
                 "line_used": p.line_used,
                 "factors_json": p.factors_json,
                 "wx_temp": w.temperature_f if w else None,

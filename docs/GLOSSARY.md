@@ -14,14 +14,14 @@
   the 54% / +3% reads the project used to quote. Proxy-graded results are
   **diagnostic only**, never evidence of profitability. Always split on
   `line_real` before concluding anything.
-- **Under Score (0–100)** — a legacy display index, **not a probability and not
-  EV**. It must never be converted into an expected value or a stake. The
-  classifier behind it is uncalibrated, the 2026-09-06 post-mortem found it
-  carries no information about the outcome, and it no longer gates anything: the
-  board ranks on `bv_gap` and the 0–100 colour is a deterministic transform of
-  the gap. "50 = breakeven" was also plain wrong — breakeven at −110 is
-  **52.38%**, so a 50 on a 0–100 display scale cannot mean it. A genuinely
-  calibrated `p_under` does not exist yet; when it does it gets its own name.
+- **`under_score` / `under_probability` (retired)** — the 0–100 classifier index
+  that used to ride beside the gap. Retired 2026-10-04
+  (`docs/CLASSIFIER_RETIREMENT.md`): it never gated anything, the 2026-09-06
+  post-mortem found it carried no information about the outcome, and its training
+  label read a mutable column. New `predictions` rows leave both NULL; legacy rows
+  keep their values and mean nothing. The board's 0–100 **score** is a different
+  thing: a deterministic transform of `bv_gap` (see `BETTING_POLICY.md`). A
+  genuinely calibrated `p_under` does not exist; when it does it gets its own name.
 - **CLV (closing line value)** — did the market move in your favour after you
   bet? Stored as `closing − bet` in points, so for an under **negative is the
   good direction** (`decision-quality.ts::favourable`, pinned by
@@ -75,7 +75,7 @@
   the 1H fair price we actually bet against.
 - **Market-blind (rule)** — the BV regressor is forbidden from training on any Vegas
   number (full-game total, 1H line). Enforced by a guard test; keeps the gap from
-  being circular. (The 0–100 classifier is allowed to be market-relative — different job.)
+  being circular.
 - **BV mean calibration** — *calibration-in-the-large*, i.e. unbiasedness:
   `mean(actual − BV) ≈ 0` overall, with segment residuals (era/tempo/dome)
   reported separately to catch conditional bias. Achieved by a global intercept.

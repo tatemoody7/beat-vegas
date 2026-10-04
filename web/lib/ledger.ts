@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { MARKET_LEDGER_1H, MARKET_LEDGER_FG, MODEL_VERSION } from "@/lib/model";
+import { MARKET_LEDGER_1H, MARKET_LEDGER_FG } from "@/lib/model";
 import {
   isPaperFirstHalf,
   isRealFirstHalf,
@@ -11,16 +11,17 @@ import { recordFrom, type Record3 } from "@/lib/record";
 
 export type { Record3 } from "@/lib/record";
 
-// The 3-way Ledger (market vs model vs you), season-scoped.
+// The Ledger (market vs you), season-scoped.
 //   Market 1H   = results.model_version='market'    (under vs the real closing 1H line)
 //   Market full = results.model_version='market_fg'
-//   Model 1H    = results.model_version=MODEL_VERSION
 //   You         = graded manual_picks: real-money first-half only; paper apart.
+// The "Model 1H" ledger (results.model_version='gbm_v1') was retired with the
+// classifier on 2026-10-04 (docs/CLASSIFIER_RETIREMENT.md); its rows stay in
+// `results` as history and nothing reads them.
 
 export type Ledger = {
   market: Record3 | null;
   marketFull: Record3 | null;
-  model: Record3 | null;
   you: Record3 | null; // real-money 1H picks only
   paper: Record3 | null; // paper 1H picks — never merged into "you"
   picks: PickFull[];
@@ -84,9 +85,6 @@ export async function getLedger(season: number): Promise<Ledger> {
     ),
     marketFull: recordFromResults(
       res.filter((r) => r.model_version === MARKET_LEDGER_FG),
-    ),
-    model: recordFromResults(
-      res.filter((r) => r.model_version === MODEL_VERSION),
     ),
     you: recordFrom(graded.filter(isRealFirstHalf)),
     paper: recordFrom(graded.filter(isPaperFirstHalf)),

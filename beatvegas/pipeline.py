@@ -361,23 +361,19 @@ def _grade_sim(season: int, week: int) -> Dict:
     from beatvegas.db.store import session_scope
 
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    from grade import _closings, grade_market, grade_model  # type: ignore
+    from grade import _closings, grade_market  # type: ignore
 
     _reset_engine()
     _assert_sim_target()
     with session_scope() as s:
         closings = _closings(s, season)
         n_market = grade_market(s, closings)
-        n_model = grade_model(s, season, closings)
 
     # grade the user's own manual picks (mirrors scripts/pick.py cmd_grade)
     with session_scope() as s:
         graded = _grade_manual_picks(s, season)
-    print(
-        f"[reveal] graded {n_market} market + {n_model} model + {graded} "
-        f"of your picks for {season} wk{week}"
-    )
-    return {"market": n_market, "model": n_model, "your_picks": graded, "phase": "graded"}
+    print(f"[reveal] graded {n_market} market + {graded} of your picks for {season} wk{week}")
+    return {"market": n_market, "your_picks": graded, "phase": "graded"}
 
 
 def _consensus_close(s, gid: int) -> float:
@@ -414,7 +410,7 @@ def _top_lines(season: int, week: int, n: int = 5) -> List[str]:
             .all()
         )
         for p, g in rows:
-            sc = int(p.under_score) if p.under_score is not None else "?"
+            gap = f"{p.bv_gap:+.2f}" if p.bv_gap is not None else "?"
             ln = f"{p.line_used:g}" if p.line_used is not None else "?"
-            out.append(f"#{p.rank} score {sc}  {g.away_team} @ {g.home_team}  line {ln}")
+            out.append(f"#{p.rank} gap {gap}  {g.away_team} @ {g.home_team}  line {ln}")
     return out

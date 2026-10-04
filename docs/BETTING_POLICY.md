@@ -148,9 +148,8 @@ A game is BET when all of these hold:
    Rock rung (both sides no worse than −160). The rule was validated as "the top 20%
    by gap"; deployed as a constant it selected half the board once the model's level
    moved. **The fallback bar, used only when a slate has no such game, is 1.75.**
-   (≥ 3.0 points = "high" confidence wording. The classifier's under_score no longer
-   gates the label: the 2026-09-06 post-mortem found it carries no information about
-   the outcome, so it stays a display chip only.)
+   (≥ 3.0 points = "high" confidence wording — the gap alone. The classifier whose
+   under_score once gated the label was retired 2026-10-04, `CLASSIFIER_RETIREMENT.md`.)
 4. A **live** first-half line has actually been captured — never an estimate.
 5. Hard Rock's under price is no more than 5 cents (per $1) worse than the
    market's no-vig fair price. Standard -110 juice on a balanced market

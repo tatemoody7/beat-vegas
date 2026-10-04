@@ -39,8 +39,8 @@ anywhere, we genuinely diverge with value.
 - **Is (since Phase 3):** the **primary ranking.** `score_slate` sorts the board by
   `bv_gap` (the top-20%-by-gap ranking rule validated in `validate_engine.py`; against
   the fair step proxy the proxy-graded backtest shows no confirmed edge — only
-  real-line CLV can). The 0–100 Under Score still comes only from the classifier and
-  is a secondary lean on the card.
+  real-line CLV can). The classifier's 0–100 Under Score that used to sit beside it
+  as a secondary lean was retired 2026-10-04 (`CLASSIFIER_RETIREMENT.md`).
 
 ## Where it shows up
 - **Board cards** (Next.js on Vercel — the product): each card shows `BV (lo–hi) · Vegas ·
@@ -58,15 +58,15 @@ anywhere, we genuinely diverge with value.
   proj_1h_ratio}` in `features.py`; the regressor trains on `BV_FEATURE_COLS =
   FEATURE_COLS − MARKET_COLS`. A runtime assert in `fit_bv_regressor` + the guard
   tests in `tests/test_features.py` make it impossible for any betting line to become
-  a model input. (The classifier keeps `FEATURE_COLS` — it's the *market-relative*
-  model by design.)
+  a model input. (`FEATURE_COLS` still carries the market columns for the offline
+  research tools in `backtest/`; nothing live trains on them.)
 - **Prediction interval:** `residual_band()` reuses the walk-forward OOF residuals
   (no extra models) to produce `bv_lo`/`bv_hi` (80%) and `bv_sigma`; `score_slate`
   also stores `bv_gap_z = gap / sigma`.
 - **Feature:** `era_post2023 = (season >= 2023)` (the 2023 running-clock rule cut
   ~8 plays/game — a real regime shift).
 - **Scoring:** `score_slate` (`beatvegas/model/score.py`) fits the regressor on the
-  same walk-forward train slice as the classifier and writes `bv_line`, `bv_gap`,
+  walk-forward train slice (prior seasons, played games) and writes `bv_line`, `bv_gap`,
   `bv_lo`, `bv_hi`, `bv_sigma` to the `predictions` table and into `factors_json`.
 - **Calibration = unbiasedness.** For a regression line, "calibrated" means
   `mean(actual − pred) ≈ 0` overall and per segment — NOT `calibration_curve` /
@@ -126,7 +126,7 @@ python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB
   sharp money the model can't see. A huge gap may mean *we're* missing something.
 - **CLV, not win rate, is the verdict.** On the biggest-gap bucket: lines moving
   *toward* our number before close = real signal; moving away = noise/blind spots.
-- The gap **drives the rank** (Phase 3 gate passed) but never feeds the Under Score;
-  the gap-vs-CLV table is how we keep checking that decision in-season.
+- The gap **drives the rank** (Phase 3 gate passed); the gap-vs-CLV table is how we
+  keep checking that decision in-season.
 - Early on, the live CLV sample is tiny (only real 1H lines collected so far) and may
   read flat — that's *insufficient data*, not a verdict. It sharpens through the season.

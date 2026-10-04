@@ -164,10 +164,11 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.line == 24.5 and p.price == -110
     assert p.reason == "model_gap" and p.verdict_at_pick == "BET" and p.blocker == "none"
     assert p.gap_at_pick == 2.1 and p.hr_line_at_pick == 24.5 and p.ev_at_pick is not None
-    # OUR number and the model's score, frozen beside Hard Rock's. Until
-    # 2026-09-13 both were NULL on every card pick, which kept the whole paper
-    # ledger out of decision-quality's agreed/against split.
-    assert p.model_line_at_pick == 22.4 and p.model_score_at_pick == 55
+    # OUR number, frozen beside Hard Rock's. Until 2026-09-13 it was NULL on
+    # every card pick, which kept the whole paper ledger out of
+    # decision-quality's agreed/against split. The classifier's score is never
+    # copied any more (retired 2026-10-04), even off a legacy prediction row.
+    assert p.model_line_at_pick == 22.4 and p.model_score_at_pick is None
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
     assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
@@ -180,7 +181,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
 
     assert q.game_id == 5 and q.is_paper is True and q.blocker == "price"
     assert q.verdict_at_pick == "WATCH" and q.price == -125 and q.gap_at_pick == 2.0
-    assert q.model_line_at_pick == 22.5 and q.model_score_at_pick == 55
+    assert q.model_line_at_pick == 22.5 and q.model_score_at_pick is None
     assert q.note.startswith("card 2026-09-18 [price]: Not yet — Hard Rock’s price is -125")
 
 

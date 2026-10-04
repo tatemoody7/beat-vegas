@@ -32,8 +32,6 @@ const row = (o: Partial<BoardRow> = {}): BoardRow => ({
   home: "Kansas State",
   awayTeamId: 66,
   homeTeamId: 2306,
-  underScore: 55,
-  underProb: 0.55,
   rank: 1,
   factors: {},
   openLine: 24,
@@ -94,7 +92,6 @@ const pick = (o: Partial<PickFull>): PickFull =>
     stake: 1,
     price: -110,
     note: null,
-    modelScore: null,
     modelLine: null,
     result: "under",
     units: 0.91,
@@ -538,9 +535,9 @@ describe("lineState", () => {
     expect(lineState(row({ curLine: null }))).toEqual({ hasModel: true });
   });
 
-  it("has no model without a score or our number", () => {
-    expect(lineState(row({ underScore: null })).hasModel).toBe(false);
+  it("has no model without our number (the classifier score is gone)", () => {
     expect(lineState(row({ bvLine: null })).hasModel).toBe(false);
+    expect(lineState(row({ bvLine: 24.5 })).hasModel).toBe(true);
   });
 });
 

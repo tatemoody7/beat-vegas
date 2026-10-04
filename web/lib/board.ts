@@ -18,8 +18,6 @@ export type BoardRow = {
   /** CFBD team ids (= the logo ids in web/data/team_logos.json); null if unknown. */
   awayTeamId: number | null;
   homeTeamId: number | null;
-  underScore: number | null;
-  underProb: number | null;
   rank: number | null;
   factors: Factors;
   openLine: number | null;
@@ -42,8 +40,6 @@ const num = (v: unknown): number | null =>
 
 type PredRow = {
   game_id: number | bigint;
-  under_score: number | bigint | null;
-  under_probability: number | null;
   rank: number | bigint | null;
   factors_json: string | null;
   first_half_total: number | bigint | null;
@@ -209,7 +205,7 @@ export async function boardGames(
   week?: number,
 ): Promise<PredRow[]> {
   return prisma.$queryRaw<PredRow[]>`
-    SELECT p.game_id, p.under_score, p.under_probability, p.rank, p.factors_json,
+    SELECT p.game_id, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
            g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
            g.away_team_id, g.home_team_id
@@ -304,8 +300,6 @@ export const getBoard = cache(async function getBoard(
       home: p.home_team ?? "?",
       awayTeamId: num(p.away_team_id),
       homeTeamId: num(p.home_team_id),
-      underScore: num(p.under_score),
-      underProb: p.under_probability ?? null,
       rank: num(p.rank),
       factors: parseFactors(p.factors_json),
       openLine: l?.open ?? null,

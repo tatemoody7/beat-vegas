@@ -40,7 +40,6 @@ export type LedgerRow = {
   homeFh: number | null;
   actualTotal: number | null;
   modelLine: number | null;
-  modelScore: number | null;
   closingLine: number | null;
   closingPrice: number | null;
   closingCapturedAt: string | null;

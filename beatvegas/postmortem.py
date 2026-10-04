@@ -37,14 +37,16 @@ from .model import score as _score
 BET_GAP_PTS = float(getattr(_score, "BET_GAP_PTS", 1.75))
 STRONG_GAP_PTS = float(getattr(_score, "STRONG_GAP_PTS", 3.0))
 WATCH_GAP_PTS = float(getattr(_score, "WATCH_GAP_PTS", 1.0))
-MODEL_BET_THRESHOLD = int(getattr(_score, "MODEL_BET_THRESHOLD", 53))
 HR_OFF_MARKET_PTS = float(getattr(_score, "HR_OFF_MARKET_PTS", 0.5))
 EV_FLOOR = float(getattr(_score, "EV_FLOOR", -0.05))
 PRICE_EDGE_EV = 0.005  # card.py / lineCheck.ts "pos" verdict
 WEEKLY_CAP = 5
 
 HIST_SCOPE = "hist_2023_25"
-RULES = ("all", "gap175", "gap300", "score53", "both", "cap5", "top20")
+# `score53` / `both` (the classifier's 0-100 score at/above 53) left RULES on
+# 2026-10-04 with the classifier (docs/CLASSIFIER_RETIREMENT.md); their stored
+# hist_2023_25 buckets stay in the table as history and are simply not rebuilt.
+RULES = ("all", "gap175", "gap300", "cap5", "top20")
 LIVE_RULES = ("all_hr", "bet", "price_read", "gap175", "qualifying")
 KEY_NUMBERS = KEY_NUMBERS_1H  # one tuple with card.py so both ledgers read alike
 SIGMA_1H = 11.9  # per-game 1H-total noise, pts (validate_engine)
@@ -58,7 +60,6 @@ GAP_BANDS = [
     (1.75, 3, "1.75–3"),
     (3, _INF, "3+"),
 ]
-SCORE_BANDS = [(-_INF, 47, "<47"), (47, 53, "47–52"), (53, 60, "53–59"), (60, _INF, "60+")]
 SPREAD_BANDS = [(0, 7, "≤7"), (7, 14, "7–14"), (14, 21, "14–21"), (21, _INF, "21+")]
 TOTAL_BANDS = [(-_INF, 45, "<45"), (45, 52, "45–52"), (52, 60, "52–60"), (60, _INF, "60+")]
 PACE_BANDS = [(-_INF, 24, "<24 fast"), (24, 27, "24–27"), (27, 30, "27–30"), (30, _INF, "30+ slow")]
@@ -87,7 +88,6 @@ EV_BANDS = [
 # Ordered bucket labels per dimension (for bucket_order); quantile dims sort by label.
 _ORDER: Dict[str, List[str]] = {
     "gap_band": [b[2] for b in GAP_BANDS],
-    "score_band": [b[2] for b in SCORE_BANDS],
     "spread_band": [b[2] for b in SPREAD_BANDS],
     "total_band": [b[2] for b in TOTAL_BANDS],
     "pace_band": [b[2] for b in PACE_BANDS],
@@ -125,7 +125,6 @@ _ORDER: Dict[str, List[str]] = {
 
 HIST_DIMENSIONS = (
     "gap_band",
-    "score_band",
     "season",
     "week_band",
     "spread_band",
@@ -161,7 +160,6 @@ CONTRAST_FEATURES = (
     "line",
     "bv_line",
     "gap",
-    "under_score",
     "pace_spp",
     "pace_plays",
     "wx_temp",
@@ -187,7 +185,6 @@ CONTRAST_LABELS: Dict[str, str] = {
     "line": "first-half line",
     "bv_line": "our number",
     "gap": "gap",
-    "under_score": "the old classifier score",
     "pace_spp": "seconds per play",
     "pace_plays": "plays per game",
     "wx_temp": "temperature",
@@ -453,7 +450,6 @@ def build_hist_frame(
                 "division": division_of(season, p.get("home_team"), p.get("away_team"), fbs),
                 "fh": float(fh),
                 "bv_line": bv,
-                "under_score": _num(p.get("under_score")),
                 "spread": spread,
                 "spread_abs": abs(spread) if spread is not None else None,
                 "full_game_total": full,
@@ -626,8 +622,7 @@ def weekly_cap(
 ) -> pd.Series:
     """Per (season, week): the top `cap` games by gap among gap >= min_gap.
     Ties: `tie_cols` ascending, default lower game_id. Deterministic. Hist rows
-    have no ev; mirrors card.apply_weekly_cap minus ev (under_score is never a
-    tie-break). The residual gate passes [kickoff, game_id] so both engines are
+    have no ev; mirrors card.apply_weekly_cap minus ev. The residual gate passes [kickoff, game_id] so both engines are
     ranked the way the card ranks them."""
     mask = pd.Series(False, index=df.index)
     if df.empty or gap_col not in df:
@@ -656,15 +651,11 @@ def _top20(df: pd.DataFrame, gap_col: str) -> pd.Series:
 def rule_masks(df: pd.DataFrame, proxy: str) -> Dict[str, pd.Series]:
     gap_col = f"gap_{proxy}"
     gap = df[gap_col] if gap_col in df else pd.Series(np.nan, index=df.index)
-    score = df["under_score"] if "under_score" in df else pd.Series(np.nan, index=df.index)
     gap175 = gap.notna() & (gap >= BET_GAP_PTS)
-    score53 = score.notna() & (score >= MODEL_BET_THRESHOLD)
     return {
         "all": pd.Series(True, index=df.index),
         "gap175": gap175,
         "gap300": gap.notna() & (gap >= STRONG_GAP_PTS),
-        "score53": score53,
-        "both": gap175 & score53,
         "cap5": weekly_cap(df, gap_col),
         "top20": _top20(df, gap_col),
     }
@@ -753,8 +744,6 @@ def assign_dimensions(df: pd.DataFrame, proxy: str) -> pd.DataFrame:
     line_col, gap_col = f"line_{proxy}", f"gap_{proxy}"
     if gap_col in out:
         out["gap_band"] = out[gap_col].map(lambda v: band_label(v, GAP_BANDS))
-    if "under_score" in out:
-        out["score_band"] = out["under_score"].map(lambda v: band_label(v, SCORE_BANDS))
     if "season" in out:
         out["season"] = out["season"].map(lambda v: str(int(v)) if _num(v) is not None else None)
     if "week" in out:
@@ -1150,36 +1139,6 @@ def derive_flags(buckets: Sequence[Dict], contrasts: Sequence[Dict], n_tests: in
                 seg, prx = b.get("segment"), b.get("proxy_kind")
                 break
 
-    s60, s47 = (
-        _find(buckets, "score_band", "60+", segment=seg, proxy=prx),
-        _find(buckets, "score_band", "<47", segment=seg, proxy=prx),
-    )
-    if s60 and s47 and _pct(s60) is not None and _pct(s47) is not None:
-        if _pct(s60) <= _pct(s47) + 0.01:
-            flags.append(
-                _flag(
-                    "score_gate",
-                    "change",
-                    f"The old classifier score does not separate outcomes ({_fmt_pct(_pct(s60))} at 60+ vs {_fmt_pct(_pct(s47))} below 47). It is no longer shown on the site.",
-                    score60=_pct(s60),
-                    n60=s60["n"],
-                    score_lt47=_pct(s47),
-                    n47=s47["n"],
-                )
-            )
-        else:
-            flags.append(
-                _flag(
-                    "score_gate",
-                    "ok",
-                    f"The old classifier score at 60+ hits {_fmt_pct(_pct(s60))} vs {_fmt_pct(_pct(s47))} below 47.",
-                    score60=_pct(s60),
-                    n60=s60["n"],
-                    score_lt47=_pct(s47),
-                    n47=s47["n"],
-                )
-            )
-
     g175, g3, gneg, gdip = (
         _find(buckets, "gap_band", lbl, segment=seg, proxy=prx)
         for lbl in ("1.75–3", "3+", "<0", "1–1.75")
@@ -1412,8 +1371,6 @@ RULE_LABEL = {
     "gap175": "Every gap ≥ 1.75",
     "gap300": "Every gap ≥ 3.0 (strong)",
     "top20": "Top 20% by gap, per season",
-    "score53": "Every score ≥ 53",
-    "both": "Gap ≥ 1.75 and score ≥ 53",
     "all": "Every rated game (blanket under)",
     "bet": "Card BET tier",
     "price_read": "Price read (Hard Rock pays ≥ fair)",
@@ -1496,7 +1453,6 @@ def render_markdown(
         lines.append("")
         for dim, title in (
             ("gap_band", "By gap band"),
-            ("score_band", "By under_score band"),
             ("season", "By season"),
             ("week_band", "By week of season"),
             ("spread_band", "By spread"),

@@ -79,7 +79,6 @@ describe("the e2e fixture port agrees with the TypeScript rules", () => {
       const input: EdgeInput = {
         away: g.away,
         home: g.home,
-        underScore: g.underScore,
         bvLine: g.bv,
         liveLine: cons.cur,
         fallbackLine: lineUsedFor(g),

@@ -50,7 +50,6 @@ def record_fields(
     replacement; a slate scored before the column existed freezes it NULL.
     """
     feats = {c: _clean(row.get(c)) for c in feature_cols}
-    us = row.get("under_score")
     eng = row.get("engine")
     return {
         "game_id": int(row["id"]),
@@ -64,7 +63,9 @@ def record_fields(
         "bv_line": _clean(row.get("bv_line")),
         "bv_gap": _clean(row.get("bv_gap")),
         "bv_gap_z": _clean(row.get("bv_gap_z")),
-        "under_score": None if us is None or pd.isna(us) else int(us),
+        # NULL since 2026-10-04: the classifier was retired
+        # (docs/CLASSIFIER_RETIREMENT.md); records frozen before keep theirs.
+        "under_score": None,
     }
 
 
@@ -91,7 +92,7 @@ def grade_records(session, now) -> int:
     """Fill the real 1H result + outcome for ungraded records whose game is final.
 
     Grades through `grading.trusted_first_half_total`, exactly as every other
-    grader does (picks.grade_pick, grade.grade_market/grade_model, the two
+    grader does (picks.grade_pick, grade.grade_market, the two
     post-mortem frames, model.residual). A LINE-SCORE 0 against a non-zero final
     is the known false-zero corruption, and booking it here would fabricate an
     UNDER win into the records grid, the credibility ledger and bv_line

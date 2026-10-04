@@ -16,7 +16,6 @@ import { evVerdictFor } from "./lineCheck";
 const base: EdgeInput = {
   away: "Ohio State",
   home: "Michigan",
-  underScore: 56,
   bvLine: 21.8,
   liveLine: 24.5,
   fallbackLine: 24.5,
@@ -46,7 +45,6 @@ const base: EdgeInput = {
 
 const noModel: EdgeInput = {
   ...base,
-  underScore: null,
   bvLine: null,
   gap: null,
   hrLine: null,
@@ -772,7 +770,6 @@ describe("H-PCT: the kill line and the score scale with the slate bar", () => {
   const input = {
     away: "A",
     home: "H",
-    underScore: 60,
     bvLine: 24,
     liveLine: 27,
     fallbackLine: null,

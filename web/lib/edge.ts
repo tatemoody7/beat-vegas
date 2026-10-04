@@ -183,7 +183,7 @@ export function basisNoun(basis: LineBasis | null): string {
 
 export function edgeScore(i: EdgeInput): EdgeResult {
   const verdict = verdictFor(i);
-  const hasModel = i.underScore !== null && i.bvLine !== null;
+  const hasModel = i.bvLine !== null;
   const bvLine = hasModel ? i.bvLine! : null;
 
   const offMarket =

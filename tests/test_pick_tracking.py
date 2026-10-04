@@ -340,7 +340,6 @@ def test_add_pick_freezes_our_number_and_leaves_it_null_when_unknown():
             away_team="A",
             line=24.5,
             model_line=22.4,
-            model_score=78,
         )
         add_pick(
             s,
@@ -353,8 +352,10 @@ def test_add_pick_freezes_our_number_and_leaves_it_null_when_unknown():
         )
         s.commit()
         first, second = s.query(ManualPick).order_by(ManualPick.id).all()
-    assert (first.model_line_at_pick, first.model_score_at_pick) == (22.4, 78)
-    assert second.model_line_at_pick is None and second.model_score_at_pick is None
+    assert first.model_line_at_pick == 22.4
+    assert second.model_line_at_pick is None
+    # model_score_at_pick is never written since the classifier retired (2026-10-04)
+    assert first.model_score_at_pick is None and second.model_score_at_pick is None
 
 
 def test_model_read_prefers_the_model_row_over_derived_lines():
@@ -384,11 +385,11 @@ def test_model_read_prefers_the_model_row_over_derived_lines():
             ]
         )
         s.commit()
-        assert model_read(s, 1) == (22.4, 78)
+        assert model_read(s, 1) == 22.4
         # The model is 1H-only, and an unmatched pick has no game to read.
-        assert model_read(s, 1, "full") == (None, None)
-        assert model_read(s, None) == (None, None)
-        assert model_read(s, 999) == (None, None)
+        assert model_read(s, 1, "full") is None
+        assert model_read(s, None) is None
+        assert model_read(s, 999) is None
 
 
 def test_pick_add_freezes_the_model_read_on_the_ticket():
@@ -407,7 +408,9 @@ def test_pick_add_freezes_the_model_read_on_the_ticket():
     pick.cmd_add(_args(paper=True))
     with Session(eng) as s:
         (row,) = s.query(ManualPick).all()
-    assert row.model_line_at_pick == 22.4 and row.model_score_at_pick == 78
+    # OUR number is frozen; the legacy prediction's score (78) is NOT copied —
+    # model_score_at_pick stays NULL on every new row since 2026-10-04.
+    assert row.model_line_at_pick == 22.4 and row.model_score_at_pick is None
 
 
 def test_existing_pick_is_scoped_per_ledger():

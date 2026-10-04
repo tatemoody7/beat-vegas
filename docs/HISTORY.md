@@ -38,6 +38,32 @@ hold the rest.
   Friday write-up left uncommitted in worktree `neggap-card24` is committed as the first commit
   of this PR.
 
+- **2026-10-04 (FULL SYSTEM REVIEW — `docs/SYSTEM_REVIEW_2026-10-04.md`; every answer
+  Tate's).** Prompted by the week-5 loss: "is the model actually getting sharper?" **It cannot
+  be, by construction**: `score_slate` trains on seasons before the target only
+  (`model/score.py`), so 2026 results never enter the fit; the Sunday refit is the same
+  2015-25 regressor, and it moved in-season only when CFBD revised reference tables. The
+  2026 factor screen (H-FACTOR-SCREEN, 212 Hard-Rock-priced games with frozen frames, 87
+  comparisons, Bonferroni 0.00058) found no input predicting the residual against the close
+  (best p 0.117) and the gap itself at rho −0.06, p 0.41; the 2023-25 buckets on record are
+  quoted, not re-read. What has a live record: the price gate (paper price-blocked 14-20 vs
+  BET-rated 7-4), the slate-bar universe fix (H-PCT-U), the close backup (53/53), the ledger
+  itself. What does not: the model vs the book (MAE 9.03 vs 8.39), every situational and
+  weather input (flat), the "overs" band (reversed), top-k concentration (top-3 by gap 5-7 vs
+  top-5 9-11 live). Already fetched and discarded at zero cost: prior-season explosiveness,
+  defensive success, SP+ special teams and strength of schedule. Not frozen anywhere: factor
+  values on paper picks and card items; `model_version` has read `gbm_v1` through B-SERVE;
+  `factor_ledger`, the post-mortem tables and `app_settings` are overwritten each run.
+  **Decisions (Tate):** model improvements enter only as shadow arms beside the champion
+  (H-SHADOW-F: the discarded CFBD inputs, legacy weather nulled; H-INSEASON-T: in-season
+  training rows at w = 1 and 3); four paper rows (H-PCT-TIE, H-TIMING, H-MOVE, H-TOP3);
+  retire the classifier; mirror the degraded hold on the web; delete the dead in-season
+  challenger arms; freeze the factor vector and a refit id on every pick and card item; keep
+  history instead of overwriting; store the Rotowire report and a poll log per build; buy
+  CFBD Tier 2; Odds API down to 20K; no public-betting purchase until H-MOVE says the move
+  carries something. Week-6 money unchanged (≤5 × $10, every card BET, first BET-rated build).
+  The stack and its dates are the brief's open item.
+
 ## 2026-10-02
 
 - **2026-10-02 (WEEK 5 `fri_pm` CARD CLEAN, VERCEL-TRIGGERED; H-NEGGAP-P WRITES ITS FIRST

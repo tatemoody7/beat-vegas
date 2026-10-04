@@ -13,17 +13,14 @@ date; the board cannot see any of these until the change is made.
 
 ## Do now
 
-1. **GitHub → Settings → Billing and licensing.** (Only needed now to be able to return the repo to private.) On 2026-09-22 at ~17:29Z GitHub
-   stopped starting jobs on this private repo: *"The job was not started because recent
-   account payments have failed or your spending limit needs to be increased."* Every
-   scheduled job — the card builds, daily grading, Sunday's refit, the close polls — is
-   blocked until this is fixed. Either raise the Actions spending limit (a few dollars a
-   month covers the overage: the 2026-09-16 audit measured ~2,830 billed minutes a month
-   against the 2,000 free on a private repo, and review days like this one add hundreds
-   more), fix the payment method, or **make the repository public** (public repos have
-   unlimited Actions minutes; the site is already public read-only, and the three secrets
-   are repository secrets, not files — but read `config.example.yaml` and `docs/` once
-   with a stranger's eyes before flipping it).
+1. **GitHub billing — RESOLVED 2026-10-04.** A card is on file, the repo is private again
+   (made private 14:36Z; it had been public since 2026-09-22 with 0 forks and 0 stars), and the
+   Actions budget is **$10/month, stop usage at the cap, alerts at 75/90/100%**
+   (github.com/settings/billing/budgets). The $0 budget with stop-usage on was what halted
+   every job on 2026-09-22; a private repo gets 2,000 free minutes against ~2,830 measured, so
+   the overage (~$7) bills to the card inside the budget. Check the budget page in the last
+   week of each month.
+
 2. **CFBD → Tier 2, $5/month, 30,000 calls** (collegefootballdata.com/api-tiers). The
    free Academic 3,000 is the quota that killed grading for two days on 2026-09-12 and
    the reason the `cfbd-cache` composite actions exist. At $5 they become optional.

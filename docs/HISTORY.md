@@ -39,6 +39,22 @@ hold the rest.
   Friday write-up left uncommitted in worktree `neggap-card24` is committed as the first commit
   of this PR.
 
+- **2026-10-04 (SHIPPED, afternoon: #269 tracking 14:44Z, #270 docs, #271 deps, #272 prisma —
+  the week-6 stack's PR2 is live; CFBD and Odds API steps on hold).** `migrate.yml` was
+  dispatched by Tate from the `tracking` ref (run 37210300461; the auto-mode classifier refuses
+  a production-database write from the session) and all 11 new columns and 3 tables were read
+  back on Neon before #269 merged (c3e8e0c, rebased over #268; 1,469 pytest / 544 vitest / 219
+  e2e). **Finding:** a full `prisma db pull` is not the schema-change step the brief described —
+  it introspects 22 models the app reads by raw SQL on purpose plus six `swfl_*` fishing tables
+  that share the Neon database, and strips the schema comments; the four new columns were
+  hand-added instead (#272) and the brief's rule now says so. #271 closed six of the seven
+  Dependabot alerts that appeared when the repo went private (dev-only `brace-expansion`);
+  `braces` has no upstream fix. Every deploy verified (health ok, routes 200/308); the new
+  tables are empty until the next refit / sweep / card build. On hold at Tate's request: the
+  Odds API 20K subscription (the 100K is due to cancel Oct 6 — Tuesday) and the CFBD Patreon
+  tier (Tier 1 at $1 covers ~20 calls a day; the review doc said Tier 2 before the $1 tier
+  was known).
+
 - **2026-10-04 (SHIPPED: PR #267 docs 14:18Z, PR #268 classifier retired 14:26Z; REPO PRIVATE
   AGAIN; ACTIONS BUDGET SET).** #268: no classifier fit in `score_slate`, the "Model 1H"
   ledger and the Results row gone, `under_score` out of the records CSV, `verdict.ts` and

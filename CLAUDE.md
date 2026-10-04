@@ -82,20 +82,25 @@ disagree, **this file wins**; memory files hold lessons and point here.
   capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
   Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
   (`vercel.json` + the route's window), Tate's call.
-- **The Odds API renewal is Oct 6, not Oct 1** (dashboard read 2026-10-04: 100K plan started
-  Sep 6, next invoice **2026-10-06**, 326 of 100,000 used; credits reset on the 1st of every
-  month, which is what the Oct 1 counter reset was). Downgrade to 20K ($30) via Manage
-  Subscription BEFORE Oct 6; if the switch issues a new key, the `ODDS_API_KEY` repository
-  secret and `config.yaml` change with it; then update the comment in `config.example.yaml`.
-- **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12): PR2 tracking
-  (factor vector frozen on paper picks and card items, refit id on predictions and picks,
-  history kept for `factor_ledger` / post-mortem / `app_settings`, injury snapshots, a poll
-  log) and PR3 classifier retirement by the Tue 2026-10-06 card build, `migrate.yml` first;
-  PR4 degraded hold mirrored on the web by Tuesday; PR5 paper arms (`pct_tie_*`, `top3`,
+- **The Odds API — ON HOLD, and time-boxed.** The 100K subscription is **due to cancel Oct 6**
+  (Tate cancelled it 2026-10-04 instead of switching; Stripe shows the next bill date Oct 7).
+  Oct 6 is Tuesday, the week's first card build. Before then: create the 20K subscription on
+  the dashboard ("New Subscription" — each subscription has its own key), set the new key with
+  `gh secret set ODDS_API_KEY --repo tatemoody7/beat-vegas` (Tate pastes it), put it in local
+  `config.yaml`, then a zero-cost `lines_watch.yml` dry dispatch proves the runner; then update
+  the comment in `config.example.yaml` and `docs/OPS_ACCOUNTS.md`.
+- **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12). **Done
+  2026-10-04:** PR2 tracking (#269, Neon migrated first; #272 schema) and PR3 classifier
+  retirement (#268). **First-rows checks:** `predictions.refit_id` after the 2026-10-04 refit,
+  `poll_log` after tonight's sweeps, `injury_snapshots` + the `FROZEN:` card line + frozen
+  vectors on paper picks at the Tue 2026-10-06 build (`bv-card-check`). **Remaining:** PR4
+  degraded hold mirrored on the web (Tue 10-06; also fix the board's "No bets yet this week"
+  headline when the week is over and 5 of 5 are placed); PR5 paper arms (`pct_tie_*`, `top3`,
   H-TIMING and H-MOVE scripts) Wed-Fri; PR6 shadow engines (`bv_shadow_f`, `bv_inseason_t`)
-  Friday 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
-- **CFBD Tier 2** ($5/mo, 30,000 calls): Tate buys it now (decision 2026-10-04); free Academic
-  3,000 until the card is on file.
+  Fri 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
+- **CFBD Patreon tier — ON HOLD (Tate, 2026-10-04 afternoon).** Measured usage is ~20 calls a
+  day, so **Tier 1 ($1, 5,000 calls, includes the Patreon weather endpoint) is the
+  recommendation**, not Tier 2; `docs/OPS_ACCOUNTS.md` item 2 still says Tier 2 until he picks.
 - **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
   stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
   against ~2,830 measured: watch the budget page in the last week of each month.
@@ -136,8 +141,10 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   event, full-game bulk), TeamRankings tempo, Open-Meteo weather, Rotowire injuries, ESPN scores.
 - **DB**: SQLAlchemy (`beatvegas/db/models.py`, `_MIGRATIONS` + `_DATA_MIGRATIONS` in
   `db/store.py`). `DATABASE_URL` → Neon Postgres (psycopg3); unset → `data/beatvegas.db`. A
-  schema change is Python first, `migrate.yml`, then `cd web && npx prisma db pull && npx prisma
-  generate`, then deploy.
+  schema change is Python first, `migrate.yml`, then the new columns **hand-added** to the
+  curated `web/prisma/schema.prisma` + `npx prisma generate`, then deploy. Never commit a full
+  `prisma db pull`: it introspects every table in the shared Neon database (22 models the app
+  reads by raw SQL on purpose, six `swfl_*` fishing tables) and strips the comments (2026-10-04).
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
   `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`),
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —

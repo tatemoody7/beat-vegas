@@ -7,6 +7,36 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-02
+
+- **2026-10-02 (WEEK 5 `fri_pm` CARD CLEAN, VERCEL-TRIGGERED; H-NEGGAP-P WRITES ITS FIRST
+  ROWS — CARD 24).** Run 37058936969 (4 m 37 s, 56 credits; `last_dispatch_card-fri-pm` note
+  `dispatched`, so Vercel fired it): 2 BET / 27 EDGE / 27 PASS, bar 2.12 = top 20% of 44
+  priced games, 9 Hard Rock alternates ignored, 9 paper unders logged (the rest-of-week
+  window), health ok. BETs: Washington @ USC u30.5 −115 (Tuesday's ticket) and Alabama @
+  Mississippi State u30.5 −105 (gap 2.12, on the bar; ticket 100, logged 20:29Z, the week's
+  fifth and last slot). Tuesday's Florida, Kentucky and Penn State tickets now read EDGE on
+  price (Hard Rock −115/−120/−115 against kills −110/−115/−105); they stand as logged.
+  **H-NEGGAP-P wrote 27 `challenger_picks` rows over 15 games** (`neggap_lt0` 15,
+  `neggap_le175` 7, `neggap_le3` 5), recorded in `docs/NEGGAP_PAPER.md` before any kicked
+  off. Thursday's card 23 (run 36919010718, 10 m 42 s, 56 credits: 2 / 26 / 30, bar 2.91 of
+  45, 10 alternates, 0 paper — the 24 h window) was clean too; its Vercel tick at 21:01Z
+  found the build (`already_ran`). **Measured 2026-10-01, nothing changed: Hard Rock's feed
+  row drifts from its main line to an alternate rung as kickoff nears.** Over every
+  pre-kickoff Hard Rock 1H snapshot of 2026 (a main row = both sides better than −140): the
+  main-line share is 97% beyond 48 h, 87% at 12–48 h, 41% at 2–12 h, 31% inside 2 h; across
+  535 consecutive-row pairs the feed went main→rung 142 times and rung→main 5, every
+  main→rung with the line dropping 1–1.5 pts and the over juiced. That is the mechanism
+  behind the 17-of-53 close coverage. Whether Hard Rock pulls its main 1H line late or The
+  Odds API picks the wrong row of the ladder is not tellable from our side. Options put to
+  Tate, simplest first: add `alternate_totals_h1` to the per-event call (2 credits an event,
+  roughly doubles sweep cost, needs one 2-credit probe to confirm the ladder carries the
+  main line), report it to The Odds API, accept it, a typed-in price at log time (breaks
+  "the site never trusts the browser"), scrape Hard Rock (not recommended: geofenced,
+  bot-walled, terms). No decision yet. The `bv-card-check` skill was updated the same day for
+  the post-#260 board (answer bar + "Bar this week" sentence, the dispatch-gauge note, the
+  real `manual_picks` column list).
+
 ## 2026-09-29
 
 - **2026-09-29 (WEEK 5 `tue_pm` CARD CLEAN; THE CLOSE-POLL BACKUP PROVED BEFORE ITS FIRST

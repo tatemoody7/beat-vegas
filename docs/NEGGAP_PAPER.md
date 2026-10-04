@@ -5,10 +5,13 @@ observation. Measurement only on the real-money side: **nothing here licenses a 
 bet on an over.** `docs/BETTING_POLICY.md` is first-half unders and this row does not
 amend it.
 
-> **STATUS 2026-09-29 — COLLECTING, NO ROWS YET.** Collection switched on with card 22
-> (`cards.id` 22, `tue_pm`, 2026-09-29, 0 rows: the 48 h paper window held every week-5
-> game). The first build that writes a row is recorded below the evening it happens, before
-> that Friday's 10Z grade reads any result.
+> **STATUS 2026-10-02 — COLLECTING; FIRST ROWS ON FILE, NOTHING GRADED.** Collection
+> switched on with card 22 (`cards.id` 22, `tue_pm`, 2026-09-29, 0 rows: the 48 h paper
+> window held every week-5 game); card 23 (`thu_pm`, 2026-10-01) also wrote 0 (the 24 h
+> window: no negative-gap game kicked off Thursday or Friday night). **Card 24 (`fri_pm`,
+> 2026-10-02, run 37058936969) wrote the first rows — 27 across 15 games: `neggap_lt0` 15,
+> `neggap_le175` 7, `neggap_le3` 5** — recorded here the same evening, before the first of
+> them kicks off (Sat 2026-10-03 16:00Z) and before Saturday's 10Z grade reads a result.
 
 ## What prompted it, stated so it is not mistaken for support
 
@@ -92,9 +95,39 @@ before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (
 ## Data note
 
 - Collection on: card 22 (`tue_pm`, 2026-09-29), 0 rows (the 48 h window).
-- First build with rows: _to be recorded_ (`cards.id`, slot, date, rows per arm) the evening
-  it happens — expected `thu_pm` 2026-10-01 (Thursday-night games only) or `fri_pm`
-  2026-10-02 — before any result is read.
+- Card 23 (`thu_pm`, 2026-10-01): 0 rows (the 24 h window).
+- **First build with rows: card 24** (`cards.id` 24, `fri_pm`, built 2026-10-02T20:15:39Z,
+  run 37058936969, bar 2.12 over 44 games, 9 Hard Rock alternates out of the universe).
+  `SELECT arm, side, count(*) FROM challenger_picks GROUP BY 1,2` → `neggap_lt0` 15,
+  `neggap_le175` 7, `neggap_le3` 5, all `side='over'`, all `placed_at` 20:15:39, nested as
+  built (every `le3` game is in `le175`, every `le175` in `lt0`). No `manual_picks` row
+  from this path: the week's 9 paper rows are the champion's unders. The 15 games, by gap
+  (`gap = hr_line − bv_line` off the card item; price = Hard Rock's OVER at the build):
+
+  | game | gap | HR line | over | arms |
+  |---|---|---|---|---|
+  | Texas State @ San Diego State | −10.01 | 27.5 | −130 | lt0, le175, le3 |
+  | Bowling Green @ Miami (OH) | −4.40 | 23.5 | −105 | lt0, le175, le3 |
+  | Baylor @ Arizona State | −4.28 | 23.5 | −130 | lt0, le175, le3 |
+  | Texas Tech @ Colorado | −3.87 | 25.5 | −120 | lt0, le175, le3 |
+  | Arkansas @ Texas A&M | −3.40 | 26.5 | −110 | lt0, le175, le3 |
+  | San José State @ Hawai'i | −1.94 | 26.5 | −110 | lt0, le175 |
+  | Vanderbilt @ Georgia | −1.79 | 27.5 | −115 | lt0, le175 |
+  | BYU @ TCU | −1.68 | 23.5 | −120 | lt0 |
+  | Maryland @ Nebraska | −1.43 | 27.5 | −120 | lt0 |
+  | Army @ Louisiana Tech | −1.42 | 23.5 | −125 | lt0 |
+  | Auburn @ Tennessee | −1.20 | 27.5 | −110 | lt0 |
+  | Virginia @ Florida State | −0.95 | 26.5 | −120 | lt0 |
+  | Old Dominion @ Georgia State | −0.42 | 25.5 | −110 | lt0 |
+  | Michigan @ Minnesota | −0.42 | 21.5 | −115 | lt0 |
+  | Miami @ Clemson | −0.22 | 24.5 | −105 | lt0 |
+
+  Two things to read with it. Texas State @ San Diego State's −10 is the model (37.5) sitting
+  nine points above the whole market (28.5), not a Hard Rock number; on Thursday's card its
+  newest Hard Rock quote was a rung and it was outside the universe, Friday's feed served the
+  main line at −130 over and it came in. And the universe is Friday's: a game whose Hard
+  Rock row drifts to an alternate rung by Saturday (`docs/RANKING_AND_TRUST.md` §9b;
+  measured 2026-10-01, HISTORY) keeps its row — the pick is judged at the price captured here.
 - Weekly: per arm, n logged, n graded, hit rate, units at price, favourable line value,
   excluded-no-close share, both LLRs against A/B.
 

@@ -46,7 +46,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   ≤ −3) on Hard Rock's MAIN line, one row per game per arm into `challenger_picks`
   (`side='over'`, never `manual_picks`), Bonferroni 0.833% per arm-clock. Measurement only;
   a pass licenses nothing at real money. The negative-gap band went over 26 of 38 live, but 23 of
-  those were Hard Rock ALTERNATE lines; on main lines it is 10 of 15.
+  those were Hard Rock ALTERNATE lines; on main lines it is 10 of 15. First rows: card 24
+  (`fri_pm` 2026-10-02), 27 rows over 15 games, recorded in `docs/NEGGAP_PAPER.md`.
 - **What the evidence says**: 2023-25 (1,902 real closes) is exhausted for rule selection;
   everything important is validated prospectively on 2026 decisions. The model reads ~2 pts
   under the market and is slightly less accurate than Hard Rock in every spread bucket —
@@ -54,9 +55,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   they barely move, so **the best look is Friday after 5:30pm ET**, then Saturday after 8:30am.
 
 ## Open items (the only place pending work lives; date each)
-- **Record the first H-NEGGAP-P build with rows** in `docs/NEGGAP_PAPER.md` the evening it
-  happens (`thu_pm` 2026-10-01 or `fri_pm` 2026-10-02), before that Friday's 10Z grade. Card 22
-  (2026-09-29 `tue_pm`) switched collection on but logged 0 rows — the 48 h paper window.
+- **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
+  main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). It is why
+  close coverage is ~a third and why late candidates read `no_hr_line`. Decide: ask the feed for
+  `alternate_totals_h1` (2 credits an event, one probe first), report to The Odds API, or accept.
 - **Sat 2026-10-03 is the first live run of the Vercel `lines-close` backup** (PR #242; a
   dry-run dispatch on 2026-09-29 proved the path). Watch `last_dispatch_lines-close` advance
   hourly; Sunday's grade must lift `close_coverage_pct` past 0.8 (17 of 53 for week 4).

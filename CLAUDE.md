@@ -34,6 +34,12 @@ disagree, **this file wins**; memory files hold lessons and point here.
   62% under: the four losers landed 3.9 pts over their lines, two by 1.5-2.5 pts, two by 7.5 and
   14.5; line value 0.00, no rule loosened — variance plus one tie-at-the-bar pick (Alabama @
   Mississippi State, gap 2.12 = bar 2.12, cap rank 5). Week-5 report: `reports/weekly/`, local.
+- **System review 2026-10-04** (`docs/SYSTEM_REVIEW_2026-10-04.md`): the model cannot sharpen
+  in-season by construction (it trains on seasons before the target only); the 2026 factor
+  screen found no input, and not the gap itself, predicting the residual against the close
+  (87 comparisons, best p 0.117); the price gate is the one live filter with a record. Seven
+  registry rows (H-FACTOR-SCREEN, H-PCT-TIE, H-TIMING, H-MOVE, H-TOP3, H-SHADOW-F,
+  H-INSEASON-T) — every one paper or measurement; the champion, stakes and H-STOP-2 unchanged.
 - **Week 5 was the first week on the B-SERVE model** (57 inputs that were NaN at serving are out
   of the feature set; `weekly_update.py` fails a scoring run whose target rows are >90% NaN on a
   column training is <10% NaN on). It fixed the level (mean `bv_line` 0.8 under Hard Rock, bias
@@ -76,21 +82,27 @@ disagree, **this file wins**; memory files hold lessons and point here.
   capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
   Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
   (`vercel.json` + the route's window), Tate's call.
-- **The Odds API renewal**: the credit counter reset on 2026-10-01 (`remaining=99940 used=60`),
-  so the 100K plan ($59) has most likely already billed for October. Confirm on the dashboard;
-  downgrade to 20K ($30) there for the next cycle; then update the comment in
-  `config.example.yaml`. No smaller paid tier exists.
-- **Draft paper rows from the week-5 review, not registered**: H-PCT-TIE (a margin above the
-  slate bar; the tie-at-bar bet lost, n=1) and H-TIMING (first-BET build vs the Friday build,
-  measurement only). Approve or drop; both are in the week-5 report (`reports/weekly/`, local), §15.
-- **CFBD Tier 2** ($5/mo, 30,000 calls) still to buy; free Academic 3,000 until then.
+- **The Odds API renewal is Oct 6, not Oct 1** (dashboard read 2026-10-04: 100K plan started
+  Sep 6, next invoice **2026-10-06**, 326 of 100,000 used; credits reset on the 1st of every
+  month, which is what the Oct 1 counter reset was). Downgrade to 20K ($30) via Manage
+  Subscription BEFORE Oct 6; if the switch issues a new key, the `ODDS_API_KEY` repository
+  secret and `config.yaml` change with it; then update the comment in `config.example.yaml`.
+- **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12): PR2 tracking
+  (factor vector frozen on paper picks and card items, refit id on predictions and picks,
+  history kept for `factor_ledger` / post-mortem / `app_settings`, injury snapshots, a poll
+  log) and PR3 classifier retirement by the Tue 2026-10-06 card build, `migrate.yml` first;
+  PR4 degraded hold mirrored on the web by Tuesday; PR5 paper arms (`pct_tie_*`, `top3`,
+  H-TIMING and H-MOVE scripts) Wed-Fri; PR6 shadow engines (`bv_shadow_f`, `bv_inseason_t`)
+  Friday 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
+- **CFBD Tier 2** ($5/mo, 30,000 calls): Tate buys it now (decision 2026-10-04); free Academic
+  3,000 until the card is on file.
 - **GitHub billing**: the repo is PUBLIC since 2026-09-22 (Actions minute cap lifted); a Billing
   support ticket is open. Once a card is on file the repo goes back to private — which restores
   the 2,000-minute cap, so the spending limit must be raised first. See `docs/OPS_ACCOUNTS.md`.
 - **Week-sandbox replay for PR #247** never ran (this Mac's SQLite is a June snapshot); the first
   live build is the check.
-- **Classifier retirement** (`docs/CLASSIFIER_RETIREMENT.md`, "after 2026-09-19"): still wanted,
-  not done. `under_score` gates nothing; it only freezes onto paper picks.
+- **Classifier retirement** (`docs/CLASSIFIER_RETIREMENT.md`): PR3 of the week-6 stack, Monday
+  2026-10-05. `verdict.ts` and `edge.ts` define "has a model" on `underScore` too — both change.
 - **2026-12-07**: the one confirmatory look for `docs/WHEN_TO_BET.md` (H6); the script refuses
   `--confirmatory` before then.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and

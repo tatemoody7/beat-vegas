@@ -1,7 +1,11 @@
 # Retiring the classifier and the Under Score — plan (execute after 2026-09-19)
 
 **Decision (Tate, 2026-09-15): retire it, after week 3, not before.** This is the
-plan; nothing here has been changed yet.
+plan; nothing here has been changed yet. **Scheduled 2026-10-04: PR3 of the week-6 stack,
+Monday 2026-10-05** (`docs/SYSTEM_REVIEW_2026-10-04.md` §12). Two web files not in the
+table below also define "has a model" as `underScore !== null && bvLine !== null`
+(`web/lib/verdict.ts` and `web/lib/edge.ts`); both must read `bvLine !== null` alone or
+every game renders as model-less.
 
 ## Why
 

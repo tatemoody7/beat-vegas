@@ -306,7 +306,8 @@ first build that rates the game BET, log at bet time (`bet_at`), paper picks bes
 same rule. H-STOP-2 is the only stop. Expect nothing from the rule in weeks 6-7 (the history
 is flat until week 7) and do not read a second losing week as a verdict: the clock would need
 roughly ten weeks like week 5 to fail on profit. Tate's account steps this week: buy CFBD Tier
-2; downgrade the Odds API to 20K on the dashboard (October has billed); add the Friday-night
+2; downgrade the Odds API to 20K before its Oct 6 invoice (credits reset on the 1st; the
+bill does not); add the Friday-night
 `lines-close` entries if he wants that gap closed before the Oct 9 Friday slate.
 
 ## 11. Model changes before the next slate

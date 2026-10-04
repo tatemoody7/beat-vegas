@@ -33,10 +33,13 @@ date; the board cannot see any of these until the change is made.
 
 ## On 2026-10-06 (the Odds API renewal)
 
-3. **The Odds API → the 20K plan, $30/month.** The credit counter reset on 2026-10-01
-   (`remaining=99940 used=60` in the Thursday card log), so October has most likely billed
-   at $59 already; the downgrade on the dashboard takes effect from the next cycle
-   (confirmed as the plan 2026-10-04). Live use is ~1,000-1,500 credits a month
+3. **The Odds API → the 20K plan, $30/month.** Dashboard read 2026-10-04
+   (dash.the-odds-api.com/api-subscriptions): the 100K plan started Sep 6, **next invoice
+   Oct 6**, 326 of 100,000 credits used this period; credits reset on the 1st of each month
+   (the Oct 1 counter reset was that, not a bill). Downgrade before Oct 6 through "Manage
+   Subscription" (a Stripe page). If the only path is "New Subscription", the 20K plan gets a
+   NEW key: update the `ODDS_API_KEY` repository secret and local `config.yaml` before the
+   next card build, and cancel the 100K one. Live use is ~1,000-1,500 credits a month
    against the 100K ($59) plan. There is **no tier between the free 500 and 20K** (checked
    2026-09-22: Starter 500 free, 20K $30, 100K $59, 5M $119, 15M $249), so 20K is the
    smallest paid plan. The 2023-25 history purchase was the only reason 100K was ever

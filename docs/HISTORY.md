@@ -27,8 +27,9 @@ hold the rest.
   graded: `lt0` 5-11 −6.71u, `le175` 3-5, `le3` 2-4, all clocks running; the band went 12 under
   / 5 over on main lines. Ops: every job green; the close backup's first Saturday fired 14
   hourly dispatches and `close_coverage_pct` read **1.000 (53 of 53)**; weather 53/55; alternate
-  share at `sat_am` 8 of 48; the Odds API counter reset on Oct 1 (99,940 remaining), so the
-  renewal the brief dated Oct 6 has most likely billed. **Decisions (Tate):** ledger confirmed;
+  share at `sat_am` 8 of 48; the Odds API counter reset on Oct 1 (99,940 remaining) — that is
+  the monthly credit reset, not a bill: the dashboard (read 2026-10-04) shows the next invoice
+  on Oct 6, so the downgrade must happen before then. **Decisions (Tate):** ledger confirmed;
   keep betting off the first BET-rated build; hold H-PCT as registered (a change would
   supersede H-STOP-2 at n=10); report + docs PR. Verdict: variance plus one marginal pick inside
   a model that is less accurate than the book; the registered clock is the arbiter. Proposed,
@@ -60,7 +61,7 @@ hold the rest.
   retire the classifier; mirror the degraded hold on the web; delete the dead in-season
   challenger arms; freeze the factor vector and a refit id on every pick and card item; keep
   history instead of overwriting; store the Rotowire report and a poll log per build; buy
-  CFBD Tier 2; Odds API down to 20K; no public-betting purchase until H-MOVE says the move
+  CFBD Tier 2; Odds API down to 20K before its Oct 6 invoice; no public-betting purchase until H-MOVE says the move
   carries something. Week-6 money unchanged (≤5 × $10, every card BET, first BET-rated build).
   The stack and its dates are the brief's open item.
 

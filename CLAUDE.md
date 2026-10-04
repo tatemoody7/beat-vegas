@@ -82,10 +82,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
   Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
   (`vercel.json` + the route's window), Tate's call.
-- **The Odds API renewal**: the credit counter reset on 2026-10-01 (`remaining=99940 used=60`),
-  so the 100K plan ($59) has most likely already billed for October. Confirm on the dashboard;
-  downgrade to 20K ($30) there for the next cycle; then update the comment in
-  `config.example.yaml`. No smaller paid tier exists.
+- **The Odds API renewal is Oct 6, not Oct 1** (dashboard read 2026-10-04: 100K plan started
+  Sep 6, next invoice **2026-10-06**, 326 of 100,000 used; credits reset on the 1st of every
+  month, which is what the Oct 1 counter reset was). Downgrade to 20K ($30) via Manage
+  Subscription BEFORE Oct 6; if the switch issues a new key, the `ODDS_API_KEY` repository
+  secret and `config.yaml` change with it; then update the comment in `config.example.yaml`.
 - **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12): PR2 tracking
   (factor vector frozen on paper picks and card items, refit id on predictions and picks,
   history kept for `factor_ledger` / post-mortem / `app_settings`, injury snapshots, a poll

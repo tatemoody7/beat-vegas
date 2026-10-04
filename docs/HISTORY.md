@@ -39,6 +39,20 @@ hold the rest.
   Friday write-up left uncommitted in worktree `neggap-card24` is committed as the first commit
   of this PR.
 
+- **2026-10-04 (SHIPPED: PR #267 docs 14:18Z, PR #268 classifier retired 14:26Z; REPO PRIVATE
+  AGAIN; ACTIONS BUDGET SET).** #268: no classifier fit in `score_slate`, the "Model 1H"
+  ledger and the Results row gone, `under_score` out of the records CSV, `verdict.ts` and
+  `edge.ts` define "has a model" on `bvLine` alone, the factor ledger reads `market` result
+  rows only; 1,444 pytest / 543 vitest / 219 e2e, production verified (health ok, overflow 0 at
+  390 on every page). Left: `backtest/engine.py` still fits the classifier for four offline
+  tools (open item). Tate put a card on GitHub and the repo went PRIVATE at 14:36Z (0 forks, 0
+  stars while public; only collaborator Tate; no deploy keys or webhooks; no credential in any
+  tracked file or in history; 2FA already on). The Actions budget read $0 with stop-usage on —
+  the mechanism of the Sep 22 outage — and is now $10/month, stop-at-cap, alerts on (Tate's
+  choice). Two medium Dependabot alerts (`brace-expansion`, build-time) wait for the next web PR.
+  The Odds API (invoice Oct 6/7, 100K due to cancel, 20K to create → new key) and the CFBD
+  Patreon tier (Tier 1 at $1 covers measured usage) are on hold at Tate's request.
+
 - **2026-10-04 (FULL SYSTEM REVIEW — `docs/SYSTEM_REVIEW_2026-10-04.md`; every answer
   Tate's).** Prompted by the week-5 loss: "is the model actually getting sharper?" **It cannot
   be, by construction**: `score_slate` trains on seasons before the target only

@@ -96,13 +96,14 @@ disagree, **this file wins**; memory files hold lessons and point here.
   Friday 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
 - **CFBD Tier 2** ($5/mo, 30,000 calls): Tate buys it now (decision 2026-10-04); free Academic
   3,000 until the card is on file.
-- **GitHub billing**: the repo is PUBLIC since 2026-09-22 (Actions minute cap lifted); a Billing
-  support ticket is open. Once a card is on file the repo goes back to private — which restores
-  the 2,000-minute cap, so the spending limit must be raised first. See `docs/OPS_ACCOUNTS.md`.
+- **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
+  stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
+  against ~2,830 measured: watch the budget page in the last week of each month.
 - **Week-sandbox replay for PR #247** never ran (this Mac's SQLite is a June snapshot); the first
   live build is the check.
-- **Classifier retirement** (`docs/CLASSIFIER_RETIREMENT.md`): PR3 of the week-6 stack, Monday
-  2026-10-05. `verdict.ts` and `edge.ts` define "has a model" on `underScore` too — both change.
+- **Offline backtest engine still fits the retired classifier** (`backtest/engine.py::_new_model`,
+  read by `scripts/backtest.py`, `retrain.py`, `validate_engine.py` and `rank_factors`); nothing
+  live reaches it since PR #268. Retire it with those four tools or leave it — Tate's call.
 - **2026-12-07**: the one confirmatory look for `docs/WHEN_TO_BET.md` (H6); the script refuses
   `--confirmatory` before then.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and

@@ -233,13 +233,19 @@ def _json_clean(obj: Any) -> Any:
     return obj
 
 
-def _model_rows(model, rows: List[Dict], computed_at: datetime) -> List[Dict]:
+def _model_rows(
+    model, rows: List[Dict], computed_at: datetime, run_id: Optional[str] = None
+) -> List[Dict]:
     cols = {c.name for c in model.__table__.columns} - {"id"}
     out = []
     for r in rows:
         row = {k: _json_clean(v) for k, v in r.items() if k in cols}
         if "computed_at" in cols:
             row["computed_at"] = computed_at
+        # Every row names its run (2026-10-04): prune_runs keeps rows by run_id,
+        # so one without it would be swept as an orphan on the next pass.
+        if run_id is not None and "run_id" in cols:
+            row["run_id"] = run_id
         out.append(row)
     return out
 
@@ -257,38 +263,41 @@ def _resync_sequence(session, model) -> None:
     resync_table_sequence(session, model.__tablename__)
 
 
+KEEP_RUNS_PER_SCOPE = 12
+
+
 def write_run(session, out: Dict[str, Any], computed_at: datetime, params: Dict[str, Any]) -> None:
-    """Replace one scope's post-mortem: delete, then insert.
+    """Write one scope's post-mortem under its own run_id and KEEP the prior
+    runs (2026-10-04; until now the scope was deleted and rewritten, so the
+    only post-mortem on file was the last one). Every reader takes the newest
+    run_id per scope (web/lib/postmortem.ts, beatvegas/snapshots.py, the
+    studies); older runs are the history of what each build said. The last
+    `KEEP_RUNS_PER_SCOPE` runs per scope stay; anything older is pruned AFTER
+    the new run is fully written, so a crash mid-write never leaves the scope
+    without a complete run to read.
 
-    KNOWN NOT ATOMIC, deliberately. The delete commits before the inserts do,
-    and the inserts commit per chunk, so a crash in between leaves the scope
-    empty or half-filled until the next run — and grade.yml runs this twice a
-    day, which widens the window.
-
-    The obvious fix (one transaction around the lot) is the one thing that must
-    NOT be done here: a single large bulk_insert_mappings STALLS the Neon pooler
-    indefinitely, which is why _chunked_insert exists at all (see
-    deploy_neon.py::_chunked_insert and the CLAUDE.md gotcha). Trading a rare
-    empty /proof section for a hung daily grading job is the wrong way round.
-
-    What makes it tolerable: the only consumer is /proof, a read-only page, and
-    web/lib/postmortem.ts already degrades to "Not computed yet" rather than
-    erroring. The real fix is to write under a new run_id and flip a pointer,
-    which is a schema change — raised, not smuggled in here.
+    Still NOT ATOMIC across the whole write, deliberately: a single large
+    bulk_insert_mappings STALLS the Neon pooler indefinitely, which is why
+    _chunked_insert exists (deploy_neon.py::_chunked_insert and the CLAUDE.md
+    gotcha). The runs row is inserted LAST, so a reader taking the newest run
+    never sees a half-written one: a crash leaves orphan bucket/game rows under
+    a run_id no runs row names, which the prune below sweeps on the next pass.
     """
     scope = out["scope"]
-    for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
-        session.query(model).filter(model.scope == scope).delete(synchronize_session=False)
-    session.commit()
+    run_id = out["run_id"]
     if session.bind.dialect.name == "postgresql":
         for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
             _resync_sequence(session, model)
         session.commit()
-    buckets = _model_rows(PostMortemBucket, out["buckets"] + out["contrasts"], computed_at)
-    games = _model_rows(PostMortemGame, out["games"], computed_at)
+    buckets = _model_rows(
+        PostMortemBucket, out["buckets"] + out["contrasts"], computed_at, run_id=run_id
+    )
+    games = _model_rows(PostMortemGame, out["games"], computed_at, run_id=run_id)
+    _chunked_insert(session, PostMortemBucket, buckets)
+    _chunked_insert(session, PostMortemGame, games)
     session.add(
         PostMortemRun(
-            run_id=out["run_id"],
+            run_id=run_id,
             computed_at=computed_at,
             scope=scope,
             params_json=json.dumps(_json_clean(params)),
@@ -299,8 +308,40 @@ def write_run(session, out: Dict[str, Any], computed_at: datetime, params: Dict[
         )
     )
     session.commit()
-    _chunked_insert(session, PostMortemBucket, buckets)
-    _chunked_insert(session, PostMortemGame, games)
+    prune_runs(session, scope, keep=KEEP_RUNS_PER_SCOPE)
+
+
+def prune_runs(session, scope: str, keep: int = KEEP_RUNS_PER_SCOPE) -> int:
+    """Delete every run of `scope` beyond the newest `keep` (by computed_at,
+    then id), plus any bucket/game rows under a run_id no runs row of the scope
+    names (a crash between the chunked inserts and the runs row). Returns the
+    number of run_ids removed."""
+    runs = (
+        session.query(PostMortemRun.run_id)
+        .filter(PostMortemRun.scope == scope)
+        .order_by(PostMortemRun.computed_at.desc(), PostMortemRun.id.desc())
+        .all()
+    )
+    keep_ids = {r[0] for r in runs[:keep]}
+    stale = {r[0] for r in runs[keep:]} - keep_ids
+    orphan = set()
+    for model in (PostMortemBucket, PostMortemGame):
+        for (rid,) in session.query(model.run_id).filter(model.scope == scope).distinct():
+            if rid not in keep_ids:
+                orphan.add(rid)
+    doomed = stale | orphan
+    if not doomed:
+        return 0
+    ids = sorted(x for x in doomed if x is not None)
+    for model in (PostMortemBucket, PostMortemGame, PostMortemRun):
+        q = session.query(model).filter(model.scope == scope)
+        if None in doomed:
+            q = q.filter((model.run_id.in_(ids)) | (model.run_id.is_(None)))
+        else:
+            q = q.filter(model.run_id.in_(ids))
+        q.delete(synchronize_session=False)
+    session.commit()
+    return len(doomed)
 
 
 # ---------------------------------------------------------------- main

@@ -21,12 +21,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from typing import Optional
 
 from beatvegas import ci
-from beatvegas.db.models import Game, GamePreview, Team
+from beatvegas.db.models import Game, GamePreview, InjurySnapshot, Team
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
@@ -91,6 +92,12 @@ def main() -> None:
         "espn_ok, games, qb_outs) so scripts/build_card.py can mark a card built "
         "on a stale QB read degraded",
     )
+    ap.add_argument(
+        "--slot",
+        default=os.environ.get("SLOT") or None,
+        help="the card build this preview feeds (card.yml passes SLOT); stamped on the "
+        "injury snapshot row. Default: the SLOT env, else none (a hand run)",
+    )
     args = ap.parse_args()
 
     # Sources first, DB second: if BOTH are empty every row would be a blank
@@ -148,6 +155,20 @@ def main() -> None:
 
     with session_scope() as s:
         week = args.week or _upcoming_week(s, args.season)
+        # The whole report as fetched, one row per run (2026-10-04): the
+        # per-game extract below is overwritten every build, so this is the
+        # only record of what the QB-out gate read at THIS build. An empty
+        # feed writes `[]` -- the evidence an outage leaves.
+        s.add(
+            InjurySnapshot(
+                season=int(args.season),
+                week=int(week),
+                slot=args.slot,
+                captured_at=now,
+                source="rotowire",
+                report_json=json.dumps(report),
+            )
+        )
         games = (
             s.query(Game)
             .filter(Game.season == args.season, Game.week == week)

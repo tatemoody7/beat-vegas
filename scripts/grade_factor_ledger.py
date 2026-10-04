@@ -15,6 +15,7 @@ exactly the point: the card shows n loudly so you don't over-read a handful.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Dict
 
@@ -66,17 +67,27 @@ def main() -> None:
         graded["order"] = graded["season"] * 100 + graded["week"]
         rows = grade_ledger(graded, outcomes)
 
-        s.query(FactorLedger).delete()
+        # Kept, never replaced (2026-10-04): every run's rows stay under their
+        # own run_id so the posterior's path is readable week to week. Readers
+        # (factors.ledger.load_ledger, web/lib/decision-quality.ts) take the
+        # newest run_id only. Until now the table was deleted on every run.
         now = datetime.utcnow()
+        run_id = ledger_run_id(now)
         for r in rows:
-            s.add(FactorLedger(created_at=now, **r))
+            s.add(FactorLedger(run_id=run_id, created_at=now, **r))
 
     promoted = [r["factor"] for r in rows if r["tier"] == 1]
     cooling = [r["factor"] for r in rows if r["drift_flag"]]
     print(
-        f"[ledger] graded {len(outcomes)} real-line games → {len(rows)} factors. "
-        f"promoted={promoted or '—'} cooling={cooling or '—'}"
+        f"[ledger] graded {len(outcomes)} real-line games → {len(rows)} factors "
+        f"(run {run_id}). promoted={promoted or '—'} cooling={cooling or '—'}"
     )
+
+
+def ledger_run_id(now: datetime) -> str:
+    """GITHUB_RUN_ID on the runner, else a UTC stamp (a hand run)."""
+    rid = os.environ.get("GITHUB_RUN_ID")
+    return f"gha-{rid}" if rid else f"local-{now:%Y%m%dT%H%M%S}"
 
 
 if __name__ == "__main__":

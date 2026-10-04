@@ -123,6 +123,57 @@ def seed_week(eng, *, kick_offset=timedelta(days=1)):
         s.commit()
 
 
+def test_paper_picks_freeze_the_factor_vector_and_the_refit(env, capsys):
+    """2026-10-04: factors_json_at_pick is {chips, factors, features} -- the
+    market chips as before, the prediction's factor payload and the model's
+    input vector off the game's record -- and refit_id names the weekly refit.
+    A game with no game_records row freezes features: null and is counted in
+    the summary's FROZEN line; the card item carries the same vector."""
+    from beatvegas.db.models import GameRecord
+    from beatvegas.model.bv_line import BV_FEATURE_COLS
+
+    mod, eng = env
+    seed_week(eng)
+    with Session(eng) as s:
+        pred = s.query(Prediction).filter(Prediction.game_id == 1).one()
+        pred.refit_id = 41
+        pred.factors_json = json.dumps({"pace": "slow", "factor_board": []})
+        s.add(
+            GameRecord(
+                game_id=1,
+                season=SEASON,
+                week=WEEK,
+                model_version="gbm_v1",
+                captured_at=NOW - timedelta(days=2),
+                features_json=json.dumps({c: 3.0 for c in BV_FEATURE_COLS}),
+            )
+        )
+        s.commit()
+    assert mod.run(SEASON, WEEK, dry_run=False, now=NOW) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  FROZEN: 1 of 2 paper picks carry the model's input vector "
+        "(1 without a game_records row)" in out
+    )
+    with Session(eng) as s:
+        picks = {p.game_id: p for p in s.query(ManualPick).all()}
+        payload = json.loads(s.query(Card).one().payload)
+    frozen = json.loads(picks[1].factors_json_at_pick)
+    assert set(frozen) == {"chips", "factors", "features"}
+    assert frozen["chips"]["total_band"] == "45–52" and frozen["chips"]["tier"] == "BET"
+    assert frozen["factors"]["pace"] == "slow"
+    assert set(frozen["features"]) == set(BV_FEATURE_COLS)
+    assert frozen["features"]["week"] == 3.0
+    assert picks[1].refit_id == 41
+    # game 5: a prediction with no refit yet and no record -> nulls, never a crash
+    other = json.loads(picks[5].factors_json_at_pick)
+    assert other["features"] is None and picks[5].refit_id is None
+    assert other["chips"]["tier"] == "EDGE"
+    # the published card item carries the same vector (or null)
+    items = {it["game_id"]: it for it in payload["items"]}
+    assert items[1]["features"] == frozen["features"] and items[5]["features"] is None
+
+
 def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     mod, eng = env
     seed_week(eng)
@@ -172,7 +223,7 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
     assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
-    chips = json.loads(p.factors_json_at_pick)
+    chips = json.loads(p.factors_json_at_pick)["chips"]
     assert chips["total_band"] == "45–52" and chips["hook_side"] == "key+0.5"
     assert chips["tier"] == "BET" and chips["cap_rank"] == 1
     # market-read chips frozen at the pick (post-mortem dimensions)
@@ -489,7 +540,7 @@ def test_no_comparable_price_logs_a_paper_pick_with_blocker_no_fair_price(env):
     assert pick.note.startswith(
         "card 2026-09-18 [no_fair_price]: Not yet — no other book is at 24.5"
     )
-    chips = json.loads(pick.factors_json_at_pick)
+    chips = json.loads(pick.factors_json_at_pick)["chips"]
     assert chips["fair_source"] is None and chips["fair_under"] is None
     assert chips["hr_vs_market"] is None and chips["market_line"] == 24.5
 
@@ -717,7 +768,7 @@ def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
     assert set(picks) == {1, 5}
     for gid, gate in ((1, "none"), (5, "price")):
         assert picks[gid].blocker == "degraded" and picks[gid].is_paper is True
-        chips = json.loads(picks[gid].factors_json_at_pick)
+        chips = json.loads(picks[gid].factors_json_at_pick)["chips"]
         assert chips["gate_blocker"] == gate
     # a clean pick carries no gate_blocker chip value
     with Session(eng) as s:
@@ -728,7 +779,7 @@ def test_a_degraded_game_keeps_the_gate_that_blocked_it(env, capsys, tmp_path):
     with Session(eng) as s:
         pick = s.query(ManualPick).filter(ManualPick.game_id == 1).one()
     assert pick.blocker == "none"
-    assert json.loads(pick.factors_json_at_pick)["gate_blocker"] is None
+    assert json.loads(pick.factors_json_at_pick)["chips"]["gate_blocker"] is None
 
 
 def test_an_unreadable_status_file_is_ignored_not_treated_as_a_failure(env, capsys, tmp_path):

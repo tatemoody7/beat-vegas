@@ -215,7 +215,8 @@ def record_weekly_refit(
     engine: str,
     skew: pd.DataFrame,
     n: int,
-) -> Optional[dict]:
+    frame_fingerprint: Optional[str] = None,
+) -> Optional[int]:
     """One `model_runs` row per scoring run (2026-09-28): what the champion was
     fitted on THIS time. Until now the weekly refit left no record of itself --
     confirming that the week-5 refit ran on the corrected inputs meant reading
@@ -226,9 +227,11 @@ def record_weekly_refit(
     `Prediction.bv_intercept`), train_rows / target_rows (the serve-skew
     check's counts), scored_rows (a serve-skew violation never reaches this
     row: it exits before scoring), frame_fingerprint (data-only digest,
-    `frame_fingerprint.fingerprint_hash`), run_id (GITHUB_RUN_ID). Never fails
-    the run: a run log is a courtesy to the reader. Returns the metrics dict, or
-    None when nothing was written."""
+    `frame_fingerprint.fingerprint_hash`; computed here unless the caller
+    already has it), run_id (GITHUB_RUN_ID). Never fails the run: a run log is
+    a courtesy to the reader. Returns the new row's id -- store_predictions
+    stamps it onto every predictions row as `refit_id` (2026-10-04) -- or None
+    when nothing was written."""
     import json
     import os
 
@@ -252,25 +255,27 @@ def record_weekly_refit(
             "train_rows": int(skew.attrs.get("n_train", 0) or 0),
             "target_rows": int(skew.attrs.get("n_target", 0) or 0),
             "scored_rows": int(n),
-            "frame_fingerprint": fingerprint_hash(fingerprint(df)),
+            "frame_fingerprint": frame_fingerprint or fingerprint_hash(fingerprint(df)),
             "run_id": os.environ.get("GITHUB_RUN_ID"),
         }
         with session_scope() as s:
-            s.add(
-                ModelRun(
-                    version=MODEL_VERSION,
-                    train_window=f"{seasons[0]}-{seasons[-1]}" if seasons else None,
-                    test_window=f"{season} wk{week}",
-                    metrics_json=json.dumps(metrics),
-                    notes=WEEKLY_REFIT_NOTE,
-                    created_at=datetime.utcnow(),
-                )
+            row = ModelRun(
+                version=MODEL_VERSION,
+                train_window=f"{seasons[0]}-{seasons[-1]}" if seasons else None,
+                test_window=f"{season} wk{week}",
+                metrics_json=json.dumps(metrics),
+                notes=WEEKLY_REFIT_NOTE,
+                created_at=datetime.utcnow(),
             )
+            s.add(row)
+            s.flush()
+            refit_id = int(row.id)
         print(
-            f"[model_runs] weekly refit recorded: {season} wk{week} inputs={metrics['n_inputs']} "
-            f"intercept={intercept} train_rows={metrics['train_rows']} frame={metrics['frame_fingerprint']}"
+            f"[model_runs] weekly refit recorded: {season} wk{week} id={refit_id} "
+            f"inputs={metrics['n_inputs']} intercept={intercept} "
+            f"train_rows={metrics['train_rows']} frame={metrics['frame_fingerprint']}"
         )
-        return metrics
+        return refit_id
     except Exception as e:  # noqa: BLE001 - the run log must never take down the run
         print(f"[model_runs] weekly refit NOT recorded: {e}")
         return None
@@ -473,8 +478,24 @@ def main() -> None:
         )
         sys.exit(1)
     _enrich_qb_out(scored)
-    n = store_predictions(scored, snapshot=not args.no_snapshot)
-    record_weekly_refit(scored, df, season=args.season, week=week, engine=engine, skew=skew, n=n)
+    # The refit's own model_runs row goes in FIRST (2026-10-04) so every
+    # predictions row can carry its id and the frame digest it was scored
+    # under; store_predictions writes every row of `scored`, so scored_rows is
+    # known before the write.
+    frame_fp = fingerprint_hash(fingerprint(df))
+    refit_id = record_weekly_refit(
+        scored,
+        df,
+        season=args.season,
+        week=week,
+        engine=engine,
+        skew=skew,
+        n=len(scored),
+        frame_fingerprint=frame_fp,
+    )
+    n = store_predictions(
+        scored, snapshot=not args.no_snapshot, refit_id=refit_id, frame_fingerprint=frame_fp
+    )
     fp_line = persist_engine_artifact(scored, engine=engine, season=args.season, week=week)
     if fp_line:
         print(fp_line)
@@ -487,8 +508,8 @@ def main() -> None:
     # len(closes): closes is computed off the pre-apply_min_games frame, so it
     # can count games score_slate's min-games/training cut later drops.
     artifact = scored.attrs.get("engine_artifact") or {}
-    fingerprint = artifact.get("fingerprint") or {}
-    n_train = fingerprint.get("n_rows")
+    artifact_fp = artifact.get("fingerprint") or {}
+    n_train = artifact_fp.get("n_rows")
     train_rows = n_train if n_train is not None else len(closes or {})
     # The residual only runs on rows with a REAL posted 1H line; the rest keep
     # the incumbent's number. Say how the board actually split.

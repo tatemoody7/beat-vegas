@@ -146,6 +146,46 @@ def write_status(
     print(f"[status] {path}: {json.dumps(payload)}")
 
 
+def log_poll(
+    *,
+    mode: str,
+    events_in_window: int,
+    events_polled: int,
+    new_snapshots: int,
+    unchanged: int,
+    credits_spent: Optional[int],
+    market: str = "1H_total",
+) -> bool:
+    """One `poll_log` row per sweep (2026-10-04): the numbers the summary line
+    prints, kept as a series so coverage and credit spend can be read back
+    without the run logs. Never raises -- the sweep's snapshots are already
+    committed and a failed log must not redden the run. Returns True when
+    written."""
+    import os
+
+    from beatvegas.db.models import PollLog
+
+    try:
+        with session_scope() as s:
+            s.add(
+                PollLog(
+                    captured_at=datetime.utcnow(),
+                    market=market,
+                    mode=mode[:32],
+                    events_in_window=int(events_in_window),
+                    events_polled=int(events_polled),
+                    new_snapshots=int(new_snapshots),
+                    unchanged=int(unchanged),
+                    credits_spent=None if credits_spent is None else int(credits_spent),
+                    run_id=os.environ.get("GITHUB_RUN_ID"),
+                )
+            )
+        return True
+    except Exception as e:  # noqa: BLE001 - a log row must never fail the sweep
+        print(f"[poll_log] not recorded: {e}")
+        return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=current_season())
@@ -458,6 +498,14 @@ def main() -> None:
         f"odds_rows={len(rows)} hr_rows={hr_rows} matched={matched} unmatched={unmatched} "
         f"new_snapshots={written} unchanged={skipped} calls_404={calls_404} "
         f"credits_spent={spent if spent is not None else 'unknown'}"
+    )
+    log_poll(
+        mode=mode,
+        events_in_window=len(in_window),
+        events_polled=polled,
+        new_snapshots=written,
+        unchanged=skipped,
+        credits_spent=spent,
     )
     # Two invariants that are free to check here and invisible everywhere else.
     # 1) The billing rule: with the bookmakers list set, a per-event call costs

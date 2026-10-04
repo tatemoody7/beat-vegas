@@ -99,9 +99,12 @@ def _sqlite_session():
     from sqlalchemy import create_engine as _ce
     from sqlalchemy.orm import Session
 
-    from beatvegas.db.models import GameRecord
+    from beatvegas.db.models import Game, GameRecord
 
     eng = _ce("sqlite:///:memory:")
+    # snapshot_slate reads the conferences off `games` (2026-10-04); an empty
+    # table leaves them NULL, exactly as a row backfilled before the column.
+    Game.__table__.create(eng)
     GameRecord.__table__.create(eng)
     return Session(eng)
 

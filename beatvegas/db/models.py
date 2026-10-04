@@ -97,6 +97,12 @@ class Game(Base):
     # NULL (scripts/backfill_spread_open.py); re-running never churns it.
     spread_open = Column(Float)
     spread_open_source = Column(String)
+    # CFBD's homeConference / awayConference for the game (2026-10-04): the
+    # conference the team belonged to THAT season, as /games reports it, so a
+    # slice by conference does not read today's membership onto an old row.
+    # Filled by scripts/backfill.py on upsert; NULL on rows older than the column.
+    home_conference = Column(String)
+    away_conference = Column(String)
 
     __table_args__ = (UniqueConstraint("id", name="uq_game_id"),)
 
@@ -301,6 +307,14 @@ class Prediction(Base):
     line_used = Column(Float)
     rank = Column(Integer)
     factors_json = Column(String)  # per-game factor payload for cards
+    # Model identity (2026-10-04): which weekly refit produced this number.
+    # `refit_id` is the `model_runs.id` scripts/weekly_update.py wrote for the
+    # run that scored this row; `fingerprint` is that run's data-only frame
+    # digest (etl/frame_fingerprint.fingerprint_hash). `model_version` stays the
+    # engine's tag; these two say WHICH fit of it. NULL on rows scored before
+    # the columns existed, and on a caller that scores outside weekly_update.
+    refit_id = Column(Integer)
+    fingerprint = Column(String)
     created_at = Column(DateTime)
 
 
@@ -404,6 +418,10 @@ class ManualPick(Base):
     # factor board at log time (forward-only); opening_line filled at grading.
     factors_json_at_pick = Column(String)
     opening_line = Column(Float)
+    # The weekly refit the pick was logged against (predictions.refit_id of the
+    # model row read at log time; 2026-10-04). Copied, never joined later: the
+    # prediction row is delete-then-insert on every re-score.
+    refit_id = Column(Integer)
 
     # Decision tracking (shared contract with web/ — names are exact). What the
     # board said at log time, so hit rate can be split by why the bet was made.
@@ -489,6 +507,10 @@ class GameRecord(Base):
     bv_gap = Column(Float)
     bv_gap_z = Column(Float)
     under_score = Column(Integer)
+    # The conferences as `games` carries them at snapshot time (2026-10-04),
+    # so a slice of the frozen records by conference needs no join.
+    home_conference = Column(String)
+    away_conference = Column(String)
     # filled after the game (the only post-kickoff write):
     first_half_total = Column(Integer)
     under_hit = Column(Boolean)
@@ -505,6 +527,12 @@ class FactorLedger(Base):
 
     __tablename__ = "factor_ledger"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # One grading run's rows share a run_id (2026-10-04; GITHUB_RUN_ID, or a
+    # UTC stamp off the runner). Rows are kept, never replaced: readers take
+    # the newest run_id (factors.ledger.load_ledger, web/lib/decision-quality.ts)
+    # and the history says how each factor's posterior moved week to week.
+    # NULL on rows written before the column existed (the last overwrite).
+    run_id = Column(String, index=True)
     factor = Column(String, index=True)  # column name
     n = Column(Integer)  # real-line green-state games graded
     hits = Column(Integer)  # of those, 1H unders that cashed (pushes dropped)
@@ -564,6 +592,11 @@ class ChallengerPick(Base):
     # When the consensus close was last confirmed pre-kick (grade_pick writes it
     # for every ledger); the H-NEGGAP-P line-value clock cuts on its age. 2026-09-28.
     closing_captured_at = Column(DateTime)
+    # The same frozen snapshot manual_picks carries (2026-10-04): the market
+    # chips, the prediction's factors and the model's input vector at the
+    # build (`picks.freeze_factors`), and the weekly refit the number came from.
+    factors_json_at_pick = Column(Text)
+    refit_id = Column(Integer)
 
     # Every field `picks.graded_pick_fields` returns, under the same names, so
     # `picks.grade_pick` grades an arm's observation with the champion's own code
@@ -666,6 +699,61 @@ class AppSetting(Base):
     value = Column(Text, nullable=False)
     note = Column(Text)
     updated_at = Column(DateTime)  # naive UTC, like every other timestamp here
+
+
+class AppSettingLog(Base):
+    """Append-only history of `app_settings` (2026-10-04). `app_settings` is
+    one row per key, overwritten in place, so a gauge's past values -- when the
+    close poll last fired each Saturday, how the credit count ran down -- were
+    gone the moment the next write landed. Every writer (beatvegas/ops.py
+    record_gauge; the Vercel cron route's `last_dispatch_*`) appends a row here
+    beside its upsert. Never read by a gate; evidence only."""
+
+    __tablename__ = "app_settings_log"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(32), index=True, nullable=False)
+    value = Column(Text, nullable=False)
+    note = Column(Text)
+    written_at = Column(DateTime, index=True)  # naive UTC
+
+
+class InjurySnapshot(Base):
+    """The whole Rotowire injury report, one row per research_preview run
+    (2026-10-04). game_previews keeps only the per-game extract and is
+    overwritten every build, so there was no way to see what the QB-out gate
+    read on Tuesday once Friday's build had replaced it. `slot` is the card
+    build that fetched it (SLOT env from card.yml; NULL on a hand run);
+    `report_json` is the raw list the source returned ([] on an empty feed,
+    which is itself the evidence an outage leaves)."""
+
+    __tablename__ = "injury_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer)
+    slot = Column(String(16))
+    captured_at = Column(DateTime, index=True)  # naive UTC
+    source = Column(String(32))  # 'rotowire'
+    report_json = Column(Text)
+
+
+class PollLog(Base):
+    """One row per 1H sweep of scripts/poll_lines.py (2026-10-04): the numbers
+    the run already prints (`events_total=… in_window=… new_snapshots=…
+    unchanged=… credits_spent=…`), kept so coverage and credit spend can be
+    read as a series instead of one run log at a time. `mode` is the sweep
+    mode string (`close<=120m`, `sweep<=6d`); `run_id` is GITHUB_RUN_ID."""
+
+    __tablename__ = "poll_log"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    captured_at = Column(DateTime, index=True)  # naive UTC
+    market = Column(String(16))  # '1H_total'
+    mode = Column(String(32))
+    events_in_window = Column(Integer)
+    events_polled = Column(Integer)
+    new_snapshots = Column(Integer)
+    unchanged = Column(Integer)
+    credits_spent = Column(Integer)
+    run_id = Column(String(32))
 
 
 class PostMortemRun(Base):

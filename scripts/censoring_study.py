@@ -46,6 +46,8 @@ def load_frame(scope: str = HIST_SCOPE) -> pd.DataFrame:
                 from postmortem_games p
                 join games g on g.id = p.game_id
                 where p.scope = :scope and p.line_real is not null
+                  and p.run_id = (select run_id from postmortem_runs where scope = :scope
+                                  order by computed_at desc limit 1)
                 """
                 ),
                 {"scope": scope},
@@ -63,6 +65,8 @@ def load_frame(scope: str = HIST_SCOPE) -> pd.DataFrame:
                 join games g on g.id = o.game_id
                 join postmortem_games p
                   on p.game_id = o.game_id and p.scope = :scope
+                 and p.run_id = (select run_id from postmortem_runs where scope = :scope
+                                 order by computed_at desc limit 1)
                 where o.market = '1H_total'
                   and p.line_real is not null
                   and o.captured_at <= g.start_date

@@ -192,6 +192,25 @@ describe("parseCard", () => {
     expect(parseCard(rawCard())?.week).toBe(3);
   });
 
+  it("ignores the item's frozen feature vector and any other unknown key", () => {
+    // Since 2026-10-04 build_card puts `features` (the model's input vector,
+    // ~60 floats or null) on every item; the site never reads it.
+    const raw = rawCard();
+    const items = raw.items as Record<string, unknown>[];
+    items[0] = {
+      ...items[0],
+      features: { week: 6, neutral_site: 0 },
+      bogus: 1,
+    };
+    items[1] = { ...items[1], features: null };
+    const c = parseCard(JSON.stringify(raw));
+    expect(c).not.toBeNull();
+    expect(c!.items).toHaveLength(items.length);
+    expect(c!.items[0].gameId).toBe(items[0].game_id);
+    expect("features" in c!.items[0]).toBe(false);
+    expect("bogus" in c!.items[0]).toBe(false);
+  });
+
   it("returns null for bad JSON, non-objects and a missing season/week", () => {
     expect(parseCard("{not json")).toBeNull();
     expect(parseCard("")).toBeNull();

@@ -577,12 +577,22 @@ def score_slate(
 
 
 def store_predictions(
-    scored: pd.DataFrame, model_version: str = MODEL_VERSION, snapshot: bool = True
+    scored: pd.DataFrame,
+    model_version: str = MODEL_VERSION,
+    snapshot: bool = True,
+    *,
+    refit_id: Optional[int] = None,
+    frame_fingerprint: Optional[str] = None,
 ) -> int:
     """Delete-then-insert the slate's predictions rows per game (so a re-score
     replaces cleanly) and, unless `snapshot=False`, freeze the pre-kickoff
     GameRecords. A retrospective re-score of a played week (rescore.yml) passes
-    False: a GameRecord written after kickoff would not be a pre-game record."""
+    False: a GameRecord written after kickoff would not be a pre-game record.
+
+    `refit_id` / `frame_fingerprint` (2026-10-04) stamp every row with the
+    model_runs row scripts/weekly_update.py wrote for THIS fit and the frame's
+    data-only digest, so a pick can name the refit it was logged against. A
+    caller that scores outside weekly_update leaves them NULL."""
     init_db()
     now = datetime.utcnow()
     # Board references: prefer the historical ones score_slate attached; else
@@ -617,6 +627,8 @@ def store_predictions(
                     bv_intercept=_f(r.get("bv_intercept")),
                     line_used=_f(line),
                     rank=int(r["rank"]),
+                    refit_id=None if refit_id is None else int(refit_id),
+                    fingerprint=frame_fingerprint,
                     factors_json=json.dumps(
                         _factors(
                             r,

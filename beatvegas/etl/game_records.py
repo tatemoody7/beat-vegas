@@ -72,18 +72,40 @@ def record_fields(
 def snapshot_slate(
     session, scored: pd.DataFrame, model_version: str, now, feature_cols=FEATURE_COLS
 ) -> int:
-    """Freeze a GameRecord per game; skip games already snapshotted (immutable)."""
+    """Freeze a GameRecord per game; skip games already snapshotted (immutable).
+
+    The conferences come off `games` at snapshot time (2026-10-04): the scored
+    frame never carries them (etl/features._query_games selects its columns by
+    name), and a join at read time would read today's membership onto an old
+    record. NULL where `games` has none (rows backfilled before the column)."""
     existing = {
         gid
         for (gid,) in session.query(GameRecord.game_id)
         .filter(GameRecord.model_version == model_version)
         .all()
     }
+    ids = [int(x) for x in scored["id"].tolist() if int(x) not in existing]
+    confs = {}
+    if ids:
+        confs = {
+            int(gid): (hc, ac)
+            for gid, hc, ac in session.query(
+                Game.id, Game.home_conference, Game.away_conference
+            ).filter(Game.id.in_(ids))
+        }
     n = 0
     for _, r in scored.iterrows():
         if int(r["id"]) in existing:
             continue
-        session.add(GameRecord(captured_at=now, **record_fields(r, model_version, feature_cols)))
+        hc, ac = confs.get(int(r["id"]), (None, None))
+        session.add(
+            GameRecord(
+                captured_at=now,
+                home_conference=hc,
+                away_conference=ac,
+                **record_fields(r, model_version, feature_cols),
+            )
+        )
         n += 1
     return n
 

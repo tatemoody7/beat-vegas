@@ -94,7 +94,7 @@ def test_grade_market_fg_skips_unfinished():
 
 
 def test_grade_market_fg_removes_a_stale_row_when_the_close_is_gone():
-    """grade_market / grade_model delete BEFORE the skip so a re-grade cleans up;
+    """grade_market deletes BEFORE the skip so a re-grade cleans up;
     grade_market_fg skipped first, so a full-game row whose close later failed
     the window kept its stale graded row forever."""
     grade = _load("grade")

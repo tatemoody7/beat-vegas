@@ -60,8 +60,8 @@ def main() -> None:
         f"directional until graded vs real DraftKings lines._"
     )
     lines.append("")
-    lines.append("| # | Matchup | Line | Our 1H | Gap | σ-gap | Bet | Lean | Why |")
-    lines.append("|--:|---|--:|--:|--:|--:|:-:|--:|---|")
+    lines.append("| # | Matchup | Line | Our 1H | Gap | σ-gap | Bet | Why |")
+    lines.append("|--:|---|--:|--:|--:|--:|:-:|---|")
     for r in s.itertuples(index=False):
         rd = pd.Series(r._asdict())
         gap = rd.get("bv_gap")
@@ -70,8 +70,7 @@ def main() -> None:
         lines.append(
             f"| {int(rd['rank'])} | {rd['away_team']} @ {rd['home_team']} | "
             f"{rd['line']:.1f} | {rd['bv_line']:.1f} | {rd['bv_gap']:+.1f} | "
-            f"{(f'{z:.1f}' if pd.notna(z) else '—')} | {opp} | "
-            f"{int(rd['under_score'])} | {_reason(rd)} |"
+            f"{(f'{z:.1f}' if pd.notna(z) else '—')} | {opp} | {_reason(rd)} |"
         )
     report = "\n".join(lines)
 

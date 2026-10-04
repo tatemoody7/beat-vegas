@@ -232,16 +232,16 @@ export function strongestRed(
 }
 
 /**
- * Pure. Whether a row has a model number: a score and our number, whatever
+ * Pure. Whether a row has a model number: our number (bvLine), whatever
  * line it was scored against. The ONE meaning of "has a model" on the site
  * (edge.ts / verdict.ts / card.py agree) — which line the gap is measured
  * against is a separate question (`LineBasis`), decided from the live lines at
  * request time.
  */
-export function lineState(row: Pick<BoardRow, "underScore" | "bvLine">): {
+export function lineState(row: Pick<BoardRow, "bvLine">): {
   hasModel: boolean;
 } {
-  return { hasModel: row.underScore !== null && row.bvLine !== null };
+  return { hasModel: row.bvLine !== null };
 }
 
 /**
@@ -564,7 +564,6 @@ export async function getHomeBoard(
     const input: EdgeInput = {
       away: row.away,
       home: row.home,
-      underScore: row.underScore,
       bvLine: row.bvLine,
       liveLine: row.curLine,
       fallbackLine,

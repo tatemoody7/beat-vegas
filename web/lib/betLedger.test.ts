@@ -39,7 +39,6 @@ function row(over: Partial<LedgerRow> = {}): LedgerRow {
     homeFh: 10,
     actualTotal: 17,
     modelLine: 23.05,
-    modelScore: 72,
     closingLine: 26.5,
     closingPrice: -112,
     closingCapturedAt: "2026-09-19T18:30:00.000Z",

@@ -233,7 +233,7 @@ def _wire(monkeypatch, wu, engine: str, argv_extra=()):
             {
                 "id": [1],
                 "rank": [1],
-                "under_score": [55],
+                "bv_gap": [1.9],
                 "away_team": ["A1"],
                 "home_team": ["H1"],
                 "line": [25.0],
@@ -288,7 +288,7 @@ def test_main_prints_actual_train_rows_not_all_fetched_closes(monkeypatch, wu, c
             {
                 "id": [1],
                 "rank": [1],
-                "under_score": [55],
+                "bv_gap": [1.9],
                 "away_team": ["A1"],
                 "home_team": ["H1"],
                 "line": [25.0],
@@ -318,7 +318,7 @@ def test_main_reports_the_residual_fallback_split(monkeypatch, wu, capsys):
             {
                 "id": [1],
                 "rank": [1],
-                "under_score": [55],
+                "bv_gap": [1.9],
                 "away_team": ["A1"],
                 "home_team": ["H1"],
                 "line": [25.0],
@@ -349,7 +349,7 @@ def test_main_reports_a_residual_fit_failure_in_the_summary(monkeypatch, wu, cap
             {
                 "id": [1],
                 "rank": [1],
-                "under_score": [55],
+                "bv_gap": [1.9],
                 "away_team": ["A1"],
                 "home_team": ["H1"],
                 "line": [25.0],

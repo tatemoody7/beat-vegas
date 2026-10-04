@@ -505,7 +505,7 @@ def main() -> None:
     top = scored.head(5)
     for _, r in top.iterrows():
         print(
-            f"  #{int(r['rank'])} score {int(r['under_score'])}  "
+            f"  #{int(r['rank'])} gap {float(r['bv_gap']):+.2f}  "
             f"{r['away_team']} @ {r['home_team']}  line {r['line']:g}"
         )
 

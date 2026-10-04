@@ -90,8 +90,10 @@ def test_score_slate_scores_the_unplayed_target_week(monkeypatch):
     r = out.iloc[0]
     assert int(r["id"]) == 999_999
     assert pd.isna(r["under"])  # target keeps an undefined outcome
-    for col in ("bv_line", "bv_gap", "under_score", "under_prob", "line", "rank"):
+    for col in ("bv_line", "bv_gap", "line", "rank"):
         assert pd.notna(r[col]), col
+    # The classifier is retired (2026-10-04): no score column is produced at all.
+    assert "under_score" not in out.columns and "under_prob" not in out.columns
     assert r["line_kind"] == "proxy"
     assert "is_opportunity" not in out.columns  # sigma gate removed (point gates in verdict)
     assert "is_opportunity" not in score_mod._factors(r, float(r["line"]))
@@ -284,7 +286,7 @@ def test_residual_engine_conditions_on_the_line():
     assert out["bv_gap_z"].notna().all()
     assert out["rank"].tolist() == list(range(1, 9))
     assert out["bv_gap"].is_monotonic_decreasing
-    assert out["under_score"].notna().all()  # classifier still runs
+    assert "under_score" not in out.columns  # the classifier is retired
     assert "engine_fallback" not in out.attrs
     art = out.attrs["engine_artifact"]
     assert hasattr(art["model"], "predict")

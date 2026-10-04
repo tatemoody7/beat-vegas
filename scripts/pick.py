@@ -125,10 +125,10 @@ def cmd_add(args) -> None:
                 )
                 return
 
-        # Freeze OUR number and the model's score onto the ticket, the same read
-        # the website's own log takes (web/lib/picks.ts createPick) — without it
-        # a terminal pick sits outside decision-quality's agreed/against split.
-        model_line, model_score = model_read(s, gid, market)
+        # Freeze OUR number onto the ticket, the same read the website's own
+        # log takes (web/lib/picks.ts createPick) — without it a terminal pick
+        # sits outside decision-quality's agreed/against split.
+        model_line = model_read(s, gid, market)
         # Paper pick: one flat unit so it grades as +/-1u on its own record
         # (is_paper keeps it out of the real ledger); CLV/result grade normally.
         # The insert itself is beatvegas.picks.add_pick, shared with the cloud card.
@@ -152,7 +152,6 @@ def cmd_add(args) -> None:
             ev=args.ev,
             hr_line=args.hr_line,
             model_line=model_line,
-            model_score=model_score,
             bet_at=bet_at_from_et(getattr(args, "bet_at", None)),
         )
         why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")

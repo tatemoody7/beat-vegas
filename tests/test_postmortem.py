@@ -85,7 +85,6 @@ def _pred(game_id, season, week, gap, score, fh, **kw):
         "home_team": kw.get("home", "Alabama"),
         "away_team": kw.get("away", "Georgia"),
         "bv_line": 27.0 - gap,
-        "under_score": score,
         "line_used": 27.0,
         "factors_json": kw.get("factors", '{"pace": "26.0s/play · 150 plays", "weather": null}'),
         "first_half_total": fh,
@@ -136,11 +135,9 @@ def test_weekly_cap_keeps_top_five_by_gap_per_week():
 
 
 def test_weekly_cap_tiebreak_is_deterministic():
-    """Equal gaps: the five lowest game_ids are kept — under_score is NOT a
-    tie-break (mirrors card.apply_weekly_cap, which never reads it)."""
-    rows = [
-        _pred(i, 2025, 5, gap=2.0, score=s, fh=20) for i, s in enumerate([50, 60, 55, 52, 58, 57])
-    ]
+    """Equal gaps: the five lowest game_ids are kept (mirrors
+    card.apply_weekly_cap: nothing but the gap and the game_id orders them)."""
+    rows = [_pred(i, 2025, 5, gap=2.0, score=None, fh=20) for i in range(6)]
     df = pm.build_hist_frame(rows, STEP, FBS)
     mask = pm.weekly_cap(df, "gap_flat", cap=5, min_gap=1.75)
     assert set(df.loc[mask, "game_id"]) == {0, 1, 2, 3, 4}  # highest id (5) drops
@@ -160,12 +157,12 @@ def test_rule_masks_cover_policy_rules():
     ]
     df = pm.build_hist_frame(rows, STEP, FBS)
     m = pm.rule_masks(df, "flat")
-    assert set(m) == {"all", "gap175", "gap300", "score53", "both", "cap5", "top20"}
+    # score53 / both left with the classifier (2026-10-04)
+    assert set(m) == {"all", "gap175", "gap300", "cap5", "top20"} == set(pm.RULES)
     assert list(m["gap175"]) == [True, True, False, False]
     assert list(m["gap300"]) == [True, False, False, False]
-    assert list(m["score53"]) == [True, False, True, False]
-    assert list(m["both"]) == [True, False, False, False]
     assert list(m["all"]) == [True] * 4
+    assert "score_band" not in pm.HIST_DIMENSIONS and "score_band" not in pm._ORDER
 
 
 # ---------------------------------------------------------------- bands + tallies
@@ -177,8 +174,7 @@ def test_band_label_edges():
     assert pm.band_label(2.99, pm.GAP_BANDS) == "1.75–3"
     assert pm.band_label(3.0, pm.GAP_BANDS) == "3+"
     assert pm.band_label(None, pm.GAP_BANDS) is None
-    assert pm.band_label(53, pm.SCORE_BANDS) == "53–59"
-    assert pm.band_label(60, pm.SCORE_BANDS) == "60+"
+    assert not hasattr(pm, "SCORE_BANDS")  # retired with the classifier
 
 
 def test_wilson_ci_brackets_the_rate():
@@ -320,8 +316,6 @@ def test_derive_flags_score_gate_fires_when_score_does_not_separate():
         }
 
     buckets = [
-        b("score_band", "<47", 2000, 0.517),
-        b("score_band", "60+", 560, 0.519),
         b("gap_band", "<0", 2100, 0.503),
         b("gap_band", "1–1.75", 300, 0.488),
         b("gap_band", "1.75–3", 350, 0.565),
@@ -329,7 +323,7 @@ def test_derive_flags_score_gate_fires_when_score_does_not_separate():
     ]
     flags = pm.derive_flags(buckets, contrasts=[], n_tests=10)
     codes = {f["code"]: f for f in flags}
-    assert codes["score_gate"]["severity"] == "change"
+    assert "score_gate" not in codes  # the classifier flag left with the classifier
     assert "gap_gate" in codes
     assert all({"code", "severity", "text", "evidence"} <= set(f) for f in flags)
 
@@ -553,7 +547,8 @@ def test_compute_hist_emits_both_segments_both_proxies_and_notes():
     assert any(b["dimension"] == "line_stress" for b in buckets)
     assert any(b["dimension"] == "resid_by_gap" for b in buckets)
     assert any(c["dimension"] == "wl_contrast" for c in contrasts)
-    assert {f["code"] for f in notes["flags"]} >= {"score_gate", "multiple_comparisons"}
+    codes = {f["code"] for f in notes["flags"]}
+    assert "multiple_comparisons" in codes and "score_gate" not in codes
     assert notes["dropped"] == {} and notes["n_tests"] > 0
     assert len(games) == len(df) and {"followed_system", "rules_json", "scope"} <= set(games[0])
     assert out["scope"] == pm.HIST_SCOPE

@@ -1,13 +1,18 @@
 """Score upcoming games for first-half under value.
 
-Walk-forward: train on all seasons before the target, predict the under
-probability, and map it to an intuitive 0-100 "Under Score" where 50 = the
--110 breakeven (52.4%). Above 50 = the model leans under with positive expected
-value; below 50 = lean over. Also assembles the per-game factor payload the
-dashboard cards render.
+Walk-forward: train on all seasons before the target, fit the market-blind
+BV-line regressor, and rank the slate by `gap = line - bv_line` (positive = the
+market sits above our number = under lean). Also assembles the per-game factor
+payload the board cards render.
+
+The 0-100 "Under Score" classifier that used to ride beside the gap was retired
+on 2026-10-04 (docs/CLASSIFIER_RETIREMENT.md): its label read a mutable column,
+the 2026-09-06 post-mortem found it carried no information about the outcome,
+and nothing gated on it. New `predictions` rows leave `under_probability` and
+`under_score` NULL; legacy rows keep theirs.
 
 Honest framing: the backtest showed only a small, unstable edge vs a proxy line,
-so treat the score as the model's *relative lean*, not a guarantee.
+so treat the gap as a ranking rule, not a guarantee.
 """
 
 from __future__ import annotations
@@ -18,12 +23,11 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from ..backtest.engine import BREAKEVEN, _new_model
 from ..config import ENGINES, engine_name
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.context import SITUATIONAL_KEYS, context_for_games, json_safe
-from ..etl.features import FEATURE_COLS, build_feature_frame, training_frame
+from ..etl.features import build_feature_frame, training_frame
 from ..etl.form import form_for_games
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
@@ -43,7 +47,6 @@ MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the e
 # carry a residual read; 'derived_fg' and 'proxy' are our own arithmetic off the
 # full-game total, so there is no market error there for the residual to model.
 REAL_LINE_KINDS = ("hr_1h", "observed_1h")
-MODEL_BET_THRESHOLD = 53  # under_score at/above this = the model "bets" it
 
 # Verdict gates, in POINTS of bv_gap (line - our 1H number), from the validated
 # top-20%-by-gap selection rule — never in sigmas: bv_sigma (~12 pts) is the
@@ -62,7 +65,7 @@ BET_GAP_PTS = (
 # game. Mirrored by web/lib/verdict.ts (slateBar); tests/fixtures/slate_bar_vectors.json
 # is read by BOTH test suites so the two cannot drift.
 PCT_SHARE = 0.20
-STRONG_GAP_PTS = 3.0  # ~ top-10% -> "high" confidence (gap alone; under_score no longer gates it)
+STRONG_GAP_PTS = 3.0  # ~ top-10% -> "high" confidence (the gap alone)
 WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
 WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
 # Hard Rock's 1H total more than this far BELOW the market's = off-market
@@ -133,11 +136,6 @@ BET_MIN_EV = EV_FLOOR
 BREAK_EVEN_EV = 0.0
 
 
-def is_model_bet(under_score, threshold: int = MODEL_BET_THRESHOLD) -> bool:
-    """Whether the model's score is a positive-EV under lean worth grading."""
-    return under_score is not None and under_score >= threshold
-
-
 def slate_bar(gaps, share: float = PCT_SHARE):
     """The gap at the top-`share` cutoff of a slate: the k-th largest gap with
     k = max(1, round(share * N)); None on an empty slate. Ties at the bar all
@@ -151,15 +149,6 @@ def slate_bar(gaps, share: float = PCT_SHARE):
         return None
     k = max(1, int(round(share * len(vals))))
     return vals[k - 1]
-
-
-def under_score(prob: float) -> int:
-    """Map under probability to 0-100, anchored at breakeven=50.
-
-    Gentle slope (x200) keeps scores in a believable band given the edge is
-    small — we don't want a marginal lean reading as a near-certain '98'."""
-    score = round(50 + (prob - BREAKEVEN) * 200)
-    return max(1, min(99, int(score)))
 
 
 def _pace_str(row: pd.Series) -> Optional[str]:
@@ -474,12 +463,8 @@ def score_slate(
     if game_ids is not None:
         target = target[target["id"].isin(game_ids)]
     if train.empty or target.empty:
-        return target.assign(under_prob=[], under_score=[], line=[], rank=[])
+        return target.assign(line=[], rank=[])
 
-    model = _new_model()
-    model.fit(train[FEATURE_COLS], train["under"])
-    target["under_prob"] = model.predict_proba(target[FEATURE_COLS])[:, 1]
-    target["under_score"] = target["under_prob"].apply(under_score)
     # The ranking line per game, with provenance: an observed retail 1H opener
     # (kind from line_kind_lookup, default 'observed_1h'); else a 1H number
     # DERIVED from the captured full-game opener (passed in via line_lookup with
@@ -496,7 +481,7 @@ def score_slate(
 
     # Our 1H number + its noise band. bv_lo/bv_hi = 80% prediction band;
     # bv_gap_z = gap in sigmas (noise-aware — a gap inside the band is noise,
-    # not an edge). Display + gap sort only; does NOT influence under_score.
+    # not an edge). Display + gap sort only.
     target["engine"] = "bv_line"
     target["resid_hat"] = float("nan")
     # The incumbent's number for EVERY row: under the bv_line engine it is the
@@ -573,7 +558,7 @@ def score_slate(
     # PRIMARY ENGINE (gbm_v2, validated Phase 3): rank the board by the raw gap
     # (line ABOVE our predicted 1H total = under lean). The BET/WATCH/PASS call is
     # made downstream against the POINT gates (BET_GAP_PTS etc.), not a sigma
-    # threshold. under_prob/under_score remain a secondary classifier lean.
+    # threshold.
     target = target.sort_values("bv_gap", ascending=False).reset_index(drop=True)
     target["rank"] = target.index + 1
     # Stash historical board references (median/spread per factor) on the frame
@@ -621,8 +606,8 @@ def store_predictions(
                 Prediction(
                     game_id=int(r["id"]),
                     model_version=model_version,
-                    under_probability=float(r["under_prob"]),
-                    under_score=int(r["under_score"]),
+                    # under_probability / under_score stay NULL: the classifier
+                    # was retired 2026-10-04 (docs/CLASSIFIER_RETIREMENT.md).
                     projected_first_half_total=_f(r.get("proj_1h_total")),
                     bv_line=_f(r.get("bv_line")),
                     bv_gap=_f(r.get("bv_gap")),

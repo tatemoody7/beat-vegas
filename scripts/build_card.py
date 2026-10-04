@@ -159,7 +159,6 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
             "model_version": p.model_version,
             "bv_line": p.bv_line,
             "bv_intercept": p.bv_intercept,
-            "under_score": p.under_score,
             "line_used": p.line_used,
             # the stored pace chip: degraded_inputs reads it
             "factors_json": p.factors_json,
@@ -235,8 +234,8 @@ def log_paper_picks(
     DECISION build for (beatvegas.ci.PAPER_WINDOW_HOURS: the midweek builds take
     the gap to the next look, fri_pm and sat_am take the rest of the week).
     None = every qualifying game still on the card. Freezes OUR number
-    (`model_line`/`model_score`) alongside Hard Rock's, marks `paper_logged`, and
-    returns the number inserted."""
+    (`model_line`) alongside Hard Rock's, marks `paper_logged`, and returns the
+    number inserted."""
     inserted = 0
     for it in card["items"]:
         if not it.get("qualifies"):
@@ -296,12 +295,12 @@ def log_paper_picks(
             placed_at=now,
             blocker=blocker,
             factors_json=json.dumps(chips, ensure_ascii=False, allow_nan=False),
-            # OUR number and the model's score, off the same card item the gap
-            # was computed from. Until 2026-09-13 nothing in the Python lane
-            # wrote these, so the whole paper ledger sat outside
-            # decision-quality's agreed/against split.
+            # OUR number, off the same card item the gap was computed from.
+            # Until 2026-09-13 nothing in the Python lane wrote it, so the whole
+            # paper ledger sat outside decision-quality's agreed/against split.
+            # (model_score_at_pick stays NULL since 2026-10-04: the classifier
+            # that produced it was retired, docs/CLASSIFIER_RETIREMENT.md.)
             model_line=it["bv_line"],
-            model_score=it.get("under_score"),
         )
         it["paper_logged"] = True
         inserted += 1

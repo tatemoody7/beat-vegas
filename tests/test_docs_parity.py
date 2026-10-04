@@ -162,12 +162,15 @@ def test_the_glossary_does_not_call_the_flat_proxy_current():
     assert "0.4975" in body and "0.5375" in body
 
 
-def test_the_glossary_does_not_call_under_score_a_probability():
+def test_the_glossary_no_longer_defines_the_under_score():
+    """The 0-100 classifier score was retired on 2026-10-04
+    (docs/CLASSIFIER_RETIREMENT.md). The entry that used to explain why "50 =
+    breakeven" was incoherent is gone with it; nothing may describe the score as
+    a live number again."""
     body = _text(GLOSSARY)
+    assert "**Under Score" not in body
     assert "rescaled probability" not in body
     assert "50 = breakeven-neutral" not in body
-    # -110 breakeven is 52.38%, which is why "50 = breakeven" was incoherent
-    assert "52.38" in body
 
 
 def test_the_glossary_does_not_call_data_sources_free():

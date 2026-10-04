@@ -31,7 +31,6 @@ const pick = (o: Partial<PickFull>): PickFull => ({
   stake: 1,
   price: -110,
   note: null,
-  modelScore: null,
   modelLine: null,
   result: "under",
   units: 0.91,

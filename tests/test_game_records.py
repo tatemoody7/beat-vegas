@@ -41,7 +41,9 @@ def test_record_fields_freezes_features_and_outputs():
     f = record_fields(row, "gbm_v1")
     assert f["game_id"] == 7 and f["season"] == 2025
     assert f["line"] == 24.5 and f["line_kind"] == "observed_1h"
-    assert f["bv_line"] == 22.0 and f["under_score"] == 58
+    # under_score is frozen NULL since the classifier retired (2026-10-04),
+    # even when the scored row still carries one.
+    assert f["bv_line"] == 22.0 and f["under_score"] is None
     import json
 
     feats = json.loads(f["features_json"])

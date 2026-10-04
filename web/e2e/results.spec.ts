@@ -36,13 +36,6 @@ const marketFullGame = record(
     return { under: pts < g.fg.total, units: unitFor(pts < g.fg.total) };
   }),
 );
-const model = record(
-  played.map((g) => {
-    const fh = g.played!.homeFh + g.played!.awayFh;
-    const lineUsed = g.hr![0].line; // predictions.line_used = the first HR capture
-    return { under: fh < lineUsed, units: unitFor(fh < lineUsed) };
-  }),
-);
 
 test.describe("results", () => {
   // --- every bet we have placed (the ledger leads the page, 2026-09-28) ------
@@ -201,12 +194,15 @@ test.describe("results", () => {
     expect((await request.get("/api/bets?season=abc")).status()).toBe(400);
   });
 
-  test("the season comparison: every under, the paper rule, our bets, and signed in the model and the full game", async ({
+  test("the season comparison: every under, the paper rule, our bets, and signed in the full game", async ({
     page,
   }) => {
     await page.goto("/results?week=all");
     const table = page.locator('table[aria-label="Season summary"]');
-    await expect(table.locator("tbody tr")).toHaveCount(5);
+    // Four rows since 2026-10-04: the "Model — first half" row left with the
+    // classifier (docs/CLASSIFIER_RETIREMENT.md); the seeded gbm_v1 results
+    // rows are history nothing reads.
+    await expect(table.locator("tbody tr")).toHaveCount(4);
     const rowText = async (label: string) =>
       (
         await table.locator("tr", { hasText: label }).first().innerText()
@@ -221,9 +217,7 @@ test.describe("results", () => {
       `50.0% ${L.real.record} ${L.real.units}`,
     );
     expect(await rowText("Our bets")).toContain(L.avgPointsGained); // line value column
-    expect(await rowText("Model — first half")).toContain(
-      `${model.hit} ${model.record} ${model.units}`,
-    );
+    await expect(table.locator("tr", { hasText: "Model" })).toHaveCount(0);
     expect(await rowText("Market — full game")).toContain(
       `${marketFullGame.hit} ${marketFullGame.record} ${marketFullGame.units}`,
     );

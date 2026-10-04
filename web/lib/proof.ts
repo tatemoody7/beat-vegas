@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { median } from "@/lib/format";
-import { MARKET_LEDGER_1H, MODEL_VERSION } from "@/lib/model";
+import { MARKET_LEDGER_1H } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 import { hasFbsSeason, isFbsGame } from "@/lib/proxy";
 import { STRONG_GAP_PTS } from "@/lib/verdict";

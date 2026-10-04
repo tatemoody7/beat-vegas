@@ -1,6 +1,6 @@
 """grade.py --season must grade AND summarize only that season. _summary read
-every results row ever written and grade_model walked every prediction, so the
-printed record mixed seasons."""
+every results row ever written, so the printed record mixed seasons. (The
+grade_model cases that lived here left with the classifier, 2026-10-04.)"""
 
 from datetime import datetime
 
@@ -8,7 +8,7 @@ from conftest import _load_script
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import Base, Game, Prediction, Result
+from beatvegas.db.models import Base, Game, Result
 
 
 def _db():
@@ -77,69 +77,3 @@ def test_summary_is_season_scoped(capsys):
         grade._summary(s, grade.MODEL_MARKET, "MARKET 1H", season=2026)
     out = capsys.readouterr().out
     assert "UNDER 0/1" in out and "units=-1.00" in out  # only the 2026 row
-
-
-def test_grade_model_only_touches_the_seasons_predictions():
-    grade = _load_script("grade")
-    eng = _db()
-    with Session(eng) as s:
-        for gid in (1, 2):
-            s.add(
-                Prediction(
-                    game_id=gid,
-                    model_version=grade.MODEL_VERSION,
-                    under_score=60,
-                    line_used=24.5,
-                    created_at=datetime(2026, 9, 1),
-                )
-            )
-        s.commit()
-        # A caller handing over closings for BOTH seasons must still only get
-        # the requested season graded.
-        closings = {
-            gid: (s.get(Game, gid), (25.0, 24.0), datetime(2026, 9, 30), (None, None))
-            for gid in (1, 2)
-        }
-        n = grade.grade_model(s, 2026, closings)
-        s.commit()
-        assert n == 1
-        rows = s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).all()
-        assert [r.game_id for r in rows] == [2]
-
-
-def test_a_rescore_below_threshold_removes_the_old_graded_row():
-    """Delete-then-rewrite is only idempotent if the delete is unconditional.
-
-    grade_model used to skip on `not is_model_bet(...)` BEFORE it deleted, so a
-    re-score that dropped a game under the threshold left its previously-graded
-    row in the ledger forever: the game stopped being a model bet but never
-    stopped counting as one. grade_market always had the ordering right; this
-    pins that grade_model matches it.
-    """
-    grade = _load_script("grade")
-    eng = _db()
-    with Session(eng) as s:
-        s.add(
-            Prediction(
-                game_id=2,
-                model_version=grade.MODEL_VERSION,
-                under_score=60,  # a bet
-                line_used=24.5,
-                created_at=datetime(2026, 9, 1),
-            )
-        )
-        s.commit()
-        closings = {2: (s.get(Game, 2), (25.0, 24.0), datetime(2026, 9, 30), (None, None))}
-        assert grade.grade_model(s, 2026, closings) == 1
-        s.commit()
-        assert s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).count() == 1
-
-        # The re-score drops it under the threshold.
-        pred = s.query(Prediction).filter(Prediction.game_id == 2).one()
-        pred.under_score = 10
-        s.commit()
-
-        assert grade.grade_model(s, 2026, closings) == 0
-        s.commit()
-        rows = s.query(Result).filter(Result.model_version == grade.MODEL_VERSION).all()
-        assert rows == [], "the stale graded row survived the re-score"

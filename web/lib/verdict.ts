@@ -15,7 +15,7 @@
 //
 // The gap that gates a BET is HARD ROCK'S number minus ours — Hard Rock is the
 // only book bettable from Florida, so a consensus gap that Hard Rock does not
-// match is not an edge you can take. MODEL_BET_THRESHOLD mirrors score.py.
+// match is not an edge you can take.
 // Betting policy (docs/BETTING_POLICY.md): 1H unders only, ≤ WEEKLY_BET_CAP
 // bets a week, flat 1 unit each. Zero bets is a valid week.
 
@@ -48,7 +48,6 @@ export function slateBar(
 }
 export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
-export const MODEL_BET_THRESHOLD = 53; // model ledger only; not a verdict input since 2026-09-06
 export const WEEKLY_BET_CAP = 5;
 // Hard Rock more than this far BELOW the market total = off-market number
 // (mirrors lib/lineCheck.ts "poor"): never a BET.
@@ -122,7 +121,9 @@ export const REASONS: readonly PickReason[] = [
 export type VerdictInput = {
   away: string;
   home: string;
-  underScore: number | null;
+  /** Our market-blind 1H number; null = the game has no model read. (The
+   *  classifier's `underScore` left this input on 2026-10-04 — a row with a
+   *  bvLine IS a model row, and legacy rows' under_score means nothing.) */
   bvLine: number | null;
   /** Live consensus current 1H line, if any book has posted one. */
   liveLine: number | null;
@@ -230,7 +231,7 @@ function sizeSentence(gap: number, bar: number = BET_GAP_PTS): string {
 
 function gapSentence(i: VerdictInput, hrGap: number | null): string {
   const line = i.liveLine ?? i.fallbackLine;
-  if (i.underScore === null || i.bvLine === null) {
+  if (i.bvLine === null) {
     const share =
       i.fhShare !== null && Number.isFinite(i.fhShare)
         ? `${fmt(i.fhShare * 100)}% of it`
@@ -300,7 +301,7 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
 }
 
 export function verdictFor(i: VerdictInput): VerdictResult {
-  const hasModel = i.underScore !== null && i.bvLine !== null;
+  const hasModel = i.bvLine !== null;
   const consensusGap = i.gap ?? 0;
   const hrGap =
     hasModel && i.hrLine !== null && i.bvLine !== null
@@ -439,9 +440,8 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
   if (hrGap !== null && inBand && i.ev !== null && i.ev >= BET_MIN_EV) {
     // Confidence is the gap alone. The classifier's under_score used to gate
-    // "high" (needed >= MODEL_BET_THRESHOLD); the 2026-09-06 post-mortem found
-    // every score band hits the same rate against a fair line, so it no longer
-    // enters the label. It stays a display chip.
+    // "high"; the 2026-09-06 post-mortem found every score band hits the same
+    // rate against a fair line, and the classifier was retired on 2026-10-04.
     const confidence: Confidence = hrGap >= STRONG_GAP_PTS ? "high" : "medium";
     return out(
       "BET",

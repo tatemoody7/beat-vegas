@@ -39,7 +39,6 @@ export type PickFull = {
   stake: number | null;
   price: number | null;
   note: string | null;
-  modelScore: number | null;
   modelLine: number | null;
   result: string | null; // under/over/push or "pending"
   units: number | null;
@@ -114,7 +113,6 @@ type RawPick = {
   stake: number | null;
   price: number | bigint | null;
   note: string | null;
-  model_score_at_pick: number | bigint | null;
   model_line_at_pick: number | null;
   result: string | null;
   units: number | null;
@@ -163,7 +161,7 @@ async function selectPicks(season: number): Promise<RawPick[]> {
   try {
     return await prisma.$queryRaw<RawPick[]>`
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
-             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             note, model_line_at_pick, result, units, clv,
              graded, is_paper, is_bonus, verdict_at_pick, reason, gap_at_pick,
              ev_at_pick, hr_line_at_pick, blocker
       FROM manual_picks WHERE season = ${season}
@@ -176,7 +174,7 @@ async function selectPicks(season: number): Promise<RawPick[]> {
   try {
     return await prisma.$queryRaw<RawPick[]>`
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
-             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             note, model_line_at_pick, result, units, clv,
              graded, is_paper, verdict_at_pick, reason, gap_at_pick, ev_at_pick,
              hr_line_at_pick
       FROM manual_picks WHERE season = ${season}
@@ -186,7 +184,7 @@ async function selectPicks(season: number): Promise<RawPick[]> {
     console.warn("manual_picks tracking columns missing — run the migration");
     return prisma.$queryRaw<RawPick[]>`
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
-             note, model_score_at_pick, model_line_at_pick, result, units, clv,
+             note, model_line_at_pick, result, units, clv,
              graded, is_paper
       FROM manual_picks WHERE season = ${season}
     `;
@@ -212,7 +210,6 @@ async function loadPicksUncached(season: number): Promise<PickFull[]> {
     stake: r.stake,
     price: num(r.price),
     note: r.note,
-    modelScore: num(r.model_score_at_pick),
     modelLine: r.model_line_at_pick,
     result: truthy(r.graded) ? r.result : "pending",
     units: r.units,
@@ -327,24 +324,23 @@ export async function createPick(
   // "newest" alone picked the reference row). model_line_at_pick is OUR
   // NUMBER (bv_line) — the value Results compares your line against — with
   // the scoring line as a fallback for legacy rows that have no bv_line.
+  // model_score_at_pick is no longer written (classifier retired 2026-10-04,
+  // docs/CLASSIFIER_RETIREMENT.md); the column stays, NULL on new rows.
   const pred =
     market === "1H"
       ? await prisma.$queryRaw<
           {
-            under_score: number | bigint | null;
             bv_line: number | null;
             line_used: number | null;
             factors_json: string | null;
           }[]
         >`
-    SELECT under_score, bv_line, line_used, factors_json FROM predictions
+    SELECT bv_line, line_used, factors_json FROM predictions
     WHERE game_id = ${input.gameId}
     ORDER BY (model_version = 'derived_lines') ASC, created_at DESC
     LIMIT 1
   `
       : [];
-  const modelScore =
-    pred[0]?.under_score == null ? null : Number(pred[0].under_score);
   const modelLine = pred[0]?.bv_line ?? pred[0]?.line_used ?? null;
   const factorsAtPick = pred[0]?.factors_json ?? null;
 
@@ -378,14 +374,14 @@ export async function createPick(
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
          book, price_provenance,
-         stake, is_paper, placed_at, bet_at, note, model_score_at_pick, model_line_at_pick,
+         stake, is_paper, placed_at, bet_at, note, model_line_at_pick,
          factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
          ev_at_pick, hr_line_at_pick)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
          ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
          ${book}, ${priceProvenance}, ${stake},
-         ${isPaper}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+         ${isPaper}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelLine},
          ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine})
     `;
     return { tracked: true };
@@ -399,13 +395,13 @@ export async function createPick(
       await prisma.$executeRaw`
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
-         book, stake, is_paper, placed_at, note, model_score_at_pick,
+         book, stake, is_paper, placed_at, note,
          model_line_at_pick, factors_json_at_pick, graded)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
          ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
          ${book}, ${stake},
-         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelScore}, ${modelLine},
+         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelLine},
          ${factorsAtPick}, false)
     `;
       return { tracked: false };

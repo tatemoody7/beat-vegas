@@ -15,7 +15,6 @@ import type { BoardFactor } from "./score";
 const base: VerdictInput = {
   away: "Ohio State",
   home: "Michigan",
-  underScore: 56,
   bvLine: 21.8,
   liveLine: 24.5,
   fallbackLine: 24.5,
@@ -175,27 +174,20 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.hrGap).toBe(2.2);
   });
 
-  it("high confidence needs only a top-10% Hard Rock gap; the classifier score does not gate it", () => {
-    // 2026-09-06 post-mortem: under_score bands hit the same rate (48.6–49.0%)
-    // against a fair line, so the score is a display chip, not a confidence input.
+  it("high confidence is a top-10% Hard Rock gap and nothing else", () => {
+    // 2026-09-06 post-mortem: the classifier's score bands hit the same rate
+    // (48.6–49.0%) against a fair line; the classifier was retired 2026-10-04
+    // and the verdict has no score input at all.
     const v = verdictFor({
       ...base,
       hrLine: 21.8 + STRONG_GAP_PTS + 0.5,
-      underScore: 58,
     });
     expect(v.verdict).toBe("BET");
     expect(v.confidence).toBe("high");
     expect(v.why[0]).toContain("top ~10%");
-    const lowScore = verdictFor({
-      ...base,
-      hrLine: 21.8 + STRONG_GAP_PTS + 0.5,
-      underScore: 40,
-    });
-    expect(lowScore.confidence).toBe("high");
     const smallerGap = verdictFor({
       ...base,
       hrLine: 21.8 + STRONG_GAP_PTS - 0.5,
-      underScore: 90,
     });
     expect(smallerGap.confidence).toBe("medium");
   });
@@ -346,7 +338,6 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
 describe("verdictFor — no model (the week is not scored yet)", () => {
   const derived: VerdictInput = {
     ...base,
-    underScore: null,
     bvLine: null,
     gap: null,
   };
@@ -491,7 +482,6 @@ describe("H-PCT: the per-slate bar and the centred quote", () => {
   const base = {
     away: "A",
     home: "H",
-    underScore: 60,
     bvLine: 24,
     liveLine: 27,
     fallbackLine: null,

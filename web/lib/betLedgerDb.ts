@@ -33,7 +33,6 @@ type Raw = {
   home_fh: number | bigint | null;
   actual_first_half_total: number | bigint | null;
   model_line_at_pick: number | null;
-  model_score_at_pick: number | bigint | null;
   closing_line: number | null;
   closing_price?: number | bigint | null;
   closing_captured_at?: string | null;
@@ -82,7 +81,7 @@ async function selectRows(season: number): Promise<Raw[]> {
              g.start_date::text AS kickoff,
              mp.is_paper, mp.is_bonus, mp.graded, mp.result, mp.units,
              g.away_first_half_points AS away_fh, g.home_first_half_points AS home_fh,
-             mp.actual_first_half_total, mp.model_line_at_pick, mp.model_score_at_pick,
+             mp.actual_first_half_total, mp.model_line_at_pick,
              mp.closing_line, mp.closing_price,
              mp.closing_captured_at::text AS closing_captured_at,
              mp.price_provenance, mp.clv, mp.clv_prob,
@@ -103,7 +102,7 @@ async function selectRows(season: number): Promise<Raw[]> {
            mp.placed_at::text AS placed_at, g.start_date::text AS kickoff,
            mp.is_paper, mp.graded, mp.result, mp.units,
            g.away_first_half_points AS away_fh, g.home_first_half_points AS home_fh,
-           mp.actual_first_half_total, mp.model_line_at_pick, mp.model_score_at_pick,
+           mp.actual_first_half_total, mp.model_line_at_pick,
            mp.closing_line, mp.clv
     FROM manual_picks mp
     LEFT JOIN games g ON g.id = mp.game_id
@@ -138,7 +137,6 @@ async function getBetLedgerUncached(season: number): Promise<LedgerRow[]> {
       homeFh: num(r.home_fh),
       actualTotal: num(r.actual_first_half_total),
       modelLine: r.model_line_at_pick,
-      modelScore: num(r.model_score_at_pick),
       closingLine: r.closing_line,
       closingPrice: num(r.closing_price),
       closingCapturedAt: isoFromNaive(r.closing_captured_at),

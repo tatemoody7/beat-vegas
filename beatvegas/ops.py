@@ -81,10 +81,11 @@ def record_gauge(key: str, value, note: Optional[str] = None, *, session=None) -
     if session is None and not gauges_enabled():
         return False
     try:
-        from .db.models import AppSetting
+        from .db.models import AppSetting, AppSettingLog
         from .db.store import session_scope
 
         def _write(s) -> None:
+            now = datetime.utcnow()
             row = s.get(AppSetting, key)
             if row is None:
                 row = AppSetting(key=key, value=str(value), note=note)
@@ -93,7 +94,10 @@ def record_gauge(key: str, value, note: Optional[str] = None, *, session=None) -
                 row.value = str(value)
                 if note is not None:
                     row.note = note
-            row.updated_at = datetime.utcnow()
+            row.updated_at = now
+            # Append-only history beside the overwrite (2026-10-04): the value
+            # of every gauge at every write, so a series can be read back.
+            s.add(AppSettingLog(key=key, value=str(value), note=note, written_at=now))
 
         if session is not None:
             _write(session)

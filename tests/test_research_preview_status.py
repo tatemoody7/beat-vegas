@@ -82,6 +82,29 @@ def test_a_healthy_run_reports_ok(env, monkeypatch, tmp_path):
         assert s.query(GamePreview).count() == 1
 
 
+def test_every_run_freezes_the_whole_injury_report_with_its_slot(env, monkeypatch, tmp_path):
+    """2026-10-04: one injury_snapshots row per run -- the raw report, the
+    season/week it fed and the card slot (SLOT env from card.yml, or --slot).
+    game_previews is overwritten every build; this is the only record of what
+    the QB-out gate read at THIS build."""
+    from beatvegas.db.models import InjurySnapshot
+
+    mod, eng = env
+    monkeypatch.setenv("SLOT", "tue_pm")
+    _run(mod, monkeypatch, "--status-file", str(tmp_path / "a.json"))
+    monkeypatch.delenv("SLOT", raising=False)
+    _run(mod, monkeypatch, "--slot", "fri_pm")
+    # an empty feed still leaves its row: [] is the evidence of the outage
+    monkeypatch.setattr(mod.rotowire, "fetch_injury_report", lambda: [])
+    _run(mod, monkeypatch)
+    with Session(eng) as s:
+        rows = s.query(InjurySnapshot).order_by(InjurySnapshot.id).all()
+    assert [r.slot for r in rows] == ["tue_pm", "fri_pm", None]
+    assert all((r.season, r.week, r.source) == (SEASON, WEEK, "rotowire") for r in rows)
+    assert json.loads(rows[0].report_json) == ROWS and json.loads(rows[2].report_json) == []
+    assert all(r.captured_at is not None for r in rows)
+
+
 def test_an_empty_injury_feed_is_not_ok_but_still_writes_the_slate(env, monkeypatch, tmp_path):
     """ESPN is up, so the run is not fatal and the previews are written — but the
     QB read behind them is blank, and the status says so."""

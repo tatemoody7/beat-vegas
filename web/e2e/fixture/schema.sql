@@ -46,6 +46,36 @@ CREATE TABLE public.app_settings (
 );
 
 --
+-- Name: app_settings_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_settings_log (
+    id integer NOT NULL,
+    key character varying(32) NOT NULL,
+    value text NOT NULL,
+    note text,
+    written_at timestamp without time zone
+);
+
+--
+-- Name: app_settings_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.app_settings_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: app_settings_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.app_settings_log_id_seq OWNED BY public.app_settings_log.id;
+
+--
 -- Name: bv_adjustments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -134,6 +164,8 @@ CREATE TABLE public.challenger_picks (
     in_season_weight double precision,
     gap_at_pick double precision,
     closing_captured_at timestamp without time zone,
+    factors_json_at_pick text,
+    refit_id integer,
     graded boolean,
     actual_first_half_total integer,
     result character varying,
@@ -169,6 +201,7 @@ ALTER SEQUENCE public.challenger_picks_id_seq OWNED BY public.challenger_picks.i
 
 CREATE TABLE public.factor_ledger (
     id integer NOT NULL,
+    run_id character varying,
     factor character varying,
     n integer,
     hits integer,
@@ -342,6 +375,8 @@ CREATE TABLE public.game_records (
     bv_gap double precision,
     bv_gap_z double precision,
     under_score integer,
+    home_conference character varying,
+    away_conference character varying,
     first_half_total integer,
     under_hit boolean,
     outcome character varying,
@@ -394,7 +429,9 @@ CREATE TABLE public.games (
     full_game_total_source character varying,
     spread_source character varying,
     spread_open double precision,
-    spread_open_source character varying
+    spread_open_source character varying,
+    home_conference character varying,
+    away_conference character varying
 );
 
 --
@@ -414,6 +451,38 @@ CREATE SEQUENCE public.games_id_seq
 --
 
 ALTER SEQUENCE public.games_id_seq OWNED BY public.games.id;
+
+--
+-- Name: injury_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.injury_snapshots (
+    id integer NOT NULL,
+    season integer,
+    week integer,
+    slot character varying(16),
+    captured_at timestamp without time zone,
+    source character varying(32),
+    report_json text
+);
+
+--
+-- Name: injury_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.injury_snapshots_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: injury_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.injury_snapshots_id_seq OWNED BY public.injury_snapshots.id;
 
 --
 -- Name: manual_picks; Type: TABLE; Schema: public; Owner: -
@@ -451,6 +520,7 @@ CREATE TABLE public.manual_picks (
     clv_prob double precision,
     factors_json_at_pick character varying,
     opening_line double precision,
+    refit_id integer,
     verdict_at_pick character varying(8),
     reason character varying(16),
     gap_at_pick double precision,
@@ -583,6 +653,41 @@ CREATE SEQUENCE public.odds_snapshots_id_seq
 --
 
 ALTER SEQUENCE public.odds_snapshots_id_seq OWNED BY public.odds_snapshots.id;
+
+--
+-- Name: poll_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.poll_log (
+    id integer NOT NULL,
+    captured_at timestamp without time zone,
+    market character varying(16),
+    mode character varying(32),
+    events_in_window integer,
+    events_polled integer,
+    new_snapshots integer,
+    unchanged integer,
+    credits_spent integer,
+    run_id character varying(32)
+);
+
+--
+-- Name: poll_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.poll_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: poll_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.poll_log_id_seq OWNED BY public.poll_log.id;
 
 --
 -- Name: postmortem_buckets; Type: TABLE; Schema: public; Owner: -
@@ -794,6 +899,8 @@ CREATE TABLE public.predictions (
     line_used double precision,
     rank integer,
     factors_json character varying,
+    refit_id integer,
+    fingerprint character varying,
     created_at timestamp without time zone
 );
 
@@ -1051,6 +1158,12 @@ CREATE SEQUENCE public.weather_obs_id_seq
 ALTER SEQUENCE public.weather_obs_id_seq OWNED BY public.weather_obs.id;
 
 --
+-- Name: app_settings_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_settings_log ALTER COLUMN id SET DEFAULT nextval('public.app_settings_log_id_seq'::regclass);
+
+--
 -- Name: bv_adjustments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1105,6 +1218,12 @@ ALTER TABLE ONLY public.game_records ALTER COLUMN id SET DEFAULT nextval('public
 ALTER TABLE ONLY public.games ALTER COLUMN id SET DEFAULT nextval('public.games_id_seq'::regclass);
 
 --
+-- Name: injury_snapshots id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.injury_snapshots ALTER COLUMN id SET DEFAULT nextval('public.injury_snapshots_id_seq'::regclass);
+
+--
 -- Name: manual_picks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1127,6 +1246,12 @@ ALTER TABLE ONLY public.model_runs ALTER COLUMN id SET DEFAULT nextval('public.m
 --
 
 ALTER TABLE ONLY public.odds_snapshots ALTER COLUMN id SET DEFAULT nextval('public.odds_snapshots_id_seq'::regclass);
+
+--
+-- Name: poll_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.poll_log ALTER COLUMN id SET DEFAULT nextval('public.poll_log_id_seq'::regclass);
 
 --
 -- Name: postmortem_buckets id; Type: DEFAULT; Schema: public; Owner: -
@@ -1187,6 +1312,13 @@ ALTER TABLE ONLY public.venues ALTER COLUMN id SET DEFAULT nextval('public.venue
 --
 
 ALTER TABLE ONLY public.weather_obs ALTER COLUMN id SET DEFAULT nextval('public.weather_obs_id_seq'::regclass);
+
+--
+-- Name: app_settings_log app_settings_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_settings_log
+    ADD CONSTRAINT app_settings_log_pkey PRIMARY KEY (id);
 
 --
 -- Name: app_settings app_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1252,6 +1384,13 @@ ALTER TABLE ONLY public.game_records
     ADD CONSTRAINT game_records_pkey PRIMARY KEY (id);
 
 --
+-- Name: injury_snapshots injury_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.injury_snapshots
+    ADD CONSTRAINT injury_snapshots_pkey PRIMARY KEY (id);
+
+--
 -- Name: manual_picks manual_picks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1278,6 +1417,13 @@ ALTER TABLE ONLY public.model_runs
 
 ALTER TABLE ONLY public.odds_snapshots
     ADD CONSTRAINT odds_snapshots_pkey PRIMARY KEY (id);
+
+--
+-- Name: poll_log poll_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.poll_log
+    ADD CONSTRAINT poll_log_pkey PRIMARY KEY (id);
 
 --
 -- Name: postmortem_buckets postmortem_buckets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1392,6 +1538,18 @@ ALTER TABLE ONLY public.weather
     ADD CONSTRAINT weather_pkey PRIMARY KEY (game_id);
 
 --
+-- Name: ix_app_settings_log_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_app_settings_log_key ON public.app_settings_log USING btree (key);
+
+--
+-- Name: ix_app_settings_log_written_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_app_settings_log_written_at ON public.app_settings_log USING btree (written_at);
+
+--
 -- Name: ix_bv_adjustments_game_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1426,6 +1584,12 @@ CREATE INDEX ix_challenger_picks_season ON public.challenger_picks USING btree (
 --
 
 CREATE INDEX ix_factor_ledger_factor ON public.factor_ledger USING btree (factor);
+
+--
+-- Name: ix_factor_ledger_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_factor_ledger_run_id ON public.factor_ledger USING btree (run_id);
 
 --
 -- Name: ix_factor_scores_factor; Type: INDEX; Schema: public; Owner: -
@@ -1512,6 +1676,18 @@ CREATE INDEX ix_games_season ON public.games USING btree (season);
 CREATE INDEX ix_games_week ON public.games USING btree (week);
 
 --
+-- Name: ix_injury_snapshots_captured_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_injury_snapshots_captured_at ON public.injury_snapshots USING btree (captured_at);
+
+--
+-- Name: ix_injury_snapshots_season; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_injury_snapshots_season ON public.injury_snapshots USING btree (season);
+
+--
 -- Name: ix_manual_picks_game_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1558,6 +1734,12 @@ CREATE INDEX ix_odds_snapshots_game_id ON public.odds_snapshots USING btree (gam
 --
 
 CREATE INDEX ix_pm_bucket_lookup ON public.postmortem_buckets USING btree (scope, segment, proxy_kind, selection, dimension);
+
+--
+-- Name: ix_poll_log_captured_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_poll_log_captured_at ON public.poll_log USING btree (captured_at);
 
 --
 -- Name: ix_postmortem_buckets_run_id; Type: INDEX; Schema: public; Owner: -

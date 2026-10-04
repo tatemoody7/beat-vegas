@@ -65,6 +65,25 @@ def test_default_freezes_one_snapshot_per_store(wired):
         assert row.game_id == 1 and row.model_version == "gbm_test" and row.line_used == 24.5
 
 
+def test_refit_identity_is_stamped_on_every_row_when_given(wired):
+    """2026-10-04: refit_id / fingerprint name the weekly refit the row came
+    from; a caller outside weekly_update leaves both NULL."""
+    eng, _ = wired
+    assert (
+        score.store_predictions(
+            _scored(), model_version="gbm_test", refit_id=17, frame_fingerprint="deadbeefcafef00d"
+        )
+        == 1
+    )
+    with Session(eng) as s:
+        (row,) = s.query(Prediction).all()
+        assert row.refit_id == 17 and row.fingerprint == "deadbeefcafef00d"
+    assert score.store_predictions(_scored(), model_version="gbm_test") == 1
+    with Session(eng) as s:
+        (row,) = s.query(Prediction).all()  # delete-then-insert per game
+        assert row.refit_id is None and row.fingerprint is None
+
+
 def test_snapshot_false_writes_predictions_but_never_a_record(wired):
     eng, calls = wired
     assert score.store_predictions(_scored(), model_version="gbm_test", snapshot=False) == 1

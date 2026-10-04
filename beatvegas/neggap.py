@@ -17,13 +17,37 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .backtest.stopping import NEGGAP
 from .card import parse_kick
 from .challenger_picks import add_challenger_pick
 from .db.models import ChallengerPick
 from .hardrock import HR_BOOK_KEY
+from .model.score import MODEL_VERSION
+from .picks import freeze_factors
+
+# The market read frozen beside each arm row (the same chips
+# scripts/build_card.py::log_paper_picks freezes on the champion's paper pick).
+_CHIP_KEYS = (
+    "total_band",
+    "hook_side",
+    "key_dist",
+    "full_game_total",
+    "spread",
+    "hr_vs_market",
+    "fair_source",
+    "fair_under",
+    "market_line",
+    "tier",
+    "cap_rank",
+    "gate_blocker",
+)
+
+
+def _chips(it: Dict) -> Dict:
+    return {k: it.get(k) for k in _CHIP_KEYS}
+
 
 ARMS: Tuple[Tuple[str, float], ...] = tuple(
     (label, float(NEGGAP["arm_gap_max"][label])) for label in NEGGAP["arms"]
@@ -77,15 +101,27 @@ def _logged(session) -> Set[Tuple[int, str]]:
 
 
 def log_neggap_picks(
-    session, card: Dict, now: datetime, window_hours: Optional[float] = None
+    session,
+    card: Dict,
+    now: datetime,
+    window_hours: Optional[float] = None,
+    predictions: Sequence[Dict] = (),
 ) -> Dict[str, int]:
     """Insert the arms' paper OVERS for this build. Mirrors
     scripts/build_card.py::log_paper_picks: the same paper window (a game
     kicking off beyond `window_hours` waits for the next build), one row per
     game per arm (a row already on file is skipped). Returns
-    {arm: rows inserted}. Never touches `manual_picks`."""
+    {arm: rows inserted}. Never touches `manual_picks`.
+
+    `predictions` (2026-10-04): the rows load_inputs built, so each arm row
+    also freezes the prediction's factor payload, the model's input vector
+    (`features`, off the card item) and the refit it came from (`refit_id`) --
+    the same `factors_json_at_pick` shape the champion's paper pick carries."""
     added: Dict[str, int] = {}
     logged = _logged(session)
+    pred_by_game = {
+        int(p["game_id"]): p for p in predictions if p.get("model_version") == MODEL_VERSION
+    }
     for it in card.get("items", []):
         if not in_universe(it):
             continue
@@ -97,6 +133,8 @@ def log_neggap_picks(
         if not arms:
             continue
         gid = int(it["game_id"])
+        pred = pred_by_game.get(gid)
+        frozen = freeze_factors(_chips(it), pred, it.get("features"))
         for arm in arms:
             if (gid, arm) in logged:
                 continue
@@ -119,6 +157,8 @@ def log_neggap_picks(
                 arm_line_at_pick=float(it["bv_line"]),
                 champion_line_at_pick=float(it["bv_line"]),
                 gap_at_pick=float(it["gap"]),
+                factors_json_at_pick=frozen,
+                refit_id=(pred or {}).get("refit_id"),
             )
             added[arm] = added.get(arm, 0) + 1
             logged.add((gid, arm))

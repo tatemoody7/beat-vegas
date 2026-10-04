@@ -81,8 +81,8 @@ async function recentRuns(
 // naive UTC to the second, the shape every other gauge uses. Never fails the
 // dispatch.
 async function recordTriggerGauge(id: string, now: Date, note: string) {
+  const value = now.toISOString().slice(0, 19);
   try {
-    const value = now.toISOString().slice(0, 19);
     await prisma.$executeRaw`
       INSERT INTO app_settings (key, value, note, updated_at)
       VALUES (${`last_dispatch_${id}`}, ${value}, ${note}, ${now}::timestamp)
@@ -91,6 +91,19 @@ async function recordTriggerGauge(id: string, now: Date, note: string) {
   } catch (e) {
     console.error(
       "[cron] dispatch gauge not recorded:",
+      String((e as Error)?.message ?? e),
+    );
+  }
+  // Append-only history beside the overwrite (2026-10-04; beatvegas/ops.py
+  // record_gauge appends the same way). Its own try: the table reaches Neon
+  // through migrate.yml, and a deploy that lands first must not lose the gauge.
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO app_settings_log (key, value, note, written_at)
+      VALUES (${`last_dispatch_${id}`}, ${value}, ${note}, ${now}::timestamp)`;
+  } catch (e) {
+    console.error(
+      "[cron] dispatch gauge history not appended:",
       String((e as Error)?.message ?? e),
     );
   }

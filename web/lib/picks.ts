@@ -333,9 +333,10 @@ export async function createPick(
             bv_line: number | null;
             line_used: number | null;
             factors_json: string | null;
+            refit_id: number | bigint | null;
           }[]
         >`
-    SELECT bv_line, line_used, factors_json FROM predictions
+    SELECT bv_line, line_used, factors_json, refit_id FROM predictions
     WHERE game_id = ${input.gameId}
     ORDER BY (model_version = 'derived_lines') ASC, created_at DESC
     LIMIT 1
@@ -343,6 +344,9 @@ export async function createPick(
       : [];
   const modelLine = pred[0]?.bv_line ?? pred[0]?.line_used ?? null;
   const factorsAtPick = pred[0]?.factors_json ?? null;
+  // Which weekly refit the number came from (predictions.refit_id, 2026-10-04;
+  // mirrors beatvegas/picks.py model_refit_id). NULL before the column lands.
+  const refitId = pred[0]?.refit_id == null ? null : Number(pred[0].refit_id);
 
   const isPaper = input.isPaper === true;
   // Flat 1 unit for real AND paper (paper record reads in units; is_paper keeps
@@ -376,13 +380,13 @@ export async function createPick(
          book, price_provenance,
          stake, is_paper, placed_at, bet_at, note, model_line_at_pick,
          factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
-         ev_at_pick, hr_line_at_pick)
+         ev_at_pick, hr_line_at_pick, refit_id)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
          ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
          ${book}, ${priceProvenance}, ${stake},
          ${isPaper}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelLine},
-         ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine})
+         ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine}, ${refitId})
     `;
     return { tracked: true };
   } catch (e) {

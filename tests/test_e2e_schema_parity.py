@@ -26,6 +26,7 @@ WEB_TABLES = {
     "odds_snapshots",
     "cards",
     "app_settings",
+    "app_settings_log",
     "game_records",
     "game_previews",
     "results",

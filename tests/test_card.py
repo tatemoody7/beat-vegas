@@ -676,6 +676,9 @@ ITEM_KEYS = {
     # Hard Rock's over price on the same quote, for the H-NEGGAP-P paper over
     # arms (2026-09-28); display and every gate ignore it.
     "hr_over_price",
+    # The model's input vector (BV_FEATURE_COLS -> value) the number was scored
+    # from, or null (2026-10-04); frozen onto picks, ignored by the site.
+    "features",
 }
 
 

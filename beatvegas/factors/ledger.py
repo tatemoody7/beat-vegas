@@ -18,7 +18,7 @@ drops back below breakeven.
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 from scipy.stats import beta
@@ -147,12 +147,36 @@ def grade_ledger(df: pd.DataFrame, outcomes: Dict[int, int], recent_window: int 
     return rows
 
 
-def load_ledger(session) -> Dict[str, Dict]:
-    """Read the persisted ledger into the dict shape build_factor_board wants."""
+def latest_ledger_run_id(session) -> Optional[str]:
+    """The run_id of the newest grading run on file (by created_at, then id),
+    or None when the table is empty or its newest rows predate run_id
+    (2026-10-04). Readers filter on it so a kept history never double-counts."""
     from ..db.models import FactorLedger
 
+    row = (
+        session.query(FactorLedger.run_id)
+        .order_by(FactorLedger.created_at.desc(), FactorLedger.id.desc())
+        .first()
+    )
+    return None if row is None else row[0]
+
+
+def load_ledger(session) -> Dict[str, Dict]:
+    """Read the persisted ledger into the dict shape build_factor_board wants:
+    the NEWEST grading run only (scripts/grade_factor_ledger.py keeps every
+    run's rows since 2026-10-04; web/lib/decision-quality.ts applies the same
+    rule). Rows written before `run_id` existed read as one run with a NULL id."""
+    from ..db.models import FactorLedger
+
+    run_id = latest_ledger_run_id(session)
+    q = session.query(FactorLedger)
+    q = (
+        q.filter(FactorLedger.run_id.is_(None))
+        if run_id is None
+        else q.filter(FactorLedger.run_id == run_id)
+    )
     out: Dict[str, Dict] = {}
-    for r in session.query(FactorLedger).all():
+    for r in q.all():
         out[r.factor] = {
             "n": r.n,
             "hits": r.hits,

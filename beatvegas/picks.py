@@ -87,11 +87,35 @@ def model_read(session, game_id: Optional[int], market: str = "1H") -> Optional[
     (docs/CLASSIFIER_RETIREMENT.md) and that column stays NULL on new rows."""
     if game_id is None or (market or "1H") != "1H":
         return None
+    row = _model_row(session, game_id)
+    if row is None:
+        return None
+    bv_line, line_used, _refit = row
+    return bv_line if bv_line is not None else line_used
+
+
+def model_refit_id(session, game_id: Optional[int], market: str = "1H") -> Optional[int]:
+    """`predictions.refit_id` of the SAME row `model_read` freezes the number
+    from (2026-10-04) — which weekly refit the pick was logged against. None
+    when there is no model row, the row predates the column, or the market is
+    not the model's."""
+    if game_id is None or (market or "1H") != "1H":
+        return None
+    row = _model_row(session, game_id)
+    if row is None or row[2] is None:
+        return None
+    return int(row[2])
+
+
+def _model_row(session, game_id: int):
+    """(bv_line, line_used, refit_id) of the prediction row the pick is logged
+    against: the model row over the display-only reference row, newest first —
+    one ordering rule for every field frozen onto a ticket."""
     from .card import REFERENCE_MODEL_VERSION  # local: picks.py must not depend on the card
     from .db.models import Prediction
 
-    row = (
-        session.query(Prediction.bv_line, Prediction.line_used)
+    return (
+        session.query(Prediction.bv_line, Prediction.line_used, Prediction.refit_id)
         .filter(Prediction.game_id == game_id)
         .order_by(
             (Prediction.model_version == REFERENCE_MODEL_VERSION).asc(),
@@ -99,10 +123,40 @@ def model_read(session, game_id: Optional[int], market: str = "1H") -> Optional[
         )
         .first()
     )
-    if row is None:
-        return None
-    bv_line, line_used = row
-    return bv_line if bv_line is not None else line_used
+
+
+def freeze_factors(chips: Optional[dict], prediction: Optional[dict], features: Optional[dict]):
+    """The JSON frozen onto a paper or challenger pick at the build
+    (`factors_json_at_pick`, 2026-10-04): one dict with three keys so the
+    post-mortem can slice by the market read, by the prediction's factor
+    payload and by the model's own input vector long after the lines, the
+    predictions row and the factor board have moved on.
+
+      chips:    the market chips build_card has always frozen (unchanged shape)
+      factors:  `predictions.factors_json` for the game as of the build, parsed
+                (None when the prediction carries none)
+      features: BV_FEATURE_COLS -> value for the game as scored, from the
+                game's `game_records.features_json` (None when the game has no
+                record; build_card counts those in its log line)
+
+    NaN is refused (`allow_nan=False`): a frozen vector with NaN in it would
+    not round-trip, and record_fields already cleaned the record to None."""
+    import json
+
+    f = (prediction or {}).get("factors")
+    if f is None:
+        f = (prediction or {}).get("factors_json")
+    if isinstance(f, str):
+        try:
+            f = json.loads(f)
+        except (TypeError, ValueError):
+            f = None
+    payload = {
+        "chips": chips,
+        "factors": f if isinstance(f, dict) else None,
+        "features": features if isinstance(features, dict) else None,
+    }
+    return json.dumps(payload, ensure_ascii=False, allow_nan=False)
 
 
 def add_pick(
@@ -131,6 +185,7 @@ def add_pick(
     factors_json: Optional[str] = None,
     model_line: Optional[float] = None,
     bet_at: Optional[datetime] = None,
+    refit_id: Optional[int] = None,
 ) -> ManualPick:
     """Insert (and flush) one under pick. A paper pick always stakes
     `PAPER_STAKE` regardless of `stake` — nothing is at risk, and a flat unit
@@ -177,6 +232,9 @@ def add_pick(
         blocker=blocker,
         factors_json_at_pick=factors_json,
         model_line_at_pick=model_line,
+        # Which weekly refit the number came from (model_refit_id / the card
+        # item's prediction row). 2026-10-04.
+        refit_id=refit_id,
     )
     session.add(pick)
     session.flush()

@@ -100,16 +100,26 @@ const numOrNull = (v: unknown): number | null =>
 /** Both post-mortem tables; null when they do not exist yet (Monday fills them). */
 async function loadPostMortemUncached(): Promise<PostMortem | null> {
   try {
+    // The NEWEST run per scope (2026-10-04): scripts/post_mortem.py keeps the
+    // last 12 runs of each scope on file instead of rewriting it, so the
+    // buckets are read under that run's id, never across runs.
     const runs = await prisma.$queryRaw<RawRun[]>`
-      SELECT scope, run_id, computed_at, n_games, notes_json
-      FROM postmortem_runs ORDER BY scope
+      SELECT DISTINCT ON (scope) scope, run_id, computed_at, n_games, notes_json
+      FROM postmortem_runs
+      ORDER BY scope, computed_at DESC, id DESC
     `;
     if (runs.length === 0) return null;
     const buckets = await prisma.$queryRaw<RawBucket[]>`
-      SELECT scope, segment, proxy_kind, selection, dimension, bucket, bucket_order,
-             n, unders, overs, pushes, under_pct, units, roi, ci_lo, ci_hi, p_beat
-      FROM postmortem_buckets
-      WHERE dimension <> 'wl_contrast'
+      SELECT b.scope, b.segment, b.proxy_kind, b.selection, b.dimension, b.bucket,
+             b.bucket_order, b.n, b.unders, b.overs, b.pushes, b.under_pct, b.units,
+             b.roi, b.ci_lo, b.ci_hi, b.p_beat
+      FROM postmortem_buckets b
+      JOIN (
+        SELECT DISTINCT ON (scope) scope, run_id
+        FROM postmortem_runs
+        ORDER BY scope, computed_at DESC, id DESC
+      ) r ON r.scope = b.scope AND r.run_id IS NOT DISTINCT FROM b.run_id
+      WHERE b.dimension <> 'wl_contrast'
     `;
     return {
       runs: runs.map((r) => {

@@ -435,6 +435,40 @@ def test_main_records_the_weekly_refit_in_model_runs(monkeypatch, wu, capsys):
     assert "[model_runs] weekly refit recorded" in capsys.readouterr().out
 
 
+def test_the_refit_id_and_frame_digest_reach_store_predictions(monkeypatch, wu):
+    """2026-10-04: the model_runs row is written BEFORE the predictions so every
+    row can carry its id (`refit_id`) and the frame's digest (`fingerprint`);
+    record_weekly_refit returns that id."""
+    import json
+
+    from beatvegas.db.models import ModelRun
+
+    _wire(monkeypatch, wu, "bv_line")
+    got = _capture_store(monkeypatch, wu)
+    wu.main()
+    with wu.session_scope() as s:
+        (row,) = s.query(ModelRun).all()
+        rid = row.id
+        digest = json.loads(row.metrics_json)["frame_fingerprint"]
+    assert got["refit_id"] == rid and rid is not None
+    assert got["frame_fingerprint"] == digest and len(digest) == 16
+
+
+def test_a_failed_refit_record_leaves_the_predictions_unstamped(monkeypatch, wu, capsys):
+    _wire(monkeypatch, wu, "bv_line")
+    got = _capture_store(monkeypatch, wu)
+
+    @contextmanager
+    def boom():
+        raise RuntimeError("neon blip")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(wu, "session_scope", boom)
+    wu.main()
+    assert got["refit_id"] is None and len(got["frame_fingerprint"]) == 16
+    assert "[model_runs] weekly refit NOT recorded: neon blip" in capsys.readouterr().out
+
+
 def test_a_failed_run_log_write_never_fails_scoring(monkeypatch, wu, capsys):
     _wire(monkeypatch, wu, "bv_line")
 

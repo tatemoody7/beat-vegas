@@ -1,4 +1,4 @@
-import { parseFactors } from "@/lib/score";
+import { parseFactors, type Factors } from "@/lib/score";
 import { prisma } from "@/lib/prisma";
 
 export type DqPickRow = {
@@ -162,7 +162,13 @@ export function perFactorAttribution(
   // factor key -> {label, picks where it was green}
   const acc = new Map<string, { label: string; rows: DqPickRow[] }>();
   for (const p of picks) {
-    const board = parseFactors(p.factors_json_at_pick).factor_board ?? [];
+    // Two shapes on file: the site freezes predictions.factors_json as-is
+    // ({factor_board, ...}); since 2026-10-04 the card's paper and challenger
+    // picks freeze {chips, factors: <that payload>, features} (picks.freeze_factors).
+    const parsed = parseFactors(p.factors_json_at_pick) as Factors & {
+      factors?: Factors | null;
+    };
+    const board = parsed.factor_board ?? parsed.factors?.factor_board ?? [];
     for (const f of board) {
       if (f.color !== "green") continue;
       const e = acc.get(f.key) ?? { label: f.label, rows: [] };
@@ -229,8 +235,15 @@ export async function getDecisionQuality(
     n: number | bigint | null;
   }[] = [];
   try {
+    // The newest grading run only (2026-10-04): scripts/grade_factor_ledger.py
+    // keeps every run's rows under a run_id instead of rewriting the table.
+    // Rows older than the column read as one run with a NULL id.
     ledgerRows = await prisma.$queryRaw`
       SELECT factor, post_mean, n FROM factor_ledger
+      WHERE run_id IS NOT DISTINCT FROM (
+        SELECT run_id FROM factor_ledger
+        ORDER BY created_at DESC NULLS LAST, id DESC LIMIT 1
+      )
     `;
   } catch (err) {
     // factor_ledger may not exist yet (created lazily by the Phase-3 Python jobs).

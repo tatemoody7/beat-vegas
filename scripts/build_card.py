@@ -33,7 +33,7 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Sequence, Set
 
 from beatvegas.card import (
     REFERENCE_MODEL_VERSION,
@@ -58,6 +58,7 @@ from beatvegas.db.models import (
     Card,
     Game,
     GamePreview,
+    GameRecord,
     ManualPick,
     OddsSnapshot,
     Prediction,
@@ -65,11 +66,12 @@ from beatvegas.db.models import (
 )
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
+from beatvegas.model.bv_line import BV_FEATURE_COLS
 from beatvegas.model.score import MODEL_VERSION
 from beatvegas.neggap import collection_enabled as neggap_enabled
 from beatvegas.neggap import log_neggap_picks
 from beatvegas.neggap import summary_line as neggap_summary_line
-from beatvegas.picks import add_pick, existing_pick
+from beatvegas.picks import add_pick, existing_pick, freeze_factors
 
 
 def hr_universe(session, season: int, week: int) -> List[Dict]:
@@ -136,6 +138,32 @@ def real_bets_this_week(session, season: int, week: int) -> Set[int]:
     return {r[0] for r in rows}
 
 
+def frozen_features(session, game_ids: List[int]) -> Dict[int, Dict]:
+    """{game_id: {BV_FEATURE_COLS -> value}} from each game's newest
+    `game_records.features_json` (2026-10-04) — the input vector the model was
+    scored from, written by etl/game_records.snapshot_slate at the first
+    pre-kickoff capture. Filtered to the regressor's own columns so the frozen
+    vector is what the number depended on, not the classifier's wider frame. A
+    game with no record is absent (its pick freezes `features: null`)."""
+    out: Dict[int, Dict] = {}
+    if not game_ids:
+        return out
+    rows = (
+        session.query(GameRecord.game_id, GameRecord.features_json)
+        .filter(GameRecord.game_id.in_(game_ids), GameRecord.features_json.isnot(None))
+        .order_by(GameRecord.captured_at.asc(), GameRecord.id.asc())
+        .all()
+    )
+    for gid, raw in rows:  # ascending, so the newest record wins
+        try:
+            feats = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(feats, dict):
+            out[int(gid)] = {c: feats.get(c) for c in BV_FEATURE_COLS}
+    return out
+
+
 def load_inputs(session, game_ids: List[int]) -> tuple:
     """(snapshots, predictions, previews) as the plain dicts build_card takes."""
     if not game_ids:
@@ -153,6 +181,7 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
         .filter(OddsSnapshot.game_id.in_(game_ids), OddsSnapshot.market == "1H_total")
         .all()
     ]
+    features = frozen_features(session, game_ids)
     preds = [
         {
             "game_id": p.game_id,
@@ -162,6 +191,11 @@ def load_inputs(session, game_ids: List[int]) -> tuple:
             "line_used": p.line_used,
             # the stored pace chip: degraded_inputs reads it
             "factors_json": p.factors_json,
+            # Model identity + the input vector the number was scored from
+            # (2026-10-04): frozen onto every paper/challenger pick and carried
+            # on the card item (`features`). None where the game has no record.
+            "refit_id": p.refit_id,
+            "features": features.get(int(p.game_id)) if p.model_version == MODEL_VERSION else None,
         }
         for p in session.query(Prediction)
         .filter(
@@ -223,7 +257,12 @@ PAPER_VERDICT = {"BET": "BET", "EDGE": "WATCH", "PASS": "PASS"}
 
 
 def log_paper_picks(
-    session, card: Dict, now: datetime, window_hours: Optional[float] = None
+    session,
+    card: Dict,
+    now: datetime,
+    window_hours: Optional[float] = None,
+    predictions: Sequence[Dict] = (),
+    stats: Optional[Dict] = None,
 ) -> int:
     """Insert one PAPER pick per QUALIFYING item (Hard Rock's 1H line >=
     BET_GAP_PTS above ours — any tier) that has no paper pick yet, tagged with
@@ -235,8 +274,17 @@ def log_paper_picks(
     the gap to the next look, fri_pm and sat_am take the rest of the week).
     None = every qualifying game still on the card. Freezes OUR number
     (`model_line`) alongside Hard Rock's, marks `paper_logged`, and returns the
-    number inserted."""
+    number inserted.
+
+    `predictions` (2026-10-04): the rows load_inputs built, so each pick also
+    freezes the prediction's factor payload, the model's input vector
+    (`features`, off the game's record) and the refit it came from
+    (`refit_id`). The build summary counts the picks that froze no vector."""
+    pred_by_game = {
+        int(p["game_id"]): p for p in predictions if p.get("model_version") == MODEL_VERSION
+    }
     inserted = 0
+    no_vector = 0
     for it in card["items"]:
         if not it.get("qualifies"):
             continue
@@ -249,6 +297,10 @@ def log_paper_picks(
             it["paper_logged"] = True
             continue
         blocker = "cap" if it.get("over_cap") else (it.get("paper_blocker") or "none")
+        pred = pred_by_game.get(int(gid))
+        features = it.get("features")
+        if features is None:
+            no_vector += 1
         # Display chips + the market read frozen at the pick, so the post-mortem
         # can slice by them even after the lines move (never gates).
         chips = {
@@ -294,16 +346,23 @@ def log_paper_picks(
             hr_line=it["hr_line"],
             placed_at=now,
             blocker=blocker,
-            factors_json=json.dumps(chips, ensure_ascii=False, allow_nan=False),
+            # {chips, factors, features}: the market chips as before, plus the
+            # prediction's factor payload and the model's input vector at the
+            # build (picks.freeze_factors, 2026-10-04).
+            factors_json=freeze_factors(chips, pred, features),
             # OUR number, off the same card item the gap was computed from.
             # Until 2026-09-13 nothing in the Python lane wrote it, so the whole
             # paper ledger sat outside decision-quality's agreed/against split.
             # (model_score_at_pick stays NULL since 2026-10-04: the classifier
             # that produced it was retired, docs/CLASSIFIER_RETIREMENT.md.)
             model_line=it["bv_line"],
+            refit_id=(pred or {}).get("refit_id"),
         )
         it["paper_logged"] = True
         inserted += 1
+    if stats is not None:
+        # for the build summary: how many of THIS build's picks froze no vector
+        stats["no_vector"] = no_vector
     return inserted
 
 
@@ -586,16 +645,24 @@ def run(
         challenger_paused = False
         neggap_added: Dict[str, int] = {}
         neggap_on = neggap_enabled()
+        paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
-                picks_added = log_paper_picks(s, card, now, window_hours=paper_window_hours)
+                picks_added = log_paper_picks(
+                    s,
+                    card,
+                    now,
+                    window_hours=paper_window_hours,
+                    predictions=preds,
+                    stats=paper_stats,
+                )
                 # H-NEGGAP-P (2026-09-28): the paper OVER arms log beside the
                 # champion from the same build into challenger_picks, never
                 # manual_picks. A failure here must never cost the real card.
                 if neggap_on:
                     try:
                         neggap_added = log_neggap_picks(
-                            s, card, now, window_hours=paper_window_hours
+                            s, card, now, window_hours=paper_window_hours, predictions=preds
                         )
                     except Exception as e:  # noqa: BLE001 - never break the card
                         print(f"[card] WARNING: H-NEGGAP-P arms not logged: {e}")
@@ -655,6 +722,18 @@ def run(
         )
     if not dry_run and card["items"] and not no_paper:
         lines.append(neggap_summary_line(neggap_added, neggap_on))
+        if picks_added:
+            # Frozen feature vectors (2026-10-04): a pick with none had no
+            # game_records row (the first scoring of the game never ran).
+            lines.append(
+                f"  FROZEN: {picks_added - paper_stats.get('no_vector', 0)} of {picks_added} "
+                "paper picks carry the model's input vector"
+                + (
+                    f" ({paper_stats['no_vector']} without a game_records row)"
+                    if paper_stats.get("no_vector")
+                    else ""
+                )
+            )
     print("\n".join(lines))
     if dry_run:
         print(json.dumps(card, indent=2, ensure_ascii=False, allow_nan=False))

@@ -26,6 +26,10 @@ _MIGRATIONS = {
         "bv_hi": "FLOAT",
         "bv_sigma": "FLOAT",
         "bv_intercept": "FLOAT",
+        # Model identity (2026-10-04): the model_runs row and frame digest of
+        # the refit that produced the number. See models.Prediction.
+        "refit_id": "INTEGER",
+        "fingerprint": "VARCHAR",
     },
     "results": {
         "closing_captured_at": "TIMESTAMP",
@@ -58,8 +62,15 @@ _MIGRATIONS = {
     # grade_pick has always written and this table never had a column for.
     "challenger_picks": {
         "closing_captured_at": "TIMESTAMP",
+        # The frozen snapshot + refit identity manual_picks carries (2026-10-04).
+        "factors_json_at_pick": "TEXT",
+        "refit_id": "INTEGER",
     },
+    # Kept rows, one run_id per grading run (2026-10-04); readers take the newest.
+    "factor_ledger": {"run_id": "VARCHAR"},
     "manual_picks": {
+        # The weekly refit the pick was logged against (2026-10-04).
+        "refit_id": "INTEGER",
         # The close price, kept apart from the price at the DECISION -- see the
         # column comment on ManualPick.closing_price for why that matters.
         "closing_price": "INTEGER",
@@ -97,10 +108,18 @@ _MIGRATIONS = {
         # for why the mutable `spread` above cannot serve as an as-of feature
         "spread_open": "FLOAT",
         "spread_open_source": "VARCHAR",
+        # CFBD's per-season conferences (2026-10-04) — see models.Game
+        "home_conference": "VARCHAR",
+        "away_conference": "VARCHAR",
     },
     "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
-    # which 1H engine froze the record (2026-09-07, after the table existed)
-    "game_records": {"engine": "VARCHAR"},
+    # which 1H engine froze the record (2026-09-07, after the table existed);
+    # the conferences as `games` carried them at snapshot time (2026-10-04)
+    "game_records": {
+        "engine": "VARCHAR",
+        "home_conference": "VARCHAR",
+        "away_conference": "VARCHAR",
+    },
 }
 
 # One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH

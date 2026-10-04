@@ -303,6 +303,8 @@ jobs:
         env:
           SEASON: ${{ steps.active.outputs.season }}
           WEEK: ${{ steps.active.outputs.week }}
+          # Stamped on the injury_snapshots row this run writes (2026-10-04).
+          SLOT: ${{ steps.slot.outputs.slot }}
         run: |
           python scripts/research_preview.py \
             --season "$SEASON" \

@@ -31,6 +31,7 @@ from beatvegas.picks import (
     grade_pick,
     graded_pick_fields,
     model_read,
+    model_refit_id,
     rule_paused,
 )
 
@@ -153,6 +154,7 @@ def cmd_add(args) -> None:
             hr_line=args.hr_line,
             model_line=model_line,
             bet_at=bet_at_from_et(getattr(args, "bet_at", None)),
+            refit_id=model_refit_id(s, gid, market),
         )
         why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
         print(

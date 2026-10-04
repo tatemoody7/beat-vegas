@@ -144,6 +144,11 @@ def backfill_season(
             "full_game_total": ou,
             "full_game_total_book": prov,
             "spread": sp,
+            # CFBD's per-season conferences (2026-10-04): the same fields the
+            # teams table has always been filled from, kept on the game so a
+            # slice reads the season's membership, not today's.
+            "home_conference": _get(g, "homeConference", "home_conference"),
+            "away_conference": _get(g, "awayConference", "away_conference"),
         }
         row.update(fh)
         game_rows.append(row)

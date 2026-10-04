@@ -943,6 +943,11 @@ def build_item(
         # (docs/CLASSIFIER_RETIREMENT.md). The key stays so every card parser
         # and the item-field snapshot (beatvegas/snapshots.py) keep reading.
         "under_score": None,
+        # The model's input vector the number was scored from (BV_FEATURE_COLS
+        # -> value, off the game's record; build_card.frozen_features), or null.
+        # 2026-10-04. Frozen onto every paper/challenger pick; the site's parser
+        # ignores it. ~60 floats per item, well under 1 MB on a 60-item card.
+        "features": _features(prediction),
         "games_played": games_played,
         # The QB-out read this build saw (Rotowire via the preview). Additive
         # since 2026-09-15 so the gates study can grade the qb_out gate ALONE:
@@ -1065,6 +1070,29 @@ def _games_played(pred: Optional[Dict]) -> Optional[int]:
         if math.isfinite(fv):
             vals.append(int(fv))
     return min(vals) if vals else None
+
+
+def _features(pred: Optional[Dict]) -> Optional[Dict]:
+    """The prediction's frozen input vector for the card item, or None. Values
+    are the floats record_fields cleaned (NaN already None), so the item stays
+    strict-JSON; anything that is not a finite number or None is dropped."""
+    f = (pred or {}).get("features")
+    if not isinstance(f, dict):
+        return None
+    out: Dict[str, Optional[float]] = {}
+    for k, v in f.items():
+        if v is None:
+            out[k] = None
+            continue
+        if isinstance(v, bool):
+            out[k] = float(v)
+            continue
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        out[k] = fv if math.isfinite(fv) else None
+    return out
 
 
 def _pred_factors(pred: Dict) -> Optional[Dict]:

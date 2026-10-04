@@ -5,7 +5,7 @@ observation. Measurement only on the real-money side: **nothing here licenses a 
 bet on an over.** `docs/BETTING_POLICY.md` is first-half unders and this row does not
 amend it.
 
-> **STATUS 2026-10-02 — COLLECTING; FIRST ROWS ON FILE, NOTHING GRADED.** Collection
+> **STATUS 2026-10-04 — COLLECTING; FIRST WEEK GRADED, NO BOUNDARY CROSSED** (table at the end). Collection
 > switched on with card 22 (`cards.id` 22, `tue_pm`, 2026-09-29, 0 rows: the 48 h paper
 > window held every week-5 game); card 23 (`thu_pm`, 2026-10-01) also wrote 0 (the 24 h
 > window: no negative-gap game kicked off Thursday or Friday night). **Card 24 (`fri_pm`,
@@ -130,6 +130,19 @@ before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (
   measured 2026-10-01, HISTORY) keeps its row — the pick is judged at the price captured here.
 - Weekly: per arm, n logged, n graded, hit rate, units at price, favourable line value,
   excluded-no-close share, both LLRs against A/B.
+
+## Weekly positions (`scripts/neggap_position.py`)
+
+### 2026-10-04 — week 5 graded (30 rows: 27 from card 24, 3 from card 25 `sat_am`)
+
+| arm | logged | graded | over (won) | units | profit n / mean / LLR | line value n / mean / LLR | verdict |
+|---|---|---|---|---|---|---|---|
+| `neggap_lt0` | 16 | 16 | 5 | −6.71 | 16 / −0.419 / −0.630 | 16 / +0.125 / −0.532 | running |
+| `neggap_le175` | 8 | 8 | 3 | −2.45 | 8 / −0.307 / −0.236 | 8 / +0.125 / −0.266 | running |
+| `neggap_le3` | 6 | 6 | 2 | −2.32 | 6 / −0.387 / −0.216 | 6 / +0.333 / +0.133 | running |
+
+Bounds A +4.564 / B −1.601; no close excluded (all 16 inside the 2 h window). The band went
+12 under / 5 over on main lines this week — the reverse of weeks 2-3. Measurement only.
 
 ## Result
 

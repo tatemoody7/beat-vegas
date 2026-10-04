@@ -28,42 +28,61 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 
-## Where we are (as of 2026-09-28)
-- **Real money: 9-6, +2.84u through week 4** (Wilson 35.7–80.2%), $10 flat units, ≤5 bets a
-  week, every card BET placed and nothing else. Paper picks run beside it on the same rule.
-- **Week 5 is the first week on the B-SERVE model** (57 inputs that were NaN at serving are out
+## Where we are (as of 2026-10-04)
+- **Real money: 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), $10 flat units, ≤5 bets a
+  week, every card BET placed and nothing else. Week 5 went 1-4 (−3.13u) on a slate that went
+  62% under: the four losers landed 3.9 pts over their lines, two by 1.5-2.5 pts, two by 7.5 and
+  14.5; line value 0.00, no rule loosened — variance plus one tie-at-the-bar pick (Alabama @
+  Mississippi State, gap 2.12 = bar 2.12, cap rank 5). Week-5 report: `reports/weekly/`, local.
+- **Week 5 was the first week on the B-SERVE model** (57 inputs that were NaN at serving are out
   of the feature set; `weekly_update.py` fails a scoring run whose target rows are >90% NaN on a
-  column training is <10% NaN on). The weekly refit writes a `model_runs` row with its frame
-  fingerprint; **any number about the live model comes from a runner dispatch and names it**.
+  column training is <10% NaN on). It fixed the level (mean `bv_line` 0.8 under Hard Rock, bias
+  +0.18 = the book's) and not the accuracy (MAE 9.03 vs 8.39; on qualifying games 8.74 vs 7.50).
+  The weekly refit writes a `model_runs` row with its frame fingerprint; **any number about the
+  live model comes from a runner dispatch and names it**.
 - **The bar is per-slate (H-PCT)**: the k-th largest gap over the slate's Hard-Rock-priced games
   with a centred quote and a model read, k = max(1, round(0.2 × N)) — `model/score.py::slate_bar`
   mirrored by `verdict.ts::slateBar`, golden vectors in `tests/fixtures/slate_bar_vectors.json`.
   `BET_GAP_PTS = 1.75` survives only as the empty-slate fallback.
 - **H-STOP-2** (SPRT, two clocks: profit and line value inside the 2 h close window, σ 0.929 /
-  1.371) starts at the 2026-09-29 `tue_pm` build; H-STOP is superseded. A failure boundary
-  pauses real money (`scripts/rule_pause.py`); a success boundary changes nothing.
+  1.371) started at the 2026-09-29 `tue_pm` build; H-STOP is superseded. A failure boundary
+  pauses real money (`scripts/rule_pause.py`); a success boundary changes nothing. **After week
+  5: profit n=10, LLR −0.26; line value n=9, LLR +0.73** (bounds +3.47 / −1.58); one pick
+  excluded (a Friday-night close 227 min out). A bad week is a clock reading, not a rule change.
 - **H-NEGGAP-P** logs paper OVERS from the same build: three nested arms (gap < 0 / ≤ −1.75 /
   ≤ −3) on Hard Rock's MAIN line, one row per game per arm into `challenger_picks`
   (`side='over'`, never `manual_picks`), Bonferroni 0.833% per arm-clock. Measurement only;
   a pass licenses nothing at real money. The negative-gap band went over 26 of 38 live, but 23 of
   those were Hard Rock ALTERNATE lines; on main lines it is 10 of 15. First rows: card 24
-  (`fri_pm` 2026-10-02), 27 rows over 15 games, recorded in `docs/NEGGAP_PAPER.md`.
+  (`fri_pm` 2026-10-02), 27 rows over 15 games, recorded in `docs/NEGGAP_PAPER.md`. Week 5
+  graded: `lt0` 5-11 (−6.7u), `le175` 3-5, `le3` 2-4 — the band went 12 under / 5 over.
 - **What the evidence says**: 2023-25 (1,902 real closes) is exhausted for rule selection;
-  everything important is validated prospectively on 2026 decisions. The model reads ~2 pts
-  under the market and is slightly less accurate than Hard Rock in every spread bucket —
-  measured weekly, tracked, not gated. Hard Rock posts 1H lines Tue 31% → Fri 78% → Sat 97% and
-  they barely move, so **the best look is Friday after 5:30pm ET**, then Saturday after 8:30am.
+  everything important is validated prospectively on 2026 decisions. The model's level now
+  matches the market (B-SERVE); it is still less accurate than Hard Rock, and in weeks 4-5 the
+  gap did not sort unders from overs (gap ≥ 1.75 went 7-7 in week 5 while gap < 1.75 went 26-13;
+  gap-vs-residual correlation +0.15 / +0.16 on main lines) — measured weekly, tracked, not gated.
+  Hard Rock posts 1H lines Tue 31% → Fri 78% → Sat 97% and they barely move, so **the best look
+  is Friday after 5:30pm ET**, then Saturday after 8:30am; Tate bets off the first BET-rated
+  build (his call, 2026-10-04 — the Tuesday tickets closed flat or better).
 
 ## Open items (the only place pending work lives; date each)
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
-  main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). It is why
-  close coverage is ~a third and why late candidates read `no_hr_line`. Decide: ask the feed for
-  `alternate_totals_h1` (2 credits an event, one probe first), report to The Odds API, or accept.
-- **Sat 2026-10-03 is the first live run of the Vercel `lines-close` backup** (PR #242; a
-  dry-run dispatch on 2026-09-29 proved the path). Watch `last_dispatch_lines-close` advance
-  hourly; Sunday's grade must lift `close_coverage_pct` past 0.8 (17 of 53 for week 4).
-- **2026-10-06**: The Odds API renewal — downgrade 100K ($59) → 20K ($30); then update the
-  comment in `config.example.yaml`. No smaller paid tier exists.
+  main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
+  candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
+  (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
+  `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
+  `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
+- **Friday-night games get no close inside 2 h** (2026-10-02: Penn State @ Northwestern, last
+  capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
+  Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
+  (`vercel.json` + the route's window), Tate's call.
+- **The Odds API renewal**: the credit counter reset on 2026-10-01 (`remaining=99940 used=60`),
+  so the 100K plan ($59) has most likely already billed for October. Confirm on the dashboard;
+  downgrade to 20K ($30) there for the next cycle; then update the comment in
+  `config.example.yaml`. No smaller paid tier exists.
+- **Draft paper rows from the week-5 review, not registered**: H-PCT-TIE (a margin above the
+  slate bar; the tie-at-bar bet lost, n=1) and H-TIMING (first-BET build vs the Friday build,
+  measurement only). Approve or drop; both are in the week-5 report (`reports/weekly/`, local), §15.
 - **CFBD Tier 2** ($5/mo, 30,000 calls) still to buy; free Academic 3,000 until then.
 - **GitHub billing**: the repo is PUBLIC since 2026-09-22 (Actions minute cap lifted); a Billing
   support ticket is open. Once a card is on file the repo goes back to private — which restores

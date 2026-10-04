@@ -7,6 +7,37 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-04
+
+- **2026-10-04 (WEEK 5 REVIEWED — `reports/weekly/2026-w5.md`, gitignored; plan file
+  `let-s-run-a-full-playful-russell.md`).** Real money **1-4, −3.13u** (season **10-10,
+  −0.29u**, Wilson 29.9–70.1%): Washington @ USC u30.5 W; Florida @ Missouri u28.5, Kentucky @
+  South Carolina u27.5, Penn State @ Northwestern u23.5 (all Tuesday tickets) and Alabama @
+  Mississippi State u30.5 (Friday, gap 2.12 on a 2.12 bar, cap rank 5) L. Line value 0 / 0 /
+  +1 / 0 / −1; price CLV −0.011; every card BET placed, nothing else; no rule loosened. Paper
+  4-6, −2.66u (BET-rated 1-1, price-blocked 3-5; season price-blocked 14-20 vs BET-rated 7-4 —
+  the price gate filters losers). **The slate went 33-20 under at Hard Rock's numbers and the
+  under side sat below the bar**: gap < 1.75 went 26-13, gap ≥ 1.75 7-7, the qualifying set
+  4-5; the gap-vs-residual correlation on main lines read +0.15 (wk 4) and +0.16 (wk 5) after
+  −0.34 / −0.36 in weeks 2-3. B-SERVE fixed the level (bias +0.18, the book's) and not the
+  accuracy (MAE 9.03 vs 8.39; qualifying games 8.74 vs 7.50); the model missed the four losers
+  by 6.8 / 6.9 / 10.4 / 16.6 pts, Hard Rock by 1.5 / 2.5 / 7.5 / 14.5. **H-STOP-2** at n=10:
+  profit LLR −0.26, line value LLR +0.73 (n=9; Penn State excluded — Friday-night close 227
+  min out, the Vercel `lines-close` entries are Saturday-only). **H-NEGGAP-P** first week
+  graded: `lt0` 5-11 −6.71u, `le175` 3-5, `le3` 2-4, all clocks running; the band went 12 under
+  / 5 over on main lines. Ops: every job green; the close backup's first Saturday fired 14
+  hourly dispatches and `close_coverage_pct` read **1.000 (53 of 53)**; weather 53/55; alternate
+  share at `sat_am` 8 of 48; the Odds API counter reset on Oct 1 (99,940 remaining), so the
+  renewal the brief dated Oct 6 has most likely billed. **Decisions (Tate):** ledger confirmed;
+  keep betting off the first BET-rated build; hold H-PCT as registered (a change would
+  supersede H-STOP-2 at n=10); report + docs PR. Verdict: variance plus one marginal pick inside
+  a model that is less accurate than the book; the registered clock is the arbiter. Proposed,
+  not done: Friday-night `lines-close` entries; draft paper rows H-PCT-TIE and H-TIMING; the
+  weekly review gains the gap-residual correlation and the qualifying-games MAE as standing
+  lines. Housekeeping: `reports/neggap_*` gitignored (the position script writes there); the
+  Friday write-up left uncommitted in worktree `neggap-card24` is committed as the first commit
+  of this PR.
+
 ## 2026-10-02
 
 - **2026-10-02 (WEEK 5 `fri_pm` CARD CLEAN, VERCEL-TRIGGERED; H-NEGGAP-P WRITES ITS FIRST

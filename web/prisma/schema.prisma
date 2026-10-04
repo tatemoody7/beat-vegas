@@ -37,6 +37,8 @@ model games {
   first_half_source      String?          @db.VarChar
   full_game_total        Float?
   full_game_total_book   String?          @db.VarChar
+  home_conference        String?          @db.VarChar
+  away_conference        String?          @db.VarChar
   spread                 Float?
   venues                 venues?          @relation(fields: [venue_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   manual_picks           manual_picks[]
@@ -87,6 +89,7 @@ model manual_picks {
   hr_line_at_pick         Float?
   blocker                 String?   @db.VarChar
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  refit_id                Int?
 
   @@index([season], map: "ix_manual_picks_season")
   @@index([game_id], map: "ix_manual_picks_game_id")
@@ -133,6 +136,8 @@ model predictions {
   bv_lo                      Float?
   bv_hi                      Float?
   bv_sigma                   Float?
+  refit_id                   Int?
+  fingerprint                String?   @db.VarChar
   line_used                  Float?
   rank                       Int?
   factors_json               String?   @db.VarChar
@@ -144,20 +149,20 @@ model predictions {
 }
 
 model results {
-  id                      Int      @id @default(autoincrement())
+  id                      Int       @id @default(autoincrement())
   game_id                 Int?
-  model_version           String?  @db.VarChar
-  market                  String?  @db.VarChar
+  model_version           String?   @db.VarChar
+  market                  String?   @db.VarChar
   actual_first_half_total Int?
   line_used               Float?
-  line_kind               String?  @db.VarChar
+  line_kind               String?   @db.VarChar
   under_hit               Boolean?
   closing_line            Float?
   closing_captured_at     DateTime? @db.Timestamp(6)
   clv                     Float?
   clv_prob                Float?
   units                   Float?
-  games                   games?   @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([game_id], map: "ix_results_game_id")
   @@index([model_version], map: "ix_results_model_version")

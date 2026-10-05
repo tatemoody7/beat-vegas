@@ -7,9 +7,11 @@ info sheets), `lanes/discord.md` (79 lines: announcements Oct 2025 → today, si
 searches, seven threads read in full), and this morning's `lanes/cfbd-tiers.md` from the data
 stack review. **Provenance:** key `/info` before 13:59Z = Academic/3,000; Tier 3 reached the
 key at 14:10Z (75,000/mo, all five feature flags true); 57 CFBD calls spent in total (16 on the
-Tier 3 counter), 74,984 remaining at writing. **The week-6 CSV was supplied by Tate and measured** (`lanes/training-csv.md`); patreon.com
-itself is refused by both browsers this app provides, so the locked posts' body text is the
-one thing unread. Nothing here changed a gate, a model constant, a registry row or a ledger
+Tier 3 counter), 74,984 remaining at writing. **Every Patreon post was read in full** after Tate pulled the campaign with gallery-dl from his own
+Chrome session (`lanes/patreon-posts.md`, 28 posts with files incl. all 18 locked ones, plus the
+seven text-only public posts from their mirrors); patreon.com itself is refused by both browsers
+this app provides. The pull also delivered **all 18 weekly CSVs** (2025 weeks 5-15, postseason,
+CFP; 2026 weeks 5-6), measured in §5. Nothing here changed a gate, a model constant, a registry row or a ledger
 row; every "test" below is a proposed `docs/HYPOTHESES.md` row for Tate to accept.
 
 **Recommendation first.** Tier 3 is the wrong tier for this system, but a harmless one: at
@@ -196,9 +198,16 @@ redistribution and raw-response resale are not; data may be retained after cance
   endpoint's `epa.total` 0.03433013271446539); havoc, points per opportunity and field
   position come from `/stats/season/advanced` (free); Elo and talent are free endpoints;
   `spread` is `/lines`. **Nothing in the file exists only at Tier 3.**
-- **The spread** is the DraftKings/Bovada line as of Sunday posting: it equals the provider's
-  opening line in 38 of 57 games and the current line (Monday) in 26, negative = home favoured
-  (mean −4.8, range −38 to +13.5). Market-aware by design; banned from our regressor.
+- **The spread** is the opening line, in Bill's own words on every weekly post ("Vegas spread
+  reflects the opening line"; CFP rounds: "the current line as of posting"): it equals the
+  provider's opener in 38 of 57 week-6 games and the still-unmoved current line in 26, negative =
+  home favoured (mean −4.8, range −38 to +13.5). Market-aware by design; banned from our regressor.
+- **Bill's stated rules** (verbatim on each weekly post): posts "typically on Sunday evenings, no
+  later than Monday"; "includes all week N games for which there is a Vegas line" (FBS-vs-FCS games
+  without a line are dropped; the two 2025 "(Update)" re-posts added games whose line was not
+  available at posting: Troy-ODU; Alabama-Auburn and Baylor-Houston); "opponent-adjusted and
+  advanced stats reflect all data through Week N−1"; postseason "does not account for any player
+  opt-outs".
 - **Scale**: these 2026 values are on the post-PPA-fix scale (they match the live API today);
   the Gumroad history (2016-25) is on the old scale until Bill refreshes the pack, so the two
   cannot be stacked yet.
@@ -207,15 +216,27 @@ redistribution and raw-response resale are not; data may be retained after cance
 - **How we could use it**: (a) a reference answer for our own opponent adjustment (a patron
   did exactly that); (b) a weekly check that our WEPA snapshot equals CFBD's file; (c) never as
   a training set — full-game target, market column, no first-half anything.
-- **Verdict**: 3/10 as a dataset, 6/10 as a validation tool. One useful side effect: it is
-  the only place CFBD publishes WEPA *as of a date* (the file is a frozen Sunday snapshot),
-  which is what the endpoint itself lacks — keeping every weekly file is a free, dated WEPA
-  history for 2026.
+- **Verdict**: 3/10 as a dataset, 6/10 as a validation tool, and **8/10 as a history**: see §5b.
+
+### 5b. The 2025 weekly files are a dated WEPA history nobody else has
+
+The pull delivered every 2025 weekly file: weeks 5-15 (11 files, 561 unique games), the two
+mid-week updates, postseason (39), CFP quarterfinals (4) and semifinals (2), all 83 columns,
+same layout as 2026. Each is a **frozen Sunday snapshot of `/wepa/team/season` "through week
+N−1"**, which the endpoint itself cannot reproduce (no week dimension, values overwritten).
+Joined by game id to our tables: all 561 games are in our `games` table and **536 carry a real Hard Rock/consensus first-half close** in `odds_snapshots`. That makes a **leak-free 2025 retrospective
+of in-season WEPA against our real first-half closes possible now**, instead of waiting a
+season of 2026 snapshots. Caveat that must be stated in the row: the 2025 files are on the
+pre-September-2026 PPA scale (mean home adjusted EPA 0.15-0.19 per file) while the 2026 files
+are post-fix (0.110), so the test standardises within 2025 (z-scores or ranks per week) and
+never pools raw values across seasons. H-WEPA-F in §7 gains a retrospective arm on these
+rows; a pass there licenses the 2026 paper arm, not the champion.
 
 ### The Patreon posts, one by one
 
-Thirty posts on the campaign (Patreon's API lists them; bodies are not served anonymously, so
-the public ones were read through their Discord and blog mirrors, which carry the same text):
+Thirty-four posts on the campaign, every one read in full: 28 pulled with their files by
+gallery-dl (all 18 locked drops included), the seven text-only public posts from their Discord
+and blog mirrors (identical text), and a 2019 "Week 9 Picks" post:
 
 | Post | Date | Access | What it is | For Beat Vegas |
 |---|---|---|---|---|
@@ -236,9 +257,12 @@ the public ones were read through their Discord and blog mirrors, which carry th
 | CFP Semifinals / Quarterfinals / Postseason (+ Army-Navy) Model Training Data | 2026-01-06, 2025-12-24, 2025-12-10 | locked | the 2025 postseason drops | shows the drop continues through the playoff |
 | Week 15, (Update) Week 14, Week 14, Week 13, (Update) Week 12, Week 12, Week 11, Week 10, Week 9, Week 8, Week 7, Week 6 Model Training Data | 2025-09-28 → 2025-12-01 | locked | the 2025 regular-season drops; two mid-week "(Update)" re-posts | cadence evidence only |
 | CBB season tips off Monday: CBBD's first full season | 2025-10-31 | public | basketball | not relevant |
+| Office Hours Recap: Starter Pack, API Q&A | 2025-07-11 | public | Starter Pack contents (100K+ games, 3.5M+ plays, 13 notebooks); roadmap: recruiting schema done, play-schema overhaul planned; GitHub suggestion board (github.com/orgs/CFBD/projects/3) | the suggestion board is where to ask for `week` on `/wepa` |
+| Starter Pack Launching July 12 + Office Hours (Tier 2+) | 2025-07-06 | public | monthly in-season Open Office Hours in Discord voice, Tier 2+ | not needed |
+| Experimental GraphQL API now available | 2024-08-31 | public | Tier 3 created for GraphQL + 75,000 calls | history only |
+| Week 9 Picks | 2019-10-22 | $1+ | Bill's margin model vs Vegas for one week; the original prediction contest | history only |
 
-The two 2026 locked posts' body text (schedule and caveats as Bill states them) is the one
-thing still unread; a paste of either post closes it.
+Nothing on the campaign is unread.
 
 ## 6. Discord findings
 
@@ -359,7 +383,7 @@ use permitted for betting research; no redistribution. Single maintainer.
 
 ## Unconfirmed / needs a human
 
-The locked posts' body text (schedule/caveats); CFBD's weather provider; GraphQL row/depth limits; the exact date of the PPA fix
+CFBD's weather provider; GraphQL row/depth limits; the exact date of the PPA fix
 ("a few weeks back" from 2026-10-01; our Sep 22 cache is post-fix, the patron's late-August
 pull was pre-fix); whether FBS `/venues` rows carry the geocoding defect; Bill's answer on
 "team WEPA by week" (asked 2025-10-23, not found).
@@ -372,4 +396,5 @@ pull was pre-fix); whether FBS `/venues` rows carry the geocoding defect; Bill's
 3. Register H-WEPA-F, H-FHBOX, H-ADJ-OWN, H-WX-VALID (rows proposed above), or a subset.
 4. Approve the one-time 2023-25 `/game/box/advanced` backfill (~2,400 calls, one Actions run).
 5. Link Discord to Patreon for the patron channel.
-6. Paste the body text of the week 5 and week 6 Patreon posts (the file itself is measured).
+6. Add a 2025 retrospective arm to H-WEPA-F using the weekly files (§5b), standardised within
+   season; approve or decline.

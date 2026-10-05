@@ -44,7 +44,13 @@ hold the rest.
   later, CSV afternoon; `/lines` close = last 5-min capture, no timestamps, DraftKings
   provider name duplicated until 09-25; new 2026 concurrency 429s; nobody there has 1H data.
   Four rows proposed (H-WEPA-F, H-FHBOX, H-ADJ-OWN, H-WX-VALID), none added; six decisions
-  for Tate at the end of the doc. Also: `lines_watch.yml` dispatches 37318117401 and
+  for Tate at the end of the doc. **Evening:** patreon.com is refused by both app browsers and
+  the classifier refused a cookie-reading script, so Tate pulled the campaign himself with
+  `gallery-dl --cookies-from-browser chrome` (one-time): all 34 posts read in full, and **all 18
+  weekly CSVs** arrived — the 2025 weeks 5-15 files are frozen Sunday WEPA snapshots (561 games,
+  536 with a real 1H close on file), a leak-free 2025 retrospective the endpoint cannot regenerate
+  (pre-PPA-fix scale; standardise within season). Bill's own rule on every post: the spread is
+  the OPENING line; games without a line at posting are dropped and re-posted mid-week. Also: `lines_watch.yml` dispatches 37318117401 and
   37318523335 proved the new Odds API key on the runner.
 
 ## 2026-10-04

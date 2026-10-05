@@ -146,6 +146,13 @@ def test_the_gauge_writer_records_share_and_note(monkeypatch, capsys):
     monkeypatch.setattr(store, "session_scope", scope)
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setattr(script, "record_gauge", lambda k, v, note=None: (k, v, note) and True)
+    # Pin the clock: the look-back is LOOKBACK_DAYS from "now", and the seeded Saturday
+    # (2026-09-26) fell out of it on 2026-10-05 -- the test must not depend on the wall clock.
+    monkeypatch.setattr(
+        script,
+        "close_window_coverage",
+        lambda s: coverage.close_window_coverage(s, SAT_EVE + timedelta(hours=12)),
+    )
     script.main()
     out = capsys.readouterr().out
     assert "on Sat 2026-09-26" in out and "gauge written" in out

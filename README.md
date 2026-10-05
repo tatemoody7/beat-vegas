@@ -91,7 +91,7 @@ the CLI is the full version:
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
-**Credit budget (Odds API paid tier, 100K/month since 2026-09-06):** `totals_h1` is
+**Credit budget (Odds API 20K plan, $30/month, since 2026-10-05; 100K Sep 6 - Oct 5 for the history purchase):** `totals_h1` is
 served only per-event, but naming our ten books (`odds_api.bookmakers_1h`) is billed
 as ONE region and overrides `regions`, so a 1H poll costs **1 credit per game**
 (it was 2 on `us,us2`); listing events is free; full-game totals are one bulk call

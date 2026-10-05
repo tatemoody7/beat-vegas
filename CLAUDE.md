@@ -23,7 +23,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - Study docs, each with its verdict at the top: `STOPPING_RULE`, `MODEL_LEVEL_2026`,
   `NEGGAP_PAPER`, `INSEASON_PAPER`, `HARNESS`, `POST_MORTEM`, `TWO_SIDED`, `WEATHER`,
   `WEATHER_STYLE`, `CENSORING_STUDY`, `LEVEL_ANCHOR`, `BLEND`, `GATES`, `WHEN_TO_BET`, `HR_LAG`,
-  `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE` (all in `docs/`).
+  `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE`,
+  `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05` (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -82,13 +83,6 @@ disagree, **this file wins**; memory files hold lessons and point here.
   capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
   Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
   (`vercel.json` + the route's window), Tate's call.
-- **The Odds API — ON HOLD, and time-boxed.** The 100K subscription is **due to cancel Oct 6**
-  (Tate cancelled it 2026-10-04 instead of switching; Stripe shows the next bill date Oct 7).
-  Oct 6 is Tuesday, the week's first card build. Before then: create the 20K subscription on
-  the dashboard ("New Subscription" — each subscription has its own key), set the new key with
-  `gh secret set ODDS_API_KEY --repo tatemoody7/beat-vegas` (Tate pastes it), put it in local
-  `config.yaml`, then a zero-cost `lines_watch.yml` dry dispatch proves the runner; then update
-  the comment in `config.example.yaml` and `docs/OPS_ACCOUNTS.md`.
 - **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12). **Done
   2026-10-04:** PR2 tracking (#269, Neon migrated first; #272 schema) and PR3 classifier
   retirement (#268). **First-rows checks:** `predictions.refit_id` after the 2026-10-04 refit,
@@ -98,9 +92,6 @@ disagree, **this file wins**; memory files hold lessons and point here.
   headline when the week is over and 5 of 5 are placed); PR5 paper arms (`pct_tie_*`, `top3`,
   H-TIMING and H-MOVE scripts) Wed-Fri; PR6 shadow engines (`bv_shadow_f`, `bv_inseason_t`)
   Fri 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
-- **CFBD Patreon tier — ON HOLD (Tate, 2026-10-04 afternoon).** Measured usage is ~20 calls a
-  day, so **Tier 1 ($1, 5,000 calls, includes the Patreon weather endpoint) is the
-  recommendation**, not Tier 2; `docs/OPS_ACCOUNTS.md` item 2 still says Tier 2 until he picks.
 - **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
   stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
   against ~2,830 measured: watch the budget page in the last week of each month.

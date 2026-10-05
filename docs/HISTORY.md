@@ -7,6 +7,46 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-05
+
+- **2026-10-05 (ODDS API ON THE 20K PLAN; DATA STACK REVIEW).** Tate cancelled the 100K
+  ($59) subscription and bought the 20K ($30) one; new key set in the `ODDS_API_KEY` secret
+  (13:35Z) and local `config.yaml`; verified by a free `/v4/sports` read (20,000 remaining)
+  and a zero-credit `lines_watch.yml` `1h_close` dispatch (run 37318117401).
+  `config.example.yaml`, `README.md` and `docs/OPS_ACCOUNTS.md` item 3 updated; the
+  CLAUDE.md open item closed. **Data stack review** written from a four-lane research swarm
+  (`docs/DATA_STACK_REVIEW_2026-10-05.md`; lanes in `research/swarm/2026-10-05-data-stack/`,
+  gitignored): keep the Odds API at 20K (nothing else sells Hard Rock 1H totals at <= $30;
+  CFBD `/lines` and ESPN are full-game only); CFBD **Tier 1 ($1)** is the right tier (gating
+  read from the API's source: Tier 1 = WEPA + weather + scoreboard; Tier 2 = live PBP only;
+  Tier 3 = GraphQL + a weekly full-game, market-aware training CSV with nothing first-half;
+  `/coaches`, `/drives`, `/games/teams` are free, correcting SYSTEM_REVIEW §7); do not buy
+  public splits (no first-half splits exist anywhere; VSiN 2022-25 has the majority-handle
+  side 51.2% on CFB totals). No published market-blind CFB totals model beats the close; the
+  missing inputs are free (in-season opponent adjustment, decision-safe weather with a wind
+  threshold, the discarded SP+/explosiveness columns, Elo/FPI/CORE). Seven decisions for Tate
+  at the end of the doc, none acted on. Also fixed: `tests/test_coverage.py` pinned its clock
+  (the seeded Saturday fell out of the 8-day look-back on 2026-10-05).
+
+- **2026-10-05 (CFBD TIER 3 BOUGHT; TIER 3 REVIEW).** Tate bought Patreon Tier 3; CFBD matched
+  it by email to the key issued to boomtatermac@gmail.com on 2026-06-02, which now carries
+  Tier 3 (75,000 calls, WEPA/weather/scoreboard/live/GraphQL flags true) and sits in
+  `config.yaml` and the `CFBD_API_KEY` secret (14:11Z); the FGCU Academic key is retired.
+  Review written from four lanes (`docs/CFBD_TIER3_REVIEW_2026-10-05.md`; 57 calls): every
+  useful dataset is Tier 1 — `/wepa/team/season` is the opponent-adjusted in-season input the
+  model lacks (no week param, absent weeks 1-4, snapshot weekly); free `/game/box/advanced`
+  splits EPA/success/explosiveness by quarter (a PBP-free route back to the 57 B-SERVE
+  columns); SP+ `sos` and sub-ratings are null since 2019 (the PR6 `sp_sos` input is dead);
+  **CFBD rewrote PPA history in Sept 2026** (turnover-on-downs fix, ~35-40% level shift on
+  past seasons; our Sep 22 cache already post-fix, mean 2025 offense PPA 0.112 = live); the
+  weekly Tier 3 CSV is full-game and market-aware (closing spread, no O/U, nothing 1H), not
+  opened (patreon.com refused by both browsers). Discord: Sunday refresh 09-10:40 ET, SP+
+  later, CSV afternoon; `/lines` close = last 5-min capture, no timestamps, DraftKings
+  provider name duplicated until 09-25; new 2026 concurrency 429s; nobody there has 1H data.
+  Four rows proposed (H-WEPA-F, H-FHBOX, H-ADJ-OWN, H-WX-VALID), none added; six decisions
+  for Tate at the end of the doc. Also: `lines_watch.yml` dispatches 37318117401 and
+  37318523335 proved the new Odds API key on the runner.
+
 ## 2026-10-04
 
 - **2026-10-04 (WEEK 5 REVIEWED — `reports/weekly/2026-w5.md`, gitignored; plan file

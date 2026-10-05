@@ -53,6 +53,14 @@ hold the rest.
   the OPENING line; games without a line at posting are dropped and re-posted mid-week. Also: `lines_watch.yml` dispatches 37318117401 and
   37318523335 proved the new Odds API key on the runner.
 
+- **2026-10-05 (SHIPPED #276 → `d03fa17`, deploy `dpl_3GcyKVvmKV76FxKLj559ynjzCuGp` READY
+  22:08Z).** CI was cancelled twice by a GitHub Actions incident (runner assignment delays from
+  19:11Z; jobs queued 15 min and cancelled without a step) and passed on the third run at 22:04Z.
+  Health ok, no warnings, four job verdicts ok; runtime errors: only the known `sslmode` warning;
+  route sweep 8/8 200, 13/13 redirects 308; ledger 96 picks / 20 real matches Neon. No web files
+  changed, so no screenshots. `gauges.cfbdCallsRemaining` 74,982 proves the runner is on the
+  Tier 3 key (grade.yml 19:21Z).
+
 ## 2026-10-04
 
 - **2026-10-04 (WEEK 5 REVIEWED — `reports/weekly/2026-w5.md`, gitignored; plan file

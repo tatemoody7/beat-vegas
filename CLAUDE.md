@@ -26,17 +26,24 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `WEATHER_STYLE`, `CENSORING_STUDY`, `LEVEL_ANCHOR`, `BLEND`, `GATES`, `WHEN_TO_BET`, `HR_LAG`,
   `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE`,
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
-  `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base) (all in `docs/`).
+  `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
+  `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice) (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 
-## Where we are (as of 2026-10-04)
+## Where we are (as of 2026-10-06)
 - **Real money: 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), $10 flat units, ≤5 bets a
   week, every card BET placed and nothing else. Week 5 went 1-4 (−3.13u) on a slate that went
   62% under: the four losers landed 3.9 pts over their lines, two by 1.5-2.5 pts, two by 7.5 and
   14.5; line value 0.00, no rule loosened — variance plus one tie-at-the-bar pick (Alabama @
   Mississippi State, gap 2.12 = bar 2.12, cap rank 5). Week-5 report: `reports/weekly/`, local.
+  Week 6 `tue_pm` (card 26, bar 3.96): 2 BETs, Maryland @ Ohio State u30.5 +100, UCF @ Oklahoma
+  State u27.5 −115; 9 of 11 qualifiers price-blocked.
+- **The deep program (since 2026-10-06)**: a betting system, not a picks page — six tracks
+  (markets, CFBD catalogue, Discord, Bill's business, assumptions audit, product thesis), one
+  Monday review (`docs/program/`, one file a week), real money unchanged for 2026. Day one: H-WEPA-F
+  null; FG overs null, FG unders tested-positive on the cap-5 ruling → H-FG-P (paper, `fg_under`).
 - **System review 2026-10-04** (`docs/SYSTEM_REVIEW_2026-10-04.md`): the model cannot sharpen
   in-season by construction (it trains on seasons before the target only); the 2026 factor
   screen found no input, and not the gap itself, predicting the residual against the close
@@ -87,28 +94,33 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (`vercel.json` + the route's window), Tate's call.
 - **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12). **Done
   2026-10-04:** PR2 tracking (#269, Neon migrated first; #272 schema) and PR3 classifier
-  retirement (#268). **First-rows checks:** `predictions.refit_id` after the 2026-10-04 refit,
-  `poll_log` after tonight's sweeps, `injury_snapshots` + the `FROZEN:` card line + frozen
-  vectors on paper picks at the Tue 2026-10-06 build (`bv-card-check`). **Remaining:** PR4
+  retirement (#268). **First-rows checks passed** at the Tue 2026-10-06 build (card 26:
+  frozen vectors 57/57, `injury_snapshots`, `refit_id` on 57/70). **Remaining:** PR4
   degraded hold mirrored on the web (Tue 10-06; also fix the board's "No bets yet this week"
-  headline when the week is over and 5 of 5 are placed); PR5 paper arms (`pct_tie_*`, `top3`,
+  headline when the week is over and 5 of 5 are placed); paper arms (`pct_tie_*`, `top3`,
   H-TIMING and H-MOVE scripts) Wed-Fri; PR6 shadow engines (`bv_shadow_f`, `bv_inseason_t`)
   Fri 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
 - **After the two data reviews (2026-10-05, `docs/CFBD_TIER3_REVIEW_2026-10-05.md` decisions 1-6,
-  `docs/DATA_STACK_REVIEW_2026-10-05.md` §9), Tate's calls:** (a) **done 2026-10-06: H-WEPA-F
-  ARM R ran once on the runner and was NOT MET** (`docs/WEPA_F.md`: dated WEPA fixed the 2025
-  level, not the accuracy; ARM P, the 2026 WEPA engine, is not licensed); (b) PR7: weekly
+  `docs/DATA_STACK_REVIEW_2026-10-05.md` §9), Tate's calls:** (a) done 2026-10-06, H-WEPA-F NOT
+  MET (`docs/WEPA_F.md`); (b) PR7: weekly
   `/wepa/team/season` + CORE/Elo/FPI snapshot tables with fingerprints from the next Sunday job;
   (c) H-FHBOX (`/game/box/advanced` quarter splits → the 57 first-half inputs; 2023-25 backfill
   ~2,400 calls); (d) drop `sp_sos` from PR6 (null since 2019); (e) CFBD Tier 3 ($10) or Tier 1
   ($1) at the **Nov 6** renewal; (f) `bv_residual` shadow and Friday-night `lines-close`
   entries, both still open from 2026-10-04. The Odds API is on 20K; CFBD on Tier 3 via the
   boomtatermac key (`docs/OPS_ACCOUNTS.md` 2-3).
+- **H-FG-P collector (program PR5; started 2026-10-06)**: first an allow-list so only the
+  champion's prediction versions are read as "the model line" (board, pick log, `_model_row`,
+  health, frozen vectors); then a Sunday `bv_fg_v1` scorer, the `FG_COLLECT=1` collector and its
+  position script; week 6 scored by hand. Freeze the line-value σ from the first
+  two Saturdays and write the first `cards.id` into `docs/FG_MARKET.md` before any reading.
+- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the 12 proposed rows in
+  `docs/KNOWLEDGE.md`, the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body), CLV in % vs
+  points, the newsletter platform (`LEGAL_MEMO_2026-10`: Substack/Buttondown or Whop, never
+  Mailchimp/Resend).
 - **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
   stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
   against ~2,830 measured: watch the budget page in the last week of each month.
-- **Week-sandbox replay for PR #247** never ran (this Mac's SQLite is a June snapshot); the first
-  live build is the check.
 - **Offline backtest engine still fits the retired classifier** (`backtest/engine.py::_new_model`,
   read by `scripts/backtest.py`, `retrain.py`, `validate_engine.py` and `rank_factors`); nothing
   live reaches it since PR #268. Retire it with those four tools or leave it — Tate's call.
@@ -258,7 +270,7 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   `bv-site-check` first.
 
 ## Honest status of the edge (don't oversell)
-- **Live evidence first.** Real money 9-6 (+2.84u) on 15 tickets is inside its Wilson interval
+- **Live evidence first.** Real money 10-10 (−0.29u) on 20 tickets is inside its Wilson interval
   either way. The rule's prospective record and line value are judged only by the registered
   stopping rule (H-STOP-2, `docs/STOPPING_RULE.md`); the site states every rate with its interval
   and labels the bankroll "modelled from the ledger, not reconciled". Line value at Hard Rock's

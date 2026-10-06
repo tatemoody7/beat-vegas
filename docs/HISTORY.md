@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (HOUSEKEEPING — #289 shipped, alerts, Dependabot, brief).** #289 (the rest of the
+  Discord knowledge base) merged `cd9f75d`, deploy READY, health ok. Dependabot alerts 13
+  (source-map-js) and 14 (sharp) patched by a lockfile-only PR inside the existing ranges; alert 12
+  (braces, dev-only via eslint-config-next, no patched version) dismissed as tolerable risk, Tate's
+  call. The three Dependabot PRs merge one at a time (#255 was superseded by #290: SQLAlchemy 2.1.3
+  needs Python ≥ 3.11, so only the runner's `requirements/lock.txt` moves; the Mac's 3.9 venv stays
+  on 2.0 under `requirements.txt`'s `>=2.0,<3`). The Paramount PDF moved from the repo root to the
+  gitignored `research/`. The brief: where-we-are dated 10-06 with the deep program and the week-6
+  card; honest status 10-10 (it still read 9-6); program PR5 (H-FG-P collector) and the 10-12
+  review added to open items; the PR #247 sandbox item dropped (live builds have run since).
+  Tate's calls for PR5: an allow-list of champion prediction versions at every model-line read,
+  and week 6 scored by hand so H-FG-P collects from this week's Thursday build.
+
 - **2026-10-06 (DISCORD CAPTURE COMPLETE — `docs/KNOWLEDGE.md`).** Seven public channels of the
   CFBD Discord captured in Tate's own signed-in session in the app's browser pane, one channel at a
   time at reader pace, back to 2025-08-01 or the channel's beginning: data-and-analytics 1,290,

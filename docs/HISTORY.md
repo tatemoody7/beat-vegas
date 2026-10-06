@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (H-FG-U-R / H-FG-O-R: data cell corrected before any look).** The rows named test
+  seasons 2023-25; the frame begins in 2023, so 2023 has no prior training season and the first
+  dispatches (`study.yml` runs 37495878846, 37495894548) returned NOT EVALUABLE with nothing graded
+  and no number read. Tate's call: amend in place — test seasons 2024 and 2025, criterion "units > 0
+  in BOTH seasons" — rather than new rows, because no observation preceded the edit. One dispatch
+  each follows.
+
 - **2026-10-06 (SHIPPED #279 `3cfe1f0`, #280 `272e6f8`, #281 `96a2506`, #282 `d269290`; the deep
   program approved).** Tate's brief: make Beat Vegas a true college-football betting system —
   six tracks (markets, CFBD catalogue, Discord knowledge base, Bill's business, assumptions audit,

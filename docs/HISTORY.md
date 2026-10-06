@@ -9,6 +9,16 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (H-FG-U-R / H-FG-O-R RUN — `docs/FG_MARKET.md`).** One dispatch each on 2024-25
+  (1,252 games at a real consensus full-game close inside 3 h). The full-game regressor is less
+  accurate than the close (MAE 13.44 vs 12.68). **Overs: NOT MET on every reading** (lower bounds
+  46.0% / 43.3%, 2025 units negative) — `tested-null`. **Unders: no verdict recorded** — the row's
+  "selected picks" is ambiguous between the qualifying set (138-107-5, 56.3%, lower bound 50.1%:
+  fails) and the cap-5 set (78-44-2, 63.9%, lower bound 55.1%: passes, units positive both
+  seasons); the reading is Tate's to rule before anything follows, and the doc lists the three
+  registered consequences. The harness printed no verdict because no `--criterion` function was
+  passed; the criterion was applied by hand to the runner's numbers, no re-dispatch.
+
 - **2026-10-06 (H-FG-U-R / H-FG-O-R: data cell corrected before any look).** The rows named test
   seasons 2023-25; the frame begins in 2023, so 2023 has no prior training season and the first
   dispatches (`study.yml` runs 37495878846, 37495894548) returned NOT EVALUABLE with nothing graded

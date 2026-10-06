@@ -7,6 +7,22 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-06
+
+- **2026-10-06 (H-WEPA-F REGISTERED AND TESTED NULL — `docs/WEPA_F.md`).** The row (PR #278,
+  commit `f9105bf`, before the script) pre-registered a 2025 retrospective arm: dated in-season
+  WEPA from the 11 Patreon weekly files (561 games, z-scored within each file;
+  `scripts/wepa_weekly_extract.py` → `data/wepa_2025_weekly_z.csv`, no raw value, no spread) as
+  a walk-forward ridge correction to the champion's 2025 line, two sub-arms (`wepa_epa1`,
+  `wepa_k4`; `beatvegas/backtest/wepa_f.py`), judged by `harness_report` on 622 games with a
+  real consensus close. One dispatch (`study.yml` run 37491506377): **NOT MET** — Δ|err|
+  −0.034 [−0.121, +0.050] and +0.008 [−0.109, +0.122], Holm p 0.91; both arms fixed the level
+  (bias +0.53 → +0.04) and not the accuracy (MAE 9.11 / 9.15 vs 9.14; market 8.90); favourable
+  line value negative for every arm. ARM P (the 2026 `bv_wepa_f` engine) is not licensed.
+  Also 2026-10-06: #277 shipped (`bd74a70`); the deep-program plan approved (six tracks, one
+  Monday program review; real money unchanged); PR #279 opened (Saturday full-game close capture
+  + the 3 h window on `market_fg`).
+
 ## 2026-10-05
 
 - **2026-10-05 (ODDS API ON THE 20K PLAN; DATA STACK REVIEW).** Tate cancelled the 100K

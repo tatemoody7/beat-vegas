@@ -234,7 +234,7 @@ rows; a pass there licenses the 2026 paper arm, not the champion.
 
 ### The Patreon posts, one by one
 
-Thirty-four posts on the campaign, every one read in full: 28 pulled with their files by
+Thirty-four posts on the campaign as the API listed them, every one read in full (**correction 2026-10-06**: a per-post gallery-dl pass found 61 posts, 33 of them text-only and unread here; they are catalogued in `docs/CFBD_CATALOGUE.md` §1 — nothing in them concerns first-half markets, totals or an edge): 28 pulled with their files by
 gallery-dl (all 18 locked drops included), the seven text-only public posts from their Discord
 and blog mirrors (identical text), and a 2019 "Week 9 Picks" post:
 
@@ -262,7 +262,7 @@ and blog mirrors (identical text), and a 2019 "Week 9 Picks" post:
 | Experimental GraphQL API now available | 2024-08-31 | public | Tier 3 created for GraphQL + 75,000 calls | history only |
 | Week 9 Picks | 2019-10-22 | $1+ | Bill's margin model vs Vegas for one week; the original prediction contest | history only |
 
-Nothing on the campaign is unread.
+Nothing on the campaign is unread as of 2026-10-06 (`docs/CFBD_CATALOGUE.md`).
 
 ## 6. Discord findings
 

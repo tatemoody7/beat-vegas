@@ -24,7 +24,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `NEGGAP_PAPER`, `INSEASON_PAPER`, `HARNESS`, `POST_MORTEM`, `TWO_SIDED`, `WEATHER`,
   `WEATHER_STYLE`, `CENSORING_STUDY`, `LEVEL_ANCHOR`, `BLEND`, `GATES`, `WHEN_TO_BET`, `HR_LAG`,
   `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE`,
-  `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05` (all in `docs/`).
+  `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F` (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -93,9 +93,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   H-TIMING and H-MOVE scripts) Wed-Fri; PR6 shadow engines (`bv_shadow_f`, `bv_inseason_t`)
   Fri 2026-10-09 or week 7, sandbox-gated. Real money unchanged all week.
 - **After the two data reviews (2026-10-05, `docs/CFBD_TIER3_REVIEW_2026-10-05.md` decisions 1-6,
-  `docs/DATA_STACK_REVIEW_2026-10-05.md` §9), Tate's calls:** (a) register H-WEPA-F with a
-  **2025 retrospective arm** on the 11 weekly Tier-3 CSVs (561 games, 536 with a real 1H close;
-  pre-PPA-fix scale — standardise within season) before any 2026 paper arm; (b) PR7: weekly
+  `docs/DATA_STACK_REVIEW_2026-10-05.md` §9), Tate's calls:** (a) **done 2026-10-06: H-WEPA-F
+  ARM R ran once on the runner and was NOT MET** (`docs/WEPA_F.md`: dated WEPA fixed the 2025
+  level, not the accuracy; ARM P, the 2026 WEPA engine, is not licensed); (b) PR7: weekly
   `/wepa/team/season` + CORE/Elo/FPI snapshot tables with fingerprints from the next Sunday job;
   (c) H-FHBOX (`/game/box/advanced` quarter splits → the 57 first-half inputs; 2023-25 backfill
   ~2,400 calls); (d) drop `sp_sos` from PR6 (null since 2019); (e) CFBD Tier 3 ($10) or Tier 1

@@ -1,0 +1,160 @@
+{
+  "row": "H-WEPA-F",
+  "season": 2025,
+  "rows": 561,
+  "weeks": [
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "columns_zscored": [
+    "home_adjusted_epa",
+    "home_adjusted_epa_allowed",
+    "away_adjusted_epa",
+    "away_adjusted_epa_allowed",
+    "home_adjusted_rushing_epa",
+    "home_adjusted_rushing_epa_allowed",
+    "away_adjusted_rushing_epa",
+    "away_adjusted_rushing_epa_allowed",
+    "home_adjusted_passing_epa",
+    "home_adjusted_passing_epa_allowed",
+    "away_adjusted_passing_epa",
+    "away_adjusted_passing_epa_allowed",
+    "home_adjusted_success",
+    "home_adjusted_success_allowed",
+    "away_adjusted_success",
+    "away_adjusted_success_allowed",
+    "home_adjusted_standard_down_success",
+    "home_adjusted_standard_down_success_allowed",
+    "away_adjusted_standard_down_success",
+    "away_adjusted_standard_down_success_allowed",
+    "home_adjusted_passing_down_success",
+    "home_adjusted_passing_down_success_allowed",
+    "away_adjusted_passing_down_success",
+    "away_adjusted_passing_down_success_allowed",
+    "home_adjusted_line_yards",
+    "home_adjusted_line_yards_allowed",
+    "away_adjusted_line_yards",
+    "away_adjusted_line_yards_allowed",
+    "home_adjusted_second_level_yards",
+    "home_adjusted_second_level_yards_allowed",
+    "away_adjusted_second_level_yards",
+    "away_adjusted_second_level_yards_allowed",
+    "home_adjusted_open_field_yards",
+    "home_adjusted_open_field_yards_allowed",
+    "away_adjusted_open_field_yards",
+    "away_adjusted_open_field_yards_allowed",
+    "home_adjusted_explosiveness",
+    "home_adjusted_explosiveness_allowed",
+    "away_adjusted_explosiveness",
+    "away_adjusted_explosiveness_allowed",
+    "home_adjusted_rush_explosiveness",
+    "home_adjusted_rush_explosiveness_allowed",
+    "away_adjusted_rush_explosiveness",
+    "away_adjusted_rush_explosiveness_allowed",
+    "home_adjusted_pass_explosiveness",
+    "home_adjusted_pass_explosiveness_allowed",
+    "away_adjusted_pass_explosiveness",
+    "away_adjusted_pass_explosiveness_allowed"
+  ],
+  "standardisation": "per column, within each weekly file, ddof 0; raw values not stored",
+  "generated_at": "2026-10-06T14:57:20Z",
+  "sources": [
+    {
+      "week": 5,
+      "file": "139431810_Week 5 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 139431810,
+      "sha256": "cfee0c495ce46556b9372e9ff15ca5f4f3a1dac6127e8baae445a65ee1257fd0",
+      "rows": 51,
+      "posted_at": "2025-09-21T23:19:50.000+00:00"
+    },
+    {
+      "week": 6,
+      "file": "139960372_Week 6 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 139960372,
+      "sha256": "b79177a4d7c9accbbeaa47eeb649711316271c6beb3c68ad9b5764649d6e2b1f",
+      "rows": 50,
+      "posted_at": "2025-09-28T22:03:18.000+00:00"
+    },
+    {
+      "week": 7,
+      "file": "140538189_Week 7 Model Training Data (Tier 3+) _01.csv",
+      "post_id": 140538189,
+      "sha256": "dfb2decfb43e374ff23e0a50cac5cdcb38b82d8e65f1c2bb1c45c509eab0655e",
+      "rows": 56,
+      "posted_at": "2025-10-05T23:52:35.000+00:00"
+    },
+    {
+      "week": 8,
+      "file": "141123139_Week 8 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 141123139,
+      "sha256": "a36f9e5dcc0cfa894620921a4b5f9a288775e144612b073f20adfdf10ea9011d",
+      "rows": 59,
+      "posted_at": "2025-10-13T15:00:29.000+00:00"
+    },
+    {
+      "week": 9,
+      "file": "141597057_Week 9 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 141597057,
+      "sha256": "1b32c577fc3edfefe1cab630f0b498e363253691bb8ab1df4e6b5ef850acfabe",
+      "rows": 53,
+      "posted_at": "2025-10-19T21:34:03.000+00:00"
+    },
+    {
+      "week": 10,
+      "file": "142134301_Week 10 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 142134301,
+      "sha256": "b1857d922432263afd41ef0a4cdb7f3bcd1344339fb2171480451e988c0a5783",
+      "rows": 52,
+      "posted_at": "2025-10-27T01:24:08.000+00:00"
+    },
+    {
+      "week": 11,
+      "file": "142699989_Week 11 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 142699989,
+      "sha256": "7cd47829b77e6a2b1a3b8b2438085c2125dab6a6ae5fde3e8c95cb9b0b8c24bd",
+      "rows": 51,
+      "posted_at": "2025-11-03T03:37:21.000+00:00"
+    },
+    {
+      "week": 12,
+      "file": "143218430_Week 12 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 143218430,
+      "sha256": "f0d7c9cc36c234ace902c569a0eb3c3339313d075e238cad0ddb00d53f3fb716",
+      "rows": 56,
+      "posted_at": "2025-11-10T00:32:16.000+00:00"
+    },
+    {
+      "week": 13,
+      "file": "143733829_Week 13 Model Training Data (Tier 3+) _01.csv",
+      "post_id": 143733829,
+      "sha256": "2f75b026b3eb724e3a2d002327d08a0e37086af2c225bcf5fd191ebe75ecbec8",
+      "rows": 59,
+      "posted_at": "2025-11-16T22:57:48.000+00:00"
+    },
+    {
+      "week": 14,
+      "file": "144295654_Week 14 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 144295654,
+      "sha256": "3957e82bbd349fd3df89440fab53eff1fa2643c3798c6fdf08e9efc62a0b2764",
+      "rows": 65,
+      "posted_at": "2025-11-24T14:48:26.000+00:00"
+    },
+    {
+      "week": 15,
+      "file": "144771561_Week 15 Model Training Data (Tier 3+)_01.csv",
+      "post_id": 144771561,
+      "sha256": "8a360d79af26dc1760f80b7311d3dbff31b042f21b6e71dbc28c05a39202f764",
+      "rows": 9,
+      "posted_at": "2025-12-01T02:10:15.000+00:00"
+    }
+  ]
+}

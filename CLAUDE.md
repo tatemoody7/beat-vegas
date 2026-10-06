@@ -200,7 +200,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +
-  `weather_validate`, `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`.
+  `weather_validate`, `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`,
+  `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files).
 - **Model / research**: `retrain`, `backtest`, `validate_engine`, `rank_factors`,
   `inspect_combo`, `explain_pbp`, `line_study`, `weekly_report`, `model_artifacts`, `bv_adjust`.
 - **Deploy / dev**: `deploy_neon`, `deploy_neon_games` (both ADDITIVE), `pg_sim` +

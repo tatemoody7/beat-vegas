@@ -389,3 +389,41 @@ def test_close_in_window_is_at_most_two_hours_before_and_never_after_kickoff():
     assert not close_in_window(None, kick) and not close_in_window(kick, None)
     # A wider registered window is the caller's to state.
     assert close_in_window(kick - timedelta(hours=3), kick, hours=3.0)
+
+
+def test_real_closes_counts_a_row_re_seen_inside_the_window():
+    """`real_closes(within_hours=)` used to test captured_at only, so an
+    unchanged line confirmed inside the window by a later poll (last_seen_at)
+    never counted as a real close. Both stamps count now."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import Base, OddsSnapshot
+    from beatvegas.lines import real_closes
+
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    kickoff = datetime(2026, 10, 10, 19, 30)
+    with Session(eng) as s:
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="draftkings",
+                market="1H_total",
+                line=24.5,
+                captured_at=datetime(2026, 10, 6, 12, 0),  # Tuesday
+                last_seen_at=datetime(2026, 10, 10, 18, 0),  # re-seen 1.5 h out
+            )
+        )
+        s.add(
+            OddsSnapshot(
+                game_id=2,
+                book="draftkings",
+                market="1H_total",
+                line=27.5,
+                captured_at=datetime(2026, 10, 6, 12, 0),  # never re-seen
+            )
+        )
+        s.commit()
+        out = real_closes(s, [1, 2], {1: kickoff, 2: kickoff}, within_hours=2.0)
+        assert out == {1: 24.5}

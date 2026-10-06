@@ -345,6 +345,17 @@ def book_closing_before_kickoff(
     return closing_before_kickoff(mine, kickoff)
 
 
+def _within(snap, kickoff, hours: float) -> bool:
+    """Captured OR re-seen (`last_seen_at`: a later poll found the number
+    unchanged and stamped the row instead of writing one) at most `hours`
+    before kickoff and not after it. A row with neither stamp passes, as the
+    pre-2026-10-06 rule (captured_at only) did."""
+    stamps = [t for t in (snap.captured_at, getattr(snap, "last_seen_at", None)) if t is not None]
+    if not stamps:
+        return True
+    return any(0 <= (kickoff - t).total_seconds() <= hours * 3600 for t in stamps)
+
+
 def real_closes(
     session,
     game_ids: Sequence[int],
@@ -368,12 +379,7 @@ def real_closes(
             .all()
         ):
             k = kickoffs.get(snap.game_id)
-            if (
-                within_hours is not None
-                and k is not None
-                and snap.captured_at is not None
-                and not (0 <= (k - snap.captured_at).total_seconds() <= within_hours * 3600)
-            ):
+            if within_hours is not None and k is not None and not _within(snap, k, within_hours):
                 continue
             by_game.setdefault(snap.game_id, []).append(snap)
     out: Dict[int, float] = {}

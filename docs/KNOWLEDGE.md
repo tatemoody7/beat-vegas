@@ -88,3 +88,43 @@ betting timing and line-movement sources (2025-11-09, 11-28 → 12-05); switchin
 
 Dropped as noise: college basketball, D2/D3/FCS gaps, package and auth help, logos/venues,
 NFL draft, recruiting/NIL, roster spellings, one-off score corrections.
+
+## projects-and-showcase, 2025-07-31 → 2026-10-06 (sitting #2, 550 messages, read in full by a research agent; curated here)
+
+The channel where members show what they built. Inventory of 55 projects in
+`research/discord/projects-and-showcase/candidates.md` (gitignored). The landscape, in four
+sentences: 13 of 55 are betting-oriented and every one prices full-game spreads or moneylines;
+the only first-half model mentioned in 14 months "barely breaks even on backtesting" and is not
+published; six publish some record and **none states an interval, a stopping rule, a
+pre-registered criterion, a book-specific close or a paper-vs-real split**; nobody posted a price
+(free-to-build-an-audience is the observable model). The ledger-first, rule-bound posture is
+unoccupied — that is the differentiation Track D named, confirmed from the builders' side.
+
+| Date | Who | Tag | The point | For Beat Vegas |
+|---|---|---|---|---|
+| 2026-08-26 | WagerP393 | challenge | "I do have a 1st half model but it barely breaks even on backtesting." | The only other first-half model in the channel, and it breaks even. Consistent with our honest status; nobody here publishes first-half picks. |
+| 2026-08-05 → 08-26 | WagerP393, Matt (POWR) | challenge | A 138-filter trend table (week-1 dogs +21 to +27.5; "Hammer" coaches) that read 59% over five seasons and 50% last year. | Trend mining and its decay: the failure pre-registration exists to prevent. |
+| 2026-09-03 | 6P (6ppredictions.com) | product | Slate-percentile confidence tiers (top 10% Strong, bottom 25% Weak), a pre-kickoff freeze of line/pick/edge, visible W/L, "No claim that this is some magic betting system." | A structural twin of our card for full-game spreads, launched the same week. Honest framing is becoming the genre default; our differentiation has to be the registered rule, the price gate and the ledger, not the tone. |
+| 2026-07-27 → 08-06 | JP+ (jpplusratings.com), dharkmeat, darren | product / idea | "60% is on selection picks. Across every pick (3,600+ games) it's closer to 52%"; CLV in points (47% positive); picks gated by a sigma model "and several layers of vetos … it may just not have a good read on a certain conference." | The closest published analogue. Publish selection-vs-all side by side (our gap ladder is the all-games half). The learned segment veto is a cheap leak-free paper arm we never tested (proposal below). darren's "CLV in % not points" is a display decision for Tate. |
+| 2026-08-26 / 09-08 | Crucialoneshot (cfpadvantage.com) | marketing / challenge | "public model receipts so every prediction can be followed"; "43-8 (84.3%) picking winners through Week 1." | "Receipts" is the public's word for our ledger; a straight-up winner % has no line and no edge content — never let one stand alone on our pages. |
+| 2026-03-16 | Criviere (SharpSharks) | marketing / challenge | "Model-filtered picks are hitting 70.5% WR at +37.7% ROI in backtesting." | The backtest-ROI headline the public distrusts; we state prospective records with intervals and never a backtest ROI. Keep it. |
+| 2025-08-13 | buddavis | idea / challenge | Preseason power ratings fitted to vig-adjusted season WIN TOTALS and the schedule (iterate until implied win totals match); "Betting Odds probably already incorporate returning production, recruiting, portal." | The one concrete preseason-prior recipe for the weeks 1-4 blind spot (proposal below; Tate decides whether a win-total prior is still "market-blind"). The second sentence is why our 2026 factor screen found nothing: the book already has those inputs. |
+| 2025-10-27 | buddavis, Charlemagne | metric | Ridge opponent adjustment "will have the more efficient one ranked better … the higher n for same epa provides a bigger sample size to overcome the penalty term." | H-RIDGE-F (proposed above) has a known tilt toward success rate over explosiveness; note it in the row before the first read. |
+| 2026-08-30 → 09-01 | Audible Analysis, saiemgilani | ops | `venues.elevation` is metres; `startTimeTBD` placeholders cross midnight westward (a Saturday reads as Friday); a win-probability garbage-time rule flagged 34.8% then 15.8% of plays across a vendor boundary — "use score points rather than wp because wp is so heavily influenced by spread." | Three cheap checks: elevation unit if ever used; kickoff fields re-pulled before week 1 (any weekday/rest feature on an unplayed slate is wrong on half the rows); grep the PBP ETL and `BV_FEATURE_COLS` for any win-probability field — it smuggles the spread into a market-blind model. |
+| 2026-09-08 | Leithal, Crucialoneshot, Flocho, Deke | source | Three builders asked where injuries come from; "The AI agent just checks ESPN for anything reported. No endpoint." | Nobody has a feed; our Rotowire `injury_snapshots` is ahead of the channel. |
+| 2026-07-24 | Bill | ops / product | On a paid product built on CFBD data: "No issues … so long as it isn't enabling bulk download of raw data from the API or repackaging into your own API. Attribution is always appreciated!" | The licence boundary in the author's words (cross-reference `docs/LEGAL_MEMO_2026-10.md`): a follow-our-picks product is inside it; a CSV of raw CFBD columns would not be. |
+| 2026-05-26 → 07-13 | dupreesdiamond, Flocho, JIMMY CULTURE | product | Team logos: "if you're not making money on the thing don't worry about it"; a paid app read the licences and dropped them as "entirely too cost prohibitive." | Our vendored logos become a decision the day the site charges (Track F). |
+| 2026-09-28 | justlikekevin, Bill | marketing | A CFBD directory page of community projects: Bill: "That's a fantastic idea. I love that actually." | A free, credible listing is coming; have a one-line description and the URL ready. |
+| 2026-09-30 | jmarcion (BallKnower) | product / idea | "1,000 Ball Bucks a week to bet on real games at real lines … no deposits, no payouts." | Play money at real lines as an engagement shape with no tout exposure — a paper-ledger league around the card is a product idea for Tate. |
+| 2026-08-05 | amccaman | angle | "have you thought about incorporating Kelly?" | Kelly needs a calibrated P(under); we have none (`bv_sigma` is one number per slate). Flat units stay by policy. |
+| 2026-01-12 | Caesar Analytics, Connor | challenge | "there's no data prior to week 0 and my model uses in season data … not particularly good for the first half" of a season. | The early-season blind spot is universal and unpublished; our no-money-before-two-games rule is the community norm said aloud. |
+| 2026-08-19 | Jakee66 | source (tool) | `fbs-cli`: read-only YAML for all 71 CFBD GET routes (`npm i -g @jvorndran/fbs-cli`). | A cheap spot-check tool for research sessions, outside the engine's cache. |
+| 2025-10-30 | PEARatings, Steven | product | Results cards: "turn 'Spread' green when you win ATS"; "Hard to read that red." | Colour on the number, not a separate tick column; red-on-dark fails — our "if it isn't obvious, cut it" rule for the ledger. |
+
+**Proposed registry rows from this sitting (proposals only):**
+- **H-SEGVETO-P** — a paper arm identical to the champion except that it refuses segments
+  (conference pairings or spread buckets) where the champion's PRIOR-season absolute residual
+  against the close was largest. Leak-free, cheap; tests a selector the 2026 factor screen did not.
+- **H-MKTPRIOR-F** — a preseason team-strength prior fitted to vig-adjusted season win totals and
+  the schedule, as a shadow-engine input for weeks 1-4. Decision first: a win-total prior is a
+  DIFFERENT market from the game's total, captured in August — does it count as market-blind?

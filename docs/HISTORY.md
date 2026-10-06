@@ -9,6 +9,21 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (DISCORD CAPTURE COMPLETE — `docs/KNOWLEDGE.md`).** Seven public channels of the
+  CFBD Discord captured in Tate's own signed-in session in the app's browser pane, one channel at a
+  time at reader pace, back to 2025-08-01 or the channel's beginning: data-and-analytics 1,290,
+  general 2,750, pick-em 650, projects-and-showcase 550, development 330, cfbfastr-questions 190,
+  cfb-chat 19 messages (raw text gitignored under `research/discord/`). Every message read in
+  full (two sittings by hand, the rest by research agents); ~120 entries curated into
+  `docs/KNOWLEDGE.md` with 12 proposed registry rows (H-FPI-P, H-RIDGE-F, H-ELO-F, H-ERRBAND-P,
+  H-SEGVETO-P, H-MKTPRIOR-F, H-PCAL-P, H-DESERVED-F, H-SPSNAP-F, H-SPARSE-F, H-FCS-F, an H-INJ
+  data arm) — none registered. Headline: nobody in the CFB data community publishes first-half
+  picks, a pre-registered criterion, an interval, a stopping rule or a book-specific close; the
+  one other first-half model "barely breaks even"; Bill's own 2024 table shows the most accurate
+  models were barely profitable and the most profitable were less accurate than the market. Not
+  captured: `help-and-support` (a forum), `announcements` (read 2026-10-05), the patron
+  `supporter-lounge` (role never synced). Discord drops the pane's session when the pane closes.
+
 - **2026-10-06 (H-FG-U-R / H-FG-O-R RUN — `docs/FG_MARKET.md`).** One dispatch each on 2024-25
   (1,252 games at a real consensus full-game close inside 3 h). The full-game regressor is less
   accurate than the close (MAE 13.44 vs 12.68). **Overs: NOT MET on every reading** (lower bounds

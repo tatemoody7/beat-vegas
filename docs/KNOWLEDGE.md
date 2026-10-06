@@ -128,3 +128,48 @@ unoccupied — that is the differentiation Track D named, confirmed from the bui
 - **H-MKTPRIOR-F** — a preseason team-strength prior fitted to vig-adjusted season win totals and
   the schedule, as a shadow-engine input for weeks 1-4. Decision first: a win-total prior is a
   DIFFERENT market from the game's total, captured in August — does it count as market-blind?
+
+## pick-em, development, cfbfastr-questions, cfb-chat (sittings #3-#6, 1,189 messages, read in full by a research agent; curated here)
+
+**How CFBD runs a public model benchmark (pick-em, 650 messages since 2024-10).** Submit a
+predicted final margin per game (web form, CSV `id,home,away,predicted`, or an API with a
+permanent per-user key); the universe is "every game for which there is a spread" and games
+appear as spreads post, often on game day; picks are editable until kickoff; the leaderboard
+counts FBS-vs-FBS only and a model must pick **≥ 70% of the available games to qualify**;
+corrections preserve a user's logged pick ("I've flipped them while maintaining existing picks");
+Bill enters his own model from week 5 and posts weekly top-5 tables to X/Bluesky; participation
+(30+ picks in week 5) went 18 → 36 → 39 → 37 → **65** from 2021 to 2025. Totals were asked for once
+(2025-09-26) and declined: "No imminent plans … a substantial rewrite." Which spread grades a pick
+(submission-time or kickoff) was asked and never answered.
+
+| Date | Who | Tag | The point | For Beat Vegas |
+|---|---|---|---|---|
+| 2026-01-02 | dharkmeat (pick-em) | source / metric | "146,508 picks from 264 unique users plus one ever-present Vegas Line" — a five-season per-user-week table of Straight Up / ATS / MAE / MSE / Bias (`cfb_leaders.csv`, a Discord attachment only). In-season 2025 the field self-reported ~75-80% straight up and 48-56% ATS; "my model went 20-30-1 ATS, but the residuals were better than ever." | The only public distribution of what hundreds of models achieve against the full-game spread. Worth asking for: it calibrates "how bad is MAE 9.03 vs 8.39" and shows the field's ATS ceiling. The accuracy-vs-profit split, live, from a participant. |
+| 2025-08-06 | Bill (pick-em) | challenge / idea | His early-season feature list: "talent … recruiting composite class ratings, portal composite class ratings, **spread**, pregame Elo ratings, returning production data (accounts for transfers), head coach experience" and 3/5-year rating averages; Elo "usually scores pretty highly in my SHAP analysis … carries over between seasons and has historical inertia." | Bill's model is NOT market-blind (the spread is an input); ours is by design. The rest is our weeks 1-4 list: Elo (H-ELO-F proposed), returning production (have), talent (late), coach experience and multi-year averages (untested). Portal class ratings are not in the API. |
+| 2025-10-15 | nickseevers, john (pick-em) | challenge / idea | "it is obsessed with predicting the score to be almost exactly the same as the over/under"; "predict just one thing, either margin or win probability, then convert … with a very simple scaler." | A totals model that tracks the market carries no gap information — the failure a market-blind model avoids by construction; never "fix" level by feeding the market back in. A gap→P(under) scaler fitted on prior seasons' real closes is the leak-free way to the calibrated probability `BREAK_EVEN_EV` waits on (proposal below). |
+| 2025-10-04 | spaceman, PEARatings (pick-em) | challenge / idea | "If your model is 8pts off market … probably need to caution yourself"; PEARatings' pipeline "raw -> opp adj -> ewma." | The spread-side statement of "too far from the line and you are missing something": a very large 1H gap is a flag for a stale or alternate line or a missing input, not more edge (our weekly hit rate by gap band measures it). An EWMA recency weight is a second knob for the H-RIDGE-F proposal. |
+| 2025-11-30 | Dave Swain (pick-em) | challenge | "Only bet games where model showed edge 50 picks: 88% straight up (44-6), 76% ATS (38-11-1)." | The unregistered selection claim in its purest form: no criterion stated in advance, no line source, no interval. The genre norm the registry exists to be different from (with 6P's and CFP Advantage's receipts above). |
+| 2026-09-08 / 2026-08-29 | Bill (cfb-chat, pick-em) | product | The ≥ 70% coverage floor; corrections that never rewrite a logged pick. | Two public-ledger rules worth stating on Results: a coverage rule ("every card BET placed and nothing else") and that no logged ticket is ever rewritten if a game row or line is corrected. |
+| 2025-08-18 | Bill (cfbfastr-questions) | product / legal | "Redistribution of raw CFBD API data, whether CSV, RDS, Parquet, or any other format, is not allowed … Hosting or publishing your own derived or augmented metrics is fine." cfbfastR was brought inside the terms that night (attribution + live API calls). | The sharpest statement of the licence line: our `/api/bets` CSV and any public download must carry OUR numbers, never raw CFBD fields verbatim. Attribution asset: `cdn.collegefootballdata.com/cfbd-watermark.png` (and `-dark`), offered 2026-09-10 — How it works should carry one. Cross-reference `docs/LEGAL_MEMO_2026-10.md`. |
+| 2025-08-29 / 2026-03-22 / 2026-08-19 | Bill (development) | ops | A 429 is ambiguous: the burst limit "50 requests in a 10 second period … time out … 10 minutes" (Cloudflare error 1015, exponential backoff — "the more calls you made while in time out, the longer the wait") versus the monthly quota. Safe pace: "making requests synchronous … a short sleep (e.g. 500 ms)". | `CFBDQuotaExceeded` is raised on the spot; check the body for `error_code 1015` before declaring the quota gone, and pin a ~0.5 s sleep in any sequential backfill. |
+| 2025-07-05 / 2025-08-25 | Bill (development) | ops | Adjusted season stats "don't go up until after 4 or 5 weeks … then updated weekly"; the Tier-3 weekly CSVs "starting week 5." | No weekly adjusted data exists for weeks 1-4 of any season; bounds the n of any in-season adjusted input (H-WEPA-F's 561 games started at week 5 for this reason). |
+| 2025-08-26 | Bill (development) | ops | "certain things aren't tracked until 2016 so havoc calcs differ wildly between 2015 and 2016." | A 2016 training floor for any havoc-family feature (`mm_havoc`); record it so a future history purchase cannot cross it. |
+| 2025-08-07 | Bill (development) | ops | `lineScores` "is just an ordered array with a length of 4 for normal completed games. There will be additional elements added for each OT period." | The exact contract behind `etl/first_half.py`'s half proof: elements 0+1 are the half, and OT appends rather than folding into Q4. |
+| 2025-09-24 / 2025-10-21 / 2025-12-15 | Bill, Vik (development) | ops | `/calendar`: "Week 1 is indeed extended to include week 0"; CFBD week ends run a day past ESPN's; "CFP and Bowl games are both postseason week 1"; 2025's week 16 (Army-Navy) overlapped postseason week 1 and broke `/scoreboard`. | Date-joins of ESPN ids to CFBD weeks go through `/calendar`, never ESPN's week; the week loop must accept 16 and the postseason filter must not drop it. |
+| 2025-11-10 → 2026-09-22 | saiemgilani, members (cfbfastr-questions) | ops | ESPN's week-9 2025 provider switch from the parser's side: play text changed format ("(06:45) #92 B.Thorson"), rusher/receiver names "not reliable from then", unfixed for ten months. | Any `fh_*` or havoc feature parsed from `play_text` or player fields must be checked across week 9 of 2025; `play_type`-based features are safer. |
+| 2026-04-16 | Bill (development) | ops | "upgrade your membership and then downgrade before next month's renewal … validate that the newer benefits and call limit is applied before downgrading." | How to buy one month of a higher tier for a one-off history pull — relevant to the Nov 6 Tier decision. |
+| 2025-09-27 / 09-28 | Bill, PEARatings (pick-em) | marketing | Participation nearly doubled in 2025; "Twitter still has a lot more engagement"; "Post easy to read visuals, and engage with people"; Bill polls newcomers on how they found the contest. | Hobby-model builders are a real, growing segment; X plus readable visuals is the distribution the room looks up to; ask arrivals how they found us once a sign-up exists (Track F). |
+
+**Proposed registry rows from these sittings (proposals only):**
+- **H-PCAL-P** — a gap→P(under) calibration fitted on prior seasons' REAL closes (never on
+  `bv_sigma`), reported beside each paper pick; a pass licenses nothing but makes `BREAK_EVEN_EV`
+  meaningful.
+- **H-DESERVED-F** — a PBP-based "deserved first-half points" label as a shadow-engine target;
+  contingent on the week-9 seam check.
+- Notes: add an EWMA recency arm to H-RIDGE-F; H-ELO-F must name which Elo (per-game pregame vs
+  the rankings table).
+
+**Ops hygiene implied (measurement or hygiene, no code change proposed here):** distinguish
+Cloudflare 1015 from the monthly 429; a 2016 havoc floor; week 16 and the postseason overlap;
+`/calendar` for date joins; PBP features across the 2025 week-9 seam; the CFBD watermark on How it
+works and no raw CFBD fields in any public CSV; ask dharkmeat for `cfb_leaders.csv`.

@@ -53,9 +53,11 @@ import pandas as pd
 from .. import postmortem as pm
 from ..etl.features import apply_min_games, build_feature_frame, training_frame
 from ..etl.frame_fingerprint import write_fingerprint
-from ..grading import clv_under, trusted_first_half_total, under_result, units_won
-from ..lines import REAL_1H_CLOSE_WINDOW_H
+from ..grading import clv_under, under_result, units_won
+from ..markets import FIRST_HALF, FULL_GAME, SIDES, Market
+from ..markets import actuals as market_actuals
 from ..model.bv_line import bv_line_for_slate
+from ..model.fg_line import bv_fg_line_for_slate
 from ..model.score import (
     BET_GAP_PTS,
     MIN_GAMES_FOR_REAL_MONEY,
@@ -140,8 +142,13 @@ class Arm:
     is_incumbent: bool = False
 
 
-def incumbent_arm() -> Arm:
-    """The champion as production scores it: model.bv_line.bv_line_for_slate."""
+def incumbent_arm(market: Market = FIRST_HALF) -> Arm:
+    """The champion as production scores it: model.bv_line.bv_line_for_slate
+    (the very object -- tests assert identity). For the research-only
+    full-game market the incumbent is the same regressor fitted to the
+    full-game total (model.fg_line.bv_fg_line_for_slate)."""
+    if market.key == FULL_GAME.key:
+        return Arm(INCUMBENT_NAME, bv_fg_line_for_slate, is_incumbent=True)
     return Arm(INCUMBENT_NAME, bv_line_for_slate, is_incumbent=True)
 
 
@@ -161,8 +168,17 @@ class HarnessSpec:
     seed: int = 7
     alpha: float = 0.05
     criterion: Optional[Callable[[Dict[str, Any]], Optional[bool]]] = None
+    # 2026-10-06: which totals market is graded and which side the record
+    # counts. Defaults keep every existing caller byte-identical (first-half
+    # unders). `side="over"` flips the gap sign (pred − close) so the top-20%
+    # rule still means "the model's largest disagreement in the bet's
+    # direction", and grades units for the over.
+    market: Market = FIRST_HALF
+    side: str = "under"
 
     def __post_init__(self) -> None:
+        if self.side not in SIDES:
+            raise HarnessRefusal(f"side must be one of {SIDES}, got {self.side!r}")
         arms = tuple(self.arms)
         object.__setattr__(self, "arms", arms)
         object.__setattr__(self, "test_seasons", tuple(sorted(int(s) for s in self.test_seasons)))
@@ -209,7 +225,13 @@ class HarnessSpec:
             "seed": self.seed,
             "alpha": self.alpha,
             "criterion_fn": _qualname(self.criterion) if self.criterion else None,
+            "market": self.market.describe(),
+            "side": self.side,
         }
+
+
+# Sentinel: `Grading(closes=...)` with no window takes the market's registered one.
+_MARKET_WINDOW: Any = object()
 
 
 @dataclass(frozen=True)
@@ -220,22 +242,31 @@ class Grading:
     book has one; `decision_lines` the candidate bet line under `decision_rule`."""
 
     closes: Dict[int, float]
-    window_h: Optional[float] = REAL_1H_CLOSE_WINDOW_H
+    window_h: Any = _MARKET_WINDOW
     hr_closes: Dict[int, float] = field(default_factory=dict)
     hr_prices: Dict[int, int] = field(default_factory=dict)
     decision_lines: Dict[int, float] = field(default_factory=dict)
     decision_rule: Optional[str] = None
+    market: Market = FIRST_HALF
 
     def __post_init__(self) -> None:
-        if self.window_h is None or float(self.window_h) != float(REAL_1H_CLOSE_WINDOW_H):
+        # The window is the MARKET's registered one (lines.REAL_1H_CLOSE_WINDOW_H
+        # 2 h; REAL_FG_CLOSE_WINDOW_H 3 h): left unset it takes it; anything
+        # passed, None included, must equal it. A close outside that window is
+        # not a real close.
+        expected = float(self.market.close_window_h)
+        if self.window_h is _MARKET_WINDOW:
+            object.__setattr__(self, "window_h", expected)
+        if self.window_h is None or float(self.window_h) != expected:
             raise HarnessRefusal(
-                f"Grading.window_h must be exactly REAL_1H_CLOSE_WINDOW_H "
-                f"({REAL_1H_CLOSE_WINDOW_H:g} h), got {self.window_h!r}; a close outside that "
-                "window is not a real close"
+                f"Grading.window_h must be exactly {self.market.window_name} "
+                f"({expected:g} h) for the {self.market.label} market, got {self.window_h!r}; "
+                "a close outside that window is not a real close"
             )
 
     def describe(self) -> Dict[str, Any]:
         return {
+            "market": self.market.describe(),
             "close_window_h": self.window_h,
             "n_closes": len(self.closes),
             "n_hr_closes": len(self.hr_closes),
@@ -306,23 +337,11 @@ def load_frame(
     return frame, fp
 
 
-def _actuals(df: pd.DataFrame) -> pd.Series:
-    """The trusted 1H total per row (grading.trusted_first_half_total), NaN when
+def _actuals(df: pd.DataFrame, market: Market = FIRST_HALF) -> pd.Series:
+    """The realized total per row for `market` (markets.actuals): the TRUSTED
+    1H total for the first half, home + away points for the full game; NaN when
     the row cannot be graded."""
-    src = df["first_half_source"] if "first_half_source" in df else pd.Series(None, index=df.index)
-    hp = df["home_points"] if "home_points" in df else pd.Series(np.nan, index=df.index)
-    ap = df["away_points"] if "away_points" in df else pd.Series(np.nan, index=df.index)
-    out = []
-    for fh, h, a, s in zip(df["first_half_total"], hp, ap, src):
-        fh_v = None if pd.isna(fh) else float(fh)
-        v = trusted_first_half_total(
-            fh_v,
-            None if pd.isna(h) else float(h),
-            None if pd.isna(a) else float(a),
-            None if (s is None or (isinstance(s, float) and math.isnan(s))) else s,
-        )
-        out.append(np.nan if v is None else float(v))
-    return pd.Series(out, index=df.index, dtype=float)
+    return market_actuals(df, market)
 
 
 def split_populations(
@@ -345,7 +364,7 @@ def split_populations(
     score_cut = apply_min_games(frame, spec.min_games_score)
     score_cut = score_cut[score_cut["season"].isin(list(spec.test_seasons))]
     score_played = training_frame(score_cut)
-    actual = _actuals(score_played)
+    actual = _actuals(score_played, spec.market)
     score_pool = score_played[actual.notna()].copy()
     score_pool["actual"] = actual[actual.notna()]
     drops = {
@@ -390,7 +409,9 @@ def walk_forward(
         train = train_pool[train_pool["season"] < s]
         target = score_pool[score_pool["season"] == s]
         if target.empty:
-            raise GateNotEvaluable(f"test season {s}: no scoreable played row (trusted 1H total)")
+            raise GateNotEvaluable(
+                f"test season {s}: no scoreable played row (trusted {spec.market.label})"
+            )
         if train.empty:
             raise GateNotEvaluable(f"test season {s}: no played training row from a prior season")
         k_train, k_test = _kick(train), _kick(target)
@@ -457,8 +478,13 @@ def attach_closes(per_game: pd.DataFrame, grading: Grading, spec: HarnessSpec) -
     -110 when its close has no price), and the candidate `decision_line`.
     `attrs["coverage"]` counts per season. GateNotEvaluable for a test season
     with zero real closes."""
-    if grading.window_h is None or float(grading.window_h) != float(REAL_1H_CLOSE_WINDOW_H):
-        raise HarnessRefusal("attach_closes: Grading.window_h is not REAL_1H_CLOSE_WINDOW_H")
+    if grading.market.key != spec.market.key:
+        raise HarnessRefusal(
+            f"attach_closes: Grading is for the {grading.market.label} market, the spec for the "
+            f"{spec.market.label}"
+        )
+    if grading.window_h is None or float(grading.window_h) != float(spec.market.close_window_h):
+        raise HarnessRefusal(f"attach_closes: Grading.window_h is not {spec.market.window_name}")
     _assert_no_proxy(per_game)
     df = per_game.copy()
     df["close"] = df["game_id"].map(grading.closes).astype(float)
@@ -474,14 +500,19 @@ def attach_closes(per_game: pd.DataFrame, grading: Grading, spec: HarnessSpec) -
         }
         if n_close == 0:
             raise GateNotEvaluable(
-                f"test season {s}: zero real 1H closes inside {REAL_1H_CLOSE_WINDOW_H:g} h of "
-                f"kickoff on {len(sub)} scoreable games; the consensus close defines the universe "
-                "and none exists, so the season is NOT EVALUABLE (no proxy line is read)"
+                f"test season {s}: zero real {spec.market.short} closes inside "
+                f"{spec.market.close_window_h:g} h of kickoff on {len(sub)} scoreable games; the "
+                "consensus close defines the universe and none exists, so the season is NOT "
+                "EVALUABLE (no proxy line is read)"
             )
     df = df[df["close"].notna()].copy()
     df["market_err"] = df["actual"] - df["close"]
+    # `outcome` is the OUTCOME ('under' / 'over' / 'push'), never the win; the
+    # record counts wins for `spec.side` and units are graded for that side.
     df["outcome"] = [under_result(a, c) for a, c in zip(df["actual"], df["close"])]
-    df["units"] = [units_won(a, c, spec.under_price) for a, c in zip(df["actual"], df["close"])]
+    df["units"] = [
+        units_won(a, c, spec.under_price, side=spec.side) for a, c in zip(df["actual"], df["close"])
+    ]
     df["hr_close"] = df["game_id"].map(grading.hr_closes).astype(float)
     df["hr_price"] = df["game_id"].map(grading.hr_prices)
     has_hr = df["hr_close"].notna()
@@ -493,15 +524,16 @@ def attach_closes(per_game: pd.DataFrame, grading: Grading, spec: HarnessSpec) -
             under_result(a, c) for a, c in zip(sub["actual"], sub["hr_close"])
         ]
         df.loc[has_hr, "units_hr"] = [
-            units_won(a, c, int(p) if not pd.isna(p) else spec.under_price)
+            units_won(a, c, int(p) if not pd.isna(p) else spec.under_price, side=spec.side)
             for a, c, p in zip(sub["actual"], sub["hr_close"], sub["hr_price"])
         ]
     df["decision_line"] = df["game_id"].map(grading.decision_lines).astype(float)
+    sign = 1.0 if spec.side == "under" else -1.0  # over: gap = pred − close
     for arm in spec.arms:
         p = df[_pred_col(arm)]
-        df[f"gap_{arm.name}"] = (df["close"] - p).round(2)
+        df[f"gap_{arm.name}"] = (sign * (df["close"] - p)).round(2)
         df[f"err_{arm.name}"] = df["actual"] - p
-        df[f"gap_hr_{arm.name}"] = (df["hr_close"] - p).round(2)
+        df[f"gap_hr_{arm.name}"] = (sign * (df["hr_close"] - p)).round(2)
     df = df.reset_index(drop=True)
     df.attrs["coverage"] = coverage
     return df
@@ -552,15 +584,18 @@ def cap_within(
     return mask
 
 
-def favourable_clv(bet_line: Optional[float], closing_line: Optional[float]) -> Optional[float]:
-    """Line value in the FAVOURABLE direction for an under: -(clv_under). The one
+def favourable_clv(
+    bet_line: Optional[float], closing_line: Optional[float], side: str = "under"
+) -> Optional[float]:
+    """Line value in the FAVOURABLE direction: for an under -(clv_under), the one
     sign flip in Python -- grading.clv_under stores closing - bet, where a
     falling line (negative) is the good one; here +1.0 means the market came a
-    point toward us. Mirrors web/lib/decision-quality.ts::favourable."""
+    point toward us. For an over it is +(closing - bet), as docs/NEGGAP_PAPER.md
+    states for the paper overs. Mirrors web/lib/decision-quality.ts::favourable."""
     c = clv_under(bet_line, closing_line)
     if c is None or (isinstance(c, float) and math.isnan(c)):
         return None
-    return -float(c)
+    return float(c) if side == "over" else -float(c)
 
 
 def _select(per_game: pd.DataFrame, arm: Arm, spec: HarnessSpec) -> pd.DataFrame:
@@ -579,7 +614,7 @@ def _select(per_game: pd.DataFrame, arm: Arm, spec: HarnessSpec) -> pd.DataFrame
         qh.loc[qhr[qhr].index] = True
     df[f"qual_hr_{arm.name}"] = qh
     df[f"clv_fav_{arm.name}"] = [
-        favourable_clv(b, c) if (qq and not pd.isna(b)) else np.nan
+        favourable_clv(b, c, spec.side) if (qq and not pd.isna(b)) else np.nan
         for qq, b, c in zip(q, df["decision_line"], df["close"])
     ]
     return df
@@ -588,9 +623,9 @@ def _select(per_game: pd.DataFrame, arm: Arm, spec: HarnessSpec) -> pd.DataFrame
 # ---------------------------------------------------------------- metrics
 
 
-def _rec(df: pd.DataFrame, mask: pd.Series, basis: str = "") -> Dict[str, Any]:
+def _rec(df: pd.DataFrame, mask: pd.Series, basis: str = "", side: str = "under") -> Dict[str, Any]:
     suffix = f"_{basis}" if basis else ""
-    return record(df, mask, outcome_col=f"outcome{suffix}", units_col=f"units{suffix}")
+    return record(df, mask, outcome_col=f"outcome{suffix}", units_col=f"units{suffix}", side=side)
 
 
 def _block(df: pd.DataFrame, arm: Arm, spec: HarnessSpec, incumbent: Arm) -> Dict[str, Any]:
@@ -612,8 +647,8 @@ def _block(df: pd.DataFrame, arm: Arm, spec: HarnessSpec, incumbent: Arm) -> Dic
             "mae": _mae(hr_rows["actual"], hr_rows[_pred_col(arm)]),
             "hr_mae": _mae(hr_rows["actual"], hr_rows["hr_close"]),
             "share_pct": float(qh.mean()) if len(hr_rows) else None,
-            "record_all": _rec(hr_rows, pd.Series(True, index=hr_rows.index), "hr"),
-            "record_pct": _rec(hr_rows, qh, "hr"),
+            "record_all": _rec(hr_rows, pd.Series(True, index=hr_rows.index), "hr", spec.side),
+            "record_pct": _rec(hr_rows, qh, "hr", spec.side),
         }
     clv = df.loc[q, f"clv_fav_{arm.name}"]
     clv_vals = clv.dropna()
@@ -639,19 +674,19 @@ def _block(df: pd.DataFrame, arm: Arm, spec: HarnessSpec, incumbent: Arm) -> Dic
         "share_pct": float(q.mean()) if n else None,
         "share_const": float((gap >= spec.fallback_bar).mean()) if n else None,
         "bar_median": float(df[f"bar_{arm.name}"].median()) if n else None,
-        "record_all": _rec(df, all_mask),
-        "record_pct": _rec(df, q),
-        "record_cap": _rec(df, c),
+        "record_all": _rec(df, all_mask, side=spec.side),
+        "record_pct": _rec(df, q, side=spec.side),
+        "record_cap": _rec(df, c, side=spec.side),
         "by_games_played": {
             f"ge{MIN_GAMES_FOR_REAL_MONEY}": {
                 "n": int(money.sum()),
-                "record_pct": _rec(df, q & money),
-                "record_cap": _rec(df, c & money),
+                "record_pct": _rec(df, q & money, side=spec.side),
+                "record_cap": _rec(df, c & money, side=spec.side),
             },
             f"lt{MIN_GAMES_FOR_REAL_MONEY}": {
                 "n": int((~money).sum()),
-                "record_pct": _rec(df, q & ~money),
-                "record_cap": _rec(df, c & ~money),
+                "record_pct": _rec(df, q & ~money, side=spec.side),
+                "record_cap": _rec(df, c & ~money, side=spec.side),
             },
         },
         "hr": hr_block,
@@ -826,13 +861,13 @@ def _market(df: pd.DataFrame, spec: HarnessSpec) -> Dict[str, Any]:
             "n": int(len(sub)),
             "close_mae": _mae(sub["actual"], sub["close"]),
             "close_bias_actual_minus_close": _bias(sub["actual"], sub["close"]),
-            "blanket_under": _rec(sub, pd.Series(True, index=sub.index)),
+            "blanket_under": _rec(sub, pd.Series(True, index=sub.index), side=spec.side),
         }
     out["pooled"] = {
         "n": int(len(df)),
         "close_mae": _mae(df["actual"], df["close"]),
         "close_bias_actual_minus_close": _bias(df["actual"], df["close"]),
-        "blanket_under": _rec(df, pd.Series(True, index=df.index)),
+        "blanket_under": _rec(df, pd.Series(True, index=df.index), side=spec.side),
     }
     return out
 
@@ -855,6 +890,11 @@ def run(
         raise HarnessRefusal(
             f"row {registry_row.id} is not runnable (status {registry_row.status!r}, "
             f"criterion {'present' if registry_row.criterion.strip() else 'EMPTY'})"
+        )
+    if grading.market.key != spec.market.key:
+        raise HarnessRefusal(
+            f"spec grades the {spec.market.label} market but the Grading was built for the "
+            f"{grading.market.label}"
         )
     train_pool, score_pool, drops = split_populations(frame, spec)
     per_game = walk_forward(train_pool, score_pool, spec)
@@ -881,10 +921,14 @@ def run(
             "substitution": (
                 "consensus close stands in for Hard Rock's line on "
                 f"{season_span(seasons_2325) if seasons_2325 else 'no'} test season(s) "
-                "(zero `hardrockbet` 1H rows in the 2023-25 history); Hard Rock basis reported "
-                "beside it where the book closed the game"
+                f"(zero `hardrockbet` {spec.market.label} rows in the 2023-25 history); Hard Rock "
+                "basis reported beside it where the book closed the game"
             ),
-            "close_rule": f"consensus close inside {REAL_1H_CLOSE_WINDOW_H:g} h of kickoff (lines.real_closes)",
+            "close_rule": (
+                f"{spec.market.label}: consensus `{spec.market.snapshot_market}` close inside "
+                f"{spec.market.close_window_h:g} h of kickoff (lines.real_closes, "
+                f"{spec.market.window_name}); side graded: {spec.side}"
+            ),
             "decision_rule": grading.decision_rule,
         },
         "market": _market(graded, spec),
@@ -977,7 +1021,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
         f"{spec['money_population_min_games']}",
         f"- rule: top {100 * spec['share']:.0f}% of each season-week slate by gap (`slate_bar`), "
         f"fallback bar {spec['fallback_bar']} on an empty slate, cap {spec['cap']} per week, "
-        f"under at {spec['under_price']}; bootstrap n={spec['n_boot']} seed={spec['seed']} "
+        f"{spec.get('side', 'under')} at {spec['under_price']}; bootstrap n={spec['n_boot']} seed={spec['seed']} "
         f"alpha={spec['alpha']}",
         f"- fbs_only = {spec['fbs_only']}",
         "",
@@ -1003,11 +1047,11 @@ def render_markdown(report: Dict[str, Any]) -> str:
         f"Frame rows {d['frame_rows']}; training pool {d['train']['played']} played rows at "
         f"min_games {d['train']['min_games']}; score pool {d['score']['trusted_actual']} trusted "
         f"rows at min_games {d['score']['min_games']} ({d['score']['untrusted_dropped']} played "
-        "rows dropped for an untrusted 1H total).",
+        "rows dropped for an untrusted actual).",
         "",
         "## Market benchmark (consensus close vs actual)",
         "",
-        "| Season | n | Close MAE | Bias (actual − close) | Blanket under W-L-P | Hit % | Units |",
+        f"| Season | n | Close MAE | Bias (actual − close) | Blanket {spec.get('side', 'under')} W-L-P | Hit % | Units |",
         "|---|---|---|---|---|---|---|",
     ]
     mk = rep["market"]

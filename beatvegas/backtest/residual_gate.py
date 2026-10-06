@@ -146,18 +146,22 @@ def record(
     mask: pd.Series,
     outcome_col: str = "outcome",
     units_col: str = "units",
+    side: str = "under",
 ) -> Dict[str, Any]:
-    """n / wins / losses / pushes / hit rate / units / ROI / Wilson 95% for the
-    under at the close over `mask`. Pushes are staked but excluded from the
+    """n / wins / losses / pushes / hit rate / units / ROI / Wilson 95% for a bet
+    on `side` at the close over `mask`. Pushes are staked but excluded from the
     rate, as postmortem.tally does. `outcome_col` / `units_col` let the harness
     grade the same rows on a second basis (Hard Rock's own close beside the
-    consensus); the defaults keep every existing caller identical."""
+    consensus); `side` ("under" default, "over" for the full-game over rows,
+    2026-10-06) says which OUTCOME is the win; the defaults keep every existing
+    caller identical."""
     sub = per_game[mask.reindex(per_game.index, fill_value=False).astype(bool)]
     o = sub[outcome_col]
     n = int(len(sub))
+    other = "over" if side == "under" else "under"
     wins, losses, pushes = (
-        int((o == "under").sum()),
-        int((o == "over").sum()),
+        int((o == side).sum()),
+        int((o == other).sum()),
         int((o == "push").sum()),
     )
     decided = wins + losses

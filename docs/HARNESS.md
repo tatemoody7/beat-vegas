@@ -51,6 +51,21 @@ Per test season, and pooled:
   picks (n_trials = number of arms); PBO over the arms' per-game portfolio units when there
   are ≥ 2 candidates and ≥ 4 groups, else `None` with a note; pick-set overlap.
 
+## Markets and sides (since 2026-10-06)
+
+The harness grades one totals market per run, the first half by default (`markets.FIRST_HALF`:
+target `first_half_total`, `odds_snapshots.market = 1H_total`, window
+`REAL_1H_CLOSE_WINDOW_H` 2 h) — every existing caller is byte-identical. `--market fg`
+(`markets.FULL_GAME`) fits the same 58-input market-blind regressor to `home_points +
+away_points` (`model.fg_line.bv_fg_line_for_slate`, the incumbent of a full-game run), grades at
+the real consensus `full_game_total` close inside `REAL_FG_CLOSE_WINDOW_H` (3 h) and reports
+`n_with_decision_line 0` (decision lines exist for the first half only). The frame's
+`full_game_total` column stays a proxy column that no grade may read. `--side over` flips the
+gap sign (`pred − close`) so "top 20% by gap" still means the model's largest disagreement in
+the bet's direction, counts the over as the win and reports favourable line value as
+`+(close − bet)`. The registered full-game rows are H-FG-U-R and H-FG-O-R; nothing live
+(`score_slate`, the card, `verdict.ts`) reads any of this.
+
 ## What it refuses, and the exit codes
 
 | Condition | Where | Result |
@@ -120,7 +135,8 @@ gh run list --workflow=study.yml --limit 1
 gh run download <run-id> -n study-harness_report -D reports/
 ```
 
-Optional arguments: `--candidate beatvegas.x.y:fn --candidate-name plus1` (repeatable),
+Optional arguments: `--market {1h,fg}`, `--side {under,over}` (the Markets section above),
+`--candidate beatvegas.x.y:fn --candidate-name plus1` (repeatable),
 `--criterion beatvegas.x.y:fn` (pre-registered rows only; `fn(report) -> True | False |
 None`), `--frame reports/frame_snapshot_<UTC>.pkl`, `--min-games-train`,
 `--min-games-score`, `--decision-rule`, `--out`, `--all-divisions`. The args field is split

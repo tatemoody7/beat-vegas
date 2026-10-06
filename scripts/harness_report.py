@@ -38,6 +38,7 @@ from beatvegas.backtest import harness as H
 from beatvegas.backtest.reporting import append_step_summary, report_paths, utc_stamp
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.markets import FIRST_HALF, SIDES, by_key
 from beatvegas.registry import HarnessRefusal, require_runnable_row
 from beatvegas.snapshots import (
     DEFAULT_DECISION_RULE,
@@ -97,6 +98,20 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument(
+        "--market",
+        choices=("1h", "fg"),
+        default="1h",
+        help="which totals market is fitted and graded (default the champion's first half; "
+        "`fg` fits the same regressor to the full-game total and grades at the real "
+        "full-game close inside REAL_FG_CLOSE_WINDOW_H -- research only, H-FG-U-R / H-FG-O-R)",
+    )
+    ap.add_argument(
+        "--side",
+        choices=SIDES,
+        default="under",
+        help="the side the record counts (default under; `over` flips the gap sign)",
+    )
     return ap.parse_args(argv)
 
 
@@ -122,7 +137,7 @@ def resolve_callable(dotted: str) -> Callable[..., Any]:
 
 
 def build_arms(args: argparse.Namespace) -> List[H.Arm]:
-    arms = [H.incumbent_arm()]
+    arms = [H.incumbent_arm(by_key(args.market))]
     if len(args.candidate_name) > len(args.candidate):
         raise HarnessRefusal("more --candidate-name values than --candidate values")
     for i, dotted in enumerate(args.candidate):
@@ -146,6 +161,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         row = require_runnable_row(args.row)
         parse_decision_rule(args.decision_rule)
+        market = by_key(args.market)
         arms = build_arms(args)
         criterion = resolve_callable(args.criterion) if args.criterion else None
         spec = H.HarnessSpec(
@@ -158,6 +174,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             n_boot=args.n_boot,
             seed=args.seed,
             criterion=criterion,
+            market=market,
+            side=args.side,
         )
         if row.status == "exploratory" and criterion is not None:
             raise HarnessRefusal(
@@ -167,9 +185,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return _refuse(str(e))
 
     print(
-        f"[harness] row {row.id} ({row.status}) · test seasons {list(spec.test_seasons)} · "
-        f"arms {[a.name for a in spec.arms]} · min_games train/score "
-        f"{spec.min_games_train}/{spec.min_games_score} · decision rule {args.decision_rule}"
+        f"[harness] row {row.id} ({row.status}) · market {market.key} · side {spec.side} · "
+        f"test seasons {list(spec.test_seasons)} · arms {[a.name for a in spec.arms]} · "
+        f"min_games train/score {spec.min_games_train}/{spec.min_games_score} · "
+        f"decision rule {args.decision_rule}"
     )
 
     # 2. database
@@ -194,15 +213,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # 3. real closes and decision lines for the test seasons' played games
     test_rows = frame[frame["season"].isin(list(spec.test_seasons))]
-    ids = [int(g) for g in test_rows.loc[test_rows["first_half_total"].notna(), "id"].tolist()]
+    if market.key == FIRST_HALF.key:
+        played = test_rows["first_half_total"].notna()
+    else:
+        played = test_rows["home_points"].notna() & test_rows["away_points"].notna()
+    ids = [int(g) for g in test_rows.loc[played, "id"].tolist()]
     with session_scope() as session:
         kicks = kickoffs_for(session, ids)
+        # Decision lines (the candidate's bet line for CLV) exist for the 1H
+        # market only in v1: a full-game run reports n_with_decision_line 0.
+        dec = (
+            decision_lines(session, ids, kicks, rule=args.decision_rule)
+            if market.key == FIRST_HALF.key
+            else {}
+        )
         grading = H.Grading(
-            closes=consensus_closes(session, ids, kicks),
-            hr_closes=hr_closes(session, ids, kicks),
-            hr_prices=hr_close_prices(session, ids, kicks),
-            decision_lines=decision_lines(session, ids, kicks, rule=args.decision_rule),
+            closes=consensus_closes(session, ids, kicks, market=market),
+            hr_closes=hr_closes(session, ids, kicks, market=market),
+            hr_prices=hr_close_prices(session, ids, kicks, market=market, side=spec.side),
+            decision_lines=dec,
             decision_rule=args.decision_rule,
+            market=market,
         )
     print(
         f"[harness] real closes {len(grading.closes)} / HR closes {len(grading.hr_closes)} / "
@@ -220,7 +251,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "",
                 f"`{type(e).__name__}: {e}`",
                 "",
-                "A test season carries no real 1H close inside the window, so nothing was graded "
+                f"A test season carries no real {market.label} close inside the window, so nothing was graded "
                 "and no proxy line was read. Nothing was decided.",
                 "",
                 f"Frame fingerprint: `{fp_path}`",

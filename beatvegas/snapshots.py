@@ -25,12 +25,12 @@ from .db.models import Card, Game, OddsSnapshot
 from .grading import trusted_first_half_total
 from .hardrock import HR_BOOK_KEY
 from .lines import (
-    REAL_1H_CLOSE_WINDOW_H,
     book_closing_before_kickoff,
     book_closing_price_before_kickoff,
     consensus_as_of,
     real_closes,
 )
+from .markets import FIRST_HALF, Market
 
 # The four whole-week decision builds (beatvegas/ci.py). Anything else is labelled
 # so a study can keep it out of a comparison of the four: the retired week-1 morning
@@ -90,26 +90,21 @@ def schedule_of(slot: Optional[str]) -> str:
     return "manual"
 
 
-def hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) -> Dict[int, float]:
-    """game_id -> Hard Rock's OWN pre-kickoff 1H close, strict centring
-    (lines.book_closing_before_kickoff); games without one are simply absent.
-    Moved here from scripts/post_mortem.py so the studies do not import a script."""
+def hr_closes(
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    market: Market = FIRST_HALF,
+) -> Dict[int, float]:
+    """game_id -> Hard Rock's OWN pre-kickoff close for `market` (1H by default),
+    strict centring (lines.book_closing_before_kickoff); games without one are
+    simply absent. Moved here from scripts/post_mortem.py so the studies do not
+    import a script."""
     if not game_ids:
         return {}
-    by_game: Dict[int, List] = {}
-    ids = list(game_ids)
-    for i in range(0, len(ids), 1000):
-        for snap in (
-            session.query(OddsSnapshot)
-            # Every book, not just Hard Rock: its alternate lines are told apart
-            # by the distance from the other books (lines.hr_rung_flags).
-            .filter(
-                OddsSnapshot.market == "1H_total",
-                OddsSnapshot.game_id.in_(ids[i : i + 1000]),
-            )
-            .all()
-        ):
-            by_game.setdefault(snap.game_id, []).append(snap)
+    # Every book, not just Hard Rock: its alternate lines are told apart by the
+    # distance from the other books (lines.hr_rung_flags).
+    by_game = _snaps_by_game(session, game_ids, market=market.snapshot_market)
     out: Dict[int, float] = {}
     for gid, snaps in by_game.items():
         _open, close, _at = book_closing_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
@@ -119,11 +114,22 @@ def hr_closes(session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]) -
 
 
 def consensus_closes(
-    session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    market: Market = FIRST_HALF,
 ) -> Dict[int, float]:
-    """game_id -> the consensus 1H close inside REAL_1H_CLOSE_WINDOW_H of kickoff
-    (lines.real_closes); absent when no book closed the game. Never proxied."""
-    return real_closes(session, game_ids, kickoffs, within_hours=REAL_1H_CLOSE_WINDOW_H)
+    """game_id -> the consensus close for `market` inside its registered window
+    (REAL_1H_CLOSE_WINDOW_H 2 h for the first half, REAL_FG_CLOSE_WINDOW_H 3 h
+    for the full game; lines.real_closes); absent when no book closed the game.
+    Never proxied."""
+    return real_closes(
+        session,
+        game_ids,
+        kickoffs,
+        market=market.snapshot_market,
+        within_hours=market.close_window_h,
+    )
 
 
 def kickoffs_for(session, game_ids: Sequence[int]) -> Dict[int, datetime]:
@@ -141,12 +147,14 @@ def kickoffs_for(session, game_ids: Sequence[int]) -> Dict[int, datetime]:
     return out
 
 
-def _snaps_1h_by_game(session, game_ids: Sequence[int], book: Optional[str] = None):
+def _snaps_by_game(
+    session, game_ids: Sequence[int], book: Optional[str] = None, market: str = "1H_total"
+):
     by_game: Dict[int, List] = {}
     ids = [int(g) for g in game_ids]
     for i in range(0, len(ids), 1000):
         q = session.query(OddsSnapshot).filter(
-            OddsSnapshot.market == "1H_total", OddsSnapshot.game_id.in_(ids[i : i + 1000])
+            OddsSnapshot.market == market, OddsSnapshot.game_id.in_(ids[i : i + 1000])
         )
         if book is not None:
             q = q.filter(OddsSnapshot.book == book)
@@ -156,17 +164,22 @@ def _snaps_1h_by_game(session, game_ids: Sequence[int], book: Optional[str] = No
 
 
 def hr_close_prices(
-    session, game_ids: Sequence[int], kickoffs: Dict[int, datetime]
+    session,
+    game_ids: Sequence[int],
+    kickoffs: Dict[int, datetime],
+    market: Market = FIRST_HALF,
+    side: str = "under",
 ) -> Dict[int, int]:
-    """game_id -> Hard Rock's closing UNDER price (American), strict centring,
-    latest priced pre-kick snapshot (lines.book_closing_price_before_kickoff).
-    Absent when Hard Rock has no priced centred pre-kick row -- never -110."""
+    """game_id -> Hard Rock's closing price for `side` (American; the UNDER by
+    default), strict centring, latest priced pre-kick snapshot
+    (lines.book_closing_price_before_kickoff). Absent when Hard Rock has no
+    priced centred pre-kick row -- never -110."""
     if not game_ids:
         return {}
     out: Dict[int, int] = {}
     # Every book: the Hard Rock rule needs the field (lines.hr_rung_flags).
-    for gid, snaps in _snaps_1h_by_game(session, game_ids).items():
-        price = book_closing_price_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY)
+    for gid, snaps in _snaps_by_game(session, game_ids, market=market.snapshot_market).items():
+        price = book_closing_price_before_kickoff(snaps, kickoffs.get(gid), HR_BOOK_KEY, side)
         if price is not None:
             out[gid] = int(price)
     return out
@@ -231,7 +244,7 @@ def decision_lines(
     if not game_ids:
         return {}
     out: Dict[int, float] = {}
-    for gid, snaps in _snaps_1h_by_game(session, game_ids).items():
+    for gid, snaps in _snaps_by_game(session, game_ids).items():
         t = decision_instant(kickoffs.get(gid), slot)
         if t is None:
             continue

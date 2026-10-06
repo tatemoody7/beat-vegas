@@ -2,8 +2,10 @@
 
 **Run 2026-10-06 (`study.yml` runs 37498128236 unders, 37498146230 overs; one dispatch each after
 the data-cell correction of PR #284). Overs: NOT MET on every reading. Unders: the pre-registered
-text is ambiguous between two selection sets and the two readings disagree — a verdict is NOT
-declared here; Tate resolves the reading before anything else happens.** Nothing changes: the
+text was ambiguous between two selection sets and the readings disagreed; Tate ruled the same day
+that the champion's rule includes the weekly cap, so the capped set is the selected set — MET
+(`tested-positive`). That licenses one thing: registering H-FG-P, a 2026 PAPER arm of full-game
+unders (row written below the result; the collector is PR5 of the program).** Nothing changes: the
 champion, the bar, the stakes and H-STOP-2 are untouched; the full-game market stays a reference
 ledger, never bet. A pass would license only a 2026 paper arm (H-FG-P).
 
@@ -100,8 +102,9 @@ units > 0 in both 2024 and 2025; Holm across the two rows (the surviving row is 
   (b) rule that it means the qualifying set → `tested-null`, question closed for 2026;
   (c) decline to rule and register H-FG-P as a measurement-only paper arm regardless, since paper
   costs nothing and the prospective record is the honest test either way.
-  The σ of per-pick units on the capped unders (the clock constant H-FG-P would freeze) is in the
-  per-game CSV of run 37498128236.
+  **Ruling (Tate, 2026-10-06, after reading this doc): (a).** The σ of per-pick units on the capped
+  unders, frozen for H-FG-P's profit clock: 0.913 (n 124; the qualifying set reads 0.939 on n 250),
+  from the per-game CSV of run 37498128236.
 
 ## Caveats (the harness prints these on every report)
 

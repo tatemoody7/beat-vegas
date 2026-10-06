@@ -832,6 +832,31 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     assert "steps.precheck.outputs.skip != 'true'" in health["if"]
 
 
+def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_the_job():
+    """Since 2026-10-06 the 1h_close run also captures the FULL-GAME close for
+    events inside REAL_FG_CLOSE_WINDOW_H (3 h): one bulk `totals` call over
+    `us,us2` (2 credits a tick). It runs only after a successful 1H close poll,
+    can never redden the job (continue-on-error + --allow-empty), and the
+    health contract stays the last step."""
+    data = _load(WF_DIR / "lines_watch.yml")
+    steps = data["jobs"]["watch"]["steps"]
+    fg = next(s for s in steps if "poll_full_game.py" in str(s.get("run", "")))
+    assert fg["if"] == "steps.close.outcome == 'success'"
+    assert fg.get("continue-on-error") is True
+    run = fg["run"]
+    for flag in (
+        "--source oddsapi",
+        "--regions us,us2",
+        "--markets totals",
+        "--kickoff-within-min 180",
+        "--credit-floor",
+        "--allow-empty",
+    ):
+        assert flag in run, flag
+    assert steps.index(fg) < steps.index(next(s for s in steps if s.get("id") == "health"))
+    assert steps[-1].get("id") == "health"
+
+
 def test_every_study_choice_is_in_the_case_line():
     """study.yml: every `script` option the dispatch form offers must appear in the
     run step's `case` pattern, or choosing it fails the run with "unknown script"

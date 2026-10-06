@@ -25,7 +25,12 @@ from beatvegas.grading import (
     under_result,
     units_won,
 )
-from beatvegas.lines import closing_before_kickoff, fair_under_before_kickoff
+from beatvegas.lines import (
+    REAL_FG_CLOSE_WINDOW_H,
+    close_in_window,
+    closing_before_kickoff,
+    fair_under_before_kickoff,
+)
 
 MODEL_MARKET = "market"  # tag for the pure market-vs-result grade (1H)
 MODEL_MARKET_FG = "market_fg"  # full-game market-vs-result grade
@@ -79,10 +84,24 @@ def _closings_fg(session, season: int):
             .filter(OddsSnapshot.game_id == g.id, OddsSnapshot.market == "full_game_total")
             .all()
         )
-        opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
-        fair = fair_under_before_kickoff(snaps, g.start_date)
+        # The opener comes from every pre-kick snapshot; the CLOSE only from
+        # rows captured or re-seen inside REAL_FG_CLOSE_WINDOW_H (3 h). Before
+        # 2026-10-06 no window applied and the 2026 ledger graded Sunday
+        # openers as closes (9 of 380 rows had a snapshot inside 3 h).
+        opening, _, _ = closing_before_kickoff(snaps, g.start_date)
+        in_window = [s for s in snaps if _in_fg_window(s, g.start_date)]
+        _, closing, closing_at = closing_before_kickoff(in_window, g.start_date)
+        fair = fair_under_before_kickoff(in_window, g.start_date)
         out[g.id] = (g, (opening, closing), closing_at, fair)
     return out
+
+
+def _in_fg_window(snap, kickoff) -> bool:
+    """A snapshot confirms the full-game close when its capture or its later
+    re-seen stamp (an unchanged line a later poll found standing) falls inside
+    REAL_FG_CLOSE_WINDOW_H before kickoff."""
+    stamps = [t for t in (snap.captured_at, getattr(snap, "last_seen_at", None)) if t is not None]
+    return any(close_in_window(t, kickoff, REAL_FG_CLOSE_WINDOW_H) for t in stamps)
 
 
 def grade_market_fg(session, closings_fg) -> int:

@@ -57,6 +57,12 @@ def _candidate_games(session, season: int) -> List[Dict]:
     return [{"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3]} for r in rows]
 
 
+# The bulk /odds markets the Sunday opener and the card-day refresh pull. The
+# Saturday close ticks pass `--markets totals` (half the credits; the spread
+# is already on file by then).
+DEFAULT_MARKETS = "totals,spreads"
+
+
 def _latest_snapshot(session, game_id: int, book: str, market: str):
     return (
         session.query(OddsSnapshot)
@@ -90,15 +96,19 @@ def _normalize_books(rows: List[Dict]) -> List[Dict]:
 
 
 def _fetch(
-    source: str, season: int, regions: str = "us,us2", credit_floor: int = 60
+    source: str,
+    season: int,
+    regions: str = "us,us2",
+    credit_floor: int = 60,
+    markets: str = DEFAULT_MARKETS,
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     """Return (full_game_rows, first_half_rows, source_used, event_count)."""
-    fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor)
+    fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor, markets)
     return _normalize_books(fg), _normalize_books(h1), used, n
 
 
 def _fetch_raw(
-    source: str, season: int, regions: str, credit_floor: int
+    source: str, season: int, regions: str, credit_floor: int, markets: str = DEFAULT_MARKETS
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     dk_events = 0
     if source == "oddsapi":
@@ -116,7 +126,10 @@ def _fetch_raw(
                 "full-game pull. Pass --credit-floor 0 to override."
             )
             return [], [], "oddsapi", 0
-        events = client.list_full_game_odds(regions=regions)
+        # Billed (markets x regions) for the whole slate: `totals,spreads` x
+        # `us,us2` = 4 credits (the Sunday opener / card-day refresh);
+        # `totals` x `us,us2` = 2 (the Saturday full-game close ticks).
+        events = client.list_full_game_odds(regions=regions, markets=markets)
         return oa_normalize_full_game(events), [], "oddsapi", len(events)
     h1: List[Dict] = []
     if source in ("dk", "auto"):
@@ -158,8 +171,8 @@ def _resolve_gid(r: Dict, games: List[Dict], ids: set) -> Optional[int]:
     return gid
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
+def main(argv: Optional[List[str]] = None) -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--season", type=int, default=current_season())
     ap.add_argument(
         "--source",
@@ -182,21 +195,50 @@ def main() -> None:
         help="--source oddsapi only: skip the paid pull once remaining monthly "
         "credits are at this floor (same reserve poll_lines honours); 0 disables",
     )
-    args = ap.parse_args()
+    ap.add_argument(
+        "--markets",
+        default=DEFAULT_MARKETS,
+        help="--source oddsapi only: bulk /odds markets, billed (markets x regions) "
+        "for the whole slate; `totals` alone halves a close tick's cost",
+    )
+    ap.add_argument(
+        "--kickoff-within-min",
+        type=int,
+        default=None,
+        help="keep only events kicking off within N minutes from now (the Saturday "
+        "full-game close ticks: 180 = lines.REAL_FG_CLOSE_WINDOW_H); the bulk "
+        "response is the whole slate, so the filter costs nothing",
+    )
+    ap.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="exit 0 when no row was captured (a close tick with no full-game event "
+        "due is a normal state inside the 1H close job, not a dead feed)",
+    )
+    args = ap.parse_args(argv)
 
     if not try_init_db():
         return
 
     fg_rows, h1_rows, source, dk_events = _fetch(
-        args.source, args.season, args.regions, credit_floor=args.credit_floor
+        args.source,
+        args.season,
+        args.regions,
+        credit_floor=args.credit_floor,
+        markets=args.markets,
     )
 
     now = datetime.utcnow()
     horizon = now + timedelta(days=args.days_ahead)
+    if args.kickoff_within_min is not None:
+        horizon = min(horizon, now + timedelta(minutes=args.kickoff_within_min))
 
     def _in_window(r) -> bool:
         dt = _parse_dt(r.get("commence_time"))
-        return dt is None or now - timedelta(days=1) <= dt <= horizon
+        if dt is None:
+            return True
+        lo = now if args.kickoff_within_min is not None else now - timedelta(days=1)
+        return lo <= dt <= horizon
 
     fg_rows = [r for r in fg_rows if _in_window(r)]
     h1_rows = [r for r in h1_rows if _in_window(r)]
@@ -248,6 +290,14 @@ def main() -> None:
                 )
                 written_fg += 1
             else:
+                # An unchanged number is a CONFIRMATION of the line at `now`:
+                # stamp it (poll_lines does the same) so a Saturday close tick
+                # that finds Sunday's number still standing turns that row into
+                # a real pre-kick close (lines.closing_before_kickoff reads
+                # last_seen_at; grade._closings_fg and lines.real_closes window
+                # on it). Without this, an unmoved full-game line could never
+                # grade as a close inside REAL_FG_CLOSE_WINDOW_H.
+                prev.last_seen_at = now
                 skipped += 1
             # Remember the best-book row per game (not feed order): the Game
             # update below must not depend on which book happened to come last.
@@ -311,9 +361,15 @@ def main() -> None:
     # (see post_derived_lines.py for the same rule). Off-season runs are
     # skipped by the workflow before this script runs.
     if not fg_rows:
+        if args.allow_empty:
+            print("no full-game rows in the window — nothing to capture (--allow-empty)")
+            return
         print("::error::no full-game rows came back from the source — nothing captured")
         sys.exit(1)
     if matched == 0:
+        if args.allow_empty:
+            print("no event matched a CFBD game in the window (--allow-empty)")
+            return
         print("::error::no events matched a CFBD game — nothing captured")
         sys.exit(1)
 

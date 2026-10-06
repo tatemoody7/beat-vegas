@@ -143,6 +143,18 @@ carries `HEALTH: <verdict> <note>`.
    by hand when the source is back, then `weekly_update.py`.
 5. `sunday.reference_cache_populated` -> as grade.
 
+### The full-game close step (since 2026-10-06)
+
+The `1h_close` run also calls `scripts/poll_full_game.py --markets totals --kickoff-within-min
+180 --allow-empty` after a successful 1H close poll: one bulk Odds API call over `us,us2`
+(2 credits a tick) captures or re-seens (`last_seen_at`) every book's full-game total for games
+kicking off inside `REAL_FG_CLOSE_WINDOW_H` (3 h). It exists so the full-game reference ledger
+(`results.model_version='market_fg'`, `scripts/grade.py::_closings_fg`, now windowed at 3 h)
+and the H-FG-U-R / H-FG-O-R retrospectives grade at a REAL close -- before this, 9 of 380 graded
+2026 games had a full-game snapshot inside 3 h. The step is `continue-on-error` and carries no
+contract check yet; a `lines_watch.fg_rows_touched` degraded check follows once the first
+Saturday shows rows.
+
 ### When lines_watch is degraded
 
 1. `lines_watch.close_polled` missed -> the close poll found events in its

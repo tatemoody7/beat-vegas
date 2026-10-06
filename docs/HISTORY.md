@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (SHIPPED #279 `3cfe1f0`, #280 `272e6f8`, #281 `96a2506`, #282 `d269290`; the deep
+  program approved).** Tate's brief: make Beat Vegas a true college-football betting system —
+  six tracks (markets, CFBD catalogue, Discord knowledge base, Bill's business, assumptions audit,
+  product thesis), one Monday program review, real money unchanged (1H unders, 5 flat units) for
+  2026; plan file `pasted-content-id-35b3-session-handoff-iterative-rossum.md`. Track A shipped
+  the same day: real Saturday full-game closes on the `lines_watch` ticks (`totals` x `us,us2`,
+  2 credits a tick) and the 3 h window on `market_fg` (#279; 9 of 380 graded 2026 games had a
+  snapshot inside 3 h before); registry rows H-FG-U-R / H-FG-O-R, pre-registered, one look each
+  (#280); the market-aware harness — `beatvegas/markets.py`, `--market fg --side over`, the
+  champion path byte-identical (#282). Track E: `docs/ASSUMPTIONS.md` v1, 28 live rules with
+  their basis, and three doc defects fixed (#281). Deploys READY, health ok after each.
+
 - **2026-10-06 (H-WEPA-F REGISTERED AND TESTED NULL — `docs/WEPA_F.md`).** The row (PR #278,
   commit `f9105bf`, before the script) pre-registered a 2025 retrospective arm: dated in-season
   WEPA from the 11 Patreon weekly files (561 games, z-scored within each file;

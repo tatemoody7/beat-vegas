@@ -19,7 +19,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   **Add the row first, then write the script**; `tests/test_hypotheses_registry.py` keeps it honest.
 - `docs/BETTING_POLICY.md` (money rules, parity-tested), `docs/HEALTH.md` (one contract per
   scheduled job), `docs/OPS_ACCOUNTS.md` (the account-side checklist only Tate can click),
-  `docs/RANKING_AND_TRUST.md` (how the board ranks and what it refuses), `docs/GLOSSARY.md`.
+  `docs/RANKING_AND_TRUST.md` (how the board ranks and what it refuses), `docs/GLOSSARY.md`,
+  `docs/ASSUMPTIONS.md` (every live money-path rule with its basis; nothing changes from it).
 - Study docs, each with its verdict at the top: `STOPPING_RULE`, `MODEL_LEVEL_2026`,
   `NEGGAP_PAPER`, `INSEASON_PAPER`, `HARNESS`, `POST_MORTEM`, `TWO_SIDED`, `WEATHER`,
   `WEATHER_STYLE`, `CENSORING_STUDY`, `LEVEL_ANCHOR`, `BLEND`, `GATES`, `WHEN_TO_BET`, `HR_LAG`,

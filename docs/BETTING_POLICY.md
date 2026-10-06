@@ -44,8 +44,12 @@ the bet card follows. Change it here first, then in code.
   built to measure. The gap band (this week's top 20% by gap, H-PCT) is the validated **top-20% ranking
   rule**, not a proven edge: against a fair proxy line the backtest shows **no
   confirmed edge**; only real-line CLV this season can show one.
-- Full-game is decision-support only. Its backtest on real lines found no
-  edge; it stays on the board as context.
+- Full-game is a reference ledger, never bet. Its lines are captured and graded
+  (`market_fg`) so the first-half picks can be read against a second market; the only
+  full-game numbers on file are the post-mortem's `fg` column, which grades the
+  1H-selected picks as full-game unders (`docs/POST_MORTEM.md`). No full-game-target
+  study exists; registry rows H-FG-U-R / H-FG-O-R are proposed, not registered
+  (`docs/ASSUMPTIONS.md`). It stays on the board as context.
 - Bets are placed on Hard Rock Bet (the only Florida book). Every This Week card shows
   Hard Rock's price against the market's fair price: a worse price turns a BET
   into a WATCH.
@@ -144,8 +148,11 @@ A game is BET when all of these hold:
    gap of the **top 20%** of the slate's Hard-Rock-priced games with a centred quote
    and a model read (`slate_bar`, H-PCT, registered 2026-09-22, effective the week-5
    refit), and the gap is positive. Not the consensus line — the consensus can clear
-   the bar while Hard Rock posts a lower number — and never on an off-centre Hard
-   Rock rung (both sides no worse than −160). The rule was validated as "the top 20%
+   the bar while Hard Rock posts a lower number — and never on one of Hard Rock's own
+   alternate lines: `is_hr_rung` (`beatvegas/devig.py`) flags a Hard Rock quote with
+   either side at −140 or worse, or 2+ points off the median of 3+ other books' centred
+   lines; the general centred-quote rule for every book (`is_centred_quote`) is both
+   sides no worse than −160 (`docs/RANKING_AND_TRUST.md` §9b). The rule was validated as "the top 20%
    by gap"; deployed as a constant it selected half the board once the model's level
    moved. **The fallback bar, used only when a slate has no such game, is 1.75.**
    (≥ 3.0 points = "high" confidence wording — the gap alone. The classifier whose

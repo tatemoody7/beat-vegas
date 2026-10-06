@@ -1,0 +1,71 @@
+name: Score the full-game shadow (H-FG-P)
+
+# Scores ONE season/week with the full-game shadow engine `bv_fg_v1`
+# (scripts/fg_shadow.py; docs/FG_MARKET.md) and writes its `predictions` rows
+# (delete-then-insert per game, that version only) plus one `model_runs` row
+# noted `fg shadow refit`. Dispatch-only: sunday.yml scores the live week after
+# the champion; this exists for a week the Sunday job did not score (2026 week 6,
+# the first) or a re-score. No GameRecords, no Odds API credits. The rows are
+# invisible to every "the model's line" read (score.CHAMPION_READ_VERSIONS);
+# the only reader is the H-FG-P paper collector (beatvegas/fg_paper.py).
+
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season, e.g. 2026"
+        required: true
+      week:
+        description: "Week to score, e.g. 6"
+        required: true
+
+# Shares the Neon writers' group: predictions are delete-then-insert, so this
+# must never overlap sunday.yml / card.yml / grade.yml.
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  fg_shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Install
+        # Hash-pinned: requirements/lock.txt names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
+      - name: Score the week with bv_fg_v1
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_SEASON: ${{ inputs.season }}
+          IN_WEEK: ${{ inputs.week }}
+        run: python scripts/fg_shadow.py --season "$IN_SEASON" --week "$IN_WEEK"
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

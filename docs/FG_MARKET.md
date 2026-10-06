@@ -113,3 +113,55 @@ season, not the weekly refit. Selection uses the close's gap (no decision-time l
 drops played games whose 1H total equals the proxy line, and `training_frame` keys on the 1H
 total — full-game rows inherit both. 2023-25 is exhausted for rule selection — this run
 measured; nothing here may pick a threshold.
+
+## H-FG-P — the 2026 paper arm (collector shipped 2026-10-06)
+
+Registry row H-FG-P (`docs/HYPOTHESES.md`, pre-registered). **Paper only**: real money stays
+first-half unders; a pass is a finding, nothing more.
+
+- **First build**: `cards.id` **TBD**, written here before any observation is read.
+- **Engine**: `bv_fg_v1`, scored by `scripts/fg_shadow.py`. It runs after the champion in
+  `sunday.yml` (continue-on-error) and by hand through `fg_shadow.yml`. Week 6 of 2026 is scored by
+  hand, Tate's call. Each scoring run writes:
+  - one `predictions` row per game, `model_version='bv_fg_v1'`;
+  - one `model_runs` row noted `fg shadow refit`;
+  - no GameRecord. The input vector rides in the row's `factors_json["features"]`.
+
+  None of these rows can be read as the champion: every "the model's line" read uses
+  `score.CHAMPION_READ_VERSIONS`, the allow-list from PR #293.
+- **Collector**: `beatvegas/fg_paper.py`, switched on by `FG_COLLECT=1` in `card.yml`. At each
+  decision build:
+  - **Universe**: the week's games not yet kicked off whose newest Hard Rock `full_game_total`
+    quote is centred (`devig.is_centred_quote`) and carries a line and an under price, with a
+    `bv_fg_v1` read.
+  - **Gap**: Hard Rock FG line − bv_fg.
+  - **Bar**: `score.slate_bar`, top 20%, ties qualify.
+  - **Cap**: 5 a week by gap (then kickoff, then away team). Rows logged earlier in the week hold
+    their slots.
+  - **Window**: the slot's paper window. A selected game outside the window waits, and its rank
+    is kept.
+
+  It writes one `challenger_picks` row per selected game: `arm='fg_under'`, `market='full'`,
+  `side='under'`, Hard Rock's under price, `champion_line_at_pick` = the first-half champion's
+  number (1H scale, for the paired diagnostic only). It runs inside a savepoint, so a failure
+  never costs the real card. It never writes to `manual_picks`.
+- **Grading**: `picks.grade_pick` via `grade_challenger_picks` (daily `grade.yml`). It grades
+  against the final total, with the consensus full-game close and its last pre-kick confirmation
+  time.
+- **Position**: `scripts/fg_position.py` (also `study.yml` → `fg_position`). Constants are in
+  `stopping.FG`.
+  - The profit clock (σ 0.913) runs from the first graded row.
+  - The line-value clock reports **not started** until its σ is frozen. It counts only closes
+    confirmed inside 3 h.
+- **σ freeze procedure (line value)**:
+  1. After the second Saturday (2026-10-17), run `fg_position`. It prints the in-window
+     (close − build line) moves and their sd.
+  2. Write that sd here and into `stopping.FG["sigma"]["clv"]` in one PR, before the clock's
+     first reading.
+  3. Report the excluded share (no close inside 3 h) weekly.
+- **Sandbox gate** (2026-10-06): the e2e fixture week was built twice with `build_card.py`, with
+  `FG_COLLECT` unset and set.
+  - The card payload hash was identical (`7fb76a4e6960a8bd`), and so were the champion's 9
+    `manual_picks` rows and the neggap row.
+  - The FG run added 5 `fg_under` rows: universe 12, bar 1.50, 12 qualify on a tied fixture.
+  - A second build that week added 0, with 5 held.

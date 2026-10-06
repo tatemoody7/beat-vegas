@@ -204,6 +204,17 @@ jobs:
           SEASON: ${{ steps.active.outputs.season }}
           WEEK: ${{ steps.active.outputs.week }}
         run: python scripts/post_derived_lines.py --season "$SEASON" --week "$WEEK" --refs "$RUNNER_TEMP/factor_refs.json"
+      - name: Score the full-game shadow (H-FG-P, bv_fg_v1; paper only)
+        # After the champion: a shadow failure must never cost the champion's
+        # Sunday, so this step cannot fail the job. Its rows are invisible to
+        # every "the model's line" read (score.CHAMPION_READ_VERSIONS).
+        if: steps.captured.outputs.need_score == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          SEASON: ${{ steps.active.outputs.season }}
+          WEEK: ${{ steps.active.outputs.week }}
+        run: python scripts/fg_shadow.py --season "$SEASON" --week "$WEEK"
       - name: Warn when the board scored WITHOUT pace/weather
         # The enrichment steps are continue-on-error so an unofficial-source
         # outage never blocks the board, but a silent miss means the week

@@ -322,6 +322,9 @@ jobs:
           # H-NEGGAP-P (docs/NEGGAP_PAPER.md): the paper OVER arms log beside the
           # champion's paper picks. Unset to switch the collection off.
           NEGGAP_COLLECT: "1"
+          # H-FG-P (docs/FG_MARKET.md): paper FULL-GAME unders from the bv_fg_v1
+          # shadow, into challenger_picks (market='full'). Unset to switch it off.
+          FG_COLLECT: "1"
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |

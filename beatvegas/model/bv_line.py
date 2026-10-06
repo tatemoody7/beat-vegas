@@ -140,7 +140,8 @@ def bv_line_for_slate(
     Empty train/target yields an empty array. Bias corrections are derived from
     the train slice only (leak-free w.r.t. the target season). `target` is the
     column fitted (default the champion's 1H total; the live path never passes
-    anything else -- `model.fg_line` is the research-only full-game caller).
+    anything else -- `model.fg_line` is the full-game caller: research, and the
+    H-FG-P shadow `bv_fg_v1`, which no champion read can see).
     """
     if train_df.empty or target_df.empty:
         return np.array([], dtype=float)

@@ -37,7 +37,8 @@ def test_grade_market_fg_full_game():
                 away_points=20,  # realized full-game total = 41
             )
         )
-        # full-game opener 52.0, close 50.0 (both before kickoff)
+        # full-game opener 52.0 (a week out), close 50.0 captured 2 h before
+        # kickoff -- inside REAL_FG_CLOSE_WINDOW_H (3 h)
         s.add(
             OddsSnapshot(
                 game_id=1,
@@ -53,7 +54,7 @@ def test_grade_market_fg_full_game():
                 book="hardrockbet",
                 market="full_game_total",
                 line=50.0,
-                captured_at=datetime(2026, 8, 31, 12),
+                captured_at=datetime(2026, 9, 1, 10),
             )
         )
         s.commit()
@@ -133,3 +134,60 @@ def test_grade_market_fg_removes_a_stale_row_when_the_close_is_gone():
         assert grade.grade_market_fg(s, closings) == 0
         s.commit()
         assert s.query(Result).filter(Result.model_version == "market_fg").count() == 0
+
+
+def _game_and_snap(s, captured_at, last_seen_at=None):
+    s.add(
+        Game(
+            id=7,
+            season=2026,
+            week=6,
+            home_team="A",
+            away_team="B",
+            start_date=datetime(2026, 10, 10, 19, 30),
+            home_points=24,
+            away_points=20,
+        )
+    )
+    s.add(
+        OddsSnapshot(
+            game_id=7,
+            book="draftkings",
+            market="full_game_total",
+            line=51.5,
+            captured_at=captured_at,
+            last_seen_at=last_seen_at,
+        )
+    )
+    s.commit()
+
+
+def test_a_sunday_only_snapshot_is_an_opener_and_grades_nothing():
+    """Before 2026-10-06 the full-game ledger applied no window and graded
+    Sunday's opener as the close (9 of 380 graded 2026 rows had a snapshot
+    inside 3 h). The close must be captured or re-seen inside
+    REAL_FG_CLOSE_WINDOW_H."""
+    grade = _load("grade")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        _game_and_snap(s, captured_at=datetime(2026, 10, 4, 18, 0))  # Sunday
+        closings = grade._closings_fg(s, 2026)
+        assert grade.grade_market_fg(s, closings) == 0
+        assert closings[7][1] == (51.5, None)  # opener known, no close
+
+
+def test_a_sunday_snapshot_re_seen_inside_three_hours_is_the_close():
+    grade = _load("grade")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        _game_and_snap(
+            s,
+            captured_at=datetime(2026, 10, 4, 18, 0),
+            last_seen_at=datetime(2026, 10, 10, 17, 0),  # 2.5 h before kick
+        )
+        closings = grade._closings_fg(s, 2026)
+        assert grade.grade_market_fg(s, closings) == 1
+        assert closings[7][1] == (51.5, 51.5)
+        assert closings[7][2] == datetime(2026, 10, 10, 17, 0)

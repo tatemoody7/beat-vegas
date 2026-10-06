@@ -244,7 +244,7 @@ def _row(gid, book, line, spread, over=-110, under=-110):
     }
 
 
-def _run_poll(mod, monkeypatch, eng, fg_rows, now, source="oddsapi"):
+def _run_poll(mod, monkeypatch, eng, fg_rows, now, source="oddsapi", extra_args=None):
     import sys
     from contextlib import contextmanager
 
@@ -262,11 +262,16 @@ def _run_poll(mod, monkeypatch, eng, fg_rows, now, source="oddsapi"):
     monkeypatch.setattr(mod, "session_scope", scope)
     monkeypatch.setattr(mod, "try_init_db", lambda: True)
     monkeypatch.setattr(mod, "datetime", _Now)
-    monkeypatch.setattr(
-        mod, "_fetch", lambda src, season, regions, credit_floor=60: (fg_rows, [], source, 1)
-    )
+    calls = []
+
+    def fetch(src, season, regions, credit_floor=60, markets=mod.DEFAULT_MARKETS):
+        calls.append({"regions": regions, "credit_floor": credit_floor, "markets": markets})
+        return fg_rows, [], source, 1
+
+    monkeypatch.setattr(mod, "_fetch", fetch)
     monkeypatch.setattr(sys, "argv", ["poll_full_game.py", "--season", "2026", "--source", source])
-    mod.main()
+    mod.main(list(extra_args) if extra_args else None)
+    return calls
 
 
 def test_two_runs_move_spread_but_fill_total_only_when_null(monkeypatch):
@@ -390,3 +395,77 @@ def test_oddsapi_normalize_keeps_the_most_balanced_of_several_pairs(capsys):
     (row,) = normalize_first_half(events)
     assert row["line"] == 27.5 and row["over_price"] == -115 and row["under_price"] == -105
     assert "::warning::odds: hardrockbet sent 2 totals_h1 point pairs" in capsys.readouterr().out
+
+
+def _row_at(gid, book, line, commence):
+    r = _row(gid, book, line, None)
+    r["commence_time"] = commence
+    return r
+
+
+def test_close_tick_passes_markets_and_keeps_only_events_inside_the_window(monkeypatch):
+    """The Saturday full-game close step: `--markets totals` reaches the client
+    (half the credits) and `--kickoff-within-min 180` keeps only events that
+    kick off inside REAL_FG_CLOSE_WINDOW_H from now; the rest of the slate is
+    not written."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.add(Game(id=2, season=2026, week=6, home_team="Ohio State", away_team="Oregon"))
+        s.commit()
+    now = datetime(2026, 10, 10, 16, 0)
+    rows = [
+        _row_at(1, "draftkings", 55.5, "2026-10-10T18:00:00Z"),  # 2 h out: in
+        _row_at(2, "draftkings", 48.5, "2026-10-10T23:30:00Z"),  # 7.5 h out: not yet
+    ]
+    calls = _run_poll(
+        mod,
+        monkeypatch,
+        eng,
+        rows,
+        now,
+        extra_args=["--markets", "totals", "--kickoff-within-min", "180", "--allow-empty"],
+    )
+    assert calls and calls[0]["markets"] == "totals"
+    with Session(eng) as s:
+        snaps = s.query(OddsSnapshot).filter_by(market="full_game_total").all()
+        assert [sn.game_id for sn in snaps] == [1]
+
+
+def test_unchanged_full_game_line_is_re_seen_not_rewritten(monkeypatch):
+    """A tick that finds the number standing stamps last_seen_at on the existing
+    row (as poll_lines does) instead of writing a duplicate; that stamp is what
+    lets an unmoved Sunday line grade as a 3 h close."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.commit()
+    rows = [_row(1, "draftkings", 55.5, -7.0)]
+    _run_poll(mod, monkeypatch, eng, rows, datetime(2026, 10, 4, 18, 0))
+    _run_poll(mod, monkeypatch, eng, rows, datetime(2026, 10, 10, 16, 0))
+    with Session(eng) as s:
+        snaps = s.query(OddsSnapshot).filter_by(market="full_game_total").all()
+        assert len(snaps) == 1
+        assert snaps[0].captured_at == datetime(2026, 10, 4, 18, 0)
+        assert snaps[0].last_seen_at == datetime(2026, 10, 10, 16, 0)
+
+
+def test_allow_empty_exits_zero_when_nothing_is_due(monkeypatch):
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.commit()
+    # no rows at all -> without --allow-empty this is a SystemExit(1)
+    import pytest
+
+    with pytest.raises(SystemExit):
+        _run_poll(mod, monkeypatch, eng, [], datetime(2026, 10, 10, 16, 0))
+    _run_poll(
+        mod, monkeypatch, eng, [], datetime(2026, 10, 10, 16, 0), extra_args=["--allow-empty"]
+    )

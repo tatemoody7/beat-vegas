@@ -49,6 +49,8 @@ name: Hard Rock 1H line capture
 #   calls_404= on every run and WARNS when spend != events polled (the billing
 #   rule regressed) or when a sweep writes no Hard Rock row (the book key
 #   drifted); --credit-floor 300 is the month-end reserve.
+#   Plus the full-game close step: `totals` x `us,us2` = 2 credits per Saturday
+#   tick (~130/month) since 2026-10-06.
 #
 # DST: kickoff windows below are wide enough for EDT and EST (Saturday kickoffs
 # fall in 16:00Z-03:30Z EDT / 17:00Z-04:30Z EST), so no cron edit at the change.
@@ -184,6 +186,18 @@ jobs:
         if: steps.close.outcome == 'success'
         continue-on-error: true
         run: python scripts/close_coverage.py
+      - name: Full-game close (same ticks; bulk totals for events inside REAL_FG_CLOSE_WINDOW_H)
+        # The full-game market is a reference ledger (never bet) and the
+        # H-FG-U-R / H-FG-O-R retrospectives grade at a REAL full-game close.
+        # Before 2026-10-06 only Sunday's opener and the card-day refresh were
+        # captured (9 of 380 graded 2026 games had a snapshot inside 3 h). One
+        # bulk /odds call per tick for the whole slate: `totals` x `us,us2` =
+        # 2 credits (~15 Saturday ticks -> ~30 a week, ~130 a month). Unchanged
+        # numbers are re-seen (last_seen_at) so they count as the close.
+        # Never fails the job: continue-on-error, --allow-empty.
+        if: steps.close.outcome == 'success'
+        continue-on-error: true
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --markets totals --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3

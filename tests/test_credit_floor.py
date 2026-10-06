@@ -63,7 +63,7 @@ def test_poll_full_game_has_credit_floor_flag():
     mod = _load_script("poll_full_game")
     captured = {}
 
-    def fake_fetch(source, season, regions="us,us2", credit_floor=60):
+    def fake_fetch(source, season, regions="us,us2", credit_floor=60, markets="totals,spreads"):
         captured["credit_floor"] = credit_floor
         raise SystemExit(0)  # stop before any DB write
 

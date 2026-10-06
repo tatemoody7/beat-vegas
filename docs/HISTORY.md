@@ -23,6 +23,22 @@ hold the rest.
   Monday program review; real money unchanged); PR #279 opened (Saturday full-game close capture
   + the 3 h window on `market_fg`).
 
+- **2026-10-06 (ASSUMPTIONS LEDGER v1).** `docs/ASSUMPTIONS.md`: every live rule on the
+  money path in one table — value, `file:line` (read in the code that day), basis (evidence /
+  design / scope / registered / derived / display), the evidence or the reason, and the
+  registered test that would move it, with a blank column for Tate's call. Two rows carry
+  outcome evidence (the top-20% gap rule and the cap-5 ranking, both from the spent 2023-25
+  set); the price gate has a live record (loss avoided); everything else is design or scope.
+  A closing section names the inherited rules with no evidence and the paper rows that would
+  test them (proposed: H-PRICE-F, H-CLOSE-W, H-EARLY-C, H-FG-U-R / H-FG-O-R; H-INJ named, not
+  registered; H-TOP3 and H-PCT-TIE already registered). Three doc defects fixed: (1)
+  `BETTING_POLICY.md` said Hard Rock rungs are "both sides no worse than −160" — the Hard Rock
+  rule (`is_hr_rung`) is −140 or 2+ pts off the field, −160 is the general centred-quote rule;
+  (2) `BETTING_POLICY.md` and (3) `EXTERNAL_REVIEW.md` each claimed a full-game backtest
+  "found no edge" — no full-game-target study exists; the only full-game numbers are the
+  post-mortem `fg` column (1H-selected picks graded as full-game unders). No code, constant,
+  gate, workflow or registry criterion changed. `CLAUDE.md` Read-first names the ledger.
+
 ## 2026-10-05
 
 - **2026-10-05 (ODDS API ON THE 20K PLAN; DATA STACK REVIEW).** Tate cancelled the 100K

@@ -26,7 +26,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `WEATHER_STYLE`, `CENSORING_STUDY`, `LEVEL_ANCHOR`, `BLEND`, `GATES`, `WHEN_TO_BET`, `HR_LAG`,
   `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE`,
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
-  `FG_MARKET` (all in `docs/`).
+  `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base) (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.

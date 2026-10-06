@@ -70,21 +70,23 @@ def _assert_market_blind(cols) -> None:
         raise AssertionError(f"BV line must be market-blind; leaked columns: {leaked}")
 
 
-def _played(df: pd.DataFrame) -> pd.DataFrame:
-    """Rows with a realized 1H total — the frame also carries the unplayed
-    upcoming slate (NaN target), which must never reach a fit or a residual."""
-    return df[pd.to_numeric(df[TARGET], errors="coerce").notna()]
+def _played(df: pd.DataFrame, target: str = TARGET) -> pd.DataFrame:
+    """Rows with a realized total for `target` — the frame also carries the
+    unplayed upcoming slate (NaN target), which must never reach a fit or a
+    residual. `target` defaults to the champion's 1H total; the research-only
+    full-game fit passes `markets.FG_ACTUAL_COL` (2026-10-06)."""
+    return df[pd.to_numeric(df[target], errors="coerce").notna()]
 
 
-def fit_bv_regressor(train_df: pd.DataFrame) -> HistGradientBoostingRegressor:
+def fit_bv_regressor(train_df: pd.DataFrame, target: str = TARGET) -> HistGradientBoostingRegressor:
     _assert_market_blind(BV_FEATURE_COLS)
-    train_df = _played(train_df)
+    train_df = _played(train_df, target)
     model = _new_regressor()
-    model.fit(train_df[BV_FEATURE_COLS], train_df[TARGET].astype(float))
+    model.fit(train_df[BV_FEATURE_COLS], train_df[target].astype(float))
     return model
 
 
-def oof_residuals(df: pd.DataFrame, min_train: int = 500) -> pd.DataFrame:
+def oof_residuals(df: pd.DataFrame, min_train: int = 500, target: str = TARGET) -> pd.DataFrame:
     """Walk-forward out-of-fold residuals (actual - pred) across seasons.
 
     For each season, train on all prior seasons and predict it — so no game is
@@ -92,7 +94,7 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500) -> pd.DataFrame:
     `bv_raw` prediction and `residual` column for the seasons that could be
     scored (early seasons with too little prior data are dropped).
     """
-    df = _played(df)
+    df = _played(df, target)
     seasons = sorted(df["season"].unique())
     out = []
     for ts in seasons:
@@ -100,25 +102,25 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500) -> pd.DataFrame:
         test = df[df["season"] == ts]
         if len(train) < min_train or test.empty:
             continue
-        model = fit_bv_regressor(train)
+        model = fit_bv_regressor(train, target)
         pred = model.predict(test[BV_FEATURE_COLS])
         chunk = test.copy()
         chunk["bv_raw"] = pred
-        chunk["residual"] = chunk[TARGET].astype(float) - pred
+        chunk["residual"] = chunk[target].astype(float) - pred
         out.append(chunk)
     if not out:
         return df.iloc[0:0].assign(bv_raw=[], residual=[])
     return pd.concat(out, ignore_index=True)
 
 
-def bias_corrections(train_df: pd.DataFrame) -> Dict:
+def bias_corrections(train_df: pd.DataFrame, target: str = TARGET) -> Dict:
     """Global intercept correction learned from OOF residuals on TRAIN only.
 
     Returns {"global": float}. We deliberately do NOT apply a per-era intercept
     (the era feature handles era; per-era would double-count) — per-era residuals
     are surfaced for auditing via residual_report instead.
     """
-    res = oof_residuals(train_df)
+    res = oof_residuals(train_df, target=target)
     if res.empty:
         return {"global": 0.0}
     return {"global": float(res["residual"].mean())}
@@ -130,17 +132,21 @@ def apply_bias(raw_pred: np.ndarray, frame: pd.DataFrame, corrections: Dict) -> 
     return np.asarray(raw_pred, dtype=float) + global_bias
 
 
-def bv_line_for_slate(train_df: pd.DataFrame, target_df: pd.DataFrame) -> np.ndarray:
+def bv_line_for_slate(
+    train_df: pd.DataFrame, target_df: pd.DataFrame, target: str = TARGET
+) -> np.ndarray:
     """Fit on train, predict the target slate, return calibrated BV lines.
 
     Empty train/target yields an empty array. Bias corrections are derived from
-    the train slice only (leak-free w.r.t. the target season).
+    the train slice only (leak-free w.r.t. the target season). `target` is the
+    column fitted (default the champion's 1H total; the live path never passes
+    anything else -- `model.fg_line` is the research-only full-game caller).
     """
     if train_df.empty or target_df.empty:
         return np.array([], dtype=float)
-    model = fit_bv_regressor(train_df)
+    model = fit_bv_regressor(train_df, target)
     raw = model.predict(target_df[BV_FEATURE_COLS])
-    corrections = bias_corrections(train_df)
+    corrections = bias_corrections(train_df, target)
     return apply_bias(raw, target_df, corrections)
 
 

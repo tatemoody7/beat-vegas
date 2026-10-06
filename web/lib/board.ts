@@ -4,6 +4,10 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
 import { median } from "@/lib/format";
+import {
+  CHAMPION_READ_VERSIONS,
+  DERIVED_LINES_MODEL_VERSION,
+} from "@/lib/model";
 
 // Opportunities board data layer — ports the SQL in beatvegas/dashboard/app.py
 // (the predictions+games board query and the odds_snapshots consensus logic).
@@ -164,8 +168,8 @@ function weekClause(week: number | undefined): Prisma.Sql {
  * The ONE definition of the board's game universe, as a WHERE fragment over
  * `predictions p JOIN games g`: this season, games Hard Rock has posted a
  * full-game total on (the only book Tate can bet), the newest real model
- * version (display-only derived_lines never outranks a model), optionally one
- * week. boardGames and boardUniverse both build on it so they cannot drift.
+ * version (display-only derived_lines never outranks a model; a shadow engine
+ * outside CHAMPION_READ_VERSIONS is never read), optionally one week. boardGames and boardUniverse both build on it so they cannot drift.
  */
 function universeWhere(season: number, week?: number): Prisma.Sql {
   return Prisma.sql`
@@ -181,10 +185,13 @@ function universeWhere(season: number, week?: number): Prisma.Sql {
         SELECT p2.model_version FROM predictions p2
         JOIN games g2 ON g2.id = p2.game_id
         WHERE g2.season = ${season}
+          -- The champion's versions only: a shadow engine (bv_fg_v1) scored
+          -- after the champion must not take over the board (2026-10-06).
+          AND p2.model_version IN (${Prisma.join([...CHAMPION_READ_VERSIONS])})
         -- A real model version always outranks display-only derived_lines:
         -- re-running post_derived_lines after a Sunday scoring must not hide
         -- the model's picks behind "DERIVED — no model pick" cards.
-        ORDER BY (p2.model_version = 'derived_lines') ASC,
+        ORDER BY (p2.model_version = ${DERIVED_LINES_MODEL_VERSION}) ASC,
                  p2.created_at DESC
         LIMIT 1)`;
 }

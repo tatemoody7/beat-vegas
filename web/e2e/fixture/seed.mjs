@@ -341,6 +341,18 @@ export function fixtureRows(week, expected) {
       }),
       created_at: ts(new Date(g.scoredAt.getTime() + 60_000)),
     });
+    // A shadow engine's row (H-FG-P's bv_fg_v1, 2026-10-06), NEWER than both
+    // and on the full-game scale: if any reader took it for the champion, the
+    // board's numbers and the pick log's frozen model line would be ~2x off and
+    // the specs would fail. CHAMPION_READ_VERSIONS keeps it out of view.
+    rows.predictions.push({
+      game_id: g.id,
+      model_version: "bv_fg_v1",
+      bv_line: round2(g.fg.total - 1.5),
+      line_used: g.fg.total,
+      rank: null,
+      created_at: ts(new Date(g.scoredAt.getTime() + 120_000)),
+    });
   }
 
   rows.cards = [

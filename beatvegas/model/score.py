@@ -43,6 +43,14 @@ from .residual import (
 
 MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the engine itself is the gbm_v2 gap ranker
 
+# The prediction versions any "the model's line" read may see (2026-10-06): the
+# champion, then the display-only derived lines (card.REFERENCE_MODEL_VERSION,
+# health.DERIVED_LINES_MODEL_VERSION). An ALLOW-list, so a shadow engine
+# (`bv_fg_v1`, H-FG-P; the PR6 shadows) writing into `predictions` can never be
+# read as the champion. Mirrored by web/lib/model.ts::CHAMPION_READ_VERSIONS
+# (tests/test_gate_parity.py).
+CHAMPION_READ_VERSIONS = (MODEL_VERSION, "derived_lines")
+
 # line_kind values that are a REAL posted 1H market number. Only these rows can
 # carry a residual read; 'derived_fg' and 'proxy' are our own arithmetic off the
 # full-game total, so there is no market error there for the residual to model.

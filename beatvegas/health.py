@@ -495,7 +495,11 @@ def _predictions_today(ctx: Ctx, derived: bool) -> int:
     if derived:
         q = q.filter(Prediction.model_version == DERIVED_LINES_MODEL_VERSION)
     else:
-        q = q.filter(Prediction.model_version != DERIVED_LINES_MODEL_VERSION)
+        # The champion only (2026-10-06): a shadow engine's Sunday rows must not
+        # pass for the champion's scoring.
+        from .model.score import MODEL_VERSION
+
+        q = q.filter(Prediction.model_version == MODEL_VERSION)
     return q.count()
 
 

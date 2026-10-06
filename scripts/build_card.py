@@ -144,13 +144,19 @@ def frozen_features(session, game_ids: List[int]) -> Dict[int, Dict]:
     scored from, written by etl/game_records.snapshot_slate at the first
     pre-kickoff capture. Filtered to the regressor's own columns so the frozen
     vector is what the number depended on, not the classifier's wider frame. A
-    game with no record is absent (its pick freezes `features: null`)."""
+    game with no record is absent (its pick freezes `features: null`). Only the
+    champion's records (`MODEL_VERSION`): a shadow engine's vector is not the
+    one the champion's number depended on."""
     out: Dict[int, Dict] = {}
     if not game_ids:
         return out
     rows = (
         session.query(GameRecord.game_id, GameRecord.features_json)
-        .filter(GameRecord.game_id.in_(game_ids), GameRecord.features_json.isnot(None))
+        .filter(
+            GameRecord.game_id.in_(game_ids),
+            GameRecord.features_json.isnot(None),
+            GameRecord.model_version == MODEL_VERSION,
+        )
         .order_by(GameRecord.captured_at.asc(), GameRecord.id.asc())
         .all()
     )

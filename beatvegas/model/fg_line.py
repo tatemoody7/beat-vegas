@@ -1,5 +1,7 @@
 """The champion's regressor fitted to the FULL-GAME total (H-FG-U-R / H-FG-O-R,
-docs/HYPOTHESES.md). Research only: nothing live scores or reads it.
+docs/HYPOTHESES.md). Live since 2026-10-06 ONLY as the H-FG-P shadow
+(`scripts/fg_shadow.py` -> predictions `bv_fg_v1`, read by nothing but the paper
+collector `beatvegas/fg_paper.py`); never the champion, never real money.
 
 `bv_fg_line_for_slate` has the `Candidate` contract of the harness
 (`bv_line_for_slate(train, target) -> np.ndarray`) and is the incumbent arm of

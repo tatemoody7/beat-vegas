@@ -652,6 +652,91 @@ def neggap_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, An
     return out
 
 
+# H-FG-P -- 2026 PAPER full-game UNDERS from the full-game shadow engine
+# `bv_fg_v1` (docs/HYPOTHESES.md H-FG-P, registered 2026-10-06 before its first
+# row; design docs/FG_MARKET.md). One arm, `fg_under`: the champion's rule
+# unchanged (slate bar, weekly cap 5 by gap) on the full-game gap. Two clocks in
+# H-STOP-2's shape, 5% split over 2 clocks, power 80%.
+#
+# SIGMAS: profit 0.913 FROZEN from the H-FG-U-R capped-under units (n 124, run
+# 37498128236). The line-value sigma is NOT known yet: the row freezes it at the
+# standard deviation of (close - build line) over the first two Saturdays of this
+# universe, written into docs/FG_MARKET.md AND here before the clock's first
+# reading. Until then `sigma["clv"]` is None and `fg_position` reports the clock
+# as not started -- it never reads a provisional sigma.
+#
+# SIGN: an UNDER, so favourable line value is -(closing - bet) (clv_sign -1),
+# against the consensus full-game close confirmed inside 3 h of kickoff
+# (lines.REAL_FG_CLOSE_WINDOW_H). docs/FG_MARKET.md quotes these;
+# tests/test_stopping.py pins them.
+FG: Dict[str, Any] = {
+    "registered_on": "2026-10-06",
+    "design": "sprt",
+    "arms": ["fg_under"],
+    "side": "under",
+    "market": "full",
+    "alpha_total": 0.05,
+    "alpha_clock": 0.05 / 2,  # 2.5% per clock
+    "power": 0.80,
+    "edge": 0.04,  # 4 pp over EACH pick's own break-even (mu1_for_price on the UNDER price)
+    "sigma": {"profit": 0.913, "clv": None},  # clv frozen after the first two Saturdays
+    "mu1": {"profit": "0.04 / break-even, per pick (mu1_for_price)", "clv": 1.00},
+    "clv_sign": -1,  # favourable line value for an UNDER = -(closing - bet)
+    "close_window_h": 3.0,  # lines.REAL_FG_CLOSE_WINDOW_H
+    "universe": (
+        "Hard-Rock-priced FULL-GAME games whose newest Hard Rock full_game_total quote is "
+        "centred, with a bv_fg_v1 read and a Hard Rock UNDER price, at the Friday-anchored "
+        "decision build with the champion's paper windows; gap = Hard Rock FG line - bv_fg"
+    ),
+    "selection": "slate bar (top 20% by gap, score.slate_bar) then the weekly cap 5 by gap, held first",
+    "observation": "one paper UNDER per selected game (challenger_picks, market=full, arm fg_under) -- never manual_picks",
+    "profit_clock": "priced picks only, at Hard Rock's UNDER price as captured at the build",
+    "clv_clock": "every pick whose consensus full-game close was confirmed inside 3 h",
+    "pass": "BOTH clocks cross A",
+    "drop": "EITHER clock crosses B",
+    "on_pass": "a finding for Tate; nothing at real money (first-half unders only)",
+    "touches": "nothing live -- no real-money selection, no model edit, H-STOP-2 unchanged",
+}
+
+
+def fg_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, Any]:
+    """The running position of the H-FG-P arm. `arms` maps the arm label to
+    {"units", "prices", "clv", "clv_in_window"} in placed order, clv ALREADY
+    favourable for an under (-(closing - bet)). The profit clock runs from the
+    first graded row; the line-value clock waits for its frozen sigma and says
+    so (never a provisional sigma)."""
+    c = FG
+    out: Dict[str, Any] = {"registered": {k: v for k, v in c.items()}, "arms": {}}
+    for label, obs in sorted(arms.items()):
+        clv = list(obs.get("clv", []))
+        in_window = list(obs.get("clv_in_window", [True] * len(clv)))
+        if c["sigma"]["clv"] is not None:
+            clocks = two_clocks(obs.get("units", []), obs.get("prices", []), clv, in_window, c)
+        else:
+            u = np.asarray(obs.get("units", []), float)
+            pr = np.asarray(obs.get("prices", []), float)
+            keep = ~np.isnan(u) & ~np.isnan(pr)
+            mu = np.array([mu1_for_price(p, c["edge"]) for p in pr[keep]])
+            ok = np.asarray(in_window, bool)
+            clocks = {
+                "profit": sprt_clock(
+                    u[keep], mu, c["sigma"]["profit"], c["alpha_clock"], c["power"]
+                ),
+                "clv": {
+                    "n": int(ok.sum()),
+                    "mean": None,
+                    "llr": None,
+                    "bounds": sprt_bounds(c["alpha_clock"], 1 - c["power"]),
+                    "status": "not started -- line-value sigma not frozen",
+                    "verdict": None,
+                    "excluded_no_close_in_window": int((~ok).sum()),
+                },
+            }
+        out["arms"][label] = {"design": c["design"], "clocks": clocks}
+    out["passers"] = family_verdicts(out["arms"])
+    return out
+
+
 def challenger_position(arms: Dict[str, Dict[str, Sequence[float]]]) -> Dict[str, Any]:
     """The running position of every arm, under the challenger's own budget.
 

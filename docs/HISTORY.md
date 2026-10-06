@@ -9,6 +9,21 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (H-FG-P COLLECTOR — PR5a #293, PR5b).** Program PR5 in two PRs, both Tate's
+  calls. **#293**: an allow-list (`score.CHAMPION_READ_VERSIONS` = `gbm_v1`, `derived_lines`,
+  mirrored in `web/lib/model.ts`) at every "the model's line" read (board universe, pick-log
+  freeze, `_model_row`, health's Sunday count, the card's frozen vectors). Behaviour unchanged
+  (Neon held only those versions); the e2e fixture now carries a newer `bv_fg_v1` row per game
+  and the lane failed 31 tests with the TS guards removed. **PR5b**: `scripts/fg_shadow.py`
+  (`bv_fg_v1` predictions + a `fg shadow refit` model_runs row, no GameRecords; `sunday.yml`
+  continue-on-error after the champion, `fg_shadow.yml` by hand), `beatvegas/fg_paper.py`
+  (`FG_COLLECT=1`, the champion's bar-then-cap-5 rule on the full-game gap, held slots, paper
+  windows, a savepoint around it), `stopping.FG` + `fg_position` (profit σ 0.913; line-value σ
+  `None` until the first two Saturdays, the clock reports "not started"), `fg_position.py` (3 h
+  window). Sandbox: the e2e fixture week built with and without the collector gave an identical
+  card payload and champion paper picks; +5 `fg_under` rows, +0 on a second build. Week 6 is
+  scored by hand so the arm collects from the Thursday 2026-10-08 build.
+
 - **2026-10-06 (HOUSEKEEPING — #289 shipped, alerts, Dependabot, brief).** #289 (the rest of the
   Discord knowledge base) merged `cd9f75d`, deploy READY, health ok. Dependabot alerts 13
   (source-map-js) and 14 (sharp) patched by a lockfile-only PR inside the existing ranges; alert 12

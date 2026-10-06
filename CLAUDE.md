@@ -109,11 +109,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   ($1) at the **Nov 6** renewal; (f) `bv_residual` shadow and Friday-night `lines-close`
   entries, both still open from 2026-10-04. The Odds API is on 20K; CFBD on Tier 3 via the
   boomtatermac key (`docs/OPS_ACCOUNTS.md` 2-3).
-- **H-FG-P collector (program PR5; started 2026-10-06)**: first an allow-list so only the
-  champion's prediction versions are read as "the model line" (board, pick log, `_model_row`,
-  health, frozen vectors); then a Sunday `bv_fg_v1` scorer, the `FG_COLLECT=1` collector and its
-  position script; week 6 scored by hand. Freeze the line-value σ from the first
-  two Saturdays and write the first `cards.id` into `docs/FG_MARKET.md` before any reading.
+- **H-FG-P (2026-10-06)**: collector live from the first build after merge; week 6 scored by hand
+  (`fg_shadow.yml`). Freeze the line-value σ from the first two Saturdays (`fg_position` prints
+  it) into `stopping.FG` + `docs/FG_MARKET.md`, and write the first `cards.id` there, before any reading.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the 12 proposed rows in
   `docs/KNOWLEDGE.md`, the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body), CLV in % vs
   points, the newsletter platform (`LEGAL_MEMO_2026-10`: Substack/Buttondown or Whop, never
@@ -181,7 +179,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
 |---|---|---|
-| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks`, `challenger_picks` (`NEGGAP_COLLECT=1`), preview |
+| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks`, `challenger_picks` (`NEGGAP_COLLECT=1`, `FG_COLLECT=1`), preview |
 | `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; input hist | finals, graded picks/records, factor ledger, post-mortem, gauges |
@@ -189,6 +187,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
+| `fg_shadow.yml` | dispatch season/week | `predictions` `bv_fg_v1` (H-FG-P shadow; Sunday runs it too) |
 | `post-lines.yml` | dispatch season/week/source | `derived_lines` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml` | dispatch (paid history) | historical 1H closes |
@@ -204,8 +203,9 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`,
   `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
-  `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`.
-- **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`,
+  `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
+  `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion).
+- **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`, `fg_position`,
   `challenger_position`, `rule_pause`, `pick` (paper-only `add`, `grade`, `summary`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,

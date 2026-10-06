@@ -65,6 +65,9 @@ from beatvegas.db.models import (
     TeamTempo,
 )
 from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.fg_paper import collection_enabled as fg_enabled
+from beatvegas.fg_paper import log_fg_picks
+from beatvegas.fg_paper import summary_line as fg_summary_line
 from beatvegas.hardrock import HR_BOOK_KEY, hr_universe_game_ids
 from beatvegas.model.bv_line import BV_FEATURE_COLS
 from beatvegas.model.score import MODEL_VERSION
@@ -651,6 +654,8 @@ def run(
         challenger_paused = False
         neggap_added: Dict[str, int] = {}
         neggap_on = neggap_enabled()
+        fg_stats: Optional[Dict] = None
+        fg_on = fg_enabled()
         paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
@@ -672,6 +677,16 @@ def run(
                         )
                     except Exception as e:  # noqa: BLE001 - never break the card
                         print(f"[card] WARNING: H-NEGGAP-P arms not logged: {e}")
+                # H-FG-P (2026-10-06): paper FULL-GAME unders from the bv_fg_v1
+                # shadow, into challenger_picks (market='full'), never
+                # manual_picks. Inside a SAVEPOINT: a failed insert rolls back
+                # only the arm's rows and can never cost the real card.
+                if fg_on:
+                    try:
+                        with s.begin_nested():
+                            fg_stats = log_fg_picks(s, card, now, window_hours=paper_window_hours)
+                    except Exception as e:  # noqa: BLE001 - never break the card
+                        print(f"[card] WARNING: H-FG-P arm not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -728,6 +743,7 @@ def run(
         )
     if not dry_run and card["items"] and not no_paper:
         lines.append(neggap_summary_line(neggap_added, neggap_on))
+        lines.append(fg_summary_line(fg_stats, fg_on))
         if picks_added:
             # Frozen feature vectors (2026-10-04): a pick with none had no
             # game_records row (the first scoring of the game never ran).

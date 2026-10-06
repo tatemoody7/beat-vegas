@@ -8,6 +8,10 @@ import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
 import { DEFAULT_STAKE, PAPER_STAKE, type PickEdit } from "@/lib/pickRules";
+import {
+  CHAMPION_READ_VERSIONS,
+  DERIVED_LINES_MODEL_VERSION,
+} from "@/lib/model";
 import { HR_BOOK_KEY } from "@/lib/books";
 
 // My Picks data layer: the current slate (for API validation), the user's
@@ -338,7 +342,8 @@ export async function createPick(
         >`
     SELECT bv_line, line_used, factors_json, refit_id FROM predictions
     WHERE game_id = ${input.gameId}
-    ORDER BY (model_version = 'derived_lines') ASC, created_at DESC
+      AND model_version IN (${Prisma.join([...CHAMPION_READ_VERSIONS])})
+    ORDER BY (model_version = ${DERIVED_LINES_MODEL_VERSION}) ASC, created_at DESC
     LIMIT 1
   `
       : [];

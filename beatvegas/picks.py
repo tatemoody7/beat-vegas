@@ -110,13 +110,19 @@ def model_refit_id(session, game_id: Optional[int], market: str = "1H") -> Optio
 def _model_row(session, game_id: int):
     """(bv_line, line_used, refit_id) of the prediction row the pick is logged
     against: the model row over the display-only reference row, newest first —
-    one ordering rule for every field frozen onto a ticket."""
+    one ordering rule for every field frozen onto a ticket. Only the champion's
+    versions are read (`CHAMPION_READ_VERSIONS`): a shadow engine's row is never
+    frozen onto a ticket."""
     from .card import REFERENCE_MODEL_VERSION  # local: picks.py must not depend on the card
     from .db.models import Prediction
+    from .model.score import CHAMPION_READ_VERSIONS
 
     return (
         session.query(Prediction.bv_line, Prediction.line_used, Prediction.refit_id)
-        .filter(Prediction.game_id == game_id)
+        .filter(
+            Prediction.game_id == game_id,
+            Prediction.model_version.in_(CHAMPION_READ_VERSIONS),
+        )
         .order_by(
             (Prediction.model_version == REFERENCE_MODEL_VERSION).asc(),
             Prediction.created_at.desc(),

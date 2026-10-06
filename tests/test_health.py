@@ -500,12 +500,12 @@ class TestSunday:
             )
             s.add(
                 Prediction(
-                    game_id=2, model_version="gbm_v2", bv_line=24.0, created_at=self.AFTER_MIDNIGHT
+                    game_id=2, model_version="gbm_v1", bv_line=24.0, created_at=self.AFTER_MIDNIGHT
                 )
             )
             s.add(
                 Prediction(
-                    game_id=1, model_version="gbm_v2", bv_line=24.0, created_at=self.BEFORE_MIDNIGHT
+                    game_id=1, model_version="gbm_v1", bv_line=24.0, created_at=self.BEFORE_MIDNIGHT
                 )
             )
             s.commit()
@@ -516,7 +516,7 @@ class TestSunday:
         with Session(eng) as s:
             s.add(
                 Prediction(
-                    game_id=1, model_version="gbm_v2", bv_line=24.0, created_at=self.AFTER_MIDNIGHT
+                    game_id=1, model_version="gbm_v1", bv_line=24.0, created_at=self.AFTER_MIDNIGHT
                 )
             )
             s.commit()

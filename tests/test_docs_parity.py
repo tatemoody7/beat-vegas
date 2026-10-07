@@ -296,3 +296,41 @@ def test_stopping_rule_doc_quotes_the_registered_constants():
     assert f"A = ln((1−β)/α) = {b['A']:.3f}" in body and f"B = ln(β/(1−α)) = {b['B']:.3f}" in body
     assert "2026 week 3" in body and "pauses real money" in body
     assert "no confidence band" in body
+
+
+# --- The gap >= 1.75 real-close cohort, 2023-25 (2026-10-07). Two docs quoted it
+# as 295 (RANKING_AND_TRUST) and 296 (POST_MORTEM): the post-mortem doc was a
+# 2026-09-07 snapshot taken before later data repairs, and the run behind it is
+# no longer stored. The cohort is now frozen as game ids, and both docs must
+# quote its count, record and units.
+
+COHORT = Path(__file__).resolve().parent / "fixtures" / "gap175_real_cohort_2023_25.json"
+
+
+def _cohort() -> dict:
+    import json
+
+    c = json.loads(COHORT.read_text())
+    assert c["n"] == len(c["game_ids"]) == len(set(c["game_ids"]))
+    assert c["wins"] + c["losses"] + c["pushes"] == c["n"]
+    return c
+
+
+def test_ranking_and_trust_quotes_the_frozen_gap175_cohort():
+    c = _cohort()
+    body = _text(DOCS / "RANKING_AND_TRUST.md")
+    head = f"**{c['n']} bets, {c['wins']}-{c['losses']}-{c['pushes']},"
+    assert head in body, head
+    assert f"| All weeks | {c['n']} | {c['wins']}-{c['losses']} |" in body
+    assert f"{c['units']:+.2f} units" in body
+
+
+def test_post_mortem_doc_quotes_the_frozen_gap175_cohort():
+    c = _cohort()
+    body = _text(DOCS / "POST_MORTEM.md")
+    rows = re.findall(
+        r"^\| Every gap ≥ 1\.75 \| all \| real[^|]* \| (\d+) \| (\d+)-(\d+)-(\d+)P \|", body, re.M
+    )
+    assert rows, "the hist headline row for gap >= 1.75 at real closes is missing"
+    n, wins, losses, pushes = map(int, rows[0])
+    assert (n, wins, losses, pushes) == (c["n"], c["wins"], c["losses"], c["pushes"])

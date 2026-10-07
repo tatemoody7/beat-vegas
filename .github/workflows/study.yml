@@ -8,6 +8,8 @@ name: Study (manual, read-only report)
 # into the RUNNER's checkout only; the committed copy comes from the artifact.
 # harness_report is the shared measurement harness (docs/HARNESS.md): it refuses any
 # --row that is not a runnable registry row (exit 2) and runs ONCE per row.
+# post_mortem runs ONLY with --dry-run (compute + markdown, no postmortem_* write):
+# the committed docs/POST_MORTEM.md is regenerated from its artifact (2026-10-07).
 
 permissions:
   contents: read
@@ -28,6 +30,7 @@ on:
           - harness_report
           - neggap_position
           - fg_position
+          - post_mortem
         default: blend_gate
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
@@ -71,10 +74,15 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position) ;;
+            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"
+          # A study writes no table: post_mortem only as --dry-run, never --write.
+          if [ "$IN_SCRIPT" = post_mortem ]; then
+            case " ${ARGS[*]} " in *" --write "*) echo "post_mortem --write is not a study"; exit 1 ;; esac
+            case " ${ARGS[*]} " in *" --dry-run "*) ;; *) echo "post_mortem needs --dry-run"; exit 1 ;; esac
+          fi
           echo "running: scripts/$IN_SCRIPT.py ${ARGS[*]}"
           python "scripts/$IN_SCRIPT.py" "${ARGS[@]}"
       - name: Upload report

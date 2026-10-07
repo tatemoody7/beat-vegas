@@ -88,7 +88,11 @@ real-money weekend. Revisit after.
 
 The `gap >= 1.75` rule at real closing lines, 2023-25: **295 bets, 165-127-3,
 56.5%, +23.00 units, +7.8% ROI.** (Reproduced exactly from `postmortem_games`
-before slicing, so the slices below are trustworthy.)
+before slicing, so the slices below are trustworthy. `docs/POST_MORTEM.md` read 296 until
+2026-10-07: it was the 09-07 snapshot, taken before later data repairs, and the run behind
+it is no longer stored. It was regenerated that day and now reads 295; the 295 game ids are
+frozen in `tests/fixtures/gap175_real_cohort_2023_25.json` and both docs are tested against
+them.)
 
 Split by part of season:
 

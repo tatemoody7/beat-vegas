@@ -158,3 +158,15 @@ false-positive budget Tate approved on 2026-10-06 (split set in its own registry
 3. When the result is in, change `status`, fill `n` and `comparisons run`, and point
    `result doc` at the committed document. Never edit the criterion cell after the run;
    if the criterion was wrong, add a new row.
+
+## The close-window sensitivity row (2026-10-07)
+
+Tate's call on `docs/ASSUMPTIONS.md` row "A real close is inside the window" (2026-10-07): the
+2 h window H-STOP-2 freezes was never chosen against 1 h or 3 h, so its sensitivity is
+registered here. It is a READ of the frozen clock under other windows, not a test of a new
+rule: nothing it finds changes the 2 h window, the clock or any money rule. Criterion
+approved verbatim by Tate before any script exists.
+
+| id | question | status | family | data (seasons, cut) | n | comparisons run | pass criterion (pre-registered) | result doc |
+|---|---|---|---|---|---|---|---|---|
+| H-CLOSE-W | Does H-STOP-2's line-value verdict depend on the 2-hour close window it froze? | pre-registered | sensitivity (no confirmatory alpha) | H-STOP-2's own line-value observations (the champion's paper ledger, 2026 from the week-5 refit, `manual_picks` `is_paper`, 1H), each pick's line value re-read against the last Hard Rock-consensus close captured at most 1 h / 2 h / 3 h / 4 h before kickoff (`captured_at` or `last_seen_at`, never after kickoff); the same frozen σ 1.371, μ₁ +0.50 pts and bounds as H-STOP-2 | H-STOP-2's line-value n at the read date | 4 (one per window: 1 h / 2 h / 3 h / 4 h) | Report the line-value mean, n and the H-STOP-2 state (continue / pass / fail) at 1 h, 2 h, 3 h and 4 h on the same read date. The result is MATERIAL if any window's state differs from the 2 h state. Read once, at H-STOP-2's resolution or at season end, whichever comes first. It licenses nothing: the 2 h window stays frozen, and a material result is a finding for Tate, not a rule change. | not yet run; the read is reported in `docs/STOPPING_RULE.md` |

@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (PR A: TATE'S 29 ASSUMPTION VERDICTS; H-CLOSE-W; 295 NOT 296).** `docs/ASSUMPTIONS.md`
+  v2 carries Tate's verdict on every row (Q&A that day): keep all but two; **retire** the
+  off-market blocker (its own gated PR, OM); **test** the 2 h close window as H-CLOSE-W, a
+  pre-registered sensitivity read with Tate's criterion verbatim (`docs/HYPOTHESES.md`). Stale
+  H-TOP3 / H-SHARE references fixed (both withdrawn in #301). The gap ≥ 1.75 real-close cohort
+  read 295 in `RANKING_AND_TRUST` and 296 in `POST_MORTEM`: the post-mortem doc was the 09-07
+  snapshot from a run no longer stored, and the three stored runs since all give 295
+  (165-127-3, +23.00u). Tate's call: regenerate it (`study.yml` gained `post_mortem`, dry-run
+  only, read-only; run 37636301161) and freeze the 295 game ids
+  (`tests/fixtures/gap175_real_cohort_2023_25.json`) with a docs-parity test on both docs. The
+  regenerated doc grades 3,596 historical games (3,601 on 09-07); "followed the system" is
+  unchanged (169, 101-65-3P).
+
 - **2026-10-07 (M2: LIVE FRESHNESS + REFRESH PRICE).** The live price check accepted any pre-kickoff
   Hard Rock snapshot, so a Tuesday quote passed on Saturday. Tate's calls: a live real BET needs the
   quote SEEN within `HR_PRICE_MAX_AGE_H` (6 h) of now (max(captured_at, last_seen_at), the M1B

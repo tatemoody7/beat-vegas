@@ -121,17 +121,15 @@ def test_edge_no_hr_line_uses_the_market_median_as_basis():
     assert "Hard Rock has not posted a first-half line yet." in it["why"]
 
 
-def test_edge_off_market_when_hard_rock_sits_below_the_market():
+def test_hard_rock_below_the_market_is_not_a_blocker_since_2026_10_07():
+    """Tate retired the off-market gate (docs/ASSUMPTIONS.md row 8). Hard Rock
+    24.0 under a 25.0 market with no book at 24.0 is now blocked by the price
+    gate's "cannot judge" branch, never by the market."""
     snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
     it = only(card([game()], snaps, [model(1, 21.5)]))
-    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
     assert it["market_line"] == 25.0 and it["gap"] == 2.5  # gap is vs Hard Rock's own number
     assert it["fair_under"] is None and it["ev"] is None  # no other book at 24.0 -> no fair price
-    assert it["action"] == (
-        "Not yet — Hard Rock’s 24.0 is 1.0 below the market line of 25.0. You would be giving "
-        "up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock "
-        "moves to 24.5 or higher."
-    )
 
 
 def test_edge_price_when_hard_rock_is_worse_than_fair():
@@ -457,15 +455,16 @@ def test_a_book_two_points_below_hard_rock_is_still_no_fair_price():
     assert it["paper_blocker"] == "no_fair_price"
 
 
-def test_hard_rock_below_the_market_keeps_the_half_point_window_and_off_market():
-    """The widening is one-directional: below the market Hard Rock is still an
-    off-market number, which is the blocker that fires."""
+def test_hard_rock_below_the_market_keeps_the_half_point_window():
+    """The widening is one-directional: below the market the 0.5 window holds,
+    so the 24.5 books cannot price Hard Rock's 23.5 and the price is unjudgeable
+    (the off-market gate that used to fire first was retired 2026-10-07)."""
     snaps = [snap(1, "hardrockbet", 23.5, -110, -110)] + market(1, 24.5)
     it = only(card([game()], snaps, [model(1, 21.0)]))
     assert it["hr_vs_market"] == -1.0
     assert it["fair_under"] is None  # the 24.5 books stay outside the 0.5 window
-    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
-    assert it["paper_blocker"] == "off_market"
+    assert it["tier"] == "EDGE" and it["blocker"] == "no_fair_price"
+    assert it["paper_blocker"] == "no_fair_price"
 
 
 def test_hr_vs_market_is_hard_rock_minus_the_other_books_median():
@@ -754,15 +753,20 @@ def test_price_blocked_edge_qualifies_with_blocker_price():
     assert it["tier"] == "EDGE" and it["qualifies"] is True and it["paper_blocker"] == "price"
 
 
-def test_off_market_with_qb_out_still_qualifies_with_blocker_off_market():
-    """gap 2.0 at Hard Rock but 1.0 under the market: score 72 (off-market and
-    QB out block, they do not move the score) -> EDGE, blocker off_market first
-    in gate order. It qualifies and the paper ledger tags off_market."""
-    snaps = [snap(1, "hardrockbet", 24.0)] + market(1, 25.0)
+def test_paper_membership_never_depended_on_the_off_market_gate():
+    """OM's gate (2026-10-07): retiring the off-market blocker must not change
+    which games the paper ledger logs, because H-STOP-2 reads that ledger.
+    `qualifies` is in_band alone, so a game below the market qualifies exactly
+    as a game at it does; only its paper tag names the next gate."""
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
-    it = only(card([game()], snaps, [model(1, 22.0)], prev))
-    assert it["tier"] == "EDGE" and it["blocker"] == "off_market"
-    assert it["qualifies"] is True and it["paper_blocker"] == "off_market"
+    below = only(
+        card([game()], [snap(1, "hardrockbet", 24.0)] + market(1, 25.0), [model(1, 22.0)], prev)
+    )
+    at = only(
+        card([game()], [snap(1, "hardrockbet", 24.0)] + market(1, 24.0), [model(1, 22.0)], prev)
+    )
+    assert below["qualifies"] is True and at["qualifies"] is True
+    assert below["paper_blocker"] != "off_market"
 
 
 def test_no_comparable_price_is_a_paper_only_edge_with_blocker_no_fair_price():
@@ -808,20 +812,16 @@ def test_price_sentence_blames_the_other_books_only_when_hard_rock_has_a_price()
     ) in it["why"]
 
 
-def test_blocker_order_off_market_then_price_then_no_fair_price_then_qb_out():
+def test_blocker_order_price_then_no_fair_price_then_qb_out():
     # early_season is last: every market gate has passed and only the games-played
     # policy (paper only) stands between the game and a real-money BET.
-    assert PAPER_BLOCKERS == ("off_market", "price", "no_fair_price", "qb_out", "early_season")
+    # off_market was retired 2026-10-07 (weeks 2-4 paper rows keep the tag).
+    assert PAPER_BLOCKERS == ("price", "no_fair_price", "qb_out", "early_season")
     # Hard Rock alone (no fair price) AND a QB out: the price gate's "cannot
     # judge" branch is named first; the QB news is transient.
     prev = [{"game_id": 1, "qb_out": True, "qb_out_detail": "QB out"}]
     it = only(card([game()], [snap(1, "hardrockbet", 24.5)], [model(1, 22.4)], prev))
     assert it["blocker"] == "no_fair_price" and it["paper_blocker"] == "no_fair_price"
-    # Hard Rock 24.0 alone vs a market at 25.0: off-market is the market read on
-    # Hard Rock's number and comes before the price gates.
-    it = only(card([game()], [snap(1, "hardrockbet", 24.0)] + market(1, 25.0), [model(1, 21.5)]))
-    assert it["ev"] is None and it["blocker"] == "off_market"
-    assert it["paper_blocker"] == "off_market"
 
 
 def test_a_bet_needs_a_judgeable_price_but_an_exchange_quote_is_enough():

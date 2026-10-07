@@ -278,7 +278,7 @@ test.describe("results", () => {
     expect(blockerRows.map((r) => r[0])).toEqual(
       expect.arrayContaining([
         "Hard Rock's price was too short",
-        "Hard Rock's line was below the market",
+        "Hard Rock's price could not be compared",
         "Past the 5-bet week",
       ]),
     );

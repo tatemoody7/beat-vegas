@@ -49,9 +49,6 @@ export function slateBar(
 export const STRONG_GAP_PTS = 3.0;
 export const WATCH_GAP_PTS = 1.0;
 export const WEEKLY_BET_CAP = 5;
-// Hard Rock more than this far BELOW the market total = off-market number
-// (mirrors lib/lineCheck.ts "poor"): never a BET.
-export const HR_OFF_MARKET_PTS = 0.5;
 // Price gate: Hard Rock's under may be at most this much worse (per $1) than the
 // market's no-vig fair price. -0.05 lets standard -110 juice on a balanced market
 // through and rejects -115 or worse unless the market itself leans under.
@@ -375,26 +372,9 @@ export function verdictFor(i: VerdictInput): VerdictResult {
   }
 
   // --- Model rows -----------------------------------------------------------
-  // Hard Rock posting a number well BELOW the market is not a gift: an under
-  // at a lower total is a worse bet than the same under at the market's number
-  // (lib/lineCheck.ts calls this "poor"), and Hard Rock's house rules can void
-  // bets on lines that differ materially from the general market. Never BET
-  // into it — WATCH until Hard Rock's number is back within half a point.
-  if (
-    hrGap !== null &&
-    inBand &&
-    i.liveLine !== null &&
-    i.liveLine - i.hrLine! > HR_OFF_MARKET_PTS
-  ) {
-    const below = round2(i.liveLine - i.hrLine!);
-    return out(
-      "WATCH",
-      "medium",
-      `Our number clears the bar, but Hard Rock’s total is ${fmt(below)} points below the market’s — you’d be giving up points, and an off-market number risks a void. Wait for Hard Rock to move toward ${fmt(i.liveLine)}.`,
-      false,
-      55 + hrGap * 10,
-    );
-  }
+  // The off-market gate (Hard Rock > HR_OFF_MARKET_PTS below the market ->
+  // WATCH) was retired 2026-10-07, Tate's call (docs/ASSUMPTIONS.md row 8): it
+  // never blocked a game on its own live. Mirrors beatvegas/card.py::is_bet.
   // A starting QB listed out: the number does not know it. Never BET into it;
   // WATCH until the news settles and the line has had a chance to react.
   if (hrGap !== null && inBand && i.qbOut) {

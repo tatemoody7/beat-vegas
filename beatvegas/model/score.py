@@ -83,8 +83,10 @@ PCT_SHARE = 0.20
 STRONG_GAP_PTS = 3.0  # ~ top-10% -> "high" confidence (the gap alone)
 WATCH_GAP_PTS = 1.0  # below BET but worth watching for a line move
 WEEKLY_BET_CAP = 5  # docs/BETTING_POLICY.md: at most this many bets a week
-# Hard Rock's 1H total more than this far BELOW the market's = off-market
-# number: giving up points on an under + void risk under HR house rules. WATCH.
+# Hard Rock's 1H total this far BELOW the market's. NOT A GATE since 2026-10-07
+# (Tate retired the off-market blocker, ASSUMPTIONS row 8: it never blocked a
+# game alone live). Kept as the band edge of postmortem's hr_vs_market bands
+# and the GATES study (backtest/gates.py), which describe history.
 HR_OFF_MARKET_PTS = 0.5
 # weekly_update --min-games: both teams need this many FBS-vs-FBS games played
 # this season for a model read. 0 since 2026-09-08 (Tate: score every game off

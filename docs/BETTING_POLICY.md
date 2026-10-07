@@ -90,7 +90,7 @@ The site is one page: every game on the week in a single ranked list.
   reference line) minus our number and `bar` is this slate's bar (H-PCT, the top-20%
   cutoff; 1.75 only on an empty slate). A gap exactly at the bar is exactly 70, so
   green always means the gap rule passed. Nothing else moves the number: Hard Rock's
-  price, an off-market Hard Rock number and a starting QB listed out are
+  price and a starting QB listed out are
   BLOCKERS — they decide whether a game is a bet and the card carries a tag —
   never score adjustments. 70+ is a bet (green), 55-69 is watch (amber), under 55
   is a pass (red). With no model read the row gets a context-only score (40
@@ -99,7 +99,7 @@ The site is one page: every game on the week in a single ranked list.
   a tier. The score RANKS; it never overrides the BET rules below.
 - **Tiers** — BET is exactly the verdict rule below, every gate passed. Watch
   (EDGE in the payload) is score 55+ with one gate still failing, and the card
-  names which one: no Hard Rock line, off-market number, price worse than fair,
+  names which one: no Hard Rock line, price worse than fair,
   no comparable price, QB out, or a gap short of the slate bar. Everything else is PASS,
   kept in the same list, dimmer. Once a game is played it is coloured by its
   result only when a REAL book line (Hard Rock's, else the market's) was posted;
@@ -167,10 +167,11 @@ A game is BET when all of these hold:
    market's no-vig fair price. Standard -110 juice on a balanced market
    passes; -115 or worse fails unless the market itself leans under. (Decided
    2026-09-05: the earlier 2-cent version could almost never fire.)
-6. Hard Rock's first-half total is **not more than 0.5 points below the
-   market's** — a lower number is a worse under, and Hard Rock's house rules
-   can void bets on lines that differ materially from the general market.
-   Off-market numbers are WATCH until Hard Rock moves back toward the market.
+6. *(Retired 2026-10-07, Tate's call: `docs/ASSUMPTIONS.md` row 8.)* Until then a
+   Hard Rock first-half total more than 0.5 points below the market's was WATCH.
+   It never blocked a game on its own live (`docs/GATES.md`, H4G), and it never
+   decided which games are paper-logged, so the stopping rule's ledger is untouched.
+   A lower Hard Rock number is still judged by the price gate at that number.
 
 Sigma (~12 points) is the noise of any single game's outcome. It is why
 every card says "still close to a coin flip on any single game" and why we
@@ -242,7 +243,7 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
   `isPaper` with `PAPER IS BUILD-ONLY` and `pick.py add` is gone). They log
   **every game whose Hard Rock first-half line clears this week's bar (the slate's top 20% by gap, on a centred quote)**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
-  BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
+  BET, `price`, `off_market` (retired 2026-10-07; weeks 2-4 rows keep it), `no_fair_price` = no book or exchange priced at
   Hard Rock's number so the price could not be judged, `qb_out`, `cap` = the
   6th+ by gap that week, `degraded` = a card input failed on the build, with
   the gate it overrode kept as `gate_blocker` in the pick's chips). The fair

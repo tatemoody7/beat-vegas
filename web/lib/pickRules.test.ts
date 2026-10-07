@@ -649,7 +649,6 @@ describe("serverVerdict (the client's word is not consulted)", () => {
     hrUnderPrice: -110,
     hrCentred: true,
     ev: 0.01,
-    marketLine: 27,
     qbOut: false,
     minGamesPlayed: 5,
   };
@@ -664,7 +663,6 @@ describe("serverVerdict (the client's word is not consulted)", () => {
     expect(serverVerdict({ ...live, hrLine: null })).toBe("WATCH");
     expect(serverVerdict({ ...live, bar: 3.5 })).toBe("WATCH");
     expect(serverVerdict({ ...live, hrCentred: false })).toBe("WATCH");
-    expect(serverVerdict({ ...live, marketLine: 28 })).toBe("WATCH");
     expect(serverVerdict({ ...live, qbOut: true })).toBe("WATCH");
     expect(serverVerdict({ ...live, ev: -0.08 })).toBe("WATCH");
     expect(serverVerdict({ ...live, hrUnderPrice: null })).toBe("WATCH");

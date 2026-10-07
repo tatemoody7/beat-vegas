@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (OM: THE OFF-MARKET GATE IS RETIRED).** Tate's call on `ASSUMPTIONS` row 8: the
+  "Hard Rock more than 0.5 pts below the market → WATCH" gate is gone from `card.py::is_bet`,
+  `verdict.ts`, `edge.ts` and `pickRules.serverVerdict` (and the e2e fixture's port; fixture game
+  900004 now reads `no_fair_price`). It never blocked a game alone live (`GATES.md`, H4G). The
+  gate he set first: retiring it must not change the paper ledger H-STOP-2 reads. It cannot, by
+  construction — `qualifies` is `in_band` alone — and a test now pins that; Neon showed 8 paper
+  picks tagged `off_market` (weeks 2-4), none since the clock started in week 5. Those rows keep
+  their tag and their label. `HR_OFF_MARKET_PTS` stays in `score.py` for the post-mortem's
+  `hr_vs_market` bands and the GATES study only; `tests/test_gate_parity.py` guards that no gate
+  reads it on either side.
+
 - **2026-10-07 (PR A: TATE'S 29 ASSUMPTION VERDICTS; H-CLOSE-W; 295 NOT 296).** `docs/ASSUMPTIONS.md`
   v2 carries Tate's verdict on every row (Q&A that day): keep all but two; **retire** the
   off-market blocker (its own gated PR, OM); **test** the 2 h close window as H-CLOSE-W, a

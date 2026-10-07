@@ -3,7 +3,6 @@ import type { RulePause } from "@/lib/rulePause";
 import {
   BET_GAP_PTS,
   BET_MIN_EV,
-  HR_OFF_MARKET_PTS,
   MIN_GAMES_FOR_REAL_MONEY,
   REASONS,
   WATCH_GAP_PTS,
@@ -321,8 +320,6 @@ export type ServerVerdictInput = {
   hrUnderPrice: number | null;
   hrCentred: boolean | null;
   ev: number | null;
-  /** Consensus median line (lib/lineCheck.ts), for the off-market gate. */
-  marketLine: number | null;
   qbOut: boolean;
   minGamesPlayed: number | null;
 };
@@ -342,8 +339,6 @@ export function serverVerdict(i: ServerVerdictInput): Verdict {
   const bar = i.bar ?? BET_GAP_PTS;
   if (gap < WATCH_GAP_PTS) return "PASS";
   if (!(gap >= bar && gap > 0) || i.hrCentred === false) return "WATCH";
-  if (i.marketLine !== null && i.marketLine - i.hrLine > HR_OFF_MARKET_PTS)
-    return "WATCH";
   if (i.qbOut) return "WATCH";
   if (i.hrUnderPrice === null || i.ev === null || i.ev < BET_MIN_EV)
     return "WATCH";

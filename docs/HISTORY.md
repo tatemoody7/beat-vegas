@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (H-HIST / H-ELO-F REGISTERED — PR H1).** The system review found the live champion
+  trains on 2023-25 only (`model_runs` 5: 2,212 rows) because Neon's `games` begins in 2023;
+  earlier docs call it a "2015-25 regressor" from the June demo-DB era. Tate's calls: use every
+  season we can, but test first; history from the free CFBD API into Neon (2003+; the Starter
+  Pack, bought the same night, stays a local cross-check in gitignored `research/cfbd_pack/`);
+  judged on 2025 + 2026 to date; pass = more accurate AND no worse units; the Elo arm on the
+  champion's own window. Rows written before any script or load; the champion is pinned at
+  2023 (PR H2) before history lands (PR H3); arms + one dispatch each (PR H4).
+
 - **2026-10-06 (H-FG-P COLLECTOR — PR5a #293, PR5b).** Program PR5 in two PRs, both Tate's
   calls. **#293**: an allow-list (`score.CHAMPION_READ_VERSIONS` = `gbm_v1`, `derived_lines`,
   mirrored in `web/lib/model.ts`) at every "the model's line" read (board universe, pick-log

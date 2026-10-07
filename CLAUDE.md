@@ -126,7 +126,6 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `--confirmatory` before then.
 - **H-SHARE** (share engine): spec'd (`docs/superpowers/specs/2026-09-15-share-engine.md`) and
   registered, not built; a pass of its gate licenses a paper arm, not promotion.
-- **Registry vocabulary**: add `superseded` (H-STOP, H-INSEASON-P currently read `rejected`).
 - **Vercel `DATABASE_URL`**: the pg driver warns at every cold start that `sslmode=require` changes
   meaning in pg v9; set `sslmode=verify-full` explicitly (same behaviour as today). Seen 2026-09-28.
 
@@ -172,9 +171,10 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
   − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
-  `data/fbs_teams.json`), global calibration intercept, re-fitted every Sunday. `score_slate`
+  `data/fbs_teams.json`), trained on 2023+ (`features.FRAME_MIN_SEASON`; older seasons are
+  study-only until H-HIST), global intercept, re-fitted every Sunday. `score_slate`
   ranks by `gap = line − bv_line`; the 0-100 score, tier and kill line all derive from the gap
-  against the slate bar. `bv_sigma` is one number per slate — never derive a probability from it.
+  against the slate bar. `bv_sigma` is one slate-wide number — no probability from it.
 
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |

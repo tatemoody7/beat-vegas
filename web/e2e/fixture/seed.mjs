@@ -251,6 +251,23 @@ export function fixtureRows(week, expected) {
     spread_open: g.fg.spread,
     spread_open_source: "oddsapi",
   }));
+  // Training history (2026-10-06, H-HIST): a pre-2023 season sits in `games`
+  // with a first-half total and no predictions, lines or picks. No page may
+  // list it (SITE_MIN_SEASON); records.spec.ts checks the season pills.
+  rows.games.push({
+    ...rows.games[0],
+    id: 905001,
+    season: 2005,
+    week: 3,
+    start_date: ts(new Date(Date.UTC(2005, 8, 17, 19, 0))),
+    home_points: 24,
+    away_points: 17,
+    home_first_half_points: 14,
+    away_first_half_points: 7,
+    first_half_total: 21,
+    first_half_source: "linescores",
+    full_game_total: 47.5,
+  });
 
   // odds_snapshots: Hard Rock's 1H captures as given (two per priced game), every
   // other book at both of the same instants, and the full-game total from Hard

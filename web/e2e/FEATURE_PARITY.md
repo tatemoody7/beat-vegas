@@ -71,6 +71,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 ## Every game we have rated
 
 - [records] Opens on the latest graded week, marks its pill, shows `N of M games` and only that week's rows — records.spec.ts › "opens on the latest graded week and shows only its rows"
+- [records] Lists no season before 2023: training-history seasons in `games` never get a pill (`SITE_MIN_SEASON`) — records.spec.ts › "lists no season before 2023 (training history stays off the site)"
 - [records] Each row: full game, line, our number, gap to one decimal with its sign, actual first half and result or Pending — records.spec.ts › "shows each game's line, our number and the gap to one decimal, signed"
 - [records] The previous week's pill filters to its two graded games — records.spec.ts › "the previous week is one click away and holds its two graded games"
 - [records] `Download all of <season>` links to the CSV export, which holds every game — records.spec.ts › "offers the whole season as a CSV download"

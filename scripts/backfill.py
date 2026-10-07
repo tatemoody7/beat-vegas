@@ -160,6 +160,15 @@ def backfill_season(
             if tid is not None and tid not in team_rows:
                 team_rows[tid] = {"id": tid, "school": name, "conference": conf}
 
+    # `teams.conference` holds ONE value per team, read as today's membership
+    # (situational `conference_game`). A past season's load must not rewrite it
+    # with that season's conference (2026-10-06: loading 2003-2022 for H-HIST
+    # would leave live 2026 rows reading 2022 membership). Past seasons insert
+    # unknown teams but never touch an existing team's conference.
+    if season < current_season():
+        for t in team_rows.values():
+            t.pop("conference", None)
+
     cfbd_with_total = sum(1 for r in game_rows if r["full_game_total"] is not None)
     with session_scope() as s:
         # The Sunday/card-day capture (Odds API / DK) owns the total + spread it

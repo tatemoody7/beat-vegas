@@ -101,7 +101,7 @@ def test_cfbd_client_fbs_teams_hits_teams_fbs_for_the_year():
 def test_load_all_games_applies_the_fbs_filter_by_default(monkeypatch):
     raw = _games()
     raw["week"] = 1
-    monkeypatch.setattr(features, "_query_games", lambda: raw)
+    monkeypatch.setattr(features, "_query_games", lambda *a, **k: raw)
     monkeypatch.setattr(features, "load_fbs_teams", lambda: FBS)
     out = features._load_all_games()
     assert out["id"].tolist() == [1, 4]
@@ -110,7 +110,7 @@ def test_load_all_games_applies_the_fbs_filter_by_default(monkeypatch):
 def test_load_all_games_can_skip_the_filter(monkeypatch):
     raw = _games()
     raw["week"] = 1
-    monkeypatch.setattr(features, "_query_games", lambda: raw)
+    monkeypatch.setattr(features, "_query_games", lambda *a, **k: raw)
     monkeypatch.setattr(
         features, "load_fbs_teams", lambda: (_ for _ in ()).throw(AssertionError("not called"))
     )

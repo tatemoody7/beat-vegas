@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { median } from "@/lib/format";
-import { MARKET_LEDGER_1H } from "@/lib/model";
+import { MARKET_LEDGER_1H, SITE_MIN_SEASON } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 import { hasFbsSeason, isFbsGame } from "@/lib/proxy";
 import { STRONG_GAP_PTS } from "@/lib/verdict";
@@ -102,6 +102,7 @@ async function getEdgeStatsUncached(season?: number): Promise<EdgeStats> {
     SELECT season, home_team, away_team, first_half_total, full_game_total
     FROM games
     WHERE first_half_total IS NOT NULL AND full_game_total > 0
+      AND season >= ${SITE_MIN_SEASON}
       ${seasonFilter}
   `;
   const ratios = rows

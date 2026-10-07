@@ -161,16 +161,28 @@ BANNED_LINE_COLS = {
 }
 
 
-def _load_all_games(fbs_only: bool = True) -> pd.DataFrame:
-    """Every game row the engine may see. `fbs_only` (default) drops any game
-    where either team was not FBS that season — see etl/fbs.py for why."""
-    df = _query_games()
+# The earliest season any feature frame reads (2026-10-06). Neon held 2023+
+# only, so the champion has always trained on 2023-25; this pins that BEFORE
+# older seasons are loaded for the H-HIST / H-ELO-F studies, so loading history
+# changes nothing live. A study that wants history passes `min_season`
+# explicitly; raising the live floor is its own PR after H-HIST's verdict
+# (docs/HYPOTHESES.md H-HIST), stating its effect on H-STOP-2.
+FRAME_MIN_SEASON = 2023
+
+
+def _load_all_games(
+    fbs_only: bool = True, min_season: Optional[int] = FRAME_MIN_SEASON
+) -> pd.DataFrame:
+    """Every game row the engine may see, from `min_season` on. `fbs_only`
+    (default) drops any game where either team was not FBS that season — see
+    etl/fbs.py for why."""
+    df = _query_games(min_season)
     if fbs_only:
         df = filter_fbs_games(df, load_fbs_teams())
     return df
 
 
-def _query_games() -> pd.DataFrame:
+def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
     with session_scope() as s:
         q = s.query(
             Game.id,
@@ -190,6 +202,8 @@ def _query_games() -> pd.DataFrame:
             Game.venue_id,
             Game.first_half_source,
         )
+        if min_season is not None:
+            q = q.filter(Game.season >= int(min_season))
         df = pd.DataFrame(
             q.all(),
             columns=[
@@ -505,9 +519,14 @@ def build_feature_frame(
     prior_weight: float = PRIOR_SEASON_WEIGHT,
     weather_lead: Optional[int] = WEATHER_OBS_LEAD_HOURS,
     allow_diagnostic_lead: bool = False,
+    min_season: Optional[int] = FRAME_MIN_SEASON,
 ) -> pd.DataFrame:
+    """`min_season` (default FRAME_MIN_SEASON): the earliest season read, for
+    the games AND the schedule-derived situational columns (rest days and the
+    cross-season revenge/rivalry flags would otherwise see older games). None
+    reads every season on file (the H-HIST study)."""
     check_weather_lead(weather_lead, allow_diagnostic_lead)
-    games = _load_all_games(fbs_only=fbs_only)
+    games = _load_all_games(fbs_only=fbs_only, min_season=min_season)
     std = _season_to_date(_team_long(games), prior_weight=prior_weight)
 
     # Merge season-to-date stats back, matching each side on its own team name.
@@ -645,7 +664,7 @@ def build_feature_frame(
     df = _merge_tempo_weather(df, weather_lead)
 
     # --- situational features (schedule-derived; real model inputs) ---
-    df = df.merge(situational_frame(), on="id", how="left")
+    df = df.merge(situational_frame(min_season=min_season), on="id", how="left")
 
     # --- first-half PBP factors (season-to-date off + def-allowed) ----------
     fh = fh_factor_frame()

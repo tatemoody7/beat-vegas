@@ -51,13 +51,13 @@ def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
     return r * 2 * math.asin(math.sqrt(a))
 
 
-def _load(session=None, season: Optional[int] = None) -> tuple:
+def _load(session=None, season: Optional[int] = None, min_season: Optional[int] = None) -> tuple:
     """games/venues/teams frames. `session` reuses a caller's session (else opens
     one); `season` restricts the games to one season (enough for rest/travel/
     kickoff — the cross-season revenge/rivalry flags then only see that season)."""
     if session is None:
         with session_scope() as s:
-            return _load(s, season)
+            return _load(s, season, min_season)
     s = session
     q = s.query(
         Game.id,
@@ -72,6 +72,8 @@ def _load(session=None, season: Optional[int] = None) -> tuple:
     )
     if season is not None:
         q = q.filter(Game.season == season)
+    if min_season is not None:
+        q = q.filter(Game.season >= int(min_season))
     games = pd.DataFrame(
         q.all(),
         columns=[
@@ -176,13 +178,15 @@ def _rest_days(games: pd.DataFrame) -> pd.DataFrame:
     return long[["id", "team", "rest_days"]]
 
 
-def situational_frame(session=None, season: Optional[int] = None) -> pd.DataFrame:
+def situational_frame(
+    session=None, season: Optional[int] = None, min_season: Optional[int] = None
+) -> pd.DataFrame:
     """One row per game id with the situational columns.
 
     Default: every game in the DB via its own session (the feature frame).
     `session` + `season` let a caller (etl/context.py) compute the rest/travel/
     kickoff numbers for one season inside an open session."""
-    games, venues, teams = _load(session, season)
+    games, venues, teams = _load(session, season, min_season)
     if games.empty:
         return pd.DataFrame(columns=["id"] + SITUATIONAL_COLS)
     games["start_date"] = pd.to_datetime(games["start_date"])

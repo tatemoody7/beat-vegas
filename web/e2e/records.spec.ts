@@ -33,6 +33,15 @@ test.describe("every game we have rated", () => {
     await expect(rows.locator("td").first()).toHaveText(String(week.week));
   });
 
+  test("lists no season before 2023 (training history stays off the site)", async ({
+    page,
+  }) => {
+    await page.goto("/records");
+    const pills = page.locator("a.bv-pill .bv-pill-value");
+    await expect(pills.filter({ hasText: String(week.season) })).toHaveCount(1);
+    await expect(pills.filter({ hasText: "2005" })).toHaveCount(0);
+  });
+
   test("shows each game's line, our number and the gap to one decimal, signed", async ({
     page,
   }) => {

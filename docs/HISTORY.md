@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (FRAME FLOOR — PR H2, no behaviour change).** Before any 2003-2022 history is
+  loaded for H-HIST / H-ELO-F: `features.FRAME_MIN_SEASON = 2023` floors every feature frame's
+  games and its situational columns (rest days and the cross-season revenge/rivalry flags would
+  otherwise read older games); a study opts out with `build_feature_frame(min_season=None)`.
+  The site lists no season before `SITE_MIN_SEASON` (records seasons, the all-season 1H share);
+  the e2e fixture now carries a 2005 game and the records spec failed with the floor removed.
+  `data/fbs_teams.json` (+ web mirror) extended to 2003-2014 from CFBD `/teams/fbs` (12 calls,
+  117-128 teams a season; 2015-26 byte-identical). A past season's `backfill.py` load no longer
+  rewrites `teams.conference` (live rows read today's membership).
 - **2026-10-06 (H-HIST / H-ELO-F REGISTERED — PR H1).** The system review found the live champion
   trains on 2023-25 only (`model_runs` 5: 2,212 rows) because Neon's `games` begins in 2023;
   earlier docs call it a "2015-25 regressor" from the June demo-DB era. Tate's calls: use every

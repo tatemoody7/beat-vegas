@@ -36,6 +36,8 @@ import pandas as pd
 from beatvegas.db.models import ModelRun, Prediction
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import (
+    CFBD_TOTALS_FROM,
+    FRAME_MIN_SEASON,
     apply_min_games,
     build_feature_frame,
     serve_skew_report,
@@ -46,6 +48,7 @@ from beatvegas.etl.frame_fingerprint import fingerprint, fingerprint_hash
 from beatvegas.markets import FG_ACTUAL_COL, FULL_GAME, with_target
 from beatvegas.model.bv_line import BV_FEATURE_COLS, bias_corrections
 from beatvegas.model.fg_line import bv_fg_line_for_slate
+from beatvegas.model.score import CHAMPION_TRAIN_MIN_SEASON
 from beatvegas.season import current_season, detect_week
 
 FG_MODEL_VERSION = "bv_fg_v1"
@@ -67,8 +70,8 @@ def score_fg_week(df: pd.DataFrame, season: int, week: int) -> pd.DataFrame:
     train, target = fg_train_target(df, season, week)
     if train.empty or target.empty:
         return pd.DataFrame(columns=["id", "bv_fg_line", "bv_intercept"])
-    lines = bv_fg_line_for_slate(train, target)
-    intercept = float(bias_corrections(train, FG_ACTUAL_COL).get("global", 0.0))
+    lines = bv_fg_line_for_slate(train, target, drop_all_nan=True)
+    intercept = float(bias_corrections(train, FG_ACTUAL_COL, drop_all_nan=True).get("global", 0.0))
     out = target[["id", *BV_FEATURE_COLS]].copy()
     out["bv_fg_line"] = pd.Series(lines, index=target.index).round(2)
     out["bv_intercept"] = round(intercept, 6)
@@ -192,8 +195,17 @@ def main(argv=None) -> int:
         return 0
 
     # The live frame, cut as the champion's Sunday cuts it (weekly_update.py).
-    df = apply_min_games(build_feature_frame(min_games=0), 0)
-    skew = serve_skew_report(df, args.season, week, BV_FEATURE_COLS)
+    # Trains like the champion (2003+, Tate 2026-10-07); the guard judges the
+    # live era only (older seasons have no pace/weather).
+    df = apply_min_games(
+        build_feature_frame(
+            min_games=0, min_season=CHAMPION_TRAIN_MIN_SEASON, total_required_from=CFBD_TOTALS_FROM
+        ),
+        0,
+    )
+    skew = serve_skew_report(
+        df[df["season"] >= FRAME_MIN_SEASON], args.season, week, BV_FEATURE_COLS
+    )
     bad = serve_skew_violations(skew)
     if bad:
         print(f"ERROR: [fg_shadow] serve skew on {len(bad)} input(s): {', '.join(bad)}")

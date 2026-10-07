@@ -9,6 +9,16 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (LIVE SWITCH: CHAMPION TRAINS ON 2003+).** Tate's calls after H-HIST: switch now,
+  start year 2003 (all three floors tied on accuracy; the tie-break did not look at betting
+  records), keep H-STOP-2 running with before/after reporting, move the full-game shadow too.
+  `score.CHAMPION_TRAIN_MIN_SEASON = 2003`, read by `weekly_update.py` and `fg_shadow.py` only;
+  `features.CFBD_TOTALS_FROM = 2013` keeps the unpriced seasons as training rows while every
+  scored row still needs a total (`rows_to_keep`); `score_slate` fits with `drop_all_nan=True`
+  (a no-op on 2023+); the factor-board anchors and the serve-skew guard stay on 2023+. Every
+  other frame (grading, factor ledger, research tools) stays at `FRAME_MIN_SEASON` 2023. Week 6
+  re-scored the same night (`rescore.yml`), then the FG shadow.
+
 - **2026-10-07 (H-HIST MET; H-ELO-F NULL).** One look each. H-HIST (run 37567344521): all three
   longer windows beat the 2023+ champion on accuracy by ~0.42 pts a game (Holm p 0.002 each),
   pooled MAE 9.17 → 8.74 / 8.75 / 8.76 against the consensus close's 8.73; units not worse

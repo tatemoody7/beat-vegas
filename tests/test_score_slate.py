@@ -78,9 +78,9 @@ def test_score_slate_scores_the_unplayed_target_week(monkeypatch):
     seen = {}
     real = score_mod.bv_line_for_slate
 
-    def spy(train_df, target_df):
+    def spy(train_df, target_df, **kw):
         seen["train"] = train_df
-        return real(train_df, target_df)
+        return real(train_df, target_df, **kw)
 
     monkeypatch.setattr(score_mod, "bv_line_for_slate", spy)
 
@@ -128,7 +128,7 @@ def _wire(monkeypatch, frame, scored_empty=True):
     wu = _load_script("weekly_update")
     monkeypatch.setattr(wu, "try_init_db", lambda: True)
     monkeypatch.setattr(wu, "detect_week", lambda season: 5)
-    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0: frame)
+    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0, **kw: frame)
     monkeypatch.setattr(wu, "ranking_line_lookup", lambda season, week, basis="opener": ({}, {}))
     if scored_empty:
         monkeypatch.setattr(wu, "score_slate", lambda *a, **k: pd.DataFrame())

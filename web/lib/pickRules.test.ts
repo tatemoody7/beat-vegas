@@ -159,6 +159,25 @@ describe("checkPolicy", () => {
       checkPolicy({ ...pick, isPaper: true }, { ...ctx, realWeekCount: 9 }),
     ).toEqual({ ok: true });
   });
+  it("a stale live price refuses a BET as PRICE STALE, apart from PRICE UNAVAILABLE", () => {
+    const stale = {
+      ...ctx,
+      livePrice: {
+        ok: false as const,
+        stale: true,
+        reason: "last confirmed long ago",
+      },
+    };
+    const r = checkPolicy({ ...pick, verdict: "BET" }, stale);
+    expect(r).toMatchObject({ ok: false, status: 409 });
+    if (!r.ok) expect(r.error).toMatch(/^PRICE STALE/);
+    const gone = {
+      ...ctx,
+      livePrice: { ok: false as const, reason: "no live line read" },
+    };
+    const r2 = checkPolicy({ ...pick, verdict: "BET" }, gone);
+    if (!r2.ok) expect(r2.error).toMatch(/^PRICE UNAVAILABLE/);
+  });
   it("a bonus bet uses no cap slot, and every other gate still applies", () => {
     const bonus = { ...pick, isBonus: true };
     expect(checkPolicy(bonus, { ...ctx, realWeekCount: 5 })).toEqual({

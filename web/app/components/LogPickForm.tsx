@@ -64,10 +64,38 @@ export default function LogPickForm({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // PRICE STALE (M2): the server saw no Hard Rock price in the last 6 h. The
+  // owner can poll this one game now (POST /api/price-refresh, 1 Odds API
+  // credit) and log again once it lands.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+
+  async function refreshPrice() {
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch("/api/price-refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: prefill.gameId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      setRefreshMsg(
+        res.ok
+          ? (j.message ?? "Refresh requested.")
+          : (j.error ?? `failed (${res.status})`),
+      );
+    } catch {
+      setRefreshMsg("Could not reach the server. Nothing was requested.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setRefreshMsg(null);
     const lineNum = Number(line);
     if (line.trim() === "" || !Number.isFinite(lineNum) || lineNum <= 0) {
       setErr("Enter the first-half total you are taking the under on.");
@@ -217,6 +245,23 @@ export default function LogPickForm({
         <p role="alert" className="mt-2 text-sm text-[var(--bad)]">
           {err}
         </p>
+      )}
+      {err?.startsWith("PRICE STALE") && (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={refreshPrice}
+            disabled={refreshing}
+            className="bv-btn text-xs"
+          >
+            {refreshing ? "Requesting…" : "Refresh price"}
+          </button>
+          {refreshMsg && (
+            <span role="status" className="text-xs text-[var(--text-muted)]">
+              {refreshMsg}
+            </span>
+          )}
+        </div>
       )}
 
       <div className="mt-4 flex items-center gap-3">

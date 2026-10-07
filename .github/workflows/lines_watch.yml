@@ -85,8 +85,14 @@ on:
   workflow_dispatch:
     inputs:
       market:
-        description: 'manual run: 1h (full refresh) | 1h_open | 1h_close'
+        description: 'manual run: 1h (full refresh) | 1h_open | 1h_close | 1h_game (one game, needs game_id)'
         default: 1h
+      game_id:
+        # The site's "Refresh price" (POST /api/price-refresh, 2026-10-07):
+        # one games.id, polled alone for 1 credit when the stored Hard Rock
+        # price is more than 6 h old. Validated as digits before use.
+        description: 'market=1h_game only: the games.id to poll'
+        default: ''
 
 concurrency:
   group: neon-writers
@@ -115,6 +121,7 @@ jobs:
         env:
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_MARKET: ${{ inputs.market }}
+          INPUT_GAME_ID: ${{ inputs.game_id }}
         run: |
           # The three 1h_open branches were removed on 2026-09-10: their crons
           # were retired when the card build took over the midweek sweep, but
@@ -131,6 +138,12 @@ jobs:
           esac
           case "$market" in
             1h|1h_open|1h_close) ;;
+            1h_game)
+              # One game, by id: digits only, or the run stops here.
+              if ! [[ "$INPUT_GAME_ID" =~ ^[0-9]{1,12}$ ]]; then
+                echo "::error::market=1h_game needs a numeric game_id"; exit 1
+              fi
+              echo "game_id=$INPUT_GAME_ID" >> "$GITHUB_OUTPUT" ;;
             *) echo "::error::unknown market '$market'"; exit 1 ;;
           esac
           echo "market=$market" >> "$GITHUB_OUTPUT"
@@ -198,6 +211,11 @@ jobs:
         if: steps.close.outcome == 'success'
         continue-on-error: true
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --markets totals --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty
+      - name: 1H one-game refresh (the site's Refresh price; 1 credit)
+        if: steps.resolve.outputs.market == '1h_game'
+        env:
+          GAME_ID: ${{ steps.resolve.outputs.game_id }}
+        run: python scripts/poll_lines.py --game-id "$GAME_ID" --hours-back 0 --days-ahead 8 --max-credits-per-run 2
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3

@@ -31,6 +31,14 @@ date; the board cannot see any of these until the change is made.
    (`docs/CFBD_TIER3_REVIEW_2026-10-05.md`). Optional: link Discord in Patreon
    (patreon.com/settings/apps) for the patron channel.
 
+3. **GitHub dispatch token — confirm its scope (added 2026-10-07).** `GITHUB_DISPATCH_TOKEN`
+   (Vercel env) now also backs the game page's **Refresh price** (`POST /api/price-refresh` →
+   `lines_watch.yml` `market=1h_game`, 1 Odds API credit). It should be a **fine-grained** token
+   with **Actions: read and write** on **tatemoody7/beat-vegas only**, nothing else
+   (github.com/settings/personal-access-tokens). If it is a classic token or covers more repos,
+   replace it with one of that shape and paste it into Vercel → Settings → Environment
+   Variables → Production, then redeploy.
+
 ## Done 2026-10-05
 
 3. **The Odds API — on the 20K plan ($30/month) since 2026-10-05.** Tate cancelled the 100K

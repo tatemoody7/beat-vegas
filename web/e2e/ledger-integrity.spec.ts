@@ -37,6 +37,37 @@ async function pickOn(gameId: number, isPaper: boolean): Promise<Row> {
   return rows[0];
 }
 
+/** Mark one game's Hard Rock 1H quotes as SEEN 10 minutes ago (as a close
+ *  poll that found the number unchanged would), run `fn`, and put every
+ *  last_seen_at back. The fixture's quotes land 72 h and 24 h ago, which the
+ *  6-hour live rule (M2) refuses as PRICE STALE. */
+async function withHrSeenNow(
+  gameId: number,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const saved = await query<{ id: number; last_seen_at: string | null }>(
+    `SELECT id, last_seen_at::text AS last_seen_at FROM odds_snapshots
+     WHERE game_id = $1 AND LOWER(book) = 'hardrockbet' AND market = '1H_total'`,
+    [gameId],
+  );
+  await query(
+    `UPDATE odds_snapshots
+     SET last_seen_at = (now() AT TIME ZONE 'utc') - interval '10 minutes'
+     WHERE game_id = $1 AND LOWER(book) = 'hardrockbet' AND market = '1H_total'`,
+    [gameId],
+  );
+  try {
+    await fn();
+  } finally {
+    for (const r of saved) {
+      await query(
+        "UPDATE odds_snapshots SET last_seen_at = $2::timestamp WHERE id = $1",
+        [r.id, r.last_seen_at],
+      );
+    }
+  }
+}
+
 test.describe("the ledger's write rules", () => {
   test("a hand-logged paper pick is refused: paper is the build's", async ({
     request,
@@ -103,11 +134,13 @@ test.describe("the ledger's write rules", () => {
       [before.id],
     );
     try {
-      const res = await request.patch(`/api/picks/${before.id}`, {
-        data: { price: -400 },
+      await withHrSeenNow(BET_ONE, async () => {
+        const res = await request.patch(`/api/picks/${before.id}`, {
+          data: { price: -400 },
+        });
+        expect(res.status()).toBe(409);
+        expect((await res.json()).error).toMatch(/worse than the kill price/);
       });
-      expect(res.status()).toBe(409);
-      expect((await res.json()).error).toMatch(/worse than the kill price/);
       expect(await pickOn(BET_ONE, false)).toEqual(before);
     } finally {
       await query(
@@ -214,5 +247,81 @@ test.describe("backdated logs", () => {
     expect(
       await query("SELECT id FROM manual_picks WHERE game_id = $1", [BET_TWO]),
     ).toHaveLength(0);
+  });
+});
+
+// Live freshness (M2, 2026-10-07): a live real ticket needs Hard Rock's price
+// SEEN in the last 6 h, and "Refresh price" polls one game. The refresh
+// specs never reach GitHub: each is refused before the dispatch (the e2e
+// server's GITHUB_DISPATCH_TOKEN is a placeholder).
+test.describe("live freshness and Refresh price", () => {
+  test("a live log on a price last seen 24 h ago is refused as PRICE STALE", async ({
+    request,
+  }) => {
+    const res = await request.post("/api/picks", {
+      data: { gameId: BET_TWO, line: 53.5, price: -110 },
+    });
+    expect(res.status()).toBe(409);
+    expect((await res.json()).error).toMatch(/^PRICE STALE/);
+    expect(
+      await query("SELECT id FROM manual_picks WHERE game_id = $1", [BET_TWO]),
+    ).toHaveLength(0);
+  });
+
+  test("the log form offers Refresh price on PRICE STALE", async ({ page }) => {
+    await page.goto(`/game/${BET_TWO}`);
+    await page.getByRole("button", { name: "Log this bet" }).click();
+    await page.getByRole("button", { name: /^Log bet/ }).click();
+    const form = page.locator("form.bv-card");
+    await expect(form.getByRole("alert")).toContainText("PRICE STALE");
+    await expect(
+      form.getByRole("button", { name: "Refresh price" }),
+    ).toBeVisible();
+  });
+
+  test("Refresh price refuses a fresh price, a kicked-off game and an unknown one", async ({
+    request,
+  }) => {
+    await withHrSeenNow(BET_TWO, async () => {
+      const fresh = await request.post("/api/price-refresh", {
+        data: { gameId: BET_TWO },
+      });
+      expect(fresh.status()).toBe(409);
+      expect((await fresh.json()).error).toMatch(/nothing to refresh/);
+    });
+    const played = await request.post("/api/price-refresh", {
+      data: { gameId: 900012 },
+    });
+    expect(played.status()).toBe(409);
+    expect((await played.json()).error).toMatch(/kicked off/);
+    const unknown = await request.post("/api/price-refresh", {
+      data: { gameId: 123 },
+    });
+    expect(unknown.status()).toBe(404);
+    const junk = await request.post("/api/price-refresh", {
+      data: { gameId: "1;drop" },
+    });
+    expect(junk.status()).toBe(400);
+  });
+
+  test("a second Refresh inside the cooldown is refused before any dispatch", async ({
+    request,
+  }) => {
+    const key = `price_refresh_${BET_TWO}`;
+    await query(
+      `INSERT INTO app_settings (key, value, note, updated_at)
+       VALUES ($1, 'e2e', 'requested', (now() AT TIME ZONE 'utc') - interval '2 minutes')
+       ON CONFLICT (key) DO UPDATE SET updated_at = EXCLUDED.updated_at`,
+      [key],
+    );
+    try {
+      const res = await request.post("/api/price-refresh", {
+        data: { gameId: BET_TWO },
+      });
+      expect(res.status()).toBe(429);
+      expect((await res.json()).error).toMatch(/last 10 minutes/);
+    } finally {
+      await query("DELETE FROM app_settings WHERE key = $1", [key]);
+    }
   });
 });

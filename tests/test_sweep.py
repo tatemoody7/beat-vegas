@@ -1,7 +1,7 @@
 """Friday 1H sweep ordering: the per-event budget must go to the games the card
 can actually bet, not to whichever kick off first."""
 
-from beatvegas.sweep import build_context, rank_events
+from beatvegas.sweep import build_context, filter_one_game, rank_events
 
 
 def ev(eid, t, home="H", away="A"):
@@ -173,3 +173,12 @@ def test_filter_hr_universe_falls_back_to_everything_when_universe_is_empty():
     events = [ev("a", "t"), ev("c-unmatched", "t")]
     got, fallback = filter_hr_universe(events, {"a": {"game_id": 1}}, hr_universe=set())
     assert [e["id"] for e in got] == ["a", "c-unmatched"] and fallback is True
+
+
+def test_filter_one_game_keeps_only_that_games_event():
+    """The site's Refresh price buys ONE per-event call (2026-10-07): an event
+    matched to another game, or to none, is never polled."""
+    events = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+    ctx = {"a": {"game_id": 7}, "b": {"game_id": 8}}
+    assert filter_one_game(events, ctx, 8) == [{"id": "b"}]
+    assert filter_one_game(events, ctx, 99) == []

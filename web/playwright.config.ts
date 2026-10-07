@@ -35,6 +35,9 @@ const serverEnv: Record<string, string> = {
   APP_PASSWORD: E2E_PASSWORD,
   // Never the Neon HTTP lane: the sandbox is plain Postgres over TCP.
   NEON_HTTP: "",
+  // A placeholder so /api/price-refresh reaches its cooldown check; every
+  // refresh spec is refused before the dispatch, so GitHub is never called.
+  GITHUB_DISPATCH_TOKEN: "e2e-placeholder-never-sent",
   NEXT_TELEMETRY_DISABLED: "1",
   // The bankroll numbers the ledger specs assert are the defaults.
   BANKROLL_USD: "100",

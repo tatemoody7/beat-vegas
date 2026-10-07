@@ -184,6 +184,82 @@ export const loadPostMortem = unstable_cache(
   { revalidate: 3600 },
 );
 
+// ---------------------------------------------------------------- model accuracy
+
+/**
+ * How far our first-half number and Hard Rock's line missed the actual first
+ * half, on average, over this season's graded games (public on How it works,
+ * Tate's call 2026-10-07). PAIRED: only games with both numbers and a result,
+ * so the two averages are over the same games. Each game is judged at the
+ * number published that week (postmortem_games.bv_line, frozen at scoring),
+ * across model changes; Hard Rock's line is the one the card read
+ * (postmortem_games.hr_line). Read from the newest live post-mortem run.
+ */
+export type ModelAccuracy = {
+  season: number;
+  n: number;
+  ours: number;
+  hardRock: number;
+};
+
+async function loadModelAccuracyUncached(): Promise<ModelAccuracy | null> {
+  try {
+    const rows = await prisma.$queryRaw<
+      {
+        scope: string;
+        n: number | bigint;
+        ours: number | null;
+        hr: number | null;
+      }[]
+    >`
+      WITH run AS (
+        SELECT scope, run_id FROM postmortem_runs
+        WHERE scope LIKE 'live_%'
+        ORDER BY computed_at DESC, id DESC
+        LIMIT 1
+      )
+      SELECT g.scope, COUNT(*) AS n,
+             AVG(ABS(g.bv_line - g.fh)) AS ours,
+             AVG(ABS(g.hr_line - g.fh)) AS hr
+      FROM postmortem_games g JOIN run r
+        ON r.scope = g.scope AND r.run_id IS NOT DISTINCT FROM g.run_id
+      WHERE g.fh IS NOT NULL AND g.bv_line IS NOT NULL AND g.hr_line IS NOT NULL
+      GROUP BY g.scope
+    `;
+    const r = rows[0];
+    if (!r || r.ours === null || r.hr === null) return null;
+    const season = Number(r.scope.replace("live_", ""));
+    const n = Number(r.n);
+    if (!Number.isFinite(season) || n === 0) return null;
+    return { season, n, ours: Number(r.ours), hardRock: Number(r.hr) };
+  } catch (e) {
+    console.error("[postmortem] model accuracy read failed:", e);
+    return null;
+  }
+}
+
+export const loadModelAccuracy = unstable_cache(
+  loadModelAccuracyUncached,
+  ["model-accuracy"],
+  { revalidate: 3600 },
+);
+
+/** The one-line public reading: "8.3" / "8.2", and which is closer. */
+export function accuracyLine(a: ModelAccuracy): {
+  ours: string;
+  hardRock: string;
+  closer: "ours" | "hardRock" | "tie";
+} {
+  const ours = a.ours.toFixed(1);
+  const hardRock = a.hardRock.toFixed(1);
+  return {
+    ours,
+    hardRock,
+    closer:
+      ours === hardRock ? "tie" : a.ours < a.hardRock ? "ours" : "hardRock",
+  };
+}
+
 // ---------------------------------------------------------------- pure selectors
 
 const pick = (

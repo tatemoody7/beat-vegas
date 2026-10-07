@@ -62,8 +62,9 @@ export default async function RootLayout({
         </main>
         <footer className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-xs text-[var(--text-dim)]">
           <span>
-            This site rates bets. It never places one. 21+. Not financial
-            advice.
+            This site rates bets. It never places one. Not betting advice. 21+,
+            Florida, Hard Rock Bet. Past results do not predict future results.
+            Gambling problem? 1-833-PLAYWISE.
           </span>
           <FooterChrome gateEnabled={gateEnabled()} authed={authed} />
         </footer>

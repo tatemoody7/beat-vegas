@@ -1130,6 +1130,20 @@ export function buildExpected(week) {
     paperLogged,
     ledger,
     lastDispatch: lastDispatchTicks(now),
+    // lib/postmortem.ts::loadModelAccuracy over the seeded postmortem_games:
+    // the played games with our number, Hard Rock's last line and a first half.
+    modelAccuracy: (() => {
+      const pg = games.filter((g) => g.played && g.hr && g.hr.length > 0);
+      const fhOf = (g) => g.played.homeFh + g.played.awayFh;
+      const avg = (f) =>
+        pg.reduce((a, g) => a + Math.abs(f(g) - fhOf(g)), 0) / pg.length;
+      return {
+        season: week.season,
+        n: pg.length,
+        ours: avg((g) => g.bv),
+        hardRock: avg((g) => g.hr[g.hr.length - 1].line),
+      };
+    })(),
     // lib/boardHealth.ts::gaugesFrom: value = the verdict, note = the run.
     // Every job wrote `ok` from its last run, at the instant its window closed.
     health: Object.fromEntries(

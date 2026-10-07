@@ -33,6 +33,7 @@ export const TABLES = [
   "predictions",
   "odds_snapshots",
   "cards",
+  "postmortem_games",
   "postmortem_buckets",
   "postmortem_runs",
   "model_runs",
@@ -421,6 +422,24 @@ export function fixtureRows(week, expected) {
     hr_line_at_pick: p.hrLine,
     blocker: p.isPaper ? p.blocker : null,
   }));
+
+  // postmortem_games (live scope, 2026-10-07): the played games with our number,
+  // Hard Rock's last line and the first half, for How it works' public
+  // "average miss" block (lib/postmortem.ts::loadModelAccuracy).
+  rows.postmortem_games = games
+    .filter((g) => g.played && g.hr && g.hr.length > 0)
+    .map((g) => ({
+      run_id: "pm-live-e2e",
+      scope: `live_${season}`,
+      game_id: g.id,
+      season,
+      week: g.week,
+      home_team: g.home,
+      away_team: g.away,
+      fh: g.played.homeFh + g.played.awayFh,
+      bv_line: g.bv,
+      hr_line: g.hr[g.hr.length - 1].line,
+    }));
 
   // results: the market (1H and full game) and the model, graded at the close.
   rows.results = [];

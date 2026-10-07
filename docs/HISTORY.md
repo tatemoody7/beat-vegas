@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (SITE: RESPONSIBLE-GAMBLING FOOTER + PUBLIC MODEL ACCURACY).** Tate's product calls
+  (`docs/program/PRODUCT_OPTIONS.md`, Option A): the footer on every page now reads "This site
+  rates bets. It never places one. Not betting advice. 21+, Florida, Hard Rock Bet. Past results do
+  not predict future results. Gambling problem? 1-833-PLAYWISE." How it works' "What we don't know"
+  shows, in public, our number's and Hard Rock's average first-half miss over this season's graded
+  games, the same games for both (`lib/postmortem.ts::loadModelAccuracy`, newest live post-mortem
+  run; season to date at merge: 8.34 vs 8.22 over 213 games), and its sentence follows the numbers.
+  Each game counts at the number published that week, across model changes.
+
 - **2026-10-07 (PROGRAM BUDGET: OPTION 2).** Tate's call (`docs/program/FP_BUDGET_OPTIONS.md`): the
   rows whose pass unlocks a promotion share one 5% budget, 1.67% each: H-PCT-TIE (now 0.417%
   per arm-clock, A = 5.257, B = −1.605), H-SHADOW-F and H-INSEASON-T (their per-comparison split

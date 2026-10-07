@@ -189,6 +189,8 @@ export type Expected = {
     bankrollUsd: number;
   };
   lastDispatch: Record<string, Date>;
+  /** lib/postmortem.ts::loadModelAccuracy over the seeded live postmortem_games. */
+  modelAccuracy: { season: number; n: number; ours: number; hardRock: number };
   health: Record<string, { verdict: "ok"; at: Date; note: string }>;
 };
 

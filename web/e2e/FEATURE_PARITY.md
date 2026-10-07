@@ -78,6 +78,8 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [how] The page links to `/records` and names 1-800-GAMBLER — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
 - [how] Signed in: the `<season> so far` panel, the flags with the multiple-comparisons note, and the Method fold (opens on a click, estimated-line table, nothing coloured) — how-it-works.spec.ts › "signed in, the live season panel, the flags and the method fold follow"
 - [how] Signed out: the backtest shows, the research section does not — how-it-works.spec.ts › "a visitor reads the page without the research section"
+- [how] Our number's average miss beside Hard Rock's, public, same games, the sentence follows the numbers — how-it-works.spec.ts › "shows our number's average miss beside Hard Rock's, in public"
+- [how] Every page carries the footer's responsible-gambling line — how-it-works.spec.ts › "every page carries the footer's responsible-gambling line"
 
 ## Every game we have rated
 

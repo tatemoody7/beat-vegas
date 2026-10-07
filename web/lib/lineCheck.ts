@@ -69,6 +69,9 @@ export type LineCheckRow = {
   hrLive?: boolean;
   /** When the shown Hard Rock quote was captured (naive UTC text). */
   hrAsOf?: string | null;
+  /** The last time a poll SAW that quote: max(captured_at, last_seen_at),
+   *  naive UTC text. Freshness is judged on this, not on hrAsOf. */
+  hrSeenAt?: string | null;
   /** The alternate line the feed served instead, when it did. */
   hrAltLine?: number | null;
   marketFairUnder: number | null; // consensus no-vig fair-under at HR's line
@@ -94,6 +97,12 @@ export const FAIR_PRICE_WIDE_WINDOW = 1.5;
 // de-vigs to a fair under near 0.71 and a delisted quote stays "latest" forever.
 export const EXCHANGE_MAX_HOLD = 0.02;
 export const EXCHANGE_MAX_AGE_H = 24.0;
+// A real ticket's Hard Rock price must have been SEEN within this many hours
+// of the moment it is judged (2026-10-07, Tate's call): for a backdated log,
+// of the bet time (M1B). "Seen" is the later of captured_at and last_seen_at --
+// a poll that finds the number unchanged writes no row, it only stamps
+// last_seen_at, so a Tuesday line re-confirmed by Friday's build is Friday's.
+export const HR_PRICE_MAX_AGE_H = 6;
 
 export type FairSource = "exchange" | "books";
 export type FairObs = {
@@ -239,8 +248,18 @@ export const getLineCheck = cache(async function getLineCheck(
   season: number,
   market: Market,
   week?: number,
+  /** Read the market as it stood at this instant: only snapshots captured
+   *  at or before it (a backdated ticket's bet time, M1B). */
+  asOf?: Date,
 ): Promise<LineCheckRow[]> {
   const dbMarket = MARKET_DB[market];
+  // captured_at is naive UTC; compare against the instant as naive UTC text.
+  const asOfNaive =
+    asOf === undefined ? null : asOf.toISOString().replace("Z", "");
+  const asOfClause = (col: Prisma.Sql) =>
+    asOfNaive === null
+      ? Prisma.empty
+      : Prisma.sql`AND ${col} <= ${asOfNaive}::timestamp`;
   // One week when the caller knows it (the board renders one week; season-wide
   // this DISTINCT ON was ~162 KB a render). Season-wide for /api/picks, which
   // checks one game and is cheap to keep simple.
@@ -273,6 +292,7 @@ export const getLineCheck = cache(async function getLineCheck(
       -- pre-kickoff only: a poll that ran after kickoff captures an in-game
       -- number (e.g. u31.5 -275 at halftime) that must never read as the line
       AND (g.start_date IS NULL OR o.captured_at <= g.start_date)
+      ${asOfClause(Prisma.sql`o.captured_at`)}
       -- Off-centre rungs of the alternate ladder are not this book's main
       -- number, so they must not become the market it is compared against.
       -- Hard Rock is exempt HERE because its 1H quote is chosen separately
@@ -289,6 +309,8 @@ export const getLineCheck = cache(async function getLineCheck(
     overPrice: number | null;
     underPrice: number | null;
     capturedAt: string;
+    /** Hard Rock's 1H quote only: max(captured_at, last_seen_at). */
+    seenAt?: string;
   };
   type Acc = {
     week: number;
@@ -342,11 +364,13 @@ export const getLineCheck = cache(async function getLineCheck(
         over_price: number | bigint | null;
         under_price: number | bigint | null;
         captured_at: string;
+        seen_at: string;
         others: number[] | null;
       }[]
     >`
       SELECT h.game_id, h.line, h.over_price, h.under_price,
         CAST(h.captured_at AS TEXT) AS captured_at,
+        CAST(GREATEST(h.captured_at, COALESCE(h.last_seen_at, h.captured_at)) AS TEXT) AS seen_at,
         ARRAY(
           SELECT x.line FROM (
             SELECT DISTINCT ON (LOWER(o.book)) o.line
@@ -366,6 +390,7 @@ export const getLineCheck = cache(async function getLineCheck(
         AND LOWER(h.book) IN (${Prisma.join(HR_KEYS)})
         AND h.line IS NOT NULL AND h.captured_at IS NOT NULL
         AND (g.start_date IS NULL OR h.captured_at <= g.start_date)
+        ${asOfClause(Prisma.sql`h.captured_at`)}
       ORDER BY h.game_id, h.captured_at DESC
     `;
     const byGame = new Map<number, typeof hrRows>();
@@ -399,6 +424,7 @@ export const getLineCheck = cache(async function getLineCheck(
                     ? null
                     : Number(main.q.under_price),
                 capturedAt: main.q.captured_at,
+                seenAt: main.q.seen_at,
               },
         live,
         altLine: live ? null : judged[0].q.line,
@@ -472,6 +498,7 @@ export const getLineCheck = cache(async function getLineCheck(
       hrCentred,
       hrLive,
       hrAsOf: hrObs?.capturedAt ?? null,
+      hrSeenAt: hrObs?.seenAt ?? hrObs?.capturedAt ?? null,
       hrAltLine: pick?.altLine ?? null,
       marketFairUnder,
       ev,

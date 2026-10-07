@@ -231,8 +231,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   to −110; a missing price is NULL and refused (`PRICE MISSING`). **Paper is build-only** (2026-10-07):
   POST refuses `isPaper`, `pick.py add` is gone, and paper rows cannot be PATCHed or DELETEd.
 - `manual_picks.bet_at` is when the ticket was WRITTEN (`placed_at` is the log time). A log more
-  than `BACKDATE_MIN_MINUTES` (30) after the bet is judged by **the card in force at bet time**
-  (`lib/card.ts::getLatestCard(season, week, asOf)`, `pickRules.verdictAtBetTime`); `betAtCheck`
+  than `BACKDATE_MIN_MINUTES` (30) after the bet is judged **as of bet time**: that card must rate it
+  BET, HR's price seen ≤6 h before (`lineCheck.HR_PRICE_MAX_AGE_H`, `getLineCheck(..., asOf)`); `betAtCheck`
   refuses future, >7 d and post-kickoff times; the log form's "Placed at" is blank by default.
 - Real tickets freeze at kickoff; until then PATCH edits price/stake/note (a new price is re-judged,
   never null; bonus is set at log only). `uq_manual_pick_per_ledger` stops duplicates.

@@ -1,6 +1,6 @@
 import { getLatestCard } from "@/lib/card";
 import { breakEvenPrice } from "@/lib/edge";
-import { getLineCheck } from "@/lib/lineCheck";
+import { getLineCheck, HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { getSlate } from "@/lib/picks";
 import {
   betAtCheck,
@@ -26,8 +26,13 @@ import type { Verdict } from "@/lib/verdict";
 // explicitly -- neither route decides "live or backdated" on its own:
 //  - "live": the ticket was written within BACKDATE_MIN_MINUTES of now, so the
 //    LIVE Hard Rock read (lib/lineCheck.ts) is the read the bet saw.
-//  - "as_of_bet_time": the ticket was written earlier, so it is judged by the
-//    card in force at bet time and the live read is not consulted.
+//  - "as_of_bet_time": the ticket was written earlier, so it is judged as of
+//    the bet time (M1B, 2026-10-07): the card in force then must have rated
+//    the game BET (a new log only; an edit keeps the verdict frozen on it), and
+//    the price and kill price come from Hard Rock's newest main-line snapshot
+//    at or before the bet time, which must have been seen within
+//    HR_PRICE_MAX_AGE_H of it. Nothing after the bet time is reconstructed: a
+//    ticket that cannot be verified from what existed then is refused.
 //
 // Paper never comes here: since 2026-10-07 every paper pick is written by the
 // card build (scripts/build_card.py), never by hand.
@@ -43,6 +48,20 @@ export function evaluationMode(
 }
 
 export type TicketEvaluation = { ok: true; verdict: Verdict } | Rejection;
+
+/**
+ * Was Hard Rock's quote last SEEN more than HR_PRICE_MAX_AGE_H before the bet
+ * time? `seenAt` is naive UTC text, max(captured_at, last_seen_at); a sighting
+ * after the bet time confirms the quote was still in force at it (an unchanged
+ * poll writes no row, so no newer quote existed in between).
+ */
+export function staleAtBet(seenAt: string | null, betAt: Date): boolean {
+  if (seenAt === null) return true;
+  const seen = Date.parse(`${seenAt.trim().replace(" ", "T")}Z`);
+  if (!Number.isFinite(seen)) return true;
+  const confirmed = Math.min(seen, betAt.getTime());
+  return betAt.getTime() - confirmed > HR_PRICE_MAX_AGE_H * 3_600_000;
+}
 
 function dbError(where: string, e: unknown): Rejection {
   console.error(`[ticketPolicy] ${where} failed:`, e);
@@ -131,13 +150,17 @@ export async function evaluateRealTicket(args: {
         mode === "as_of_bet_time" ? (betAtDate ?? undefined) : undefined,
       )
     : Promise.resolve(null);
-  // The LIVE market read — the same loader the board renders from, so the gate
-  // and the screen cannot disagree. Read only in live mode: the live read is
-  // not the read a backdated ticket saw.
-  const checkQ =
-    game && mode === "live"
-      ? getLineCheck(game.season, "1h")
-      : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
+  // The market read — the same loader the board renders from, so the gate and
+  // the screen cannot disagree. Live: now. As of bet time: only the snapshots
+  // captured at or before the bet time.
+  const checkQ = game
+    ? getLineCheck(
+        game.season,
+        "1h",
+        undefined,
+        mode === "as_of_bet_time" ? (betAtDate ?? undefined) : undefined,
+      )
+    : Promise.resolve([] as Awaited<ReturnType<typeof getLineCheck>>);
   // The real-money pause (docs/STOPPING_RULE.md). getRulePause never throws —
   // a failed read comes back as the UNREADABLE state, which checkPolicy
   // refuses with its own reason.
@@ -174,29 +197,58 @@ export async function evaluateRealTicket(args: {
   //    falling back to the card's cached number. Mirrors verdict.ts, where the
   //    BET branch requires a non-null ev and otherwise reads WATCH.
   const row = checks.find((c) => c.gameId === pick.gameId) ?? null;
+  const asOfBet = mode === "as_of_bet_time";
+  const priceAt = asOfBet ? "at the time the ticket was written" : "right now";
   let livePrice: PolicyContext["livePrice"];
-  if (mode === "as_of_bet_time") {
-    livePrice = { ok: true, killPrice: null };
-  } else if (row === null) {
-    livePrice = { ok: false, reason: "no live line read for this game" };
+  if (row === null) {
+    livePrice = {
+      ok: false,
+      reason: asOfBet
+        ? "no Hard Rock read existed for this game at the time the ticket was written"
+        : "no live line read for this game",
+    };
   } else if (row.hrLive === false) {
     // hrLine/hrUnderPrice are Hard Rock's last MAIN line, held over while the
     // feed serves an alternate: shown on the board, never a live price.
     livePrice = {
       ok: false,
-      reason:
-        "Hard Rock’s feed is showing an alternate line, so its live price cannot be verified",
+      reason: `Hard Rock’s feed was showing an alternate line ${priceAt}, so its price cannot be verified`,
     };
   } else if (row.hrUnderPrice === null) {
-    livePrice = { ok: false, reason: "Hard Rock has not priced its under" };
+    livePrice = {
+      ok: false,
+      reason: `Hard Rock had not priced its under ${priceAt}`,
+    };
   } else if (row.marketFairUnder === null) {
     livePrice = {
       ok: false,
-      reason: "no other book or exchange is priced at Hard Rock’s number",
+      reason: `no other book or exchange was priced at Hard Rock’s number ${priceAt}`,
+    };
+  } else if (asOfBet && staleAtBet(row.hrSeenAt ?? null, betAtDate!)) {
+    livePrice = {
+      ok: false,
+      reason: `Hard Rock’s last confirmed price before the bet time was more than ${HR_PRICE_MAX_AGE_H} hours old, so the price the ticket was written at cannot be verified`,
     };
   } else {
     livePrice = { ok: true, killPrice: breakEvenPrice(row.marketFairUnder) };
   }
+  // A NEW backdated log must have been a BET on the card in force then
+  // (2026-10-07, Tate's call): an off-card ticket written earlier cannot be
+  // verified from what the system said at the time, so it is not recorded.
+  // An edit keeps the verdict frozen on the ticket and skips this.
+  if (asOfBet && args.frozenVerdict == null) {
+    const tier = verdictAtBetTime(item);
+    if (tier !== "BET") {
+      return {
+        ok: false,
+        error: `NOT A BET THEN — the card in force when the ticket was written ${
+          item === null ? "did not rate this game" : `rated it ${tier}, not BET`
+        }. A late log is recorded only when it can be checked against that card; log tickets when they are written.`,
+        status: 409,
+      };
+    }
+  }
+
   const verdict: Verdict =
     args.frozenVerdict ??
     (mode === "as_of_bet_time"

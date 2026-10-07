@@ -117,3 +117,102 @@ test.describe("the ledger's write rules", () => {
     }
   });
 });
+
+// Backdated logs (M1B, 2026-10-07): a ticket written more than 30 minutes
+// before it is logged is judged as of its bet time -- the card in force then
+// must have rated it BET, and Hard Rock's price must have been seen within
+// 6 h before the bet. The fixture's card is built 10 min ago and its Hard
+// Rock snapshots land 72 h and 24 h ago, so two specs move the card back 30 h
+// (and put it back in `finally`).
+const BET_TWO = 900002; // BET #2, nothing logged on it
+
+const hoursAgoIso = (h: number) =>
+  new Date(Date.now() - h * 3_600_000).toISOString();
+
+async function withCardBuilt30hAgo(fn: () => Promise<void>): Promise<void> {
+  const cards = await query<{ id: number; built_at: string }>(
+    "SELECT id, built_at::text AS built_at FROM cards",
+  );
+  await query(
+    "UPDATE cards SET built_at = (now() AT TIME ZONE 'utc') - interval '30 hours'",
+  );
+  try {
+    await fn();
+  } finally {
+    for (const c of cards) {
+      await query("UPDATE cards SET built_at = $2::timestamp WHERE id = $1", [
+        c.id,
+        c.built_at,
+      ]);
+    }
+  }
+}
+
+test.describe("backdated logs", () => {
+  test("a late log of a game no card in force rated BET is refused", async ({
+    request,
+  }) => {
+    // The only card was built 10 min ago: at a bet time 1 h back, none existed.
+    const res = await request.post("/api/picks", {
+      data: { gameId: BET_TWO, line: 53.5, price: -110, betAt: hoursAgoIso(1) },
+    });
+    expect(res.status()).toBe(409);
+    expect((await res.json()).error).toMatch(/^NOT A BET THEN/);
+    expect(
+      await query("SELECT id FROM manual_picks WHERE game_id = $1", [BET_TWO]),
+    ).toHaveLength(0);
+  });
+
+  test("a late log whose Hard Rock price was over 6 h old at bet time is refused", async ({
+    request,
+  }) => {
+    await withCardBuilt30hAgo(async () => {
+      // Card in force: yes (30 h back). Newest Hard Rock quote before a bet
+      // 1 h ago: the one captured 24 h ago -- 23 h old at the bet.
+      const res = await request.post("/api/picks", {
+        data: {
+          gameId: BET_TWO,
+          line: 53.5,
+          price: -110,
+          betAt: hoursAgoIso(1),
+        },
+      });
+      expect(res.status()).toBe(409);
+      const { error } = await res.json();
+      expect(error).toMatch(/^PRICE UNAVAILABLE/);
+      expect(error).toMatch(/more than 6 hours old/);
+    });
+    expect(
+      await query("SELECT id FROM manual_picks WHERE game_id = $1", [BET_TWO]),
+    ).toHaveLength(0);
+  });
+
+  test("a late log checked against the card and a fresh price at bet time is recorded", async ({
+    request,
+  }) => {
+    await withCardBuilt30hAgo(async () => {
+      // Bet 23 h ago: the card (30 h) was in force and the 24 h-old quote was
+      // 1 h old. It is recorded as the BET it was; then removed again.
+      const res = await request.post("/api/picks", {
+        data: {
+          gameId: BET_TWO,
+          line: 53.5,
+          price: -110,
+          betAt: hoursAgoIso(23),
+        },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+      const rows = await query<{ id: number; verdict_at_pick: string }>(
+        "SELECT id, verdict_at_pick FROM manual_picks WHERE game_id = $1",
+        [BET_TWO],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].verdict_at_pick).toBe("BET");
+      const del = await request.delete(`/api/picks/${rows[0].id}`);
+      expect(del.status()).toBe(200);
+    });
+    expect(
+      await query("SELECT id FROM manual_picks WHERE game_id = $1", [BET_TWO]),
+    ).toHaveLength(0);
+  });
+});

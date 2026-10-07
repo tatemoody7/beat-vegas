@@ -201,6 +201,8 @@ def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
             Game.spread,
             Game.venue_id,
             Game.first_half_source,
+            Game.home_pregame_elo,
+            Game.away_pregame_elo,
         )
         if min_season is not None:
             q = q.filter(Game.season >= int(min_season))
@@ -224,6 +226,10 @@ def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
                 "venue_id",
                 "first_half_source",  # 'pbp' | 'linescores' — selected for the residual-model
                 # training frame added in the next PR (unused here so far)
+                # CFBD pregame Elo (2026-10-06): read by the H-ELO-F study arm
+                # only (`model/elo_line.py`); never in FEATURE_COLS.
+                "home_pregame_elo",
+                "away_pregame_elo",
             ],
         )
         venues = pd.DataFrame(
@@ -520,11 +526,18 @@ def build_feature_frame(
     weather_lead: Optional[int] = WEATHER_OBS_LEAD_HOURS,
     allow_diagnostic_lead: bool = False,
     min_season: Optional[int] = FRAME_MIN_SEASON,
+    require_total: bool = True,
 ) -> pd.DataFrame:
     """`min_season` (default FRAME_MIN_SEASON): the earliest season read, for
     the games AND the schedule-derived situational columns (rest days and the
     cross-season revenge/rivalry flags would otherwise see older games). None
-    reads every season on file (the H-HIST study)."""
+    reads every season on file (the H-HIST study).
+
+    `require_total` (default True, the live rule): drop rows without a
+    full-game total. The regressor never reads the total (a market column), so
+    the H-HIST study frame passes False to keep pre-2013 seasons, which CFBD's
+    free /lines cannot price (docs/HYPOTHESES.md H-HIST, amended before any
+    look). Those rows carry a NaN proxy line and an `under` of no meaning."""
     check_weather_lead(weather_lead, allow_diagnostic_lead)
     games = _load_all_games(fbs_only=fbs_only, min_season=min_season)
     std = _season_to_date(_team_long(games), prior_weight=prior_weight)
@@ -690,10 +703,14 @@ def build_feature_frame(
     # trains or grades must drop them (training_frame / played_mask).
     df["full_game_total"] = pd.to_numeric(df["full_game_total"], errors="coerce")
     df["first_half_total"] = pd.to_numeric(df["first_half_total"], errors="coerce")
-    df = df[df["full_game_total"].notna() & (df["full_game_total"] > 0)].copy()
-    df["proxy_line"] = df.apply(
-        lambda r: proxy_total(r["full_game_total"], spread=r.get("spread")), axis=1
-    )
+    has_total = df["full_game_total"].notna() & (df["full_game_total"] > 0)
+    df = (df[has_total] if require_total else df).copy()
+    has_total = df["full_game_total"].notna() & (df["full_game_total"] > 0)
+    df["proxy_line"] = np.nan
+    if has_total.any():
+        df.loc[has_total, "proxy_line"] = df[has_total].apply(
+            lambda r: proxy_total(r["full_game_total"], spread=r.get("spread")), axis=1
+        )
     played = df["first_half_total"].notna()
     df = df[~(played & (df["first_half_total"] == df["proxy_line"]))]  # drop pushes (played only)
     played = df["first_half_total"].notna()

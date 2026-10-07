@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (H-HIST / H-ELO-F MACHINERY — PR H4).** `build_feature_frame(require_total=False)`
+  keeps rows without a full-game total for the STUDY frame only (proxy line NaN instead of
+  raising); the frame now carries `home_pregame_elo` / `away_pregame_elo` (never in
+  FEATURE_COLS). `bv_line_for_slate(feature_cols=...)` lets a study arm add inputs (default =
+  the champion's, byte-identical, tested). Arms: `model/train_windows.py` (`hist_2003`,
+  `hist_2010`, `hist_2015`, and `champion_2023`, the incumbent as live trains it) and
+  `model/elo_line.py` (`elo_2023`). `harness_report --frame-min-season all
+  --keep-rows-without-total` lowers the study frame and pins the incumbent to 2023+;
+  `HarnessSpec` records both knobs; every report now carries per-season frame coverage (rows,
+  rows without a total, NaN shares, Elo coverage). Criteria `backtest/history_f.py` reuse the
+  H-WEPA-F per-arm test. One dispatch per row follows the merge.
+
 - **2026-10-06 (THE FIVE CODE-LESS ARMS, Tate's calls).** H-TOP3, H-MOVE and H-SHARE withdrawn
   before any observation (`superseded`, reasons in each row: no power at this volume; a test
   window already read; a gate judged only on spent 2023-25 data). H-PCT-TIE kept and folded: it

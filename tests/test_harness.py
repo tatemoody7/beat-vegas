@@ -609,16 +609,22 @@ def test_load_frame_builds_at_the_finer_knob_when_no_snapshot(hand, tmp_path, mo
     frame, _, _ = hand
     calls = {}
 
-    def fake_build(min_games, fbs_only):
-        calls["min_games"], calls["fbs_only"] = min_games, fbs_only
+    def fake_build(min_games, fbs_only, **kw):
+        calls.update(min_games=min_games, fbs_only=fbs_only, **kw)
         return frame.copy()
 
     monkeypatch.setattr(H, "build_feature_frame", fake_build)
     got, fp = H.load_frame(
         None, spec_for(PRE_ROW, min_games_train=2, min_games_score=0), tmp_path / "f.json"
     )
-    assert calls == {"min_games": 0, "fbs_only": True}
-    assert got.attrs["build"] == {"fbs_only": True, "min_games": 0}
+    # The live frame's floor and total rule by default (2026-10-06).
+    assert calls == {"min_games": 0, "fbs_only": True, "min_season": 2023, "require_total": True}
+    assert got.attrs["build"] == {
+        "fbs_only": True,
+        "min_games": 0,
+        "min_season": 2023,
+        "require_total": True,
+    }
     assert (tmp_path / "f.json").exists() and fp["source"]["snapshot"] is None
 
 

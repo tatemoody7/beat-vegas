@@ -19,9 +19,13 @@ from ..etl.features import FRAME_MIN_SEASON
 from .bv_line import bv_line_for_slate
 
 
-def _from(floor: int):
+def _from(floor: int, drop_all_nan: bool = True):
     def scorer(train: pd.DataFrame, target: pd.DataFrame) -> np.ndarray:
-        return bv_line_for_slate(train[train["season"] >= int(floor)], target)
+        # drop_all_nan: a fold trained on early seasons has inputs CFBD never
+        # carried for them (talent before 2015); see fit_bv_regressor.
+        return bv_line_for_slate(
+            train[train["season"] >= int(floor)], target, drop_all_nan=drop_all_nan
+        )
 
     scorer.__name__ = f"bv_line_from_{floor}"
     scorer.floor = int(floor)  # type: ignore[attr-defined]
@@ -31,4 +35,6 @@ def _from(floor: int):
 bv_line_from_2003 = _from(2003)
 bv_line_from_2010 = _from(2010)
 bv_line_from_2015 = _from(2015)
-champion_2023 = _from(FRAME_MIN_SEASON)
+# The incumbent exactly as live fits it: no column drop (live never sees an
+# all-NaN column on 2023+, or the Sunday refit would crash).
+champion_2023 = _from(FRAME_MIN_SEASON, drop_all_nan=False)

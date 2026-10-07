@@ -155,3 +155,27 @@ def test_study_frame_switch_keeps_rows_without_a_total(monkeypatch):
 
         proxy_total(float("nan"))
     assert pd.isna(np.nan)
+
+
+def test_history_arms_survive_an_input_that_is_empty_in_early_seasons():
+    """The H-HIST dispatch of 2026-10-07 (run 37566306294) crashed before any
+    number: HGB refuses to bin an all-NaN column, and a fold trained on the
+    earliest seasons has no talent input at all. The history arms drop a column
+    that is empty in THAT training slice; the champion's path is untouched."""
+    df = _frame()
+    col = bv_line.BV_FEATURE_COLS[3]
+    df.loc[df["season"] < 2020, col] = np.nan  # e.g. talent before it existed
+    train, target = df[df["season"] < 2025], df[df["season"] == 2025]
+    pred = train_windows.bv_line_from_2015(train, target)
+    assert pred.shape == (len(target),) and np.all(np.isfinite(pred))
+    m = bv_line.fit_bv_regressor(df[df["season"] < 2018], drop_all_nan=True)
+    assert col not in m.bv_cols_ and len(m.bv_cols_) == len(bv_line.BV_FEATURE_COLS) - 1
+    full = bv_line.fit_bv_regressor(df[df["season"] >= 2020])
+    assert full.bv_cols_ == list(bv_line.BV_FEATURE_COLS)
+
+
+def test_the_champion_arm_never_drops_a_column():
+    import inspect as _i
+
+    src = _i.getsource(train_windows)
+    assert "champion_2023 = _from(FRAME_MIN_SEASON, drop_all_nan=False)" in src

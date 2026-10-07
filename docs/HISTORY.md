@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (REVIEW QUICK FIXES, Tate's calls).** The neggap paper arms now run inside a
+  savepoint like H-FG-P (a database error in them could have discarded the whole card at commit).
+  Doc drift: BETTING_POLICY's score, Watch and kill-number passages and README described the
+  retired constant 1.75 bar (now the per-slate bar; the kill price is `BET_MIN_EV`, not "2% of
+  vig"); SYSTEM_REVIEW_2026-10-04 §1's "2015-25 regressor" corrected to 2023-25; ASSUMPTIONS
+  marks the full-game rows as run. Registry: H-PCT, H-PCT-U, H-STOP-2, H-NEGGAP-P were running
+  but read `pre-registered` -> `live-tracking` (they run as clocks, never through the harness;
+  the harness smoke-run test now names H-HIST); H-FG-U-R relabelled a **post-hoc positive**
+  (row + `FG_MARKET.md`, whose "no verdict" paragraph is marked superseded); the blank line that
+  split the full-game table and the `--row <id>` placeholders fixed.
+
 - **2026-10-06 (HISTORY LOADED; H-HIST AMENDED BEFORE ANY LOOK).** `migrate.yml` added the
   Elo columns; the 2003 probe (`history_load.yml` run 37561721141) stored 699 FBS games, all with
   a first-half total and pregame Elo, 632 with a known venue, and **0 with a full-game total**:

@@ -200,3 +200,15 @@ def test_grade_challenger_picks_settles_an_over_row_at_hard_rocks_over_close():
         assert p.graded and p.result == "over" and round(p.units, 4) == 0.3077
         assert p.closing_line == 21.5 and p.clv == 0.0
         assert p.closing_captured_at is not None
+
+
+def test_build_card_logs_the_arms_inside_a_savepoint():
+    """A database error in the arms must never cost the card (2026-10-06): a
+    try/except alone leaves Postgres's transaction aborted, so the card and the
+    champion's paper picks would roll back at commit. Both paper arms run inside
+    `begin_nested()`."""
+    from conftest import _load_script
+
+    text = open(_load_script("build_card").__file__).read()
+    i = text.index("neggap_added = log_neggap_picks(")
+    assert "with s.begin_nested():" in text[i - 200 : i]

@@ -4,7 +4,8 @@
 the data-cell correction of PR #284). Overs: NOT MET on every reading. Unders: the pre-registered
 text was ambiguous between two selection sets and the readings disagreed; Tate ruled the same day
 that the champion's rule includes the weekly cap, so the capped set is the selected set — MET
-(`tested-positive`). That licenses one thing: registering H-FG-P, a 2026 PAPER arm of full-game
+(`tested-positive`), **positive only on a reading chosen after the numbers were read (relabelled
+2026-10-06, Tate's call); the qualifying-set reading fails. Quote it as a post-hoc positive.** That licenses one thing: registering H-FG-P, a 2026 PAPER arm of full-game
 unders (row written below the result; the collector is PR5 of the program).** Nothing changes: the
 champion, the bar, the stakes and H-STOP-2 are untouched; the full-game market stays a reference
 ledger, never bet. A pass would license only a 2026 paper arm (H-FG-P).
@@ -83,8 +84,10 @@ units > 0 in both 2024 and 2025; Holm across the two rows (the surviving row is 
   - Qualifying reading: lower bound 50.1% (49.2% Holm) → **(1) fails**; (2) passes.
   - Cap-5 reading: lower bound 55.1% (53.8% Holm) → **(1) passes**; (2) passes (+12.55, +14.36).
   The two readings disagree, and choosing between them after reading the numbers would be
-  exactly what pre-registration forbids. **No verdict is recorded for H-FG-U-R.** The row keeps
-  `pre-registered`, `n` and `comparisons run = 1` are filled, and the result doc points here.
+  exactly what pre-registration forbids. As first written: **no verdict recorded**, the row kept
+  `pre-registered`. [Superseded the same day: Tate ruled (a) below after reading this doc, so
+  the row reads `tested-positive` WITH the post-hoc label -- the choice of reading came after the
+  numbers, which is exactly the caution this paragraph stated, and the label keeps it visible.]
 
 ## What this does and does not say
 

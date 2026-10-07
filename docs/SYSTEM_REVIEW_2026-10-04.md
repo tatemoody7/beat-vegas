@@ -44,7 +44,8 @@ timing, line movement) — while the tracking gaps that stop us from learning ar
    `season < target_season` (`beatvegas/model/score.py:470`). 2026 games reach it only as
    season-to-date averages in the inputs. SP+, PPA, talent and returning production are last
    season's numbers all year (`etl/features.py:466-473, 620-629`). The Sunday refit re-fits the
-   same 2015-25 regressor; its only in-season movement came from CFBD revising reference
+   same regressor [corrected 2026-10-06: it trains on 2023-25 only -- Neon's `games` began in
+   2023; "2015-25" was the June demo-DB era; see H-HIST]; its only in-season movement came from CFBD revising reference
    tables (40 of 196 columns between June and September). "Getting sharper as we collect
    results" has not been happening because nothing is wired to make it happen.
 2. **Level is fixed; accuracy is not.** B-SERVE removed 57 inputs that were NaN on every

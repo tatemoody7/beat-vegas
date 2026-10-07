@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (PROGRAM BUDGET: OPTION 2).** Tate's call (`docs/program/FP_BUDGET_OPTIONS.md`): the
+  rows whose pass unlocks a promotion share one 5% budget, 1.67% each: H-PCT-TIE (now 0.417%
+  per arm-clock, A = 5.257, B = −1.605), H-SHADOW-F and H-INSEASON-T (their per-comparison split
+  written in their engine PRs before they log). All three were amended before any observation;
+  none has a collector or engine yet. H-NEGGAP-P, H-FG-P and H6 keep 5% each as findings that
+  license nothing; H-STOP-2, H-TIMING and H-CLOSE-W stay outside. `docs/HYPOTHESES.md` gains a
+  "Program budget" list that `tests/test_hypotheses_registry.py` reads.
+
 - **2026-10-07 (TWO DECISION MEMOS).** `docs/program/FP_BUDGET_OPTIONS.md`: three ways to split the
   program-wide false-positive budget Tate approved on 2026-10-06 (one 10% cap; tighten only rows
   whose pass unlocks a promotion; keep 5% each and require a repeat), with each row's threshold

@@ -169,3 +169,26 @@ def test_the_how_to_names_the_harness_and_its_doc_exists():
     assert "harness" in how_to and "docs/HARNESS.md" in how_to
     assert "no unattended iteration" in how_to
     assert "docs/HARNESS.md" not in STUDY_DOCS
+
+
+def _budget_table() -> dict:
+    text = REGISTRY.read_text()
+    sec = text.split("## Program budget", 1)[1].split("\n## ", 1)[0]
+    out = {}
+    for m in re.finditer(r"^- `([^`]+)` · (promotion|finding) · ([\d.]+%)", sec, re.M):
+        out[m.group(1)] = (m.group(2), m.group(3))
+    assert out, "the Program budget list did not parse"
+    return out
+
+
+def test_the_promotion_tier_shares_one_five_percent_budget():
+    """Option 2 (2026-10-07): rows whose pass unlocks a promotion share 5% in
+    total, and each states its share in its own criterion."""
+    table = _budget_table()
+    promo = {k: v[1] for k, v in table.items() if v[0] == "promotion"}
+    shares = {k: float(v.rstrip("%")) for k, v in promo.items()}
+    assert sum(shares.values()) <= 5.0 + 0.02, shares
+    rows = {r["id"]: r for r in _rows()}
+    for rid, share in promo.items():
+        assert rid in rows, rid
+        assert share in rows[rid]["criterion"], (rid, share)

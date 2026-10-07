@@ -1,5 +1,11 @@
 # The stopping rule — when does the paper record end the test?
 
+> **Closed 2026-10-07 — inconclusive.** Tate paused real money under `docs/ROADMAP_2026.md`; H-STOP-2's
+> clocks count real tickets only, so they stopped after week 5 with no boundary crossed (profit n=10,
+> LLR −0.26; line value n=9, LLR +0.73). Two real tickets placed 2026-10-06, before the pause
+> (`manual_picks` 102 and 103, week 6), grade into the ledger as normal but feed no clock. The design
+> below stays as written; its observations are development evidence for the 2026 Statistical Protocol.
+
 **Registered 2026-09-15, before any week-3 decision had graded.** Design **SPRT**
 (Wald's sequential probability ratio test), **total false-stop 5%, 2.5% per clock**,
 power 80%. Two clocks, either can stop it. **A failure boundary pauses real money

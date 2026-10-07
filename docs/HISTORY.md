@@ -9,6 +9,23 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (THE RESET: ROADMAP 2026 v1; REAL MONEY PAUSED).** Tate reset the project after a
+  ground-up review and twelve rounds of questions plus an outside critique (plan file
+  `~/.claude/plans/pasted-content-id-83e1-session-handoff-optimized-lampson.md`): Beat Vegas is a
+  potential business that follows the evidence to the market with the most defensible edge, not a
+  1H-unders system; 2026 is the research year. `docs/ROADMAP_2026.md` v1 governs from here, changed
+  only by versioned amendment. Real money paused until a strategy passes a pre-registered sequential
+  test on EV at the wager's exact terms against the median-of-books de-vigged close (≤2 h), built
+  for +3% EV inside a 5% family-wise budget held as a fixed ledger (K = 10, 0.5% each, never
+  recycled); promotion → $10 flat live validation; up to 7 uncapped paper arms; every confirmatory
+  clock starts after the Statistical Protocol is registered and simulated. H-STOP-2 closed
+  inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73; tickets 102 and 103, placed
+  2026-10-06, grade but feed no clock). H-NEGGAP-P, H-FG-P, H-PCT-TIE, H-TIMING, H-CLOSE-W
+  superseded (their rows are development evidence); H-MARGIN closed, the Pick'em dropped. Option 2's
+  program budget is replaced for the betting arms; the shadow engines' 1.67% shares stay until the
+  protocol decides. `docs/BETTING_POLICY.md` gains the pause; the brief is rewritten once around
+  the roadmap with Tate's mission line. Nothing in code changed; the site work is the next PR (1b).
+
 - **2026-10-07 (CFBD STARTER PACK WALKTHROUGH + BRIEF REFRESH).** All 14 notebooks of the licensed
   Starter Pack (2026 preseason edition, gitignored at `research/cfbd_pack/`) run as shipped with
   Tate, in its own venv; notes in `docs/CFBD_PACK.md`. Five defects found and checked on scratchpad

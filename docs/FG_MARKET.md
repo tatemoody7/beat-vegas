@@ -1,5 +1,9 @@
 # H-FG-U-R / H-FG-O-R — a full-game-target regressor at the real full-game close, 2024-25
 
+> **H-FG-P superseded 2026-10-07** (`docs/ROADMAP_2026.md`). The full-game unders arm restarts
+> uncapped and judged on line value against the consensus close, under the 2026 Statistical
+> Protocol; rows logged under H-FG-P are development evidence only. The study result below stands.
+
 **Run 2026-10-06 (`study.yml` runs 37498128236 unders, 37498146230 overs; one dispatch each after
 the data-cell correction of PR #284). Overs: NOT MET on every reading. Unders: the pre-registered
 text was ambiguous between two selection sets and the readings disagreed; Tate ruled the same day

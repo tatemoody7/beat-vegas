@@ -3,6 +3,19 @@
 Decided 2026-09-01 (week 1 audit). This is the rulebook the site enforces and
 the bet card follows. Change it here first, then in code.
 
+## Real money is paused (2026-10-07)
+
+**No real-money bets until a strategy is promoted under `docs/ROADMAP_2026.md`.** Tate's call on
+2026-10-07: 2026 is the research season; every strategy runs on paper and is judged by line value
+against the de-vigged consensus close. A strategy that passes its pre-registered sequential test is
+promoted to **$10 flat live validation**, at whatever weekly volume that strategy produces. Tate
+places no personal bets until then, and official plays are exactly what the promoted rule outputs.
+
+The two tickets placed 2026-10-06, before the pause (`manual_picks` 102 and 103), stand and grade as
+normal. The money path below (BET verdict, weekly cap, price checks, bonus bets) stays built and
+working but frozen: nothing new is built on it while money is paused, and it applies again only to a
+promoted strategy, under the rules the protocol writes for it.
+
 ## Bankroll and stakes
 
 - **Starting bankroll: $100. One unit = $10. Every bet is exactly one unit.**

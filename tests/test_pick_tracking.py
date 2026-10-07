@@ -175,22 +175,31 @@ def _pick_module():
     return pick, eng
 
 
-def test_add_stores_the_decision_snapshot():
-    """The CLI is paper-only since 2026-09-22 (real money is logged on the site,
-    where the policy gates run); the decision snapshot is stored either way."""
-    pick, eng = _pick_module()
-    pick.cmd_add(
-        _args(
-            paper=True,
+def test_add_pick_stores_the_decision_snapshot():
+    """The build's paper pick (scripts/build_card.py) writes through add_pick;
+    the decision snapshot and the flat paper unit are stored on the row. (The
+    `pick.py add` CLI that also used it was removed 2026-10-07.)"""
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        add_pick(
+            s,
+            game_id=1,
+            season=2026,
+            week=13,
+            home_team="Michigan",
+            away_team="Ohio State",
+            line=24.5,
+            price=-110,
+            stake=2.0,
+            is_paper=True,
             reason="model_gap",
             verdict="BET",
             gap=2.25,
             ev=0.031,
             hr_line=24.5,
-            stake=2.0,
         )
-    )
-    with Session(eng) as s:
+        s.commit()
         (row,) = s.query(ManualPick).all()
     assert row.reason == "model_gap"
     assert row.verdict_at_pick == "BET"
@@ -200,25 +209,6 @@ def test_add_stores_the_decision_snapshot():
     assert row.stake == 1.0 and row.is_paper is True  # paper stakes one flat unit
 
 
-def test_add_defaults_to_manual_reason_and_null_snapshot():
-    pick, eng = _pick_module()
-    pick.cmd_add(_args(paper=True))
-    with Session(eng) as s:
-        (row,) = s.query(ManualPick).all()
-    assert row.reason == "manual"
-    assert row.verdict_at_pick is None and row.gap_at_pick is None
-    assert row.ev_at_pick is None and row.hr_line_at_pick is None
-
-
-def test_paper_pick_stakes_one_flat_unit():
-    pick, eng = _pick_module()
-    pick.cmd_add(_args(paper=True, stake=3.0))
-    with Session(eng) as s:
-        (row,) = s.query(ManualPick).all()
-    assert row.is_paper is True
-    assert row.stake == 1.0  # grades as +/-1u; is_paper keeps it off the real ledger
-
-
 def test_paper_pick_grades_to_plus_minus_one_unit():
     fields = _load_script("pick").graded_pick_fields(20, 24.5, -110, 1.0, 25.0, 24.0)
     assert fields["result"] == "under" and round(fields["units"], 3) == 0.909
@@ -226,42 +216,22 @@ def test_paper_pick_grades_to_plus_minus_one_unit():
     assert fields["result"] == "over" and fields["units"] == -1.0
 
 
-def test_cli_parses_the_new_flags(monkeypatch):
+def test_pick_py_has_no_add(monkeypatch):
+    """`pick.py add` is gone (2026-10-07): real tickets are logged on the site,
+    paper is written by the card build only. The subcommand must not parse."""
     import sys
 
+    import pytest
+
     pick = _load_script("pick")
-    seen = {}
+    assert not hasattr(pick, "cmd_add")
     monkeypatch.setattr(pick, "try_init_db", lambda: True)
-    monkeypatch.setattr(pick, "cmd_add", lambda a: seen.update(vars(a)))
     monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "pick.py",
-            "add",
-            "--home",
-            "Michigan",
-            "--away",
-            "Ohio State",
-            "--line",
-            "24.5",
-            "--reason",
-            "price_edge",
-            "--verdict",
-            "WATCH",
-            "--gap",
-            "1.5",
-            "--ev",
-            "0.02",
-            "--hr-line",
-            "25",
-            "--paper",
-        ],
+        sys, "argv", ["pick.py", "add", "--home", "A", "--away", "B", "--line", "24.5"]
     )
-    pick.main()
-    assert seen["reason"] == "price_edge" and seen["verdict"] == "WATCH"
-    assert seen["gap"] == 1.5 and seen["ev"] == 0.02 and seen["hr_line"] == 25.0
-    assert seen["paper"] is True
+    with pytest.raises(SystemExit) as e:
+        pick.main()
+    assert e.value.code == 2
 
 
 # --- paper ledger vs real ledger (2026-09-07) ----------------------------------
@@ -392,27 +362,6 @@ def test_model_read_prefers_the_model_row_over_derived_lines():
         assert model_read(s, 999) is None
 
 
-def test_pick_add_freezes_the_model_read_on_the_ticket():
-    pick, eng = _pick_module()
-    with Session(eng) as s:
-        s.add(
-            Prediction(
-                game_id=1,
-                model_version="gbm_v1",
-                bv_line=22.4,
-                under_score=78,
-                created_at=datetime(2026, 9, 11, 20, 0),
-            )
-        )
-        s.commit()
-    pick.cmd_add(_args(paper=True))
-    with Session(eng) as s:
-        (row,) = s.query(ManualPick).all()
-    # OUR number is frozen; the legacy prediction's score (78) is NOT copied —
-    # model_score_at_pick stays NULL on every new row since 2026-10-04.
-    assert row.model_line_at_pick == 22.4 and row.model_score_at_pick is None
-
-
 def test_existing_pick_is_scoped_per_ledger():
     pick, eng = _pick_module()
     with Session(eng) as s:
@@ -464,25 +413,6 @@ def test_real_ticket_is_not_blocked_by_the_cards_paper_pick():
         s.commit()
         rows = s.query(ManualPick).order_by(ManualPick.id).all()
     assert [r.is_paper for r in rows] == [True, False]
-
-
-def test_the_cli_refuses_real_money_dup_or_not(capsys):
-    """Since 2026-09-22 `pick.py add` is paper-only: it ran none of the policy
-    gates and defaulted a missing price to -110. Real money is logged on the site."""
-    pick, eng = _pick_module()
-    pick.cmd_add(_args())
-    pick.cmd_add(_args(price=-105))
-    out = capsys.readouterr().out
-    assert out.count("REFUSED") == 2 and "paper-only" in out
-    with Session(eng) as s:
-        assert s.query(ManualPick).count() == 0
-
-
-def test_second_paper_pick_is_refused(capsys):
-    pick, eng = _pick_module()
-    pick.cmd_add(_args(paper=True))
-    pick.cmd_add(_args(paper=True))
-    assert "REFUSED: paper pick" in capsys.readouterr().out
 
 
 def test_grade_uses_the_consensus_close_even_for_a_hard_rock_ticket():

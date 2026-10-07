@@ -46,7 +46,7 @@ export default function LogPickButton({
         onClick={() => setOpen(true)}
         className="bv-btn text-xs"
       >
-        {prefill.verdict === "BET" ? "Log this bet" : "Log as paper pick"}
+        {prefill.verdict === "BET" ? "Log this bet" : "Log a real ticket"}
       </button>
     );
   }

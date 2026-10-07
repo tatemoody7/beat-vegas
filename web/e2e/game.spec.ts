@@ -110,7 +110,7 @@ test.describe("the game page", () => {
     );
     await expect(tiles.locator("p.text-base")).toHaveText(r.edge.action);
     await expect(
-      page.getByRole("button", { name: "Log as paper pick" }),
+      page.getByRole("button", { name: "Log a real ticket" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Log this bet" }),
@@ -118,7 +118,7 @@ test.describe("the game page", () => {
   });
 
   test.describe("the log control, signed in", () => {
-    test("offers 'Log this bet' on an open BET and 'Log as paper pick' on a Watch", async ({
+    test("offers 'Log this bet' on an open BET and 'Log a real ticket' on a Watch", async ({
       page,
     }) => {
       await page.goto(`/game/${BET_OPEN}`);
@@ -127,7 +127,7 @@ test.describe("the game page", () => {
       ).toBeVisible();
       await page.goto(`/game/${GAP_SHORT}`);
       await expect(
-        page.getByRole("button", { name: "Log as paper pick" }),
+        page.getByRole("button", { name: "Log a real ticket" }),
       ).toBeVisible();
     });
 

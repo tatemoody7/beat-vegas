@@ -33,7 +33,10 @@ the bet card follows. Change it here first, then in code.
   stake, so a free bet must not crowd out a real one. It is still a real ticket
   (`is_paper` stays false) and still appears in the "you" ledger — but a LOSS books zero
   units instead of the stake, because it cost nothing. A win is unchanged: a bonus bet
-  pays profit only, which is what the units maths already computed.
+  pays profit only, which is what the units maths already computed. **The bonus flag is
+  set on the log form when the ticket is logged and cannot be edited afterwards**
+  (2026-10-07): flipping it on a logged ticket freed a cap slot and turned a loss into
+  zero after the fact.
 - A bet placed anyway on a WATCH or PASS game is still logged as real money,
   flagged **off-policy** on Results and broken out separately, so the record
   is complete and the overrides can be judged against the system.
@@ -212,7 +215,7 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
 | Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 
-| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) **when it is written**. Logging later is allowed: enter the time the ticket was written ("Placed at"), and the row is judged by the card in force at that moment, not by the live read at log time (2026-09-28) | you |
+| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) **when it is written**. Logging later is allowed: enter the time the ticket was written ("Placed at"), and the row is judged by the card in force at that moment, not by the live read at log time (2026-09-28). Only real tickets are logged by hand; paper is the build's (2026-10-07) | you |
 | Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 
@@ -224,11 +227,19 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
   (docs/POST_MORTEM.md) found the 1H market barely moves between open and
   close (mean |move| 0.42 pts, 45% unchanged), so CLV alone cannot resolve the
   edge in one season — volume of graded gated games can.
-- **Correcting a pick:** price, stake, note and the bonus flag can be edited from the
-  Results table while the pick is PENDING (`PATCH /api/picks/<id>`). The line, market and
-  game are not editable — they are what the bet *was* — and a graded pick is refused. A
-  ledger that can be rewritten once the result is known is not evidence of anything.
-- Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) log
+- **Correcting a pick:** a REAL ticket's price, stake and note can be edited from the
+  Results table **until kickoff** (`PATCH /api/picks/<id>`); from kickoff nothing can
+  change. The line, market and game are not editable — they are what the bet *was* — and
+  neither is the bonus flag (set at log time). A price cannot be cleared, and **a changed
+  price is re-judged** by the same checks a new ticket goes through
+  (`web/lib/ticketPolicy.ts`), at the time the ticket was written and against the
+  verdict frozen on it, so a ticket logged at a passing price cannot be edited to one
+  the kill price refuses (2026-10-07). **Paper picks cannot be edited or deleted at
+  all**: they are the build's, and the stopping rule's record. A ledger that can be
+  rewritten once the result is known is not evidence of anything.
+- Paper picks (`is_paper`, 1-unit stake so units/ROI are comparable) are **written by
+  the card build only** (since 2026-10-07 there is no hand path: the site refuses
+  `isPaper` with `PAPER IS BUILD-ONLY` and `pick.py add` is gone). They log
   **every game whose Hard Rock first-half line clears this week's bar (the slate's top 20% by gap, on a centred quote)**,
   tagged with the gate that blocked a real bet (`blocker`: `none` = it was a
   BET, `price`, `off_market`, `no_fair_price` = no book or exchange priced at
@@ -291,9 +302,9 @@ inside the **100K/month** tier the project has been on since 2026-09-06.
 
 A server-side switch, one row in `app_settings` (`rule_paused`), thrown and cleared by
 `scripts/rule_pause.py on|off|status`. While it is on, **every real-money first-half pick
-is refused** — on the site (`POST /api/picks`, its own `RULE PAUSED` rejection) and from
-the terminal (`pick.py add`, and `--force` does not bypass it). **Paper picks continue**
-and still count toward the record. When the state cannot be read at all, real money is
+is refused** on the site (`POST /api/picks`, its own `RULE PAUSED` rejection), the only
+place real money is logged. **The build's paper picks continue** and still count toward
+the record. When the state cannot be read at all, real money is
 refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch that is off.
 `docs/STOPPING_RULE.md` says what throws it — a pre-registered failure boundary on the
 paper rule — and that nothing resumes real money until the rule has been reviewed.

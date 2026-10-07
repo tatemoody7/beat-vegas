@@ -65,11 +65,21 @@ describe("parsePickBody", () => {
     });
     expect(parsePickBody({ ...good, price: 50 })).toMatchObject({ ok: false });
   });
-  it("paper picks are 1 flat unit regardless of the client's stake", () => {
-    const r = parsePickBody({ ...good, isPaper: true, stake: 0 });
-    expect(r.ok && r.pick.stake).toBe(1);
-    const r2 = parsePickBody({ ...good, isPaper: true, stake: 3 });
-    expect(r2.ok && r2.pick.stake).toBe(1);
+  it("refuses a paper pick: paper is written by the card build only", () => {
+    // 2026-10-07: a hand-logged paper pick took the game's one slot on the
+    // stopping rule's ledger before the build reached it.
+    for (const extra of [{}, { market: "full" }, { stake: 3 }]) {
+      const r = parsePickBody({ ...good, ...extra, isPaper: true });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/^PAPER IS BUILD-ONLY/);
+    }
+  });
+  it("takes the bonus flag at log time, and only as a boolean", () => {
+    const r = parsePickBody({ ...good, isBonus: true });
+    expect(r.ok && r.pick.isBonus).toBe(true);
+    const r2 = parsePickBody(good);
+    expect(r2.ok && r2.pick.isBonus).toBe(false);
+    expect(parsePickBody({ ...good, isBonus: "yes" }).ok).toBe(false);
   });
   it("real picks are ALWAYS 1 flat unit — the client's stake is ignored, never rejected", () => {
     for (const stake of [3, 0, -2, null, "abc", NaN]) {
@@ -78,12 +88,10 @@ describe("parsePickBody", () => {
       expect(r.ok && r.pick.stake).toBe(1);
     }
   });
-  it("rejects a real-money full-game pick but allows it as paper", () => {
+  it("rejects a real-money full-game pick", () => {
     const real = parsePickBody({ ...good, market: "full" });
     expect(real.ok).toBe(false);
     if (!real.ok) expect(real.error).toMatch(/first-half unders only/);
-    const paper = parsePickBody({ ...good, market: "full", isPaper: true });
-    expect(paper.ok).toBe(true);
   });
   it("stores the verdict snapshot and rejects unknown reasons", () => {
     const r = parsePickBody({
@@ -150,6 +158,15 @@ describe("checkPolicy", () => {
     expect(
       checkPolicy({ ...pick, isPaper: true }, { ...ctx, realWeekCount: 9 }),
     ).toEqual({ ok: true });
+  });
+  it("a bonus bet uses no cap slot, and every other gate still applies", () => {
+    const bonus = { ...pick, isBonus: true };
+    expect(checkPolicy(bonus, { ...ctx, realWeekCount: 5 })).toEqual({
+      ok: true,
+    });
+    expect(
+      checkPolicy({ ...bonus, price: null }, { ...ctx, realWeekCount: 5 }),
+    ).toMatchObject({ ok: false });
   });
   it("real money is accepted on any verdict (WATCH/PASS = off-policy, still recorded)", () => {
     expect(checkPolicy({ ...pick, verdict: "WATCH" }, ctx)).toEqual({

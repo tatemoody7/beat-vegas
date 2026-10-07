@@ -135,11 +135,30 @@ describe("createPick writes the book and the price's provenance", () => {
     expect(values).toContain(-115);
   });
 
-  it("stores a priceless paper pick as NULL with provenance 'unknown' — never -110", async () => {
-    await createPick({ gameId: 7, line: 26.5, isPaper: true });
+  it("stores a priceless ticket as NULL with provenance 'unknown' — never -110", async () => {
+    // The route refuses a real ticket without a price (PRICE MISSING) before
+    // it gets here; the writer itself still never invents one.
+    await createPick({ gameId: 7, line: 26.5 });
     const { values } = sent();
     expect(values).toContain("unknown");
     expect(values).toContain(null);
     expect(values).not.toContain(-110);
+  });
+
+  it("refuses a paper pick: paper is written by the card build only", async () => {
+    await expect(
+      createPick({ gameId: 7, line: 26.5, price: -110, isPaper: true }),
+    ).rejects.toThrow(/card build only/);
+    expect(executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("writes the bonus flag set at log time", async () => {
+    await createPick({ gameId: 7, line: 26.5, price: -110, isBonus: true });
+    const { sql, values } = sent();
+    expect(sql).toMatch(/\bis_paper, is_bonus\b/);
+    // is_paper false, is_bonus true, in that order.
+    const i = values.indexOf(true);
+    expect(i).toBeGreaterThan(0);
+    expect(values[i - 1]).toBe(false);
   });
 });

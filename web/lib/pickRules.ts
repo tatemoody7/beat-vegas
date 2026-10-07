@@ -32,6 +32,9 @@ export type PickRequest = {
    *  checkPolicy (PRICE MISSING); paper may be logged priceless. */
   price: number | null;
   isPaper: boolean;
+  /** A bonus (free) bet: real money the book funded. Uses no cap slot and books
+   *  0 units on a loss. Set at log time only (2026-10-07). */
+  isBonus?: boolean;
   /** When the ticket was WRITTEN, as a UTC ISO instant, when that is not now
    *  (2026-09-28). null = logged at bet time. Validated against the clock and
    *  the kickoff by betAtCheck; a value more than BACKDATE_MIN_MINUTES old
@@ -101,20 +104,35 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
     return reject("Enter the first-half total.");
   }
   const market: "1H" | "full" = b.market === "full" ? "full" : "1H";
-  const isPaper = b.isPaper === true;
 
-  // Real money is first-half only. Full game is context — paper is fine.
-  if (market === "full" && !isPaper) {
+  // PAPER IS BUILD-ONLY (2026-10-07). The paper ledger is H-STOP-2's
+  // observation stream: one pick per qualifying game, written by the card
+  // build (scripts/build_card.py) at the build's line and price. A hand-logged
+  // paper pick took that game's one slot first, at a hand-entered number, and
+  // the clock could not tell the difference. Nothing written here is paper.
+  if (b.isPaper === true) {
     return reject(
-      "Real money is first-half unders only. Log the full game as a paper pick.",
+      "PAPER IS BUILD-ONLY — paper picks are written by the card build, one per qualifying game, so the stopping rule reads only what the system logged. Log real tickets here.",
     );
   }
+  const isPaper = false;
+
+  // Real money is first-half only. Full game is context, captured by the build.
+  if (market === "full") {
+    return reject("Real money is first-half unders only.");
+  }
+
+  // A BONUS bet (the book funded the stake): set here, once, when the ticket
+  // is logged -- never by an edit, where flipping it freed a cap slot and
+  // turned a loss into zero after the fact (2026-10-07).
+  if (b.isBonus !== undefined && typeof b.isBonus !== "boolean") {
+    return reject("isBonus must be true or false.");
+  }
+  const isBonus = b.isBonus === true;
 
   // Stake: ALWAYS flat 1 unit (docs/BETTING_POLICY.md) — the client's `stake`
-  // is ignored so a stray 0/NaN/3 can never size a real bet. Paper picks are
-  // 1 unit too (so their record reads in units); is_paper keeps them out of
-  // the bankroll.
-  const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
+  // is ignored so a stray 0/NaN/3 can never size a real bet.
+  const stake = DEFAULT_STAKE;
 
   // No default. A missing price is stored as NULL with price_provenance
   // 'unknown'; a real ticket is then refused below (PRICE MISSING), a paper pick
@@ -173,6 +191,7 @@ export function parsePickBody(body: unknown): Parsed | Rejection {
       stake,
       price,
       isPaper,
+      isBonus,
       betAt,
       note,
       verdict,
@@ -349,13 +368,13 @@ export function checkPolicy(
   if (!pick.isPaper && pick.market === "1H") {
     if (ctx.rulePause.paused === "unreadable") {
       return reject(
-        `RULE STATE UNREADABLE — ${ctx.rulePause.reason}. Real money needs the pause switch to be readable right now. Log it as paper, or re-try once the database is back.`,
+        `RULE STATE UNREADABLE — ${ctx.rulePause.reason}. Real money needs the pause switch to be readable right now. Re-try once the database is back.`,
         409,
       );
     }
     if (ctx.rulePause.paused === true) {
       return reject(
-        `RULE PAUSED — real money is switched off${ctx.rulePause.note ? ` (${ctx.rulePause.note})` : ""}. Log it as paper; it still counts toward the record. scripts/rule_pause.py off resumes.`,
+        `RULE PAUSED — real money is switched off${ctx.rulePause.note ? ` (${ctx.rulePause.note})` : ""}. The build's paper picks continue; scripts/rule_pause.py off resumes real money.`,
         409,
       );
     }
@@ -369,7 +388,7 @@ export function checkPolicy(
   // paper ledger's actual prices and this must not change them).
   if (!pick.isPaper && pick.price === null) {
     return reject(
-      "PRICE MISSING — a real ticket needs the odds it was written at (a whole number, like -110). Enter them, or log it as paper.",
+      "PRICE MISSING — a real ticket needs the odds it was written at (a whole number, like -110). Enter them.",
     );
   }
   // A real BET below the card's kill line, or at a worse price, is not the
@@ -383,7 +402,7 @@ export function checkPolicy(
     // outage as a run of discipline.
     if (!ctx.livePrice.ok) {
       return reject(
-        `PRICE UNAVAILABLE — ${ctx.livePrice.reason}. A real bet needs a price we can check against the market right now; the card's number is from the last build, not from this moment. Log it as paper, or re-try once the line is back.`,
+        `PRICE UNAVAILABLE — ${ctx.livePrice.reason}. A real bet needs a price we can check against the market right now; the card's number is from the last build, not from this moment. Re-try once the line is back.`,
         409,
       );
     }
@@ -398,7 +417,7 @@ export function checkPolicy(
       ctx.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY
     ) {
       return reject(
-        `EARLY SEASON — a team here has played ${ctx.minGamesPlayed} game${ctx.minGamesPlayed === 1 ? "" : "s"} this season, and real money needs ${MIN_GAMES_FOR_REAL_MONEY}. The model scores it, but that regime has never been validated for money. Log it as paper; it still counts toward the record.`,
+        `EARLY SEASON — a team here has played ${ctx.minGamesPlayed} game${ctx.minGamesPlayed === 1 ? "" : "s"} this season, and real money needs ${MIN_GAMES_FOR_REAL_MONEY}. The model scores it, but that regime has never been validated for money. Pass on it; the build paper-logs qualifying games on its own.`,
         409,
       );
     }
@@ -426,14 +445,15 @@ export function checkPolicy(
   // Real money on a WATCH/PASS verdict is allowed but OFF-POLICY: the record
   // must capture every bet actually placed, and Results flags these so the
   // owner can see how overrides do (lib/picks.ts isOffPolicy). The cap and
-  // the flat unit still apply.
+  // the flat unit still apply; a bonus bet uses no cap slot.
   if (
     !pick.isPaper &&
+    !pick.isBonus &&
     pick.market === "1H" &&
     ctx.realWeekCount >= WEEKLY_BET_CAP
   ) {
     return reject(
-      `${WEEKLY_BET_CAP} real-money bets are already logged for week ${ctx.week ?? "?"}. That is the ceiling. Log this one as paper if you want to track it.`,
+      `${WEEKLY_BET_CAP} real-money bets are already logged for week ${ctx.week ?? "?"}. That is the ceiling. Pass on it; the build paper-logs the rest of the week's qualifiers on its own.`,
       409,
     );
   }
@@ -447,10 +467,10 @@ export function checkPolicy(
 export const MAX_EDIT_STAKE = 10;
 
 export type PickEdit = {
-  price?: number | null;
+  /** Omitted = keep the stored price. Never null: a real ticket keeps a price. */
+  price?: number;
   stake?: number;
   note?: string | null;
-  isBonus?: boolean;
 };
 
 export type ParsedEdit = { ok: true; edit: PickEdit };
@@ -458,10 +478,16 @@ export type ParsedEdit = { ok: true; edit: PickEdit };
 /**
  * Shape checks for PATCH /api/picks/<id>. No DB.
  *
- * Only price, stake, note and the bonus flag are editable, and only before the
- * pick is graded (the route enforces that). Line, side, market and game are
- * NOT editable: those identify the bet, and letting them change after the fact
- * would turn the ledger into something that cannot be evidence of anything.
+ * Only a REAL ticket's price, stake and note are editable, and only before
+ * kickoff (the route enforces both, and re-judges a changed price through
+ * lib/ticketPolicy.ts). Line, side, market and game are NOT editable: those
+ * identify the bet, and letting them change after the fact would turn the
+ * ledger into something that cannot be evidence of anything.
+ *
+ * Since 2026-10-07: an OMITTED price keeps the stored one, an explicit
+ * `price: null` is refused (a real ticket never loses its price), and the
+ * bonus flag is refused -- it is set when the ticket is logged, because
+ * flipping it later freed a cap slot and booked a loss as zero.
  */
 export function parsePickEdit(body: unknown): ParsedEdit | Rejection {
   if (!body || typeof body !== "object") {
@@ -471,11 +497,16 @@ export function parsePickEdit(body: unknown): ParsedEdit | Rejection {
   const edit: PickEdit = {};
 
   if ("price" in b) {
+    if (b.price === null || b.price === "") {
+      return reject(
+        "PRICE MISSING — a real ticket keeps the odds it was written at. Enter the corrected odds, or leave the price out to keep it.",
+      );
+    }
     const p = optNumber(b.price, "price");
     if ("ok" in p && p.ok === false) return p;
     const v = (p as { value: number | null | undefined }).value;
-    if (v !== undefined) {
-      if (v !== null && (!Number.isInteger(v) || Math.abs(v) < 100)) {
+    if (v !== undefined && v !== null) {
+      if (!Number.isInteger(v) || Math.abs(v) < 100) {
         return reject("Price must be American odds, like -125 or +100.");
       }
       edit.price = v;
@@ -501,10 +532,10 @@ export function parsePickEdit(body: unknown): ParsedEdit | Rejection {
   }
 
   if ("isBonus" in b) {
-    if (typeof b.isBonus !== "boolean") {
-      return reject("isBonus must be true or false.");
-    }
-    edit.isBonus = b.isBonus;
+    return reject(
+      "The bonus flag is set when the ticket is logged and cannot be edited. Delete the pick before kickoff and log it again if it was entered wrong.",
+      409,
+    );
   }
 
   if (Object.keys(edit).length === 0) {

@@ -103,12 +103,23 @@ def pairs_from_rows(
     fh: List[Tuple[float, float]] = []
     fg: List[Tuple[float, float]] = []
     for r in rows:
-        fgt = r.get("full_game_total")
+        fgt = _num(r.get("full_game_total"))
         if fgt is None:
             continue
-        if r.get("final_total") is not None:
-            fg.append((float(fgt), float(r["final_total"])))
-        e1 = expected_first_half(fgt, r.get("spread"), base, blowout, cut)
-        if e1 is not None and r.get("fh_trusted") is not None:
-            fh.append((e1, float(r["fh_trusted"])))
+        final = _num(r.get("final_total"))
+        if final is not None:
+            fg.append((fgt, final))
+        e1 = expected_first_half(fgt, _num(r.get("spread")), base, blowout, cut)
+        half = _num(r.get("fh_trusted"))
+        if e1 is not None and half is not None:
+            fh.append((e1, half))
     return fh, fg
+
+
+def _num(v) -> Optional[float]:
+    """A float, or None for None and NaN (a pandas frame hands back NaN for a
+    missing number even after .where(notna, None) on a float column)."""
+    if v is None:
+        return None
+    f = float(v)
+    return None if math.isnan(f) else f

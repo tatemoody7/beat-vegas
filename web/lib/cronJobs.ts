@@ -145,6 +145,27 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateCloseMin: null,
     everyTick: true,
   },
+  "close-weeknight": {
+    workflow: "lines_watch.yml",
+    // The weeknight twin of `lines-close` (2026-10-06, Tate's call: Tue-Fri,
+    // hourly 6-10pm ET, first-half + full-game closes). GitHub's weeknight close
+    // crons fired after kickoff or overnight for two weeks running (0 captures),
+    // so Thursday/Friday games -- and November's Tuesday/Wednesday MACtion --
+    // never had a close inside H-STOP-2's 2-hour window or a full-game close
+    // inside 3 h. Same dispatch as Saturday's: market=1h_close, every tick; the
+    // workflow's free /events pre-check skips a tick with no Hard Rock game
+    // kicking off in the next 120 minutes (0 credits, ~1 Actions minute).
+    // Entries 22Z-03Z cover 6pm-10pm ET in both DST regimes (22Z is 5pm EST,
+    // refused before_window; 03Z is 11pm EDT, allowed). GitHub's crons stay as
+    // the backup (Tate, 2026-10-06).
+    inputs: { market: "1h_close" },
+    days: ["Tue", "Wed", "Thu", "Fri"],
+    dispatchOpenMin: 18 * 60,
+    dispatchCloseMin: 24 * 60 - 1,
+    gateOpenMin: null,
+    gateCloseMin: null,
+    everyTick: true,
+  },
   grade: {
     workflow: "grade.yml",
     // grade.yml declares one OPTIONAL input (`hist`, the 2023-25 post-mortem

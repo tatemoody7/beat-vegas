@@ -574,6 +574,12 @@ export const CRON_JOBS = {
   sunday: { days: ["Sun"], openMin: 13 * 60, closeMin: 17 * 60 },
   // The Saturday close-poll backup (2026-09-28): no card slot, every tick dispatches.
   "lines-close": { days: ["Sat"], openMin: 10 * 60, closeMin: 24 * 60 - 1 },
+  // The Tue-Fri evening close polls (2026-10-06), same dispatch as Saturday's.
+  "close-weeknight": {
+    days: ["Tue", "Wed", "Thu", "Fri"],
+    openMin: 18 * 60,
+    closeMin: 24 * 60 - 1,
+  },
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
 };
 

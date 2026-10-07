@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (WEEKNIGHT CLOSES).** Two weeks of GitHub weeknight close crons captured nothing
+  (all 20 runs fired after kickoff or overnight), so Thursday/Friday games had no 1H close
+  inside H-STOP-2's 2 h window and no full-game close inside 3 h. Tate's call: a Vercel
+  `close-weeknight` job, Tue–Fri 6pm–midnight ET, hourly (24 entries, 22Z–03Z, both DST
+  regimes), the same `lines_watch.yml market=1h_close` dispatch as Saturday (1H per game + the
+  full-game bulk call); a tick with no Hard Rock game in the next 120 min stops at the free
+  `/events` pre-check. GitHub's crons stay as backup. The id is short because
+  `last_dispatch_<id>` must fit `app_settings.key` (32 chars).
 - **2026-10-06 (REVIEW QUICK FIXES, Tate's calls).** The neggap paper arms now run inside a
   savepoint like H-FG-P (a database error in them could have discarded the whole card at commit).
   Doc drift: BETTING_POLICY's score, Watch and kill-number passages and README described the

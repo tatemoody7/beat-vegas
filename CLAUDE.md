@@ -88,10 +88,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Friday-night games get no close inside 2 h** (2026-10-02: Penn State @ Northwestern, last
-  capture 227 min out, excluded from H-STOP-2's line-value clock). `lines-close` entries are
-  Saturday-only and GitHub's weeknight cron did not fire. Decide: add Fri 22Z–01Z entries
-  (`vercel.json` + the route's window), Tate's call.
+- **Weeknight closes (shipped 2026-10-06, Tate's call: Tue–Fri)**: confirm the first Thursday
+  (10-08) ticks wrote 1H + full-game rows inside the windows for every Thursday game.
 - **Week-6 stack** (decided 2026-10-04, `docs/SYSTEM_REVIEW_2026-10-04.md` §12). **Done
   2026-10-04:** PR2 tracking (#269, Neon migrated first; #272 schema) and PR3 classifier
   retirement (#268). **First-rows checks passed** at the Tue 2026-10-06 build (card 26:
@@ -106,8 +104,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `/wepa/team/season` + CORE/Elo/FPI snapshot tables with fingerprints from the next Sunday job;
   (c) H-FHBOX (`/game/box/advanced` quarter splits → the 57 first-half inputs; 2023-25 backfill
   ~2,400 calls); (d) drop `sp_sos` from PR6 (null since 2019); (e) CFBD Tier 3 ($10) or Tier 1
-  ($1) at the **Nov 6** renewal; (f) `bv_residual` shadow and Friday-night `lines-close`
-  entries, both still open from 2026-10-04. The Odds API is on 20K; CFBD on Tier 3 via the
+  ($1) at the **Nov 6** renewal; (f) `bv_residual` shadow, still open from 2026-10-04. The Odds API is on 20K; CFBD on Tier 3 via the
   boomtatermac key (`docs/OPS_ACCOUNTS.md` 2-3).
 - **H-FG-P (2026-10-06)**: collector live from the first build after merge; week 6 scored by hand
   (`fg_shadow.yml`). Freeze the line-value σ from the first two Saturdays (`fg_position` prints
@@ -135,7 +132,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Tue / Thu / Fri, gate 3:45–5:15pm | `card.yml` slots `tue_pm` `thu_pm` `fri_pm` | whole-week 1H sweep + injuries → FINAL card; paper windows 48 h / 24 h / rest of week |
 | Sat, dispatch 7:00–8:15am, gate 7:45–9:15am | `card.yml` slot `sat_am` | same sweep before the morning sitting; paper window rest of week |
 | Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, `CLOSE_LOOKAHEAD_MIN=120`; GitHub's every-30-min crons stay |
-| Weeknights (GitHub cron only) | `lines_watch.yml` | opener/close sweeps 22Z–03Z |
+| Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
 | Daily 10Z (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 

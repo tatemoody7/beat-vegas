@@ -150,10 +150,11 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     expect(job.workflow).toBe("lines_watch.yml");
     expect(dispatchBody(job).inputs).toEqual({ market: "1h_close" });
     expect(job.everyTick).toBe(true);
-    // Only this job may skip the duplicate probe: a card build that ran twice
-    // spends a whole sweep, a close poll that ran twice re-sees the same lines.
+    // Only the close polls may skip the duplicate probe: a card build that ran
+    // twice spends a whole sweep, a close poll that ran twice re-sees the same lines.
+    const closePolls = new Set(["lines-close", "close-weeknight"]);
     for (const [id, j] of Object.entries(CRON_JOBS)) {
-      if (id !== "lines-close") expect(j.everyTick ?? false).toBe(false);
+      if (!closePolls.has(id)) expect(j.everyTick ?? false).toBe(false);
     }
   });
 
@@ -192,6 +193,47 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     );
     // A weekday tick never dispatches.
     expect(dispatchDecision(job, at("2026-09-29T15:05:00Z")).reason).toContain(
+      "wrong_day",
+    );
+  });
+});
+
+describe("close-weeknight (Tue-Fri evening close polls, 2026-10-06)", () => {
+  const job = CRON_JOBS["close-weeknight"];
+
+  it("dispatches the same close poll as Saturday's, every tick", () => {
+    expect(job.workflow).toBe("lines_watch.yml");
+    expect(dispatchBody(job).inputs).toEqual({ market: "1h_close" });
+    expect(job.everyTick).toBe(true);
+  });
+
+  it("covers Tue-Fri 6pm to midnight ET in both DST regimes, never Sat-Mon", () => {
+    // Thursday 2026-10-08: 22Z is 6pm EDT (in), 21Z 5pm (before).
+    expect(dispatchDecision(job, at("2026-10-08T22:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-10-08T21:55:00Z")).reason).toContain(
+      "before_window",
+    );
+    // Friday night 10pm EDT is Saturday 02Z in UTC: still Friday in ET.
+    expect(dispatchDecision(job, at("2026-10-10T02:30:00Z")).allowed).toBe(
+      true,
+    );
+    // December: 22Z is 5pm EST (refused), 23Z 6pm EST and 03Z 10pm EST (in).
+    expect(dispatchDecision(job, at("2026-12-17T22:30:00Z")).reason).toContain(
+      "before_window",
+    );
+    expect(dispatchDecision(job, at("2026-12-17T23:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-12-18T03:59:00Z")).allowed).toBe(
+      true,
+    );
+    // Saturday evening belongs to `lines-close`; Monday has no entry.
+    expect(dispatchDecision(job, at("2026-10-10T23:05:00Z")).reason).toContain(
+      "wrong_day",
+    );
+    expect(dispatchDecision(job, at("2026-10-05T23:05:00Z")).reason).toContain(
       "wrong_day",
     );
   });
@@ -342,6 +384,7 @@ describe("vercel.json stays in lock-step with the table", () => {
       // A date in each month matching the cron's weekday.
       "0": { [july]: "2026-07-12", [december]: "2026-12-13" },
       "2": { [july]: "2026-07-14", [december]: "2026-12-15" },
+      "3": { [july]: "2026-07-15", [december]: "2026-12-16" },
       "4": { [july]: "2026-07-16", [december]: "2026-12-17" },
       "5": { [july]: "2026-07-17", [december]: "2026-12-18" },
       "6": { [july]: "2026-07-18", [december]: "2026-12-19" },

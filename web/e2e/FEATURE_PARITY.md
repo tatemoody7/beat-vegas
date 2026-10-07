@@ -75,7 +75,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [how] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — how-it-works.spec.ts › "the gap ladder draws one bar per band and the break-even line"
 - [how] The real-close records table is the one uncapped 2023–25 row with its interval — how-it-works.spec.ts › "the real-close records table is the one uncapped row"
 - [how] The glossary sits at `#glossary` (where `/glossary` redirects) with exactly the ten visitor terms in order — how-it-works.spec.ts › "the glossary is where /glossary lands, with the visitor's ten terms"
-- [how] The page links to `/records` and names 1-800-GAMBLER — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
+- [how] The page links to `/records` and names 1-833-PLAYWISE — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
 - [how] Signed in: the `<season> so far` panel, the flags with the multiple-comparisons note, and the Method fold (opens on a click, estimated-line table, nothing coloured) — how-it-works.spec.ts › "signed in, the live season panel, the flags and the method fold follow"
 - [how] Signed out: the backtest shows, the research section does not — how-it-works.spec.ts › "a visitor reads the page without the research section"
 - [how] Our number's average miss beside Hard Rock's, public, same games, the sentence follows the numbers — how-it-works.spec.ts › "shows our number's average miss beside Hard Rock's, in public"

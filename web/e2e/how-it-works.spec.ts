@@ -135,7 +135,7 @@ test.describe("how it works", () => {
     await expect(
       page.getByRole("link", { name: "Every game we have rated →" }),
     ).toHaveAttribute("href", "/records");
-    await expect(page.getByText(/call 1-800-GAMBLER/)).toBeVisible();
+    await expect(page.getByText(/call 1-833-PLAYWISE/)).toBeVisible();
   });
 
   test("shows our number's average miss beside Hard Rock's, in public", async ({

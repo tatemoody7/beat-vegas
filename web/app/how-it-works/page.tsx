@@ -320,7 +320,7 @@ export default async function HowItWorksPage({
         </Link>
         <p className="text-xs text-[var(--text-dim)]">
           If gambling is a problem for you or someone you know, call
-          1-800-GAMBLER.
+          1-833-PLAYWISE.
         </p>
       </div>
 

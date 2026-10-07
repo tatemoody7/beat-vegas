@@ -9,6 +9,11 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (THE FIVE CODE-LESS ARMS, Tate's calls).** H-TOP3, H-MOVE and H-SHARE withdrawn
+  before any observation (`superseded`, reasons in each row: no power at this volume; a test
+  window already read; a gate judged only on spent 2023-25 data). H-PCT-TIE kept and folded: it
+  is the margin-above-the-bar ranking test Tate approved after the review. H-TIMING kept as a
+  no-bet measurement. Collectors for the two kept rows are later PRs.
 - **2026-10-06 (WEEKNIGHT CLOSES).** Two weeks of GitHub weeknight close crons captured nothing
   (all 20 runs fired after kickoff or overnight), so Thursday/Friday games had no 1H close
   inside H-STOP-2's 2 h window and no full-game close inside 3 h. Tate's call: a Vercel

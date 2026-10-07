@@ -103,6 +103,11 @@ class Game(Base):
     # Filled by scripts/backfill.py on upsert; NULL on rows older than the column.
     home_conference = Column(String)
     away_conference = Column(String)
+    # CFBD's pregame Elo per side (2026-10-06, H-ELO-F): `/games`
+    # homePregameElo / awayPregameElo, set before kickoff (leak-free as of the
+    # game). Read by the H-ELO-F study arm only; not a champion input.
+    home_pregame_elo = Column(Float)
+    away_pregame_elo = Column(Float)
 
     __table_args__ = (UniqueConstraint("id", name="uq_game_id"),)
 

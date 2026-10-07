@@ -29,7 +29,7 @@ def _run(monkeypatch, *, venues_raise: bool):
             raise _Boom("CFBD 429 for /venues")
         return 3
 
-    def fake_season(client, season, season_type, use_pbp):
+    def fake_season(client, season, season_type, use_pbp, **kw):
         order.append(f"season:{season}:{season_type}")
         return {"games": 5, "with_1h": 4, "cfbd_with_total": 5}
 
@@ -61,7 +61,7 @@ def test_a_venue_failure_does_not_stop_the_run(monkeypatch, capsys):
 def test_a_season_failure_is_still_fatal(monkeypatch):
     # The guard is deliberately narrow: grading depends on the scores, so a
     # failure fetching them must still fail the job loudly.
-    def fake_season(client, season, season_type, use_pbp):
+    def fake_season(client, season, season_type, use_pbp, **kw):
         raise _Boom("CFBD 429 for /games")
 
     monkeypatch.setattr(mod, "backfill_venues", lambda c: 3)

@@ -1,0 +1,68 @@
+name: Load past seasons (history for H-HIST / H-ELO-F)
+
+# Loads FBS-vs-FBS games for a range of past seasons from the FREE CFBD /games
+# + /lines endpoints into Neon (scripts/backfill.py --fbs-only): scores, the
+# first-half total from the quarter line scores (play-by-play fallback only for
+# weeks whose line scores fail the trust check), the CFBD consensus full-game
+# total, and pregame Elo. Dispatch-only. Tate's calls of 2026-10-06: probe one
+# season first, then the rest; history for the registered H-HIST / H-ELO-F
+# studies (docs/HYPOTHESES.md).
+#
+# Nothing live reads these rows: every feature frame starts at
+# features.FRAME_MIN_SEASON (2023) and the site at SITE_MIN_SEASON (PR #296).
+# A past season's load never rewrites `teams.conference`, never stores an
+# unknown venue id, and never overwrites a line field a live capture owns.
+# Re-running a season is idempotent (store.upsert; never writes None).
+
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "First season, e.g. 2003"
+        required: true
+      end:
+        description: "Last season, e.g. 2022"
+        required: true
+
+# Shares the Neon writers' group: games rows are upserted, so this must never
+# overlap sunday.yml / card.yml / grade.yml.
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Install
+        # Hash-pinned: requirements/lock.txt names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Load the seasons (FBS-vs-FBS)
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_START: ${{ inputs.start }}
+          IN_END: ${{ inputs.end }}
+        run: python scripts/backfill.py --start "$IN_START" --end "$IN_END" --season-type both --fbs-only

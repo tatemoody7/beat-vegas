@@ -431,7 +431,9 @@ CREATE TABLE public.games (
     spread_open double precision,
     spread_open_source character varying,
     home_conference character varying,
-    away_conference character varying
+    away_conference character varying,
+    home_pregame_elo double precision,
+    away_pregame_elo double precision
 );
 
 --

@@ -20,9 +20,9 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "Beat Vegas — first-half unders",
+  title: "Beat Vegas — College Football Betting System",
   description:
-    "College football first-half under totals. What to bet, and the numbers behind it.",
+    "College football betting research. Every rating and every result is public, losses included.",
   // Readable without a password since 2026-09-16, but not for search engines:
   // every render is metered Neon egress. app/robots.ts says the same to crawlers.
   robots: { index: false, follow: false },
@@ -52,7 +52,7 @@ export default async function RootLayout({
               <span className="text-[var(--accent)]">BEAT</span>
               <span className="text-[var(--text)]"> VEGAS</span>
               <span className="ml-2 hidden align-middle text-xs font-medium uppercase tracking-widest text-[var(--text-dim)] sm:inline">
-                First-half unders
+                College Football Betting System
               </span>
             </Link>
             <HeaderChrome />

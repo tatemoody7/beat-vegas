@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (H-MARGIN REGISTERED, BEFORE ANY SCRIPT).** For the CFBD Model Pick'em (Tate: enter
+  it), which scores full-game margins the system never had: a market-blind margin regressor on the
+  champion's inputs, 2003+, every FBS-vs-FBS game, `bv_margin_v1` (never a champion read). Tate's
+  calls: exploratory measurement that licenses nothing, and entry does not depend on the backtest;
+  the report states MAE / MSE / straight-up / ATS beside the Vegas closing spread. Submission by API
+  once Tate creates the Pick'em account and credential.
+
 - **2026-10-07 (PROGRAM BUDGET: OPTION 2).** Tate's call (`docs/program/FP_BUDGET_OPTIONS.md`): the
   rows whose pass unlocks a promotion share one 5% budget, 1.67% each: H-PCT-TIE (now 0.417%
   per arm-clock, A = 5.257, B = −1.605), H-SHADOW-F and H-INSEASON-T (their per-comparison split

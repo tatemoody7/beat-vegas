@@ -37,7 +37,8 @@ independent 1H total (`beatvegas/model/bv_line.py`); the board ranks games by th
 **gap** to the real Vegas line, and the board and each game page turn the gap + Hard
 Rock's price into a plain-English Bet / Watch / Pass verdict (`web/lib/verdict.ts`). The
 BV line is noisy (σ ≈ 12 pts on any single game), so gates are in points from the
-validated top-20% ranking rule (≥ 1.75), never in σ. Full write-up: `docs/BV_LINE.md`.
+top-20% ranking rule, read per slate (the k-th largest gap; 1.75 only on an empty slate),
+never in σ. Full write-up: `docs/BV_LINE.md`.
 
 Components: CFBD REST client (`sources/cfbd.py`), 1H points ETL (`etl/first_half.py`),
 leak-free features (`etl/features.py`), walk-forward backtest (`backtest/engine.py`),

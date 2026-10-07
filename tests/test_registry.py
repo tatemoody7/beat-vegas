@@ -91,8 +91,10 @@ def test_find_row_is_exact_and_case_sensitive(registry_file):
 
 
 def test_the_real_registry_has_a_runnable_row_for_the_planned_smoke_run():
-    """H-STOP-2 is the planned first dispatch; if its status ever leaves the
-    runnable set this names the change."""
-    row = R.require_runnable_row("H-STOP-2")
+    """H-HIST is the next planned harness dispatch (PR H4). H-STOP-2 held this
+    place until 2026-10-06, when it became `live-tracking` (it runs as a
+    clock, never through the harness). If H-HIST's status leaves the runnable
+    set before its dispatch, this names the change."""
+    row = R.require_runnable_row("H-HIST")
     assert row.status == "pre-registered"
     assert len(row.criterion) > 40

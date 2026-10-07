@@ -82,10 +82,11 @@ The site is one page: every game on the week in a single ranked list.
 - **Universe** — games Hard Rock has priced a full-game total on. If Hard Rock
   will not take the game, it is not a decision we have to make.
 - **Score (0-100)** — one number per game, and the only thing the list sorts on.
-  It is the GAP ALONE: 50 + gap × (20 / 1.75), floored and clamped to 0-100, where
+  It is the GAP ALONE: 50 + gap × (20 / bar), floored and clamped to 0-100, where
   the gap is the line you can bet (Hard Rock's, else the market's, else our
-  reference line) minus our number. A gap of exactly 1.75 is exactly 70, so green
-  always means the gap rule passed. Nothing else moves the number: Hard Rock's
+  reference line) minus our number and `bar` is this slate's bar (H-PCT, the top-20%
+  cutoff; 1.75 only on an empty slate). A gap exactly at the bar is exactly 70, so
+  green always means the gap rule passed. Nothing else moves the number: Hard Rock's
   price, an off-market Hard Rock number and a starting QB listed out are
   BLOCKERS — they decide whether a game is a bet and the card carries a tag —
   never score adjustments. 70+ is a bet (green), 55-69 is watch (amber), under 55
@@ -96,16 +97,17 @@ The site is one page: every game on the week in a single ranked list.
 - **Tiers** — BET is exactly the verdict rule below, every gate passed. Watch
   (EDGE in the payload) is score 55+ with one gate still failing, and the card
   names which one: no Hard Rock line, off-market number, price worse than fair,
-  no comparable price, QB out, or a gap short of 1.75. Everything else is PASS,
+  no comparable price, QB out, or a gap short of the slate bar. Everything else is PASS,
   kept in the same list, dimmer. Once a game is played it is coloured by its
   result only when a REAL book line (Hard Rock's, else the market's) was posted;
   a game whose only line was our reference number shows a neutral final.
 - **Action line** — one sentence per card saying what to do now: bet it at this
   number and price, wait for a specific number, or pass and why.
-- **Kill number** — where the edge is gone: our number plus 1.75 rounded up to
-  the next half point, and the worst price still clearing the market's fair under
-  by more than the unavoidable 2% of vig. Clearing one and not the other is not a
-  bet.
+- **Kill number** — where the edge is gone: our number plus the slate bar, rounded
+  up to the next half point, and the worst price whose value against the market's
+  no-vig fair under is still at or above `BET_MIN_EV` (−0.05: standard −110 juice on
+  a balanced market passes, −115 fails; `edge.ts::breakEvenPrice`). Clearing one and
+  not the other is not a bet.
 - **Degraded card** — every card carries a `status`: **final** (a morning build:
   the decision card for every game kicking off before the next morning),
   **preview** (a manual or legacy build that a morning card replaces), or

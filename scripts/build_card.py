@@ -669,12 +669,16 @@ def run(
                 )
                 # H-NEGGAP-P (2026-09-28): the paper OVER arms log beside the
                 # champion from the same build into challenger_picks, never
-                # manual_picks. A failure here must never cost the real card.
+                # manual_picks. A failure here must never cost the real card: a
+                # SAVEPOINT (2026-10-06, as the H-FG-P arm) rolls back only the
+                # arm's rows on a database error, which try/except alone cannot --
+                # an aborted Postgres transaction would discard the card at commit.
                 if neggap_on:
                     try:
-                        neggap_added = log_neggap_picks(
-                            s, card, now, window_hours=paper_window_hours, predictions=preds
-                        )
+                        with s.begin_nested():
+                            neggap_added = log_neggap_picks(
+                                s, card, now, window_hours=paper_window_hours, predictions=preds
+                            )
                     except Exception as e:  # noqa: BLE001 - never break the card
                         print(f"[card] WARNING: H-NEGGAP-P arms not logged: {e}")
                 # H-FG-P (2026-10-06): paper FULL-GAME unders from the bv_fg_v1

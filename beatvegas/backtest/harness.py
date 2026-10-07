@@ -51,7 +51,12 @@ import numpy as np
 import pandas as pd
 
 from .. import postmortem as pm
-from ..etl.features import apply_min_games, build_feature_frame, training_frame
+from ..etl.features import (
+    FRAME_MIN_SEASON,
+    apply_min_games,
+    build_feature_frame,
+    training_frame,
+)
 from ..etl.frame_fingerprint import write_fingerprint
 from ..grading import clv_under, under_result, units_won
 from ..markets import FIRST_HALF, FULL_GAME, SIDES, Market
@@ -175,6 +180,12 @@ class HarnessSpec:
     # direction", and grades units for the over.
     market: Market = FIRST_HALF
     side: str = "under"
+    # 2026-10-06 (H-HIST): the study frame's floor and total rule. Defaults are
+    # the live frame's (FRAME_MIN_SEASON, rows need a full-game total), so every
+    # existing caller is byte-identical. H-HIST passes None / False to reach
+    # 2003-2012, which CFBD's free /lines cannot price.
+    frame_min_season: Optional[int] = FRAME_MIN_SEASON
+    require_total: bool = True
 
     def __post_init__(self) -> None:
         if self.side not in SIDES:
@@ -227,6 +238,8 @@ class HarnessSpec:
             "criterion_fn": _qualname(self.criterion) if self.criterion else None,
             "market": self.market.describe(),
             "side": self.side,
+            "frame_min_season": self.frame_min_season,
+            "require_total": self.require_total,
         }
 
 
@@ -328,8 +341,18 @@ def load_frame(
             )
         source: Dict[str, Any] = {"snapshot": str(snapshot), "build": dict(build)}
     else:
-        frame = build_feature_frame(min_games=finest, fbs_only=spec.fbs_only)
-        frame.attrs["build"] = {"fbs_only": spec.fbs_only, "min_games": finest}
+        frame = build_feature_frame(
+            min_games=finest,
+            fbs_only=spec.fbs_only,
+            min_season=spec.frame_min_season,
+            require_total=spec.require_total,
+        )
+        frame.attrs["build"] = {
+            "fbs_only": spec.fbs_only,
+            "min_games": finest,
+            "min_season": spec.frame_min_season,
+            "require_total": spec.require_total,
+        }
         source = {"snapshot": None, "build": dict(frame.attrs["build"])}
     fp = write_fingerprint(frame, Path(fingerprint_path))
     fp["source"] = source
@@ -930,6 +953,7 @@ def run(
                 f"{spec.market.window_name}); side graded: {spec.side}"
             ),
             "decision_rule": grading.decision_rule,
+            "frame_seasons": frame_coverage(train_pool),
         },
         "market": _market(graded, spec),
         "arms": arms,
@@ -943,6 +967,35 @@ def run(
     }
     report["verdict"] = verdict(report, spec, registry_row)
     return HarnessResult(per_game=graded, report=_clean(report))
+
+
+def frame_coverage(train_pool: pd.DataFrame) -> Dict[str, Any]:
+    """Per training season: played rows, rows without a full-game total (they
+    enter only under `require_total=False`), the mean NaN share over the
+    champion's inputs, the inputs that are entirely empty, and the pregame-Elo
+    NaN share. The H-HIST / H-ELO-F rows require these in the report."""
+    from ..model.bv_line import BV_FEATURE_COLS
+
+    out: Dict[str, Any] = {}
+    if train_pool.empty:
+        return out
+    cols = [c for c in BV_FEATURE_COLS if c in train_pool.columns]
+    for s, g in train_pool.groupby("season"):
+        nan = g[cols].isna().mean()
+        fg = pd.to_numeric(g.get("full_game_total"), errors="coerce")
+        elo = (
+            pd.to_numeric(g["home_pregame_elo"], errors="coerce").isna().mean()
+            if "home_pregame_elo" in g
+            else 1.0
+        )
+        out[int(s)] = {
+            "rows": int(len(g)),
+            "rows_without_total": int((fg.isna() | (fg <= 0)).sum()) if fg is not None else None,
+            "mean_nan_share": round(float(nan.mean()), 4),
+            "all_nan_inputs": sorted(c for c in cols if nan[c] >= 1.0),
+            "elo_nan_share": round(float(elo), 4),
+        }
+    return out
 
 
 # ---------------------------------------------------------------- rendering

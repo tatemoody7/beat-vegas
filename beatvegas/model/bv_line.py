@@ -24,7 +24,7 @@ data that doesn't yet exist.
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -78,15 +78,26 @@ def _played(df: pd.DataFrame, target: str = TARGET) -> pd.DataFrame:
     return df[pd.to_numeric(df[target], errors="coerce").notna()]
 
 
-def fit_bv_regressor(train_df: pd.DataFrame, target: str = TARGET) -> HistGradientBoostingRegressor:
-    _assert_market_blind(BV_FEATURE_COLS)
+def fit_bv_regressor(
+    train_df: pd.DataFrame, target: str = TARGET, feature_cols: Optional[Sequence[str]] = None
+) -> HistGradientBoostingRegressor:
+    """`feature_cols` (default BV_FEATURE_COLS, the champion's inputs): a study
+    arm may add inputs (H-ELO-F); the market-blind assert covers whatever is
+    passed."""
+    cols = list(BV_FEATURE_COLS if feature_cols is None else feature_cols)
+    _assert_market_blind(cols)
     train_df = _played(train_df, target)
     model = _new_regressor()
-    model.fit(train_df[BV_FEATURE_COLS], train_df[target].astype(float))
+    model.fit(train_df[cols], train_df[target].astype(float))
     return model
 
 
-def oof_residuals(df: pd.DataFrame, min_train: int = 500, target: str = TARGET) -> pd.DataFrame:
+def oof_residuals(
+    df: pd.DataFrame,
+    min_train: int = 500,
+    target: str = TARGET,
+    feature_cols: Optional[Sequence[str]] = None,
+) -> pd.DataFrame:
     """Walk-forward out-of-fold residuals (actual - pred) across seasons.
 
     For each season, train on all prior seasons and predict it — so no game is
@@ -102,8 +113,8 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500, target: str = TARGET) 
         test = df[df["season"] == ts]
         if len(train) < min_train or test.empty:
             continue
-        model = fit_bv_regressor(train, target)
-        pred = model.predict(test[BV_FEATURE_COLS])
+        model = fit_bv_regressor(train, target, feature_cols)
+        pred = model.predict(test[list(BV_FEATURE_COLS if feature_cols is None else feature_cols)])
         chunk = test.copy()
         chunk["bv_raw"] = pred
         chunk["residual"] = chunk[target].astype(float) - pred
@@ -113,14 +124,16 @@ def oof_residuals(df: pd.DataFrame, min_train: int = 500, target: str = TARGET) 
     return pd.concat(out, ignore_index=True)
 
 
-def bias_corrections(train_df: pd.DataFrame, target: str = TARGET) -> Dict:
+def bias_corrections(
+    train_df: pd.DataFrame, target: str = TARGET, feature_cols: Optional[Sequence[str]] = None
+) -> Dict:
     """Global intercept correction learned from OOF residuals on TRAIN only.
 
     Returns {"global": float}. We deliberately do NOT apply a per-era intercept
     (the era feature handles era; per-era would double-count) — per-era residuals
     are surfaced for auditing via residual_report instead.
     """
-    res = oof_residuals(train_df, target=target)
+    res = oof_residuals(train_df, target=target, feature_cols=feature_cols)
     if res.empty:
         return {"global": 0.0}
     return {"global": float(res["residual"].mean())}
@@ -133,7 +146,10 @@ def apply_bias(raw_pred: np.ndarray, frame: pd.DataFrame, corrections: Dict) -> 
 
 
 def bv_line_for_slate(
-    train_df: pd.DataFrame, target_df: pd.DataFrame, target: str = TARGET
+    train_df: pd.DataFrame,
+    target_df: pd.DataFrame,
+    target: str = TARGET,
+    feature_cols: Optional[Sequence[str]] = None,
 ) -> np.ndarray:
     """Fit on train, predict the target slate, return calibrated BV lines.
 
@@ -145,9 +161,10 @@ def bv_line_for_slate(
     """
     if train_df.empty or target_df.empty:
         return np.array([], dtype=float)
-    model = fit_bv_regressor(train_df, target)
-    raw = model.predict(target_df[BV_FEATURE_COLS])
-    corrections = bias_corrections(train_df, target)
+    cols = list(BV_FEATURE_COLS if feature_cols is None else feature_cols)
+    model = fit_bv_regressor(train_df, target, cols)
+    raw = model.predict(target_df[cols])
+    corrections = bias_corrections(train_df, target, cols)
     return apply_bias(raw, target_df, corrections)
 
 

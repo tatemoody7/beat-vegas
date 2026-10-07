@@ -38,6 +38,7 @@ from beatvegas.backtest import harness as H
 from beatvegas.backtest.reporting import append_step_summary, report_paths, utc_stamp
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.etl.features import FRAME_MIN_SEASON
 from beatvegas.markets import FIRST_HALF, SIDES, by_key
 from beatvegas.registry import HarnessRefusal, require_runnable_row
 from beatvegas.snapshots import (
@@ -96,6 +97,19 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_false",
         help="include non-FBS games in the feature frame (default: FBS-only, as production)",
     )
+    ap.add_argument(
+        "--frame-min-season",
+        default=None,
+        help="earliest season the study frame reads: a year, or `all` (H-HIST). Default the "
+        "live floor (features.FRAME_MIN_SEASON). Below the live floor the incumbent is the "
+        "champion as pinned (model.train_windows.champion_2023), never trained on the history",
+    )
+    ap.add_argument(
+        "--keep-rows-without-total",
+        action="store_true",
+        help="study frame keeps rows without a full-game total (H-HIST: CFBD's free /lines has "
+        "none before 2013); the live frame never does",
+    )
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument(
@@ -136,8 +150,33 @@ def resolve_callable(dotted: str) -> Callable[..., Any]:
     return fn
 
 
+def frame_floor(args: argparse.Namespace) -> Optional[int]:
+    """`--frame-min-season`: None (flag absent) -> the live floor; `all` -> no
+    floor; a year -> that year."""
+    raw = args.frame_min_season
+    if raw is None:
+        return FRAME_MIN_SEASON
+    if str(raw).lower() == "all":
+        return None
+    try:
+        return int(raw)
+    except ValueError as e:
+        raise HarnessRefusal(f"--frame-min-season must be a year or `all`, got {raw!r}") from e
+
+
 def build_arms(args: argparse.Namespace) -> List[H.Arm]:
-    arms = [H.incumbent_arm(by_key(args.market))]
+    floor = frame_floor(args)
+    if floor is None or floor < FRAME_MIN_SEASON:
+        # The study frame reaches below the live floor (H-HIST): the incumbent
+        # must stay the champion AS LIVE TRAINS IT, so it keeps only seasons
+        # >= FRAME_MIN_SEASON. First-half only: no full-game study lowers it.
+        if args.market != "1h":
+            raise HarnessRefusal("--frame-min-season below the live floor is first-half only")
+        from beatvegas.model.train_windows import champion_2023
+
+        arms = [H.Arm(H.INCUMBENT_NAME, champion_2023, is_incumbent=True)]
+    else:
+        arms = [H.incumbent_arm(by_key(args.market))]
     if len(args.candidate_name) > len(args.candidate):
         raise HarnessRefusal("more --candidate-name values than --candidate values")
     for i, dotted in enumerate(args.candidate):
@@ -176,6 +215,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             criterion=criterion,
             market=market,
             side=args.side,
+            frame_min_season=frame_floor(args),
+            require_total=not args.keep_rows_without_total,
         )
         if row.status == "exploratory" and criterion is not None:
             raise HarnessRefusal(

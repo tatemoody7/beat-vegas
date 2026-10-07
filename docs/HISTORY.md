@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (TWO DECISION MEMOS).** `docs/program/FP_BUDGET_OPTIONS.md`: three ways to split the
+  program-wide false-positive budget Tate approved on 2026-10-06 (one 10% cap; tighten only rows
+  whose pass unlocks a promotion; keep 5% each and require a repeat), with each row's threshold
+  and expected picks to a pass. `docs/program/PRODUCT_OPTIONS.md`: site only, site + free Sunday
+  email, or that plus a written 2027 paid-tier gate, built from the teardown, legal memo and
+  knowledge base on file. Nothing decided; each choice lands as its own PR.
+
 - **2026-10-07 (OM: THE OFF-MARKET GATE IS RETIRED).** Tate's call on `ASSUMPTIONS` row 8: the
   "Hard Rock more than 0.5 pts below the market → WATCH" gate is gone from `card.py::is_bet`,
   `verdict.ts`, `edge.ts` and `pickRules.serverVerdict` (and the e2e fixture's port; fixture game

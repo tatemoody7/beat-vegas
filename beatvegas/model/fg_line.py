@@ -20,9 +20,12 @@ from ..markets import FG_ACTUAL_COL, FULL_GAME, with_target
 from .bv_line import bv_line_for_slate
 
 
-def bv_fg_line_for_slate(train_df: pd.DataFrame, target_df: pd.DataFrame) -> np.ndarray:
+def bv_fg_line_for_slate(
+    train_df: pd.DataFrame, target_df: pd.DataFrame, drop_all_nan: bool = False
+) -> np.ndarray:
     """Fit on `train_df` (rows with a final score), predict `target_df`, return
-    calibrated full-game lines."""
+    calibrated full-game lines. `drop_all_nan`: see bv_line.fit_bv_regressor
+    (the shadow trains like the champion, on 2003+, since 2026-10-07)."""
     train = with_target(train_df, FULL_GAME)
     target = with_target(target_df, FULL_GAME)
-    return bv_line_for_slate(train, target, target=FG_ACTUAL_COL)
+    return bv_line_for_slate(train, target, target=FG_ACTUAL_COL, drop_all_nan=drop_all_nan)

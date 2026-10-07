@@ -41,8 +41,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   Mississippi State, gap 2.12 = bar 2.12, cap rank 5). Week-5 report: `reports/weekly/`, local.
   Week 6 `tue_pm` (card 26, bar 3.96): 2 BETs, Maryland @ Ohio State u30.5 +100, UCF @ Oklahoma
   State u27.5 −115; 9 of 11 qualifiers price-blocked.
-- **H-HIST met (2026-10-07)**: 2003/2010/2015+ training cut error ~0.42 pts (9.17 → ~8.75, close
-  8.73); picks not worse. Live trains 2023+ until Tate's switch PR. H-ELO-F null.
+- **H-HIST met; live switched (2026-10-07)**: 2003+ training cut error ~0.43 pts (9.17 → 8.74, close
+  8.73); picks not worse. Champion + FG shadow now train 2003+. H-ELO-F null.
 - **The deep program (since 2026-10-06)**: a betting system, not a picks page — six tracks
   (markets, CFBD catalogue, Discord, Bill's business, assumptions audit, product thesis), one
   Monday review (`docs/program/`, one file a week), real money unchanged for 2026. Day one: H-WEPA-F
@@ -171,8 +171,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
   − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
-  `data/fbs_teams.json`), trained on 2023+ (`features.FRAME_MIN_SEASON`; older seasons are
-  study-only until H-HIST), global intercept, re-fitted every Sunday. `score_slate`
+  `data/fbs_teams.json`), trained on 2003+ (`score.CHAMPION_TRAIN_MIN_SEASON`; other frames
+  2023+), global intercept, re-fitted every Sunday. `score_slate`
   ranks by `gap = line − bv_line`; the 0-100 score, tier and kill line all derive from the gap
   against the slate bar. `bv_sigma` is one slate-wide number — no probability from it.
 

@@ -189,7 +189,9 @@ def bv_line_for_slate(
     return apply_bias(raw, target_df, corrections)
 
 
-def residual_band(train_df: pd.DataFrame, lo: float = 0.1, hi: float = 0.9) -> Dict:
+def residual_band(
+    train_df: pd.DataFrame, lo: float = 0.1, hi: float = 0.9, drop_all_nan: bool = False
+) -> Dict:
     """Empirical (conformal) prediction band for the BV line.
 
     Reuses the walk-forward OOF residuals — no extra models. Returns
@@ -197,7 +199,7 @@ def residual_band(train_df: pd.DataFrame, lo: float = 0.1, hi: float = 0.9) -> D
     an [lo, hi] interval (default 80%), and the residual std. A raw gap is
     meaningless without this — a 2pt gap is noise if sigma is 7pt.
     """
-    res = oof_residuals(train_df)
+    res = oof_residuals(train_df, drop_all_nan=drop_all_nan)
     if res.empty or len(res) < _MIN_SEGMENT:
         return {"lo_off": None, "hi_off": None, "sigma": None}
     r = res["residual"]

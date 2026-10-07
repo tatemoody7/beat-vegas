@@ -147,7 +147,7 @@ def test_study_frame_switch_keeps_rows_without_a_total(monkeypatch):
     """require_total=False keeps the rows and gives them a NaN proxy line
     instead of raising inside proxy_total."""
     src = inspect.getsource(features.build_feature_frame)
-    assert "df = (df[has_total] if require_total else df).copy()" in src
+    assert "rows_to_keep(df, require_total, total_required_from)" in src
     assert 'df.loc[has_total, "proxy_line"]' in src
     # proxy_total itself cannot take a NaN total -- the guard is why.
     with pytest.raises(ValueError):

@@ -302,7 +302,7 @@ def _wire(monkeypatch, mem, scored: pd.DataFrame, engine: str = "residual"):
     monkeypatch.setattr(wu, "engine_name", lambda: engine)
     monkeypatch.setattr(wu, "try_init_db", lambda: True)
     monkeypatch.setattr(wu, "detect_week", lambda season: 5)
-    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0: frame)
+    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0, **kw: frame)
     monkeypatch.setattr(wu, "ranking_line_lookup", lambda season, week, basis="opener": ({}, {}))
     monkeypatch.setattr(wu, "training_real_closes", lambda frame, season: {})
     monkeypatch.setattr(wu, "score_slate", lambda *a, **k: scored)

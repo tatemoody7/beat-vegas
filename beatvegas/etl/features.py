@@ -169,6 +169,28 @@ BANNED_LINE_COLS = {
 # (docs/HYPOTHESES.md H-HIST), stating its effect on H-STOP-2.
 FRAME_MIN_SEASON = 2023
 
+# CFBD's free /lines carries no full-game total before 2013 (probe 2026-10-06:
+# 2003-2012 hold 0; 2013 702 of 813). A frame that reaches further back keeps
+# those seasons' rows only when told which seasons must carry a total
+# (`total_required_from`), so the champion's 2003+ training never drops them.
+CFBD_TOTALS_FROM = 2013
+
+
+def rows_to_keep(
+    df: pd.DataFrame, require_total: bool = True, total_required_from: Optional[int] = None
+) -> pd.Series:
+    """Which frame rows survive the full-game-total rule: every row with a
+    total; without one, a row survives only when `require_total` is off (the
+    H-HIST study frame) or its season is before `total_required_from` (the live
+    champion's 2003+ training, 2026-10-07: seasons CFBD never priced)."""
+    tot = pd.to_numeric(df["full_game_total"], errors="coerce")
+    has_total = tot.notna() & (tot > 0)
+    if not require_total:
+        return pd.Series(True, index=df.index)
+    if total_required_from is None:
+        return has_total
+    return has_total | (df["season"] < int(total_required_from))
+
 
 def _load_all_games(
     fbs_only: bool = True, min_season: Optional[int] = FRAME_MIN_SEASON
@@ -527,6 +549,7 @@ def build_feature_frame(
     allow_diagnostic_lead: bool = False,
     min_season: Optional[int] = FRAME_MIN_SEASON,
     require_total: bool = True,
+    total_required_from: Optional[int] = None,
 ) -> pd.DataFrame:
     """`min_season` (default FRAME_MIN_SEASON): the earliest season read, for
     the games AND the schedule-derived situational columns (rest days and the
@@ -537,7 +560,12 @@ def build_feature_frame(
     full-game total. The regressor never reads the total (a market column), so
     the H-HIST study frame passes False to keep pre-2013 seasons, which CFBD's
     free /lines cannot price (docs/HYPOTHESES.md H-HIST, amended before any
-    look). Those rows carry a NaN proxy line and an `under` of no meaning."""
+    look). Those rows carry a NaN proxy line and an `under` of no meaning.
+
+    `total_required_from` (the live champion since 2026-10-07, H-HIST): with
+    `require_total`, only rows from that season on must carry a total -- every
+    scored row still does, and the seasons CFBD never priced stay as training
+    history. None (default) = every row must carry one."""
     check_weather_lead(weather_lead, allow_diagnostic_lead)
     games = _load_all_games(fbs_only=fbs_only, min_season=min_season)
     std = _season_to_date(_team_long(games), prior_weight=prior_weight)
@@ -703,8 +731,7 @@ def build_feature_frame(
     # trains or grades must drop them (training_frame / played_mask).
     df["full_game_total"] = pd.to_numeric(df["full_game_total"], errors="coerce")
     df["first_half_total"] = pd.to_numeric(df["first_half_total"], errors="coerce")
-    has_total = df["full_game_total"].notna() & (df["full_game_total"] > 0)
-    df = (df[has_total] if require_total else df).copy()
+    df = df[rows_to_keep(df, require_total, total_required_from)].copy()
     has_total = df["full_game_total"].notna() & (df["full_game_total"] > 0)
     df["proxy_line"] = np.nan
     if has_total.any():

@@ -27,7 +27,7 @@ from ..config import ENGINES, engine_name
 from ..db.models import Prediction
 from ..db.store import init_db, session_scope
 from ..etl.context import SITUATIONAL_KEYS, context_for_games, json_safe
-from ..etl.features import build_feature_frame, training_frame
+from ..etl.features import FRAME_MIN_SEASON, build_feature_frame, training_frame
 from ..etl.form import form_for_games
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
@@ -42,6 +42,13 @@ from .residual import (
 )
 
 MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the engine itself is the gbm_v2 gap ranker
+
+# The champion's training floor (Tate, 2026-10-07): H-HIST met -- training on
+# 2003+ instead of 2023-25 cut the first-half error ~0.43 pts a game to the
+# close's level (docs/HISTORY_DEPTH.md, start year 2003 chosen without looking
+# at the betting records). Read by the live scorers only (scripts/weekly_update.py,
+# scripts/fg_shadow.py); every other frame stays at features.FRAME_MIN_SEASON.
+CHAMPION_TRAIN_MIN_SEASON = 2003
 
 # The prediction versions any "the model's line" read may see (2026-10-06): the
 # champion, then the display-only derived lines (card.REFERENCE_MODEL_VERSION,
@@ -495,13 +502,17 @@ def score_slate(
     # The incumbent's number for EVERY row: under the bv_line engine it is the
     # whole board, and under the residual engine it is the per-row fallback.
     # (An independent calibrated "BV line" from a MARKET-BLIND regressor.)
-    target["bv_line"] = bv_line_for_slate(train, target).round(2)
+    # drop_all_nan: early training seasons carry inputs CFBD never had for them
+    # (talent before 2015); a no-op on a 2023+ train (H-HIST, 2026-10-07).
+    target["bv_line"] = bv_line_for_slate(train, target, drop_all_nan=True).round(2)
     # The intercept that number carries, stored per row so the RAW, pre-intercept
     # prediction stays recoverable as bv_line - bv_intercept. H-INSEASON-P's arms
     # re-estimate the calibration from the season's own raw residuals, and without
     # this they would have to refit the model to see them.
-    target["bv_intercept"] = round(float(bias_corrections(train).get("global", 0.0)), 6)
-    band = residual_band(train)
+    target["bv_intercept"] = round(
+        float(bias_corrections(train, drop_all_nan=True).get("global", 0.0)), 6
+    )
+    band = residual_band(train, drop_all_nan=True)
     bands: List = [(pd.Series(True, index=target.index), band)]
     fallback: Optional[str] = None
     artifact: Optional[Dict] = None
@@ -576,7 +587,9 @@ def score_slate(
     # Everything below is attached AFTER the final reshape on purpose: pandas
     # deep-copies .attrs through sort_values/reset_index, and engine_artifact
     # holds a fitted regressor. Attaching it earlier clones the model for nothing.
-    target.attrs["factor_refs"] = factor_references(df)
+    # The board's tint anchors stay on the live era (2023+): the 2003+ training
+    # history is the model's, not the factor board's (2026-10-07).
+    target.attrs["factor_refs"] = factor_references(df[df["season"] >= FRAME_MIN_SEASON])
     if fallback:
         target.attrs["engine_fallback"] = fallback
     if artifact is not None:

@@ -211,7 +211,7 @@ def _frame() -> pd.DataFrame:
 def _wire(monkeypatch, wu, engine: str, argv_extra=()):
     monkeypatch.setattr(wu, "try_init_db", lambda: True)
     monkeypatch.setattr(wu, "detect_week", lambda season: WEEK)
-    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0: _frame())
+    monkeypatch.setattr(wu, "build_feature_frame", lambda min_games=0, **kw: _frame())
     monkeypatch.setattr(wu, "engine_name", lambda: engine)
     monkeypatch.setattr(wu, "_enrich_qb_out", lambda scored: None)
     monkeypatch.setattr(wu, "store_predictions", lambda scored, **kw: len(scored))

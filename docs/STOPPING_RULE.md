@@ -140,3 +140,13 @@ this reduces to the Clock-1 formula.
 
 Constants: `beatvegas/backtest/stopping.py::REGISTERED_2`; the weekly position is
 `scripts/stopping_rule_position.py --clock 2`. Registry row **H-STOP-2**.
+
+## The model switch inside Clock 2 — 2026-10-07 (Tate's call: keep the clock running)
+
+After H-HIST met (`docs/HISTORY_DEPTH.md`), the champion's training floor moved from 2023 to
+2003 (`score.CHAMPION_TRAIN_MIN_SEASON`) with the 2026 week-6 re-score of 2026-10-07. Clock 2
+keeps running across the switch: under the null (no edge) every observation has zero expected
+profit and zero expected line value whichever model chose it, so the registered boundaries keep
+their error rates. The position report states the observations before and after the switch
+separately (week 6's re-score is the boundary: picks logged from cards built on the 2003+
+predictions are "after"). No constant, bound or sigma changes.

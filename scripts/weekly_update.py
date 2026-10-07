@@ -41,8 +41,11 @@ from beatvegas.config import engine_name
 from beatvegas.db.models import Game, ModelRun, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import (
+    CFBD_TOTALS_FROM,
+    FRAME_MIN_SEASON,
     apply_min_games,
     build_feature_frame,
+    played_mask,
     serve_skew_report,
     serve_skew_violations,
 )
@@ -62,7 +65,12 @@ from beatvegas.model.artifacts import (
     persist_artifact,
 )
 from beatvegas.model.bv_line import BV_FEATURE_COLS
-from beatvegas.model.score import MODEL_VERSION, score_slate, store_predictions
+from beatvegas.model.score import (
+    CHAMPION_TRAIN_MIN_SEASON,
+    MODEL_VERSION,
+    score_slate,
+    store_predictions,
+)
 from beatvegas.season import current_season, detect_week
 from beatvegas.sources import rotowire
 
@@ -252,7 +260,8 @@ def record_weekly_refit(
             "engine": engine,
             "n_inputs": int(len(BV_FEATURE_COLS)),
             "intercept": intercept,
-            "train_rows": int(skew.attrs.get("n_train", 0) or 0),
+            "train_rows": int(skew.attrs.get("n_train_all", skew.attrs.get("n_train", 0)) or 0),
+            "skew_guard_train_rows": int(skew.attrs.get("n_train", 0) or 0),
             "target_rows": int(skew.attrs.get("n_target", 0) or 0),
             "scored_rows": int(n),
             "frame_fingerprint": frame_fingerprint or fingerprint_hash(fingerprint(df)),
@@ -412,11 +421,20 @@ def main() -> None:
     # Build WITHOUT the min_games cut so we can tell "nothing eligible yet" from
     # "scoring broke": the frame keeps every game with a full-game total
     # (including the unplayed target week), and the cut is applied here.
-    frame = build_feature_frame(min_games=0)
+    # The champion trains on 2003+ (CHAMPION_TRAIN_MIN_SEASON, H-HIST, Tate
+    # 2026-10-07); seasons CFBD never priced (before CFBD_TOTALS_FROM) stay as
+    # training rows, and every scored row still needs a total. The factor-board
+    # anchors and the serve-skew guard stay on the live era (2023+).
+    frame = build_feature_frame(
+        min_games=0,
+        min_season=CHAMPION_TRAIN_MIN_SEASON,
+        total_required_from=CFBD_TOTALS_FROM,
+    )
+    live_era = frame[frame["season"] >= FRAME_MIN_SEASON]
     if args.write_refs:
         # Same frame historical_references() would build (min_games=0), so the
         # derived-lines step gets identical anchors without a second build.
-        save_references(factor_references(frame), args.write_refs)
+        save_references(factor_references(live_era), args.write_refs)
         print(f"factor references written to {args.write_refs}")
     in_week = (frame["season"] == args.season) & (frame["week"] == week)
     n_with_total = int(in_week.sum())
@@ -427,7 +445,14 @@ def main() -> None:
     # the training rows is a defect (the model would route every game through
     # branches it never trained). 57 such columns went unnoticed for a season
     # because every backtest scores played rows; this fails the run instead.
-    skew = serve_skew_report(df, args.season, week, BV_FEATURE_COLS)
+    # The guard judges serving against the live era's training rows: older
+    # seasons have no pace/weather at all, which would hide a live skew.
+    skew = serve_skew_report(
+        df[df["season"] >= FRAME_MIN_SEASON], args.season, week, BV_FEATURE_COLS
+    )
+    if "under" in df.columns or "first_half_total" in df.columns:
+        # the training rows the champion actually fits on (2003+), for model_runs
+        skew.attrs["n_train_all"] = int(((df["season"] < args.season) & played_mask(df)).sum())
     bad = serve_skew_violations(skew)
     print(
         f"serve-skew check: {skew.attrs.get('n_target', 0)} target rows vs "

@@ -79,16 +79,30 @@ def _played(df: pd.DataFrame, target: str = TARGET) -> pd.DataFrame:
 
 
 def fit_bv_regressor(
-    train_df: pd.DataFrame, target: str = TARGET, feature_cols: Optional[Sequence[str]] = None
+    train_df: pd.DataFrame,
+    target: str = TARGET,
+    feature_cols: Optional[Sequence[str]] = None,
+    drop_all_nan: bool = False,
 ) -> HistGradientBoostingRegressor:
     """`feature_cols` (default BV_FEATURE_COLS, the champion's inputs): a study
     arm may add inputs (H-ELO-F); the market-blind assert covers whatever is
-    passed."""
+    passed.
+
+    `drop_all_nan` (default False, the champion's path): fit only on columns
+    with at least one value in THIS training slice. sklearn's HGB refuses to
+    bin an all-NaN column (`window shape cannot be larger than input array
+    shape`), and an all-NaN column carries no split the model could use, so
+    dropping it is the same model. The H-HIST arms need it: a fold trained on
+    2003 alone has no talent / returning-production inputs at all. The fitted
+    model records the columns it used in `bv_cols_`; every predict reads them."""
     cols = list(BV_FEATURE_COLS if feature_cols is None else feature_cols)
     _assert_market_blind(cols)
     train_df = _played(train_df, target)
+    if drop_all_nan:
+        cols = [c for c in cols if train_df[c].notna().any()]
     model = _new_regressor()
     model.fit(train_df[cols], train_df[target].astype(float))
+    model.bv_cols_ = cols
     return model
 
 
@@ -97,6 +111,7 @@ def oof_residuals(
     min_train: int = 500,
     target: str = TARGET,
     feature_cols: Optional[Sequence[str]] = None,
+    drop_all_nan: bool = False,
 ) -> pd.DataFrame:
     """Walk-forward out-of-fold residuals (actual - pred) across seasons.
 
@@ -113,8 +128,8 @@ def oof_residuals(
         test = df[df["season"] == ts]
         if len(train) < min_train or test.empty:
             continue
-        model = fit_bv_regressor(train, target, feature_cols)
-        pred = model.predict(test[list(BV_FEATURE_COLS if feature_cols is None else feature_cols)])
+        model = fit_bv_regressor(train, target, feature_cols, drop_all_nan)
+        pred = model.predict(test[model.bv_cols_])
         chunk = test.copy()
         chunk["bv_raw"] = pred
         chunk["residual"] = chunk[target].astype(float) - pred
@@ -125,7 +140,10 @@ def oof_residuals(
 
 
 def bias_corrections(
-    train_df: pd.DataFrame, target: str = TARGET, feature_cols: Optional[Sequence[str]] = None
+    train_df: pd.DataFrame,
+    target: str = TARGET,
+    feature_cols: Optional[Sequence[str]] = None,
+    drop_all_nan: bool = False,
 ) -> Dict:
     """Global intercept correction learned from OOF residuals on TRAIN only.
 
@@ -133,7 +151,9 @@ def bias_corrections(
     (the era feature handles era; per-era would double-count) — per-era residuals
     are surfaced for auditing via residual_report instead.
     """
-    res = oof_residuals(train_df, target=target, feature_cols=feature_cols)
+    res = oof_residuals(
+        train_df, target=target, feature_cols=feature_cols, drop_all_nan=drop_all_nan
+    )
     if res.empty:
         return {"global": 0.0}
     return {"global": float(res["residual"].mean())}
@@ -150,6 +170,7 @@ def bv_line_for_slate(
     target_df: pd.DataFrame,
     target: str = TARGET,
     feature_cols: Optional[Sequence[str]] = None,
+    drop_all_nan: bool = False,
 ) -> np.ndarray:
     """Fit on train, predict the target slate, return calibrated BV lines.
 
@@ -162,9 +183,9 @@ def bv_line_for_slate(
     if train_df.empty or target_df.empty:
         return np.array([], dtype=float)
     cols = list(BV_FEATURE_COLS if feature_cols is None else feature_cols)
-    model = fit_bv_regressor(train_df, target, cols)
-    raw = model.predict(target_df[cols])
-    corrections = bias_corrections(train_df, target, cols)
+    model = fit_bv_regressor(train_df, target, cols, drop_all_nan)
+    raw = model.predict(target_df[model.bv_cols_])
+    corrections = bias_corrections(train_df, target, cols, drop_all_nan)
     return apply_bias(raw, target_df, corrections)
 
 

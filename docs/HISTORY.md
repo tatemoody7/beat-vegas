@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (H-HIST FIRST DISPATCH CRASHED BEFORE ANY NUMBER).** `study.yml` run 37566306294
+  built the 2003-2026 study frame (17,447 rows) and crashed in the first fit: HGB refuses an
+  all-NaN column, and a fold trained on 2003 alone has no talent input (the known HGB gotcha).
+  Nothing was computed or read. Fix: `fit_bv_regressor(drop_all_nan=True)` for the history arms
+  only (an all-empty column offers no split, so it is the same model); the incumbent keeps the
+  live path. Noted in the H-HIST row before the re-dispatch; not a look.
+
 - **2026-10-06 (H-HIST / H-ELO-F MACHINERY — PR H4).** `build_feature_frame(require_total=False)`
   keeps rows without a full-game total for the STUDY frame only (proxy line NaN instead of
   raising); the frame now carries `home_pregame_elo` / `away_pregame_elo` (never in

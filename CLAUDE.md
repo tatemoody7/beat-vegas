@@ -27,7 +27,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `SHARP_BOOKS`, `CLASSIFIER_RETIREMENT`, `EXTERNAL_REVIEW`, `PIVOT`, `BV_LINE`,
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
-  `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice) (all in `docs/`).
+  `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
+  `ELO_F` (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -40,6 +41,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   Mississippi State, gap 2.12 = bar 2.12, cap rank 5). Week-5 report: `reports/weekly/`, local.
   Week 6 `tue_pm` (card 26, bar 3.96): 2 BETs, Maryland @ Ohio State u30.5 +100, UCF @ Oklahoma
   State u27.5 −115; 9 of 11 qualifiers price-blocked.
+- **H-HIST met (2026-10-07)**: 2003/2010/2015+ training cut error ~0.42 pts (9.17 → ~8.75, close
+  8.73); picks not worse. Live trains 2023+ until Tate's switch PR. H-ELO-F null.
 - **The deep program (since 2026-10-06)**: a betting system, not a picks page — six tracks
   (markets, CFBD catalogue, Discord, Bill's business, assumptions audit, product thesis), one
   Monday review (`docs/program/`, one file a week), real money unchanged for 2026. Day one: H-WEPA-F

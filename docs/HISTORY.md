@@ -9,6 +9,12 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (H-HIST MET; H-ELO-F NULL).** One look each. H-HIST (run 37567344521): all three
+  longer windows beat the 2023+ champion on accuracy by ~0.42 pts a game (Holm p 0.002 each),
+  pooled MAE 9.17 → 8.74 / 8.75 / 8.76 against the consensus close's 8.73; units not worse
+  (intervals span zero). H-ELO-F (run 37566955440): Δ|err| −0.019 [−0.087, +0.050], not met.
+  Nothing live changed; raising `FRAME_MIN_SEASON` is Tate's call in its own PR.
+
 - **2026-10-07 (H-HIST FIRST DISPATCH CRASHED BEFORE ANY NUMBER).** `study.yml` run 37566306294
   built the 2003-2026 study frame (17,447 rows) and crashed in the first fit: HGB refuses an
   all-NaN column, and a fold trained on 2003 alone has no talent input (the known HGB gotcha).

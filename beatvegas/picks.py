@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from .consensus import fields_for_pick
 from .db.models import AppSetting, ManualPick, OddsSnapshot
 from .grading import (
     clv_under,
@@ -383,6 +384,11 @@ def grade_pick(session, pick, game) -> bool:
     # The age of the close is a fact about the close, stored beside it. A dropped
     # pre-kick poll makes Friday's sweep quote "the close" silently otherwise.
     pick.closing_captured_at = closing_at
+    # Line value at the wager's exact terms (beatvegas/consensus.py): the 2026
+    # research program's judge, read from the same pre-kick snapshots. It never
+    # blocks a grade -- a missing reading records why in `cons_excluded`.
+    for k, v in fields_for_pick(snaps, game.start_date, pick).items():
+        setattr(pick, k, v)
     pick.graded = True
     return True
 

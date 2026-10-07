@@ -50,7 +50,9 @@ MIN_BOOKS = 3
 MAX_CONVERT_PTS = 1.5
 CLOSE_WINDOW_H = 2.0
 
-HALFPOINT_PATH = Path(__file__).resolve().parent.parent / "data" / f"halfpoint_{HALFPOINT_VERSION}.json"
+HALFPOINT_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / f"halfpoint_{HALFPOINT_VERSION}.json"
+)
 
 # The snapshot market each pick market reads.
 SNAP_MARKET = {"1H": "1H_total", "full": "full_game_total"}
@@ -61,6 +63,7 @@ EX_NO_LINE = "no_line"
 EX_FEW_BOOKS = "few_books"
 EX_OUTSIDE_TABLE = "outside_table"
 EX_NO_HR_CLOSE = "no_hr_close"
+EX_NO_TABLE = "no_table"
 
 
 # --- the half-point table ------------------------------------------------------
@@ -238,7 +241,9 @@ def read_at_terms(
     usable = [
         c
         for c in closes.values()
-        if c.seen_at is not None and c.seen_at >= floor and abs(c.line - line) <= MAX_CONVERT_PTS + 1e-9
+        if c.seen_at is not None
+        and c.seen_at >= floor
+        and abs(c.line - line) <= MAX_CONVERT_PTS + 1e-9
     ]
     if len(usable) < min_books:
         return Reading(books=len(usable), excluded=EX_FEW_BOOKS)
@@ -294,7 +299,9 @@ def hr_reading(
         return Reading(excluded=EX_NO_KICKOFF)
     from .lines import hr_main_snaps  # local: lines imports picks-adjacent helpers
 
-    hr_only = [s for s in hr_main_snaps(snaps) if (getattr(s, "book", "") or "").lower() == HR_BOOK_KEY]
+    hr_only = [
+        s for s in hr_main_snaps(snaps) if (getattr(s, "book", "") or "").lower() == HR_BOOK_KEY
+    ]
     closes = book_closes(hr_only, kickoff, excluded=frozenset())
     r = read_at_terms(closes, kickoff, market, line, side, price, table, min_books=1)
     if r.excluded == EX_FEW_BOOKS:
@@ -315,3 +322,28 @@ def pick_fields(cons: Reading, hr: Reading) -> dict:
         "ev_hr": hr.ev,
         "cons_excluded": cons.excluded,
     }
+
+
+_TABLE: Optional[HalfPointTable] = None
+
+
+def default_table() -> Optional[HalfPointTable]:
+    """The frozen hp1 table, loaded once; None if the file is missing (the
+    caller records `no_table` rather than failing a grading run)."""
+    global _TABLE
+    if _TABLE is None and HALFPOINT_PATH.exists():
+        _TABLE = HalfPointTable.load()
+    return _TABLE
+
+
+def fields_for_pick(snaps: Sequence, kickoff, pick, table: Optional[HalfPointTable] = None) -> dict:
+    """The consensus columns for one pick, from its game's snapshots of the
+    pick's own market (the same list `picks.grade_pick` already read)."""
+    t = table if table is not None else default_table()
+    market = SNAP_MARKET.get(getattr(pick, "market", None) or "1H", "1H_total")
+    side = (getattr(pick, "side", None) or "under").lower()
+    if t is None:
+        return pick_fields(Reading(excluded=EX_NO_TABLE), Reading(excluded=EX_NO_TABLE))
+    cons = consensus_reading(snaps, kickoff, market, pick.line, side, pick.price, t)
+    hr = hr_reading(snaps, kickoff, market, pick.line, side, pick.price, t)
+    return pick_fields(cons, hr)

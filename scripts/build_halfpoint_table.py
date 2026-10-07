@@ -41,7 +41,9 @@ FIRST_SEASON, LAST_SEASON = 2013, 2025
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--out", default="reports")
     args = ap.parse_args(argv)
     if not try_init_db():
@@ -92,7 +94,12 @@ def main(argv=None) -> int:
             "blowout": mult["blowout"],
             "cut": mult["cut"],
         },
-        "games": {"read": n_all, "fbs": len(df), "first_half_pairs": len(fh), "full_game_pairs": len(fg)},
+        "games": {
+            "read": n_all,
+            "fbs": len(df),
+            "first_half_pairs": len(fh),
+            "full_game_pairs": len(fg),
+        },
         "markets": {
             "1H_total": {"centers": t_fh},
             "full_game_total": {"centers": t_fg},
@@ -110,7 +117,9 @@ def main(argv=None) -> int:
     ]
     for name, t in (("1H_total", t_fh), ("full_game_total", t_fg)):
         cs = sorted(float(c) for c in t)
-        lines.append(f"## {name}: {len(t)} centers" + (f", {cs[0]:.1f} to {cs[-1]:.1f}" if cs else ""))
+        lines.append(
+            f"## {name}: {len(t)} centers" + (f", {cs[0]:.1f} to {cs[-1]:.1f}" if cs else "")
+        )
         lines.append("")
         lines.append("| integer center | games | push rate |")
         lines.append("|---|---|---|")

@@ -7,6 +7,17 @@
 web research; platform policies are as read on 2026-10-06 and change, so any platform is
 re-checked in writing before it is used. Nothing changes from this document.
 
+## Tate's decisions (2026-10-07)
+
+1. **Option A: the site is the whole product this season.** No email list now.
+2. **Substack** is the platform on record if a list is ever started; nothing is set up.
+3. Of A's site work: **the legal footer** on every page, and **the weekly model-vs-Hard-Rock
+   accuracy made public** (even while it says the market is more accurate). Not now: the
+   attribution lines and the "what changed" page.
+4. **Enter the free CFBD Model Pick'em** with the full-game reference margin: the entry rules are
+   brought to Tate before anything is submitted.
+5. The first-reader question is moot with no list.
+
 ## The decision
 
 What should someone who is not you be able to get from Beat Vegas this season: the public site

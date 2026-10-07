@@ -4,6 +4,14 @@
 option is chosen lands as its own registry PR (`docs/HYPOTHESES.md` amended before any row it
 touches reads a new number).
 
+## Tate's decision (2026-10-07): Option 2
+
+Only the rows whose pass unlocks a promotion (H-PCT-TIE, H-SHADOW-F, H-INSEASON-T) share one
+5% budget, 1.67% each; the finding rows (H-NEGGAP-P, H-FG-P, H6) keep 5% each and every pass of
+theirs is reported as "a finding, licenses nothing"; H-STOP-2, H-TIMING and H-CLOSE-W stay
+outside the budget. Lands as its own registry PR, amending the three rows before any of them
+reads an observation.
+
 ## The decision
 
 You approved one false-positive budget for the whole program on 2026-10-06 and left the split

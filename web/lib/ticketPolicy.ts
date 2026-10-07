@@ -50,17 +50,18 @@ export function evaluationMode(
 export type TicketEvaluation = { ok: true; verdict: Verdict } | Rejection;
 
 /**
- * Was Hard Rock's quote last SEEN more than HR_PRICE_MAX_AGE_H before the bet
- * time? `seenAt` is naive UTC text, max(captured_at, last_seen_at); a sighting
- * after the bet time confirms the quote was still in force at it (an unchanged
- * poll writes no row, so no newer quote existed in between).
+ * Was Hard Rock's quote last SEEN more than HR_PRICE_MAX_AGE_H before `at`
+ * (now for a live ticket, M2; the bet time for a backdated one, M1B)?
+ * `seenAt` is naive UTC text, max(captured_at, last_seen_at); a sighting after
+ * `at` confirms the quote was still in force at it (an unchanged poll writes
+ * no row, so no newer quote existed in between).
  */
-export function staleAtBet(seenAt: string | null, betAt: Date): boolean {
+export function staleAt(seenAt: string | null, at: Date): boolean {
   if (seenAt === null) return true;
   const seen = Date.parse(`${seenAt.trim().replace(" ", "T")}Z`);
   if (!Number.isFinite(seen)) return true;
-  const confirmed = Math.min(seen, betAt.getTime());
-  return betAt.getTime() - confirmed > HR_PRICE_MAX_AGE_H * 3_600_000;
+  const confirmed = Math.min(seen, at.getTime());
+  return at.getTime() - confirmed > HR_PRICE_MAX_AGE_H * 3_600_000;
 }
 
 function dbError(where: string, e: unknown): Rejection {
@@ -224,10 +225,19 @@ export async function evaluateRealTicket(args: {
       ok: false,
       reason: `no other book or exchange was priced at Hard Rock’s number ${priceAt}`,
     };
-  } else if (asOfBet && staleAtBet(row.hrSeenAt ?? null, betAtDate!)) {
+  } else if (asOfBet && staleAt(row.hrSeenAt ?? null, betAtDate!)) {
     livePrice = {
       ok: false,
       reason: `Hard Rock’s last confirmed price before the bet time was more than ${HR_PRICE_MAX_AGE_H} hours old, so the price the ticket was written at cannot be verified`,
+    };
+  } else if (!asOfBet && staleAt(row.hrSeenAt ?? null, now)) {
+    // M2 (2026-10-07): a live ticket needs a price SEEN in the last 6 h. Our
+    // snapshots land at builds and close polls, so midweek the newest one can
+    // be a day old; the board's "Refresh price" polls this one game.
+    livePrice = {
+      ok: false,
+      stale: true,
+      reason: `Hard Rock’s price was last confirmed more than ${HR_PRICE_MAX_AGE_H} hours ago`,
     };
   } else {
     livePrice = { ok: true, killPrice: breakEvenPrice(row.marketFairUnder) };

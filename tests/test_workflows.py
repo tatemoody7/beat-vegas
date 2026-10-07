@@ -906,3 +906,23 @@ def test_neggap_collection_is_switched_on_only_in_the_card_build():
             assert "NEGGAP_COLLECT" not in text, p.name
     data = _load(WF_DIR / "study.yml")
     assert "neggap_position" in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
+
+
+def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():
+    """The site's Refresh price (2026-10-07) dispatches market=1h_game with a
+    game_id: the id is checked as digits in the resolve step, reaches bash only
+    through env, and the poll is pinned to that game with a 2-credit cap."""
+    data = _load(WF_DIR / "lines_watch.yml")
+    assert "game_id" in _on(data)["workflow_dispatch"]["inputs"]
+    steps = list(_steps(data))
+    resolve = next(s for s in steps if s.get("id") == "resolve")
+    assert resolve["env"]["INPUT_GAME_ID"] == "${{ inputs.game_id }}"
+    run = resolve["run"]
+    assert '[[ "$INPUT_GAME_ID" =~ ^[0-9]{1,12}$ ]]' in run
+    assert run.index("^[0-9]{1,12}$") < run.index('echo "game_id=')
+    one = next(s for s in steps if "--game-id" in str(s.get("run", "")))
+    assert one["if"] == "steps.resolve.outputs.market == '1h_game'"
+    assert one["env"] == {"GAME_ID": "${{ steps.resolve.outputs.game_id }}"}
+    assert '--game-id "$GAME_ID"' in one["run"]
+    assert "--max-credits-per-run 2" in one["run"]
+    assert not INLINE_EXPR.search(one["run"])

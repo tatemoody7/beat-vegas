@@ -165,7 +165,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   the cookie** (`viewerIsAuthed()`): ops warnings, the My-teams chip, the Monday review on
   Results, the research section on How it works, the log control. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
-  `/api/login`, `/api/logout`, `/api/cron/[job]`. Reads are public; writes need the
+  `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
   `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
   `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on
   `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
@@ -224,8 +224,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 
 ## Money path (server-side; the site never trusts the browser)
 - POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
-  Hard Rock's own MAIN line, a **live** verifiable price (`lib/lineCheck.ts`; none → `PRICE
-  UNAVAILABLE`, a different refusal from the kill-price one), a price at or better than the kill
+  Hard Rock's own MAIN line, a **live** verifiable price seen ≤6 h ago (`lib/lineCheck.ts`; none →
+  `PRICE UNAVAILABLE`, old → `PRICE STALE` + the form's Refresh price), a price at or better than the kill
   price recomputed now, both teams with ≥2 current-season FBS games (`MIN_GAMES_FOR_REAL_MONEY`),
   and a free cap slot (5 a week; bonus bets use none and book no loss). Nothing defaults a price
   to −110; a missing price is NULL and refused (`PRICE MISSING`). **Paper is build-only** (2026-10-07):

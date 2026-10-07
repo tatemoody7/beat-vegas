@@ -134,6 +134,17 @@ def filter_missing_hr(
     return out
 
 
+def filter_one_game(
+    events: List[Dict[str, Any]],
+    ctx: Dict[str, Dict[str, Any]],
+    game_id: int,
+) -> List[Dict[str, Any]]:
+    """Keep only the event(s) matched to one game: the site's "Refresh price"
+    (POST /api/price-refresh -> lines_watch.yml market=1h_game, 2026-10-07)
+    buys one per-event call, never a sweep."""
+    return [ev for ev in events if (c := ctx.get(ev["id"])) is not None and c["game_id"] == game_id]
+
+
 def filter_hr_universe(
     events: List[Dict[str, Any]],
     ctx: Dict[str, Dict[str, Any]],

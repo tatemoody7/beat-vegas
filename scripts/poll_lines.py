@@ -64,6 +64,7 @@ from beatvegas.sweep import (
     build_context,
     filter_hr_universe,
     filter_missing_hr,
+    filter_one_game,
     latest_pace_by_team,
     rank_events,
     select_window,
@@ -226,6 +227,14 @@ def main() -> None:
         help="OPENER mode: skip games that already have a Hard Rock 1H snapshot",
     )
     ap.add_argument(
+        "--game-id",
+        type=int,
+        default=None,
+        dest="game_id",
+        help="ONE game only (the site's Refresh price, lines_watch.yml market=1h_game): "
+        "poll just the event matched to this games.id -- 1 credit -- or nothing",
+    )
+    ap.add_argument(
         "--max-events",
         type=int,
         default=0,
@@ -336,6 +345,11 @@ def main() -> None:
             )
     if args.missing_hr_only:
         in_window = filter_missing_hr(in_window, ctx, have_hr_1h)
+    if args.game_id is not None:
+        in_window = filter_one_game(in_window, ctx, args.game_id)
+        print(f"one-game refresh: game {args.game_id} -> {len(in_window)} event(s) to poll")
+        if not in_window:
+            warn(f"No Odds API event in the window matches game {args.game_id}; nothing polled.")
     # Rank the window by bettability BEFORE spending credits, so a capped or
     # credit-limited run pays for the right games first.
     in_window = rank_events(in_window, ctx, args.max_events)

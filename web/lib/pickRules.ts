@@ -291,7 +291,14 @@ export type PolicyContext = {
    * like a price is worse than no price, because it reads as verified.
    */
   livePrice:
-    { ok: true; killPrice: number | null } | { ok: false; reason: string };
+    | { ok: true; killPrice: number | null }
+    | {
+        ok: false;
+        reason: string;
+        /** The price exists but was last seen more than HR_PRICE_MAX_AGE_H
+         *  ago (M2): refused as PRICE STALE, which the form can refresh. */
+        stale?: boolean;
+      };
   /**
    * The real-money pause (docs/STOPPING_RULE.md; lib/rulePause.ts). REQUIRED,
    * like livePrice, so a new caller cannot skip it by omission. `paused: true`
@@ -400,6 +407,12 @@ export function checkPolicy(
     // not check" and "we checked and it is too expensive" are different
     // failures, and a post-mortem that cannot tell them apart will read an
     // outage as a run of discipline.
+    if (!ctx.livePrice.ok && ctx.livePrice.stale) {
+      return reject(
+        `PRICE STALE — ${ctx.livePrice.reason}. A real bet needs a price we have seen recently; use Refresh price to poll this game now (1 Odds API credit), then log again.`,
+        409,
+      );
+    }
     if (!ctx.livePrice.ok) {
       return reject(
         `PRICE UNAVAILABLE — ${ctx.livePrice.reason}. A real bet needs a price we can check against the market right now; the card's number is from the last build, not from this moment. Re-try once the line is back.`,

@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (M2: LIVE FRESHNESS + REFRESH PRICE).** The live price check accepted any pre-kickoff
+  Hard Rock snapshot, so a Tuesday quote passed on Saturday. Tate's calls: a live real BET needs the
+  quote SEEN within `HR_PRICE_MAX_AGE_H` (6 h) of now (max(captured_at, last_seen_at), the M1B
+  reading), refused as `PRICE STALE`; the form then offers **Refresh price** → authed
+  `POST /api/price-refresh` → `lines_watch.yml market=1h_game` → `poll_lines.py --game-id`
+  (one event, 1 credit, `--max-credits-per-run 2`). Nothing was ported to TypeScript and
+  `ODDS_API_KEY` stays off Vercel. The route refuses an unknown or kicked-off game, a price already
+  fresh, a credit gauge under 300, and a second request within 10 min (claimed atomically in
+  `app_settings` `price_refresh_<gameId>`, released if the dispatch fails). Tate confirms the
+  dispatch token's scope (`OPS_ACCOUNTS.md` item 3).
+
 - **2026-10-07 (M1B: BACKDATED INTEGRITY).** A ticket logged more than 30 min after it was written
   used to skip the price check entirely (the card's kill price, or none when the card did not rate
   it BET; typing a bet time 31 min back was enough). Tate's calls (ASSUMPTIONS row 18): the

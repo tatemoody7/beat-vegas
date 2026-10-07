@@ -15,7 +15,15 @@ hold the rest.
   CFBD's free `/lines` has no totals before 2013 (2013: 702 of 813). The frame drops rows
   without a total although the regressor never reads it, so the 2003 and 2010 arms would both
   have started at 2013. Tate's call: a STUDY-only exception (`require_total=False`, PR H4); the
-  live frame keeps its rule; written into H-HIST before any number was read. 2004-2022 loaded.
+  live frame keeps its rule; written into H-HIST before any number was read. 2004-2022 loaded
+  (run 37562361195: ~14,000 FBS games, totals from 2013 on). Elo onto 2023-26 (run 37562510742)
+  went through the standard loader, which also writes CFBD's consensus full-game total: before,
+  2,128 of 2,398 finished 2023-25 FBS games carried a total; after, all of them (source `cfbd`).
+  The frame keeps only rows with a total, so the champion's 2023-25 training set grows **2,212
+  → 2,343** from the week-7 refit (proved on `fg_shadow` run 37562628469, `model_runs` 7:
+  train_window still 2023-2025, train_rows 2,343). Tate's call: keep it as a data repair (those
+  games were excluded only for a missing total). Lesson: re-running the loader on a season the
+  champion trains on is a training-data change, not a no-op.
 
 - **2026-10-06 (HISTORY LOADER — PR H3).** `games.home_pregame_elo` / `away_pregame_elo`
   (CFBD `/games` pregame Elo; H-ELO-F's inputs, read by no champion code); `backfill.py

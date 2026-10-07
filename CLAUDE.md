@@ -28,7 +28,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
-  `ELO_F` (all in `docs/`).
+  `ELO_F`, `MARGIN` (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -210,7 +210,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
-  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`.
+  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`.
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +

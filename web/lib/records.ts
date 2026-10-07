@@ -27,6 +27,9 @@ export type RecordRow = {
    *  accuracy only, never a decision the board could have acted on. Null when
    *  either timestamp is missing. */
   scoredAfterKickoff: boolean | null;
+  /** Kickoff as epoch ms (survives the cache's JSON round trip); null when
+   *  unknown. Read by `lib/signalGate.gateRecords`; not a CSV column. */
+  kickoffMs: number | null;
 };
 
 const num = (v: number | bigint | null | undefined): number | null =>
@@ -54,6 +57,19 @@ export function scoredAfter(
   const k = new Date(startDate).getTime();
   if (Number.isNaN(c) || Number.isNaN(k)) return null;
   return c > k;
+}
+
+/** Exported for its test. Epoch ms of a kickoff, or null when unknown. */
+export function kickoffMs(
+  startDate: Date | string | null | undefined,
+): number | null {
+  if (startDate == null) return null;
+  // A naive string is UTC (never hand one to Date without a zone).
+  const k =
+    typeof startDate === "string" && !/[zZ]|[+-]\d\d:?\d\d$/.test(startDate)
+      ? Date.parse(`${startDate.replace(" ", "T")}Z`)
+      : new Date(startDate).getTime();
+  return Number.isNaN(k) ? null : k;
 }
 
 /** The week the records grid opens on: the LATEST week with a graded game.
@@ -138,6 +154,7 @@ async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
       firstHalfTotal: fh,
       outcome: outcome(fh, line),
       scoredAfterKickoff: scoredAfter(r.created_at, r.start_date),
+      kickoffMs: kickoffMs(r.start_date),
     };
   });
 }

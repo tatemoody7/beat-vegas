@@ -74,15 +74,14 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: 1b site
-  (research-season banner, BET shown as a paper rating, signals hidden from the public until the
-  close) → consensus fair-price engine v1 → Statistical Protocol + simulation (Tate approves the
+- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: consensus
+  fair-price engine v1 → Statistical Protocol + simulation (Tate approves the
   numbers; it settles the shadow engines' budget and defines "shows in two seasons") → multi-book
   spreads + moneylines and one team-total probe → literature looks (citations verified; Tate picks
   the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools).
-- **Real-money switch (2026-10-07)**: `scripts/rule_pause.py on --note …` makes the site refuse
-  every real ticket and shows a board banner; throwing it is Tate's call.
+- **Real-money switch: ON since 2026-10-07** (Tate's call; written through Neon's HTTPS endpoint,
+  mirroring `scripts/rule_pause.py`): the site refuses every real ticket until a promotion.
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
   candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
@@ -140,7 +139,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
   plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
   (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`): ops warnings, the My-teams chip, the Monday review on
+  the cookie** (`viewerIsAuthed()`), and **a visitor sees no pre-kickoff signal**
+  (`lib/signalGate.ts`: board, game page, `/records`, the ledger and both CSVs): ops warnings, the My-teams chip, the Monday review on
   Results, the research section on How it works, the log control. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the

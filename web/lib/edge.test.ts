@@ -103,7 +103,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("BET");
     expect(e.blocker).toBeNull();
     expect(e.action).toBe(
-      "Bet one unit: first-half under 24.5 at -105 on Hard Rock.",
+      "Paper signal: first-half under 24.5 at -105 on Hard Rock.",
     );
     expect(e.verdict.verdict).toBe("BET");
     expect(e.kill.line).toBe(24);
@@ -136,7 +136,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
-      "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher.",
+      "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.0 or higher.",
     );
     expect(e.kill.price).toBeNull();
     expect(e.kill.text).toBe("No longer a bet below u24.0.");
@@ -164,7 +164,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
-      "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher.",
+      "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.0 or higher.",
     );
   });
   it("Hard Rock below the market is no longer a blocker (retired 2026-10-07)", () => {
@@ -396,7 +396,7 @@ describe("edgeScore — model rows", () => {
     expect(at110.blocker).toBeNull();
     expect(at110.kill.price).toBe(-110);
     expect(at110.action).toBe(
-      "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
+      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
     );
 
     const ev115 = evUnder(fair, -115);
@@ -430,7 +430,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("gap");
     expect(e.action).toBe(
-      "Not yet — the line is 1.5 above our number. It becomes a bet at 24.0 or higher.",
+      "Not yet — the line is 1.5 above our number. It becomes a signal at 24.0 or higher.",
     );
   });
   it("small gap → Watch (amber band) with blocker gap; a tiny gap → PASS", () => {
@@ -464,7 +464,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("gap");
     expect(e.kill.line).toBe(24);
     expect(e.action).toBe(
-      "Not yet — the line is 0.7 above our number. It becomes a bet at 24.0 or higher.",
+      "Not yet — the line is 0.7 above our number. It becomes a signal at 24.0 or higher.",
     );
   });
   it("with no Hard Rock line the sentence names the market line (site review 2026-09-28)", () => {
@@ -500,7 +500,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(ref.lineBasis).toBe("reference");
     expect(ref.action).toBe(
-      "Pass: our reference line is 1.3 below our number, so this leans over. We only bet unders.",
+      "Pass: our reference line is 1.3 below our number, so this leans over. We only rate unders.",
     );
   });
   it("a line on our number says so instead of '0.0 below'", () => {
@@ -516,7 +516,7 @@ describe("edgeScore — model rows", () => {
       marketFairUnder: null,
     });
     expect(e.tier).toBe("PASS");
-    expect(e.action).toBe("Pass: the line sits on our number. Nothing to bet.");
+    expect(e.action).toBe("Pass: the line sits on our number. No signal.");
   });
   it("line below our number reads as an over lean", () => {
     const e = edgeScore({
@@ -532,7 +532,7 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(35);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
-      "Pass: the line is 1.3 below our number, so this leans over. We only bet unders.",
+      "Pass: the line is 1.3 below our number, so this leans over. We only rate unders.",
     );
   });
   it("model read but no line anywhere → PASS at 50, action names the line to take", () => {
@@ -552,7 +552,7 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(50);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
-      "Not yet — no first-half line anywhere. It becomes a bet at under 24.0 or higher.",
+      "Not yet — no first-half line anywhere. It becomes a signal at under 24.0 or higher.",
     );
   });
   it("score clamps to 0..100", () => {
@@ -692,7 +692,7 @@ describe("edgeScore — no model read", () => {
     expect(e.verdict.priceEdgeOnly).toBe(true);
     expect(e.verdict.reason).toBe("price_edge");
     expect(e.action).toBe(
-      "Pass: no model number yet. Hard Rock pays about 3.0% more than the market on this under, but a price alone is not a bet.",
+      "Pass: no model number yet. Hard Rock pays about 3.0% more than the market on this under, but a price alone is not a signal.",
     );
     expect(e.kill.line).toBeNull();
     expect(e.kill.price).toBe(-110); // fair 0.5: standard juice is the floor

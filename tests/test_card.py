@@ -102,7 +102,7 @@ def test_bet_path_logs_hard_rocks_number_and_price():
     assert it["ev"] == pytest.approx(-0.004, abs=1e-3)  # fair: inside the -5% floor
     # -120 vs fair 0.5217 is -4.7% (inside); -125 is -6.1% (outside).
     assert it["kill_line"] == 24.5 and it["kill_price"] == -120
-    assert it["action"] == "Bet one unit: first-half under 24.5 at -110 on Hard Rock."
+    assert it["action"] == "Paper signal: first-half under 24.5 at -110 on Hard Rock."
     assert _tiers(c["counts"]) == {"bet": 1, "edge": 0, "pass": 0, "over_cap": 0, "degraded": 0}
     assert c["model_read"] is True and c["notes"] == []
     assert it["paper_logged"] is False
@@ -116,7 +116,7 @@ def test_edge_no_hr_line_uses_the_market_median_as_basis():
     assert it["gap_basis"] == "market"
     assert it["kill_line"] == 24.5
     assert it["action"] == (
-        "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.5 or higher."
+        "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.5 or higher."
     )
     assert "Hard Rock has not posted a first-half line yet." in it["why"]
 
@@ -166,7 +166,7 @@ def test_edge_gap_blocker_when_the_score_clears_55_short_of_the_bar():
     assert it["tier"] == "EDGE" and it["blocker"] == "gap"
     assert it["gap"] == 1.3 and it["kill_line"] == 25.0 and gap_score(1.3) == 64
     assert it["action"] == (
-        "Not yet — the line is 1.3 above our number. It becomes a bet at 25.0 or higher."
+        "Not yet — the line is 1.3 above our number. It becomes a signal at 25.0 or higher."
     )
 
 
@@ -221,7 +221,7 @@ def test_no_model_price_only_is_a_pass():
     assert it["ev"] == pytest.approx(0.0696, abs=1e-3)
     assert it["action"] == (
         "Pass: no model number yet. Hard Rock pays about 7.0% more than the market on this "
-        "under, but a price alone is not a bet."
+        "under, but a price alone is not a signal."
     )
     assert c["model_read"] is False
     assert c["notes"][0].startswith("No model number this week")
@@ -244,7 +244,7 @@ def test_model_pass_leans_over_wording():
     assert it["tier"] == "PASS"
     assert it["gap"] == -2.0 and it["kill_line"] == 26.0
     assert it["action"] == (
-        "Pass: the line is 2.0 below our number, so this leans over. We only bet unders."
+        "Pass: the line is 2.0 below our number, so this leans over. We only rate unders."
     )
 
 
@@ -263,7 +263,7 @@ def test_pass_sentence_on_our_number_says_so():
     snaps = [snap(1, "hardrockbet", 22.0)] + market(1, 22.0)
     it = only(card([game()], snaps, [model(1, 22.0)]))
     assert it["gap"] == 0.0 and it["tier"] == "PASS"
-    assert it["action"] == "Pass: the line sits on our number. Nothing to bet."
+    assert it["action"] == "Pass: the line sits on our number. No signal."
 
 
 def test_hard_rock_gap_gates_the_bet_not_the_consensus_gap():
@@ -282,7 +282,7 @@ def test_derived_reference_is_the_basis_when_no_book_has_posted():
     assert it["market_line"] is None and it["gap"] == 2.0  # derived_lines row wins
     assert it["tier"] == "EDGE" and it["blocker"] == "no_hr_line"
     assert it["action"] == (
-        "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher."
+        "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.0 or higher."
     )
 
 
@@ -290,7 +290,7 @@ def test_no_line_at_all_wording():
     it = only(card([game()], [], [model(1, 22.0)]))
     assert it["gap"] is None and it["tier"] == "PASS" and it["blocker"] is None
     assert it["action"] == (
-        "Not yet — no first-half line anywhere. It becomes a bet at under 24.0 or higher."
+        "Not yet — no first-half line anywhere. It becomes a signal at under 24.0 or higher."
     )
     assert it["why"][0].startswith("Our number for the first half is 22.0, but no Vegas line")
 
@@ -555,7 +555,7 @@ def test_standard_juice_passes_the_price_gate_and_a_nickel_more_does_not():
     assert at_110["ev"] == pytest.approx(-0.0455, abs=1e-3) and at_110["ev"] >= EV_FLOOR
     assert at_110["tier"] == "BET" and at_110["blocker"] is None
     assert at_110["kill_price"] == -110
-    assert at_110["action"] == ("Bet one unit: first-half under 24.5 at -110 on Hard Rock.")
+    assert at_110["action"] == ("Paper signal: first-half under 24.5 at -110 on Hard Rock.")
 
     at_115 = only(
         card([game()], [snap(1, "hardrockbet", 24.5, -110, -115)] + balanced, [model(1, 22.4)])

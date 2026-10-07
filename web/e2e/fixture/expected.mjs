@@ -414,14 +414,14 @@ export function edgeFor(
   let action;
   if (tier === "BET") {
     const at = hrUnderPrice !== null ? ` at ${american(hrUnderPrice)}` : "";
-    action = `Bet one unit: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
+    action = `Paper signal: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
   } else if (blocker === "no_hr_line" || basis === null) {
     if (basis === null) {
-      action = `Not yet — no first-half line anywhere. It becomes a bet at under ${fmt(killLine)} or higher.`;
+      action = `Not yet — no first-half line anywhere. It becomes a signal at under ${fmt(killLine)} or higher.`;
     } else {
       const at =
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
-      action = `Not yet — Hard Rock has no first-half line. It becomes a bet at under ${fmt(killLine)} or higher${at}.`;
+      action = `Not yet — Hard Rock has no first-half line. It becomes a signal at under ${fmt(killLine)} or higher${at}.`;
     }
   } else if (blocker === "hr_alt_line") {
     action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(hrLine)}; check the app.`;
@@ -441,15 +441,15 @@ export function edgeFor(
     const n = minGamesPlayed ?? 0;
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
-    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
+    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a signal at ${fmt(killLine)} or higher.`;
   } else {
     const gg = gap ?? 0;
     action =
       gg > 0
         ? `Pass: ${noun} is ${fmt(gg)} above our number. It needs ${fmt(killLine)} or higher.`
         : Math.abs(gg) < 0.05
-          ? `Pass: ${noun} sits on our number. Nothing to bet.`
-          : `Pass: ${noun} is ${fmt(Math.abs(gg))} below our number, so this leans over. We only bet unders.`;
+          ? `Pass: ${noun} sits on our number. No signal.`
+          : `Pass: ${noun} is ${fmt(Math.abs(gg))} below our number, so this leans over. We only rate unders.`;
   }
 
   return {
@@ -754,10 +754,10 @@ export function buildExpected(week) {
     cap: WEEKLY_BET_CAP,
     headline:
       open > 0
-        ? `${open} ${open === 1 ? "bet" : "bets"} live`
+        ? `${open} paper ${open === 1 ? "signal" : "signals"} live`
         : placed > 0
           ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
-          : "No bets yet this week",
+          : "No paper signals yet this week",
     slotsLine: `${usedSlots} of ${WEEKLY_BET_CAP} bets this week`,
   };
 

@@ -73,7 +73,7 @@ export const BLOCKER_SHORT: Record<AnyBlocker, string> = {
 
 /** Results "what blocked it" rows (includes the two non-blocker ledger keys). */
 export const GATE_TEXT: Record<AnyBlocker | "none" | "untagged", string> = {
-  none: "Bet — nothing blocked it",
+  none: "Paper signal — nothing blocked it",
   no_hr_line: "Hard Rock had no first-half line",
   hr_alt_line: "Hard Rock's feed showed an alternate line",
   off_market: "Hard Rock's line was below the market",

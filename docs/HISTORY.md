@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (HISTORY LOADER — PR H3).** `games.home_pregame_elo` / `away_pregame_elo`
+  (CFBD `/games` pregame Elo; H-ELO-F's inputs, read by no champion code); `backfill.py
+  --fbs-only` stores only FBS-vs-FBS games (`data/fbs_teams.json`, refuses a season the list
+  lacks); an unknown venue id is stored NULL instead of failing the `venues` FK; the loader
+  prints per-season Elo coverage. `history_load.yml` (dispatch-only, `neon-writers`, inputs via
+  `env:`) runs it. Tate's calls: load right after merge, probe 2003 first, then 2004-2022, and
+  prove the floor in production by re-running `fg_shadow` (its `model_runs.train_window` must
+  still read 2023-2025).
+
 - **2026-10-06 (FRAME FLOOR — PR H2, no behaviour change).** Before any 2003-2022 history is
   loaded for H-HIST / H-ELO-F: `features.FRAME_MIN_SEASON = 2023` floors every feature frame's
   games and its situational columns (rest days and the cross-season revenge/rivalry flags would

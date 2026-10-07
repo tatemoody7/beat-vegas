@@ -190,7 +190,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `fg_shadow.yml` | dispatch season/week | `predictions` `bv_fg_v1` (H-FG-P shadow; Sunday runs it too) |
 | `post-lines.yml` | dispatch season/week/source | `derived_lines` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
-| `backfill_1h.yml` | dispatch (paid history) | historical 1H closes |
+| `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
 | `residual_gate.yml`, `level_anchor_gate.yml`, `intercept_gate.yml`, `inseason_gate.yml` | dispatch | a report; never the model |
 

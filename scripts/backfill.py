@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional
 from beatvegas.config import load_config
 from beatvegas.db.models import Game, Team, Venue
 from beatvegas.db.store import init_db, session_scope, upsert
+from beatvegas.etl.fbs import load_fbs_teams
 from beatvegas.etl.first_half import (
     attach_first_half,
     final_from_plays,
@@ -78,10 +79,31 @@ def _needs_pbp(g: Dict[str, Any]) -> bool:
     return fh is None or not line_scores_trustworthy(g, fh)
 
 
+def _fbs_only(games: list, season: int) -> list:
+    """Keep only games where BOTH teams were FBS that season
+    (`data/fbs_teams.json`, the same list the feature frame filters on). The
+    history load (H-HIST, 2026-10-06) stores nothing the engine never reads."""
+    fbs = load_fbs_teams().get(int(season))
+    if not fbs:
+        raise ValueError(f"data/fbs_teams.json has no {season}: run scripts/fetch_fbs_teams.py")
+    return [
+        g
+        for g in games
+        if _get(g, "homeTeam", "home_team") in fbs and _get(g, "awayTeam", "away_team") in fbs
+    ]
+
+
+def _known_venues() -> set:
+    with session_scope() as s:
+        return {int(v) for (v,) in s.query(Venue.id).all()}
+
+
 def backfill_season(
-    client: CFBDClient, season: int, season_type: str, use_pbp: bool
+    client: CFBDClient, season: int, season_type: str, use_pbp: bool, fbs_only: bool = False
 ) -> Dict[str, int]:
     games = client.games(year=season, season_type=season_type)
+    if fbs_only:
+        games = _fbs_only(games, season)
     lines_resp = client.lines(year=season, season_type=season_type)
     total_by_game = {}
     for g in lines_resp:
@@ -147,6 +169,8 @@ def backfill_season(
             # CFBD's per-season conferences (2026-10-04): the same fields the
             # teams table has always been filled from, kept on the game so a
             # slice reads the season's membership, not today's.
+            "home_pregame_elo": _get(g, "homePregameElo", "home_pregame_elo"),
+            "away_pregame_elo": _get(g, "awayPregameElo", "away_pregame_elo"),
             "home_conference": _get(g, "homeConference", "home_conference"),
             "away_conference": _get(g, "awayConference", "away_conference"),
         }
@@ -169,6 +193,15 @@ def backfill_season(
         for t in team_rows.values():
             t.pop("conference", None)
 
+    # `games.venue_id` references `venues(id)` on Postgres. /venues lists
+    # today's venues, so a retired stadium from 2005 would fail the whole
+    # insert; an unknown venue is stored as NULL instead (situational travel
+    # then reads NaN for that game, which only an old season can hit).
+    known = _known_venues()
+    for r in game_rows:
+        if r["venue_id"] is not None and int(r["venue_id"]) not in known:
+            r["venue_id"] = None
+
     cfbd_with_total = sum(1 for r in game_rows if r["full_game_total"] is not None)
     with session_scope() as s:
         # The Sunday/card-day capture (Odds API / DK) owns the total + spread it
@@ -188,6 +221,7 @@ def backfill_season(
     return {
         "games": len(game_rows),
         "with_1h": n_with_1h,
+        "with_elo": sum(1 for r in game_rows if r["home_pregame_elo"] is not None),
         "cfbd_with_total": cfbd_with_total,
     }
 
@@ -223,6 +257,11 @@ def main() -> None:
     ap.add_argument(
         "--use-pbp", action="store_true", help="fill first-half gaps via play-by-play (slower)"
     )
+    ap.add_argument(
+        "--fbs-only",
+        action="store_true",
+        help="store only FBS-vs-FBS games (data/fbs_teams.json); the history load for H-HIST",
+    )
     args = ap.parse_args()
 
     init_db()
@@ -238,9 +277,10 @@ def main() -> None:
     season_types = ["regular", "postseason"] if args.season_type == "both" else [args.season_type]
     for season in seasons:
         for st in season_types:
-            stats = backfill_season(client, season, st, args.use_pbp)
+            stats = backfill_season(client, season, st, args.use_pbp, fbs_only=args.fbs_only)
             print(
                 f"{season} {st}: {stats['games']} games, {stats['with_1h']} with 1H, "
+                f"{stats.get('with_elo', 0)} with pregame Elo, "
                 f"{stats['cfbd_with_total']} with a CFBD-supplied full-game total"
             )
 

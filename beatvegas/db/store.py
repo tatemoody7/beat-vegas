@@ -111,6 +111,9 @@ _MIGRATIONS = {
         # CFBD's per-season conferences (2026-10-04) — see models.Game
         "home_conference": "VARCHAR",
         "away_conference": "VARCHAR",
+        # CFBD pregame Elo (2026-10-06, H-ELO-F) — see models.Game
+        "home_pregame_elo": "FLOAT",
+        "away_pregame_elo": "FLOAT",
     },
     "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
     # which 1H engine froze the record (2026-09-07, after the table existed);

@@ -154,3 +154,4 @@ sweep printed against the plan.
 | Version | Date | Change | Decided by |
 |---|---|---|---|
 | v1 | 2026-10-07 | Adopted. | Tate |
+| v1.1 | 2026-10-07 | The consensus specified (`docs/CONSENSUS.md`): every centred book except Hard Rock and Fliff (exchanges count), multiplicative de-vig, the 2-hour close window for every market (the full-game capture's 3 hours does not apply to the judge), at least 3 books, at most 1.5 points of line conversion, first-half table built from 2013–25 games by the full-game-close proxy. "Rungs excluded (`is_hr_rung` logic)" is moot for the consensus: Hard Rock never counts. | Tate |

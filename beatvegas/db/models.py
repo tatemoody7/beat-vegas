@@ -441,6 +441,21 @@ class ManualPick(Base):
     # picks and legacy rows. The post-mortem groups the paper record by it.
     blocker = Column(String(16))
 
+    # Line value at the wager's exact terms (beatvegas/consensus.py, docs/CONSENSUS.md;
+    # 2026-10-07). The research program's judge: EV per unit of this line and price
+    # against the median de-vigged close of every counted book (Hard Rock and Fliff
+    # excluded), converted through the half-point table. Written at grading and by
+    # scripts/consensus_backfill.py; `cons_version` names the engine that wrote them.
+    cons_version = Column(String(8))
+    cons_books = Column(Integer)  # books counted in the median
+    cons_line = Column(Float)  # the median of those books' closing lines
+    cons_close_at = Column(DateTime)  # the newest counted confirmation before kickoff
+    cons_p_win = Column(Float)  # consensus fair chance this wager wins
+    cons_p_push = Column(Float)  # ...and pushes (integer lines only)
+    ev_cons = Column(Float)  # EV per unit vs the consensus close: the judge
+    ev_hr = Column(Float)  # EV per unit vs Hard Rock's own closing main quote (secondary)
+    cons_excluded = Column(String(32))  # why there is no reading (few_books, ...)
+
 
 class BvAdjustment(Base):
     """A manual nudge to the BV line for one game (e.g. a confirmed QB-out the
@@ -615,6 +630,21 @@ class ChallengerPick(Base):
     clv = Column(Float)  # closing - bet; for an under, NEGATIVE is favourable
     clv_prob = Column(Float)
     closing_price = Column(Integer)
+
+    # Line value at the wager's exact terms (beatvegas/consensus.py, docs/CONSENSUS.md;
+    # 2026-10-07). The research program's judge: EV per unit of this line and price
+    # against the median de-vigged close of every counted book (Hard Rock and Fliff
+    # excluded), converted through the half-point table. Written at grading and by
+    # scripts/consensus_backfill.py; `cons_version` names the engine that wrote them.
+    cons_version = Column(String(8))
+    cons_books = Column(Integer)  # books counted in the median
+    cons_line = Column(Float)  # the median of those books' closing lines
+    cons_close_at = Column(DateTime)  # the newest counted confirmation before kickoff
+    cons_p_win = Column(Float)  # consensus fair chance this wager wins
+    cons_p_push = Column(Float)  # ...and pushes (integer lines only)
+    ev_cons = Column(Float)  # EV per unit vs the consensus close: the judge
+    ev_hr = Column(Float)  # EV per unit vs Hard Rock's own closing main quote (secondary)
+    cons_excluded = Column(String(32))  # why there is no reading (few_books, ...)
 
 
 class ModelRun(Base):

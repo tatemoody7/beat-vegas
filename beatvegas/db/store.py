@@ -65,6 +65,16 @@ _MIGRATIONS = {
         # The frozen snapshot + refit identity manual_picks carries (2026-10-04).
         "factors_json_at_pick": "TEXT",
         "refit_id": "INTEGER",
+        # Line value at the wager's exact terms (beatvegas/consensus.py, 2026-10-07).
+        "cons_version": "VARCHAR(8)",
+        "cons_books": "INTEGER",
+        "cons_line": "FLOAT",
+        "cons_close_at": "TIMESTAMP",
+        "cons_p_win": "FLOAT",
+        "cons_p_push": "FLOAT",
+        "ev_cons": "FLOAT",
+        "ev_hr": "FLOAT",
+        "cons_excluded": "VARCHAR(32)",
     },
     # Kept rows, one run_id per grading run (2026-10-04); readers take the newest.
     "factor_ledger": {"run_id": "VARCHAR"},
@@ -97,6 +107,16 @@ _MIGRATIONS = {
         # books 0 units. MUST exist before the web app deploys — its cap query
         # reads COALESCE(is_bonus, false).
         "is_bonus": "BOOLEAN",
+        # Line value at the wager's exact terms (beatvegas/consensus.py, 2026-10-07).
+        "cons_version": "VARCHAR(8)",
+        "cons_books": "INTEGER",
+        "cons_line": "FLOAT",
+        "cons_close_at": "TIMESTAMP",
+        "cons_p_win": "FLOAT",
+        "cons_p_push": "FLOAT",
+        "ev_cons": "FLOAT",
+        "ev_hr": "FLOAT",
+        "cons_excluded": "VARCHAR(32)",
     },
     "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},

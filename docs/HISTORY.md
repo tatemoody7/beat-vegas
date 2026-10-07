@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (THE JUDGE: CONSENSUS ENGINE cv1).** Roadmap step 2, specified by Tate (amendment
+  v1.1, `docs/CONSENSUS.md`): EV per unit of each wager at its own line and price against the median
+  de-vigged close of every centred book except Hard Rock and Fliff, books within 1.5 points, closes
+  confirmed inside 2 hours, at least 3 books. Lines are converted through a frozen half-point table
+  (`data/halfpoint_hp1.json`, 2013–25 FBS games, built on the runner, study.yml run 37702656840):
+  first-half key numbers 24 (8.9%), 31 (7.7%), 34, 27, 28, 21. `picks.grade_pick` writes nine
+  `cons_*`/`ev_*` columns on both pick tables; grade.yml back-fills rows graded earlier. Development
+  read (CONS-DEV, run 37703161461): the paper and real unders sat at about −5% EV at the close (the
+  vig; P(win) ~0.51), EV varies about 4 points per bet, and most rows without a reading are weeks 2–4
+  stale closes (0/31, 0/34, 3/16, then 13/15 in week 5). Nothing live changed; the protocol is next.
+
 - **2026-10-07 (1b: THE SITE IS A RESEARCH LAB; THE REAL-MONEY SWITCH IS ON).** The real-money
   switch (`app_settings.rule_paused`) was thrown at 21:40 UTC on Tate's call, written through
   Neon's HTTPS endpoint (campus filters 5432) exactly as `scripts/rule_pause.py` writes it, and read

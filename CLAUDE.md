@@ -17,8 +17,9 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1): what is tested, how an edge is judged,
-  what is paused. Changed only by a versioned amendment logged at its bottom.
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.1): what is tested, how an edge is judged,
+  what is paused. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
+  is the judge it names (engine `cv1`, table `hp1`).
 - `docs/HISTORY.md` — what happened, by date (2026-05 → today). Read the top entry before touching
   anything that shipped this week.
 - `docs/HYPOTHESES.md` — the registry: every study ever run or proposed, its status and criterion.
@@ -74,8 +75,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: consensus
-  fair-price engine v1 → Statistical Protocol + simulation (Tate approves the
+- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: Statistical
+  Protocol + simulation, sized on `docs/CONSENSUS.md`'s development read (Tate approves the
   numbers; it settles the shadow engines' budget and defines "shows in two seasons") → multi-book
   spreads + moneylines and one team-total probe → literature looks (citations verified; Tate picks
   the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
@@ -182,7 +183,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
-  `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion).
+  `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
+  (the judge's columns on graded picks; grade.yml writes, study.yml reports).
 - **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`, `fg_position`,
   `challenger_position`, `rule_pause`, `pick` (`list`, `grade`, `summary`; no `add`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
@@ -193,7 +195,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +
   `weather_validate`, `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`,
-  `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files).
+  `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
+  `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `retrain`, `backtest`, `validate_engine`, `rank_factors`,
   `inspect_combo`, `explain_pbp`, `line_study`, `weekly_report`, `model_artifacts`, `bv_adjust`.
 - **Deploy / dev**: `deploy_neon`, `deploy_neon_games` (both ADDITIVE), `pg_sim` +
@@ -254,7 +257,8 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   interval either way; H-STOP-2 (`docs/STOPPING_RULE.md`) closed inconclusive. From 2026-10-07 the
   only judge is each arm's registered sequential test on line value against the consensus close;
   the site states every rate with its interval and labels the bankroll "modelled from the ledger,
-  not reconciled". Line value against the close is the one edge measure that needs no proxy.
+  not reconciled". Line value against the close is the one edge measure that needs no proxy; it
+  is read at each wager's exact terms by `beatvegas/consensus.py` (`ev_cons` on every graded pick).
 - **What is measured, not gated**: the model's ~2-pt level deficit and its spread-bucket accuracy
   vs Hard Rock (weekly review), the negative-gap "overs" band (H-NEGGAP, H-NEGGAP-P), the gap
   ladder by band. No gate, model constant or registry row changes from an analysis; fixes land

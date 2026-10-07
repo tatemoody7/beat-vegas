@@ -926,3 +926,12 @@ def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():
     assert '--game-id "$GAME_ID"' in one["run"]
     assert "--max-credits-per-run 2" in one["run"]
     assert not INLINE_EXPR.search(one["run"])
+
+def test_study_runs_post_mortem_only_as_a_dry_run():
+    """study.yml regenerates docs/POST_MORTEM.md read-only (2026-10-07): the run
+    step refuses post_mortem without --dry-run, and refuses --write."""
+    data = _load(WF_DIR / "study.yml")
+    run = next(s["run"] for s in _steps(data) if "IN_SCRIPT" in str(s.get("run", "")))
+    assert "post_mortem --write is not a study" in run
+    assert "post_mortem needs --dry-run" in run
+    assert run.index("--write is not a study") < run.index('python "scripts/$IN_SCRIPT.py"')

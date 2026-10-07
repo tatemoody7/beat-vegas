@@ -11,7 +11,7 @@ import { fixture } from "./helpers/fixture";
 // The bucket numbers below are the ones seed.mjs writes (fixtureRows); the
 // arithmetic is lib/record.ts::recordFromCounts.
 
-const { week } = fixture();
+const { week, expected } = fixture();
 
 // (hist_2023_25, fbs_only, real, cap5, all): 102 unders, 66 overs, 1 push, +26.9u.
 const CAP5 = { unders: 102, overs: 66, pushes: 1, units: 26.9 };
@@ -135,7 +135,42 @@ test.describe("how it works", () => {
     await expect(
       page.getByRole("link", { name: "Every game we have rated →" }),
     ).toHaveAttribute("href", "/records");
-    await expect(page.getByText(/call 1-800-GAMBLER/)).toBeVisible();
+    await expect(page.getByText(/call 1-833-PLAYWISE/)).toBeVisible();
+  });
+
+  test("shows our number's average miss beside Hard Rock's, in public", async ({
+    page,
+  }) => {
+    // Tate's call 2026-10-07: the model-vs-Hard-Rock accuracy is public, over
+    // this season's graded games, the same games for both, lower is closer.
+    const acc = expected.modelAccuracy;
+    await page.goto("/how-it-works");
+    const block = page.getByRole("group", { name: "Average miss this season" });
+    await expect(block).toContainText(
+      `Average miss, first half · ${acc.season} · ${acc.n} games`,
+    );
+    await expect(block).toContainText(`${acc.ours.toFixed(1)} pts`);
+    await expect(block).toContainText(`${acc.hardRock.toFixed(1)} pts`);
+    const closer =
+      acc.ours.toFixed(1) === acc.hardRock.toFixed(1)
+        ? /equally close/
+        : acc.ours < acc.hardRock
+          ? /Our number has been closer/
+          : /Hard Rock’s line has been closer/;
+    await expect(
+      page.locator('section[aria-label="What we don’t know"]'),
+    ).toContainText(closer);
+  });
+
+  test("every page carries the footer's responsible-gambling line", async ({
+    page,
+  }) => {
+    for (const path of ["/", "/results", "/how-it-works"]) {
+      await page.goto(path);
+      await expect(page.locator("footer")).toContainText(
+        "Not betting advice. 21+, Florida, Hard Rock Bet. Past results do not predict future results. Gambling problem? 1-833-PLAYWISE.",
+      );
+    }
   });
 
   test("signed in, the live season panel, the flags and the method fold follow", async ({

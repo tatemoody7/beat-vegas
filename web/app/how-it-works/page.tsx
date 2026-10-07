@@ -9,6 +9,9 @@ import {
   liveNotesFrom,
   liveScopeOf,
   loadPostMortem,
+  accuracyLine,
+  loadModelAccuracy,
+  type ModelAccuracy,
 } from "@/lib/postmortem";
 import {
   BREAKEVEN_PCT,
@@ -81,7 +84,7 @@ export default async function HowItWorksPage({
   // The visitor's page needs only the post-mortem. The owner's research
   // section (behind the cookie) needs the rest; nothing is loaded for a
   // visitor that they will not see.
-  const pm = await loadPostMortem();
+  const [pm, acc] = await Promise.all([loadPostMortem(), loadModelAccuracy()]);
   const seasons = authed ? await getRecordSeasons() : [];
   const studySeasons = one !== null ? [one] : seasons;
   const scopeLabel = one !== null ? `${one}` : "all seasons";
@@ -285,10 +288,14 @@ export default async function HowItWorksPage({
             game by far more than any gap between it and the line, so a rating
             only means something across hundreds of bets.
           </p>
-          <p>
-            Hard Rock’s line has been at least as accurate as our number so far.
-            The gap is a disagreement, not proof of who is right.
-          </p>
+          {acc === null ? (
+            <p>
+              Hard Rock’s line has been at least as accurate as our number so
+              far. The gap is a disagreement, not proof of who is right.
+            </p>
+          ) : (
+            <ModelAccuracyBlock acc={acc} />
+          )}
           <p>
             So the real test is the live record: Hard Rock’s actual lines, the
             bets we log, and whether the line moves our way after we bet. It is
@@ -313,7 +320,7 @@ export default async function HowItWorksPage({
         </Link>
         <p className="text-xs text-[var(--text-dim)]">
           If gambling is a problem for you or someone you know, call
-          1-800-GAMBLER.
+          1-833-PLAYWISE.
         </p>
       </div>
 
@@ -516,6 +523,54 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-4 border-t border-[var(--border)] py-2 text-sm first:border-t-0 sm:border-t-0">
       <dt className="text-[var(--text-muted)]">{label}</dt>
       <dd className="font-mono tabular-nums text-[var(--text)]">{value}</dd>
+    </div>
+  );
+}
+
+// The model against Hard Rock, in public (Tate's call 2026-10-07): the average
+// miss of each over this season's graded games, the same games for both. The
+// sentence follows the numbers so it can never claim the wrong side.
+function ModelAccuracyBlock({ acc }: { acc: ModelAccuracy }) {
+  const a = accuracyLine(acc);
+  const verdict =
+    a.closer === "hardRock"
+      ? "Hard Rock’s line has been closer than our number so far."
+      : a.closer === "ours"
+        ? "Our number has been closer than Hard Rock’s line so far, by a margin that small samples swing."
+        : "Our number and Hard Rock’s line have been equally close so far.";
+  return (
+    <div>
+      <p>
+        {`${verdict} The gap is a disagreement, not proof of who is right.`}
+      </p>
+      <div
+        role="group"
+        aria-label="Average miss this season"
+        className="mt-3 max-w-sm"
+      >
+        <p className="bv-stat-label">
+          {`Average miss, first half · ${acc.season} · ${acc.n} games`}
+        </p>
+        <div className="mt-1 grid grid-cols-2 gap-x-6">
+          <p>
+            <span className="block font-mono text-2xl tabular-nums text-[var(--text)]">
+              {`${a.ours} pts`}
+            </span>
+            <span className="text-xs text-[var(--text-dim)]">Our number</span>
+          </p>
+          <p>
+            <span className="block font-mono text-2xl tabular-nums text-[var(--text)]">
+              {`${a.hardRock} pts`}
+            </span>
+            <span className="text-xs text-[var(--text-dim)]">
+              Hard Rock’s line
+            </span>
+          </p>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-[var(--text-dim)]">
+        Lower is closer. Each game counts at the number we published that week.
+      </p>
     </div>
   );
 }

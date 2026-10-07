@@ -60,7 +60,9 @@ SNAP_MARKET = {"1H": "1H_total", "full": "full_game_total"}
 # Exclusion reasons, recorded on the row (VARCHAR(32)).
 EX_NO_KICKOFF = "no_kickoff"
 EX_NO_LINE = "no_line"
-EX_FEW_BOOKS = "few_books"
+EX_FEW_BOOKS = "few_books"  # fewer than MIN_BOOKS counted books quoted it at all
+EX_STALE = "stale_close"  # enough books, too few confirmed inside the close window
+EX_FAR = "far_lines"  # enough fresh books, too few within MAX_CONVERT_PTS of the line
 EX_OUTSIDE_TABLE = "outside_table"
 EX_NO_HR_CLOSE = "no_hr_close"
 EX_NO_TABLE = "no_table"
@@ -238,15 +240,19 @@ def read_at_terms(
     if line is None:
         return Reading(excluded=EX_NO_LINE)
     floor = kickoff - timedelta(hours=CLOSE_WINDOW_H)
-    usable = [
-        c
-        for c in closes.values()
-        if c.seen_at is not None
-        and c.seen_at >= floor
-        and abs(c.line - line) <= MAX_CONVERT_PTS + 1e-9
-    ]
+    fresh = [c for c in closes.values() if c.seen_at is not None and c.seen_at >= floor]
+    usable = [c for c in fresh if abs(c.line - line) <= MAX_CONVERT_PTS + 1e-9]
     if len(usable) < min_books:
-        return Reading(books=len(usable), excluded=EX_FEW_BOOKS)
+        # Say WHICH rule left the wager without a reading: the protocol counts
+        # exclusions, and "too few books" alone could not tell a missing close
+        # poll from a market that moved away from the wager's line.
+        if len(closes) < min_books:
+            why = EX_FEW_BOOKS
+        elif len(fresh) < min_books:
+            why = EX_STALE
+        else:
+            why = EX_FAR
+        return Reading(books=len(usable), excluded=why)
     center = round(statistics.median(c.line for c in usable) * 2) / 2
     mass = table.mass(market, center)
     unders = []

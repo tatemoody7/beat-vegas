@@ -125,7 +125,7 @@ def test_a_book_more_than_one_and_a_half_points_away_is_left_out():
         snap("betmgm", 29.5, -110, -110),
     ]
     r = C.consensus_reading(snaps, KICK, "1H_total", 27.5, "under", -110, TABLE)
-    assert r.excluded == C.EX_FEW_BOOKS and r.books == 2
+    assert r.excluded == C.EX_FAR and r.books == 2
     snaps[2] = snap("betmgm", 29.0, -110, -110)  # exactly 1.5 away counts
     assert C.consensus_reading(snaps, KICK, "1H_total", 27.5, "under", -110, TABLE).books == 3
 
@@ -136,7 +136,7 @@ def test_the_close_window_is_two_hours_and_a_later_confirmation_counts():
     ]
     assert (
         C.consensus_reading(old, KICK, "1H_total", 27.5, "under", -110, TABLE).excluded
-        == C.EX_FEW_BOOKS
+        == C.EX_STALE
     )
     # Same quotes, re-confirmed unchanged 40 minutes before kickoff: they count.
     seen = [

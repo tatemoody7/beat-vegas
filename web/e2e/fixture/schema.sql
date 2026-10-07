@@ -174,7 +174,16 @@ CREATE TABLE public.challenger_picks (
     closing_line double precision,
     clv double precision,
     clv_prob double precision,
-    closing_price integer
+    closing_price integer,
+    cons_version character varying(8),
+    cons_books integer,
+    cons_line double precision,
+    cons_close_at timestamp without time zone,
+    cons_p_win double precision,
+    cons_p_push double precision,
+    ev_cons double precision,
+    ev_hr double precision,
+    cons_excluded character varying(32)
 );
 
 --
@@ -528,7 +537,16 @@ CREATE TABLE public.manual_picks (
     gap_at_pick double precision,
     ev_at_pick double precision,
     hr_line_at_pick double precision,
-    blocker character varying(16)
+    blocker character varying(16),
+    cons_version character varying(8),
+    cons_books integer,
+    cons_line double precision,
+    cons_close_at timestamp without time zone,
+    cons_p_win double precision,
+    cons_p_push double precision,
+    ev_cons double precision,
+    ev_hr double precision,
+    cons_excluded character varying(32)
 );
 
 --

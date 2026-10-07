@@ -181,6 +181,13 @@ jobs:
         env:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/pick.py grade --season "$SEASON"
+      - name: Line value at each pick's exact terms (consensus engine)
+        if: steps.probe.outputs.need_grade == 'true'
+        # docs/CONSENSUS.md. grade_pick writes these columns for every new grade;
+        # this fills any graded row that lacks them (graded before the engine,
+        # or by a run without the table). The judge never blocks grading.
+        continue-on-error: true
+        run: python scripts/consensus_backfill.py --write --missing-only
       - name: Grade frozen game records
         if: steps.probe.outputs.need_grade == 'true'
         run: python scripts/grade_records.py

@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (M1B: BACKDATED INTEGRITY).** A ticket logged more than 30 min after it was written
+  used to skip the price check entirely (the card's kill price, or none when the card did not rate
+  it BET; typing a bet time 31 min back was enough). Tate's calls (ASSUMPTIONS row 18): the
+  evaluator's `as_of_bet_time` mode now reads the market as it stood at the bet time
+  (`getLineCheck(season, "1h", undefined, asOf)`: snapshots captured at or before it), recomputes
+  the kill price from it, refuses when Hard Rock's quote was last SEEN more than
+  `HR_PRICE_MAX_AGE_H` = 6 h before the bet, and refuses a new late log the card in force did not
+  rate BET (`NOT A BET THEN`). "Seen" is max(captured_at, last_seen_at): an unchanged poll writes no
+  row and only stamps `last_seen_at` on the newest one, so a later sighting proves the quote was in
+  force at the bet. An edit keeps its frozen verdict, so the price check also closes M1A's no-card
+  gap for PATCH.
+
 - **2026-10-07 (M1A: TICKET AND PAPER-STREAM INTEGRITY).** The system review found PATCH re-checked
   nothing: a ticket logged at a passing price could be edited to a worse one, cleared to no price,
   restaked, or flipped to a bonus bet (freeing a cap slot, booking a loss as 0); paper rows could be

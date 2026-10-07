@@ -263,7 +263,11 @@ export function buildWeek(now = new Date()) {
       },
       fg: { total: 56.5, spread: -14.5 },
       ref: 28.0,
-      scenario: "EDGE blocked off_market (HR 1.0 below the market), paper pick",
+      // Until 2026-10-07 this was the off-market example; that gate is retired,
+      // so Hard Rock 1.0 under the market with no book at its number is now
+      // blocked by the price gate's "cannot judge" branch.
+      scenario:
+        "EDGE blocked no_fair_price (HR 1.0 below the market, nothing priced at 44.5), paper pick",
     },
     {
       id: 900005,

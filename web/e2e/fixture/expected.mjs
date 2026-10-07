@@ -18,7 +18,6 @@ import { etMinutesOfDay, etParts, HR } from "./week.mjs";
 
 export const BET_GAP_PTS = 1.75;
 export const PCT_SHARE = 0.2;
-export const HR_OFF_MARKET_PTS = 0.5;
 export const EV_FLOOR = -0.05;
 export const BET_MIN_EV = EV_FLOOR;
 export const SCORE_BET_MIN = 70;
@@ -340,14 +339,8 @@ export function edgeFor(
   const inBand = hrGap !== null && centred && hrGap > 0 && hrGap >= bar;
   const liveLine = marketLine;
   let verdict = "PASS";
-  if (
-    hrGap !== null &&
-    inBand &&
-    liveLine !== null &&
-    liveLine - hrLine > HR_OFF_MARKET_PTS
-  ) {
-    verdict = "WATCH";
-  } else if (hrGap !== null && inBand && qbOut) {
+  // The off-market gate was retired 2026-10-07 (verdict.ts, card.py).
+  if (hrGap !== null && inBand && qbOut) {
     verdict = "WATCH";
   } else if (
     hrGap !== null &&
@@ -373,10 +366,6 @@ export function edgeFor(
   const reason = deriveReason(true, hrGap, false, bar);
 
   // edgeScore proper.
-  const offMarket =
-    hrLine !== null &&
-    marketLine !== null &&
-    marketLine - hrLine > HR_OFF_MARKET_PTS;
   const pricePos = evVerdict === "pos";
   const basis = hrLine ?? marketLine ?? fallbackLine;
   const lineBasis =
@@ -411,7 +400,6 @@ export function edgeFor(
     tier = "EDGE";
     if (hrLine === null) blocker = "no_hr_line";
     else if (hrLive === false) blocker = "hr_alt_line";
-    else if (offMarket) blocker = "off_market";
     else if (ev === null) blocker = "no_fair_price";
     else if (ev < BET_MIN_EV) blocker = "price";
     else if (qbOut) blocker = "qb_out";
@@ -437,9 +425,6 @@ export function edgeFor(
     }
   } else if (blocker === "hr_alt_line") {
     action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(hrLine)}; check the app.`;
-  } else if (blocker === "off_market") {
-    const diff = round2(marketLine - hrLine);
-    action = `Not yet — Hard Rock’s ${fmt(hrLine)} is ${fmt(diff)} below the market line of ${fmt(marketLine)}. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to ${fmt(marketLine - HR_OFF_MARKET_PTS)} or higher.`;
   } else if (blocker === "price") {
     const needs = `${american(killPrice ?? -110)} or better`;
     const hr = hrUnderPrice !== null ? american(hrUnderPrice) : "not posted";
@@ -480,7 +465,6 @@ export function edgeFor(
     reason,
     hrGap,
     inBand,
-    offMarket,
     pricePos,
     priceLine: priceSentence({ hrLine, hrUnderPrice, ev, evVerdict }),
     input: {
@@ -811,13 +795,11 @@ export function buildExpected(week) {
       hrLine !== null && others !== null ? round2(hrLine - others) : null;
     const hrOpen = g.hr && g.hr.length ? g.hr[0].line : null;
     const paperBlocker = e.inBand
-      ? e.offMarket
-        ? "off_market"
-        : e.input.ev === null
-          ? "no_fair_price"
-          : e.input.ev < BET_MIN_EV
-            ? "price"
-            : null
+      ? e.input.ev === null
+        ? "no_fair_price"
+        : e.input.ev < BET_MIN_EV
+          ? "price"
+          : null
       : null;
     const why = [
       gapSentence(g.bv, hrLine, e.input.marketLine, g.ref, e.gap),
@@ -1035,10 +1017,11 @@ export function buildExpected(week) {
       modelLine: g4.game.bv,
       modelScore: g4.game.underScore,
       graded: false,
-      blocker: "off_market",
+      blocker: "no_fair_price",
       note: null,
       placedAt: builtAt,
-      scenario: "paper, blocked off_market",
+      scenario:
+        "paper, blocked no_fair_price (Hard Rock below the market, nothing priced at its number)",
     },
     {
       id: 6,

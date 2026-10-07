@@ -32,7 +32,6 @@ PARITY = {
     "STRONG_GAP_PTS": score.STRONG_GAP_PTS,
     "WATCH_GAP_PTS": score.WATCH_GAP_PTS,
     "WEEKLY_BET_CAP": score.WEEKLY_BET_CAP,
-    "HR_OFF_MARKET_PTS": score.HR_OFF_MARKET_PTS,
     "MIN_GAMES_FOR_MODEL": score.MIN_GAMES_FOR_MODEL,
     # The money gate that MIN_GAMES_FOR_MODEL deliberately is NOT: the model
     # scores a week-1 game, real money will not take one.
@@ -235,3 +234,17 @@ def test_bet_branch_gates_on_bet_min_ev_not_ev_floor():
     assert "i.ev >= BET_MIN_EV" in src, "verdict.ts BET branch must gate on BET_MIN_EV"
     card = _CARD_PY.read_text()
     assert "ev >= BET_MIN_EV" in card, "card.py is_bet must gate on BET_MIN_EV"
+
+
+def test_the_off_market_gate_is_retired_on_both_sides():
+    """Tate retired the off-market blocker on 2026-10-07 (docs/ASSUMPTIONS.md
+    row 8). The constant survives in score.py only as a post-mortem band edge;
+    no gate on either side reads it, and the web no longer exports it."""
+    web = Path(__file__).resolve().parent.parent / "web" / "lib"
+    for f in ("verdict.ts", "edge.ts", "pickRules.ts", "ticketPolicy.ts"):
+        code = [ln for ln in (web / f).read_text().splitlines() if not ln.strip().startswith("//")]
+        assert not any("HR_OFF_MARKET_PTS" in ln for ln in code), f
+        assert not any('"off_market"' in ln and "blocker =" in ln for ln in code), f
+    card = (Path(__file__).resolve().parent.parent / "beatvegas" / "card.py").read_text()
+    assert "HR_OFF_MARKET_PTS" not in card
+    assert '"off_market"' not in card

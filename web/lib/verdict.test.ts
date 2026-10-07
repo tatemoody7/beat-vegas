@@ -50,10 +50,16 @@ const factor = (over: Partial<BoardFactor>): BoardFactor => ({
 });
 
 describe("verdictFor — model rows, gated on Hard Rock's number", () => {
-  it("WATCH, never BET, when Hard Rock's total sits more than half a point below the market", () => {
-    // Our 21.8 vs HR 24.0 clears 1.75, but the market is at 26.0: HR is 2 pts
-    // off-market — giving up points, and a void risk under HR house rules.
-    const v = verdictFor({
+  it("Hard Rock below the market is no longer a gate (retired 2026-10-07)", () => {
+    // Our 21.8 vs HR 24.0 clears the bar with the market at 26.0: HR is 2 pts
+    // under the market. The off-market gate used to hold this at WATCH; Tate
+    // retired it (docs/ASSUMPTIONS.md row 8), so the price decides.
+    const v = verdictFor({ ...base, liveLine: 26.0, gap: 4.2, hrLine: 24.0 });
+    expect(v.verdict).toBe("BET");
+    expect(v.headline).not.toContain("below the market");
+    expect(v.hrGap).toBe(2.2);
+    // Unpriced at that number it is WATCH for the price, not the market.
+    const unpriced = verdictFor({
       ...base,
       liveLine: 26.0,
       gap: 4.2,
@@ -61,9 +67,8 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
       ev: null,
       evVerdict: "na",
     });
-    expect(v.verdict).toBe("WATCH");
-    expect(v.headline).toContain("2.0 points below the market");
-    expect(v.hrGap).toBe(2.2);
+    expect(unpriced.verdict).toBe("WATCH");
+    expect(unpriced.headline).not.toContain("below the market");
   });
   it("BET still allowed when Hard Rock is within half a point of the market", () => {
     const v = verdictFor({ ...base, liveLine: 25.0, gap: 3.2, hrLine: 24.5 });
@@ -306,19 +311,6 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
     expect(v.strength).toBe(58 + 2.7 * 10);
     expect(v.priceEdgeOnly).toBe(false);
     expect(v.flags[0]).toMatch(/^QB OUT/);
-    // The gate sits after the off-market check: an off-market number still
-    // reads as off-market first.
-    const off = verdictFor({
-      ...base,
-      qbOut: true,
-      liveLine: 26.0,
-      gap: 4.2,
-      hrLine: 24.0,
-      ev: null,
-      evVerdict: "na",
-    });
-    expect(off.verdict).toBe("WATCH");
-    expect(off.headline).toContain("below the market");
     // Below the bar (Hard Rock and the market both at 23.0: gap 1.2) the QB
     // flag is just a flag; the verdict is the usual small lean.
     const short = verdictFor({

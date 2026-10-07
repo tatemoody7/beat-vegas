@@ -17,7 +17,6 @@ import { SCORE_BET_MIN, SCORE_WATCH_MIN } from "@/lib/grade";
 import {
   BET_GAP_PTS,
   BET_MIN_EV,
-  HR_OFF_MARKET_PTS,
   MIN_GAMES_FOR_REAL_MONEY,
   verdictFor,
   type VerdictInput,
@@ -186,10 +185,6 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   const hasModel = i.bvLine !== null;
   const bvLine = hasModel ? i.bvLine! : null;
 
-  const offMarket =
-    i.hrLine !== null &&
-    i.marketLine !== null &&
-    i.marketLine - i.hrLine > HR_OFF_MARKET_PTS;
   const pricePos = i.evVerdict === "pos";
   // Display chip only — the price BLOCKER and the BET gate both read BET_MIN_EV.
   const priceNeg = i.evVerdict === "neg";
@@ -234,8 +229,8 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     tier = "BET";
   } else if (score >= EDGE_SCORE_MIN) {
     tier = "EDGE";
-    // Gate order (mirrors beatvegas/card.py): no_hr_line and off_market are
-    // market reads on Hard Rock's number; no_fair_price is "cannot judge the
+    // Gate order (mirrors beatvegas/card.py): no_hr_line is the market read on
+    // Hard Rock's number (off_market was retired 2026-10-07); no_fair_price is "cannot judge the
     // price at all" and so precedes "judged it and it is too dear"; qb_out is
     // transient news resolved by kickoff; gap is the residual.
     //
@@ -247,7 +242,6 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     // model for a price problem.
     if (i.hrLine === null) blocker = "no_hr_line";
     else if (i.hrLive === false) blocker = "hr_alt_line";
-    else if (offMarket) blocker = "off_market";
     else if (i.ev === null) blocker = "no_fair_price";
     else if (i.ev < BET_MIN_EV) blocker = "price";
     else if (i.qbOut) blocker = "qb_out";
@@ -283,9 +277,6 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     }
   } else if (blocker === "hr_alt_line") {
     action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(i.hrLine)}; check the app.`;
-  } else if (blocker === "off_market") {
-    const diff = round2(i.marketLine! - i.hrLine!);
-    action = `Not yet — Hard Rock’s ${fmt(i.hrLine)} is ${fmt(diff)} below the market line of ${fmt(i.marketLine)}. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to ${fmt(i.marketLine! - HR_OFF_MARKET_PTS)} or higher.`;
   } else if (blocker === "price") {
     const needs = `${american(killPrice ?? -110)} or better`;
     const hr =

@@ -10,8 +10,8 @@ never disagree about a game:
   * BET        = model read AND Hard Rock posted AND Hard Rock's own gap >=
                  BET_GAP_PTS AND a JUDGEABLE price that is fair-or-better
                  (ev >= EV_FLOOR against the exchange-first fair price; no
-                 comparable price = blocker no_fair_price, paper only) AND NOT
-                 an off-market number AND no QB listed out;
+                 comparable price = blocker no_fair_price, paper only) AND no
+                 QB listed out (the off-market gate was retired 2026-10-07);
   * EDGE       = the score (the GAP ALONE: floor(50 + SCORE_PER_GAP_PT * gap),
                  so a gap of exactly BET_GAP_PTS is exactly SCORE_BET_MIN) clears
                  SCORE_WATCH_MIN with one gate failing — the blocker names it;
@@ -37,7 +37,6 @@ from .model.score import (
     BET_GAP_PTS,
     BET_MIN_EV,
     EV_FLOOR,
-    HR_OFF_MARKET_PTS,
     MIN_GAMES_FOR_REAL_MONEY,
     MODEL_VERSION,
     PCT_SHARE,
@@ -102,12 +101,12 @@ REFERENCE_MODEL_VERSION = "derived_lines"
 # and the historical tables read alike.
 KEY_NUMBERS_1H = (24.0, 28.0, 31.0)
 TOTAL_BANDS = ((45.0, "<45"), (52.0, "45–52"), (60.0, "52–60"), (math.inf, "60+"))
-# Paper-ledger blockers, in the order the gates are checked. off_market and
-# price are market reads on Hard Rock's number; no_fair_price is the price
-# gate's "cannot judge" branch (no book or exchange priced at that number, or
-# Hard Rock itself unpriced) so it follows price; qb_out is transient news
-# resolved by kickoff.
-PAPER_BLOCKERS = ("off_market", "price", "no_fair_price", "qb_out", "early_season")
+# Paper-ledger blockers the build writes. price is the market read on Hard
+# Rock's number; no_fair_price is the price gate's "cannot judge" branch (no
+# book or exchange priced at that number, or Hard Rock itself unpriced); qb_out
+# is transient news resolved by kickoff. `off_market` was retired 2026-10-07;
+# rows from weeks 2-4 keep it as history.
+PAPER_BLOCKERS = ("price", "no_fair_price", "qb_out", "early_season")
 
 # Inputs that can fail on a build while every job still reports success. Each
 # one either narrows the slate the card was built from or makes a gate read
@@ -501,7 +500,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     # Every MARKET aggregate below is built from centred quotes only: a feed that
     # serves an off-centre rung of the alternate ladder as the main total drags
     # the median (BetMGM alone moved it on 13 of 63 week-2 games by up to 0.5,
-    # which is exactly HR_OFF_MARKET_PTS and enough to flip the off-market gate).
+    # which was exactly the half point the retired off-market gate keyed on).
     # These still read Hard Rock's raw latest quote through that general filter,
     # exactly as web/lib/board.ts does, so the card and the site keep one
     # consensus.
@@ -511,7 +510,7 @@ def market_read(snaps: Sequence[Dict], now: Optional[datetime] = None) -> Dict[s
     lines = [o["line"] for b, o in centred.items() if b not in SYNTHETIC_BOOKS]
     # Hard Rock vs the OTHER books' median (a display chip + why sentence, and
     # the reason the comparable window widens below). `market_line` keeps Hard
-    # Rock in its median so off_market and the web's liveLine are untouched.
+    # Rock in its median so the web's liveLine is untouched.
     others = _median(
         [o["line"] for b, o in centred.items() if b not in SYNTHETIC_BOOKS and b != HR_BOOK_KEY]
     )
@@ -717,11 +716,6 @@ def build_item(
         has_model and games_played is not None and games_played < MIN_GAMES_FOR_REAL_MONEY
     )
 
-    off_market = (
-        hr_line is not None
-        and market_line is not None
-        and market_line - hr_line > HR_OFF_MARKET_PTS
-    )
     basis = (
         hr_line
         if hr_line is not None
@@ -763,20 +757,21 @@ def build_item(
     # H-PCT: in the band = Hard Rock's gap at or above this slate's bar, positive,
     # on a centred Hard Rock quote. The same three facts decide the paper ledger.
     in_band = has_model and hr_gap is not None and hr_centred and hr_gap >= bar_pts and hr_gap > 0
-    is_bet = in_band and not off_market and price_ok and not qb_out and not early_season
+    # The off-market gate (Hard Rock more than half a point below the market) was
+    # retired 2026-10-07 (Tate's call, ASSUMPTIONS row 8): it never blocked a game
+    # alone live (GATES.md, H4G). It never decided paper membership either --
+    # `qualifies` is in_band alone -- so H-STOP-2's observations are untouched.
+    is_bet = in_band and price_ok and not qb_out and not early_season
     # Paper ledger (decided 2026-09-07): EVERY game whose Hard Rock 1H line sits
     # >= BET_GAP_PTS above our number is logged, tagged with the gate that
     # blocked a real bet (None = it was a BET). The weekly cap adds "cap" later.
     qualifies = in_band
     paper_blocker: Optional[str] = None
-    # Gate order (PAPER_BLOCKERS): off_market and price are market reads on
-    # Hard Rock's number; no_fair_price is the price gate's "cannot judge"
-    # branch, so it follows price; qb_out is transient news resolved by
-    # kickoff; gap is the residual (EDGE only).
+    # Gate order (PAPER_BLOCKERS): no_fair_price is the price gate's "cannot
+    # judge" branch; price is the market read on Hard Rock's number; qb_out is
+    # transient news resolved by kickoff; gap is the residual (EDGE only).
     if qualifies:
-        if off_market:
-            paper_blocker = "off_market"
-        elif ev is None:
+        if ev is None:
             paper_blocker = "no_fair_price"
         elif not price_ok:
             paper_blocker = "price"
@@ -795,8 +790,6 @@ def build_item(
             # The feed served one of Hard Rock's alternate lines; hr_line is the
             # last main line on file, shown but never judged (market_read).
             blocker = "hr_alt_line"
-        elif off_market:
-            blocker = "off_market"
         elif ev is None:
             blocker = "no_fair_price"
         elif not price_ok:
@@ -839,14 +832,6 @@ def build_item(
         action = (
             "Not yet — Hard Rock’s feed is showing an alternate line, not its main number. "
             f"The last main line on file is under {fmt(hr_line)}; check the app."
-        )
-    elif blocker == "off_market":
-        diff = round2(market_line - hr_line)
-        action = (
-            f"Not yet — Hard Rock’s {fmt(hr_line)} is {fmt(diff)} below the market line of "
-            f"{fmt(market_line)}. You would be giving up points, and Hard Rock can void a bet "
-            f"that far off the market. Bet it if Hard Rock moves to "
-            f"{fmt(market_line - HR_OFF_MARKET_PTS)} or higher."
         )
     elif blocker == "price":
         needs = f"{american(k_price if k_price is not None else -110)} or better"

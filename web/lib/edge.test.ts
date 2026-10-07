@@ -167,7 +167,9 @@ describe("edgeScore — model rows", () => {
       "Not yet — Hard Rock has no first-half line. It becomes a bet at under 24.0 or higher.",
     );
   });
-  it("off-market Hard Rock → EDGE / off_market (the score is untouched) and a wait-for line", () => {
+  it("Hard Rock below the market is no longer a blocker (retired 2026-10-07)", () => {
+    // HR 24 vs a 26 market used to be EDGE / off_market. With the gate retired
+    // (docs/ASSUMPTIONS.md row 8) the unpriced number is named for its price.
     const e = edgeScore({
       ...base,
       liveLine: 26,
@@ -179,14 +181,9 @@ describe("edgeScore — model rows", () => {
       evVerdict: "na",
       marketFairUnder: null,
     });
-    // hrGap 2.2 → 75; off-market is a blocker, not a score term
     expect(e.score).toBe(75);
     expect(e.tier).toBe("EDGE");
-    expect(e.blocker).toBe("off_market");
-    expect(e.verdict.verdict).toBe("WATCH");
-    expect(e.action).toBe(
-      "Not yet — Hard Rock’s 24.0 is 2.0 below the market line of 26.0. You would be giving up points, and Hard Rock can void a bet that far off the market. Bet it if Hard Rock moves to 25.5 or higher.",
-    );
+    expect(e.blocker).toBe("no_fair_price");
   });
   it("Hard Rock within half a point of the market is not off-market", () => {
     const e = edgeScore({ ...base, liveLine: 25, marketLine: 25, gap: 3.2 });
@@ -332,19 +329,6 @@ describe("edgeScore — model rows", () => {
       qbOut: true,
     });
     expect(both.blocker).toBe("no_fair_price");
-    // ... and after off_market (a market read on Hard Rock's number).
-    const off = edgeScore({
-      ...base,
-      liveLine: 26,
-      marketLine: 26,
-      bestLine: 26,
-      gap: 4.2,
-      hrLine: 24,
-      ev: null,
-      evVerdict: "na",
-      marketFairUnder: null,
-    });
-    expect(off.blocker).toBe("off_market");
   });
   it("QB out → EDGE / qb_out when the gap is short of the bar", () => {
     // A judgeable fair price (ev 0) so the QB gate, not no_fair_price, is named.
@@ -370,7 +354,7 @@ describe("edgeScore — model rows", () => {
   it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH), score unchanged", () => {
     // Everything else clears: in-band Hard Rock gap, on-market number, good
     // price. The QB news alone turns the BET into a WATCH the site renders as
-    // EDGE with the qb_out blocker (gate order: no_hr_line → off_market →
+    // EDGE with the qb_out blocker (gate order: no_hr_line →
     // price → qb_out → gap; the first three pass here).
     const e = edgeScore({
       ...base,
@@ -739,7 +723,7 @@ describe("edgeScore — no model read", () => {
 describe("edgeScore — early season is paper only", () => {
   it("a would-be BET with one game played → EDGE / early_season, verdict WATCH", () => {
     // Everything else clears (in-band Hard Rock gap, on-market, good price).
-    // Gate order: no_hr_line → off_market → no_fair_price → price → qb_out →
+    // Gate order: no_hr_line → no_fair_price → price → qb_out →
     // early_season → gap, mirrored by beatvegas/card.py::build_item.
     const e = edgeScore({ ...base, minGamesPlayed: 1 });
     expect(e.tier).toBe("EDGE");

@@ -270,7 +270,6 @@ export async function evaluateRealTicket(args: {
           hrUnderPrice: row?.hrUnderPrice ?? null,
           hrCentred: row?.hrCentred ?? null,
           ev: row?.ev ?? null,
-          marketLine: row?.median ?? null,
           qbOut: item?.blocker === "qb_out" || item?.paperBlocker === "qb_out",
           minGamesPlayed,
         }));

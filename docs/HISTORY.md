@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (CFBD STARTER PACK WALKTHROUGH + BRIEF REFRESH).** All 14 notebooks of the licensed
+  Starter Pack (2026 preseason edition, gitignored at `research/cfbd_pack/`) run as shipped with
+  Tate, in its own venv; notes in `docs/CFBD_PACK.md`. Five defects found and checked on scratchpad
+  copies (00's explosiveness definition, 05 predicts a home win for every game, 07's home-oriented
+  field position and 116 impossible drive totals, 04's within-four radar scaling, 10's
+  mis-specified least squares — harmless on 2025). Findings: the pack's PPA is on the pre-September
+  scale; on 2025, weeks 1-7 first-half scoring correlates 0.14 with week 8+ first-half totals and
+  ridge opponent adjustment adds nothing (a prior for H-RIDGE-F); explosiveness is nearly
+  independent of EPA and success. Proposed, not registered: H-BOOM-R, H-FHDRIVE. Open: whether the
+  pack may ever feed the engine (licence). Nothing in the system changed.
+
 - **2026-10-07 (H-MARGIN RUN: THE MARKET IS CLEARLY CLOSER).** `bv_margin_v1` (the champion's 58
   market-blind inputs, target home minus away, 2003+) against the Vegas closing spread, one run
   (study.yml 37670166376, frame `23cb43a0a69c29aa`): MAE 13.16 vs 11.76 over 1,058 games of 2025 and

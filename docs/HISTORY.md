@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (M1A: TICKET AND PAPER-STREAM INTEGRITY).** The system review found PATCH re-checked
+  nothing: a ticket logged at a passing price could be edited to a worse one, cleared to no price,
+  restaked, or flipped to a bonus bet (freeing a cap slot, booking a loss as 0); paper rows could be
+  edited or deleted before kickoff; and a hand-logged paper pick (site, API or `pick.py add`) took a
+  game's one slot on H-STOP-2's ledger before the build reached it. Tate's calls (ASSUMPTIONS rows
+  15, 16, 19, 29): one evaluator for POST and PATCH (`web/lib/ticketPolicy.ts`, mode passed in
+  explicitly); a changed price is re-judged at the time the ticket was written against its frozen
+  verdict; an omitted price keeps the stored one and an explicit null is refused; the bonus flag
+  moved onto the log form and is not editable; paper is build-only (`PAPER IS BUILD-ONLY`,
+  `PAPER IS FROZEN`, `pick.py add` removed). Neon check that day: all 76 paper picks for 2026
+  carry a `blocker`, so no hand-logged paper was ever written. The 10u edit cap stays (row 14).
+  Backdated pricing (M1B) and the 6 h live-price limit (M2) follow as their own PRs.
+
 - **2026-10-07 (LIVE SWITCH: CHAMPION TRAINS ON 2003+).** Tate's calls after H-HIST: switch now,
   start year 2003 (all three floors tied on accuracy; the tie-break did not look at betting
   records), keep H-STOP-2 running with before/after reporting, move the full-game shadow too.

@@ -30,8 +30,9 @@ export type PickPrefill = {
 };
 
 // Real money is first-half unders at one flat unit; the stake is not a field.
-// Paper picks are also one unit (so their record reads in units) but sit apart
-// from the bankroll. WATCH defaults to paper — WATCH is not a bet (policy).
+// Every pick logged here is a REAL ticket: paper is written by the card build
+// only (2026-10-07), so a Watch or Pass logged here is an off-policy real bet
+// and Results flags it. A bonus bet is marked here, once; it cannot be edited.
 export default function LogPickForm({
   prefill,
   unitUsd,
@@ -48,15 +49,14 @@ export default function LogPickForm({
     prefill.line === null ? "" : String(prefill.line),
   );
   // Blank when Hard Rock has not priced the under: the form never invents odds.
-  // A real ticket must have them (the server refuses PRICE MISSING); paper may
-  // go in blank and is stored priceless.
+  // A real ticket must have them (the server refuses PRICE MISSING).
   const [price, setPrice] = useState<string>(
     prefill.price === null ? "" : String(prefill.price),
   );
-  const [isPaper, setIsPaper] = useState(prefill.verdict !== "BET");
+  const [isBonus, setIsBonus] = useState(false);
   // When the ticket was written, ET wall clock, BLANK unless the ticket was
   // written earlier: blank means "now", and the server judges the live read.
-  // Sent for real money only, as a UTC instant; a bet time more than 30
+  // Sent as a UTC instant; a bet time more than 30
   // minutes before the log makes it a backdated log, judged by the card in
   // force then (docs/BETTING_POLICY.md). A pre-filled "now" would turn a form
   // left open half an hour into a backdated log with no live price check.
@@ -80,14 +80,14 @@ export default function LogPickForm({
         setErr("Enter the odds as a number, like -110.");
         return;
       }
-    } else if (!isPaper) {
+    } else {
       setErr(
         "A real ticket needs its odds. Enter them as a number, like -110.",
       );
       return;
     }
     let betAtIso: string | undefined;
-    if (!isPaper && betAt.trim() !== "") {
+    if (betAt.trim() !== "") {
       const t = etLocalToUtc(betAt);
       if (t === null) {
         setErr(
@@ -107,7 +107,7 @@ export default function LogPickForm({
           market: "1H",
           line: lineNum,
           price: priceNum,
-          isPaper,
+          isBonus,
           betAt: betAtIso,
           note: note.trim() || undefined,
           verdict: prefill.verdict,
@@ -172,37 +172,34 @@ export default function LogPickForm({
           <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
             <input
               type="checkbox"
-              checked={isPaper}
-              onChange={(e) => setIsPaper(e.target.checked)}
+              checked={isBonus}
+              onChange={(e) => setIsBonus(e.target.checked)}
             />
-            Paper pick — no money on it
+            Bonus bet — the book funded the stake
           </label>
           <span className={hintCls}>
-            Graded like a real bet, but kept in its own record.
+            A loss books nothing and it uses no weekly slot.
           </span>
         </div>
-        {!isPaper && prefill.verdict && prefill.verdict !== "BET" && (
+        {prefill.verdict && prefill.verdict !== "BET" && (
           <p className="text-xs text-[var(--warn)] sm:col-span-3">
             {`This site rates the game ${verdictWord}, not Bet. Logging it as real money is fine — Results will show it separately so you can see how your own calls do.`}
           </p>
         )}
 
-        {!isPaper && (
-          <label className={`${labelCls} sm:col-span-3`}>
-            Placed at (Eastern time) — leave blank if now
-            <input
-              type="datetime-local"
-              value={betAt}
-              onChange={(e) => setBetAt(e.target.value)}
-              className={field}
-            />
-            <span className={hintCls}>
-              Fill it in only if you wrote the ticket earlier. A late log is
-              judged by the card that was in force then, not by today&apos;s
-              line.
-            </span>
-          </label>
-        )}
+        <label className={`${labelCls} sm:col-span-3`}>
+          Placed at (Eastern time) — leave blank if now
+          <input
+            type="datetime-local"
+            value={betAt}
+            onChange={(e) => setBetAt(e.target.value)}
+            className={field}
+          />
+          <span className={hintCls}>
+            Fill it in only if you wrote the ticket earlier. A late log is
+            judged by the card that was in force then, not by today&apos;s line.
+          </span>
+        </label>
 
         <label className={`${labelCls} sm:col-span-3`}>
           Note — why you took it
@@ -224,11 +221,7 @@ export default function LogPickForm({
 
       <div className="mt-4 flex items-center gap-3">
         <button type="submit" disabled={busy} className="bv-btn">
-          {busy
-            ? "Logging…"
-            : isPaper
-              ? "Log paper pick"
-              : `Log bet (${usd(unitUsd)})`}
+          {busy ? "Logging…" : `Log bet (${usd(unitUsd)})`}
         </button>
         {onDone && (
           <button

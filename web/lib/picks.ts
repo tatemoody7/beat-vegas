@@ -7,7 +7,7 @@ import { minGamesPlayedFrom } from "@/lib/homeBoard";
 import { recordFrom, type Record3 } from "@/lib/record";
 import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import { DEFAULT_STAKE, PAPER_STAKE, type PickEdit } from "@/lib/pickRules";
+import { DEFAULT_STAKE, type PickEdit } from "@/lib/pickRules";
 import {
   CHAMPION_READ_VERSIONS,
   DERIVED_LINES_MODEL_VERSION,
@@ -294,7 +294,11 @@ export type CreatePickInput = {
   /** American odds on the ticket; null/absent = none given (stored NULL, provenance 'unknown'). */
   price?: number | null;
   note?: string;
+  /** Always false from the web: paper is written by the card build only
+   *  (2026-10-07). Kept so the type matches PickRequest; true throws. */
   isPaper?: boolean;
+  /** A bonus (free) bet, set once at log time; stored as is_bonus. */
+  isBonus?: boolean;
   /** When the ticket was written (UTC ISO), when that is not now; stored as bet_at. */
   betAt?: string | null;
   verdict?: Verdict;
@@ -319,6 +323,12 @@ export async function createPick(
     select: { season: true, week: true, home_team: true, away_team: true },
   });
   if (!game) throw new Error("game not found");
+  // Paper is build-only (2026-10-07): POST /api/picks refuses it, and this
+  // writer refuses it too so no future caller can open a hand path into the
+  // stopping rule's observation stream.
+  if (input.isPaper === true) {
+    throw new Error("paper picks are written by the card build only");
+  }
 
   const market = input.market === "full" ? "full" : "1H";
 
@@ -353,10 +363,10 @@ export async function createPick(
   // mirrors beatvegas/picks.py model_refit_id). NULL before the column lands.
   const refitId = pred[0]?.refit_id == null ? null : Number(pred[0].refit_id);
 
-  const isPaper = input.isPaper === true;
-  // Flat 1 unit for real AND paper (paper record reads in units; is_paper keeps
-  // it out of the bankroll). The client's stake is never trusted.
-  const stake = isPaper ? PAPER_STAKE : DEFAULT_STAKE;
+  const isPaper = false;
+  const isBonus = input.isBonus === true;
+  // Flat 1 unit; the client's stake is never trusted.
+  const stake = DEFAULT_STAKE;
   // Never invent a price. NULL + 'unknown' is an honest row; -110 + nothing
   // (the behaviour until 2026-09-20) read as a verified ticket price and left
   // every real 2026 ticket without a closing price, because grade_pick only
@@ -383,20 +393,23 @@ export async function createPick(
       INSERT INTO manual_picks
         (game_id, season, week, home_team, away_team, side, market, line, price,
          book, price_provenance,
-         stake, is_paper, placed_at, bet_at, note, model_line_at_pick,
+         stake, is_paper, is_bonus, placed_at, bet_at, note, model_line_at_pick,
          factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
          ev_at_pick, hr_line_at_pick, refit_id)
       VALUES
         (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
          ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
          ${book}, ${priceProvenance}, ${stake},
-         ${isPaper}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelLine},
+         ${isPaper}, ${isBonus}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelLine},
          ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine}, ${refitId})
     `;
     return { tracked: true };
   } catch (e) {
     if (isDuplicatePick(e)) throw new DuplicatePickError();
     if (!isMissingColumn(e)) throw e;
+    // The legacy insert has no is_bonus: storing a bonus ticket as a funded
+    // one would book its loss and spend a cap slot. Refuse instead.
+    if (isBonus) throw e;
     console.warn(
       "manual_picks tracking columns missing — pick stored without snapshot",
     );
@@ -421,6 +434,68 @@ export async function createPick(
   }
 }
 
+/** The stored facts an edit is judged against (PATCH /api/picks/<id>). */
+export type EditablePick = {
+  id: number;
+  gameId: number | null;
+  market: "1H" | "full";
+  line: number;
+  price: number | null;
+  isPaper: boolean;
+  isBonus: boolean;
+  graded: boolean;
+  verdictAtPick: Verdict | null;
+  /** When the ticket was written: bet_at, else placed_at (UTC ISO). */
+  writtenAt: string | null;
+};
+
+// "2026-10-07 18:00:00.123" (naive UTC, as text) -> "2026-10-07T18:00:00.123Z".
+const asIso = (v: string | null): string | null => {
+  if (v === null) return null;
+  const t = new Date(`${v.trim().replace(" ", "T")}Z`);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+};
+
+export async function getEditablePick(
+  id: number,
+): Promise<EditablePick | null> {
+  // Timestamps read as text: they are naive UTC, and a bare timestamp column
+  // comes back shifted by the server's zone (lib/et.ts).
+  const rows = await prisma.$queryRaw<
+    {
+      id: number;
+      game_id: number | null;
+      market: string | null;
+      line: number;
+      price: number | null;
+      is_paper: boolean | null;
+      is_bonus: boolean | null;
+      graded: boolean | null;
+      verdict_at_pick: string | null;
+      bet_at: string | null;
+      placed_at: string | null;
+    }[]
+  >`
+    SELECT id, game_id, market, line, price, is_paper, is_bonus, graded,
+           verdict_at_pick, bet_at::text AS bet_at, placed_at::text AS placed_at
+    FROM manual_picks WHERE id = ${id}
+  `;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    gameId: r.game_id,
+    market: r.market === "full" ? "full" : "1H",
+    line: Number(r.line),
+    price: r.price === null ? null : Number(r.price),
+    isPaper: r.is_paper === true,
+    isBonus: r.is_bonus === true,
+    graded: r.graded === true,
+    verdictAtPick: asVerdict(r.verdict_at_pick),
+    writtenAt: asIso(r.bet_at ?? r.placed_at),
+  };
+}
+
 /**
  * Apply an edit to a PENDING pick whose game has NOT kicked off. Returns false
  * when the pick is missing, already graded, or its game has started — a ledger
@@ -435,9 +510,6 @@ export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
   if (edit.price !== undefined) sets.push(Prisma.sql`price = ${edit.price}`);
   if (edit.stake !== undefined) sets.push(Prisma.sql`stake = ${edit.stake}`);
   if (edit.note !== undefined) sets.push(Prisma.sql`note = ${edit.note}`);
-  if (edit.isBonus !== undefined) {
-    sets.push(Prisma.sql`is_bonus = ${edit.isBonus}`);
-  }
   if (sets.length === 0) return false;
 
   // ONE statement, with the immutability rule in its WHERE clause. It used to
@@ -451,9 +523,13 @@ export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
   // books 0) or restaked to the whole roll. A price typo is correctable before
   // the whistle; nothing is correctable after it (2026-09-22). start_date is
   // naive UTC, so the clock is compared in UTC.
+  // ...and NEVER on paper (2026-10-07): the build's paper pick is the
+  // stopping rule's observation, so its price and stake are what the build
+  // saw. The route refuses first with its own message; this is the backstop.
   const changed = await prisma.$executeRaw`
     UPDATE manual_picks SET ${Prisma.join(sets, ", ")}
     WHERE id = ${id} AND COALESCE(graded, false) = false
+      AND COALESCE(is_paper, false) = false
       AND (game_id IS NULL OR game_id IN (
         SELECT id FROM games
         WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')
@@ -462,12 +538,13 @@ export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
   return changed > 0;
 }
 
-// Returns false if the pick is already graded (immutable) or missing. Same
-// single-statement reasoning as updatePick.
+// Returns false if the pick is already graded (immutable), paper (the build's,
+// frozen), or missing. Same single-statement reasoning as updatePick.
 export async function deletePick(id: number): Promise<boolean> {
   const changed = await prisma.$executeRaw`
     DELETE FROM manual_picks
     WHERE id = ${id} AND COALESCE(graded, false) = false
+      AND COALESCE(is_paper, false) = false
       AND (game_id IS NULL OR game_id IN (
         SELECT id FROM games
         WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')

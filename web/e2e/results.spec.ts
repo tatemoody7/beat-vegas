@@ -366,7 +366,7 @@ test.describe("results", () => {
     await expect(detail).toContainText(`Our number then44`);
   });
 
-  test("signed in, pending picks can be edited or deleted; graded ones cannot", async ({
+  test("signed in, pending real tickets can be edited or deleted; paper and graded ones cannot", async ({
     page,
   }) => {
     await page.goto("/results?week=all");
@@ -382,9 +382,21 @@ test.describe("results", () => {
       .locator("tbody > tr.align-top");
     const pending = rows.filter({ hasText: "Pending" });
     const graded = rows.filter({ hasNotText: "Pending" });
-    await expect(pending.getByRole("button", { name: "edit" })).toHaveCount(3);
+    // Paper is the build's and frozen (2026-10-07): of the three pending rows
+    // only the real ticket offers edit/delete.
+    const pendingPaper = expected.picks.filter(
+      (p) => !p.graded && p.isPaper,
+    ).length;
+    const pendingReal = expected.picks.filter(
+      (p) => !p.graded && !p.isPaper,
+    ).length;
+    expect([pendingReal, pendingPaper]).toEqual([1, 2]);
+    await expect(pending).toHaveCount(pendingReal + pendingPaper);
+    await expect(pending.getByRole("button", { name: "edit" })).toHaveCount(
+      pendingReal,
+    );
     await expect(pending.getByRole("button", { name: "delete" })).toHaveCount(
-      3,
+      pendingReal,
     );
     await expect(graded.getByRole("button", { name: "edit" })).toHaveCount(0);
     await expect(graded.getByRole("button", { name: "delete" })).toHaveCount(0);

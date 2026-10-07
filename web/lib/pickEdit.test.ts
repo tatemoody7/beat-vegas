@@ -3,25 +3,26 @@ import { MAX_EDIT_STAKE, parsePickEdit } from "./pickRules";
 
 // Editing exists because entry mistakes are normal: a price typed from memory,
 // a bonus bet that staked more than a flat unit. What must NOT be editable is
-// anything that identifies the bet, or anything at all once it is graded (the
-// route enforces the graded rule; these cover the shape).
+// anything that identifies the bet, the bonus flag, a paper pick, or anything
+// at all from kickoff (the route enforces paper and kickoff and re-judges a
+// changed price; these cover the shape).
 
 describe("parsePickEdit", () => {
-  it("takes price, stake, note and the bonus flag together", () => {
-    const r = parsePickEdit({
-      price: -125,
-      stake: 2,
-      note: "bonus bet",
-      isBonus: true,
-    });
+  it("takes price, stake and note together", () => {
+    const r = parsePickEdit({ price: -125, stake: 2, note: "bonus bet" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.edit).toEqual({
-      price: -125,
-      stake: 2,
-      note: "bonus bet",
-      isBonus: true,
-    });
+    expect(r.edit).toEqual({ price: -125, stake: 2, note: "bonus bet" });
+  });
+
+  it("refuses the bonus flag: it is set when the ticket is logged", () => {
+    // 2026-10-07: flipping it later freed a cap slot and booked a loss as 0.
+    for (const isBonus of [true, false]) {
+      const r = parsePickEdit({ isBonus });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.status).toBe(409);
+    }
+    expect(parsePickEdit({ price: -110, isBonus: true }).ok).toBe(false);
   });
 
   it("applies only the fields that are present", () => {
@@ -32,11 +33,23 @@ describe("parsePickEdit", () => {
     expect("stake" in r.edit).toBe(false);
   });
 
-  it("allows clearing the price and the note to null", () => {
-    const r = parsePickEdit({ price: null, note: null });
+  it("an OMITTED price keeps the stored one; an explicit null is refused", () => {
+    // Omitted: the edit does not carry a price at all, so the row keeps its own.
+    const kept = parsePickEdit({ stake: 2 });
+    expect(kept.ok).toBe(true);
+    if (kept.ok) expect("price" in kept.edit).toBe(false);
+    // Explicit null (or a blank field): a real ticket never loses its price.
+    for (const price of [null, ""]) {
+      const r = parsePickEdit({ price });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/^PRICE MISSING/);
+    }
+  });
+
+  it("allows clearing the note to null", () => {
+    const r = parsePickEdit({ note: null });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.edit.price).toBeNull();
     expect(r.edit.note).toBeNull();
   });
 

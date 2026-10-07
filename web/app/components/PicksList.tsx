@@ -61,9 +61,8 @@ export default function PicksList({
   const [draft, setDraft] = useState<{
     price: string;
     stake: string;
-    isBonus: boolean;
     note: string;
-  }>({ price: "", stake: "", isBonus: false, note: "" });
+  }>({ price: "", stake: "", note: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +72,6 @@ export default function PicksList({
     setDraft({
       price: p.price === null ? "" : String(p.price),
       stake: p.stake === null ? "" : String(p.stake),
-      isBonus: p.isBonus,
       note: p.note ?? "",
     });
   }
@@ -82,10 +80,12 @@ export default function PicksList({
     setSaving(true);
     setError(null);
     try {
+      // A blank price is sent as null so the server says why it refuses
+      // (a real ticket keeps its price); an unchanged one is not re-judged.
+      // The bonus flag is set at log time and is not editable (2026-10-07).
       const body: Record<string, unknown> = {
         price: draft.price.trim() === "" ? null : Number(draft.price),
         stake: Number(draft.stake),
-        isBonus: draft.isBonus,
         note: draft.note.trim() === "" ? null : draft.note,
       };
       const res = await fetch(`/api/picks/${id}`, {
@@ -258,7 +258,8 @@ export default function PicksList({
                       >
                         {open === p.id ? "hide" : "details"}
                       </button>
-                      {authed && !p.graded && (
+                      {/* Paper is the build's and frozen (2026-10-07). */}
+                      {authed && !p.graded && !p.isPaper && (
                         <>
                           <button
                             onClick={() => startEdit(p)}
@@ -341,19 +342,6 @@ export default function PicksList({
                               className="w-24 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono"
                             />
                           </label>
-                          <label className="flex items-center gap-2 pb-1">
-                            <input
-                              type="checkbox"
-                              checked={draft.isBonus}
-                              onChange={(e) =>
-                                setDraft({
-                                  ...draft,
-                                  isBonus: e.target.checked,
-                                })
-                              }
-                            />
-                            <span>Bonus bet (a loss books nothing)</span>
-                          </label>
                           <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
                             <span className="text-[var(--text-dim)]">Note</span>
                             <input
@@ -384,7 +372,7 @@ export default function PicksList({
                           </p>
                         )}
                         <p className="mt-2 text-xs text-[var(--text-dim)]">
-                          {`One unit is $10. A bonus bet pays profit only, so a $20 bonus at -125 wins $16 and loses nothing — tick the box and set the stake to 2. Editing stops once the game is graded.`}
+                          {`One unit is $10. A bonus bet pays profit only, so a $20 bonus at -125 wins $16 and loses nothing — it is marked when the ticket is logged; set its stake to 2 here. Editing stops at kickoff.`}
                         </p>
                       </td>
                     </tr>

@@ -76,10 +76,9 @@ python scripts/backtest.py                               # the proxy-graded edge
 Data lands in Neon when `DATABASE_URL` is set, else `data/beatvegas.db`
 (gitignored). Every script is idempotent.
 
-**Log your own bets** (graded vs the same real lines, so your intuition is
-measured next to the market):
+**Your own bets** are logged on the site (the game page's log button, where every
+policy gate runs); paper picks are written by the card build only. From the terminal:
 ```bash
-python scripts/pick.py add --home "Ohio State" --away "Michigan" --line 24.5 --market 1h
 python scripts/pick.py grade --season 2026     # after games finish
 python scripts/pick.py summary                 # your hit rate, units, CLV
 ```

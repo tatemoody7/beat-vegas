@@ -4,15 +4,13 @@ pick.py's add path outside --force while paper still logs."""
 from __future__ import annotations
 
 import importlib.util
-from argparse import Namespace
 from contextlib import contextmanager
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from beatvegas.db.models import AppSetting, Base, Game, ManualPick
+from beatvegas.db.models import AppSetting, Base
 from beatvegas.picks import RULE_PAUSED_KEY, rule_paused, set_rule_paused
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -73,77 +71,3 @@ def test_script_toggles_and_reports_status(capsys):
         assert s.query(AppSetting).count() == 1
     assert mod.main(["off"]) == 0
     assert mod.main(["status"]) == 0
-
-
-def _pick_module_paused(paused: bool):
-    pick = _load("pick")
-    eng = _engine()
-    future = datetime.utcnow() + timedelta(days=3)
-    with Session(eng) as s:
-        s.add(
-            Game(
-                id=1,
-                season=2026,
-                week=4,
-                home_team="Ohio State",
-                away_team="Michigan",
-                start_date=future,
-            )
-        )
-        if paused:
-            set_rule_paused(s, True, note="boundary crossed")
-        s.commit()
-    pick.session_scope = _scope(eng)
-    return pick, eng
-
-
-def _args(**kw) -> Namespace:
-    base = dict(
-        home="Ohio State",
-        away="Michigan",
-        line=24.5,
-        price=-110,
-        stake=1.0,
-        book=None,
-        season=2026,
-        week=None,
-        note=None,
-        market="1h",
-        force=False,
-        paper=False,
-        reason="manual",
-        verdict=None,
-        gap=None,
-        ev=None,
-        hr_line=None,
-    )
-    base.update(kw)
-    return Namespace(**base)
-
-
-def _n_picks(eng) -> int:
-    with Session(eng) as s:
-        return s.query(ManualPick).count()
-
-
-def test_cmd_add_refuses_real_money_while_paused_even_with_force(capsys):
-    """Since 2026-09-22 the CLI is paper-only, so real money is refused before
-    the pause is even consulted -- and --force changes nothing. The pause itself
-    is still enforced on the site's write path (pickRules.checkPolicy) and read
-    fail-closed there; scripts/rule_pause.py remains its only writer."""
-    pick, eng = _pick_module_paused(True)
-    pick.cmd_add(_args())
-    assert _n_picks(eng) == 0
-    pick.cmd_add(_args(force=True))
-    assert _n_picks(eng) == 0
-    out = capsys.readouterr().out
-    assert "REFUSED" in out and "paper-only" in out
-
-
-def test_cmd_add_still_logs_paper_while_paused_and_never_real():
-    pick, eng = _pick_module_paused(True)
-    pick.cmd_add(_args(paper=True))
-    assert _n_picks(eng) == 1  # the pause is about money; paper keeps accruing
-    pick2, eng2 = _pick_module_paused(False)
-    pick2.cmd_add(_args())
-    assert _n_picks(eng2) == 0  # real money is logged on the site, never here

@@ -1,17 +1,15 @@
 #!/usr/bin/env python
-"""Log and grade your own first-half under bets, by team name.
-
-# log a bet (resolves the game by name within the season):
-python scripts/pick.py add --home "Ohio State" --away "Michigan" --line 24.5
-python scripts/pick.py add --home Bama --away LSU --line 27 --price -105 --stake 2 --book dk
-# record WHY (board verdict + numbers at log time) so hit rate splits by reason:
-python scripts/pick.py add --home LSU --away Clemson --line 24.5 --reason model_gap \
-    --verdict BET --gap 2.25 --ev 0.03 --hr-line 24.5
-python scripts/pick.py add ... --paper           # paper: one flat unit, own record
+"""List, grade and summarise the logged picks.
 
 python scripts/pick.py list                 # show logged picks
 python scripts/pick.py grade --season 2026  # grade completed picks (vs result + CLV)
 python scripts/pick.py summary              # your hit rate, units, avg CLV
+
+There is no `add` (removed 2026-10-07). Real tickets are logged on the site
+(the game page, POST /api/picks), where every policy gate runs; paper picks are
+written by the card build only (scripts/build_card.py), one per qualifying game,
+because the paper ledger is the stopping rule's observation stream and a hand
+paper pick took a game's one slot before the build reached it.
 """
 
 from __future__ import annotations
@@ -23,16 +21,9 @@ from typing import List, Optional
 from beatvegas.challenger_picks import grade_challenger_picks
 from beatvegas.db.models import Game, ManualPick
 from beatvegas.db.store import session_scope, try_init_db
-from beatvegas.etl.match import resolve_game
 from beatvegas.picks import (
-    add_pick,
-    bet_at_from_et,
-    existing_pick,
     grade_pick,
     graded_pick_fields,
-    model_read,
-    model_refit_id,
-    rule_paused,
 )
 
 __all__ = ["graded_pick_fields"]  # re-exported from beatvegas.picks for existing importers
@@ -53,116 +44,6 @@ def _season_games(s, season: int) -> List[dict]:
 def _default_season(now: Optional[datetime] = None) -> int:
     now = now or datetime.utcnow()
     return now.year if now.month >= 6 else now.year - 1
-
-
-def cmd_add(args) -> None:
-    # PAPER ONLY (2026-09-22). Real money is logged on the site, where
-    # POST /api/picks runs every policy gate -- the cap, the kill numbers, the
-    # live-price check, early season, the pause -- and decides the verdict
-    # itself. This command ran none of them and defaulted a missing price to
-    # -110, the fabrication removed from the web writer two days earlier.
-    if not getattr(args, "paper", False):
-        print(
-            "REFUSED: real-money picks are logged on the site (the game page's log button, "
-            "POST /api/picks), where the policy gates run. `pick.py add` is paper-only: "
-            "pass --paper."
-        )
-        return
-    season = args.season or _default_season()
-    market = "full" if args.market == "full" else "1H"
-    with session_scope() as s:
-        games = _season_games(s, season)
-        gid, score, n, candidates = resolve_game(args.home, args.away, games, week=args.week)
-        if gid is None:
-            print(
-                f"No game found for '{args.away} @ {args.home}' in {season}. "
-                "Check spelling, or run backfill --season for this year. "
-                "You can still log it; it just won't grade until matched."
-            )
-        elif n > 1 and not args.force:
-            print(f"REFUSED: {n} games match '{args.away} @ {args.home}' in {season}:")
-            for c in candidates:
-                print(f"  wk{c.get('week')}: {c.get('away_team')} @ {c.get('home_team')}")
-            print(
-                "Pass --week to pin the game, or --force to accept the best guess — "
-                "a real-money pick must not attach to a guessed game."
-            )
-            return
-        g = next((x for x in games if x["id"] == gid), None)
-
-        # Real-money integrity guards (override with --force if intentional).
-        if gid is not None and not args.force:
-            start = (g or {}).get("start_date")
-            if start is not None and start <= datetime.utcnow():
-                print(
-                    f"REFUSED: {args.away} @ {args.home} already kicked off "
-                    f"({start} UTC) — a post-kickoff pick isn't a real bet. "
-                    "Pass --force if you genuinely placed it pre-game."
-                )
-                return
-            # Per ledger: the card's PAPER pick on a game never blocks a real
-            # ticket on it (the paper ledger now logs every qualifying game).
-            dup = existing_pick(s, gid, market, is_paper=bool(args.paper))
-            if dup is not None:
-                print(
-                    f"REFUSED: {'paper ' if args.paper else ''}pick #{dup.id} already logged "
-                    f"on this game/market (UNDER {dup.line}). Pass --force to log a second bet on it."
-                )
-                return
-
-        # THE PAUSE (docs/STOPPING_RULE.md). While the rule_paused switch is on,
-        # no real-money pick is logged from anywhere -- not the site, not here --
-        # and --force does not bypass it: the switch exists because something is
-        # wrong, and an override while paused is exactly the bet it must stop.
-        # Paper continues; it still counts toward the record.
-        if not args.paper:
-            note = rule_paused(s)
-            if note is not None:
-                print(
-                    "REFUSED: RULE PAUSED — real money is switched off"
-                    + (f" ({note})" if note else "")
-                    + ". Log it with --paper; it still counts toward the record. "
-                    "scripts/rule_pause.py off resumes."
-                )
-                return
-
-        # Freeze OUR number onto the ticket, the same read the website's own
-        # log takes (web/lib/picks.ts createPick) — without it a terminal pick
-        # sits outside decision-quality's agreed/against split.
-        model_line = model_read(s, gid, market)
-        # Paper pick: one flat unit so it grades as +/-1u on its own record
-        # (is_paper keeps it out of the real ledger); CLV/result grade normally.
-        # The insert itself is beatvegas.picks.add_pick, shared with the cloud card.
-        pick = add_pick(
-            s,
-            game_id=gid,
-            season=season,
-            week=(g or {}).get("week") if g else args.week,
-            home_team=(g or {}).get("home_team", args.home) if g else args.home,
-            away_team=(g or {}).get("away_team", args.away) if g else args.away,
-            market=market,
-            line=args.line,
-            price=args.price,
-            stake=args.stake,
-            is_paper=bool(args.paper),
-            book=args.book,
-            note=args.note,
-            reason=args.reason or "manual",
-            verdict=args.verdict,
-            gap=args.gap,
-            ev=args.ev,
-            hr_line=args.hr_line,
-            model_line=model_line,
-            bet_at=bet_at_from_et(getattr(args, "bet_at", None)),
-            refit_id=model_refit_id(s, gid, market),
-        )
-        why = pick.reason + (f"/{pick.verdict_at_pick}" if pick.verdict_at_pick else "")
-        print(
-            f"logged {'PAPER ' if args.paper else ''}pick #{pick.id}: {market} UNDER "
-            f"{args.line} ({args.price}) {pick.away_team} @ {pick.home_team} "
-            f"[{season} wk{pick.week}] stake={pick.stake}u reason={why}"
-            + (f" (game {gid})" if gid else " (UNMATCHED)")
-        )
 
 
 def cmd_list(args) -> None:
@@ -267,62 +148,6 @@ def main() -> None:
         return
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-
-    a = sub.add_parser("add", help="log a first-half under bet")
-    a.add_argument("--home", required=True)
-    a.add_argument("--away", required=True)
-    a.add_argument("--line", type=float, required=True)
-    a.add_argument(
-        "--price",
-        type=int,
-        default=None,
-        help="American odds on the ticket; omitted = stored NULL (never an invented -110)",
-    )
-    a.add_argument("--stake", type=float, default=1.0)
-    a.add_argument("--book")
-    a.add_argument("--season", type=int)
-    a.add_argument("--week", type=int)
-    a.add_argument("--note")
-    a.add_argument(
-        "--market",
-        choices=("1h", "full"),
-        default="1h",
-        help="which total the bet is on: 1h (default) or full game",
-    )
-    a.add_argument(
-        "--paper",
-        action="store_true",
-        help="paper pick: nothing at risk, staked one flat unit so it grades +/-1u "
-        "on its own PAPER record",
-    )
-    a.add_argument(
-        "--reason",
-        choices=("model_gap", "price_edge", "manual"),
-        default="manual",
-        help="why the bet: the model gap, a Hard Rock price edge, or your own read",
-    )
-    a.add_argument(
-        "--verdict",
-        choices=("BET", "WATCH", "PASS"),
-        help="the board's verdict at log time (frozen for later review)",
-    )
-    a.add_argument("--gap", type=float, help="bv_gap in points shown at log time")
-    a.add_argument("--ev", type=float, help="no-vig EV of the under at log time")
-    a.add_argument("--hr-line", type=float, dest="hr_line", help="Hard Rock's line at log time")
-    a.add_argument(
-        "--bet-at",
-        dest="bet_at",
-        help="when the ticket was WRITTEN if not now, Eastern wall clock: 2026-09-25T16:10",
-    )
-    a.add_argument(
-        "--force",
-        action="store_true",
-        help=(
-            "log even if a pick already exists on this game/market, kickoff has "
-            "passed, or the game match is ambiguous"
-        ),
-    )
-    a.set_defaults(func=cmd_add)
 
     li = sub.add_parser("list", help="list logged picks")
     li.add_argument("--season", type=int)

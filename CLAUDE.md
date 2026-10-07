@@ -206,7 +206,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion).
 - **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`, `fg_position`,
-  `challenger_position`, `rule_pause`, `pick` (paper-only `add`, `grade`, `summary`).
+  `challenger_position`, `rule_pause`, `pick` (`list`, `grade`, `summary`; no `add`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
@@ -223,26 +223,26 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)
-- `POST /api/picks` → `lib/pickRules.ts::serverVerdict` + `checkPolicy`: a real-money BET needs
+- POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
   Hard Rock's own MAIN line, a **live** verifiable price (`lib/lineCheck.ts`; none → `PRICE
   UNAVAILABLE`, a different refusal from the kill-price one), a price at or better than the kill
   price recomputed now, both teams with ≥2 current-season FBS games (`MIN_GAMES_FOR_REAL_MONEY`),
   and a free cap slot (5 a week; bonus bets use none and book no loss). Nothing defaults a price
-  to −110; a missing price is NULL and refused (`PRICE MISSING`). Paper is exempt from the price
-  rules so the stopping rule's observations are untouched.
+  to −110; a missing price is NULL and refused (`PRICE MISSING`). **Paper is build-only** (2026-10-07):
+  POST refuses `isPaper`, `pick.py add` is gone, and paper rows cannot be PATCHed or DELETEd.
 - `manual_picks.bet_at` is when the ticket was WRITTEN (`placed_at` is the log time). A log more
   than `BACKDATE_MIN_MINUTES` (30) after the bet is judged by **the card in force at bet time**
   (`lib/card.ts::getLatestCard(season, week, asOf)`, `pickRules.verdictAtBetTime`); `betAtCheck`
   refuses future, >7 d and post-kickoff times; the log form's "Placed at" is blank by default.
-- Picks freeze at kickoff (PATCH/DELETE refused); `uq_manual_pick_per_ledger` stops duplicates.
+- Real tickets freeze at kickoff; until then PATCH edits price/stake/note (a new price is re-judged,
+  never null; bonus is set at log only). `uq_manual_pick_per_ledger` stops duplicates.
 - Grading is side-aware in one place each: `grading.units_won(side)`,
   `picks.graded_pick_fields(side)`, `lines.book_closing_price_before_kickoff(side)`. Stored
   `clv = closing − bet`, so **negative is the good direction for an under**; the site shows `−clv`
   (`lib/clvDirection.test.ts` pins it). `price_provenance` ∈ logged / backfilled_close / unknown;
   only `logged` feeds price CLV.
-- Real tickets: `manual_picks` (`is_paper=false`). Paper: `manual_picks` (`is_paper=true`, 1
-  flat unit). Challenger families: `challenger_picks` only — one missed filter would contaminate
-  the champion's clock.
+- Real: `manual_picks` (`is_paper=false`). Paper: `manual_picks` (`is_paper=true`, 1 unit, build
+  only). Challengers: `challenger_picks` only — one missed filter contaminates the champion's clock.
 
 ## Setup + dev
 ```bash

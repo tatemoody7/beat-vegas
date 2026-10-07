@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { csvCell } from "@/lib/format";
-import { MODEL_VERSION } from "@/lib/model";
+import { MODEL_VERSION, SITE_MIN_SEASON } from "@/lib/model";
 import { prisma } from "@/lib/prisma";
 
 // Our own season records (plan Phase 1): one row per game, model-aligned —
@@ -78,9 +78,10 @@ export async function getRecordSeasons(): Promise<number[]> {
   // 2026 rows.
   const rows = await prisma.$queryRaw<{ season: number | bigint }[]>`
     SELECT DISTINCT g.season FROM games g
-    WHERE g.first_half_total IS NOT NULL
-       OR EXISTS (SELECT 1 FROM predictions p
-                  WHERE p.game_id = g.id AND p.model_version = ${MODEL_VERSION})
+    WHERE g.season >= ${SITE_MIN_SEASON}
+      AND (g.first_half_total IS NOT NULL
+           OR EXISTS (SELECT 1 FROM predictions p
+                      WHERE p.game_id = g.id AND p.model_version = ${MODEL_VERSION}))
     ORDER BY g.season DESC
   `;
   return rows.map((r) => Number(r.season));

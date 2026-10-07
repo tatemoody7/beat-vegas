@@ -4,6 +4,12 @@
 // a literal, so a retrain that bumps the version is a one-line change here.
 export const MODEL_VERSION = "gbm_v1";
 
+// The earliest season the site lists (2026-10-06). Seasons before 2023 are
+// loaded into `games` only as training history for the H-HIST / H-ELO-F
+// studies; they carry no predictions, lines or picks, so no page shows them.
+// Mirrors beatvegas/etl/features.py::FRAME_MIN_SEASON (tests/test_gate_parity.py).
+export const SITE_MIN_SEASON = 2023;
+
 // The display-only derived lines (scripts/post_derived_lines.py): shown on a
 // card when no model row exists, never ranked above one.
 export const DERIVED_LINES_MODEL_VERSION = "derived_lines";

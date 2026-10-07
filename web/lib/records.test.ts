@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultWeek,
+  kickoffMs,
   outcome,
   recordsToCsv,
   scoredAfter,
@@ -23,6 +24,7 @@ const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   outcome: "under",
 
   scoredAfterKickoff: null,
+  kickoffMs: null,
   ...o,
 });
 
@@ -106,5 +108,24 @@ describe("defaultWeek", () => {
   it("is null when nothing has been graded yet", () => {
     expect(defaultWeek([{ week: 1, outcome: null }])).toBeNull();
     expect(defaultWeek([])).toBeNull();
+  });
+});
+
+describe("kickoffMs", () => {
+  it("reads a Date, a zoned string and a naive string as the same UTC instant", () => {
+    const ms = Date.UTC(2026, 9, 10, 19, 30);
+    expect(kickoffMs(new Date(ms))).toBe(ms);
+    expect(kickoffMs("2026-10-10T19:30:00Z")).toBe(ms);
+    expect(kickoffMs("2026-10-10 19:30:00")).toBe(ms);
+  });
+  it("is null when unknown or unparseable", () => {
+    expect(kickoffMs(null)).toBeNull();
+    expect(kickoffMs(undefined)).toBeNull();
+    expect(kickoffMs("not a date")).toBeNull();
+  });
+  it("is not a CSV column", () => {
+    const head = recordsToCsv([row({ kickoffMs: 1 })]).split("\n")[0];
+    expect(head.split(",")).toHaveLength(14);
+    expect(head.split(",").at(-1)).toBe("scored_after_kickoff");
   });
 });

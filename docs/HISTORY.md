@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (1b: THE SITE IS A RESEARCH LAB; THE REAL-MONEY SWITCH IS ON).** The real-money
+  switch (`app_settings.rule_paused`) was thrown at 21:40 UTC on Tate's call, written through
+  Neon's HTTPS endpoint (campus filters 5432) exactly as `scripts/rule_pause.py` writes it, and read
+  back; `/api/health` reports `rulePaused: true`. The site then became the research lab
+  (`docs/ROADMAP_2026.md`): a full-width banner under the header on every page (Tate's wording); a
+  visitor sees no pre-kickoff signal — `lib/signalGate.ts` strips rating, rank, our number, gap,
+  kill line, factor read and the logged chip from the board and game page, blanks our number and
+  rank on `/records` and its CSV, and withholds pre-kickoff rows from the Results ledger and
+  `/api/bets`; hidden rows lose their order too (a day sorts by kickoff, not score). The owner
+  sees everything. "Bet one unit" became "Paper signal" in the action sentence and its mirrors
+  (`edge.ts`, `card.py`, the e2e fixture); the board's old pause box folded into the banner.
+
 - **2026-10-07 (THE RESET: ROADMAP 2026 v1; REAL MONEY PAUSED).** Tate reset the project after a
   ground-up review and twelve rounds of questions plus an outside critique (plan file
   `~/.claude/plans/pasted-content-id-83e1-session-handoff-optimized-lampson.md`): Beat Vegas is a

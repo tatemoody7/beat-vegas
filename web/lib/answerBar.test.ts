@@ -19,7 +19,7 @@ describe("shortNeed", () => {
 
   it("falls back to the whole line when there is no needs clause", () => {
     const s =
-      "Not yet — Hard Rock has no first-half line. It becomes a bet at under 26.0 or higher.";
+      "Not yet — Hard Rock has no first-half line. It becomes a signal at under 26.0 or higher.";
     expect(shortNeed(s)).toBe(s);
   });
 

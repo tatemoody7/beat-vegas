@@ -408,17 +408,20 @@ test.describe("results", () => {
     test("a visitor gets the ledger and three comparison rows, not the Monday review", async ({
       page,
     }) => {
+      // Research season (lib/signalGate.gateLedger): a row whose game has not
+      // kicked off is withheld from a visitor; every row after kickoff shows.
+      const now = Date.now();
+      const visible = expected.picks.filter(
+        (p) => p.game.kick.getTime() <= now,
+      ).length;
+      expect(visible).toBeLessThan(expected.picks.length);
       await page.goto("/results?week=all");
       const strip = page.locator('section[aria-label="Every bet"]');
       await expect(strip).toContainText("Our bets50.0%");
-      await strip
-        .getByRole("tab", { name: `All ${expected.picks.length}` })
-        .click();
-      await expect(strip.locator("tbody > tr.align-top")).toHaveCount(
-        expected.picks.length,
-      );
+      await strip.getByRole("tab", { name: `All ${visible}` }).click();
+      await expect(strip.locator("tbody > tr.align-top")).toHaveCount(visible);
       await expect(strip.getByRole("button", { name: "details" })).toHaveCount(
-        expected.picks.length,
+        visible,
       );
       await expect(page.getByRole("button", { name: "edit" })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "delete" })).toHaveCount(0);

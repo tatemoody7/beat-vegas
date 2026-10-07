@@ -51,17 +51,17 @@ const KEYS: { color: string; term: string; text: string }[] = [
   {
     color: "var(--good)",
     term: "Green",
-    text: "bet one unit. The row says the line and price: “Bet one unit: first-half under 24.5 at -110 on Hard Rock.”",
+    text: "a paper signal. The row says the line and price: “Paper signal: first-half under 24.5 at -110 on Hard Rock.” In the 2026 research season a rating publishes at kickoff.",
   },
   {
     color: "var(--warn)",
     term: "Amber, “Not yet”",
-    text: "close, but a line or price is missing. The row says what would make it a bet.",
+    text: "close, but a line or price is missing. The row says what would make it a signal.",
   },
   {
     color: "var(--bad)",
     term: "Red, “Pass”",
-    text: "the numbers do not disagree enough, or the line leans over. We only bet unders.",
+    text: "the numbers do not disagree enough, or the line leans over. We only rate unders.",
   },
 ];
 

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
+import { HIDDEN_ACTION, RESEARCH_BANNER } from "../lib/signalGate";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
 // number asserted here is derived in e2e/fixture/expected.mjs from the same rows
@@ -33,7 +34,7 @@ test.describe("the board", () => {
     await page.goto("/");
     const strip = page.locator('p[aria-label="What this is"]');
     await expect(strip).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet. Every bet we place is on Results. How it works →",
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means a paper signal. Every result, losses included, is on Results. How it works →",
     );
     await expect(strip.getByRole("link")).toHaveAttribute(
       "href",
@@ -117,9 +118,12 @@ test.describe("the board", () => {
     await page.goto("/");
     const c = expected.counts;
     await expect(
-      page.getByText(`${c.bet} bet · ${c.edge} watch · ${c.pass} pass`, {
-        exact: true,
-      }),
+      page.getByText(
+        `${c.bet} paper ${c.bet === 1 ? "signal" : "signals"} · ${c.edge} watch · ${c.pass} pass`,
+        {
+          exact: true,
+        },
+      ),
     ).toBeVisible();
   });
 
@@ -153,7 +157,7 @@ test.describe("the board", () => {
         await expect(li.locator(".bv-badge")).toHaveText("bet logged");
     }
     await expect(
-      bar.getByRole("heading", { name: "Closest to a bet" }),
+      bar.getByRole("heading", { name: "Closest to a signal" }),
     ).toBeVisible();
     const near = bar.locator("ul").nth(1).locator("li");
     await expect(near).toHaveCount(expected.answer.closest.length);
@@ -260,6 +264,51 @@ test.describe("the board, signed out", () => {
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
   });
+
+  // The research season (docs/ROADMAP_2026.md, lib/signalGate): a visitor sees
+  // the slate, never a pre-kickoff rating.
+  test("a visitor reads the research-season banner and the slate with no ratings", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator('p[aria-label="Research season"]')).toHaveText(
+      RESEARCH_BANNER,
+    );
+    await expect(page.locator('p[aria-label="What this is"]')).toHaveText(
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Every result, losses included, is on Results. How it works →",
+    );
+    await expect(
+      page.locator('div[aria-label="This week at a glance"]'),
+    ).toHaveCount(0);
+    await expect(page.getByText(/ watch · \d+ pass/)).toHaveCount(0);
+    const r = await rows(page);
+    const upcoming = r.filter((x) => x.section !== "Played");
+    expect(upcoming.length).toBeGreaterThan(0);
+    for (const x of upcoming) {
+      expect(x.lit).toBe(false);
+      expect(x.badge).toBe("—");
+      expect(x.chips).toEqual([]);
+    }
+    // The order cannot rank the games either: each day reads by kickoff, then
+    // the away team (lib/signalGate zeroes the score the board sorts on).
+    for (const day of new Set(upcoming.map((x) => x.section))) {
+      const ids = upcoming.filter((x) => x.section === day).map((x) => x.id);
+      const neutral = [...ids].sort((a, b) => {
+        const ga = byId.get(a)!;
+        const gb = byId.get(b)!;
+        return (
+          ga.kick.getTime() - gb.kick.getTime() ||
+          ga.away.localeCompare(gb.away)
+        );
+      });
+      expect(ids).toEqual(neutral);
+    }
+    await expect(
+      page.locator("section:not([aria-label='Played']) a.bv-card p", {
+        hasText: HIDDEN_ACTION,
+      }),
+    ).toHaveCount(upcoming.length);
+  });
 });
 
 // The two banners the clean fixture never shows, by putting the gauges into the
@@ -298,26 +347,24 @@ test.describe.serial("banners driven by app_settings", () => {
     await expect(page.locator("div[role=status]")).toHaveCount(0);
   });
 
-  test("the real-money pause shows its banner and /api/health reports it", async ({
+  test("the real-money switch is reported by /api/health; the season banner speaks for it on the board", async ({
     page,
     request,
   }) => {
     const before = await setSetting("rule_paused", "true");
     try {
       await page.goto("/");
-      await expect(page.getByText("Our bets are paused.")).toBeVisible();
-      await expect(
-        page.getByText(
-          "Every real-money first-half pick is refused until the rule has been reviewed. Paper picks still log and count toward the record.",
-        ),
-      ).toBeVisible();
+      // One message, not two (2026-10-07): the research-season banner says
+      // money is paused; the old board box is gone.
+      await expect(page.locator('p[aria-label="Research season"]')).toHaveText(
+        RESEARCH_BANNER,
+      );
+      await expect(page.getByText("Our bets are paused.")).toHaveCount(0);
       const health = await (await request.get("/api/health")).json();
       expect(health.rulePaused).toBe(true);
       expect(health.rulePauseReadable).toBe(true);
     } finally {
       await restoreSetting("rule_paused", before);
     }
-    await page.goto("/");
-    await expect(page.getByText("Our bets are paused.")).toHaveCount(0);
   });
 });

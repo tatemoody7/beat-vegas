@@ -22,10 +22,10 @@ export default function AnswerBar({
   // What is left to decide leads. A week whose bets are all placed is not
   // "no bets yet", and a placed ticket is not "live" — it is done.
   const headline = live
-    ? `${open} ${open === 1 ? "bet" : "bets"} live`
+    ? `${open} paper ${open === 1 ? "signal" : "signals"} live`
     : placed > 0
       ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
-      : "No bets yet this week";
+      : "No paper signals yet this week";
 
   return (
     <div
@@ -73,7 +73,7 @@ export default function AnswerBar({
       {closest.length > 0 && (
         <div className="mt-3 border-t border-[var(--border)] pt-2">
           <h2 className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
-            Closest to a bet
+            Closest to a signal
           </h2>
           <ul className="space-y-1.5">
             {closest.map((c) => (

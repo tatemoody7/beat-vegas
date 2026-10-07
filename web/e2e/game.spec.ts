@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fixture } from "./helpers/fixture";
+import { HIDDEN_ACTION } from "../lib/signalGate";
 
 // /game/[id] (app/components/GameDetail.tsx): the decision block must show the
 // SAME numbers the board row carried (it rebuilds the whole week to get the
@@ -64,7 +65,7 @@ test.describe("the game page", () => {
     const short = rowById.get(GAP_SHORT)!;
     await page.goto(`/game/${GAP_SHORT}`);
     await expect(page.locator("section.bv-card").first()).toContainText(
-      `It becomes a bet at ${fmt(short.edge.killLine)} or higher.`,
+      `It becomes a signal at ${fmt(short.edge.killLine)} or higher.`,
     );
     const dear = rowById.get(PRICE_BLOCKED)!;
     await page.goto(`/game/${PRICE_BLOCKED}`);
@@ -180,6 +181,27 @@ test.describe("the game page", () => {
       );
       await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
       await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
+    });
+
+    // The research season (lib/signalGate): before kickoff a visitor sees the
+    // game, its lines and form, never the rating, rank, our number or the read.
+    test("a visitor sees no rating before kickoff, and the full read after it", async ({
+      page,
+    }) => {
+      await page.goto(`/game/${BET_OPEN}`);
+      const card = page.locator("section.bv-card").first();
+      await expect(card).toContainText(HIDDEN_ACTION);
+      await expect(card).toContainText("Our numberat kickoff");
+      await expect(card).not.toContainText("Paper signal:");
+      await expect(page.getByText(/^#\d+$/)).toHaveCount(0);
+      await expect(
+        page.getByText("The factor read publishes at kickoff."),
+      ).toBeVisible();
+      // A played game is history: its result is public.
+      await page.goto(`/game/${PLAYED}`);
+      await expect(page.locator("section.bv-card").first()).not.toContainText(
+        HIDDEN_ACTION,
+      );
     });
   });
 

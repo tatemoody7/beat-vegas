@@ -23,9 +23,9 @@ describe("distinctTag", () => {
 
   it("keeps a tag that adds something", () => {
     const tag = "Hard Rock has no first-half line";
-    expect(distinctTag(tag, "It becomes a bet at under 26.0 or higher.")).toBe(
-      tag,
-    );
+    expect(
+      distinctTag(tag, "It becomes a signal at under 26.0 or higher."),
+    ).toBe(tag);
   });
 
   it("passes null and empty tags straight through as null", () => {

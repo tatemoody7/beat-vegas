@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 
 import { getSeasonRecords, recordsToCsv } from "@/lib/records";
+import { viewerIsAuthed } from "@/lib/session";
+import { gateRecords } from "@/lib/signalGate";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,14 @@ export async function GET(req: NextRequest) {
   }
   let csv: string;
   try {
-    csv = recordsToCsv(await getSeasonRecords(season));
+    // A visitor's file is gated like the page: no pre-kickoff number.
+    csv = recordsToCsv(
+      gateRecords(
+        await getSeasonRecords(season),
+        await viewerIsAuthed(),
+        new Date(),
+      ),
+    );
   } catch (e) {
     // A download link that 500s with no body reads as a broken button.
     console.error("[api/records] getSeasonRecords failed:", e);

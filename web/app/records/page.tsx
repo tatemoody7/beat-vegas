@@ -14,6 +14,8 @@ import {
   RecordRow,
 } from "@/lib/records";
 import { resolveSeason } from "@/lib/season";
+import { viewerIsAuthed } from "@/lib/session";
+import { gateRecords } from "@/lib/signalGate";
 import { BET_GAP_PTS } from "@/lib/verdict";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import { EmptyLine } from "@/app/components/Section";
@@ -51,7 +53,15 @@ export default async function RecordsPage({
   const seasons = await getRecordSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
-  const all: RecordRow[] = seasons.length ? await getSeasonRecords(season) : [];
+  // Our number, the gap and the rank stay blank for a visitor until kickoff
+  // (research season, lib/signalGate).
+  const all: RecordRow[] = seasons.length
+    ? gateRecords(
+        await getSeasonRecords(season),
+        await viewerIsAuthed(),
+        new Date(),
+      )
+    : [];
 
   // ONE WEEK AT A TIME. A whole season is 3,681 rows and 255,000px of page --
   // six megabytes of HTML behind the header's primary button, which no phone

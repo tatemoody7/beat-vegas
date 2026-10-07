@@ -36,7 +36,7 @@ test.describe("how it works", () => {
     );
     const keys = page.locator('section[aria-label="How to read the Board"]');
     await expect(keys.locator("li")).toHaveCount(3);
-    await expect(keys).toContainText("Green — bet one unit.");
+    await expect(keys).toContainText("Green — a paper signal.");
     await expect(keys).toContainText("Amber, “Not yet”");
     await expect(keys).toContainText("Red, “Pass”");
     await expect(keys).toContainText(

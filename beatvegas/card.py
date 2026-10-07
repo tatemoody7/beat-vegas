@@ -808,24 +808,24 @@ def build_item(
     # change it, rather than instructing the reader to wait.
     if tier == "BET":
         at = f" at {american(hr_price)}" if hr_price is not None else ""
-        action = f"Bet one unit: first-half under {fmt(hr_line)}{at} on Hard Rock."
+        action = f"Paper signal: first-half under {fmt(hr_line)}{at} on Hard Rock."
     elif not has_model:
         action = (
             f"Pass: no model number yet. Hard Rock pays about {fmt((ev or 0) * 100)}% more than "
-            "the market on this under, but a price alone is not a bet."
+            "the market on this under, but a price alone is not a signal."
             if price_pos
             else "Pass: no model number yet, and Hard Rock’s price is no better than the market."
         )
     elif blocker == "no_hr_line" or basis is None:
         if basis is None:
             action = (
-                "Not yet — no first-half line anywhere. It becomes a bet at under "
+                "Not yet — no first-half line anywhere. It becomes a signal at under "
                 f"{fmt(k_line)} or higher."
             )
         else:
             at = f", at {american(k_price)} or better" if k_price is not None else ""
             action = (
-                "Not yet — Hard Rock has no first-half line. It becomes a bet at under "
+                "Not yet — Hard Rock has no first-half line. It becomes a signal at under "
                 f"{fmt(k_line)} or higher{at}."
             )
     elif blocker == "hr_alt_line":
@@ -863,7 +863,7 @@ def build_item(
         # blocker "gap": the amber band — a model row short of the bar.
         noun = _basis_noun(gap_basis)
         action = (
-            f"Not yet — {noun} is {fmt(gap or 0)} above our number. It becomes a bet at "
+            f"Not yet — {noun} is {fmt(gap or 0)} above our number. It becomes a signal at "
             f"{fmt(k_line)} or higher."
         )
     else:
@@ -876,11 +876,11 @@ def build_item(
         if g > 0:
             action = f"Pass: {noun} is {fmt(g)} above our number. It needs {fmt(k_line)} or higher."
         elif abs(g) < 0.05:
-            action = f"Pass: {noun} sits on our number. Nothing to bet."
+            action = f"Pass: {noun} sits on our number. No signal."
         else:
             action = (
                 f"Pass: {noun} is {fmt(abs(g))} below our number, so this leans over. "
-                "We only bet unders."
+                "We only rate unders."
             )
 
     # --- why (2-4 plain sentences) ---------------------------------------------

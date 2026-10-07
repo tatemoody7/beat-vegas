@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
 import { viewerIsAuthed } from "@/lib/session";
+import { gateGame } from "@/lib/signalGate";
 
 // One game, in full. The board row links here rather than expanding in place,
 // so the board stays a scan and everything analytical has room to be a picture.
@@ -40,7 +41,7 @@ export default async function GamePage({
   const authed = await viewerIsAuthed();
   return (
     <GameDetail
-      g={found.game}
+      g={gateGame(found.game, authed)}
       authed={authed}
       unitUsd={unitUsd}
       backHref={`/#game-${gameId}`}

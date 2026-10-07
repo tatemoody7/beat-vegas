@@ -18,6 +18,7 @@ import Section from "@/app/components/Section";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
+import { gateLedger } from "@/lib/signalGate";
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +143,11 @@ export default async function ResultsPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {/* The ledger leads: our bets, in units, then every bet as logged. */}
-      <BetLedger rows={bets} season={season} curve={curve} />
+      <BetLedger
+        rows={gateLedger(bets, authed, new Date())}
+        season={season}
+        curve={curve}
+      />
 
       <Section
         title={`Season comparison · ${season}`}

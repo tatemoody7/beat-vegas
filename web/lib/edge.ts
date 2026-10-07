@@ -262,18 +262,18 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   let action: string;
   if (tier === "BET") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
-    action = `Bet one unit: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
+    action = `Paper signal: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (!hasModel) {
     action = pricePos
-      ? `Pass: no model number yet. Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under, but a price alone is not a bet.`
+      ? `Pass: no model number yet. Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under, but a price alone is not a signal.`
       : "Pass: no model number yet, and Hard Rock’s price is no better than the market.";
   } else if (blocker === "no_hr_line" || basis === null) {
     if (basis === null) {
-      action = `Not yet — no first-half line anywhere. It becomes a bet at under ${fmt(killLine)} or higher.`;
+      action = `Not yet — no first-half line anywhere. It becomes a signal at under ${fmt(killLine)} or higher.`;
     } else {
       const at =
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
-      action = `Not yet — Hard Rock has no first-half line. It becomes a bet at under ${fmt(killLine)} or higher${at}.`;
+      action = `Not yet — Hard Rock has no first-half line. It becomes a signal at under ${fmt(killLine)} or higher${at}.`;
     }
   } else if (blocker === "hr_alt_line") {
     action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(i.hrLine)}; check the app.`;
@@ -297,7 +297,7 @@ export function edgeScore(i: EdgeInput): EdgeResult {
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
     // blocker "gap": the amber band — a model row short of the bar.
-    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a bet at ${fmt(killLine)} or higher.`;
+    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a signal at ${fmt(killLine)} or higher.`;
   } else {
     // PASS on a model row: the line is short of the bar, on our number, or
     // below it. The noun names the basis: a row that reads "no line yet" and
@@ -307,8 +307,8 @@ export function edgeScore(i: EdgeInput): EdgeResult {
       g > 0
         ? `Pass: ${noun} is ${fmt(g)} above our number. It needs ${fmt(killLine)} or higher.`
         : Math.abs(g) < 0.05
-          ? `Pass: ${noun} sits on our number. Nothing to bet.`
-          : `Pass: ${noun} is ${fmt(Math.abs(g))} below our number, so this leans over. We only bet unders.`;
+          ? `Pass: ${noun} sits on our number. No signal.`
+          : `Pass: ${noun} is ${fmt(Math.abs(g))} below our number, so this leans over. We only rate unders.`;
   }
 
   return { score, tier, blocker, action, kill, gap, lineBasis, verdict };

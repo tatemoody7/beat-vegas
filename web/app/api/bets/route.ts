@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 
 import { betsToCsv } from "@/lib/betLedger";
 import { getBetLedger } from "@/lib/betLedgerDb";
+import { viewerIsAuthed } from "@/lib/session";
+import { gateLedger } from "@/lib/signalGate";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,15 @@ export async function GET(req: NextRequest) {
   }
   let csv: string;
   try {
-    csv = betsToCsv(season, await getBetLedger(season));
+    // A visitor's file holds only rows whose game has kicked off.
+    csv = betsToCsv(
+      season,
+      gateLedger(
+        await getBetLedger(season),
+        await viewerIsAuthed(),
+        new Date(),
+      ),
+    );
   } catch (e) {
     console.error("[api/bets] getBetLedger failed:", e);
     return new Response("could not build the export — try again", {

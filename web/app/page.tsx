@@ -18,8 +18,8 @@ import { nextBuild } from "@/lib/nextBuild";
 import { getLatestCard } from "@/lib/card";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
+import { gateGame } from "@/lib/signalGate";
 import { viewerIsAuthed } from "@/lib/session";
-import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import Link from "next/link";
 import AnswerBar from "@/app/components/AnswerBar";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
@@ -66,6 +66,10 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
+  // The research season (docs/ROADMAP_2026.md): a visitor sees a game's rating
+  // only once it kicks off. Every count, list and row below reads the gated
+  // games, so nothing pre-kickoff reaches a visitor's page.
+  const all = board.games.map((g) => gateGame(g, authed));
   const results = staleness(await getGradeHealth(season));
   const buildHealth = buildStatus(await getBuildHealth());
   // The card's own health — "paper only, some inputs are missing", "built by
@@ -74,26 +78,22 @@ export default async function BoardPage({
   // about to bet off, not about a bet already placed (Tate 2026-09-13).
   const card =
     board.week === null ? null : await getLatestCard(season, board.week);
-  // The real-money pause (docs/STOPPING_RULE.md) — a banner, because a switch
-  // that only speaks when you try to log a bet is a switch you find out about
-  // at the worst moment.
+  // The real-money switch. The research-season banner (app/layout.tsx) says
+  // money is paused to everyone; only an unreadable switch needs its own
+  // warning, and only the owner can act on it.
   const pause = await getRulePause();
 
   const filters = parseFilters(sp);
-  const games = board.games.filter((g) => matchesFilters(g, filters));
+  const games = all.filter((g) => matchesFilters(g, filters));
   const counts = tierCounts(games);
-  const filtered = games.length !== board.games.length;
+  const filtered = games.length !== all.length;
   // A game that has kicked off is not a decision: it drops out of the ranked
   // list into its own group at the end, instead of sitting among the week's
   // bets with no rank.
   const upcoming = games.filter((g) => !g.kickedOff);
   const played = games.filter((g) => g.kickedOff);
   const days = groupByDay(upcoming);
-  const answer = buildAnswer(
-    board.games,
-    board.bankroll.weekBets,
-    board.bankroll.cap,
-  );
+  const answer = buildAnswer(all, board.bankroll.weekBets, board.bankroll.cap);
   const build = nextBuild(new Date());
 
   return (
@@ -105,7 +105,8 @@ export default async function BoardPage({
         aria-label="What this is"
       >
         Beat Vegas rates college football first-half unders, priced at Hard Rock
-        Bet. Green means bet. Every bet we place is on Results.{" "}
+        Bet.{authed ? " Green means a paper signal." : ""} Every result, losses
+        included, is on Results.{" "}
         <Link
           href="/how-it-works"
           className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
@@ -130,7 +131,8 @@ export default async function BoardPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      <AnswerBar answer={answer} nextBuild={build?.label ?? null} />
+      {/* What is live this week is a pre-kickoff signal: the owner's only. */}
+      {authed && <AnswerBar answer={answer} nextBuild={build?.label ?? null} />}
 
       {board.slate.n > 0 && (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
@@ -147,16 +149,6 @@ export default async function BoardPage({
       <CardStatusBanner card={card} />
 
       {authed && <OpsBanner />}
-
-      {pause.paused === true && (
-        <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--text)]">Our bets are paused.</p>
-          <p className="mt-1">
-            {authed && pause.note ? `${pause.note}. ` : ""}
-            {`Every real-money first-half pick is refused until the rule has been reviewed. Paper picks still log and count toward the record.`}
-          </p>
-        </div>
-      )}
 
       {authed && pause.paused === "unreadable" && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
@@ -204,7 +196,7 @@ export default async function BoardPage({
             No model number this week.
           </p>
           <p className="mt-1">
-            {`The week has not been scored yet. Until it is, the ranking comes from pace, weather, the spread and last season’s first halves. Anything you bet this week is a price bet, not a model bet.`}
+            {`The week has not been scored yet. Until it is, the ranking comes from pace, weather, the spread and last season’s first halves, so a rating this week is a price rating, not a model rating.`}
           </p>
         </div>
       )}
@@ -215,7 +207,9 @@ export default async function BoardPage({
             Hard Rock has not posted first-half lines yet.
           </p>
           <p className="mt-1">
-            {`First-half totals usually post later in the week. Each game says the line and price that would make it a bet.`}
+            {authed
+              ? `First-half totals usually post later in the week. Each game says the line and price that would make it a paper signal.`
+              : `First-half totals usually post later in the week.`}
           </p>
         </div>
       )}
@@ -226,21 +220,24 @@ export default async function BoardPage({
         </p>
       ) : (
         <>
-          <p className="mb-3 text-sm text-[var(--text-dim)]">
-            <span className="font-mono font-semibold text-[var(--good)]">
-              {counts.bet}
-            </span>
-            {` bet · `}
-            <span className="font-mono font-semibold text-[var(--warn)]">
-              {counts.edge}
-            </span>
-            {` watch · `}
-            <span className="font-mono font-semibold text-[var(--bad)]">
-              {counts.pass}
-            </span>
-            {` pass`}
-            {filtered ? ` · ${board.games.length} games before filters` : ""}
-          </p>
+          {/* The tier counts are a pre-kickoff signal: the owner's only. */}
+          {authed && (
+            <p className="mb-3 text-sm text-[var(--text-dim)]">
+              <span className="font-mono font-semibold text-[var(--good)]">
+                {counts.bet}
+              </span>
+              {` paper ${counts.bet === 1 ? "signal" : "signals"} · `}
+              <span className="font-mono font-semibold text-[var(--warn)]">
+                {counts.edge}
+              </span>
+              {` watch · `}
+              <span className="font-mono font-semibold text-[var(--bad)]">
+                {counts.pass}
+              </span>
+              {` pass`}
+              {filtered ? ` · ${all.length} games before filters` : ""}
+            </p>
+          )}
 
           {games.length === 0 ? (
             <p className="bv-card p-5 text-sm text-[var(--text-muted)]">
@@ -248,9 +245,9 @@ export default async function BoardPage({
             </p>
           ) : (
             <>
-              {counts.bet === 0 && counts.edge === 0 && (
+              {authed && counts.bet === 0 && counts.edge === 0 && (
                 <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
-                  {`Nothing clears the bar this week. No bets, nothing to watch. Zero bets is a normal week — the ${WEEKLY_BET_CAP}-bet cap is a ceiling, not a target.`}
+                  {`Nothing clears the bar this week: no paper signals, nothing to watch. Zero is a normal week.`}
                 </p>
               )}
               {days.map((grp) => (

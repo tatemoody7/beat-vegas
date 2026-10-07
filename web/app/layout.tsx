@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import Link from "next/link";
 import { gateEnabled } from "@/lib/auth";
 import { viewerIsAuthed } from "@/lib/session";
+import { RESEARCH_BANNER } from "@/lib/signalGate";
 import FooterChrome from "@/app/components/FooterChrome";
 import HeaderChrome from "@/app/components/HeaderChrome";
 import "./globals.css";
@@ -57,6 +58,18 @@ export default async function RootLayout({
             <HeaderChrome />
           </div>
         </header>
+        {/* The research season (docs/ROADMAP_2026.md): one full-width strip
+            under the header on every page, aligned with the header rather than
+            any one page's column. Outside <header>, so the header keeps its
+            height; not role=status — it is the season, not an alert. */}
+        <div className="border-b border-[var(--border)] bg-[var(--bg-2)]">
+          <p
+            className="mx-auto max-w-7xl px-4 py-2 text-sm leading-snug text-[var(--text)] sm:px-6"
+            aria-label="Research season"
+          >
+            {RESEARCH_BANNER}
+          </p>
+        </div>
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {children}
         </main>

@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (H-MARGIN REGISTERED, BEFORE ANY SCRIPT).** For the CFBD Model Pick'em (Tate: enter
+  it), which scores full-game margins the system never had: a market-blind margin regressor on the
+  champion's inputs, 2003+, every FBS-vs-FBS game, `bv_margin_v1` (never a champion read). Tate's
+  calls: exploratory measurement that licenses nothing, and entry does not depend on the backtest;
+  the report states MAE / MSE / straight-up / ATS beside the Vegas closing spread. Submission by API
+  once Tate creates the Pick'em account and credential.
+
 - **2026-10-07 (SITE: RESPONSIBLE-GAMBLING FOOTER + PUBLIC MODEL ACCURACY).** Tate's product calls
   (`docs/program/PRODUCT_OPTIONS.md`, Option A): the footer on every page now reads "This site
   rates bets. It never places one. Not betting advice. 21+, Florida, Hard Rock Bet. Past results do

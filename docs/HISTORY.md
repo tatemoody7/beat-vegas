@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-06 (HISTORY LOADED; H-HIST AMENDED BEFORE ANY LOOK).** `migrate.yml` added the
+  Elo columns; the 2003 probe (`history_load.yml` run 37561721141) stored 699 FBS games, all with
+  a first-half total and pregame Elo, 632 with a known venue, and **0 with a full-game total**:
+  CFBD's free `/lines` has no totals before 2013 (2013: 702 of 813). The frame drops rows
+  without a total although the regressor never reads it, so the 2003 and 2010 arms would both
+  have started at 2013. Tate's call: a STUDY-only exception (`require_total=False`, PR H4); the
+  live frame keeps its rule; written into H-HIST before any number was read. 2004-2022 loaded.
+
 - **2026-10-06 (HISTORY LOADER — PR H3).** `games.home_pregame_elo` / `away_pregame_elo`
   (CFBD `/games` pregame Elo; H-ELO-F's inputs, read by no champion code); `backfill.py
   --fbs-only` stores only FBS-vs-FBS games (`data/fbs_teams.json`, refuses a season the list

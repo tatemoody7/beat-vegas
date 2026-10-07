@@ -9,6 +9,12 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (H-MARGIN RUN: THE MARKET IS CLEARLY CLOSER).** `bv_margin_v1` (the champion's 58
+  market-blind inputs, target home minus away, 2003+) against the Vegas closing spread, one run
+  (study.yml 37670166376, frame `23cb43a0a69c29aa`): MAE 13.16 vs 11.76 over 1,058 games of 2025 and
+  2026 (+1.40, 95% +1.04 to +1.77; both seasons alone exclude zero), straight-up 71.6% vs 74.9%, ATS
+  49.1%. Exploratory, licenses nothing; the Pick'em entry stands (Tate). `docs/MARGIN.md`.
+
 - **2026-10-07 (H-MARGIN REGISTERED, BEFORE ANY SCRIPT).** For the CFBD Model Pick'em (Tate: enter
   it), which scores full-game margins the system never had: a market-blind margin regressor on the
   champion's inputs, 2003+, every FBS-vs-FBS game, `bv_margin_v1` (never a champion read). Tate's

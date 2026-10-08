@@ -146,8 +146,10 @@ close.** The Power Rank's own record is 55.3% against openers but 51-53% against
 across four seasons, and the market moved ~3.6 pts toward its opener disagreement 95.6% of the
 time; Farinella & Moffett (2016) found no profitable CFB totals rule over ten seasons; Kelly &
 Chen show the NFL high-total under edge died after 2010. The one recent peer-reviewed
-totals-family inefficiency (Arscott 2023) is censoring on **team** totals, which our
-`CENSORING_STUDY` examined for game totals and found priced. Our MAE gap (9.03 vs 8.39) is the
+totals-family inefficiency (Arscott 2023) is censoring in the **full-game** total: overs at
+the close when the underdog is expected to score little, 1996-2017 (corrected 2026-10-08 from
+"team totals" after reading the paper, `docs/LITERATURE.md`); our `CENSORING_STUDY` examined
+the same mechanism on first-half totals and found it priced. Our MAE gap (9.03 vs 8.39) is the
 expected state of a market-blind model, not a data defect.
 
 Items we lack, ranked by plausibility and cost:

@@ -85,8 +85,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
   probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
-  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger; registry
-  rows next; Coleman waits for his full text, Salaga for a 2016-22 observed-weather backfill; team
+  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger; rows
+  H-LIT-ARSCOTT/TV/BENNETT 10-08, script next; Coleman waits on full text, Salaga on weather; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
   1HO / FGU, clocks from the 10-09 fri_pm build, `scripts/protocol_position.py` on Mondays; 4-5 not
   designed) → shadow engines → public research-lab page →

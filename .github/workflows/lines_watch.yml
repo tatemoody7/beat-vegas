@@ -2,7 +2,7 @@ name: Hard Rock 1H line capture
 
 # Captures Hard Rock's (and the rest of the market's) first-half totals into
 # Neon — EVERY Hard Rock-priced FBS game, Tuesday through Monday, on the paid
-# Odds API tier (100K credits/month since 2026-09-06). Runs in the cloud: GHA
+# Odds API tier (20K credits/month since 2026-10-05). Runs in the cloud: GHA
 # reaches the Odds API (HTTPS) AND Neon, and runs while the Mac sleeps.
 #
 # Two modes (the "resolve" step maps each cron to ONE mode; an unmapped cron
@@ -40,17 +40,22 @@ name: Hard Rock 1H line capture
 # Rock-priced FBS games in a 6-day window, measured — the old ~60 in this
 # comment understated the real spend by ~40%.
 #   - card.yml whole-week sweeps (4 builds x ~82 x 1)  ~= 328/wk (cap 150/run)
-#   - card.yml full-game refresh (4 x 4)               ~=  16/wk
+#   - card.yml full-game refresh (4 x 9)               ~=  36/wk
 #   - closes: ~2.5 polls/game x 82 x 1                 ~= 205/wk (worst 246)
 #     + the Saturday Vercel backup: ~2 more polls/game    ~= +150/wk worst
-#   - sunday.yml full-game openers (3 runs x 6)        ~=  18/wk
-#   Expected ~567/wk (~2,450/mo), worst ~774/wk. Was ~1,308/wk at 2 credits
+#   - sunday.yml full-game openers (3 runs x 9)        ~=  27/wk worst
+#   Expected ~567/wk (~2,450/mo), worst ~774/wk, before the 2026-10-07 side
+#   markets (below). Was ~1,308/wk at 2 credits
 #   with five morning builds. poll_lines.py prints credits_spent=, hr_rows= and
 #   calls_404= on every run and WARNS when spend != events polled (the billing
 #   rule regressed) or when a sweep writes no Hard Rock row (the book key
 #   drifted); --credit-floor 300 is the month-end reserve.
-#   Plus the full-game close step: `totals` x `us,us2` = 2 credits per Saturday
-#   tick (~130/month) since 2026-10-06.
+#   Plus the full-game close step on every Saturday and weeknight tick:
+#   `totals,spreads,h2h` x `us,us2,us_ex` = 9 credits a tick since 2026-10-07
+#   (2 on `totals` x `us,us2` from 2026-10-06). With ~25 ticks a week (~17
+#   Saturday, ~8 weeknight, the latter an estimate) the roadmap step 4 side
+#   markets add ~+200/wk (~+860/mo) in all, to ~3,300/mo of 20K;
+#   poll_full_game.py prints `credits: ... spent= remaining=` on every pull.
 #
 # DST: kickoff windows below are wide enough for EDT and EST (Saturday kickoffs
 # fall in 16:00Z-03:30Z EDT / 17:00Z-04:30Z EST), so no cron edit at the change.
@@ -199,18 +204,20 @@ jobs:
         if: steps.close.outcome == 'success'
         continue-on-error: true
         run: python scripts/close_coverage.py
-      - name: Full-game close (same ticks; bulk totals for events inside REAL_FG_CLOSE_WINDOW_H)
+      - name: Full-game close (same ticks; totals, spreads, moneylines for events inside REAL_FG_CLOSE_WINDOW_H)
         # The full-game market is a reference ledger (never bet) and the
         # H-FG-U-R / H-FG-O-R retrospectives grade at a REAL full-game close.
         # Before 2026-10-06 only Sunday's opener and the card-day refresh were
         # captured (9 of 380 graded 2026 games had a snapshot inside 3 h). One
-        # bulk /odds call per tick for the whole slate: `totals` x `us,us2` =
-        # 2 credits (~15 Saturday ticks -> ~30 a week, ~130 a month). Unchanged
-        # numbers are re-seen (last_seen_at) so they count as the close.
-        # Never fails the job: continue-on-error, --allow-empty.
+        # bulk /odds call per tick for the whole slate. Since 2026-10-07
+        # (roadmap step 4) it carries the spread and the moneyline with both
+        # prices, and the exchanges (us_ex) for the consensus close:
+        # `totals,spreads,h2h` x `us,us2,us_ex` = 9 credits a tick (~25 ticks a
+        # week -> ~225). Unchanged numbers are re-seen (last_seen_at) so they
+        # count as the close. Never fails the job: continue-on-error, --allow-empty.
         if: steps.close.outcome == 'success'
         continue-on-error: true
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --markets totals --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,spreads,h2h --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty
       - name: 1H one-game refresh (the site's Refresh price; 1 credit)
         if: steps.resolve.outputs.market == '1h_game'
         env:

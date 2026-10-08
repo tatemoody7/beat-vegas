@@ -834,10 +834,12 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
 
 def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_the_job():
     """Since 2026-10-06 the 1h_close run also captures the FULL-GAME close for
-    events inside REAL_FG_CLOSE_WINDOW_H (3 h): one bulk `totals` call over
-    `us,us2` (2 credits a tick). It runs only after a successful 1H close poll,
-    can never redden the job (continue-on-error + --allow-empty), and the
-    health contract stays the last step."""
+    events inside REAL_FG_CLOSE_WINDOW_H (3 h). Since 2026-10-07 (roadmap step
+    4) that one bulk call carries the spread and the moneyline too, with the
+    exchanges: `totals,spreads,h2h` x `us,us2,us_ex` (9 credits a tick). It
+    runs only after a successful 1H close poll, can never redden the job
+    (continue-on-error + --allow-empty), and the health contract stays the
+    last step."""
     data = _load(WF_DIR / "lines_watch.yml")
     steps = data["jobs"]["watch"]["steps"]
     fg = next(s for s in steps if "poll_full_game.py" in str(s.get("run", "")))
@@ -846,8 +848,8 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
     run = fg["run"]
     for flag in (
         "--source oddsapi",
-        "--regions us,us2",
-        "--markets totals",
+        "--regions us,us2,us_ex",
+        "--markets totals,spreads,h2h",
         "--kickoff-within-min 180",
         "--credit-floor",
         "--allow-empty",
@@ -855,6 +857,28 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
         assert flag in run, flag
     assert steps.index(fg) < steps.index(next(s for s in steps if s.get("id") == "health"))
     assert steps[-1].get("id") == "health"
+
+
+def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
+    """Roadmap step 4 (2026-10-07, Tate's calls): the Sunday opener, the
+    card-day refresh and the close ticks all price on `us,us2,us_ex`, and none
+    narrows the markets below poll_full_game's default `totals,spreads,h2h`
+    (the close step names them explicitly). A pull that dropped `us_ex` or the
+    side markets would quietly thin the consensus the judge reads."""
+    pulls = {
+        "sunday.yml": "Capture full-game openers",
+        "card.yml": "Full-game refresh",
+        "lines_watch.yml": "Full-game close",
+    }
+    for wf, prefix in pulls.items():
+        data = _load(WF_DIR / wf)
+        steps = [s for job in data["jobs"].values() for s in job.get("steps", [])]
+        step = next(s for s in steps if s.get("name", "").startswith(prefix))
+        run = step["run"]
+        assert "poll_full_game.py --source oddsapi" in run, wf
+        assert "--regions us,us2,us_ex" in run, wf
+        if "--markets" in run:
+            assert "--markets totals,spreads,h2h" in run, wf
 
 
 def test_every_study_choice_is_in_the_case_line():
@@ -926,6 +950,7 @@ def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():
     assert '--game-id "$GAME_ID"' in one["run"]
     assert "--max-credits-per-run 2" in one["run"]
     assert not INLINE_EXPR.search(one["run"])
+
 
 def test_study_runs_post_mortem_only_as_a_dry_run():
     """study.yml regenerates docs/POST_MORTEM.md read-only (2026-10-07): the run

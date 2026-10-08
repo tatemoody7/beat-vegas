@@ -51,7 +51,9 @@ date; the board cannot see any of these until the change is made.
    There is **no tier between the free 500 and 20K** (re-read 2026-10-05: Starter 500 free,
    20K $30, 100K $59, 5M $119, 15M $249, hard cap, no overage). The 100K plan existed for the
    one-time 2023-25 history purchase (~44.9K credits, Sep 6-8). Full stack review:
-   `docs/DATA_STACK_REVIEW_2026-10-05.md`.
+   `docs/DATA_STACK_REVIEW_2026-10-05.md`. **Since 2026-10-07** (roadmap step 4, Tate's
+   approved credit math) every full-game pull also carries spreads, moneylines and the
+   exchanges: ~+860 credits a month, ~3,300 a month in all, still on the 20K plan.
 
 ## What the board now shows about these
 

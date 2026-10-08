@@ -9,6 +9,25 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (CAPTURE: FULL-GAME SPREADS + MONEYLINES).** Roadmap step 4, part one, Tate's calls
+  on the credit math (plan `~/.claude/plans/pasted-content-id-3a47-session-handoff-shiny-bunny.md`).
+  - **What gets captured:** every Odds API full-game pull (Sunday opener, card-day refresh, every
+    Saturday and weeknight close tick) asks for `totals,spreads,h2h` on `us,us2,us_ex`, 9 credits
+    for the whole slate.
+  - **New rows:** each book's spread and moneyline are written as their own `odds_snapshots` rows
+    (`full_game_spread`: line = the home point; `full_game_ml`: line NULL) with the new
+    `home_price` / `away_price` columns.
+  - **What stays unchanged:** the `full_game_total` rows keep their own `spread` column, so every
+    existing reader is unchanged; each reader filters on `market` (checked reader by reader).
+  - **Change detection:** a price move on either side writes a new row, and a standing quote
+    stamps `last_seen_at` so it can grade as the close.
+  - **Credits:** +200 a week, +860 a month, about 3,300 a month of 20K in all. The weeknight tick
+    count is an estimate; the pull now prints `credits: ... spent= remaining=`.
+  - **Not done here:** no site display (capture only). The judge still grades totals only; a
+    spread needs a margin table in a later engine version.
+  - **Next:** the `H-MKT-PROBE` (5 games, `us,us2`, Saturday 10-10 morning, ≤ 50 credits) is the
+    second part.
+
 - **2026-10-07 (THE TEST: STATISTICAL PROTOCOL p1).** Roadmap step 3 (`docs/PROTOCOL_2026.md`,
   `H-PROGRAM-2026`, amendment v1.2), Tate's calls: Wald SPRT per arm on line value at Hard Rock's
   price, H0 0 vs H1 +3% EV, alpha 0.5% (5% / K = 10, never recycled), beta 0.20, spread 0.06 per bet,

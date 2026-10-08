@@ -135,7 +135,13 @@ _MIGRATIONS = {
         "home_pregame_elo": "FLOAT",
         "away_pregame_elo": "FLOAT",
     },
-    "odds_snapshots": {"spread": "FLOAT", "last_seen_at": "TIMESTAMP"},
+    # home/away prices for the side markets (2026-10-07, roadmap step 4)
+    "odds_snapshots": {
+        "spread": "FLOAT",
+        "last_seen_at": "TIMESTAMP",
+        "home_price": "INTEGER",
+        "away_price": "INTEGER",
+    },
     # which 1H engine froze the record (2026-09-07, after the table existed);
     # the conferences as `games` carried them at snapshot time (2026-10-04)
     "game_records": {

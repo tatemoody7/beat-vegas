@@ -469,3 +469,101 @@ def test_allow_empty_exits_zero_when_nothing_is_due(monkeypatch):
     _run_poll(
         mod, monkeypatch, eng, [], datetime(2026, 10, 10, 16, 0), extra_args=["--allow-empty"]
     )
+
+
+def _side(gid, book, market, line, home, away):
+    return {
+        "game_id": gid,
+        "book": book,
+        "market": market,
+        "line": line,
+        "home_price": home,
+        "away_price": away,
+        "commence_time": None,
+    }
+
+
+def test_side_markets_are_written_as_their_own_rows_beside_the_total(monkeypatch):
+    """Roadmap step 4 (2026-10-07): one pull writes the total, the spread and
+    the moneyline per book. The side rows carry both prices and never touch
+    the full_game_total row's own `spread` column or Game.spread."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=7, home_team="LSU", away_team="Clemson"))
+        s.commit()
+    rows = [
+        _row(1, "draftkings", 55.5, -7.0),
+        _side(1, "draftkings", "full_game_spread", -7.0, -110, -110),
+        _side(1, "draftkings", "full_game_ml", None, -300, 240),
+        _side(1, "draftkings", "full_game_ml", None, -310, 250),  # duplicate: skipped
+    ]
+    _run_poll(mod, monkeypatch, eng, rows, datetime(2026, 10, 8, 20, 0))
+    with Session(eng) as s:
+        by_market = {sn.market: sn for sn in s.query(OddsSnapshot).all()}
+        assert set(by_market) == {"full_game_total", "full_game_spread", "full_game_ml"}
+        assert len(s.query(OddsSnapshot).all()) == 3
+        sp, ml = by_market["full_game_spread"], by_market["full_game_ml"]
+        assert (sp.line, sp.home_price, sp.away_price) == (-7.0, -110, -110)
+        assert sp.over_price is None and sp.spread is None
+        assert (ml.line, ml.home_price, ml.away_price) == (None, -300, 240)
+        tot = by_market["full_game_total"]
+        assert tot.spread == -7.0 and tot.home_price is None
+        assert s.get(Game, 1).spread == -7.0
+
+
+def test_a_moneyline_price_move_writes_a_new_row_and_an_unchanged_one_is_re_seen(monkeypatch):
+    """A side row has no line or over/under to move: a change in either team's
+    price alone must write a new snapshot, and a standing quote must stamp
+    last_seen_at so it can grade as the close."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=7, home_team="LSU", away_team="Clemson"))
+        s.commit()
+    t1, t2, t3 = (
+        datetime(2026, 10, 8, 20, 0),
+        datetime(2026, 10, 9, 20, 0),
+        datetime(2026, 10, 10, 15, 0),
+    )
+    tot = _row(1, "fanduel", 55.5, -7.0)
+    _run_poll(
+        mod, monkeypatch, eng, [tot, _side(1, "fanduel", "full_game_ml", None, -300, 240)], t1
+    )
+    _run_poll(
+        mod, monkeypatch, eng, [tot, _side(1, "fanduel", "full_game_ml", None, -300, 250)], t2
+    )
+    _run_poll(
+        mod, monkeypatch, eng, [tot, _side(1, "fanduel", "full_game_ml", None, -300, 250)], t3
+    )
+    with Session(eng) as s:
+        ml = (
+            s.query(OddsSnapshot)
+            .filter_by(market="full_game_ml")
+            .order_by(OddsSnapshot.captured_at)
+            .all()
+        )
+        assert [(m.captured_at, m.away_price) for m in ml] == [(t1, 240), (t2, 250)]
+        assert ml[1].last_seen_at == t3
+
+
+def test_change_detection_sees_side_prices():
+    _changed = _load("poll_full_game")._changed
+
+    class Snap:
+        line, spread, over_price, under_price = -7.0, None, None, None
+        home_price, away_price = -110, -110
+
+    assert not _changed(Snap(), -7.0, None, None, None, home=-110, away=-110)
+    assert _changed(Snap(), -7.0, None, None, None, home=-115, away=-110)
+    assert _changed(Snap(), -7.5, None, None, None, home=-110, away=-110)
+
+
+def test_odds_snapshot_side_price_columns_are_migrated():
+    from beatvegas.db.store import _MIGRATIONS
+
+    for name in ("home_price", "away_price"):
+        assert name in OddsSnapshot.__table__.columns
+        assert _MIGRATIONS["odds_snapshots"][name] == "INTEGER"

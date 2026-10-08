@@ -1,16 +1,18 @@
 """The Odds API v4 client for college-football totals (totals_h1 + full-game).
 
-Paid tier = 100K credits/month (2026-09; free tier was 500). A per-event call is
+Paid tier = 20K credits/month (since 2026-10-05; free tier is 500). A per-event call is
 billed (markets x regions), but `bookmakers=` (up to 10 keys) counts as ONE region
 and takes priority over `regions` — so the 1H sweep names its ten books and pays
 1 credit per event instead of 2 on us,us2 (verified live 2026-09-09). We surface
 the credit headers on every call. The normalizers turn the nested
 events->bookmakers->markets->outcomes JSON into flat snapshot rows.
 
-The bulk full-game pull asks for BOTH featured markets, `totals,spreads`, so each
-(event, book) row carries that book's home-relative spread next to its total
-(`spread` is None only when the book posted no spreads market). Featured markets
-cost (markets x regions) credits per call, so the whole slate is 4-6 credits.
+The bulk full-game pull asks for all three featured markets, `totals,spreads,h2h`.
+Each (event, book) totals row carries that book's home-relative spread next to its
+total (`spread` is None only when the book posted no spreads market), and since
+2026-10-07 the spread and the moneyline are also captured as their own rows with
+both teams' prices (`normalize_full_game_sides`). Featured markets cost
+(markets x regions) credits per call: 9 for the whole slate on `us,us2,us_ex`.
 
 Every HTTP status error and transport error is re-raised with the `apiKey=`
 query value redacted (`redact_key`) so a 401/429 traceback, or a connection
@@ -199,14 +201,15 @@ class OddsAPIClient:
         return floor > 0 and c is not None and c.remaining is not None and c.remaining <= floor
 
     def list_full_game_odds(
-        self, regions: Optional[str] = None, markets: str = "totals,spreads"
+        self, regions: Optional[str] = None, markets: str = "totals,spreads,h2h"
     ) -> List[Dict[str, Any]]:
         """Full-game featured markets for every book in `regions`, from the BULK
         /odds endpoint. Featured markets cost (n_markets x n_regions) credits
-        TOTAL for the whole slate: the Sunday opener (`us,us2,us_ex`, two
-        markets) is 6 credits, a card-day refresh (`us,us2`) is 4 — cheap vs
-        the per-event 1H calls. Default `totals,spreads` gives each book's
-        total AND its home-relative spread in one call.
+        TOTAL for the whole slate: the default three markets on `us,us2,us_ex`
+        are 9 credits (the Sunday opener, the card-day refresh and every close
+        tick since 2026-10-07) — cheap vs the per-event 1H calls. The default
+        `totals,spreads,h2h` gives each book's total, its spread and its
+        moneyline, with prices, in one call.
 
         REGIONS, NOT BOOKMAKERS: this is the bulk endpoint, billed
         (markets x regions) for the WHOLE slate, and it needs `us_ex` for the
@@ -462,6 +465,108 @@ def _home_spreads(
                 if prev is None or stamp >= prev[0]:
                     by_key[key] = (stamp, spread)
     return {k: v[1] for k, v in by_key.items()}
+
+
+# The two full-game SIDE markets captured since 2026-10-07 (roadmap step 4):
+# Odds API market key -> odds_snapshots.market.
+SIDE_MARKETS = {"spreads": "full_game_spread", "h2h": "full_game_ml"}
+
+
+def _side_pair(
+    market_key: str, outcomes, home: Optional[str], away: Optional[str]
+) -> Optional[Tuple[Optional[float], Any, Any, int]]:
+    """(home line, home_price, away_price, n_complete_pairs) for one book's
+    `spreads` or `h2h` market, or None when no honest quote can be read.
+
+    `h2h` has no point: the home and away prices are the quote. `spreads`
+    pairs the home outcome at point p with the away outcome at -p; several
+    complete pairs are a ladder and the most BALANCED one is the main line,
+    the rule _main_pair applies to totals. With no complete pair, a single
+    one-sided outcome still yields its home-relative line; a home and an away
+    at non-mirrored points are alternate rungs, and pairing their prices would
+    make a number up, so the book is skipped."""
+    if market_key == "h2h":
+        prices: Dict[str, Any] = {}
+        for oc in outcomes:
+            if oc.get("name") == home:
+                prices["home"] = oc.get("price")
+            elif oc.get("name") == away:
+                prices["away"] = oc.get("price")
+        if not prices:
+            return None
+        return None, prices.get("home"), prices.get("away"), 0
+    by_pt: Dict[float, Dict[str, Any]] = {}  # keyed by the HOME-relative point
+    for oc in outcomes:
+        try:
+            point = float(oc.get("point"))
+        except (TypeError, ValueError):
+            continue
+        if oc.get("name") == home:
+            by_pt.setdefault(point, {})["home"] = oc.get("price")
+        elif oc.get("name") == away:
+            by_pt.setdefault(-point, {})["away"] = oc.get("price")
+    complete = {pt: d for pt, d in by_pt.items() if "home" in d and "away" in d}
+    if complete:
+
+        def skew(pt: float) -> float:
+            h, a = _implied(complete[pt]["home"]), _implied(complete[pt]["away"])
+            return abs(h - a) if h is not None and a is not None else float("inf")
+
+        pt = min(sorted(complete), key=skew)
+        return pt, complete[pt]["home"], complete[pt]["away"], len(complete)
+    if len(by_pt) == 1:
+        pt, d = next(iter(by_pt.items()))
+        return pt, d.get("home"), d.get("away"), 0
+    return None
+
+
+def normalize_full_game_sides(
+    events: List[Dict[str, Any]], books: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
+    """One row per (event, book, market) for the full-game side markets
+    (`spreads` -> 'full_game_spread', `h2h` -> 'full_game_ml'), with each
+    team's price. Each row: event_id, commence_time, home_team, away_team,
+    book, market, line (the home point; None for a moneyline), home_price,
+    away_price, last_update. Same freshest-`last_update`-wins rule and
+    canonical book key as _rows_for_market."""
+    book_filter = set(books) if books else None
+    by_key: Dict[tuple, Dict[str, Any]] = {}
+    for ev in events:
+        home = ev.get("home_team")
+        away = ev.get("away_team")
+        for bm in ev.get("bookmakers", []):
+            if book_filter and bm.get("key") not in book_filter:
+                continue
+            for mkt in bm.get("markets", []):
+                market = SIDE_MARKETS.get(mkt.get("key"))
+                if market is None:
+                    continue
+                picked = _side_pair(mkt.get("key"), mkt.get("outcomes", []), home, away)
+                if picked is None:
+                    continue
+                line, home_price, away_price, n_pairs = picked
+                if n_pairs > 1:
+                    print(
+                        f"::warning::odds: {bm.get('key')} sent {n_pairs} spreads point "
+                        f"pairs for event {ev.get('id')}; kept the most balanced ({line})"
+                    )
+                row = {
+                    "event_id": ev.get("id"),
+                    "commence_time": ev.get("commence_time"),
+                    "home_team": home,
+                    "away_team": away,
+                    "book": normalize_book(bm.get("key")),
+                    "market": market,
+                    "line": None if line is None else float(line),
+                    "home_price": home_price,
+                    "away_price": away_price,
+                    "last_update": mkt.get("last_update") or bm.get("last_update"),
+                }
+                key = (row["event_id"], row["book"], market)
+                prev = by_key.get(key)
+                if prev is None or (row["last_update"] or "") >= (prev["last_update"] or ""):
+                    by_key[key] = row
+    return list(by_key.values())
 
 
 def normalize_full_game(

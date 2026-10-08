@@ -94,15 +94,19 @@ python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 **Credit budget (Odds API 20K plan, $30/month, since 2026-10-05; 100K Sep 6 - Oct 5 for the history purchase):** `totals_h1` is
 served only per-event, but naming our ten books (`odds_api.bookmakers_1h`) is billed
 as ONE region and overrides `regions`, so a 1H poll costs **1 credit per game**
-(it was 2 on `us,us2`); listing events is free; full-game totals are one bulk call
-priced per region, which is why the bulk pull still uses `regions`.
+(it was 2 on `us,us2`); listing events is free; the full game is one bulk call
+priced per region (`totals,spreads,h2h` x `us,us2,us_ex` = 9 credits for the whole
+slate), which is why the bulk pull still uses `regions`.
 `poll_lines.py` captures EVERY Hard Rock-priced game (`--hr-universe`): opener
 sweeps stop paying for a game once its Hard Rock 1H line is in (`--missing-hr-only`),
 per-game closes poll only games kicking off inside the 120-minute close
 look-ahead (`--kickoff-within-min`, `CLOSE_LOOKAHEAD_MIN` in `lines_watch.yml`), `--max-credits-per-run` is the runaway guard and
 `--credit-floor` the month-end reserve. Expected **~567 credits/week (~2,450/month),
 worst ~774** across four whole-week builds and the per-game closes, on a basis of 82
-Hard Rock-priced games (budget comment in `.github/workflows/lines_watch.yml`).
+Hard Rock-priced games, plus **~200/week (~860/month)** since 2026-10-07 for every
+book's full-game spread and moneyline (with prices) and the exchanges on the
+Sunday opener, the card-day refresh and every close tick: **~3,300/month** of 20K
+(budget comment in `.github/workflows/lines_watch.yml`).
 
 ## How it runs
 

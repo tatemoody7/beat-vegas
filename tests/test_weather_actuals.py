@@ -123,9 +123,14 @@ def test_check_flags_bad_values_and_measures_agreement(W):
     assert any("gust 12.0 < wind 20.0" in p for p in problems)
 
 
-def test_era5_fetch_stages_rows_skips_domes_and_resumes(W, monkeypatch):
-    k1, k2, k3 = datetime(2016, 9, 3, 16), datetime(2016, 9, 10, 23, 30), datetime(2016, 9, 17, 19)
-    plan = {101: (2016, k1, 1), 102: (2016, k2, 1), 103: (2016, k3, 2)}
+def test_era5_fetch_is_one_call_per_venue_season_skips_domes_and_resumes(W, monkeypatch):
+    """GitHub's runners are throttled per request, so ERA5 is fetched one call
+    per venue-season (2026-10-08). Two games at one venue in 2016 share a call
+    whose range spans both windows; a 2017 game there is its own call; a dome
+    costs nothing; a re-run fetches nothing."""
+    k1, k2 = datetime(2016, 9, 3, 16), datetime(2016, 9, 10, 23, 30)
+    k3, k4 = datetime(2017, 9, 2, 19), datetime(2016, 9, 17, 19)
+    plan = {101: (2016, k1, 1), 102: (2016, k2, 1), 104: (2017, k3, 1), 103: (2016, k4, 2)}
     venues = {
         1: {"dome": False, "lat": 30.6, "lon": -96.3, "name": "Kyle Field"},
         2: {"dome": True, "lat": 33.7, "lon": -84.4, "name": "a dome"},
@@ -135,18 +140,18 @@ def test_era5_fetch_stages_rows_skips_domes_and_resumes(W, monkeypatch):
     def fake(lat, lon, lo, hi, **kw):
         calls.append((lo, hi, kw["models"], sorted(kw["variables"])))
         start = datetime.strptime(lo, "%Y-%m-%d")
-        return _series(start, range(0, 48))
+        days = (datetime.strptime(hi, "%Y-%m-%d") - start).days + 1
+        return _series(start, range(0, 24 * days))
 
     monkeypatch.setattr(W, "fetch_hourly_series", fake)
     W.fetch_era5(plan, venues, set(), None)
-    assert len(calls) == 2  # the dome costs no call
-    assert calls[1][:2] == ("2016-09-10", "2016-09-11")
+    assert [c[:2] for c in calls] == [("2016-09-03", "2016-09-11"), ("2017-09-02", "2017-09-02")]
     assert calls[0][2] == "era5" and "relative_humidity_2m" in calls[0][3]
     staged = [json.loads(x) for x in W.STAGING.read_text().splitlines()]
-    assert {r["game_id"] for r in staged} == {101, 102}
-    assert len(staged) == 12
+    assert {r["game_id"] for r in staged} == {101, 102, 104}
+    assert len(staged) == 18  # six hours a game
     done = W._load_done()
-    assert done == {"era5|101", "era5|102", "era5|103"}
+    assert done == {"era5|101", "era5|102", "era5|103", "era5|104"}
     W.fetch_era5(plan, venues, done, None)  # a re-run fetches nothing
     assert len(calls) == 2
 
@@ -155,7 +160,7 @@ def test_era5_fetch_stops_after_consecutive_failures(W, monkeypatch):
     from beatvegas.sources.weather import WeatherUnavailable
 
     monkeypatch.setattr(W, "MAX_CONSECUTIVE_FAILURES", 2)
-    plan = {i: (2016, datetime(2016, 9, 3, 16), 1) for i in range(1, 6)}
+    plan = {i: (2013 + i, datetime(2013 + i, 9, 3, 16), 1) for i in range(1, 6)}
     venues = {1: {"dome": False, "lat": 30.6, "lon": -96.3, "name": "Kyle Field"}}
     n = []
 

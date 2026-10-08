@@ -29,6 +29,11 @@ hold the rest.
     Allianz Stadium (2017 Rice vs Stanford). Tate's call: allow-list both at their published
     coordinates (`etl/venues.py::VERIFIED_VENUES`, ±0.01°); the guard stays strict for every other
     venue.
+  - **Second dispatch (37782514919):** about 2.6 games a minute (Open-Meteo throttles GitHub's
+    shared runner addresses per request). It reached the 350-minute limit with 859 games staged
+    (925 done keys) and an empty log, because Python buffered its prints.
+  - **Tate's call:** fetch one call per venue-season (about 1,700 requests for the range) and set
+    `PYTHONUNBUFFERED`. #331 had already made a cut-off run resumable.
 
 - **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
   research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and

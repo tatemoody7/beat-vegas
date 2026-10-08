@@ -15,9 +15,9 @@ decision-safe.
 
 TWO SOURCES, SIDE BY SIDE (a cross-check, never blended):
   era5  Open-Meteo's ERA5 archive, `models=era5` pinned so 2013 and 2026 come from
-        the same reanalysis. One call per game for the day(s) spanning the kickoff
-        hour -1 to +4, so each call is one unit of the free quota (~10,000 a day:
-        a full 2013-2026 pass spans two UTC days and resumes where it stopped).
+        the same reanalysis. One call per venue-season covering every game there
+        (each game sliced from the kickoff hour -1 to +4): GitHub's shared runners
+        are throttled per request, so fewer, larger calls; the run resumes per game.
         `timezone=UTC` as everywhere (docs/WEATHER.md section 1). ERA5 lags real
         time by about five days, so games newer than ERA5_LAG_DAYS are left for a
         later run. Domed venues are skipped -- no call, no row.
@@ -302,16 +302,33 @@ def fetch_era5(plan, venues, done: set, limit: Optional[int]) -> int:
         raise SystemExit(f"{len(bad)} venues have implausible coordinates; fix them first.")
     if limit:
         todo = todo[:limit]
-    print(f"== era5: {len(todo)} games to fetch ({len(done)} done-keys on file) ==")
-    written = skipped = fails = 0
-    with STAGING.open("a") as out, DONE.open("a") as donef:
-        for i, (gid, k, vid) in enumerate(todo, 1):
+    # One call per VENUE-SEASON, not per game (2026-10-08): GitHub's shared
+    # runner addresses are throttled per request (the first full run managed
+    # ~2.6 games a minute), and a venue's whole season in one ranged call is the
+    # pattern backfill_weather.py already uses. A ranged call costs more quota
+    # units (Open-Meteo weights by days), but the daily budget was never the limit.
+    groups: Dict[Tuple[Optional[int], int], List[Tuple[int, datetime]]] = {}
+    skipped = 0
+    with DONE.open("a") as donef:
+        for gid, k, vid in todo:
             v = venues.get(vid) if vid is not None else None
             if v is None or v["dome"] or v["lat"] is None or v["lon"] is None:
                 skipped += 1
                 donef.write(f"era5|{gid}\n")  # nothing to fetch, ever
                 continue
-            lo, hi = era5_window(k)
+            groups.setdefault((vid, plan[gid][0]), []).append((gid, k))
+    print(
+        f"== era5: {len(todo)} games to fetch in {len(groups)} venue-seasons "
+        f"({len(done)} done-keys on file, {skipped} domed or without a venue) =="
+    )
+    written = fails = 0
+    with STAGING.open("a") as out, DONE.open("a") as donef:
+        for i, ((vid, season), games) in enumerate(
+            sorted(groups.items(), key=lambda kv: kv[0][1]), 1
+        ):
+            v = venues[vid]
+            windows = [era5_window(k) for _, k in games]
+            lo, hi = min(w[0] for w in windows), max(w[1] for w in windows)
             try:
                 series = fetch_hourly_series(
                     v["lat"],
@@ -324,7 +341,7 @@ def fetch_era5(plan, venues, done: set, limit: Optional[int]) -> int:
                 )
             except WeatherUnavailable as e:
                 fails += 1
-                print(f"  [warn] game {gid}: {e}")
+                print(f"  [warn] venue {vid} {season}: {e}")
                 if fails >= MAX_CONSECUTIVE_FAILURES:
                     print(
                         f"::warning::{MAX_CONSECUTIVE_FAILURES} calls failed in a row "
@@ -333,18 +350,20 @@ def fetch_era5(plan, venues, done: set, limit: Optional[int]) -> int:
                     break
                 continue
             fails = 0
-            rows = era5_rows(gid, k, series, v["lat"], v["lon"], datetime.utcnow().isoformat())
-            for r in rows:
-                out.write(json.dumps(r) + "\n")
+            stamp = datetime.utcnow().isoformat()
+            for gid, k in games:
+                rows = era5_rows(gid, k, series, v["lat"], v["lon"], stamp)
+                for r in rows:
+                    out.write(json.dumps(r) + "\n")
+                if rows:
+                    donef.write(f"era5|{gid}\n")
+                written += len(rows)
             out.flush()
-            if rows:
-                donef.write(f"era5|{gid}\n")
-                donef.flush()
-            written += len(rows)
-            if i % 250 == 0 or i == len(todo):
-                print(f"  {i}/{len(todo)} games, {written} rows")
+            donef.flush()
+            if i % 25 == 0 or i == len(groups):
+                print(f"  {i}/{len(groups)} venue-seasons, {written} rows")
             time.sleep(SLEEP_S)
-    print(f"era5: staged {written} rows; {skipped} games domed or without a venue")
+    print(f"era5: staged {written} rows")
     return written
 
 

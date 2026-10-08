@@ -8,11 +8,15 @@ name: Backfill observed weather (ERA5 + CFBD -> weather_actuals)
 # (tests/test_weather_actuals.py pins it): the champion reads `weather`, the frozen
 # studies read `weather_obs`, so this can run at any time without moving either.
 #
-# A full ERA5 pass is ~10,000 one-unit calls against Open-Meteo's free ~10,000 a
-# day, so it spans two UTC days. The staging file is cached between runs
-# (restore the newest, save under this run's id): re-dispatch the next UTC day and
-# it skips every game already staged. Each run promotes everything staged so far,
-# after the --check gate (out-of-range values, gust below wind) passes.
+# Open-Meteo throttles GitHub's shared runner addresses per request: the first
+# full run (2026-10-08, one call per game) fetched ~2.6 games a minute and hit
+# the 350-minute limit at 925 games. So ERA5 is fetched one call per venue-season
+# (~1,700 requests for the whole range). The staging file is cached between runs
+# (restore the newest, save under this run's id, even on a timeout): re-dispatch
+# and it skips every game already staged. A run that finishes promotes everything
+# staged so far, after the --check gate (out-of-range values, gust below wind).
+# PYTHONUNBUFFERED: without it a run cut off at its limit loses every progress
+# line still sitting in Python's output buffer (the first run's log was empty).
 
 permissions:
   contents: read
@@ -43,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     env:
+      PYTHONUNBUFFERED: '1'
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       SEASON_START: ${{ inputs.start }}

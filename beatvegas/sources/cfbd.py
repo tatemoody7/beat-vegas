@@ -189,6 +189,13 @@ class CFBDClient:
             },
         )
 
+    def game_weather(self, year: int, season_type: str = "regular") -> List[Dict]:
+        """Observed weather, one row per game (Patreon Tier 1+; 2001-). Keyed by
+        `id`, which is the same game id `/games` returns. No issued-at or
+        forecast/observed flag, so for an UNPLAYED game this is a forecast of
+        unknown age -- the backfill reads played games only."""
+        return self._get("/games/weather", {"year": year, "seasonType": season_type})
+
     def fbs_teams(self, year: int) -> List[Dict]:
         """Teams classified FBS for `year` (each row has `school`, `conference`)."""
         return self._get("/teams/fbs", {"year": year})

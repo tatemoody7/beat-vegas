@@ -264,6 +264,66 @@ class WeatherObs(Base):
     )
 
 
+class WeatherActual(Base):
+    """OBSERVED weather around a played game, hour by hour -- a study table.
+
+    Written by scripts/backfill_weather_actuals.py (2026-10-08, roadmap v1.3) for
+    the Salaga & Howley history look (docs/LITERATURE.md): wind and rain averaged
+    over the game, temperature and humidity at kickoff. NOTHING ELSE READS IT. It
+    is kept out of `weather` (the champion reads that table) and out of
+    `weather_obs` (studies read that table's newest lead-0 row per game, which
+    ERA5 rows would shadow), so filling it can never move the model or a frozen
+    study.
+
+    These are actuals, never decision-safe: what the conditions WERE, not what
+    anyone could have known before kickoff.
+
+    Two sources, side by side (a cross-check, not a blend):
+      open_meteo_era5_archive  ERA5 reanalysis, hourly, `models=era5` pinned so
+                               every season comes from one model; one row per
+                               hour from `hour_offset` -1 to +4 around the
+                               kickoff hour (offset 0 = the UTC hour the game
+                               kicks off in).
+      cfbd_games_weather       CFBD /games/weather, one reading per game
+                               (provider unnamed), stored at hour_offset 0.
+    """
+
+    __tablename__ = "weather_actuals"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
+    source = Column(String, nullable=False)
+    hour_offset = Column(Integer, nullable=False)  # hours from the kickoff hour
+    valid_time = Column(DateTime)  # the UTC hour this row describes
+    kickoff_utc = Column(DateTime)  # Game.start_date as fetched (naive UTC)
+    temperature_f = Column(Float)
+    humidity_pct = Column(Float)
+    dew_point_f = Column(Float)
+    wind_mph = Column(Float)
+    wind_gust_mph = Column(Float)
+    wind_direction_deg = Column(Float)
+    precipitation_in = Column(Float)  # ERA5: the hour's total; CFBD: as reported
+    snowfall_in = Column(Float)  # CFBD only, as reported
+    pressure = Column(Float)  # CFBD only, as reported (unit undocumented)
+    weather_code = Column(Integer)  # CFBD weatherConditionCode
+    game_indoors = Column(Boolean)  # CFBD gameIndoors; NULL for ERA5 rows
+    latitude = Column(Float)  # the coordinates actually used (ERA5 rows)
+    longitude = Column(Float)
+    weather_model = Column(String)  # Open-Meteo `models=` (era5)
+    dataset_version = Column(String, nullable=False)
+    retrieved_at = Column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "game_id",
+            "source",
+            "hour_offset",
+            "dataset_version",
+            name="uq_weather_actual_reading",
+        ),
+        Index("ix_weather_actuals_game", "game_id"),
+    )
+
+
 class OddsSnapshot(Base):
     """One row per (game, book, market) observation. Repeated polling builds the
     full movement history; the earliest captured_at = posting time."""

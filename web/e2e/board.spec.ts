@@ -119,7 +119,7 @@ test.describe("the board", () => {
     const c = expected.counts;
     await expect(
       page.getByText(
-        `${c.bet} paper ${c.bet === 1 ? "signal" : "signals"} · ${c.edge} watch · ${c.pass} pass`,
+        `${c.bet} ${c.bet === 1 ? "bet" : "bets"} · ${c.edge} watch · ${c.pass} pass`,
         {
           exact: true,
         },
@@ -161,7 +161,7 @@ test.describe("the board", () => {
         await expect(li.locator(".bv-badge")).toHaveText("paper signal");
     }
     await expect(
-      bar.getByRole("heading", { name: "Closest to a signal" }),
+      bar.getByRole("heading", { name: "Closest to a bet" }),
     ).toBeVisible();
     const near = bar.locator("ul").nth(1).locator("li");
     await expect(near).toHaveCount(expected.answer.closest.length);

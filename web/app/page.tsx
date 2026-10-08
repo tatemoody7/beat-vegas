@@ -229,7 +229,7 @@ export default async function BoardPage({
               <span className="font-mono font-semibold text-[var(--good)]">
                 {counts.bet}
               </span>
-              {` paper ${counts.bet === 1 ? "signal" : "signals"} · `}
+              {` ${counts.bet === 1 ? "bet" : "bets"} · `}
               <span className="font-mono font-semibold text-[var(--warn)]">
                 {counts.edge}
               </span>

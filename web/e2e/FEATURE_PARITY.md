@@ -15,7 +15,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [board] Games group by ET day Thu, Fri, Sat, with played games in a `Played · N` section last — board.spec.ts › "groups the week Thu, Fri, Sat, then Played last"
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
-- [board] The `N paper signal(s) · N watch · N pass` counts line (signed in) matches the derived tiers — board.spec.ts › "states the tier counts"
+- [board] The `N bet(s) · N watch · N pass` counts line (signed in) matches the derived tiers — board.spec.ts › "states the tier counts"
 - [board] The H-PCT bar sentence (`Bar this week: <bar> pts (top <share>% of <n> priced games).`, one decimal, no gate clause since 2026-09-28) is exact — board.spec.ts › "states this week’s bar exactly"
 - [board] The two-line strip (what this is, signed in: green means bet inside this week's cap and a paper signal past it, every result is on Results) opens the page and links to How it works — board.spec.ts › "opens with the two-line strip that says what this is"
 - [board] The answer bar names the live bet (`N bets live` inside the real-money cap; past it a `paper signal` chip), the placed one (muted, `bet logged`), the `U of 5 bets placed — L left this week` line, the three closest with their `needs …` clause, and a `Next update <window> ET` line — board.spec.ts › "the answer bar names the live bet, the placed one, the closest three and the next update"

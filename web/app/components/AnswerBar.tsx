@@ -80,7 +80,7 @@ export default function AnswerBar({
       {closest.length > 0 && (
         <div className="mt-3 border-t border-[var(--border)] pt-2">
           <h2 className="mb-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">
-            Closest to a signal
+            Closest to a bet
           </h2>
           <ul className="space-y-1.5">
             {closest.map((c) => (

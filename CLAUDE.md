@@ -17,9 +17,10 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.1): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.2): what is tested, how an edge is judged,
   what is paused. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
-  is the judge it names (engine `cv1`, table `hp1`).
+  is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
+  runs (weekly SPRT, alpha 0.5% each, K = 10).
 - `docs/HISTORY.md` — what happened, by date (2026-05 → today). Read the top entry before touching
   anything that shipped this week.
 - `docs/HYPOTHESES.md` — the registry: every study ever run or proposed, its status and criterion.
@@ -75,12 +76,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: Statistical
-  Protocol + simulation, sized on `docs/CONSENSUS.md`'s development read (Tate approves the
-  numbers; it settles the shadow engines' budget and defines "shows in two seasons") → multi-book
+- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines and one team-total probe → literature looks (citations verified; Tate picks
   the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
-  retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools).
+  retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
+  full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **Real-money switch: ON since 2026-10-07** (Tate's call; written through Neon's HTTPS endpoint,
   mirroring `scripts/rule_pause.py`): the site refuses every real ticket until a promotion.
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
@@ -190,7 +190,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
-  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`.
+  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`,
+  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +

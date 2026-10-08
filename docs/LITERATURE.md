@@ -18,8 +18,9 @@ promote anything.**
   - A pass licenses a paper arm only; that arm then registers under `docs/PROTOCOL_2026.md` and
     spends a ledger slot.
 - **Team totals and full-game weather** are tracked edge candidates in their own right.
-- **Nothing here is a registry row yet.** The rows are written in a later PR, once each look's
-  definition is frozen.
+- **Three looks are registry rows (2026-10-08):** `H-LIT-ARSCOTT`, `H-LIT-TV` and
+  `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, each frozen before its script. Coleman, Cox and Salaga
+  follow in their own PRs.
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against
@@ -48,18 +49,21 @@ Epidemiology) found no jet-lag effect on away teams against the spread over 2013
 
 ## The six looks (Tate, 2026-10-08)
 
-All read the closing lines we hold: CFBD's full-game spread and total for 2013-2026, about 750
-FBS-vs-FBS games a season. A look's judge is the paper's own measure, the win rate at the closing
-line against the 52.4% break-even at −110. Each look's exact rule, side and n are frozen in its
-registry row before it runs; the family is Holm-corrected at 5%.
+All read CFBD's closing lines for 2013-2025, about 750 FBS-vs-FBS regular-season games a season,
+as each game's median across CFBD's providers (the provider stored in `games` changes by era, so
+the looks never read it). A look's judge is the paper's own measure: the win rate at that close,
+pushes dropped, by a one-sided exact binomial test against the 52.38% break-even at −110. Each
+look's exact rule, side and n are frozen in its registry row before it runs; the family is
+Holm-corrected at 5% with m = 6 fixed (a look not yet run counts as p = 1). Tate's calls of
+2026-10-08.
 
 | Look | Rule | Years | Definition status |
 |---|---|---|---|
-| Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | His censoring formula is transcribed from the paper into the row |
+| Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | Frozen in `H-LIT-ARSCOTT`: the formula and both σ from the working paper; spread-0 games excluded |
 | Coleman | Home favourite vs a visiting underdog that travelled one time zone east, second half of the season | 2013-2025 | **Waiting on the full text**: Tate's call is to freeze Coleman's exact "second half" cutoff and line timing, not a guess |
-| National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen |
+| National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen in `H-LIT-TV`: any TV outlet that is exactly one of the five |
 | Cox | Rivalry games = FBS series with a named trophy (Wikipedia's trophy-game list, frozen on the registration date) | 2019-2025 | Which of Cox's rules are tested (rivalry underdog; the favourite that won the last 3 meetings) is fixed in the row |
-| Bennett | Fade the previous season's final AP top 10 in its first game | 2017-2025 | Frozen; about 80 games, so it reads closer to a description than a test |
+| Bennett | Fade the previous season's final AP top 10 in its first game | 2018-2025 | Frozen in `H-LIT-BENNETT`: 2017 dropped (the paper's 2008-2016 may name the first-game seasons); the literal first game; top-10 pairs dropped. About 70 games, so it reads closer to a description than a test |
 | Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Observed weather comes from `weather_actuals` (ERA5 hourly + a CFBD cross-check, 2013-2026; `docs/WEATHER.md` §7); the game window is fixed in the row. Uses game-time weather, so a pass does not make it bettable as stated |
 
 ## Tracked edge candidates (roadmap v1.3)
@@ -90,7 +94,8 @@ registry row before it runs; the family is Holm-corrected at 5%.
   the full-game total (overs), so `CENSORING_STUDY` was examining the same family, on the first half.
 - `docs/EXTERNAL_REVIEW.md`'s source list now carries the full citations. Its Francisco & Moore
   numbers were already exact.
-- The deep-research report (Tate's, not committed) also has these wrong:
+- The deep-research report (Tate's, not committed; kept beside the research run in
+  `research/swarm/2026-10-08-literature-step5/`, gitignored) also has these wrong:
   - Bennett's sample.
   - The direction of Cox's streak result.
   - Coleman's direction.

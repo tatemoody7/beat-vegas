@@ -9,6 +9,21 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (THREE LITERATURE LOOKS PRE-REGISTERED: H-LIT-ARSCOTT, H-LIT-TV, H-LIT-BENNETT).**
+  Roadmap step 5, part two. Three of the six v1.3 looks are now rows in `docs/HYPOTHESES.md`;
+  no script exists yet. Tate's calls:
+  - **The line:** each game's median close across CFBD's providers, re-fetched by the script.
+    The provider stored in `games` changes by era (TeamRankings 2013-16, consensus 2017-22, one
+    book 2023-25).
+  - **The test:** one-sided exact binomial against 52.38%, pushes dropped. Holm at 5% with
+    m = 6 fixed; a look not yet run counts as p = 1. Each look runs once its script merges.
+  - **Scope:** regular season only.
+  - **Arscott:** the working paper's formula and σ; spread-0 games are excluded.
+  - **National TV:** any TV outlet that is exactly ABC, CBS, NBC, FOX or ESPN qualifies.
+  - **Bennett:** first games of 2018-2025, since the paper's 2008-2016 may name first-game
+    seasons; the team's literal first game; a game between two prior top-10 teams is dropped.
+  - Coleman (full text), Cox (which rules) and Salaga (the weather backfill) still wait.
+
 - **2026-10-08 (WEEKNIGHT CLOSES CONFIRMED).** The first Thursday ticks (shipped 2026-10-06) closed every
   Thursday game inside its windows: 4 of 4 with first-half closes (2 h) and full-game total,
   spread and moneyline closes (3 h). The first spread and moneyline capture (thu_pm refresh,

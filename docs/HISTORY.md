@@ -34,6 +34,11 @@ hold the rest.
     (925 done keys) and an empty log, because Python buffered its prints.
   - **Tate's call:** fetch one call per venue-season (about 1,700 requests for the range) and set
     `PYTHONUNBUFFERED`. #331 had already made a cut-off run resumable.
+  - **The queue:** the run held `neon-writers` from 13:12 to 19:02Z, and the 16:00Z grade backup
+    waited 90 minutes behind it. Tate's call: split the workflow into plan / fetch / promote, with
+    only plan and promote in the queue; the fetch job holds no `DATABASE_URL`.
+    - `test_every_neon_writer_shares_the_concurrency_group` now checks every job that can reach
+      Neon, whether it joins the queue at workflow or job level.
 
 - **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
   research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and

@@ -47,14 +47,48 @@ def _run_blocks(data: dict):
 
 
 def test_every_neon_writer_shares_the_concurrency_group():
+    """Every JOB that can reach Neon (it, or its workflow, holds DATABASE_URL) is
+    in neon-writers -- through the workflow-level group or its own. Job-level
+    lets a long job that never touches Neon sit outside the queue
+    (weather_actuals.yml's fetch, 2026-10-08) while its writing jobs stay in it."""
     writers = [p for p in _workflows() if _writes_neon(_load(p))]
     assert writers, "expected at least one Neon-writing workflow"
+    checked = 0
     for p in writers:
-        conc = _load(p).get("concurrency") or {}
-        assert conc.get("group") == NEON_GROUP, f"{p.name}: concurrency.group must be {NEON_GROUP}"
-        assert conc.get("cancel-in-progress") is False, (
-            f"{p.name}: cancel-in-progress must be false"
-        )
+        data = _load(p)
+        wf_conc = data.get("concurrency") or {}
+        wf_has_db = "secrets.DATABASE_URL" in yaml.safe_dump(data.get("env") or {})
+        for jname, job in (data.get("jobs") or {}).items():
+            if not (wf_has_db or "secrets.DATABASE_URL" in yaml.safe_dump(job)):
+                continue
+            conc = job.get("concurrency") or wf_conc
+            assert conc.get("group") == NEON_GROUP, (
+                f"{p.name}:{jname}: concurrency.group must be {NEON_GROUP}"
+            )
+            assert conc.get("cancel-in-progress") is False, (
+                f"{p.name}:{jname}: cancel-in-progress must be false"
+            )
+            checked += 1
+    assert checked >= len(writers)
+
+
+def test_weather_actuals_fetches_outside_the_queue_and_writes_inside_it():
+    """The hours of ERA5 fetching hold no DATABASE_URL and no queue slot; the
+    plan and promote jobs, which reach Neon, hold both. Promote runs after a
+    fetch cut off at its limit, but never without a plan."""
+    data = _load(WF_DIR / "weather_actuals.yml")
+    assert "concurrency" not in data  # job-level only, or the fetch would hold it
+    jobs = data["jobs"]
+    fetch = yaml.safe_dump(jobs["fetch"])
+    assert "DATABASE_URL" not in fetch and "concurrency" not in jobs["fetch"]
+    assert "--plan data/cache/weather_actuals_plan.json" in fetch
+    for name in ("plan", "promote"):
+        assert jobs[name]["concurrency"] == {"group": NEON_GROUP, "cancel-in-progress": False}
+        assert "secrets.DATABASE_URL" in yaml.safe_dump(jobs[name]["env"])
+    assert jobs["fetch"]["needs"] == "plan"
+    assert jobs["promote"]["needs"] == ["plan", "fetch"]
+    cond = jobs["promote"]["if"]
+    assert "always()" in cond and "needs.plan.result == 'success'" in cond
 
 
 def test_ci_keeps_its_own_group():

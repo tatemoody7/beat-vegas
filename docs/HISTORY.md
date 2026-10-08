@@ -9,6 +9,11 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (WEEKNIGHT CLOSES CONFIRMED).** The first Thursday ticks (shipped 2026-10-06) closed every
+  Thursday game inside its windows: 4 of 4 with first-half closes (2 h) and full-game total,
+  spread and moneyline closes (3 h). The first spread and moneyline capture (thu_pm refresh,
+  9 credits): 1,241 spread rows and 1,187 moneyline rows from 24 books on 56 games.
+
 - **2026-10-08 (THE FIRST ARMS REGISTER: H-ARM-1HU, H-ARM-1HO, H-ARM-FGU).** Roadmap step 6, Tate's calls.
   - **The rows:** three pre-registered rows under protocol p1, ledger slots 1-3 at 0.5% each
     (7 of 10 remain). The rows were committed before any collector.

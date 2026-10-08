@@ -42,7 +42,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 
-## Where we are (as of 2026-10-07)
+## Where we are (as of 2026-10-08)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
   vig-free median-of-books consensus close (newest snapshot ≤2 h before kickoff) — designed for +3%
@@ -100,9 +100,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Weeknight closes (shipped 2026-10-06, Tate's call: Tue–Fri)**: confirm the first Thursday
-  (10-08) ticks wrote 1H + full-game rows inside the windows for every Thursday game.
-- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset; the 12
+- **Arms' first build (2026-10-09 fri_pm)**: confirm H-ARM-1HU / 1HO / FGU each logged and write
+  that build's `cards.id` into `docs/PROTOCOL_2026.md`; first Monday read 10-12 (`protocol_position`).
+  `weather_actuals.yml` (run 37833098273) may need a re-dispatch to finish its ERA5 fetch.
+- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
+  and the arms' first read; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
   licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body).
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`

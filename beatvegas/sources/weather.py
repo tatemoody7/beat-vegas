@@ -71,6 +71,17 @@ _VARS = {
     "precipitation": "precipitation",
 }
 
+# The observed-weather study set, for the study-only table that
+# scripts/backfill_weather_actuals.py fills: the four above plus what the Salaga &
+# Howley look needs (humidity) and two fields that cost nothing extra in the same
+# call. ERA5 archive only.
+ACTUAL_VARS = {
+    **_VARS,
+    "relative_humidity_2m": "humidity_pct",
+    "dew_point_2m": "dew_point_f",
+    "wind_direction_10m": "wind_direction_deg",
+}
+
 FORECAST_HORIZON_DAYS = 16  # past this the forecast API has nothing
 MAX_LEAD_HOURS = 168  # previous_day7; day8 returns empty
 _ATTEMPTS = 4
@@ -149,8 +160,13 @@ def fetch_hourly_series(
     lead_hours: int = 0,
     models: Optional[str] = None,
     timeout: int = 60,
+    variables: Optional[Dict[str, str]] = None,
 ) -> Dict[str, dict]:
     """One ranged call -> {'YYYY-MM-DDTHH' (UTC): {temp, wind, gust, precip}}.
+
+    `variables` (Open-Meteo name -> our column) replaces the default four; only
+    the ERA5 archive takes it (`ACTUAL_VARS`), since a fixed-lead source renames
+    every variable with its `_previous_dayN` suffix.
 
     The backfill fetches a venue's whole season in one request and then slices
     each kickoff hour locally -- hundreds of calls instead of thousands. Hours
@@ -165,7 +181,9 @@ def fetch_hourly_series(
         24 <= lead_hours <= MAX_LEAD_HOURS and lead_hours % 24 == 0
     ):
         raise ValueError(f"lead_hours must be a whole number of days in 24..{MAX_LEAD_HOURS}")
-    names = _hourly_names(source, lead_hours)
+    if variables is not None and source == SOURCE_DECISION:
+        raise ValueError("custom variables are not supported for fixed-lead forecasts")
+    names = dict(variables) if variables is not None else _hourly_names(source, lead_hours)
     params = {
         "latitude": lat,
         "longitude": lon,

@@ -9,6 +9,22 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (OBSERVED WEATHER FOR THE HISTORY LOOKS: `weather_actuals`).** Roadmap v1.3's
+  Salaga look needs 2016-2025 observed weather; we held 2023+.
+  - **Tate's calls:**
+    - ERA5 (Open-Meteo archive, `models=era5`) as the data, with CFBD's `/games/weather` beside
+      it as a cross-check.
+    - Every played FBS-vs-FBS game 2013-2026.
+    - A new study-only table.
+  - **What it stores:** ERA5 is one row per hour from one hour before the kickoff hour to four
+    after; CFBD is one reading per game.
+  - **Nothing reads it but the look.** `tests/test_weather_actuals.py` pins that, so the
+    champion (`weather`) and the frozen studies (`weather_obs`) cannot move.
+  - **Running it:** `weather_actuals.yml` stages, checks and promotes, and resumes across the two
+    UTC days a full ERA5 pass needs.
+  - **Checked:** the CFBD Starter Pack has no weather at all; CFBD's endpoint covered 60 of 60 and
+    54 of 54 probed games; one live ERA5 call returned every variable for a 2016 game.
+
 - **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
   research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and
   sources in the gitignored `research/swarm/2026-10-08-literature-step5/`).

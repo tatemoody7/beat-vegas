@@ -60,7 +60,7 @@ registry row before it runs; the family is Holm-corrected at 5%.
 | National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen |
 | Cox | Rivalry games = FBS series with a named trophy (Wikipedia's trophy-game list, frozen on the registration date) | 2019-2025 | Which of Cox's rules are tested (rivalry underdog; the favourite that won the last 3 meetings) is fixed in the row |
 | Bennett | Fade the previous season's final AP top 10 in its first game | 2017-2025 | Frozen; about 80 games, so it reads closer to a description than a test |
-| Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Needs observed weather for 2016-2022 first (an Open-Meteo backfill; we hold 2023+). Uses game-time weather, so a pass does not make it bettable as stated |
+| Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Observed weather comes from `weather_actuals` (ERA5 hourly + a CFBD cross-check, 2013-2026; `docs/WEATHER.md` §7); the game window is fixed in the row. Uses game-time weather, so a pass does not make it bettable as stated |
 
 ## Tracked edge candidates (roadmap v1.3)
 

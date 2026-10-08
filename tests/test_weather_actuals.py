@@ -302,3 +302,14 @@ def test_nothing_but_the_backfill_reads_weather_actuals():
             if re.search(r"\bweather_actuals\b|\bWeatherActual\b", p.read_text(errors="ignore")):
                 hits.append(rel)
     assert hits == [], hits
+
+
+def test_a_truncated_final_staging_line_is_skipped_but_damage_elsewhere_raises(W):
+    """A run cut off at its time limit (or cancelled) can stop mid-write; the
+    resume must still check and promote. A broken line in the middle is not a
+    cut-off, so it still stops everything."""
+    good = json.dumps({"game_id": 1, "source": "s", "hour_offset": 0, "dataset_version": "v"})
+    assert len(W.parse_staging(good + "\n" + good[:20])) == 1
+    assert len(W.parse_staging(good + "\n\n" + good + "\n")) == 2
+    with pytest.raises(json.JSONDecodeError):
+        W.parse_staging(good[:20] + "\n" + good)

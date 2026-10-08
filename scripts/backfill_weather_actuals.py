@@ -376,10 +376,28 @@ def fetch_cfbd(plan, start: int, end: int, done: set) -> int:
     return written
 
 
+def parse_staging(text: str) -> List[dict]:
+    """The staging file's rows. A run cut off by its time limit or a cancel can
+    stop mid-write, so an unreadable LAST line is skipped (that game was never
+    marked done, so the next run fetches it again). An unreadable line anywhere
+    else is real damage and raises."""
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    rows = []
+    for i, ln in enumerate(lines):
+        try:
+            rows.append(json.loads(ln))
+        except json.JSONDecodeError:
+            if i == len(lines) - 1:
+                print(f"skipping a truncated final staging line ({len(ln)} chars)")
+                continue
+            raise
+    return rows
+
+
 def _staged() -> List[dict]:
     if not STAGING.exists():
         return []
-    return dedupe(json.loads(ln) for ln in STAGING.read_text().splitlines() if ln.strip())
+    return dedupe(parse_staging(STAGING.read_text()))
 
 
 def promote(sources: List[str]) -> None:

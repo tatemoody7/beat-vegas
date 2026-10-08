@@ -1,28 +1,31 @@
 """The 2026 Statistical Protocol's test (docs/PROTOCOL_2026.md; docs/ROADMAP_2026.md v1.2).
 
 Every confirmatory arm of the 2026 research program is one sequential test on
-its stream of line-value observations: `ev_cons` per graded paper pick -- the
-EV per unit of the wager at Hard Rock's price against the consensus close
-(beatvegas/consensus.py). A pick with no reading (`cons_excluded` set) is not an
-observation; it is counted as an exclusion.
+its line value: `ev_cons` per graded paper pick -- the EV per unit of the wager
+at Hard Rock's price against the consensus close (beatvegas/consensus.py). A
+pick with no reading (`cons_excluded` set) is not an observation; it is counted
+as an exclusion.
 
-The test (Wald's SPRT on a normal mean with a frozen spread), Tate's calls of
-2026-10-07:
+The test, Tate's calls of 2026-10-07:
 
-- H0: mean EV 0 (no edge) against H1: mean EV +0.03 (the economically meaningful
-  edge the program is built to find).
-- alpha 0.005 per arm (the fixed ledger: 5% family-wise across at most K = 10
-  confirmatory tests, never recycled); beta 0.20.
-- Assumed spread 0.06 per bet (measured 0.04-0.047 on development rows; the
-  conservative value keeps a no-edge arm's false-promotion chance inside its
-  0.5% even if the true spread is that wide).
-- No decision before 30 observations spanning at least 3 different weeks (one
-  Saturday's market-wide move cannot carry an arm across a boundary).
-- PROMOTE when the log-likelihood ratio reaches ln((1-beta)/alpha); STOP when it
-  falls to ln(beta/(1-alpha)) -- the evidence favours "no +3% edge" -- and the
-  arm is retired as NEEDS MORE EVIDENCE (a thin real edge can stop here; it is
-  not called negative). TIMEOUT at 200 observations or the season's end, also
-  NEEDS MORE EVIDENCE. Every ending spends the arm's alpha.
+- H0: mean EV 0 (no edge) against H1: mean EV +0.03, Wald's SPRT on a normal
+  mean, alpha 0.005 per arm (the fixed ledger: 5% family-wise across at most
+  K = 10 confirmatory tests, never recycled), beta 0.20.
+- **The observation is a WEEK**: the mean EV of the arm's readings that week.
+  Bets in one week share the Saturday market move, so they are not independent;
+  WEEK-SHOCK measured that shared move at 0.005 (2023-25, 42 weeks, interval to
+  0.007) and 0.012 (2026, 6 weeks, interval to 0.020). A week's mean of n bets
+  is treated as having variance SIGMA_WEEK^2 + SIGMA^2 / n with SIGMA_WEEK =
+  0.02 (the top of 2026's interval) and SIGMA = 0.06 per bet (measured
+  0.04-0.05). In the simulation this keeps a no-edge arm's false-promotion
+  chance at or below 0.08% everywhere in the measured range.
+- No decision before 30 readings spanning at least 3 different weeks.
+- PROMOTE when the log-likelihood ratio reaches ln((1-beta)/alpha) -> $10 live
+  validation. STOP when it falls to ln(beta/(1-alpha)) -- the evidence favours
+  "no +3% edge" -- retired as NEEDS MORE EVIDENCE (a thin real edge can stop
+  here; it is not called negative). TIMEOUT at 200 readings or the season's end,
+  also NEEDS MORE EVIDENCE. Every ending spends the arm's alpha.
+- Only COMPLETED weeks enter (the Monday review reads the week just graded).
 
 Pure: observations in, a position out. Tests pin the arithmetic; the simulation
 (scripts/protocol_sim.py) gives the operating characteristics Tate approved.
@@ -32,7 +35,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 PROTOCOL_VERSION = "p1"
 K_TESTS = 10
@@ -41,10 +44,11 @@ ALPHA = FAMILY_ALPHA / K_TESTS  # 0.005 per confirmatory test
 BETA = 0.20
 MU0 = 0.0
 MU1 = 0.03
-SIGMA = 0.06
-MIN_OBS = 30
+SIGMA = 0.06  # per-bet spread of line value
+SIGMA_WEEK = 0.02  # the week-wide move every bet in a week shares
+MIN_OBS = 30  # readings
 MIN_WEEKS = 3
-MAX_OBS = 200
+MAX_OBS = 200  # readings
 
 UPPER = math.log((1.0 - BETA) / ALPHA)  # promote
 LOWER = math.log(BETA / (1.0 - ALPHA))  # stop
@@ -55,49 +59,66 @@ STOP = "stop"
 TIMEOUT = "timeout"
 
 
-def llr_step(ev: float, sigma: float = SIGMA, mu0: float = MU0, mu1: float = MU1) -> float:
-    """One observation's contribution to the log-likelihood ratio, H1 over H0,
-    for a normal mean with known spread."""
-    return (mu1 - mu0) / sigma**2 * (ev - (mu0 + mu1) / 2.0)
+def week_variance(n: int, sigma: float = SIGMA, sigma_week: float = SIGMA_WEEK) -> float:
+    """The assumed variance of one week's mean line value over n bets."""
+    return sigma_week**2 + sigma**2 / n
+
+
+def llr_week(mean_ev: float, n: int, mu0: float = MU0, mu1: float = MU1) -> float:
+    """One week's contribution to the log-likelihood ratio, H1 over H0."""
+    return (mu1 - mu0) / week_variance(n) * (mean_ev - (mu0 + mu1) / 2.0)
 
 
 @dataclass
 class Position:
-    """Where an arm stands after its observations, in order."""
+    """Where an arm stands after its completed weeks."""
 
     state: str
-    n: int
+    n: int  # readings
     weeks: int
     llr: float
-    decided_at: Optional[int] = None  # the observation count at which it ended
+    decided_at_week: Optional[object] = None  # the week the arm ended
 
     @property
     def can_decide(self) -> bool:
         return self.n >= MIN_OBS and self.weeks >= MIN_WEEKS
 
 
-def position(observations: Iterable[Tuple[object, float]], season_over: bool = False) -> Position:
-    """Run the test over (week, ev) observations in the order they graded.
-
-    The boundaries are checked after every observation once at least MIN_OBS
-    observations span MIN_WEEKS distinct weeks; the first crossing ends the arm.
-    `season_over` ends a still-running arm as TIMEOUT."""
-    llr = 0.0
-    seen_weeks: set = set()
-    n = 0
+def weekly(observations: Iterable[Tuple[object, float]]) -> List[Tuple[object, int, float]]:
+    """(week, n, mean ev) per week, in the order weeks first appear."""
+    order: List[object] = []
+    acc: dict = {}
     for week, ev in observations:
-        n += 1
-        seen_weeks.add(week)
-        llr += llr_step(ev)
-        if n >= MIN_OBS and len(seen_weeks) >= MIN_WEEKS:
+        if week not in acc:
+            acc[week] = []
+            order.append(week)
+        acc[week].append(float(ev))
+    return [(w, len(acc[w]), sum(acc[w]) / len(acc[w])) for w in order]
+
+
+def position(observations: Iterable[Tuple[object, float]], season_over: bool = False) -> Position:
+    """Run the test over an arm's (week, ev) readings from COMPLETED weeks.
+
+    Weeks enter in order; after each, once MIN_OBS readings span MIN_WEEKS
+    weeks, the first boundary crossed ends the arm. MAX_OBS readings, or
+    `season_over`, end a still-running arm as TIMEOUT."""
+    llr = 0.0
+    n = 0
+    k = 0
+    for week, n_w, mean in weekly(observations):
+        n += n_w
+        k += 1
+        llr += llr_week(mean, n_w)
+        if n >= MIN_OBS and k >= MIN_WEEKS:
             if llr >= UPPER:
-                return Position(PROMOTE, n, len(seen_weeks), llr, n)
+                return Position(PROMOTE, n, k, llr, week)
             if llr <= LOWER:
-                return Position(STOP, n, len(seen_weeks), llr, n)
+                return Position(STOP, n, k, llr, week)
         if n >= MAX_OBS:
-            return Position(TIMEOUT, n, len(seen_weeks), llr, n)
-    state = TIMEOUT if season_over else RUNNING
-    return Position(state, n, len(seen_weeks), llr, n if season_over else None)
+            return Position(TIMEOUT, n, k, llr, week)
+    if season_over:
+        return Position(TIMEOUT, n, k, llr, None)
+    return Position(RUNNING, n, k, llr, None)
 
 
 def label(state: str) -> str:
@@ -111,8 +132,8 @@ def label(state: str) -> str:
 
 
 def observations_from_rows(rows: Sequence) -> Tuple[list, int]:
-    """(week, ev_cons) observations from graded pick rows in grading order,
-    and the count of rows excluded for want of a reading."""
+    """(week, ev_cons) readings from graded pick rows in grading order, and the
+    count of rows excluded for want of a reading."""
     obs = []
     excluded = 0
     for r in rows:
@@ -133,41 +154,35 @@ def simulate(
     reps: int = 20000,
     seed: int = 7,
 ) -> dict:
-    """Operating characteristics of `position` under a simple world: each week
-    brings `per_week` observations; each is true_mu + a week-wide shock (shared
-    by that week's bets: the Saturday market move) + independent noise, with the
-    total spread `true_sigma`. Vectorised, but the same rule as `position`
-    (tests/test_protocol.py holds them equal path by path)."""
+    """Operating characteristics of `position` in a simple world: each week
+    brings `per_week` readings, each true_mu + a week-wide shock shared by that
+    week + independent noise, total spread `true_sigma`. Vectorised over weeks
+    (tests/test_protocol.py holds it equal to `position` path by path)."""
     import numpy as np
 
     rng = np.random.default_rng(seed)
-    n_max = min(MAX_OBS, per_week * max_weeks)
     idio_sd = math.sqrt(max(true_sigma**2 - week_shock_sd**2, 0.0))
-    weeks_idx = np.arange(n_max) // per_week
-    shocks = (
-        rng.normal(0.0, week_shock_sd, size=(reps, max_weeks))
-        if week_shock_sd > 0
-        else np.zeros((reps, max_weeks))
-    )
-    x = true_mu + shocks[:, weeks_idx] + rng.normal(0.0, idio_sd, size=(reps, n_max))
-    llr = np.cumsum(llr_step(x), axis=1)
-    n = np.arange(1, n_max + 1)
-    ok = (n >= MIN_OBS) & ((weeks_idx + 1) >= MIN_WEEKS)
+    weeks = min(max_weeks, math.ceil(MAX_OBS / per_week))
+    shock = rng.normal(0.0, week_shock_sd, size=(reps, weeks)) if week_shock_sd > 0 else 0.0
+    means = true_mu + shock + rng.normal(0.0, idio_sd / math.sqrt(per_week), size=(reps, weeks))
+    llr = np.cumsum(llr_week(means, per_week), axis=1)
+    k = np.arange(1, weeks + 1)
+    ok = (k * per_week >= MIN_OBS) & (k >= MIN_WEEKS)
     up = (llr >= UPPER) & ok
     dn = (llr <= LOWER) & ok
-    big = n_max + 10
+    big = weeks + 10
     fu = np.where(up.any(1), up.argmax(1), big)
     fd = np.where(dn.any(1), dn.argmax(1), big)
     promote = fu < fd
     stop = fd < fu
-    end = np.where(promote, fu, np.where(stop, fd, n_max - 1)) + 1
+    end_week = np.where(promote, fu, np.where(stop, fd, weeks - 1)) + 1
     return {
         "promote": float(promote.mean()),
         "stop": float(stop.mean()),
         "timeout": float(1.0 - promote.mean() - stop.mean()),
-        "mean_obs": float(end.mean()),
-        "mean_weeks": float(np.ceil(end / per_week).mean()),
-        "n_max": int(n_max),
+        "mean_weeks": float(end_week.mean()),
+        "mean_bets": float((end_week * per_week).mean()),
+        "max_weeks": int(weeks),
     }
 
 

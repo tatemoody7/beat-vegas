@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-07 (THE TEST: STATISTICAL PROTOCOL p1).** Roadmap step 3 (`docs/PROTOCOL_2026.md`,
+  `H-PROGRAM-2026`, amendment v1.2), Tate's calls: Wald SPRT per arm on line value at Hard Rock's
+  price, H0 0 vs H1 +3% EV, alpha 0.5% (5% / K = 10, never recycled), beta 0.20, spread 0.06 per bet,
+  at least 30 readings over 3+ weeks; promote → $10 live validation, the sequential lower bound
+  stops an arm as NEEDS MORE EVIDENCE, timeout 200 readings or season end. The first simulation
+  showed a shared Saturday move would leak the budget (1–5.5% false promotion), so WEEK-SHOCK was
+  registered and run (study.yml 37712076009): the week move is 0.005 (2023–25, 42 weeks, to 0.007)
+  and 0.012 (2026, 6 weeks, to 0.020); full game not measurable yet. Tate chose the WEEKLY-average
+  design (assume 0.02): no-edge false promotion ≤ 0.08% everywhere measured; a real +3% edge found
+  57% (8 bets/wk) to 80% (15/wk) of the time this season; a −5% arm stops in 3–4 weeks. Shadow
+  engines left the alpha budget (exploratory). "Two seasons" = the unchanged rule passes again in 2027.
+
 - **2026-10-07 (THE JUDGE: CONSENSUS ENGINE cv1).** Roadmap step 2, specified by Tate (amendment
   v1.1, `docs/CONSENSUS.md`): EV per unit of each wager at its own line and price against the median
   de-vigged close of every centred book except Hard Rock and Fliff, books within 1.5 points, closes

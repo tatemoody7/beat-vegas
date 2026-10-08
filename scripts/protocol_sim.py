@@ -30,6 +30,7 @@ from beatvegas.protocol import (
     MU1,
     PROTOCOL_VERSION,
     SIGMA,
+    SIGMA_WEEK,
     UPPER,
     simulate,
 )
@@ -48,8 +49,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     rows = []
     for per_week in (8, 15):
-        for true_sd in (0.045, 0.06):
-            for shock in (0.0, 0.02):
+        for true_sd in (0.05, 0.06):
+            for shock in (0.0, 0.005, 0.012, 0.02):
                 for mu in MEANS:
                     r = simulate(mu, true_sd, per_week, SEASON_WEEKS, shock, reps=args.reps)
                     rows.append(
@@ -64,16 +65,17 @@ def main(argv=None) -> int:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     head = (
         f"# Protocol {PROTOCOL_VERSION} simulation ({stamp})\n\n"
-        f"Rule: SPRT H0 mean EV 0 vs H1 +{MU1:.2f}, assumed spread {SIGMA}, alpha {ALPHA} per arm, "
+        f"Rule: SPRT on WEEKLY mean line value, H0 mean EV 0 vs H1 +{MU1:.2f}; a week of n bets has assumed "
+        f"variance {SIGMA_WEEK}^2 + {SIGMA}^2/n; alpha {ALPHA} per arm, "
         f"beta {BETA}; promote at LLR >= {UPPER:.3f}, stop at LLR <= {LOWER:.3f}; no decision before "
         f"{MIN_OBS} observations over {MIN_WEEKS}+ weeks; timeout at {MAX_OBS} or {SEASON_WEEKS} weeks. "
         f"{args.reps} simulated arms per world.\n\n"
-        "| bets/week | true spread | week shock | true mean EV | promote | stop | timeout | mean bets | mean weeks |\n"
+        "| bets/week | true spread | true week move | true mean EV | promote | stop | timeout | mean bets | mean weeks |\n"
         "|---|---|---|---|---|---|---|---|---|\n"
     )
     body = "".join(
         f"| {r['per_week']} | {r['true_sd']} | {r['week_shock_sd']} | {r['true_mean_ev']:+.2f} | {r['promote']:.4f} | "
-        f"{r['stop']:.4f} | {r['timeout']:.4f} | {r['mean_obs']:.0f} | {r['mean_weeks']:.1f} |\n"
+        f"{r['stop']:.4f} | {r['timeout']:.4f} | {r['mean_bets']:.0f} | {r['mean_weeks']:.1f} |\n"
         for r in rows
     )
     outdir = ROOT / args.out

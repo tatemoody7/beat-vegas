@@ -10,7 +10,9 @@ wrong hemisphere.
 Audited against the live database on 2026-09-13: 720 venues used by 2023-26
 games, lat 21.29 to 53.34, lon -157.82 to -0.28, every extreme legitimate
 (Aloha Stadium Honolulu, Aviva Dublin, Wembley London), zero swaps. This module
-exists so that stays true rather than being rechecked by hand.
+exists so that stays true rather than being rechecked by hand. The 2013-2026
+observed-weather backfill (2026-10-08) met two real Sydney venues outside the
+bounds; they are allow-listed in VERIFIED_VENUES with their checked coordinates.
 """
 
 from __future__ import annotations
@@ -21,6 +23,18 @@ from typing import Dict, Iterable, List, Optional, Tuple
 # neutral site. A swapped US pair lands near lat -87, far outside this.
 PLAUSIBLE_LAT = (18.0, 62.0)
 PLAUSIBLE_LON = (-180.0, 15.0)
+
+# Real venues OUTSIDE those bounds, each checked against its published
+# coordinates before it was added (Tate's call, 2026-10-08). A listed venue
+# passes only while its stored pair still sits within VERIFIED_TOLERANCE_DEG of
+# the checked one, so a later swap or re-geocode of the same id is still caught.
+VERIFIED_VENUES: Dict[int, Tuple[str, float, float]] = {
+    # Stadium Australia, Sydney Olympic Park: 2016 Hawai'i vs California.
+    5221: ("ANZ Stadium, Sydney", -33.84722, 151.06306),
+    # Sydney Football Stadium (1988), Moore Park: 2017 Rice vs Stanford.
+    5363: ("Allianz Stadium, Sydney", -33.88917, 151.22528),
+}
+VERIFIED_TOLERANCE_DEG = 0.01
 
 
 def coord_problems(venues: Iterable[Dict]) -> List[Tuple[int, str]]:
@@ -36,6 +50,15 @@ def coord_problems(venues: Iterable[Dict]) -> List[Tuple[int, str]]:
         vid = v.get("id")
         if lat is None or lon is None:
             out.append((vid, "missing"))
+            continue
+        if vid in VERIFIED_VENUES:
+            name, vlat, vlon = VERIFIED_VENUES[vid]
+            if (
+                abs(lat - vlat) <= VERIFIED_TOLERANCE_DEG
+                and abs(lon - vlon) <= VERIFIED_TOLERANCE_DEG
+            ):
+                continue
+            out.append((vid, f"does not match the verified location of {name}: {lat}, {lon}"))
             continue
         if looks_swapped(lat, lon):
             # Report this first and by name: it is the failure this module exists

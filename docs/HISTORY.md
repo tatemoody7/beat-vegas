@@ -24,6 +24,11 @@ hold the rest.
     UTC days a full ERA5 pass needs.
   - **Checked:** the CFBD Starter Pack has no weather at all; CFBD's endpoint covered 60 of 60 and
     54 of 54 probed games; one live ERA5 call returned every variable for a 2016 game.
+  - **First dispatch (run 37780538551):** CFBD staged 9,917 of 10,097 games. ERA5 was refused by
+    the coordinate guard on two real Sydney venues: ANZ Stadium (2016 Hawai'i vs California) and
+    Allianz Stadium (2017 Rice vs Stanford). Tate's call: allow-list both at their published
+    coordinates (`etl/venues.py::VERIFIED_VENUES`, ±0.01°); the guard stays strict for every other
+    venue.
 
 - **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
   research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and

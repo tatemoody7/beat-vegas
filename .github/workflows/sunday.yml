@@ -155,9 +155,11 @@ jobs:
         # us_ex adds Kalshi / Novig / ProphetX / BetOpenly (CFTC exchanges, ~0 vig):
         # legal in FL but no 1H totals, so they are a PRICE-COMPARISON source
         # only — they sharpen the market fair price Hard Rock is judged against.
-        # +2 credits per run here only (the region multiplies BOTH markets;
-        # 3 slots/wk ~= +26/mo worst case); the 1H
-        # sweeps stay us,us2 (Hard Rock is in us2; no exchange 1H lines).
+        # The region multiplies every market: totals,spreads,h2h (the default
+        # since 2026-10-07, roadmap step 4) x us,us2,us_ex = 9 credits a run
+        # (3 slots/wk worst case ~= 27). The card-day refresh and the close
+        # ticks carry us_ex too since that date; the 1H sweeps stay us,us2
+        # (Hard Rock is in us2; no exchange 1H lines).
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
         id: pace

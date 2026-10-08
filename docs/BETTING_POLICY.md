@@ -218,8 +218,10 @@ after a minute, so they fired only when the laptop happened to be awake —
 `web/lib/boardHealth.ts` surfaces a stale-results banner and a missed-build
 banner, and GitHub emails failed runs.
 
-Odds API: ~567 credits a week expected (`lines_watch.yml` header), comfortably
-inside the **100K/month** tier the project has been on since 2026-09-06.
+Odds API: ~3,300 credits a month expected since the 2026-10-07 side-market
+capture (`lines_watch.yml` header: ~567 a week for the first half and the
+full-game totals, plus ~200 a week for spreads, moneylines and the exchanges),
+comfortably inside the **20K/month** plan the project has been on since 2026-10-05.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |

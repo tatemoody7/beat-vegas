@@ -279,11 +279,18 @@ class OddsSnapshot(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     book = Column(String)
-    market = Column(String)  # '1H_total' | 'full_game_total'
-    line = Column(Float)  # the total for this market
-    spread = Column(Float)  # home-relative spread (full_game rows)
-    over_price = Column(Integer)
+    # '1H_total' | 'full_game_total' | 'full_game_spread' | 'full_game_ml'
+    # (the last two since 2026-10-07, roadmap step 4; every reader filters on it)
+    market = Column(String)
+    # The total for a totals market; the HOME point for 'full_game_spread'
+    # (negative = home favoured); NULL for 'full_game_ml'.
+    line = Column(Float)
+    spread = Column(Float)  # home-relative spread (full_game_total rows)
+    over_price = Column(Integer)  # totals markets only
     under_price = Column(Integer)
+    # Side markets ('full_game_spread', 'full_game_ml'): each team's price.
+    home_price = Column(Integer)
+    away_price = Column(Integer)
     captured_at = Column(DateTime, index=True)
     # Snapshots are written on CHANGE only, so a pre-kick poll that finds the
     # number unchanged leaves no row; it stamps the moment it re-confirmed this

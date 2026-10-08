@@ -652,6 +652,8 @@ CREATE TABLE public.odds_snapshots (
     spread double precision,
     over_price integer,
     under_price integer,
+    home_price integer,
+    away_price integer,
     captured_at timestamp without time zone,
     last_seen_at timestamp without time zone
 );

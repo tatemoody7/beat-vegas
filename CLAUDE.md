@@ -77,7 +77,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Open items (the only place pending work lives; date each)
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
-  spreads + moneylines and one team-total probe → literature looks (citations verified; Tate picks
+  spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
+  `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
+  probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (citations verified; Tate picks
   the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
@@ -128,7 +130,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade, run by GitHub Actions.
   Nothing runs on the Mac on a schedule and nothing texts Tate; the board is the failure surface.
   Data: CFBD (games, PBP, SP+, talent, returning production), The Odds API (`totals_h1` per
-  event, full-game bulk), TeamRankings tempo, Open-Meteo weather, Rotowire injuries, ESPN scores.
+  event; full-game bulk totals + spreads + moneylines), TeamRankings tempo, Open-Meteo weather,
+  Rotowire injuries, ESPN scores.
 - **DB**: SQLAlchemy (`beatvegas/db/models.py`, `_MIGRATIONS` + `_DATA_MIGRATIONS` in
   `db/store.py`). `DATABASE_URL` → Neon Postgres (psycopg3); unset → `data/beatvegas.db`. A
   schema change is Python first, `migrate.yml`, then the new columns **hand-added** to the
@@ -159,7 +162,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | File | Trigger | Writes |
 |---|---|---|
 | `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks`, `challenger_picks` (`NEGGAP_COLLECT=1`, `FG_COLLECT=1`), preview |
-| `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H) |
+| `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; input hist | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |

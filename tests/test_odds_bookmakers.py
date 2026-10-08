@@ -100,13 +100,16 @@ def test_the_historical_endpoint_takes_the_same_cheap_path(monkeypatch, sent):
 
 @pytest.mark.parametrize("books", [TEN, []])
 def test_the_bulk_full_game_pull_always_prices_by_region(monkeypatch, sent, books):
-    """The bulk endpoint is billed (markets x regions) for the WHOLE slate — 4
-    credits, or 6 with the exchanges — and the Sunday capture needs `us_ex` for
-    the exchange fair price. Naming books here would cap the slate at those ten
-    and save nothing, so it must never inherit the per-event scope."""
+    """The bulk endpoint is billed (markets x regions) for the WHOLE slate — 9
+    credits for the default three markets with the exchanges — and every pull
+    needs `us_ex` for the exchange fair price. Naming books here would cap the
+    slate at those ten and save nothing, so it must never inherit the
+    per-event scope. The default markets carry the spread and the moneyline
+    (roadmap step 4, 2026-10-07)."""
     c = _client(monkeypatch, books)
     c.list_full_game_odds(regions="us,us2,us_ex")
     assert sent[0]["regions"] == "us,us2,us_ex"
+    assert sent[0]["markets"] == "totals,spreads,h2h"
     assert "bookmakers" not in sent[0]
 
 

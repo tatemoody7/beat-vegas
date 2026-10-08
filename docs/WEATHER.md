@@ -213,7 +213,11 @@ cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
     in its registry row, not baked into the data.
   - Temperature, humidity, dew point, wind, gusts, direction, and the hour's
     precipitation.
-  - One call per game, one quota unit each, so a full pass spans two UTC days.
+  - One call per venue-season, each game sliced from it.
+    - The first full run (2026-10-08) made one call per game. GitHub's shared runners are
+      throttled per request, so it managed about 2.6 games a minute and was cut off at its
+      350-minute limit with 925 games staged.
+    - An 86-day venue-season call returns in under a second.
   - Domes are skipped, and games newer than six days wait for the archive.
   - Checked live on 2026-10-08 against a 2016 game: every variable populated.
 - **CFBD.** One reading per game, as reported (provider unnamed, whole-number

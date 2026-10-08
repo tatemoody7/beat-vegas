@@ -172,6 +172,12 @@ false-positive budget Tate approved on 2026-10-06 (split set in its own registry
 |---|---|---|---|---|---|---|---|---|
 | CONS-DEV | How much does line value at the wager's exact terms vary per bet, and how often is there no reading, on the 2026 development rows? | exploratory | consensus-measurement (no confirmatory alpha) | Every graded manual_picks and challenger_picks row on file 2026-10-07 (all development evidence, docs/ROADMAP_2026.md); engine cv1, table hp1 | 126 graded rows; 59 with a reading | 1 | None: counts, means and standard deviations only, read once to size the Statistical Protocol's simulation; no arm, gate, model or stake changes from it. | `docs/CONSENSUS.md` (study.yml run 37703161461) |
 
+## The week-shock measurement (2026-10-07, before the protocol freezes)
+
+| id | question | status | family | data (seasons, cut) | n | comparisons run | pass criterion (pre-registered) | result doc |
+|---|---|---|---|---|---|---|---|---|
+| WEEK-SHOCK | How much of line value per bet is shared by every bet in the same week (a market-wide Saturday move), against the part unique to each game? | exploratory | protocol-sizing (no confirmatory alpha) | 2023-25 FBS-vs-FBS games with a real first-half (and full-game) opener and close on file, and 2026 weeks 1-6; for each game a standard bet -- the under at the median opening line of the counted books, priced -110 -- read by the consensus engine (cv1) against the close | games and weeks stated by the report | 1 | None: a one-way random-effects split of EV into week and game components (method of moments, weeks resampled for an interval), read once to size the Statistical Protocol; no arm, gate, model or stake changes from it. | `docs/PROTOCOL_2026.md` (PR 1) |
+
 ## How to add a row
 
 1. Write the row — question, data, the exact criterion — and commit it.

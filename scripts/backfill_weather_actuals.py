@@ -4,6 +4,8 @@
     python scripts/backfill_weather_actuals.py --start 2013 --end 2026 --sources era5,cfbd
     python scripts/backfill_weather_actuals.py --check     # sanity + ERA5-vs-CFBD agreement
     python scripts/backfill_weather_actuals.py --promote   # staging file -> weather_actuals
+    python scripts/backfill_weather_actuals.py --write-plan plan.json   # DB -> plan (workflow)
+    python scripts/backfill_weather_actuals.py --plan plan.json         # fetch, no DB (workflow)
 
 A STUDY TABLE, NOT A MODEL INPUT (Tate's calls, 2026-10-08, roadmap v1.3): the data
 behind the Salaga & Howley history look (docs/LITERATURE.md) -- wind and rain
@@ -264,6 +266,28 @@ def _plan(start: int, end: int):
     return plan, venues
 
 
+def dump_plan(plan, venues) -> str:
+    """The plan as JSON, so the fetch can run with NO database access (the
+    workflow's fetch job holds no DATABASE_URL and sits outside neon-writers)."""
+    return json.dumps(
+        {
+            "games": {str(g): [s, k.isoformat(), v] for g, (s, k, v) in plan.items()},
+            "venues": {str(v): d for v, d in venues.items()},
+        }
+    )
+
+
+def load_plan(text: str):
+    """Inverse of dump_plan: ({game_id: (season, kickoff, venue_id)}, venues)."""
+    d = json.loads(text)
+    plan = {
+        int(g): (int(s), datetime.fromisoformat(k), None if v is None else int(v))
+        for g, (s, k, v) in d["games"].items()
+    }
+    venues = {int(v): x for v, x in d["venues"].items()}
+    return plan, venues
+
+
 def _load_done() -> set:
     if not DONE.exists():
         return set()
@@ -456,6 +480,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--limit", type=int, help="era5: stop after N games (smoke test)")
     ap.add_argument("--check", action="store_true", help="sanity + agreement on the staging file")
     ap.add_argument("--promote", action="store_true", help="staging file -> weather_actuals")
+    ap.add_argument(
+        "--write-plan", metavar="PATH", help="read games + venues from the database, write a plan"
+    )
+    ap.add_argument(
+        "--plan", metavar="PATH", help="fetch from a plan file: no database access at all"
+    )
     args = ap.parse_args(argv)
     keys = [k.strip() for k in args.sources.split(",") if k.strip()]
     unknown = [k for k in keys if k not in SOURCES]
@@ -470,15 +500,26 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"  [problem] {p}")
         return 1 if problems or not summary["rows"] else 0
 
-    from beatvegas.db.store import try_init_db
+    STAGING.parent.mkdir(parents=True, exist_ok=True)
+    if args.promote or not args.plan:
+        from beatvegas.db.store import try_init_db
 
-    if not try_init_db():
-        return 1
+        if not try_init_db():
+            return 1
     if args.promote:
         promote(sources)
         return 0
-    STAGING.parent.mkdir(parents=True, exist_ok=True)
-    plan, venues = _plan(args.start, args.end)
+    if args.plan:
+        # The fetch job: no database connection and no init_db (whose id-sequence
+        # resync is a WRITE), so it can run outside neon-writers for hours.
+        plan, venues = load_plan(Path(args.plan).read_text())
+    else:
+        plan, venues = _plan(args.start, args.end)
+        if args.write_plan:
+            Path(args.write_plan).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.write_plan).write_text(dump_plan(plan, venues))
+            print(f"wrote a plan of {len(plan)} games to {args.write_plan}")
+            return 0
     print(f"{len(plan)} played FBS-vs-FBS games in {args.start}-{args.end}")
     done = _load_done()
     if "cfbd" in keys:

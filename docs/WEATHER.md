@@ -223,9 +223,13 @@ cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
 - **CFBD.** One reading per game, as reported (provider unnamed, whole-number
   wind), at `hour_offset` 0, two calls a season. Probed 2026-10-08: 60 of 60 rows
   (2016 week 10) and 54 of 54 (2019 week 12), with every numeric present.
-- **Running it.** `weather_actuals.yml` (dispatch): fetch to a staging file, run
-  `--check` (out-of-range values, gust below wind), then promote. The staging file
-  is cached between runs, so the second UTC day's dispatch resumes.
+- **Running it.** `weather_actuals.yml` (dispatch) has three jobs, so the hours of
+  fetching never hold the Neon-writer queue:
+  - **plan** (in `neon-writers`, seconds): reads games and venues and writes a plan file.
+  - **fetch** (no `DATABASE_URL`, outside the queue): ERA5 and CFBD into a staging file.
+  - **promote** (in `neon-writers`, minutes): runs `--check` (out-of-range values, gust below
+    wind), then writes. It also runs after a fetch cut off at its limit.
+  - The staging file is cached between runs, so a re-dispatch resumes.
 - **These rows are never decision-safe** and never a model input. A
   forecast-based weather arm (the tracked candidate in roadmap v1.3) reads
   `weather_obs` leads 24/72 instead.

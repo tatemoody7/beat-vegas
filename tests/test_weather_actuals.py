@@ -318,3 +318,30 @@ def test_a_truncated_final_staging_line_is_skipped_but_damage_elsewhere_raises(W
     assert len(W.parse_staging(good + "\n\n" + good + "\n")) == 2
     with pytest.raises(json.JSONDecodeError):
         W.parse_staging(good[:20] + "\n" + good)
+
+
+def test_the_plan_round_trips_and_the_plan_fetch_never_touches_the_database(
+    W, monkeypatch, tmp_path
+):
+    """The workflow's fetch job has no DATABASE_URL: `--plan` must run without
+    init_db (whose id-sequence resync is a write) and without any query."""
+    import beatvegas.db.store as store
+
+    plan = {7: (2016, datetime(2016, 9, 3, 16, 30), 1), 8: (2016, datetime(2016, 9, 3, 19), None)}
+    venues = {1: {"dome": False, "lat": 30.6, "lon": -96.3, "name": "Kyle Field"}}
+    assert W.load_plan(W.dump_plan(plan, venues)) == (plan, venues)
+
+    path = tmp_path / "plan.json"
+    path.write_text(W.dump_plan(plan, venues))
+    monkeypatch.setattr(store, "try_init_db", lambda *a, **k: pytest.fail("init_db called"))
+    monkeypatch.setattr(store, "session_scope", lambda *a, **k: pytest.fail("database opened"))
+    monkeypatch.setattr(W, "_plan", lambda *a, **k: pytest.fail("_plan called"))
+    seen = {}
+
+    def fake_era5(p, v, done, limit):
+        seen["plan"], seen["venues"] = p, v
+        return 0
+
+    monkeypatch.setattr(W, "fetch_era5", fake_era5)
+    assert W.main(["--sources", "era5", "--plan", str(path)]) == 0
+    assert seen == {"plan": plan, "venues": venues}

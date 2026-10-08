@@ -6,6 +6,7 @@ import { boardUniverse, getBoard, type BoardRow } from "@/lib/board";
 import { cache } from "react";
 import {
   edgeScore,
+  withBetOpening,
   type EdgeContext,
   type EdgeInput,
   type EdgeResult,
@@ -432,13 +433,21 @@ export function assignBoardRanks(games: HomeGame[]): HomeGame[] {
  * Games already bet (`held`) keep their slot ahead of new arrivals; the rest
  * follow by gap desc, then Hard Rock's price, then kickoff. Rank > cap marks
  * overCap: every gate passed, paper only. Non-BETs get capRank null.
+ *
+ * `weekBetIds`: the games this week's cap-counting real tickets sit on. One on
+ * a game that is NOT ranked here (kicked off, or no longer a BET) still holds a
+ * slot, so ranks start after them -- card.py's prior_bet_game_ids. A BET inside
+ * the cap reads "Bet one unit: …"; past it, "Paper signal: …" (roadmap v1.4).
  */
 export function assignCapRanks(
   games: HomeGame[],
   held: Set<number>,
   cap: number = WEEKLY_BET_CAP,
+  weekBetIds: Set<number> = new Set(),
 ): HomeGame[] {
   const bets = games.filter((g) => g.edge.tier === "BET" && !g.kickedOff);
+  const rankedIds = new Set(bets.map((g) => g.row.gameId));
+  const used = [...weekBetIds].filter((id) => !rankedIds.has(id)).length;
   const ms = (g: HomeGame): number => {
     const t = asDate(g.row.startDate);
     return t === null ? Number.POSITIVE_INFINITY : t.getTime();
@@ -453,10 +462,17 @@ export function assignCapRanks(
       ms(a) - ms(b) ||
       a.row.away.localeCompare(b.row.away),
   );
-  const rank = new Map(ranked.map((g, i) => [g.row.gameId, i + 1]));
+  const rank = new Map(ranked.map((g, i) => [g.row.gameId, used + i + 1]));
   return games.map((g) => {
     const r = rank.get(g.row.gameId) ?? null;
-    return { ...g, capRank: r, overCap: r !== null && r > cap };
+    const overCap = r !== null && r > cap;
+    if (r === null) return { ...g, capRank: r, overCap };
+    return {
+      ...g,
+      capRank: r,
+      overCap,
+      edge: { ...g.edge, action: withBetOpening(g.edge.action, !overCap) },
+    };
   });
 }
 
@@ -631,8 +647,14 @@ export async function getHomeBoard(
   const heldIds = new Set(
     [...pickedGames].filter((g): g is number => g !== null),
   );
+  const weekBetIds = new Set(
+    picks
+      .filter((p) => countsAgainstCap(p) && p.week === week)
+      .map((p) => p.gameId)
+      .filter((g): g is number => g !== null),
+  );
   const sorted = assignBoardRanks(
-    assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP),
+    assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP, weekBetIds),
   );
   const weekPicks: WeekPick[] = real1H
     .filter((p) => p.week === week)

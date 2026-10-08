@@ -39,6 +39,8 @@ type Raw = {
   price_provenance?: string | null;
   clv: number | null;
   clv_prob?: number | null;
+  ev_cons?: number | null;
+  cons_excluded?: string | null;
   verdict_at_pick?: string | null;
   reason?: string | null;
   gap_at_pick?: number | null;
@@ -85,7 +87,8 @@ async function selectRows(season: number): Promise<Raw[]> {
              mp.closing_line, mp.closing_price,
              mp.closing_captured_at::text AS closing_captured_at,
              mp.price_provenance, mp.clv, mp.clv_prob,
-             mp.verdict_at_pick, mp.reason, mp.gap_at_pick, mp.hr_line_at_pick, mp.blocker
+             mp.verdict_at_pick, mp.reason, mp.gap_at_pick, mp.hr_line_at_pick, mp.blocker,
+             mp.ev_cons, mp.cons_excluded
       FROM manual_picks mp
       LEFT JOIN games g ON g.id = mp.game_id
       WHERE mp.season = ${season}
@@ -143,6 +146,8 @@ async function getBetLedgerUncached(season: number): Promise<LedgerRow[]> {
       priceProvenance: r.price_provenance ?? null,
       clv: r.clv,
       clvProb: r.clv_prob ?? null,
+      evCons: r.ev_cons ?? null,
+      consExcluded: r.cons_excluded ?? null,
       verdictAtPick: asVerdict(r.verdict_at_pick),
       reason: asReason(r.reason),
       gapAtPick: r.gap_at_pick ?? null,

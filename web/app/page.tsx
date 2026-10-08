@@ -105,8 +105,11 @@ export default async function BoardPage({
         aria-label="What this is"
       >
         Beat Vegas rates college football first-half unders, priced at Hard Rock
-        Bet.{authed ? " Green means a paper signal." : ""} Every result, losses
-        included, is on Results.{" "}
+        Bet.
+        {authed
+          ? " Green means bet, inside this week’s cap; past it, a paper signal."
+          : ""}{" "}
+        Every result, losses included, is on Results.{" "}
         <Link
           href="/how-it-works"
           className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"

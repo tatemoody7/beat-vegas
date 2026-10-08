@@ -16,16 +16,20 @@ export default function AnswerBar({
   answer: Answer;
   nextBuild: string | null;
 }) {
-  const { bets, open, closest, used, cap } = answer;
-  const placed = bets.length - open;
+  const { bets, open, paperOpen, closest, used, cap } = answer;
+  const placed = bets.filter((b) => b.picked).length;
   const live = open > 0;
+  const left = Math.max(cap - used, 0);
   // What is left to decide leads. A week whose bets are all placed is not
-  // "no bets yet", and a placed ticket is not "live" — it is done.
+  // "no bets yet", and a placed ticket is not "live" — it is done. Inside the
+  // real-money cap a BET is a bet; past it, a paper signal (roadmap v1.4).
   const headline = live
-    ? `${open} paper ${open === 1 ? "signal" : "signals"} live`
-    : placed > 0
-      ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
-      : "No paper signals yet this week";
+    ? `${open} ${open === 1 ? "bet" : "bets"} live`
+    : paperOpen > 0
+      ? `${paperOpen} paper ${paperOpen === 1 ? "signal" : "signals"} live`
+      : placed > 0
+        ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
+        : "No bets yet this week";
 
   return (
     <div
@@ -40,7 +44,7 @@ export default function AnswerBar({
           {headline}
         </span>
         <span className="font-mono text-sm text-[var(--text-muted)]">
-          {`${used} of ${cap} bets this week`}
+          {`${used} of ${cap} bets placed — ${left === 0 ? "none" : left} left this week`}
         </span>
       </div>
 
@@ -64,6 +68,9 @@ export default function AnswerBar({
               </span>
               {b.picked && (
                 <span className="bv-badge bv-badge--push">bet logged</span>
+              )}
+              {!b.picked && b.paper && (
+                <span className="bv-badge bv-badge--push">paper signal</span>
               )}
             </li>
           ))}

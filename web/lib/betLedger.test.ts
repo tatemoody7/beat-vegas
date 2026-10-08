@@ -7,6 +7,7 @@ import {
   hoursBeforeKickoff,
   ledgerSummary,
   rowsFor,
+  consensusCell,
   sortNewestFirst,
   withRunningUnits,
   type LedgerRow,
@@ -50,6 +51,8 @@ function row(over: Partial<LedgerRow> = {}): LedgerRow {
     gapAtPick: 3.45,
     hrLineAtPick: 26.5,
     blocker: null,
+    evCons: 0.021,
+    consExcluded: null,
     ...over,
   };
 }
@@ -219,5 +222,15 @@ describe("bet_at: when the ticket was written (2026-09-28)", () => {
     expect(csv.split("\n")[1]).toContain(
       "2026-09-18T20:12:00.000Z,2026-09-25T20:16:00.000Z,2026-09-19T19:30:00.000Z",
     );
+  });
+});
+
+describe("consensusCell", () => {
+  it("prints ev_cons as a signed percent, and a dash without a reading", () => {
+    expect(consensusCell(0.021)).toBe("+2.1%");
+    expect(consensusCell(-0.0549)).toBe("-5.5%");
+    expect(consensusCell(0)).toBe("0.0%");
+    expect(consensusCell(null)).toBe("—");
+    expect(row().evCons).toBe(0.021);
   });
 });

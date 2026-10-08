@@ -9,6 +9,24 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (REAL MONEY RESUMES AS A PERSONAL LEDGER; ROADMAP v1.4).** Tate kept the 7 paper
+  arms as planned and resumed real-money first-half unders beside them.
+  - **What is bet:** the old rule (BET at the per-slate bar, the top 5 a week by gap, every
+    money-path check), $10 flat.
+  - **Never evidence:** the protocol reads only an arm's own paper picks, so no real ticket is an
+    observation, and every real bet has its paper twin.
+  - **No stop rule**, to season end. A promotion's $10 live validation stays a separate track.
+  - **The switch:** `rule_paused` set off at 20:00 UTC (it had been on since 2026-10-07 21:40 UTC).
+    Tickets 102 and 103 hold 2 of week 6's 5 slots.
+  - **The site:**
+    - The banner names both tracks.
+    - Signed in, a BET inside the cap reads "Bet one unit", past it "Paper signal" (the cap now
+      also counts tickets on games that kicked off, mirroring `card.py`'s `prior_bet_game_ids`).
+    - The answer bar reads "U of 5 bets placed — L left this week".
+    - A visitor never sees bet wording (`signalGate.gateGame`).
+    - Results shows line value vs the consensus close (`ev_cons`) per ticket.
+  - **The card build:** `card.py`'s BET sentence is "Bet one unit" again.
+
 - **2026-10-08 (OBSERVED WEATHER FOR THE HISTORY LOOKS: `weather_actuals`).** Roadmap v1.3's
   Salaga look needs 2016-2025 observed weather; we held 2023+.
   - **Tate's calls:**

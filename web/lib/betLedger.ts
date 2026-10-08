@@ -47,6 +47,12 @@ export type LedgerRow = {
   /** Stored `closing - bet`: NEGATIVE is the good direction for an under. */
   clv: number | null;
   clvProb: number | null;
+  /** EV at the wager's exact terms against the vig-free consensus close
+   *  (docs/CONSENSUS.md, `ev_cons`): POSITIVE is good, 0.021 = +2.1%. Written
+   *  at grading, so it never exists before kickoff. */
+  evCons: number | null;
+  /** Why there is no consensus reading (`cons_excluded`), e.g. stale_close. */
+  consExcluded: string | null;
   verdictAtPick: Verdict | null;
   reason: PickReason | null;
   gapAtPick: number | null;
@@ -234,4 +240,11 @@ export function betsToCsv(season: number, rows: LedgerRow[]): string {
       .join(","),
   );
   return [BETS_CSV_HEADER, ...body].join("\n") + "\n";
+}
+
+/** `ev_cons` as a signed percent ("+2.1%"), or "—" when there is no reading. */
+export function consensusCell(ev: number | null): string {
+  if (ev === null || !Number.isFinite(ev)) return "—";
+  const pct = Math.round(ev * 1000) / 10;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
 }

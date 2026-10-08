@@ -507,8 +507,23 @@ export function sortGames(rows) {
   );
 }
 
-export function assignCapRanks(rows, held, cap = WEEKLY_BET_CAP) {
+// lib/edge.ts::withBetOpening (roadmap v1.4)
+export function withBetOpening(action, bet) {
+  const [from, to] = bet
+    ? ["Paper signal:", "Bet one unit:"]
+    : ["Bet one unit:", "Paper signal:"];
+  return action.startsWith(from) ? to + action.slice(from.length) : action;
+}
+
+export function assignCapRanks(
+  rows,
+  held,
+  cap = WEEKLY_BET_CAP,
+  weekBetIds = new Set(),
+) {
   const bets = rows.filter((r) => r.edge.tier === "BET" && !r.kickedOff);
+  const rankedIds = new Set(bets.map((r) => r.game.id));
+  const used = [...weekBetIds].filter((id) => !rankedIds.has(id)).length;
   const ranked = [...bets].sort(
     (a, b) =>
       Number(!held.has(a.game.id)) - Number(!held.has(b.game.id)) ||
@@ -519,10 +534,17 @@ export function assignCapRanks(rows, held, cap = WEEKLY_BET_CAP) {
       ms(a.game) - ms(b.game) ||
       a.game.away.localeCompare(b.game.away),
   );
-  const rank = new Map(ranked.map((r, i) => [r.game.id, i + 1]));
+  const rank = new Map(ranked.map((r, i) => [r.game.id, used + i + 1]));
   return rows.map((r) => {
     const cr = rank.get(r.game.id) ?? null;
-    return { ...r, capRank: cr, overCap: cr !== null && cr > cap };
+    const overCap = cr !== null && cr > cap;
+    if (cr === null) return { ...r, capRank: cr, overCap };
+    return {
+      ...r,
+      capRank: cr,
+      overCap,
+      edge: { ...r.edge, action: withBetOpening(r.edge.action, !overCap) },
+    };
   });
 }
 
@@ -700,7 +722,13 @@ export function buildExpected(week) {
       boardRank: null,
     };
   });
-  rows = assignCapRanks(sortGames(rows), pickedIds);
+  // real, non-bonus 1H tickets logged on this week: 900001 (see usedSlots)
+  rows = assignCapRanks(
+    sortGames(rows),
+    pickedIds,
+    WEEKLY_BET_CAP,
+    new Set([900001]),
+  );
   let n = 0;
   rows = rows.map((r) => (r.kickedOff ? r : { ...r, boardRank: ++n }));
 
@@ -732,6 +760,7 @@ export function buildExpected(week) {
       matchup: `${r.game.away} @ ${r.game.home}`,
       numbers: numbersOf(r),
       picked: r.picked,
+      paper: r.overCap,
     }));
   const closest = live
     .filter((r) => r.edge.tier !== "BET")
@@ -743,22 +772,27 @@ export function buildExpected(week) {
       numbers: numbersOf(r),
       needs: shortNeed(r.edge.action),
     }));
-  const open = answerBets.filter((b) => !b.picked).length;
-  const placed = answerBets.length - open;
+  const open = answerBets.filter((b) => !b.picked && !b.paper).length;
+  const paperOpen = answerBets.filter((b) => !b.picked && b.paper).length;
+  const placed = answerBets.filter((b) => b.picked).length;
   const usedSlots = 1; // real, non-bonus 1H tickets logged on this week: 900001
+  const left = Math.max(WEEKLY_BET_CAP - usedSlots, 0);
   const answer = {
     bets: answerBets,
     open,
+    paperOpen,
     closest,
     used: usedSlots,
     cap: WEEKLY_BET_CAP,
     headline:
       open > 0
-        ? `${open} paper ${open === 1 ? "signal" : "signals"} live`
-        : placed > 0
-          ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
-          : "No paper signals yet this week",
-    slotsLine: `${usedSlots} of ${WEEKLY_BET_CAP} bets this week`,
+        ? `${open} ${open === 1 ? "bet" : "bets"} live`
+        : paperOpen > 0
+          ? `${paperOpen} paper ${paperOpen === 1 ? "signal" : "signals"} live`
+          : placed > 0
+            ? `${placed} ${placed === 1 ? "bet" : "bets"} placed, nothing else live`
+            : "No bets yet this week",
+    slotsLine: `${usedSlots} of ${WEEKLY_BET_CAP} bets placed — ${left === 0 ? "none" : left} left this week`,
   };
 
   // --- the card (beatvegas/card.py::build_card), built ten minutes ago ---

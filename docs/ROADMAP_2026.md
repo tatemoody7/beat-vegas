@@ -30,7 +30,8 @@ edge exists.**
    inefficiencies (travel, top-10 hangover, rivalry, national-TV overs, full-game weather).
 3. **What 2026 tests:** up to 7 paper betting arms, each a pre-registered sequential test on CLV vs
    the vig-free consensus close, inside a 5% family-wise error budget; one-shot history looks for
-   literature hypotheses. Real money PAUSED until an arm is promoted.
+   literature hypotheses. Real money PAUSED until an arm is promoted (amended v1.4, 2026-10-08:
+   Tate's personal first-half-unders ledger resumes beside the research, never as evidence).
 4. **What we need:** the Statistical Protocol (written + simulated), the consensus fair-price engine
    (first build), multi-book spread + moneyline capture (now), a team-total probe, literature tags.
 5. **What would justify a business (all required):** promoted on CLV; real-money confirmation after
@@ -64,7 +65,9 @@ edge exists.**
   post-sample years = the clean extension and the verdict; pass → paper forward test only; fail →
   REJECTED unless the data was flawed.
 - **Real money paused now**; H-STOP-2 closed inconclusive (n 10 / 9); Tate does no personal betting
-  until a promotion; official plays system-only.
+  until a promotion; official plays system-only. **Amended v1.4 (2026-10-08):** Tate bets first-half
+  unders again as a personal ledger (the old rule, cap 5 by gap, $10 flat, no stop rule), never an
+  observation for any arm; a promotion's live validation stays a separate track.
 - **Publication:** signals private until the market closes; results after close + Monday report,
   pre-kickoff timestamps as proof. Site = research lab in public.
 - **Timestamps:** naive-UTC storage convention kept; new evidence tables also store the book's own
@@ -159,3 +162,4 @@ sweep printed against the plan.
 | v1.1 | 2026-10-07 | The consensus specified (`docs/CONSENSUS.md`): every centred book except Hard Rock and Fliff (exchanges count), multiplicative de-vig, the 2-hour close window for every market (the full-game capture's 3 hours does not apply to the judge), at least 3 books, at most 1.5 points of line conversion, first-half table built from 2013–25 games by the full-game-close proxy. "Rungs excluded (`is_hr_rung` logic)" is moot for the consensus: Hard Rock never counts. | Tate |
 | v1.2 | 2026-10-07 | The Statistical Protocol p1 (`docs/PROTOCOL_2026.md`, `H-PROGRAM-2026`): the observation is a completed WEEK's mean line value (WEEK-SHOCK measured the shared week move; the design assumes 0.02); spread 0.06 per bet; at least 30 readings over 3+ weeks; Hard Rock's price; the kill is the sequential LOWER bound and its label is NEEDS MORE EVIDENCE, not REJECTED (replacing "kill at the failure boundary (CLV clearly negative)"); timeout 200 readings or season end; "two seasons" = the unchanged rule passes again in 2027; the shadow engines leave the alpha budget (exploratory). | Tate |
 | v1.3 | 2026-10-08 | Literature verified (`docs/LITERATURE.md`). Six history looks approved, one look each on the years after the paper's sample, Holm-corrected at 5% across the six and outside the K = 10 ledger (a pass licenses a paper arm only, which then spends a ledger slot): Arscott full-game overs; Coleman eastbound visitor (definition frozen from his full text, once read); national-TV unders (ABC, CBS, NBC, FOX, ESPN; not ESPN2); Cox rivalry (trophy games, Wikipedia's list frozen at registration); Bennett holdover; Salaga weather unders (after an observed-weather backfill). Ledger: "team-total censoring" relabelled as Arscott's full-game overs; team totals and full-game weather added as tracked candidates with their next steps. | Tate |
+| v1.4 | 2026-10-08 | Real money resumes as Tate's personal first-half-unders ledger, beside the research: the old rule (BET at the per-slate bar, the top 5 a week by gap, every money-path check), $10 flat on $100, no stop rule to the season's end; never an observation for any arm (the protocol reads only an arm's paper picks); a promoted arm's $10 live validation is a fresh, separate track. The 7 paper arms, the protocol, the K = 10 ledger and the judge are unchanged. Site: banner names both tracks; signed in, a BET inside the cap reads "Bet one unit", past it "Paper signal"; a visitor never sees bet wording; Results shows line value vs the consensus close per ticket. Switch `rule_paused` off 2026-10-08 20:00 UTC. | Tate |

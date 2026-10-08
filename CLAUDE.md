@@ -3,9 +3,9 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1) governs 2026**: real money is
-paused and every strategy runs on paper, judged by line value against the de-vigged consensus
-close. It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1.4) governs 2026**: every
+strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
+first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
 automates gambling.** Site: https://beat-vegas.vercel.app — readable by anyone with the link,
 password guards writes.
@@ -17,8 +17,8 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.3): what is tested, how an edge is judged,
-  what is paused. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.4): what is tested, how an edge is judged,
+  what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
 - `docs/HISTORY.md` — what happened, by date (2026-05 → today). Read the top entry before touching
@@ -43,7 +43,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 
 ## Where we are (as of 2026-10-07)
-- **The reset (`docs/ROADMAP_2026.md`)**: real money PAUSED until a strategy passes a
+- **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
   vig-free median-of-books consensus close (newest snapshot ≤2 h before kickoff) — designed for +3%
   EV, inside a 5% family-wise budget held as a fixed ledger (K = 10 tests, 0.5% each, never
@@ -51,7 +51,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (bottom 20% of the slate), full-game unders, derivative consistency, early/stale lines, two open
   (team totals, literature passes); shadow engines sit outside the slots. Every confirmatory clock
   starts after the Statistical Protocol is registered; all earlier rows are development evidence.
-- **Real money ended 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
+- **Real money: Tate's personal first-half-unders ledger since 2026-10-08 (v1.4)** — the old rule
+  (BET at the per-slate bar, top 5 a week by gap, every money-path check), $10 flat, no stop rule,
+  never an observation for any arm; paused 2026-10-07 → 10-08. Signed in, a BET inside the cap
+  reads "Bet one unit", past it "Paper signal"; visitors never see bet wording.
+- **Real money stood 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
   placed 2026-10-06 before the pause (`manual_picks` 102, 103; they grade as normal). H-STOP-2
   closed inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73); H-NEGGAP-P, H-FG-P,
   H-PCT-TIE, H-TIMING and H-CLOSE-W superseded; H-MARGIN closed (Pick'em dropped). The existing
@@ -86,8 +90,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   totals and full-game weather tracked as candidates) → arms re-registered and live → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
-- **Real-money switch: ON since 2026-10-07** (Tate's call; written through Neon's HTTPS endpoint,
-  mirroring `scripts/rule_pause.py`): the site refuses every real ticket until a promotion.
+- **Real-money switch: OFF since 2026-10-08 20:00 UTC** (v1.4, Tate's call; written through Neon's
+  HTTPS endpoint, mirroring `scripts/rule_pause.py`; it was on 2026-10-07 → 10-08).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
   candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
@@ -212,8 +216,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)
-- **Paused 2026-10-07** (`docs/BETTING_POLICY.md`): built, working and frozen; it applies again only to
-  a strategy promoted under the roadmap.
+- **Live again for the personal ledger since 2026-10-08** (`docs/BETTING_POLICY.md`, v1.4; paused
+  2026-10-07 → 10-08); a promoted strategy's live validation will be its own track.
 - POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
   Hard Rock's own MAIN line, a **live** verifiable price seen ≤6 h ago (`lib/lineCheck.ts`; none →
   `PRICE UNAVAILABLE`, old → `PRICE STALE` + the form's Refresh price), a price at or better than the kill
@@ -261,8 +265,8 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   `bv-site-check` first.
 
 ## Honest status of the edge (don't oversell)
-- **Live evidence first.** Real money ended 10-10 (−0.29u) on 20 tickets, inside its Wilson
-  interval either way; H-STOP-2 (`docs/STOPPING_RULE.md`) closed inconclusive. From 2026-10-07 the
+- **Live evidence first.** Real money stood 10-10 (−0.29u) on 20 tickets when it paused, inside its
+  Wilson interval either way (the v1.4 personal ledger is never evidence); H-STOP-2 (`docs/STOPPING_RULE.md`) closed inconclusive. From 2026-10-07 the
   only judge is each arm's registered sequential test on line value against the consensus close;
   the site states every rate with its interval and labels the bankroll "modelled from the ledger,
   not reconciled". Line value against the close is the one edge measure that needs no proxy; it

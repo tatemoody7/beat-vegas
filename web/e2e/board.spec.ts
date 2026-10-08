@@ -34,7 +34,7 @@ test.describe("the board", () => {
     await page.goto("/");
     const strip = page.locator('p[aria-label="What this is"]');
     await expect(strip).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means a paper signal. Every result, losses included, is on Results. How it works →",
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet, inside this week’s cap; past it, a paper signal. Every result, losses included, is on Results. How it works →",
     );
     await expect(strip.getByRole("link")).toHaveAttribute(
       "href",
@@ -152,9 +152,13 @@ test.describe("the board", () => {
         `/game/${b.gameId}`,
       );
       await expect(li).toContainText(b.numbers);
-      await expect(li.locator(".bv-badge")).toHaveCount(b.picked ? 1 : 0);
+      await expect(li.locator(".bv-badge")).toHaveCount(
+        b.picked || b.paper ? 1 : 0,
+      );
       if (b.picked)
         await expect(li.locator(".bv-badge")).toHaveText("bet logged");
+      else if (b.paper)
+        await expect(li.locator(".bv-badge")).toHaveText("paper signal");
     }
     await expect(
       bar.getByRole("heading", { name: "Closest to a signal" }),

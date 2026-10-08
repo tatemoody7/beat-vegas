@@ -446,6 +446,40 @@ describe("assignCapRanks", () => {
     expect(by[5].overCap).toBe(true);
   });
 
+  it("a real ticket on a game no longer ranked still holds a slot (card.py prior_bet_game_ids)", () => {
+    // Two tickets this week on games that kicked off (or slipped from BET): the
+    // three open slots go to the top three remaining BETs by gap.
+    const games = [
+      bet(1, 3.0),
+      bet(2, 2.9),
+      bet(3, 2.8),
+      bet(4, 2.7),
+      bet(9, 4.0, { kickedOff: true }),
+    ];
+    const out = assignCapRanks(games, new Set([9]), 5, new Set([9, 10]));
+    const by = Object.fromEntries(out.map((g) => [g.row.gameId, g]));
+    expect([1, 2, 3, 4].map((id) => by[id].capRank)).toEqual([3, 4, 5, 6]);
+    expect(by[4].overCap).toBe(true);
+    expect(by[9].capRank).toBe(null);
+  });
+
+  it("inside the cap a BET reads 'Bet one unit'; past it, 'Paper signal' (roadmap v1.4)", () => {
+    const say = (id: number, gap: number) =>
+      bet(id, gap, {
+        edge: {
+          ...edge(70 + gap, "BET"),
+          action: "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
+        } as EdgeResult,
+      });
+    const out = assignCapRanks([say(1, 3.0), say(2, 2.0)], new Set(), 1);
+    expect(out[0].edge.action).toBe(
+      "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
+    );
+    expect(out[1].edge.action).toBe(
+      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
+    );
+  });
+
   it("kicked-off games are out of the ranking", () => {
     const out = assignCapRanks(
       [bet(1, 3.0, { kickedOff: true }), bet(2, 2.0)],

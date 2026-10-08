@@ -18,6 +18,9 @@ export type AnswerBet = {
   /** A real-money ticket is already logged on this game (HomeGame.picked):
    *  rendered muted and sorted below the open bets, because it is done. */
   picked: boolean;
+  /** Past the week's real-money cap (HomeGame.overCap): a paper signal, not a
+   *  bet (roadmap v1.4). */
+  paper: boolean;
 };
 
 export type AnswerNear = {
@@ -31,8 +34,10 @@ export type AnswerNear = {
 export type Answer = {
   /** Open (unplaced) bets first by rank, then the placed ones. */
   bets: AnswerBet[];
-  /** How many of `bets` are still open, i.e. decisions left to make. */
+  /** How many of `bets` are still open bets inside the cap: decisions left. */
   open: number;
+  /** Unplaced BETs past the cap: paper signals only. */
+  paperOpen: number;
   /** The best games that are not bets yet, best first. */
   closest: AnswerNear[];
   used: number;
@@ -97,8 +102,10 @@ export function buildAnswer(
       matchup: matchupOf(g),
       numbers: numbersOf(g),
       picked: g.picked,
+      paper: g.overCap === true,
     }));
-  const open = bets.filter((b) => !b.picked).length;
+  const open = bets.filter((b) => !b.picked && !b.paper).length;
+  const paperOpen = bets.filter((b) => !b.picked && b.paper).length;
 
   const closest = live
     .filter((g) => g.edge.tier !== "BET")
@@ -111,5 +118,5 @@ export function buildAnswer(
       needs: shortNeed(g.edge.action),
     }));
 
-  return { bets, open, closest, used, cap };
+  return { bets, open, paperOpen, closest, used, cap };
 }

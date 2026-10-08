@@ -70,6 +70,12 @@ test.describe("results", () => {
       strip.getByRole("link", { name: "Download every bet (CSV)" }),
     ).toHaveAttribute("href", `/api/bets?season=${week.season}`);
 
+    // Line value vs the consensus close sits beside every ticket (roadmap
+    // v1.4); the fixture's picks carry no ev_cons, so each cell reads "—".
+    await expect(
+      strip.getByRole("columnheader", { name: "vs consensus" }).first(),
+    ).toBeVisible();
+
     // One heading per week, newest first, each with its own record.
     const heads = strip.locator("h3.bv-day-head");
     await expect(heads).toHaveCount(2);

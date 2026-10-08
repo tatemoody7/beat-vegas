@@ -1,18 +1,21 @@
 import type { LedgerRow } from "@/lib/betLedger";
+import { withBetOpening } from "@/lib/edge";
 import type { HomeGame } from "@/lib/homeBoard";
 import type { RecordRow } from "@/lib/records";
 
-// The research season (docs/ROADMAP_2026.md, Tate 2026-10-07): real money is
-// paused, every strategy runs on paper, and a visitor sees a game's rating only
-// once the game has kicked off — results after the close, never a pre-kickoff
-// signal someone could mistake for a recommendation. The signed-in owner sees
-// everything, as before. Every public surface that carries a rating, our
+// The research season (docs/ROADMAP_2026.md, Tate 2026-10-07): every strategy
+// runs on paper, and a visitor sees a game's rating only once the game has
+// kicked off — results after the close, never a pre-kickoff signal someone
+// could mistake for a recommendation. Since roadmap v1.4 (2026-10-08) the
+// owner also bets first-half unders with real money, recorded separately; a
+// visitor still never reads bet wording ("Bet one unit" becomes "Paper signal").
+// The signed-in owner sees everything, as before. Every public surface that carries a rating, our
 // number, a gap or a paper pick passes through one of the three gates below,
 // server-side, before anything is rendered or serialised.
 
-/** The site-wide banner (Tate's wording, 2026-10-07). */
+/** The site-wide banner (Tate's wording, 2026-10-08, roadmap v1.4). */
 export const RESEARCH_BANNER =
-  "2026 is a research season. Real money is paused; every strategy runs on paper and is judged against the closing line. Ratings publish at kickoff.";
+  "2026 is a research season. Every strategy runs on paper and is judged against the closing line; the owner also bets first-half unders with real money, recorded separately. Ratings publish at kickoff.";
 
 /** What a visitor reads in place of the action line before kickoff. */
 export const HIDDEN_ACTION = "Rating publishes at kickoff.";
@@ -46,7 +49,15 @@ export function kickoffPassed(
  *  to bet — rating, rank, cap slot, our number, the gap, the kill line, the
  *  factor read and the "bet logged" chip. */
 export function gateGame(g: HomeGame, authed: boolean): HomeGame {
-  if (!hidesSignal(g.kickedOff, authed)) return g;
+  if (!hidesSignal(g.kickedOff, authed)) {
+    // A visitor after kickoff sees the rating, never bet wording: the
+    // owner's real bets are his, recorded separately (roadmap v1.4).
+    if (authed) return g;
+    return {
+      ...g,
+      edge: { ...g.edge, action: withBetOpening(g.edge.action, false) },
+    };
+  }
   return {
     ...g,
     signalHidden: true,

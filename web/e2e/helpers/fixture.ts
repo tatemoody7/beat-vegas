@@ -147,8 +147,10 @@ export type Expected = {
       matchup: string;
       numbers: string;
       picked: boolean;
+      paper: boolean;
     }[];
     open: number;
+    paperOpen: number;
     closest: {
       gameId: number;
       matchup: string;

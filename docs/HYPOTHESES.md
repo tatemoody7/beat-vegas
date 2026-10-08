@@ -31,6 +31,8 @@ added here, one per row, in the PR that registers the arm.
   model-promotion test).
 - Superseded 2026-10-07, observations kept as development evidence: `H-PCT-TIE`, `H-NEGGAP-P`,
   `H-FG-P`, `H-STOP-2`, `H-TIMING`, `H-CLOSE-W`.
+- Not a test, no alpha: Tate's personal real-money first-half-unders ledger (roadmap v1.4,
+  2026-10-08). Its tickets are never an observation for any arm; each has a paper twin.
 
 ## Vocabulary
 

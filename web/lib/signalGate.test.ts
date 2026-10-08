@@ -78,11 +78,29 @@ describe("gateGame", () => {
     expect(g.row.bvLine).toBeNull();
     expect(g.row.factors.factor_board).toEqual([]);
   });
-  it("passes the owner's game and any kicked-off game through untouched", () => {
+  it("passes the owner's game through untouched; a kicked-off game keeps its rating", () => {
     const pre = game(false);
     expect(gateGame(pre, true)).toBe(pre);
     const post = game(true);
-    expect(gateGame(post, false)).toBe(post);
+    expect(gateGame(post, false)).toEqual(post);
+  });
+
+  it("never shows a visitor bet wording (roadmap v1.4)", () => {
+    const post = game(true);
+    const bet = {
+      ...post,
+      edge: {
+        ...post.edge,
+        action: "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
+      },
+    };
+    expect(gateGame(bet, false).edge.action).toBe(
+      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
+    );
+    expect(gateGame(bet, true).edge.action).toBe(bet.edge.action);
+    expect(gateGame({ ...bet, kickedOff: false }, false).edge.action).toBe(
+      HIDDEN_ACTION,
+    );
   });
 });
 

@@ -256,13 +256,16 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   }
 
   // --- Action ---------------------------------------------------------------
+  // A BET's sentence opens with PAPER_ACTION here; homeBoard.assignCapRanks
+  // swaps in BET_ACTION for the BETs inside the week's real-money cap (roadmap
+  // v1.4), and signalGate swaps it back for a visitor.
   // One plain sentence saying what to do, and for anything that is not a bet
   // yet, the number or price that would make it one (spec §13). "Wait" became
   // "Not yet" so the sentence names a condition rather than an instruction.
   let action: string;
   if (tier === "BET") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
-    action = `Paper signal: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
+    action = `${PAPER_ACTION} first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (!hasModel) {
     action = pricePos
       ? `Pass: no model number yet. Hard Rock pays about ${fmt((i.ev ?? 0) * 100)}% more than the market on this under, but a price alone is not a signal.`
@@ -312,4 +315,20 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   }
 
   return { score, tier, blocker, action, kill, gap, lineBasis, verdict };
+}
+
+/**
+ * The two openings of a BET's action sentence (roadmap v1.4, Tate 2026-10-08):
+ * a BET inside the week's real-money cap is a bet; past the cap, or in a
+ * visitor's view, the same pick is a paper signal. Mirrored by beatvegas/card.py.
+ */
+export const BET_ACTION = "Bet one unit:";
+export const PAPER_ACTION = "Paper signal:";
+
+/** Pure: the same sentence with the opening that fits (`bet` = inside the cap). */
+export function withBetOpening(action: string, bet: boolean): string {
+  const [from, to] = bet
+    ? [PAPER_ACTION, BET_ACTION]
+    : [BET_ACTION, PAPER_ACTION];
+  return action.startsWith(from) ? to + action.slice(from.length) : action;
 }

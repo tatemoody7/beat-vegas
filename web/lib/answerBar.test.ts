@@ -41,6 +41,7 @@ function game(o: {
   picked?: boolean;
   kickedOff?: boolean;
   action?: string;
+  overCap?: boolean;
 }): HomeGame {
   return {
     row: { gameId: o.id, away: `A${o.id}`, home: `H${o.id}` },
@@ -52,6 +53,7 @@ function game(o: {
     boardRank: o.rank,
     picked: o.picked ?? false,
     kickedOff: o.kickedOff ?? false,
+    overCap: o.overCap ?? false,
   } as unknown as HomeGame;
 }
 
@@ -89,5 +91,23 @@ describe("buildAnswer — placed bets are marked and sorted below open ones", ()
     );
     expect(a.bets).toEqual([]);
     expect(a.open).toBe(0);
+  });
+});
+
+describe("buildAnswer — the real-money cap (roadmap v1.4)", () => {
+  it("counts only unplaced BETs inside the cap as open; past the cap is paper", () => {
+    const a = buildAnswer(
+      [
+        game({ id: 1, tier: "BET", rank: 1, picked: true }),
+        game({ id: 2, tier: "BET", rank: 2 }),
+        game({ id: 3, tier: "BET", rank: 3, overCap: true }),
+      ],
+      4,
+      5,
+    );
+    expect(a.open).toBe(1);
+    expect(a.paperOpen).toBe(1);
+    expect(a.bets.find((b) => b.gameId === 3)?.paper).toBe(true);
+    expect(a.bets.find((b) => b.gameId === 2)?.paper).toBe(false);
   });
 });

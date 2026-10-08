@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { americanToDecimal, devigTwoWay, evUnder } from "./devig";
 import {
+  BET_ACTION,
   FAIR_EV_FLOOR,
+  PAPER_ACTION,
   breakEvenPrice,
   contextScore,
   edgeScore,
   roundHalfUp,
+  withBetOpening,
   type EdgeInput,
 } from "./edge";
 import { round2 } from "./format";
@@ -788,5 +791,22 @@ describe("H-PCT: the kill line and the score scale with the slate bar", () => {
     ).toBe(70);
     expect(edgeScore({ ...input, bar: 3.5 }).score).toBeLessThan(70);
     expect(edgeScore({ ...input }).score).toBe(84); // the fallback bar: 50 + 20/1.75 * 3, floored
+  });
+});
+
+describe("withBetOpening (roadmap v1.4)", () => {
+  it("swaps only the opening of a BET sentence", () => {
+    const paper = "Paper signal: first-half under 24.5 at -110 on Hard Rock.";
+    const bet = "Bet one unit: first-half under 24.5 at -110 on Hard Rock.";
+    expect(withBetOpening(paper, true)).toBe(bet);
+    expect(withBetOpening(bet, false)).toBe(paper);
+    expect(withBetOpening(paper, false)).toBe(paper);
+    expect(withBetOpening("Not yet — needs -110 or better.", true)).toBe(
+      "Not yet — needs -110 or better.",
+    );
+    expect([BET_ACTION, PAPER_ACTION]).toEqual([
+      "Bet one unit:",
+      "Paper signal:",
+    ]);
   });
 });

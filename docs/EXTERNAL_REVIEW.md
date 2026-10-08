@@ -88,15 +88,19 @@ data or a different historical cut.
 
 For future rows that want to cite the literature rather than the write-up:
 
-- Francisco & Moore, *College football bettors and the wisdom of crowds* — 7,557 games,
-  2003-04 to 2015-16; unders 50.09% at the opener and 50.14% at the close; mean absolute
-  deviation from the final 13.28 (opener) vs 13.08 (close). The write-up's figures.
-- Salaga & Howley (2024), *The impact of weather on betting outcomes and market behaviour
-  in the NCAA football totals market*.
-- Coleman, *Team Travel Effects and the College Football Betting Market* (Journal of
-  Sports Economics).
-- Arscott (2023), *Market Efficiency and Censoring Bias in College Football Gambling*
-  (Journal of Sports Economics).
+- Francisco & Moore (2019), *College Football Bettors and the Wisdom of Crowds*, Journal of
+  Sports Economics & Management 9(1) 52-64 (no DOI) — 7,557 games, 2003-04 to 2015-16; unders
+  50.09% at the opener and 50.14% at the close; mean absolute deviation from the final 13.28
+  (opener) vs 13.08 (close). The write-up's figures, checked against the paper 2026-10-08.
+- Salaga & Howley (2024; online 2022), *The impact of weather on betting outcomes and market
+  behaviour in the NCAA football totals market*, Applied Economics Letters 31(8) 779-782,
+  doi 10.1080/13504851.2022.2146651.
+- Coleman (2017; online 2015), *Team Travel Effects and the College Football Betting Market*,
+  Journal of Sports Economics 18(4) 388-425, doi 10.1177/1527002515574514.
+- Arscott (2023), *Market Efficiency and Censoring Bias in College Football Gambling*, Journal
+  of Sports Economics 24(5) 664-689, doi 10.1177/15270025221148991 — the bet is the full-game
+  over, not a team total.
+- What each paper actually found, and which years we could test it on: `docs/LITERATURE.md`.
 - The 2006-07 clock-rule studies (Coastal Carolina finance/economics working paper) and
   the NCAA's 2023 timing-rule release.
 - Unabated on vig-free closing-price comparison; Circa on how opening lines are set.

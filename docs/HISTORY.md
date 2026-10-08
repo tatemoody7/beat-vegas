@@ -9,6 +9,26 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
+  research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and
+  sources in the gitignored `research/swarm/2026-10-08-literature-step5/`).
+  - **The papers:** all 11 exist, but the report misdescribes most of them.
+    - Arscott bets full-game OVERS at the close (1996-2017, 56% on 691, p 0.08), not team totals.
+    - Coleman's effect is the home favourite against a visitor that came one zone EAST (2004-2011,
+      ~55%).
+    - Cox's only 5% result is a streak favourite.
+    - Bennett is 2008-2016, n 83.
+    - Salaga & Howley is a real college weather study (2012-2015, observed weather).
+  - **Tate's calls:** six history looks, one look each on the post-sample years, Holm at 5% outside
+    the K = 10 ledger.
+    - National TV = ABC, CBS, NBC, FOX, ESPN (not ESPN2).
+    - Rivalry = trophy games.
+    - Coleman's cutoff comes from his full text.
+    - Salaga waits for a 2016-22 weather backfill.
+    - Team totals and full-game weather are added as tracked candidates (amendment v1.3).
+  - **Doc corrections:** `DATA_STACK_REVIEW` called Arscott "team totals"; `EXTERNAL_REVIEW`'s
+    source list now has full citations.
+
 - **2026-10-07 (CAPTURE: FULL-GAME SPREADS + MONEYLINES).** Roadmap step 4, part one, Tate's calls
   on the credit math (plan `~/.claude/plans/pasted-content-id-3a47-session-handoff-shiny-bunny.md`).
   - **What gets captured:** every Odds API full-game pull (Sunday opener, card-day refresh, every

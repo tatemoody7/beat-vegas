@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.2): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.3): what is tested, how an edge is judged,
   what is paused. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -36,7 +36,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
-  `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough) (all in `docs/`).
+  `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
+  behind the six history looks) (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -79,8 +80,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
-  probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (citations verified; Tate picks
-  the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
+  probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
+  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger; registry
+  rows next; Coleman waits for his full text, Salaga for a 2016-22 observed-weather backfill; team
+  totals and full-game weather tracked as candidates) → arms re-registered and live → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **Real-money switch: ON since 2026-10-07** (Tate's call; written through Neon's HTTPS endpoint,

@@ -223,6 +223,9 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
     assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
+    # Every paper pick is a reading for the registered arm H-ARM-1HU (2026-10-08),
+    # the price-blocked qualifier included (arm 1 counts every qualifier).
+    assert p.arm == "H-ARM-1HU" and q.arm == "H-ARM-1HU"
     chips = json.loads(p.factors_json_at_pick)["chips"]
     assert chips["total_band"] == "45–52" and chips["hook_side"] == "key+0.5"
     assert chips["tier"] == "BET" and chips["cap_rank"] == 1

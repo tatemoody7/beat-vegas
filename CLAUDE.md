@@ -87,7 +87,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger; registry
   rows next; Coleman waits for his full text, Salaga for a 2016-22 observed-weather backfill; team
-  totals and full-game weather tracked as candidates) → arms re-registered and live → shadow engines → public research-lab page →
+  totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
+  1HO / FGU, clocks from the 10-09 fri_pm build, `scripts/protocol_position.py` on Mondays; 4-5 not
+  designed) → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **Real-money switch: OFF since 2026-10-08 20:00 UTC** (v1.4, Tate's call; written through Neon's
@@ -196,8 +198,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
-- **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`, `fg_position`,
-  `challenger_position`, `rule_pause`, `pick` (`list`, `grade`, `summary`; no `add`).
+- **Positions / rule**: `protocol_position` (the registered arms, Mondays), `stopping_rule_position`,
+  `neggap_position`, `fg_position`, `challenger_position`, `rule_pause`, `pick` (no `add`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,

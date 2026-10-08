@@ -953,15 +953,14 @@ def test_every_vercel_cron_job_input_is_declared_by_its_workflow():
             )
 
 
-def test_neggap_collection_is_switched_on_only_in_the_card_build():
-    """H-NEGGAP-P (2026-09-28): the paper over arms log from the decision builds;
-    no other workflow may set NEGGAP_COLLECT."""
+def test_the_development_collectors_are_retired_everywhere():
+    """H-NEGGAP-P and H-FG-P logged from the decision builds until 2026-10-08,
+    when the registered arms H-ARM-1HO and H-ARM-FGU replaced them (Tate's
+    call): no workflow sets NEGGAP_COLLECT or FG_COLLECT any more."""
     for p in _workflows():
         text = p.read_text()
-        if p.name == "card.yml":
-            assert 'NEGGAP_COLLECT: "1"' in text
-        else:
-            assert "NEGGAP_COLLECT" not in text, p.name
+        for switch in ("NEGGAP_COLLECT:", "FG_COLLECT:"):
+            assert switch not in text, (p.name, switch)
     data = _load(WF_DIR / "study.yml")
     assert "neggap_position" in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
 

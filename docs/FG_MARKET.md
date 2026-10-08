@@ -3,6 +3,8 @@
 > **H-FG-P superseded 2026-10-07** (`docs/ROADMAP_2026.md`). The full-game unders arm restarts
 > uncapped and judged on line value against the consensus close, under the 2026 Statistical
 > Protocol; rows logged under H-FG-P are development evidence only. The study result below stands.
+> **Retired 2026-10-08:** the registered arm H-ARM-FGU (uncapped) replaced it; `FG_COLLECT` is no
+> longer set (`docs/PROTOCOL_2026.md`).
 
 **Run 2026-10-06 (`study.yml` runs 37498128236 unders, 37498146230 overs; one dispatch each after
 the data-cell correction of PR #284). Overs: NOT MET on every reading. Unders: the pre-registered

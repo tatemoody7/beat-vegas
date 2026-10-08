@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (THE FIRST ARMS REGISTER: H-ARM-1HU, H-ARM-1HO, H-ARM-FGU).** Roadmap step 6, Tate's calls.
+  - **The rows:** three pre-registered rows under protocol p1, ledger slots 1-3 at 0.5% each
+    (7 of 10 remain). The rows were committed before any collector.
+  - **Arm 1** (first-half unders) counts every qualifier at the per-slate bar, uncapped and whatever
+    the money-path flags. Its paper picks carry the new `manual_picks.arm`.
+  - **Arm 2** (first-half overs) is the bottom-20% mirror with the gap below zero, logged by the new
+    `beatvegas/arm_paper.py`.
+  - **Arm 3** (full-game unders) is H-FG-P's rule without its cap, plus gap above zero.
+  - **Clocks:** they start at the fri_pm build of 2026-10-09.
+  - **Retired:** H-NEGGAP-P and H-FG-P.
+  - **Exclusions:** an unpriced paper pick is now excluded as `no_price`.
+  - **Monday read:** `scripts/protocol_position.py`, through `study.yml`.
+
 - **2026-10-08 (REAL MONEY RESUMES AS A PERSONAL LEDGER; ROADMAP v1.4).** Tate kept the 7 paper
   arms as planned and resumed real-money first-half unders beside them.
   - **What is bet:** the old rule (BET at the per-slate bar, the top 5 a week by gap, every

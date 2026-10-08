@@ -522,6 +522,10 @@ class ManualPick(Base):
     ev_cons = Column(Float)  # EV per unit vs the consensus close: the judge
     ev_hr = Column(Float)  # EV per unit vs Hard Rock's own closing main quote (secondary)
     cons_excluded = Column(String(32))  # why there is no reading (few_books, ...)
+    # The registered protocol arm a PAPER pick belongs to (docs/HYPOTHESES.md,
+    # e.g. 'H-ARM-1HU'; 2026-10-08). Written by the card build from the arm's
+    # first eligible build on; NULL on real tickets and on development rows.
+    arm = Column(String(16))
 
 
 class BvAdjustment(Base):

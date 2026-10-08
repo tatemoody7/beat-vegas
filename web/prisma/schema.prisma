@@ -90,6 +90,8 @@ model manual_picks {
   blocker                 String?   @db.VarChar
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   refit_id                Int?
+  /// The registered protocol arm of a paper pick (docs/HYPOTHESES.md H-ARM-1HU; 2026-10-08).
+  arm                     String?   @db.VarChar(16)
 
   @@index([season], map: "ix_manual_picks_season")
   @@index([game_id], map: "ix_manual_picks_game_id")

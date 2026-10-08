@@ -35,6 +35,7 @@ on:
           - build_halfpoint_table
           - consensus_backfill
           - week_shock_study
+          - protocol_position
         default: blend_gate
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
@@ -78,7 +79,7 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem|margin_backtest|build_halfpoint_table|consensus_backfill|week_shock_study) ;;
+            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem|margin_backtest|build_halfpoint_table|consensus_backfill|week_shock_study|protocol_position) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"

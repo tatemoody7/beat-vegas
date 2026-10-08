@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+"""Where each registered arm stands under the 2026 Statistical Protocol p1.
+
+The Monday program review reads this (docs/PROTOCOL_2026.md). For every arm in
+`beatvegas.protocol.ARMS` (docs/HYPOTHESES.md H-ARM-*): its paper picks -- the
+arm's table, its `arm` tag, market and side, placed on or after the arms' start
+-- grouped by week. Only COMPLETED weeks enter: a week counts once every one of
+the arm's picks in it is graded. Each graded pick with an `ev_cons` reading is
+one reading (EV at the wager's exact terms against the consensus close, at the
+logged Hard Rock price); a pick without one is an exclusion, counted by its
+`cons_excluded` reason and never an observation. The readings go to
+`protocol.position`, which applies the weekly SPRT, the 30-readings-over-3-weeks
+guard and the 200-reading timeout.
+
+Read-only: nothing here writes, and no position it prints moves real money.
+
+    PYTHONPATH=. python scripts/protocol_position.py --out reports/protocol
+    PYTHONPATH=. python scripts/protocol_position.py --season-over   # the final read
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections import Counter, defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from residual_gate import append_step_summary, report_paths  # noqa: E402
+
+from beatvegas import protocol as P  # noqa: E402
+from beatvegas.db.models import ChallengerPick, ManualPick  # noqa: E402
+from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("--out", default="reports/protocol")
+    ap.add_argument(
+        "--season-over", action="store_true", help="the season has ended: running arms time out"
+    )
+    return ap.parse_args(argv)
+
+
+def arm_rows(session, arm: str, spec: Dict[str, Any]) -> List[Any]:
+    """The arm's paper picks, placed order. Never a real ticket."""
+    start = datetime.fromisoformat(P.ARMS_START)
+    model = ManualPick if spec["table"] == "manual_picks" else ChallengerPick
+    q = session.query(model).filter(
+        model.arm == arm,
+        model.market == spec["market"],
+        model.side == spec["side"],
+        model.placed_at >= start,
+    )
+    if model is ManualPick:
+        q = q.filter(ManualPick.is_paper.is_(True))
+    return q.order_by(model.placed_at, model.id).all()
+
+
+def completed(rows: Sequence[Any]) -> List[Any]:
+    """The graded rows of the weeks whose every pick is graded."""
+    by_week: Dict[Any, List[Any]] = defaultdict(list)
+    for r in rows:
+        by_week[(r.season, r.week)].append(r)
+    done = {k for k, rs in by_week.items() if rs and all(bool(r.graded) for r in rs)}
+    return [r for r in rows if (r.season, r.week) in done]
+
+
+def read_arm(rows: Sequence[Any], season_over: bool = False) -> Dict[str, Any]:
+    """Pure: the arm's position over its completed weeks, plus its tallies."""
+    done = completed(rows)
+    obs, excluded = P.observations_from_rows(done)
+    pos = P.position(obs, season_over=season_over)
+    reasons = Counter(r.cons_excluded or "unexplained" for r in done if r.ev_cons is None)
+    weeks = sorted({(r.season, r.week) for r in done})
+    return {
+        "logged": len(rows),
+        "pending": len(rows) - len(done),
+        "completed_weeks": [f"{s}-w{w}" for s, w in weeks],
+        "readings": pos.n,
+        "excluded": excluded,
+        "excluded_by_reason": dict(reasons),
+        "weeks": pos.weeks,
+        "llr": round(pos.llr, 3),
+        "state": pos.state,
+        "label": P.label(pos.state),
+        "decided_at_week": pos.decided_at_week,
+        "mean_ev": round(sum(e for _, e in obs) / len(obs), 4) if obs else None,
+    }
+
+
+def render(result: Dict[str, Any]) -> str:
+    L = [
+        f"# Protocol {P.PROTOCOL_VERSION}: the registered arms",
+        "",
+        f"Generated {result['generated_at']}. Boundaries: PROMOTE at LLR >= {P.UPPER:.3f}, "
+        f"STOP at LLR <= {P.LOWER:.3f}; no decision before {P.MIN_OBS} readings over "
+        f"{P.MIN_WEEKS}+ weeks; timeout {P.MAX_OBS} readings or season end. Only completed weeks "
+        "enter; an exclusion is counted, never an observation.",
+        "",
+        "| arm | slot | state | readings | weeks | LLR | mean EV | excluded | pending |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for arm, r in result["arms"].items():
+        ev = "—" if r["mean_ev"] is None else f"{r['mean_ev']:+.4f}"
+        L.append(
+            f"| {arm} | {r['slot']} | {r['label']} | {r['readings']} | {r['weeks']} | "
+            f"{r['llr']:+.3f} | {ev} | {r['excluded']} | {r['pending']} |"
+        )
+    L.append("")
+    for arm, r in result["arms"].items():
+        if r["excluded_by_reason"]:
+            why = ", ".join(f"{k} {v}" for k, v in sorted(r["excluded_by_reason"].items()))
+            L.append(f"- {arm} exclusions: {why}")
+    return "\n".join(L) + "\n"
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
+    if not try_init_db():
+        return 1
+    arms: Dict[str, Dict[str, Any]] = {}
+    with session_scope() as s:
+        for arm, spec in P.ARMS.items():
+            arms[arm] = {**read_arm(arm_rows(s, arm, spec), args.season_over), "slot": spec["slot"]}
+    result = {"generated_at": datetime.utcnow().isoformat() + "Z", "arms": arms}
+    md = render(result)
+    md_path, json_path, _csv = report_paths(args.out)
+    md_path.parent.mkdir(parents=True, exist_ok=True)
+    md_path.write_text(md)
+    json_path.write_text(json.dumps(result, indent=1, default=str))
+    append_step_summary(md)
+    print(md)
+    print(f"wrote {md_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

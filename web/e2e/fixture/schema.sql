@@ -546,7 +546,8 @@ CREATE TABLE public.manual_picks (
     cons_p_push double precision,
     ev_cons double precision,
     ev_hr double precision,
-    cons_excluded character varying(32)
+    cons_excluded character varying(32),
+    arm character varying(16)
 );
 
 --

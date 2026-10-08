@@ -35,6 +35,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Set
 
+from beatvegas.arm_paper import arm_summary_lines, log_overs_mirror
 from beatvegas.card import (
     REFERENCE_MODEL_VERSION,
     build_card,
@@ -75,6 +76,7 @@ from beatvegas.neggap import collection_enabled as neggap_enabled
 from beatvegas.neggap import log_neggap_picks
 from beatvegas.neggap import summary_line as neggap_summary_line
 from beatvegas.picks import add_pick, existing_pick, freeze_factors
+from beatvegas.protocol import ARM_1H_UNDER, ARM_FG_UNDER
 
 
 def hr_universe(session, season: int, week: int) -> List[Dict]:
@@ -366,6 +368,9 @@ def log_paper_picks(
             # that produced it was retired, docs/CLASSIFIER_RETIREMENT.md.)
             model_line=it["bv_line"],
             refit_id=(pred or {}).get("refit_id"),
+            # Every paper pick this ledger writes is a reading for the registered
+            # first-half-unders arm (docs/HYPOTHESES.md H-ARM-1HU, 2026-10-08).
+            arm=ARM_1H_UNDER,
         )
         it["paper_logged"] = True
         inserted += 1
@@ -656,6 +661,8 @@ def run(
         neggap_on = neggap_enabled()
         fg_stats: Optional[Dict] = None
         fg_on = fg_enabled()
+        arm_over_stats: Optional[Dict] = None
+        arm_fg_stats: Optional[Dict] = None
         paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
@@ -691,6 +698,30 @@ def run(
                             fg_stats = log_fg_picks(s, card, now, window_hours=paper_window_hours)
                     except Exception as e:  # noqa: BLE001 - never break the card
                         print(f"[card] WARNING: H-FG-P arm not logged: {e}")
+                # The registered protocol arms (docs/HYPOTHESES.md, 2026-10-08):
+                # H-ARM-1HU is the paper ledger above (manual_picks.arm); arms 2
+                # and 3 log into challenger_picks on every decision build, each
+                # in its own SAVEPOINT so a failure can never cost the real card.
+                try:
+                    with s.begin_nested():
+                        arm_over_stats = log_overs_mirror(
+                            s, card, now, window_hours=paper_window_hours, predictions=preds
+                        )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    print(f"[card] WARNING: H-ARM-1HO not logged: {e}")
+                try:
+                    with s.begin_nested():
+                        arm_fg_stats = log_fg_picks(
+                            s,
+                            card,
+                            now,
+                            window_hours=paper_window_hours,
+                            arm=ARM_FG_UNDER,
+                            cap=None,
+                            require_positive=True,
+                        )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    print(f"[card] WARNING: H-ARM-FGU not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -748,6 +779,7 @@ def run(
     if not dry_run and card["items"] and not no_paper:
         lines.append(neggap_summary_line(neggap_added, neggap_on))
         lines.append(fg_summary_line(fg_stats, fg_on))
+        lines.extend(arm_summary_lines(arm_over_stats, arm_fg_stats))
         if picks_added:
             # Frozen feature vectors (2026-10-04): a pick with none had no
             # game_records row (the first scoring of the game never ran).

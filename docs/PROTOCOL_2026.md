@@ -85,3 +85,26 @@ is therefore a demanding objective, and a clean "not yet" is a likely and accept
 Each arm's registry row names: this protocol (`p1`), its ledger slot and 0.5%, its exact
 selection rule, its market and side, the first eligible build, and its expected weekly volume.
 Its position is reported every Monday from `beatvegas.protocol.position` over its completed weeks.
+
+## The registered arms (2026-10-08, Tate's calls)
+
+The first three arms registered before any collector logged, each with its own ledger slot (rows in
+`docs/HYPOTHESES.md`; `beatvegas/protocol.py::ARMS`). Their clocks start at the **fri_pm card of
+2026-10-09**, the first eligible build after the rows merged; every earlier row is development
+evidence. Its `cards.id` is written here once it runs.
+
+| Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
+|---|---|---|---|
+| H-ARM-1HU | 1 | First-half UNDER on every game at or above the per-slate bar (gap above zero), whatever the money-path flags | `manual_picks`, `is_paper`, `arm = 'H-ARM-1HU'` (written by `scripts/build_card.py::log_paper_picks`) |
+| H-ARM-1HO | 2 | First-half OVER on every game at or below the slate floor (the k-th smallest gap, k = max(1, round(0.2N))) with the gap below zero, at Hard Rock's over price | `challenger_picks`, `arm = 'H-ARM-1HO'` (`beatvegas/arm_paper.py`) |
+| H-ARM-FGU | 3 | Full-game UNDER on every game at or above the full-game slate bar (gap above zero), H-FG-P's universe without its cap | `challenger_picks`, `arm = 'H-ARM-FGU'` (`beatvegas/fg_paper.py`, `cap=None`) |
+
+- **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
+  H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.
+- **Exclusions:** a paper pick without a Hard Rock price is now excluded by name (`no_price`,
+  `beatvegas/consensus.py`), so nothing is a silent gap.
+- **The Monday read:** `scripts/protocol_position.py`, through `study.yml` (`script =
+  protocol_position`), reports each arm's state, readings, weeks, LLR, mean EV and exclusions by
+  reason over its completed weeks.
+- **Tate's personal real-money ledger** (roadmap v1.4) is never an observation for any arm.
+

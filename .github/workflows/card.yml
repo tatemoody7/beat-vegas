@@ -321,12 +321,10 @@ jobs:
           SLOT: ${{ steps.slot.outputs.slot }}
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
           NO_PAPER: ${{ steps.slot.outputs.no_paper }}
-          # H-NEGGAP-P (docs/NEGGAP_PAPER.md): the paper OVER arms log beside the
-          # champion's paper picks. Unset to switch the collection off.
-          NEGGAP_COLLECT: "1"
-          # H-FG-P (docs/FG_MARKET.md): paper FULL-GAME unders from the bv_fg_v1
-          # shadow, into challenger_picks (market='full'). Unset to switch it off.
-          FG_COLLECT: "1"
+          # H-NEGGAP-P and H-FG-P (development collectors) retired 2026-10-08 when
+          # the registered arms H-ARM-1HO and H-ARM-FGU started (Tate's call):
+          # NEGGAP_COLLECT and FG_COLLECT are no longer set. The registered arms
+          # (docs/HYPOTHESES.md) log on every decision build and need no switch.
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |

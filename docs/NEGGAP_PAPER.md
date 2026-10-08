@@ -2,7 +2,8 @@
 
 > **Superseded 2026-10-07** (`docs/ROADMAP_2026.md`). The over arm restarts as one arm — the bottom
 > 20% of gaps on each slate — registered under the 2026 Statistical Protocol before it logs. Rows
-> from the three nested arms below are development evidence only; the collector runs until then.
+> from the three nested arms below are development evidence only. **Retired 2026-10-08:** the
+> registered arm H-ARM-1HO replaced it (`docs/PROTOCOL_2026.md`); `NEGGAP_COLLECT` is no longer set.
 
 Registry row **H-NEGGAP-P** (`docs/HYPOTHESES.md`), written 2026-09-28 before any
 observation. Measurement only on the real-money side: **nothing here licenses a real

@@ -50,6 +50,21 @@ MIN_OBS = 30  # readings
 MIN_WEEKS = 3
 MAX_OBS = 200  # readings
 
+# The registered arms (docs/HYPOTHESES.md, Tate's calls of 2026-10-08). Each is
+# one sequential test with its own 0.5% ledger slot; `table` + `arm` + `market`
+# + `side` select its paper picks, and `start` is the earliest placed_at that
+# can belong to it (its first eligible build is the fri_pm card of 2026-10-09;
+# the tag itself is written only from then on, so `start` is a backstop).
+ARM_1H_UNDER = "H-ARM-1HU"
+ARM_1H_OVER = "H-ARM-1HO"
+ARM_FG_UNDER = "H-ARM-FGU"
+ARMS = {
+    ARM_1H_UNDER: {"table": "manual_picks", "market": "1H", "side": "under", "slot": 1},
+    ARM_1H_OVER: {"table": "challenger_picks", "market": "1H", "side": "over", "slot": 2},
+    ARM_FG_UNDER: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 3},
+}
+ARMS_START = "2026-10-09T00:00:00"  # naive UTC; the fri_pm build is later that day
+
 UPPER = math.log((1.0 - BETA) / ALPHA)  # promote
 LOWER = math.log(BETA / (1.0 - ALPHA))  # stop
 

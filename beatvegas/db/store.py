@@ -79,6 +79,8 @@ _MIGRATIONS = {
     # Kept rows, one run_id per grading run (2026-10-04); readers take the newest.
     "factor_ledger": {"run_id": "VARCHAR"},
     "manual_picks": {
+        # The registered protocol arm of a paper pick (2026-10-08, roadmap step 6).
+        "arm": "VARCHAR(16)",
         # The weekly refit the pick was logged against (2026-10-04).
         "refit_id": "INTEGER",
         # The close price, kept apart from the price at the DECISION -- see the

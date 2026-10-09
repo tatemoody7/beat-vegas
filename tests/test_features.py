@@ -31,10 +31,13 @@ def test_market_features_are_exactly_known_set():
 
 
 def test_bv_features_are_classifier_features_minus_market_and_serve_unavailable():
-    """Market-blind AND free of the inputs that are NaN at serving (B-SERVE)."""
-    from beatvegas.etl.features import SERVE_UNAVAILABLE_COLS
+    """Market-blind, free of the inputs that are NaN at serving (B-SERVE), and free
+    of the legacy kickoff-weather values (strategic review, 2026-10-09)."""
+    from beatvegas.etl.features import LEAKY_WEATHER_COLS, SERVE_UNAVAILABLE_COLS
 
-    assert set(BV_FEATURE_COLS) == set(FEATURE_COLS) - MARKET_COLS - set(SERVE_UNAVAILABLE_COLS)
+    assert set(BV_FEATURE_COLS) == (
+        set(FEATURE_COLS) - MARKET_COLS - set(SERVE_UNAVAILABLE_COLS) - set(LEAKY_WEATHER_COLS)
+    )
 
 
 def test_feature_cols_unique():

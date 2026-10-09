@@ -33,6 +33,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from ..etl.features import (
     BANNED_LINE_COLS,
     FEATURE_COLS,
+    LEAKY_WEATHER_COLS,
     MARKET_COLS,
     SERVE_UNAVAILABLE_COLS,
 )
@@ -47,8 +48,10 @@ _MIN_SEGMENT = 200  # min rows to report a segment residual
 # ...and it never sees the first-half PBP season-to-date columns: they are NaN
 # on every row the live model scores and present on every row it trains on
 # (features.SERVE_UNAVAILABLE_COLS, B-SERVE 2026-09-22).
-_SERVE_UNAVAILABLE = set(SERVE_UNAVAILABLE_COLS)
-BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _SERVE_UNAVAILABLE]
+# ...nor the legacy weather values, kickoff observations that live serving never
+# has (features.LEAKY_WEATHER_COLS, strategic review 2026-10-09).
+_EXCLUDED = set(SERVE_UNAVAILABLE_COLS) | set(LEAKY_WEATHER_COLS)
+BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _EXCLUDED]
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:

@@ -4,8 +4,11 @@ model feature (not just current-week display).
 
   python scripts/backfill_enrichment.py --start 2017 --end 2025
 
-One TeamRankings pull per season/week (as-of that week's median date). Idempotent
-(upserts). Slow; safe to re-run / resume.
+One TeamRankings pull per season/week, AS OF THE SUNDAY BEFORE the week's first
+regular-season kickoff (Eastern date) -- what `sunday.yml` pulls live. Until
+2026-10-09 the pull was as of the week's median kickoff date, so a team that
+played Tuesday-Friday (and maybe Saturday) carried that very game in its pace
+(strategic review topic 3). Idempotent (upserts). Slow; safe to re-run / resume.
 
 WEATHER USED TO LIVE HERE AND NO LONGER DOES. It keyed a local-time Open-Meteo
 series with a UTC kickoff, so every value it wrote was displaced by the venue's
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from datetime import timedelta
 
 import pandas as pd
 
@@ -28,6 +32,16 @@ from beatvegas.sources.cfbd import CFBDClient  # noqa: F401  (ensures key check)
 from beatvegas.sources.teamrankings import fetch_tempo, map_to_cfbd
 
 
+def as_of_sunday(first_kick_utc) -> str:
+    """The Sunday strictly before the Eastern date of a week's first kickoff
+    (a naive-UTC timestamp), as YYYY-MM-DD. A Sunday kickoff reads the Sunday
+    before it, so no as-of date can contain a game of its own week."""
+    et = pd.Timestamp(first_kick_utc).tz_localize("UTC").tz_convert("America/New_York")
+    d = et.date()
+    back = (d.weekday() + 1) % 7 or 7  # Monday=0 ... Sunday=6
+    return (d - timedelta(days=back)).isoformat()
+
+
 def backfill_tempo(start: int, end: int) -> None:
     from datetime import datetime
 
@@ -35,12 +49,16 @@ def backfill_tempo(start: int, end: int) -> None:
         teams = [t[0] for t in s.query(Team.school).distinct().all()]
         games = pd.DataFrame(
             s.query(Game.season, Game.week, Game.start_date)
-            .filter(Game.season.between(start, end), Game.start_date.isnot(None))
+            .filter(
+                Game.season.between(start, end),
+                Game.start_date.isnot(None),
+                Game.season_type == "regular",  # bowls are filed as week 1
+            )
             .all(),
             columns=["season", "week", "start_date"],
         )
     games["start_date"] = pd.to_datetime(games["start_date"])
-    wk_dates = games.groupby(["season", "week"])["start_date"].median().dt.strftime("%Y-%m-%d")
+    wk_dates = games.groupby(["season", "week"])["start_date"].min().map(as_of_sunday)
     for (season, week), date in wk_dates.items():
         try:
             df = fetch_tempo(date=date)

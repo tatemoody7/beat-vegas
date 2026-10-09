@@ -143,6 +143,15 @@ FEATURE_COLS += MATCHUP_COLS
 # being retired. `serve_skew_report` below is the guard for the CLASS.
 SERVE_UNAVAILABLE_COLS = list(FH_FACTOR_COLS) + list(MATCHUP_COLS)
 
+# The legacy `weather` table's values are information from after the bet when
+# they train the model: kickoff-hour observations (on the old local-vs-UTC clock)
+# for 2023-25 only, while the live model reads a forecast about six days out.
+# Strategic review topic 3, Tate's call 2026-10-09: they leave the regressor
+# (model/bv_line.BV_FEATURE_COLS); the dome flag is a venue fact and stays.
+# Weather as an edge is tested on its own (registry H-WX-*), and forecast
+# weather can return to the model only through its own gate.
+LEAKY_WEATHER_COLS = ["wx_temp", "wx_wind", "wx_precip"]
+
 MARKET_COLS = {"full_game_total", "proj_1h_ratio"}
 
 # Names derived from the 1H BETTING line. These must NEVER be a feature in ANY

@@ -13,8 +13,9 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from ..db.models import Game, Team, Venue
+from ..db.models import Game, Venue
 from ..db.store import session_scope
+from .trophy_games import load_pairs
 
 SITUATIONAL_COLS = [
     "home_rest_days",
@@ -37,7 +38,12 @@ SITUATIONAL_COLS = [
     "conference_game",
 ]
 
-_RIVALRY_MIN_SEASONS = 8  # near-annual series: met in >=8 distinct seasons
+# Neither conference flag nor rivalry flag may know the future (strategic review,
+# 2026-10-09): `conference_game` reads each game's OWN conference fields (CFBD sets
+# them per season, so realignment is honoured); `rivalry_game` is the frozen list
+# of named trophy games (`data/trophy_games.json`), not a count of meetings that
+# included seasons after the game.
+_INDEPENDENT = "FBS Independents"
 
 
 def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
@@ -52,9 +58,10 @@ def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
 
 
 def _load(session=None, season: Optional[int] = None, min_season: Optional[int] = None) -> tuple:
-    """games/venues/teams frames. `session` reuses a caller's session (else opens
+    """games/venues frames. `session` reuses a caller's session (else opens
     one); `season` restricts the games to one season (enough for rest/travel/
-    kickoff — the cross-season revenge/rivalry flags then only see that season)."""
+    kickoff — the cross-season revenge flags then only see that season; the
+    trophy-game rivalry and per-game conference flags need no other season)."""
     if session is None:
         with session_scope() as s:
             return _load(s, season, min_season)
@@ -69,6 +76,8 @@ def _load(session=None, season: Optional[int] = None, min_season: Optional[int] 
         Game.away_team,
         Game.home_points,
         Game.away_points,
+        Game.home_conference,
+        Game.away_conference,
     )
     if season is not None:
         q = q.filter(Game.season == season)
@@ -86,16 +95,15 @@ def _load(session=None, season: Optional[int] = None, min_season: Optional[int] 
             "away_team",
             "home_points",
             "away_points",
+            "home_conference",
+            "away_conference",
         ],
     )
     venues = pd.DataFrame(
         s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
         columns=["venue_id", "lat", "lon"],
     )
-    teams = pd.DataFrame(
-        s.query(Team.school, Team.conference).all(), columns=["team", "conference"]
-    )
-    return games, venues, teams
+    return games, venues
 
 
 def _pair_key(a, b) -> tuple:
@@ -103,17 +111,17 @@ def _pair_key(a, b) -> tuple:
     return (a, b) if str(a) <= str(b) else (b, a)
 
 
-def _revenge_and_rivalry(games: pd.DataFrame) -> pd.DataFrame:
-    """Per-game home/away revenge flags + a static rivalry flag.
+def _revenge_and_rivalry(games: pd.DataFrame, trophy_pairs=None) -> pd.DataFrame:
+    """Per-game home/away revenge flags + the trophy-game rivalry flag.
 
     revenge: in the two teams' most recent PRIOR meeting (earlier date), this
-    side LOST (prior info only -> leak-free). rivalry: the pair met in
-    >=_RIVALRY_MIN_SEASONS distinct seasons across the dataset (a stable
-    structural property, not a predictive signal, so full history is fine).
+    side LOST (prior info only -> leak-free). rivalry: the pair plays for a
+    named trophy (`data/trophy_games.json`, frozen 2026-10-09) -- a fact about
+    the pair that no later meeting can change.
     """
+    pairs = load_pairs() if trophy_pairs is None else trophy_pairs
     g = games.sort_values("start_date", na_position="last")
     last_meet: Dict[tuple, tuple] = {}  # pair -> (winner, loser) of last meeting
-    pair_seasons: Dict[tuple, set] = {}
     rows = []
     for r in g.itertuples(index=False):
         pk = _pair_key(r.home_team, r.away_team)
@@ -123,24 +131,31 @@ def _revenge_and_rivalry(games: pd.DataFrame) -> pd.DataFrame:
             _, loser = prev
             home_rev = 1 if loser == r.home_team else 0
             away_rev = 1 if loser == r.away_team else 0
-        rows.append({"id": r.id, "home_revenge": home_rev, "away_revenge": away_rev})
-        pair_seasons.setdefault(pk, set()).add(r.season)
+        rows.append(
+            {
+                "id": r.id,
+                "home_revenge": home_rev,
+                "away_revenge": away_rev,
+                "rivalry_game": 1 if frozenset((r.home_team, r.away_team)) in pairs else 0,
+            }
+        )
         # update last meeting (skip ties / missing scores)
         hp, ap = r.home_points, r.away_points
         if pd.notna(hp) and pd.notna(ap) and hp != ap:
             winner = r.home_team if hp > ap else r.away_team
             loser = r.away_team if hp > ap else r.home_team
             last_meet[pk] = (winner, loser)
-    rivalry_pairs = {pk for pk, seas in pair_seasons.items() if len(seas) >= _RIVALRY_MIN_SEASONS}
-    rv = pd.DataFrame(rows)
-    rv["rivalry_game"] = [
-        1 if _pair_key(h, a) in rivalry_pairs else 0
-        for h, a in zip(
-            games.set_index("id").loc[rv["id"], "home_team"],
-            games.set_index("id").loc[rv["id"], "away_team"],
-        )
-    ]
-    return rv
+    return pd.DataFrame(rows, columns=["id", "home_revenge", "away_revenge", "rivalry_game"])
+
+
+def same_conference(home_conf, away_conf) -> int:
+    """1 when both teams sit in the same conference THAT SEASON; independents and
+    unknowns never make a conference game."""
+    if home_conf is None or away_conf is None or pd.isna(home_conf) or pd.isna(away_conf):
+        return 0
+    if home_conf == _INDEPENDENT:
+        return 0
+    return 1 if home_conf == away_conf else 0
 
 
 def _opener(games: pd.DataFrame) -> pd.DataFrame:
@@ -186,12 +201,11 @@ def situational_frame(
     Default: every game in the DB via its own session (the feature frame).
     `session` + `season` let a caller (etl/context.py) compute the rest/travel/
     kickoff numbers for one season inside an open session."""
-    games, venues, teams = _load(session, season, min_season)
+    games, venues = _load(session, season, min_season)
     if games.empty:
         return pd.DataFrame(columns=["id"] + SITUATIONAL_COLS)
     games["start_date"] = pd.to_datetime(games["start_date"])
     vcoord = venues.set_index("venue_id")
-    conf = teams.dropna(subset=["conference"]).set_index("team")["conference"].to_dict()
 
     # team's modal home venue per season (their "home base")
     home_base = (
@@ -227,7 +241,6 @@ def situational_frame(
         local_hour = None
         if pd.notna(r.start_date) and glon is not None and not pd.isna(glon):
             local_hour = (r.start_date.hour + glon / 15.0) % 24
-        h_conf, a_conf = conf.get(r.home_team), conf.get(r.away_team)
         rows.append(
             {
                 "id": r.id,
@@ -242,11 +255,8 @@ def situational_frame(
                 "kickoff_local_hour": local_hour,
                 "early_kickoff": 1 if (local_hour is not None and local_hour <= 13) else 0,
                 "night_game": 1 if (local_hour is not None and local_hour >= 18) else 0,
-                # conference_game from current team conference (realignment-approx
-                # for older seasons; fine for a factor screen).
-                "conference_game": (
-                    1 if (h_conf is not None and a_conf is not None and h_conf == a_conf) else 0
-                ),
+                # that season's conferences, from the game row (CFBD per season)
+                "conference_game": same_conference(r.home_conference, r.away_conference),
             }
         )
     df_base = pd.DataFrame(rows)

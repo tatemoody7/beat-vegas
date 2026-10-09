@@ -27,6 +27,16 @@ The test, Tate's calls of 2026-10-07:
   also NEEDS MORE EVIDENCE. Every ending spends the arm's alpha.
 - Only COMPLETED weeks enter (the Monday review reads the week just graded).
 
+Amended p1.1 (roadmap v1.5, Tate's calls of 2026-10-09, strategic review topic 3):
+
+- The three arms' clocks are PAUSED before any completed week: the model under
+  them is re-fitted without its training leaks first, and readings count only
+  from the first card built on that model (ARMS_START is set then). Picks the
+  arms log meanwhile are development evidence.
+- Abandoning and restarting a test spends its alpha once any completed week of
+  it has been read; a restart before any completed week is free (no result has
+  been looked at).
+
 Pure: observations in, a position out. Tests pin the arithmetic; the simulation
 (scripts/protocol_sim.py) gives the operating characteristics Tate approved.
 """
@@ -37,7 +47,7 @@ import math
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence, Tuple
 
-PROTOCOL_VERSION = "p1"
+PROTOCOL_VERSION = "p1.1"
 K_TESTS = 10
 FAMILY_ALPHA = 0.05
 ALPHA = FAMILY_ALPHA / K_TESTS  # 0.005 per confirmatory test
@@ -52,9 +62,10 @@ MAX_OBS = 200  # readings
 
 # The registered arms (docs/HYPOTHESES.md, Tate's calls of 2026-10-08). Each is
 # one sequential test with its own 0.5% ledger slot; `table` + `arm` + `market`
-# + `side` select its paper picks, and `start` is the earliest placed_at that
-# can belong to it (its first eligible build is the fri_pm card of 2026-10-09;
-# the tag itself is written only from then on, so `start` is a backstop).
+# + `side` select its paper picks. The builds tag them from ARMS_TAGGED_FROM
+# on; ARMS_START is the earliest placed_at that counts toward a clock, and None
+# while the clocks are paused (p1.1, 2026-10-09: until the first card built on
+# the leak-fixed model, whose time is written here when it runs).
 ARM_1H_UNDER = "H-ARM-1HU"
 ARM_1H_OVER = "H-ARM-1HO"
 ARM_FG_UNDER = "H-ARM-FGU"
@@ -63,7 +74,8 @@ ARMS = {
     ARM_1H_OVER: {"table": "challenger_picks", "market": "1H", "side": "over", "slot": 2},
     ARM_FG_UNDER: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 3},
 }
-ARMS_START = "2026-10-09T00:00:00"  # naive UTC; the fri_pm build is later that day
+ARMS_TAGGED_FROM = "2026-10-09T00:00:00"  # naive UTC; the first tagging build is fri_pm
+ARMS_START: Optional[str] = None  # paused 2026-10-09 (p1.1); naive UTC once set
 
 UPPER = math.log((1.0 - BETA) / ALPHA)  # promote
 LOWER = math.log(BETA / (1.0 - ALPHA))  # stop
@@ -72,6 +84,7 @@ RUNNING = "running"
 PROMOTE = "promote"
 STOP = "stop"
 TIMEOUT = "timeout"
+PAUSED = "paused"
 
 
 def week_variance(n: int, sigma: float = SIGMA, sigma_week: float = SIGMA_WEEK) -> float:
@@ -143,6 +156,7 @@ def label(state: str) -> str:
         STOP: "NEEDS MORE EVIDENCE (stopped: no +3% edge)",
         TIMEOUT: "NEEDS MORE EVIDENCE (timed out)",
         RUNNING: "IN FORWARD TEST",
+        PAUSED: "PAUSED (clock not started; development evidence)",
     }[state]
 
 

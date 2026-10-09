@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Where each registered arm stands under the 2026 Statistical Protocol p1.
+"""Where each registered arm stands under the 2026 Statistical Protocol (p1.1).
 
 The Monday program review reads this (docs/PROTOCOL_2026.md). For every arm in
 `beatvegas.protocol.ARMS` (docs/HYPOTHESES.md H-ARM-*): its paper picks -- the
@@ -48,9 +48,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
-def arm_rows(session, arm: str, spec: Dict[str, Any]) -> List[Any]:
-    """The arm's paper picks, placed order. Never a real ticket."""
-    start = datetime.fromisoformat(P.ARMS_START)
+def arm_rows(session, arm: str, spec: Dict[str, Any], since: Optional[str] = None) -> List[Any]:
+    """The arm's paper picks placed on or after `since` (default: the clock's
+    start), placed order. Never a real ticket."""
+    start = datetime.fromisoformat(since or P.ARMS_START)
     model = ManualPick if spec["table"] == "manual_picks" else ChallengerPick
     q = session.query(model).filter(
         model.arm == arm,
@@ -95,6 +96,24 @@ def read_arm(rows: Sequence[Any], season_over: bool = False) -> Dict[str, Any]:
     }
 
 
+def paused_arm(logged: int) -> Dict[str, Any]:
+    """Pure: a paused arm's line -- no readings, whatever it has logged."""
+    return {
+        "logged": logged,
+        "pending": 0,
+        "completed_weeks": [],
+        "readings": 0,
+        "excluded": 0,
+        "excluded_by_reason": {},
+        "weeks": 0,
+        "llr": 0.0,
+        "state": P.PAUSED,
+        "label": P.label(P.PAUSED),
+        "decided_at_week": None,
+        "mean_ev": None,
+    }
+
+
 def render(result: Dict[str, Any]) -> str:
     L = [
         f"# Protocol {P.PROTOCOL_VERSION}: the registered arms",
@@ -104,13 +123,22 @@ def render(result: Dict[str, Any]) -> str:
         f"{P.MIN_WEEKS}+ weeks; timeout {P.MAX_OBS} readings or season end. Only completed weeks "
         "enter; an exclusion is counted, never an observation.",
         "",
-        "| arm | slot | state | readings | weeks | LLR | mean EV | excluded | pending |",
-        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    if any(r["state"] == P.PAUSED for r in result["arms"].values()):
+        L += [
+            "**Clocks paused** since 2026-10-09 (p1.1, roadmap v1.5): no reading counts until "
+            "the first card built on the leak-fixed model; the picks logged meanwhile "
+            "(`logged`) are development evidence.",
+            "",
+        ]
+    L += [
+        "| arm | slot | state | logged | readings | weeks | LLR | mean EV | excluded | pending |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for arm, r in result["arms"].items():
         ev = "—" if r["mean_ev"] is None else f"{r['mean_ev']:+.4f}"
         L.append(
-            f"| {arm} | {r['slot']} | {r['label']} | {r['readings']} | {r['weeks']} | "
+            f"| {arm} | {r['slot']} | {r['label']} | {r['logged']} | {r['readings']} | {r['weeks']} | "
             f"{r['llr']:+.3f} | {ev} | {r['excluded']} | {r['pending']} |"
         )
     L.append("")
@@ -128,7 +156,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     arms: Dict[str, Dict[str, Any]] = {}
     with session_scope() as s:
         for arm, spec in P.ARMS.items():
-            arms[arm] = {**read_arm(arm_rows(s, arm, spec), args.season_over), "slot": spec["slot"]}
+            if P.ARMS_START is None:
+                line = paused_arm(len(arm_rows(s, arm, spec, since=P.ARMS_TAGGED_FROM)))
+            else:
+                line = read_arm(arm_rows(s, arm, spec), args.season_over)
+            arms[arm] = {**line, "slot": spec["slot"]}
     result = {"generated_at": datetime.utcnow().isoformat() + "Z", "arms": arms}
     md = render(result)
     md_path, json_path, _csv = report_paths(args.out)

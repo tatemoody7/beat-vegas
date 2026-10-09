@@ -9,6 +9,27 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (STRATEGIC REVIEW; ARMS PAUSED, PROTOCOL p1.1, ROADMAP v1.5).** Tate opened an
+  evidence-first review of the whole project (one topic at a time; its record lands as one docs PR
+  when the review ends).
+  - **Topic 1 (goals):** proof is the goal, at small stakes on Hard Rock only (bankroll under $1K);
+    proof = an arm passes its line-value test, then 2027 real tickets; two seasons fine; the
+    personal ledger stays; the stop rule is set in January.
+  - **Topic 2 (the odds):** every pick with a closing reading averages about −5% EV against the
+    consensus close (real n 9, paper n 27, overs n 27): the vig and nothing else. Tate's and my
+    estimate: about 1 in 10 that a strategy earns the proof by the end of 2027.
+  - **Topic 3 (the test):** the protocol is sound; +3% is the smallest edge it can find in one
+    season. Verified: CFBD files bowls as week 1, so the bowl season would enter as one week; one
+    ungradable pick freezes its week. **Tate's calls:** fix the model's training leaks now (pace,
+    weather, same-season roster and talent, rivalry and conference flags; inputs with no clean
+    history come back to him one by one) and **pause the three arms' clocks before any completed
+    week**: they start at the first card on the leak-fixed model. A restart before any read is
+    free; after one it spends the slot. Bookkeeping fixes and four side readings queued as PRs.
+  - **This PR:** `protocol.ARMS_START = None` (paused), `PROTOCOL_VERSION = "p1.1"`,
+    `protocol_position` reads PAUSED with the logged count; `PROTOCOL_2026.md`, the three
+    `H-ARM-*` rows and `H-PROGRAM-2026` amended; roadmap v1.5. The literature-ledger question
+    deferred to Monday is renumbered v1.6.
+
 - **2026-10-09 UTC (WEATHER PROMOTE REFUSED; INVERTED GUSTS NOW BLANKED).** Run 37833098273's
   fetch hit its 350-minute cap at 01:26Z. Its staging file was saved (1.06 MiB): 4,610 of
   10,097 planned ERA5 games (2013 to mid-2019) and every CFBD season.

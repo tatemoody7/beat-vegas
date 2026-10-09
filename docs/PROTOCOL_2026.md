@@ -1,7 +1,8 @@
-# The 2026 Statistical Protocol — `p1`
+# The 2026 Statistical Protocol — `p1.1`
 
-**Status: frozen on Tate's approval of the simulated numbers below (2026-10-07). Registry row
-`H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
+**Status: frozen on Tate's approval of the simulated numbers below (2026-10-07); amended `p1.1`
+on 2026-10-09 (roadmap v1.5: the three arms' clocks paused before any completed week, and the
+restart rule below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
 is one test under this protocol, registered as its own row before it logs anything; every
 confirmatory clock starts at the first eligible build after that row exists. Everything logged
 before is development evidence. Code: `beatvegas/protocol.py` (the test),
@@ -24,7 +25,9 @@ to any rule here is a new protocol version and a roadmap amendment, never an edi
 | Exclusions | a pick with no reading (`cons_excluded`) is not an observation; every exclusion is counted and reported beside the arm | `docs/CONSENSUS.md` |
 | Reading cadence | the Monday program review reads each arm over completed weeks | roadmap |
 
-Every ending spends the arm's 0.5%. A new arm enters only while ledger slots remain (10 in total
+Every ending spends the arm's 0.5%. **Restarts (p1.1, 2026-10-09):** abandoning a test and
+restarting it is an ending, and spends the slot, once any completed week of it has been read; a
+restart before any completed week is free, because no result has been looked at. A new arm enters only while ledger slots remain (10 in total
 for 2026, 7 betting slots at a time). Correlated arms (the first-half unders and their over mirror
 read the same slates) need no adjustment: the ledger is a Bonferroni split, valid under any
 dependence.
@@ -82,16 +85,24 @@ is therefore a demanding objective, and a clean "not yet" is a likely and accept
 
 ## Before any arm goes live (roadmap step 6)
 
-Each arm's registry row names: this protocol (`p1`), its ledger slot and 0.5%, its exact
+Each arm's registry row names: this protocol (`p1`, amended `p1.1`), its ledger slot and 0.5%, its exact
 selection rule, its market and side, the first eligible build, and its expected weekly volume.
 Its position is reported every Monday from `beatvegas.protocol.position` over its completed weeks.
 
 ## The registered arms (2026-10-08, Tate's calls)
 
 The first three arms registered before any collector logged, each with its own ledger slot (rows in
-`docs/HYPOTHESES.md`; `beatvegas/protocol.py::ARMS`). Their clocks start at the **fri_pm card of
-2026-10-09**, the first eligible build after the rows merged; every earlier row is development
-evidence. Its `cards.id` is written here once it runs.
+`docs/HYPOTHESES.md`; `beatvegas/protocol.py::ARMS`). The builds tag their picks from the **fri_pm
+card of 2026-10-09** on.
+
+**Clocks paused (p1.1, roadmap v1.5, Tate 2026-10-09, before any completed week).** The October
+2026 strategic review (topic 3) found information from after the game
+in the model's training inputs (pace, weather, same-season roster and talent, the rivalry and
+conference flags). The model under the three arms is re-fitted without those leaks first. Each
+arm's clock starts at the **first card built on the leak-fixed model**; its `cards.id` and time are
+written here and into `beatvegas/protocol.py::ARMS_START` when it runs. Every pick the arms log
+until then is development evidence, like every row before 2026-10-09. No week has been read, so
+the restart spends no alpha; the selection rules, slots and test are otherwise unchanged.
 
 | Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
 |---|---|---|---|

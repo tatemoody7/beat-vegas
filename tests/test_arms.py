@@ -50,7 +50,26 @@ def test_the_arms_are_registered_with_their_slots():
     }
     assert P.ARMS[P.ARM_1H_OVER]["side"] == "over" and P.ARMS[P.ARM_1H_OVER]["slot"] == 2
     assert P.ARMS[P.ARM_FG_UNDER]["market"] == "full" and P.ARMS[P.ARM_FG_UNDER]["slot"] == 3
-    assert P.ARMS_START == "2026-10-09T00:00:00"
+    assert P.ARMS_TAGGED_FROM == "2026-10-09T00:00:00"
+    # p1.1 (roadmap v1.5, 2026-10-09): paused before any completed week, until the
+    # first card built on the leak-fixed model
+    assert P.ARMS_START is None and P.PROTOCOL_VERSION == "p1.1"
+
+
+def test_a_paused_arm_reports_no_reading_and_says_so(load_script):
+    pos = load_script("protocol_position")
+    line = pos.paused_arm(7)
+    assert line["state"] == P.PAUSED and line["readings"] == 0 and line["logged"] == 7
+    assert line["label"].startswith("PAUSED")
+    md = pos.render({"generated_at": "now", "arms": {P.ARM_1H_UNDER: {**line, "slot": 1}}})
+    assert "**Clocks paused**" in md and "| H-ARM-1HU | 1 | PAUSED" in md
+
+
+def test_a_running_read_carries_no_pause_note(load_script):
+    pos = load_script("protocol_position")
+    line = pos.read_arm([_row(2026, 7, True, 0.01)])
+    md = pos.render({"generated_at": "now", "arms": {P.ARM_1H_UNDER: {**line, "slot": 1}}})
+    assert "Clocks paused" not in md and "IN FORWARD TEST" in md
 
 
 def test_slate_floor_mirrors_the_bar():

@@ -19,8 +19,9 @@ promote anything.**
     spends a ledger slot.
 - **Team totals and full-game weather** are tracked edge candidates in their own right.
 - **Three looks are registry rows (2026-10-08):** `H-LIT-ARSCOTT`, `H-LIT-TV` and
-  `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, each frozen before its script. Coleman, Cox and Salaga
-  follow in their own PRs.
+  `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, each frozen before its script
+  (`scripts/literature_look.py`, one `study.yml` dispatch each). Coleman, Cox and Salaga follow
+  in their own PRs.
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against

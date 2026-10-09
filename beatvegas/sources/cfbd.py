@@ -232,6 +232,18 @@ class CFBDClient:
             },
         )
 
+    def game_media(self, year: int, season_type: str = "regular") -> List[Dict]:
+        """Broadcast listings, one row per game per outlet: `mediaType` (tv, web,
+        radio) and `outlet` (ESPN, ABC, CBSSN, ...). Keyed by `id`, the same game
+        id `/games` returns. Read by the H-LIT-TV look (docs/HYPOTHESES.md)."""
+        return self._get("/games/media", {"year": year, "seasonType": season_type})
+
+    def rankings(self, year: int, season_type: str = "regular") -> List[Dict]:
+        """Poll releases by week: `polls[].poll` ("AP Top 25", ...) with
+        `polls[].ranks[]` (`rank`, `school`). The postseason call holds each
+        poll's final release. Read by the H-LIT-BENNETT look."""
+        return self._get("/rankings", {"year": year, "seasonType": season_type})
+
     def sp_ratings(self, year: int, team: Optional[str] = None) -> List[Dict]:
         return self._get("/ratings/sp", {"year": year, "team": team})
 

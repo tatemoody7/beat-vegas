@@ -220,8 +220,10 @@ Three of the six history looks roadmap v1.3 approved, each frozen before its scr
 - **The family** is the six looks: Holm at 5% with m = 6 fixed, outside the K = 10 ledger. A look
   not yet run counts as p = 1. Holm is monotone, so a verdict reached before the last look runs
   is final.
-- **One `study.yml` dispatch per row**, after its script merges; a second look goes in
-  `comparisons run`.
+- **One `study.yml` dispatch per row**, after its script merges: `literature_look --row <id>`
+  (`scripts/literature_look.py`, logic in `beatvegas/backtest/literature.py`; CFBD only, no
+  database read). `literature_look --holm <json>...` combines the finished looks' reports into
+  the family table. A second look goes in `comparisons run`.
 - **A pass licenses only** registering a paper arm under `docs/PROTOCOL_2026.md`, which then
   takes a ledger slot. Nothing changes the model, a gate, a stake or a live rule from these rows.
 

@@ -9,6 +9,21 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-08 (THE LITERATURE LOOK SCRIPT).** `scripts/literature_look.py` +
+  `beatvegas/backtest/literature.py` run H-LIT-ARSCOTT, H-LIT-TV and H-LIT-BENNETT, one
+  `study.yml` dispatch each, on CFBD data only (`/games`, `/lines`, `/games/media`,
+  `/rankings`; the two new client calls are `game_media` and `rankings`). It refuses a row that
+  is not runnable, quotes the criterion verbatim, and `--holm` builds the family table (m = 6).
+  - **Tate's call:** Bennett's first game is the first game PLAYED; a cancelled or postponed
+    opener is skipped.
+  - **Probe before the code (about 20 CFBD calls):**
+    - CFBD's providers change by era. 2013-16 has `consensus` (spread, no total) beside
+      `teamrankings` and `numberfire`, two near-identical feeds. Books arrive in 2018, and they
+      agree tightly from then on.
+    - No look reads a 2013-16 spread. TV's 2013-16 totals come from those two feeds.
+    - `/games` returns FCS openers.
+    - The final AP poll is one postseason release, and its first 10 places can include a tie.
+
 - **2026-10-08 (THREE LITERATURE LOOKS PRE-REGISTERED: H-LIT-ARSCOTT, H-LIT-TV, H-LIT-BENNETT).**
   Roadmap step 5, part two. Three of the six v1.3 looks are now rows in `docs/HYPOTHESES.md`;
   no script exists yet. Tate's calls:

@@ -264,6 +264,38 @@ class WeatherObs(Base):
     )
 
 
+class BuildForecast(Base):
+    """The forecast a card build SAW: one row per game per build that fetched it.
+
+    Written by `beatvegas.wx_paper.capture` during each decision build (registry
+    rows H-ARM-WX1H / H-ARM-WXFG, Tate's calls of 2026-10-09). Decision-safe by
+    construction: `fetched_at` is the build's own clock and always precedes the
+    kickoff it describes. Kept out of `weather_obs` on purpose: that table's
+    backfill deletes and rewrites rows by lead, and its studies read fixed
+    leads, so build-time rows there could be wiped or mixed into a frozen study.
+    Nothing but the weather arms reads it.
+    """
+
+    __tablename__ = "build_forecasts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
+    fetched_at = Column(DateTime, nullable=False)  # the build's clock, naive UTC
+    kickoff = Column(DateTime)  # the game's start_date when fetched (naive UTC)
+    lead_hours = Column(Float)  # kickoff - fetched_at, in hours
+    slot = Column(String)  # the build that fetched it
+    temperature_f = Column(Float)
+    wind_mph = Column(Float)  # sustained 10 m wind at the kickoff hour
+    wind_gust_mph = Column(Float)
+    precipitation = Column(Float)
+    dome = Column(Boolean)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    source = Column(String)  # beatvegas.sources.weather.SOURCE_FORECAST
+    weather_model = Column(String)  # pinned, as weather_obs's history
+
+    __table_args__ = (Index("ix_build_forecasts_game_fetched", "game_id", "fetched_at"),)
+
+
 class WeatherActual(Base):
     """OBSERVED weather around a played game, hour by hour -- a study table.
 

@@ -110,6 +110,20 @@ the restart spends no alpha; the selection rules, slots and test are otherwise u
 | H-ARM-1HO | 2 | First-half OVER on every game at or below the slate floor (the k-th smallest gap, k = max(1, round(0.2N))) with the gap below zero, at Hard Rock's over price | `challenger_picks`, `arm = 'H-ARM-1HO'` (`beatvegas/arm_paper.py`) |
 | H-ARM-FGU | 3 | Full-game UNDER on every game at or above the full-game slate bar (gap above zero), H-FG-P's universe without its cap | `challenger_picks`, `arm = 'H-ARM-FGU'` (`beatvegas/fg_paper.py`, `cap=None`) |
 
+**The weather arms (roadmap v1.6, Tate 2026-10-09), ledger slots 6 and 7.** Registered under
+p1.1 with the same test; they read no model, so the pause above does not apply, and each clock
+starts at its first eligible build after the rows merged (`protocol.WX_ARMS_START` is the backstop;
+`protocol.arm_start` gives each arm's start).
+
+| Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
+|---|---|---|---|
+| H-ARM-WX1H | 6 | First-half UNDER on every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph, at Hard Rock's centred main line and under price | `challenger_picks`, `arm = 'H-ARM-WX1H'` (`beatvegas/wx_paper.py`) |
+| H-ARM-WXFG | 7 | Full-game UNDER on the same games, at Hard Rock's newest centred full-game total and under price | `challenger_picks`, `arm = 'H-ARM-WXFG'` (`beatvegas/wx_paper.py`) |
+
+- **The forecast:** each decision build fetches the kickoff-hour forecast of the week's games not
+  yet kicked off (Open-Meteo forecast API, model `icon_seamless`) into `build_forecasts`, which
+  nothing else reads; a game qualifies on its newest forecast fetched at or before the build.
+
 - **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
   H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.
 - **Exclusions:** a paper pick without a Hard Rock price is now excluded by name (`no_price`,

@@ -9,6 +9,23 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (THE WEATHER ARMS, ROADMAP v1.6).** Strategic review topic 3: Tate asked for the correct
+  weather test instead of a verdict. The legacy weather inputs left the model as a leak (#344); weather as
+  an edge now runs as its own tests.
+  - **Two forward paper arms under p1.1**, ledger slots 6 and 7 (4-5 stay reserved for derivative
+    consistency and stale lines): H-ARM-WX1H (first-half unders) and H-ARM-WXFG (full-game unders) on
+    every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph, at
+    Hard Rock's price, uncapped, no model read. `beatvegas/wx_paper.py`; the build fetches forecasts into
+    the new `build_forecasts` table (Open-Meteo forecast API, `icon_seamless`), kept out of
+    `weather_obs` because that table's backfill deletes and rewrites rows by lead.
+  - **Sizing (counts only, no outcomes):** about 95 priced outdoor games a season had a 10+ mph forecast
+    72 h out in 2024-25, about 6 a week; 186 of them have both a 48-hour first-half line and a close (the
+    history look's universe).
+  - **Correction recorded:** only R09 (1H gust × style) was a weather null; R06 was rejected on blast
+    radius, not signal.
+  - Also on 2026-10-09: the 2023-25 pace re-pull (enrich_tempo run 37992138665) rewrote every row as of
+    the Sunday before its week (6,310 rows, all Sunday-dated).
+
 - **2026-10-09 UTC (TWO EXPLORATORY LOOKS REGISTERED: H-WX-HIST, H-JUDGE).** Strategic review topic 3,
   Tate's calls. Rows first, scripts in the same PR, each read once through `study.yml` after merge.
   - **H-WX-HIST** (`scripts/weather_history_look.py`): 2024-25 outdoor FBS games, the decision-safe

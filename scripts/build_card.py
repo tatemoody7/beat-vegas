@@ -35,6 +35,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Set
 
+from beatvegas import wx_paper
 from beatvegas.arm_paper import arm_summary_lines, log_overs_mirror
 from beatvegas.card import (
     REFERENCE_MODEL_VERSION,
@@ -663,6 +664,7 @@ def run(
         fg_on = fg_enabled()
         arm_over_stats: Optional[Dict] = None
         arm_fg_stats: Optional[Dict] = None
+        wx_stats: Optional[Dict] = None
         paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
@@ -722,6 +724,31 @@ def run(
                         )
                 except Exception as e:  # noqa: BLE001 - never break the card
                     print(f"[card] WARNING: H-ARM-FGU not logged: {e}")
+                # The weather arms (H-ARM-WX1H / WXFG, 2026-10-09): fetch the
+                # forecast this build sees, then log windy outdoor games. Their
+                # own SAVEPOINT: a failed fetch or insert never costs the card.
+                try:
+                    with s.begin_nested():
+                        wx_ids = wx_paper.week_game_ids(s, season, week, now)
+                        wx_stats = {
+                            "capture": wx_paper.capture(s, wx_ids, now, slot=card.get("slot"))
+                        }
+                        forecasts = wx_paper.newest(s, wx_ids, now)
+                        wx_stats["1h"] = wx_paper.log_first_half(
+                            s, card, now, forecasts, window_hours=paper_window_hours
+                        )
+                        wx_stats["full"] = wx_paper.log_full_game(
+                            s,
+                            season,
+                            week,
+                            now,
+                            forecasts,
+                            window_hours=paper_window_hours,
+                            slot=card.get("slot"),
+                        )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    wx_stats = None
+                    print(f"[card] WARNING: weather arms not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -780,6 +807,7 @@ def run(
         lines.append(neggap_summary_line(neggap_added, neggap_on))
         lines.append(fg_summary_line(fg_stats, fg_on))
         lines.extend(arm_summary_lines(arm_over_stats, arm_fg_stats))
+        lines.extend(wx_paper.summary_lines(wx_stats))
         if picks_added:
             # Frozen feature vectors (2026-10-04): a pick with none had no
             # game_records row (the first scoring of the game never ran).

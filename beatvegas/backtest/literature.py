@@ -157,8 +157,10 @@ def binomial_p(wins: int, n: int, p0: float = BREAK_EVEN) -> Optional[float]:
 def holm_family(pvalues: Mapping[str, float], m: int = FAMILY_M) -> Dict[str, Dict[str, Any]]:
     """Holm-adjusted p-values for the looks that have run, with the family fixed
     at `m` and every look not yet run counted as p = 1. Holm is monotone in each
-    p-value, so a PASS here is final; a look not passing is final only once all
-    `m` have run (a later rejection can lower its threshold)."""
+    p-value, so a PASS here is final. A look not passing is final when all `m`
+    have run, or when its own p is at least ALPHA: Holm's loosest step tests at
+    ALPHA itself, so no later rejection can bring such a look under it.
+    Otherwise a later rejection can still lower its threshold."""
     ids = list(pvalues)
     if len(ids) > m:
         raise ValueError(f"{len(ids)} looks reported for a family of {m}")
@@ -168,14 +170,14 @@ def holm_family(pvalues: Mapping[str, float], m: int = FAMILY_M) -> Dict[str, Di
     out: Dict[str, Dict[str, Any]] = {}
     for i, rid in enumerate(ids):
         a = float(adj[i])  # every entry is a float: none of `padded` is None
-        passed = a < ALPHA
-        out[rid] = {
-            "p": float(pvalues[rid]),
-            "holm_p": a,
-            "verdict": "PASS"
-            if passed
-            else ("NOT MET" if complete else "not met so far (final once all six have run)"),
-        }
+        raw = float(pvalues[rid])
+        if a < ALPHA:
+            verdict = "PASS"
+        elif complete or raw >= ALPHA:
+            verdict = "NOT MET"
+        else:
+            verdict = "not met so far (final once all six have run)"
+        out[rid] = {"p": raw, "holm_p": a, "verdict": verdict}
     return out
 
 

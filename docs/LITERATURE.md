@@ -18,10 +18,14 @@ promote anything.**
   - A pass licenses a paper arm only; that arm then registers under `docs/PROTOCOL_2026.md` and
     spends a ledger slot.
 - **Team totals and full-game weather** are tracked edge candidates in their own right.
-- **Three looks are registry rows (2026-10-08):** `H-LIT-ARSCOTT`, `H-LIT-TV` and
-  `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, each frozen before its script
-  (`scripts/literature_look.py`, one `study.yml` dispatch each). Coleman, Cox and Salaga follow
-  in their own PRs.
+- **Three looks ran, once each (2026-10-09 UTC): all NOT MET, and final.** See "Results"
+  below.
+  - Arscott 51.6% on 219, national TV 52.4% on 2,385, Bennett 46.7% on 60, against the 52.38%
+    break-even. Every p is above 0.5, and every Holm-adjusted p is 1.000.
+  - They are final because a raw p above 5% cannot pass at any Holm step, whatever Coleman, Cox
+    and Salaga show.
+  - The rows are `H-LIT-ARSCOTT`, `H-LIT-TV` and `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, run by
+    `scripts/literature_look.py`. Coleman, Cox and Salaga follow in their own PRs.
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against
@@ -60,12 +64,53 @@ Holm-corrected at 5% with m = 6 fixed (a look not yet run counts as p = 1). Tate
 
 | Look | Rule | Years | Definition status |
 |---|---|---|---|
-| Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | Frozen in `H-LIT-ARSCOTT`: the formula and both σ from the working paper; spread-0 games excluded |
+| Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | Frozen in `H-LIT-ARSCOTT`: the formula and both σ from the working paper; spread-0 games excluded. **Ran 2026-10-09: NOT MET** |
 | Coleman | Home favourite vs a visiting underdog that travelled one time zone east, second half of the season | 2013-2025 | **Waiting on the full text**: Tate's call is to freeze Coleman's exact "second half" cutoff and line timing, not a guess |
-| National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen in `H-LIT-TV`: any TV outlet that is exactly one of the five |
+| National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen in `H-LIT-TV`: any TV outlet that is exactly one of the five. **Ran 2026-10-09: NOT MET** |
 | Cox | Rivalry games = FBS series with a named trophy (Wikipedia's trophy-game list, frozen on the registration date) | 2019-2025 | Which of Cox's rules are tested (rivalry underdog; the favourite that won the last 3 meetings) is fixed in the row |
-| Bennett | Fade the previous season's final AP top 10 in its first game | 2018-2025 | Frozen in `H-LIT-BENNETT`: 2017 dropped (the paper's 2008-2016 may name the first-game seasons); the literal first game; top-10 pairs dropped. About 70 games, so it reads closer to a description than a test |
+| Bennett | Fade the previous season's final AP top 10 in its first game | 2018-2025 | Frozen in `H-LIT-BENNETT`: 2017 dropped (the paper's 2008-2016 may name the first-game seasons); the literal first game; top-10 pairs dropped. About 70 games, so it reads closer to a description than a test. **Ran 2026-10-09: NOT MET** (60 graded) |
 | Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Observed weather comes from `weather_actuals` (ERA5 hourly + a CFBD cross-check, 2013-2026; `docs/WEATHER.md` §7); the game window is fixed in the row. Uses game-time weather, so a pass does not make it bettable as stated |
+
+## Results (one `study.yml` dispatch each, 2026-10-09 UTC, at `4345320`)
+
+The judge was the median closing number across CFBD's providers, with the win rate tested by a
+one-sided exact binomial against 52.38%, pushes dropped. Holm ran at 5% with m = 6.
+
+| Look | Run | Record (pushes) | Win rate | p | Holm-adjusted p | Units at −110 | Verdict |
+|---|---|---|---|---|---|---|---|
+| Arscott: over when the bias > 1.00 | 37863814444 | 113-106 (3) | 51.6% | 0.618 | 1.000 | −3.27 | NOT MET |
+| National TV: under | 37864047692 | 1249-1136 (30) | 52.4% | 0.513 | 1.000 | −0.55 | NOT MET |
+| Bennett: fade the prior top 10 | 37864196666 | 28-32 (1) | 46.7% | 0.845 | 1.000 | −6.55 | NOT MET |
+
+**The three verdicts are final.** Holm's loosest step tests at 5% itself, so a raw p above 5%
+cannot pass whatever the other looks show. Coleman, Cox and Salaga will be adjusted at m = 6
+with these three p-values in the family (`literature_look --holm`).
+
+**Secondary numbers.** These are descriptive only. Nothing is tested on them and no rule is
+chosen from them.
+- **Arscott:**
+  - 3.9% of the 5,693 graded games qualified; the paper reports about 5%.
+  - The paper's in-sample 1.75 cut went 32-20-1 (61.5%, n 52).
+  - Every graded over went 49.4% (n 5,628).
+  - Season rates ran from 40.5% (2023) to 62.5% (2020, n 8).
+  - 12 spread-0 games were excluded.
+- **National TV:**
+  - Under rates by network: ESPN 54.4% (n 971), ABC 51.6% (614), CBS 51.4% (247), FOX 50.2%
+    (424), NBC 49.6% (125).
+  - Other televised games' unders went 50.6% (n 6,154); games with no media row 49.9% (n 670).
+  - National games numbered 164 to 226 a season. Games with no media row fell from 98 (2013) to
+    6-20 (2023-25).
+- **Bennett:**
+  - 80 team-seasons. 13 opened against FCS, and 6 were in top-10 pairs: Georgia-Clemson 2021,
+    Notre Dame-Ohio State 2022, Ohio State-Texas 2025.
+  - Every poll name matched a schedule name.
+  - Faded at home: 37.8% (n 45). Faded away: 73.3% (n 15).
+
+**Provenance.**
+- The 2013-16 totals came from `teamrankings` and `numberfire`, two near-identical feeds, so in
+  effect one source. `consensus` adds a total from 2017, and books arrive from 2018.
+- CFBD calls left after the three runs: 74,182.
+- The per-game CSVs are in each run's `study-literature_look` artifact.
 
 ## Tracked edge candidates (roadmap v1.3)
 

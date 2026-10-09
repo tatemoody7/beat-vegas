@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (H-WX-HIST / H-JUDGE FIRST RUNS READ NO LINE VALUE: A MARKET-NAME BUG).** `study.yml`
+  runs 37996581552 (weather) and 37996591672 (judge) at `59c0037` completed, but every line-value
+  reading was excluded (`outside_table`; 3,804 first-half bets in the judge check, every weather cell):
+  `early_close.records` passed the WAGER market ('1H') where the judge's half-point table is keyed by
+  the SNAPSHOT market ('1H_total'). No line-value number was produced, so none was seen. The weather
+  look's record against the close does not use the table and ran correctly: first half windy 90-95-2
+  (48.6%, Wilson 41.5-55.8%, p 0.862), calm 517-511-23 (50.3%); full game windy 94-92-4 (50.5%), calm
+  522-523-13. The fix passes the snapshot market, both reports now count exclusions by reason, and
+  `tests/test_early_close.py` runs one game through the real table. The re-run repeats the close
+  records identically and adds the line-value half.
+
 - **2026-10-09 UTC (THE WEATHER ARMS, ROADMAP v1.6).** Strategic review topic 3: Tate asked for the correct
   weather test instead of a verdict. The legacy weather inputs left the model as a leak (#344); weather as
   an edge now runs as its own tests.

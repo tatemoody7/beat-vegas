@@ -137,7 +137,6 @@ def records(
         kick = g.start_date
         closes = book_closes(sn, kick)
         early = early_line(sn, kick)
-        mk = "1H" if market == "1H_total" else "full"
         rec = {
             "game_id": gid,
             "season": g.season,
@@ -149,10 +148,27 @@ def records(
             "total": realized_total(g, market),
         }
         for side in ("under", "over"):
-            r = read_at_terms(closes, kick, mk, early, side, STANDARD_PRICE, table)
+            # the judge's half-point table is keyed by the SNAPSHOT market
+            # ('1H_total' / 'full_game_total'), as picks read it through SNAP_MARKET
+            r = read_at_terms(closes, kick, market, early, side, STANDARD_PRICE, table)
             rec[side] = {"ev": r.ev, "excluded": r.excluded, "books": r.books}
         out.append(rec)
     return out
+
+
+def exclusion_counts(
+    recs: Iterable[dict], sides: Sequence[str] = ("under", "over")
+) -> Dict[str, int]:
+    """Why each bet had no reading, by reason -- so a run that reads nothing
+    says why instead of printing an empty table."""
+    out: Dict[str, int] = defaultdict(int)
+    for r in recs:
+        for side in sides:
+            if r[side]["ev"] is None:
+                out[
+                    "no_early_line" if r["early"] is None else (r[side]["excluded"] or "no_ev")
+                ] += 1
+    return dict(out)
 
 
 def week_key(rec: dict) -> tuple:

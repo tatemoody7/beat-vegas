@@ -112,3 +112,51 @@ def test_judge_check_pairs_both_sides_at_the_early_line_and_fits_a_line(load_scr
     slope, icpt = jc.ols([(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)])
     assert slope == pytest.approx(1.0) and icpt == pytest.approx(0.0)
     assert jc.ols([(1.0, 0.0), (1.0, 1.0), (1.0, 2.0)]) is None
+
+
+def test_records_reads_a_real_judge_value_end_to_end():
+    """The regression the first H-WX-HIST / H-JUDGE runs hit (2026-10-09): the
+    judge's half-point table is keyed by the SNAPSHOT market; passing the wager
+    market ('1H') excluded every bet. One synthetic game through the real table."""
+    from sqlalchemy.orm import Session
+
+    from beatvegas.db.models import Game, OddsSnapshot
+    from tests.conftest import _sqlite_scope
+
+    eng, scope = _sqlite_scope()
+    with Session(eng) as s:
+        s.add(
+            Game(
+                id=1,
+                season=2025,
+                week=7,
+                season_type="regular",
+                start_date=KICK,
+                home_team="Ohio State",
+                away_team="Michigan",
+                home_points=24,
+                away_points=17,
+                first_half_total=17,
+                first_half_source="linescores",
+            )
+        )
+        for book in ("draftkings", "fanduel", "betmgm", "espnbet"):
+            for hours, line in ((48, 27.5), (0.5, 26.5)):
+                s.add(
+                    OddsSnapshot(
+                        game_id=1,
+                        book=book,
+                        market="1H_total",
+                        line=line,
+                        over_price=-110,
+                        under_price=-110,
+                        captured_at=KICK - timedelta(hours=hours),
+                    )
+                )
+        s.commit()
+    with scope() as s:
+        (rec,) = E.records(s, [2025], "1H_total")
+    assert rec["early"] == 27.5 and rec["close"] == 26.5 and rec["total"] == 17
+    assert rec["under"]["ev"] is not None and rec["over"]["ev"] is not None
+    assert rec["under"]["ev"] > rec["over"]["ev"]  # the market moved toward the under
+    assert E.exclusion_counts([rec]) == {}

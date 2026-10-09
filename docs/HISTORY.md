@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (WEATHER PROMOTE REFUSED; INVERTED GUSTS NOW BLANKED).** Run 37833098273's
+  fetch hit its 350-minute cap at 01:26Z. Its staging file was saved (1.06 MiB): 4,610 of
+  10,097 planned ERA5 games (2013 to mid-2019) and every CFBD season.
+  - **The refusal:** the promote's `--check` refused all 37,577 rows. 37 ERA5 hours had a gust
+    more than 0.5 mph below the wind (median 1.2, max 8.1). There were no out-of-range values,
+    and ERA5 vs CFBD agreed to 2.0 °F, 7.0% humidity and 2.8 mph wind. `weather_actuals` holds
+    nothing yet.
+  - **Tate's call:** blank those gusts (`null_inverted_gusts`) and promote the rest. The real
+    staging file now passes `--check` with 37 gusts blanked.
+  - **The fetch:** resumed fetch-only (run 37870394348, `promote=false`).
+  - **Deferred:** the roadmap ledger edit for the three literature nulls goes to Monday's review
+    (v1.5, Tate).
+
 - **2026-10-09 UTC (THREE LITERATURE LOOKS: ALL NOT MET).** One `study.yml` dispatch each, at
   `4345320`, judged on the median CFBD close. `docs/LITERATURE.md` "Results" has the tables.
   - **H-LIT-ARSCOTT** (run 37863814444): 113-106-3, 51.6%, p 0.618.

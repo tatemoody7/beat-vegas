@@ -232,6 +232,51 @@ def test_promote_writes_the_table_and_a_second_promote_replaces_it(W, monkeypatc
         assert got[1].valid_time == datetime(2016, 9, 3, 16)
 
 
+def test_inverted_gusts_beyond_rounding_are_blanked_and_nothing_else(W):
+    """Tate 2026-10-08: a gust more than 0.5 mph below the hour's wind is set to
+    NULL; the hour's wind, temperature and humidity stay; a rounding-size
+    deficit stays; the check then passes."""
+    k = datetime(2016, 9, 3, 16)
+    bad = W.era5_rows(1, k, _series(k, [0], wind=20.0, gust=12.0, temp=71.0), 0, 0, "t")
+    calm = W.era5_rows(2, k, _series(k, [0], wind=8.1, gust=7.8), 0, 0, "t")
+    fine = W.era5_rows(3, k, _series(k, [0], wind=8.0, gust=15.0), 0, 0, "t")
+    rows = bad + calm + fine
+    assert W.check(rows)[0]  # the rule still flags it before the blanking
+    assert W.null_inverted_gusts(rows) == {W.SOURCE_ERA5: 1}
+    assert bad[0]["wind_gust_mph"] is None
+    assert (bad[0]["wind_mph"], bad[0]["temperature_f"]) == (20.0, 71.0)
+    assert calm[0]["wind_gust_mph"] == 7.8 and fine[0]["wind_gust_mph"] == 15.0
+    problems, _ = W.check(rows)
+    assert problems == []
+    assert W.null_inverted_gusts(rows) == {}  # idempotent
+
+
+def test_promote_blanks_inverted_gusts_then_writes(W, monkeypatch):
+    from contextlib import contextmanager
+
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    import beatvegas.db.store as store
+
+    monkeypatch.setattr(store, "session_scope", scope)
+    k = datetime(2016, 9, 3, 16)
+    rows = W.era5_rows(
+        1, k, _series(k, [0], wind=20.0, gust=12.0), 30.6, -96.3, "2026-10-08T00:00:00"
+    )
+    W.STAGING.write_text(json.dumps(rows[0]) + "\n")
+    W.promote([W.SOURCE_ERA5])
+    with Session(eng) as s:
+        got = s.query(WeatherActual).one()
+        assert got.wind_gust_mph is None and got.wind_mph == 20.0
+
+
 def test_promote_refuses_a_staging_file_with_problems(W):
     k = datetime(2016, 9, 3, 16)
     rows = W.era5_rows(1, k, _series(k, [0], hum=140.0), 0, 0, "t")

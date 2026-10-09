@@ -9,6 +9,29 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (THE LEAK-FIXED MODEL).** Strategic review topic 3, Tate's calls. The model under
+  the arms had information from after the game in its training rows; each fix below is pinned by
+  `tests/test_trophy_games.py`.
+  - **Pace:** the 2023-25 `team_tempo` rows were pulled as of each week's median kickoff date
+    (2025's rows are dated the Saturday of the game week), so midweek teams carried their own game.
+    `backfill_enrichment.py` now reads the Sunday before the week's first regular-season kickoff
+    (Eastern), as `sunday.yml` does live; `enrich_tempo.yml` re-pulls 2023-25 after merge.
+  - **Weather:** `wx_temp`, `wx_wind`, `wx_precip` leave `BV_FEATURE_COLS`
+    (`features.LEAKY_WEATHER_COLS`): kickoff observations on the old clock for 2023-25 only, while
+    live reads a six-day forecast. `wx_dome` stays. Weather as an edge gets its own tests
+    (history look, Salaga, two forward arms at 10+ mph; registry rows follow).
+  - **Rivalry:** "met in 8+ distinct seasons across the dataset" counted future meetings; it is
+    now the named trophy games, frozen from Wikipedia revision 1379225783 into
+    `data/trophy_games.json` (112 FBS pairs; `scripts/build_trophy_games.py`). Counting only
+    earlier meetings would have flagged nothing before 2011, since games start in 2003.
+  - **Conference:** read from each game's own conference fields (realignment honoured: Texas Big
+    12 through 2023, SEC from 2024; none missing on 17,632 FBS-vs-FBS games); two independents
+    no longer count as a conference game.
+  - **Kept, Tate's call:** same-season talent and roster experience, returning production,
+    prior-season PPA/success (their risk is CFBD revising numbers, not after-game information).
+  - 58 → 55 model inputs. Sunday's refit trains the leak-fixed model; the first card on it starts
+    the arms' clocks (`protocol.ARMS_START` + `cards.id`, a follow-up PR).
+
 - **2026-10-09 UTC (STRATEGIC REVIEW; ARMS PAUSED, PROTOCOL p1.1, ROADMAP v1.5).** Tate opened an
   evidence-first review of the whole project (one topic at a time; its record lands as one docs PR
   when the review ends).

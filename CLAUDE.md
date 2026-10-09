@@ -68,9 +68,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   two-sided overs, Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model against the spread.
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
   judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
-- **The model and bar as built** (they feed the paper arms): market-blind HGB (B-SERVE removed 57
-  inputs that were NaN at serving; `weekly_update.py` fails a scoring run whose target rows are
-  >90% NaN on a column training is <10% NaN on). The per-slate bar (H-PCT) is the k-th largest gap
+- **The model and bar as built** (they feed the paper arms): market-blind HGB, 55 inputs (B-SERVE
+  dropped 57 NaN at serving, the leak fix 3 kickoff-weather; rivalry = trophy games; `weekly_update.py`
+  fails a run >90% NaN on a column training has <10% NaN). The per-slate bar (H-PCT) is the k-th largest gap
   over the slate's Hard-Rock-priced games, k = max(1, round(0.2 × N)) — `model/score.py::slate_bar`
   mirrored by `verdict.ts::slateBar`, golden vectors in `tests/fixtures/slate_bar_vectors.json`;
   `BET_GAP_PTS = 1.75` survives only as the empty-slate fallback. The weekly refit writes a
@@ -100,8 +100,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Arms paused (2026-10-09, v1.5)** while training leaks are fixed; the leak-fixed model's first
-  card starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile picks are development data.
+- **Arms paused (2026-10-09, v1.5)** until the leak-fixed model's first card (pace re-pulled as of the
+  Sunday before, 2023-25) starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile dev data.
   `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
   and the arms' first read; the 12
@@ -163,7 +163,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on
   `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
-  − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
+  − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS` − `LEAKY_WEATHER_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
   `data/fbs_teams.json`), trained on 2003+ (`score.CHAMPION_TRAIN_MIN_SEASON`; other frames
   2023+), global intercept, re-fitted every Sunday. `score_slate`
   ranks by `gap = line − bv_line`; the 0-100 score, tier and kill line all derive from the gap
@@ -210,7 +210,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +
-  `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`,
+  `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`, `build_trophy_games` (rivalry list),
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `retrain`, `backtest`, `validate_engine`, `rank_factors`,

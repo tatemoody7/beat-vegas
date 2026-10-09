@@ -88,8 +88,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
   Arscott/TV/Bennett all NOT MET 10-09 (final); Coleman waits on full text, Salaga on weather; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
-  1HO / FGU, clocks from the 10-09 fri_pm build, `scripts/protocol_position.py` on Mondays; 4-5 not
-  designed) → shadow engines → public research-lab page →
+  1HO / FGU, tagged from the 10-09 fri_pm build, clocks PAUSED (p1.1, v1.5) until the leak-fixed
+  model's first card, `scripts/protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **Real-money switch: OFF since 2026-10-08 20:00 UTC** (v1.4, Tate's call; written through Neon's
@@ -100,13 +100,13 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Arms' first build (2026-10-09 fri_pm)**: confirm H-ARM-1HU / 1HO / FGU each logged and write
-  that build's `cards.id` into `docs/PROTOCOL_2026.md`; first Monday read 10-12 (`protocol_position`).
+- **Arms paused (2026-10-09, v1.5)** while training leaks are fixed; the leak-fixed model's first
+  card starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile picks are development data.
   `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
   and the arms' first read; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.5: 3 literature nulls → REJECTED?
+  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.6: 3 literature nulls → REJECTED?
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
   shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
   engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget

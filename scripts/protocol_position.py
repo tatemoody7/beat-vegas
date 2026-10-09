@@ -49,9 +49,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def arm_rows(session, arm: str, spec: Dict[str, Any], since: Optional[str] = None) -> List[Any]:
-    """The arm's paper picks placed on or after `since` (default: the clock's
-    start), placed order. Never a real ticket."""
-    start = datetime.fromisoformat(since or P.ARMS_START)
+    """The arm's paper picks placed on or after `since` (default: the arm's
+    clock start), placed order. Never a real ticket."""
+    start = datetime.fromisoformat(since or P.arm_start(arm))
     model = ManualPick if spec["table"] == "manual_picks" else ChallengerPick
     q = session.query(model).filter(
         model.arm == arm,
@@ -126,9 +126,9 @@ def render(result: Dict[str, Any]) -> str:
     ]
     if any(r["state"] == P.PAUSED for r in result["arms"].values()):
         L += [
-            "**Clocks paused** since 2026-10-09 (p1.1, roadmap v1.5): no reading counts until "
-            "the first card built on the leak-fixed model; the picks logged meanwhile "
-            "(`logged`) are development evidence.",
+            "**Clocks paused** since 2026-10-09 (p1.1, roadmap v1.5) for the arms marked "
+            "PAUSED: no reading counts until the first card built on the leak-fixed model; "
+            "the picks they log meanwhile (`logged`) are development evidence.",
             "",
         ]
     L += [
@@ -156,10 +156,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     arms: Dict[str, Dict[str, Any]] = {}
     with session_scope() as s:
         for arm, spec in P.ARMS.items():
-            if P.ARMS_START is None:
+            start = P.arm_start(arm)
+            if start is None:
                 line = paused_arm(len(arm_rows(s, arm, spec, since=P.ARMS_TAGGED_FROM)))
             else:
-                line = read_arm(arm_rows(s, arm, spec), args.season_over)
+                line = read_arm(arm_rows(s, arm, spec, since=start), args.season_over)
             arms[arm] = {**line, "slot": spec["slot"]}
     result = {"generated_at": datetime.utcnow().isoformat() + "Z", "arms": arms}
     md = render(result)

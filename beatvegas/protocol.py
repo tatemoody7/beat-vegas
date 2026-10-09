@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 PROTOCOL_VERSION = "p1.1"
 K_TESTS = 10
@@ -69,13 +69,37 @@ MAX_OBS = 200  # readings
 ARM_1H_UNDER = "H-ARM-1HU"
 ARM_1H_OVER = "H-ARM-1HO"
 ARM_FG_UNDER = "H-ARM-FGU"
+# The weather arms (Tate's calls of 2026-10-09, strategic review topic 3): a
+# paper UNDER on every outdoor game whose newest build-time forecast has a
+# sustained kickoff-hour wind of 10+ mph (beatvegas/wx_paper.py). They read no
+# model, so the leak-fix pause does not apply to them.
+ARM_WX_1H = "H-ARM-WX1H"
+ARM_WX_FG = "H-ARM-WXFG"
 ARMS = {
     ARM_1H_UNDER: {"table": "manual_picks", "market": "1H", "side": "under", "slot": 1},
     ARM_1H_OVER: {"table": "challenger_picks", "market": "1H", "side": "over", "slot": 2},
     ARM_FG_UNDER: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 3},
+    ARM_WX_1H: {"table": "challenger_picks", "market": "1H", "side": "under", "slot": 6},
+    ARM_WX_FG: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 7},
 }
 ARMS_TAGGED_FROM = "2026-10-09T00:00:00"  # naive UTC; the first tagging build is fri_pm
 ARMS_START: Optional[str] = None  # paused 2026-10-09 (p1.1); naive UTC once set
+# The weather arms tag nothing before their rows merge, so this is a backstop:
+# their clocks run from their first eligible build.
+WX_ARMS_START = "2026-10-10T00:00:00"
+ARM_STARTS: Dict[str, Optional[str]] = {
+    ARM_1H_UNDER: ARMS_START,
+    ARM_1H_OVER: ARMS_START,
+    ARM_FG_UNDER: ARMS_START,
+    ARM_WX_1H: WX_ARMS_START,
+    ARM_WX_FG: WX_ARMS_START,
+}
+
+
+def arm_start(arm: str) -> Optional[str]:
+    """The earliest placed_at that counts toward `arm`'s clock; None = paused."""
+    return ARM_STARTS[arm]
+
 
 UPPER = math.log((1.0 - BETA) / ALPHA)  # promote
 LOWER = math.log(BETA / (1.0 - ALPHA))  # stop

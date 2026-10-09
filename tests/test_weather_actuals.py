@@ -120,6 +120,10 @@ def test_check_flags_bad_values_and_measures_agreement(W):
     bad = W.era5_rows(2, k, _series(k, [0], hum=140.0, wind=20.0, gust=12.0), 0, 0, "t")
     problems, _ = W.check(bad)
     assert any("humidity_pct=140.0" in p for p in problems)
+    # ERA5's gust may sit below the wind (a reanalysis property, 2026-10-09):
+    assert not any("gust" in p for p in problems)
+    other = [dict(bad[0], source="some_other_source", humidity_pct=60.0)]
+    problems, _ = W.check(other)
     assert any("gust 12.0 < wind 20.0" in p for p in problems)
 
 

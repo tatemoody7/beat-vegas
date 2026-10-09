@@ -89,6 +89,14 @@ hold the rest.
     - Results shows line value vs the consensus close (`ev_cons`) per ticket.
   - **The card build:** `card.py`'s BET sentence is "Bet one unit" again.
 
+- **2026-10-09 (weather_actuals: the first split run).** Run 37833098273 fetched ERA5 outside the queue
+  for 350 minutes and reached 750 of 1,855 venue-seasons (4,610 games, about 2 calls a minute on
+  GitHub's runners). CFBD covered 9,917 games. Across the 4,560 games both sources cover, they
+  differ by 2.0°F, 7 humidity points and 2.8 mph on average.
+  - **Promote refused by `--check`:** ERA5 gusts below the wind, up to 8 mph. Nothing was written.
+  - **Tate's call:** keep ERA5's gusts and skip that check for ERA5 rows (`docs/WEATHER.md` §7).
+    The staging file is cached, so the next dispatch resumes.
+
 - **2026-10-08 (OBSERVED WEATHER FOR THE HISTORY LOOKS: `weather_actuals`).** Roadmap v1.3's
   Salaga look needs 2016-2025 observed weather; we held 2023+.
   - **Tate's calls:**

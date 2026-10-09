@@ -192,16 +192,22 @@ def dedupe(rows: Iterable[dict]) -> List[dict]:
 
 
 def check(rows: List[dict]) -> Tuple[List[str], Dict[str, object]]:
-    """(problems, summary). Problems block a promote: an out-of-range value, or a
-    gust below the mean wind by more than rounding (docs/WEATHER.md section 2)."""
+    """(problems, summary). Problems block a promote: an out-of-range value, or
+    (any source but ERA5) a gust below the mean wind by more than rounding
+    (docs/WEATHER.md sections 2 and 7)."""
     problems: List[str] = []
     for r in rows:
         for col, (lo, hi) in BOUNDS.items():
             v = r.get(col)
             if v is not None and not (lo <= v <= hi):
                 problems.append(f"game {r['game_id']} {r['source']} {col}={v}")
+        # ERA5's gust can sit below the hour's wind (run 37833098273: up to
+        # 8 mph, e.g. gust 13.2 vs wind 21.3) -- a property of how the
+        # reanalysis estimates gusts, not a broken run, so ERA5 rows keep
+        # their gusts unchecked (Tate, 2026-10-09). The check stays for any
+        # other source that carries a gust.
         w, g = r.get("wind_mph"), r.get("wind_gust_mph")
-        if w is not None and g is not None and g < w - 0.5:
+        if r["source"] != SOURCE_ERA5 and w is not None and g is not None and g < w - 0.5:
             problems.append(f"game {r['game_id']} offset {r['hour_offset']}: gust {g} < wind {w}")
     era5 = {r["game_id"]: r for r in rows if r["source"] == SOURCE_ERA5 and r["hour_offset"] == 0}
     cfbd = {r["game_id"]: r for r in rows if r["source"] == SOURCE_CFBD}

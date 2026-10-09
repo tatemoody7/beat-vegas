@@ -230,6 +230,11 @@ cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
   - **promote** (in `neon-writers`, minutes): runs `--check` (out-of-range values, gust below
     wind), then writes. It also runs after a fetch cut off at its limit.
   - The staging file is cached between runs, so a re-dispatch resumes.
+- **ERA5's gusts are stored unchecked.** Its gust can sit below the hour's wind (run
+  37833098273: up to 8 mph, e.g. gust 13.2 against wind 21.3). That is a property of how the
+  reanalysis estimates gusts, not a broken run like the gfs inversions in §2. So `--check` keeps
+  every range check but skips gust-versus-wind for ERA5 rows (Tate, 2026-10-09). No study uses
+  the gusts; the Salaga look reads wind, temperature, humidity and rain.
 - **These rows are never decision-safe** and never a model input. A
   forecast-based weather arm (the tracked candidate in roadmap v1.3) reads
   `weather_obs` leads 24/72 instead.

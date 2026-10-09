@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from beatvegas.backtest import literature as L
-from beatvegas.registry import require_runnable_row
+from beatvegas.registry import HarnessRefusal, find_row, parse_registry, require_runnable_row
 
 ROOT = Path(__file__).resolve().parent.parent
 FBS = {2019: {"A", "B", "C", "D", "E", "F"}, 2020: {"A", "B", "C", "D", "E", "F"}}
@@ -226,6 +226,9 @@ def test_holm_family_fixes_m_at_six_and_counts_unrun_looks_as_one():
     miss = L.holm_family({L.TV: 0.02})[L.TV]
     assert miss["holm_p"] == pytest.approx(0.12)
     assert miss["verdict"].startswith("not met so far")
+    # A raw p at or above 5% can never pass: Holm's loosest step tests at 5% itself.
+    assert L.holm_family({L.TV: 0.513})[L.TV]["verdict"] == "NOT MET"
+    assert L.holm_family({L.TV: 0.05})[L.TV]["verdict"] == "NOT MET"
     # A second small p lowers the first one's threshold (Holm step-down).
     two = L.holm_family({L.ARSCOTT: 0.001, L.TV: 0.009})
     assert two[L.ARSCOTT]["holm_p"] == pytest.approx(0.006)
@@ -237,9 +240,16 @@ def test_holm_family_fixes_m_at_six_and_counts_unrun_looks_as_one():
         L.holm_family({f"L{i}": 0.5 for i in range(7)})
 
 
-def test_the_three_rows_are_registered_and_runnable():
+def test_each_look_ran_once_and_a_second_look_is_refused(capsys):
+    """All three looks ran on 2026-10-09 UTC and are decided: the registry gate
+    refuses each, so the script exits 2 before any CFBD call."""
+    mod = _script()
     for rid in L.LOOKS:
-        assert require_runnable_row(rid).id == rid
+        assert find_row(parse_registry(), rid).status == "tested-null"
+        with pytest.raises(HarnessRefusal):
+            require_runnable_row(rid)
+        assert mod.main(["--row", rid]) == 2
+    assert "REFUSED" in capsys.readouterr().err
 
 
 # --- the script --------------------------------------------------------------------
@@ -289,7 +299,7 @@ def test_run_look_end_to_end_writes_md_json_csv(tmp_path, monkeypatch, row_id):
         assert res["record"]["wins"] == 2
     else:
         assert res["record"]["n"] == 2 and res["record"]["wins"] == 2  # 52 over 50
-    row = require_runnable_row(row_id)
+    row = find_row(parse_registry(), row_id)
     stem = mod.write_reports(tmp_path, row, res, client.calls_remaining)
     md = stem.with_suffix(".md").read_text()
     assert row.criterion in md  # quoted verbatim

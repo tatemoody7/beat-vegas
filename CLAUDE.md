@@ -67,7 +67,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   gap did not sort unders from overs. Closed null: 1H game-total censoring, weather × style,
   two-sided overs, Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model against the spread.
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
-  judged on the years after the paper's own sample.
+  judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
 - **The model and bar as built** (they feed the paper arms): market-blind HGB (B-SERVE removed 57
   inputs that were NaN at serving; `weekly_update.py` fails a scoring run whose target rows are
   >90% NaN on a column training is <10% NaN on). The per-slate bar (H-PCT) is the k-th largest gap
@@ -85,8 +85,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
   probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
-  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger; rows
-  H-LIT-ARSCOTT/TV/BENNETT 10-08, script next; Coleman waits on full text, Salaga on weather; team
+  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
+  Arscott/TV/Bennett all NOT MET 10-09 (final); Coleman waits on full text, Salaga on weather; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
   1HO / FGU, clocks from the 10-09 fri_pm build, `scripts/protocol_position.py` on Mondays; 4-5 not
   designed) → shadow engines → public research-lab page →

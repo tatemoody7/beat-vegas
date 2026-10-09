@@ -9,6 +9,20 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (THREE LITERATURE LOOKS: ALL NOT MET).** One `study.yml` dispatch each, at
+  `4345320`, judged on the median CFBD close. `docs/LITERATURE.md` "Results" has the tables.
+  - **H-LIT-ARSCOTT** (run 37863814444): 113-106-3, 51.6%, p 0.618.
+  - **H-LIT-TV** (run 37864047692): 1249-1136-30, 52.4%, p 0.513.
+  - **H-LIT-BENNETT** (run 37864196666): 28-32-1, 46.7%, p 0.845.
+  - **Holm (m = 6):** every adjusted p is 1.000. The verdicts are final: a raw p above 5% cannot
+    pass at any Holm step, whatever Coleman, Cox and Salaga show.
+  - **No paper arm is licensed.** The rows are `tested-null`, and a second run is refused (exit
+    2).
+  - **Descriptive only:** the 1.75 Arscott cut (32-20-1, n 52) and Bennett faded-away (11-4-1)
+    were never tests. They are not candidates without their own row.
+  - **Not changed:** the roadmap's hypothesis ledger still lists the six looks under NEEDS MORE
+    EVIDENCE. Moving three to REJECTED is a versioned amendment, so it is Tate's call.
+
 - **2026-10-08 (THE LITERATURE LOOK SCRIPT).** `scripts/literature_look.py` +
   `beatvegas/backtest/literature.py` run H-LIT-ARSCOTT, H-LIT-TV and H-LIT-BENNETT, one
   `study.yml` dispatch each, on CFBD data only (`/games`, `/lines`, `/games/media`,

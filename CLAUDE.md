@@ -102,11 +102,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
 - **Arms' first build (2026-10-09 fri_pm)**: confirm H-ARM-1HU / 1HO / FGU each logged and write
   that build's `cards.id` into `docs/PROTOCOL_2026.md`; first Monday read 10-12 (`protocol_position`).
-  `weather_actuals.yml` (run 37833098273) may need a re-dispatch to finish its ERA5 fetch.
+  `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
   and the arms' first read; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body).
+  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.5: 3 literature nulls → REJECTED?
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
   shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
   engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget

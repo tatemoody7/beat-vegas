@@ -229,6 +229,13 @@ cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
   - **fetch** (no `DATABASE_URL`, outside the queue): ERA5 and CFBD into a staging file.
   - **promote** (in `neon-writers`, minutes): runs `--check` (out-of-range values, gust below
     wind), then writes. It also runs after a fetch cut off at its limit.
+  - **A gust more than 0.5 mph below its hour's wind is blanked, not refused** (Tate
+    2026-10-08). The first full promote met 37 such ERA5 hours of 27,660 (0.13%; short by a
+    median 1.2 mph, at most 8.1) and refused all 37,577 rows.
+    - `null_inverted_gusts` sets only those gusts to NULL. It keeps the hour's wind,
+      temperature and humidity, and reports the count by source as `gusts_nulled`.
+    - It runs before `--check` in both `--check` and `--promote`, and the rule stays in `check`.
+    - Salaga's look reads wind, temperature and humidity, never gust.
   - The staging file is cached between runs, so a re-dispatch resumes.
 - **These rows are never decision-safe** and never a model input. A
   forecast-based weather arm (the tracked candidate in roadmap v1.3) reads

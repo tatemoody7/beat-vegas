@@ -39,6 +39,7 @@ import json
 import statistics
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -75,6 +76,9 @@ BOUNDS = {
     "wind_gust_mph": (0.0, 130.0),
     "precipitation_in": (0.0, 10.0),
 }
+# A gust below the hour's mean wind by up to this much is Open-Meteo's m/s
+# rounding (docs/WEATHER.md section 2); beyond it the gust is not trusted.
+GUST_ROUNDING_MPH = 0.5
 
 
 # ---------------------------------------------------------------- pure
@@ -191,6 +195,22 @@ def dedupe(rows: Iterable[dict]) -> List[dict]:
     return list(latest.values())
 
 
+def null_inverted_gusts(rows: Iterable[dict]) -> Dict[str, int]:
+    """Blank `wind_gust_mph` on every hour whose gust sits below that hour's
+    wind by more than rounding, keeping the hour's wind, temperature and
+    humidity, and return the count by source (Tate 2026-10-08: the first full
+    promote met 37 such ERA5 hours of 27,660 and refused everything). Runs
+    before `check` in both --check and --promote, so the two always agree;
+    `check` keeps the rule, so an inversion that bypassed this still blocks."""
+    nulled: Counter = Counter()
+    for r in rows:
+        w, g = r.get("wind_mph"), r.get("wind_gust_mph")
+        if w is not None and g is not None and g < w - GUST_ROUNDING_MPH:
+            r["wind_gust_mph"] = None
+            nulled[r["source"]] += 1
+    return dict(nulled)
+
+
 def check(rows: List[dict]) -> Tuple[List[str], Dict[str, object]]:
     """(problems, summary). Problems block a promote: an out-of-range value, or a
     gust below the mean wind by more than rounding (docs/WEATHER.md section 2)."""
@@ -201,7 +221,7 @@ def check(rows: List[dict]) -> Tuple[List[str], Dict[str, object]]:
             if v is not None and not (lo <= v <= hi):
                 problems.append(f"game {r['game_id']} {r['source']} {col}={v}")
         w, g = r.get("wind_mph"), r.get("wind_gust_mph")
-        if w is not None and g is not None and g < w - 0.5:
+        if w is not None and g is not None and g < w - GUST_ROUNDING_MPH:
             problems.append(f"game {r['game_id']} offset {r['hour_offset']}: gust {g} < wind {w}")
     era5 = {r["game_id"]: r for r in rows if r["source"] == SOURCE_ERA5 and r["hour_offset"] == 0}
     cfbd = {r["game_id"]: r for r in rows if r["source"] == SOURCE_CFBD}
@@ -448,7 +468,9 @@ def promote(sources: List[str]) -> None:
     from beatvegas.db.store import session_scope
 
     rows = [r for r in _staged() if r["source"] in sources]
+    nulled = null_inverted_gusts(rows)
     problems, summary = check(rows)
+    summary["gusts_nulled"] = nulled
     if problems:
         raise SystemExit(f"{len(problems)} problems; run --check. First: {problems[:3]}")
     for r in rows:
@@ -494,7 +516,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     sources = [SOURCES[k] for k in keys]
 
     if args.check:
-        problems, summary = check(_staged())
+        rows = _staged()
+        nulled = null_inverted_gusts(rows)
+        problems, summary = check(rows)
+        summary["gusts_nulled"] = nulled
         print(json.dumps(summary, indent=1))
         for p in problems[:20]:
             print(f"  [problem] {p}")

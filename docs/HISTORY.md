@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-06
 
+- **2026-10-09 UTC (TWO EXPLORATORY LOOKS REGISTERED: H-WX-HIST, H-JUDGE).** Strategic review topic 3,
+  Tate's calls. Rows first, scripts in the same PR, each read once through `study.yml` after merge.
+  - **H-WX-HIST** (`scripts/weather_history_look.py`): 2024-25 outdoor FBS games, the decision-safe
+    72-hour forecast, windy at 10+ mph against calm. Line value of the under at the early consensus
+    line against the close (first half), and the under's record against the closing line (both
+    markets), plus wind bands.
+  - **H-JUDGE** (`scripts/judge_check.py`): does `ev_cons` predict returns? Both sides of every
+    2023-25 first-half game at the early line, -110: predicted EV beside realized units, by quintile,
+    and the slope of realized on predicted, with week-resampled intervals.
+  - Both read spent 2023-25 data, so both are exploratory; the shared frame is
+    `beatvegas/backtest/early_close.py` (bowls keyed apart from week 1).
+
 - **2026-10-09 UTC (THE LEAK-FIXED MODEL).** Strategic review topic 3, Tate's calls. The model under
   the arms had information from after the game in its training rows; each fix below is pinned by
   `tests/test_trophy_games.py`.

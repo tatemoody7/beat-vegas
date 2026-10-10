@@ -37,7 +37,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
-  behind the six history looks) (all in `docs/`).
+  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
 - Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
   `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
@@ -64,8 +64,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   average first-half miss 8.34 vs Hard Rock 8.22 over 213 games; H-HIST pooled 8.75 vs the close
   8.73, live on 2003+ training since 2026-10-07); the 2026 factor screen found no input, nor the
   gap, predicting the residual against the close (87 comparisons, best p 0.117); in weeks 4-5 the
-  gap did not sort unders from overs. Closed null: 1H game-total censoring, weather × style,
-  two-sided overs, Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model against the spread.
+  gap did not sort unders from overs. Closed null: 1H censoring, weather × style, two-sided overs,
+  Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model, the four-fix model (H-MODEL-FIX).
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
   judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
 - **The model and bar as built** (they feed the paper arms): market-blind HGB, 55 inputs (B-SERVE
@@ -206,7 +206,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
   `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`,
-  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`.
+  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +

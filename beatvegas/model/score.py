@@ -46,7 +46,9 @@ MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the e
 # The champion's training floor (Tate, 2026-10-07): H-HIST met -- training on
 # 2003+ instead of 2023-25 cut the first-half error ~0.43 pts a game to the
 # close's level (docs/HISTORY_DEPTH.md, start year 2003 chosen without looking
-# at the betting records). Read by the live scorers only (scripts/weekly_update.py,
+# at the betting records). H-MODEL-FIX (2026-10-10) tested 2015 together with
+# three other changes and the bundle was less accurate (docs/MODEL_FIX.md), so
+# 2003 stays. Read by the live scorers only (scripts/weekly_update.py,
 # scripts/fg_shadow.py); every other frame stays at features.FRAME_MIN_SEASON.
 CHAMPION_TRAIN_MIN_SEASON = 2003
 

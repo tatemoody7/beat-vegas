@@ -9,6 +9,25 @@ hold the rest.
 
 ## 2026-10-10
 
+- **2026-10-10 UTC (H-MODEL-FIX NOT MET; MODEL WORK STOPS).** One `study.yml` dispatch
+  (run 38070611660, branch `model/fix-2026-10` at 1e6bce5; `docs/MODEL_FIX.md`).
+  - **Result:** with the four fixes, the champion's first-half number was less accurate:
+    - Δ|err| +0.163 [+0.025, +0.294] against the +0.10 margin, over 760 games graded at a real
+      consensus 1H close;
+    - worse in 2025 (8.85 → 9.02) and in 2026 (7.98 → 8.10);
+    - more often 6+ points from the close (19 games against 8).
+  - **The live champion is level with the close** on those games (8.69 against 8.72).
+  - **Disclosed after the run:** the incumbent's 2025 test games saw the 2025 bowls (week-ordered,
+    as live trains). The candidate's deficit was larger on the games the bowls could not touch, so
+    the flaw does not explain the verdict.
+  - **Tate's calls:**
+    - model work stops and the live model stays;
+    - arms 1-3 start their clocks at the 2026-10-13 card on the 2026-10-11 refit;
+    - PR #351 keeps the study re-runnable with every switch off live, and states early stopping as
+      `'auto'` (sklearn's default, unchanged);
+    - each refit records the trees it grew in `model_runs.metrics`;
+    - next comes the 60+ first-half-unders arm, triggered on the judge's books.
+
 - **2026-10-10 UTC (H-MODEL-FIX REGISTERED).** After the 2003+ switch, the champion's number
   tracked a raw early-season scoring projection (week 6: correlation 0.76, was 0.26; Georgia @
   Alabama 34.8 against Hard Rock's 25.5). Four defects were found read-only:

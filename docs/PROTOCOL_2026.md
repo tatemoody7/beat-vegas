@@ -128,6 +128,14 @@ starts at its first eligible build after the rows merged (`protocol.WX_ARMS_STAR
   a build now fetches only the games an arm can log (Hard Rock-priced; `wx_paper.arm_game_ids`),
   10 s a call, 2 tries, 180 s in all. The rule is unchanged.
 
+**The high-total arm (roadmap v1.8, Tate 2026-10-10), ledger slot 8.** Registered under p1.1
+with the same test. It reads no model, so the pause above does not apply, and its clock starts at
+its first eligible build after its collector merges (`protocol.HT_ARM_START` is the backstop).
+
+| Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
+|---|---|---|---|
+| H-ARM-HT1H | 8 | First-half UNDER on every game whose consensus full-game total at the build is 60.0 or more (the median of each counted book's newest centred quote at or before the build, at least 3 books, the judge's book set), at Hard Rock's centred main line and under price | `challenger_picks`, `arm = 'H-ARM-HT1H'` (`beatvegas/ht_paper.py`, its collector PR) |
+
 - **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
   H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.
 - **Exclusions:** a paper pick without a Hard Rock price is now excluded by name (`no_price`,

@@ -9,6 +9,21 @@ hold the rest.
 
 ## 2026-10-10
 
+- **2026-10-10 UTC (H-ARM-HT1H REGISTERED, ROADMAP v1.8).** Tate asked whether games with higher
+  totals had done better.
+  - **The answer:** yes in 2023-25. First-half unders at the real consensus close went 154-110-4
+    (58.3%, n 268) where the full-game total was 60 or more (`docs/POST_MORTEM.md`). The pattern
+    was found by slicing after the fact, and 2026 is too thin to say.
+  - **Tate's calls:**
+    - test it forward as a paper arm: first-half UNDERS on every game whose consensus full-game
+      total at the build is 60.0 or more, at Hard Rock's price;
+    - the consensus uses the judge's books: every centred book except Hard Rock, Fliff and the
+      synthetic consensus, at least 3;
+    - ledger slot 8, with its clock starting at its first eligible build (it reads no model);
+    - the cap on paper arms rises from 7 to 8.
+  - **Order:** the row comes before the collector (`beatvegas/ht_paper.py`, its own PR). The
+    literature-nulls amendment moves to v1.9.
+
 - **2026-10-10 UTC (H-MODEL-FIX NOT MET; MODEL WORK STOPS).** One `study.yml` dispatch
   (run 38070611660, branch `model/fix-2026-10` at 1e6bce5; `docs/MODEL_FIX.md`).
   - **Result:** with the four fixes, the champion's first-half number was less accurate:

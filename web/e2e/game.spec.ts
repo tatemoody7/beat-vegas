@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { fixture } from "./helpers/fixture";
-import { HIDDEN_ACTION } from "../lib/signalGate";
 
 // /game/[id] (app/components/GameDetail.tsx): the decision block must show the
 // SAME numbers the board row carried (it rebuilds the whole week to get the
@@ -183,24 +182,24 @@ test.describe("the game page", () => {
       await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
     });
 
-    // The research season (lib/signalGate): before kickoff a visitor sees the
-    // game, its lines and form, never the rating, rank, our number or the read.
-    test("a visitor sees no rating before kickoff, and the full read after it", async ({
+    // Roadmap v1.7 (Tate 2026-10-10; lib/signalGate): before kickoff a visitor
+    // sees the owner's read -- the rating, our number, the factor read -- in
+    // paper wording, never bet wording; a played game shows its result.
+    test("a visitor sees the rating before kickoff in paper wording, and the result after it", async ({
       page,
     }) => {
       await page.goto(`/game/${BET_OPEN}`);
       const card = page.locator("section.bv-card").first();
-      await expect(card).toContainText(HIDDEN_ACTION);
-      await expect(card).toContainText("Our numberat kickoff");
-      await expect(card).not.toContainText("Paper signal:");
-      await expect(page.getByText(/^#\d+$/)).toHaveCount(0);
+      await expect(card).toContainText("Paper signal:");
+      await expect(card).not.toContainText("Bet one unit");
+      await expect(card).not.toContainText("at kickoff");
       await expect(
         page.getByText("The factor read publishes at kickoff."),
-      ).toBeVisible();
+      ).toHaveCount(0);
       // A played game is history: its result is public.
       await page.goto(`/game/${PLAYED}`);
-      await expect(page.locator("section.bv-card").first()).not.toContainText(
-        HIDDEN_ACTION,
+      await expect(page.locator("section.bv-card").first()).toContainText(
+        "Won · first half 27, line 30.5",
       );
     });
   });

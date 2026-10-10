@@ -149,7 +149,9 @@ export default async function BoardPage({
         <BoardFilters current={filters} showMine={authed} />
       </div>
 
-      <CardStatusBanner card={card} />
+      {/* The build warnings are the owner's (Tate 2026-10-10): a visitor's
+          first screen is the board, not our ops. */}
+      {authed && <CardStatusBanner card={card} />}
 
       {authed && <OpsBanner />}
 
@@ -164,7 +166,7 @@ export default async function BoardPage({
         </div>
       )}
 
-      {buildHealth.missed && (
+      {authed && buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
             {`${buildHealth.day}'s build did not run.`}

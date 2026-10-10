@@ -9,6 +9,22 @@ hold the rest.
 
 ## 2026-10-10
 
+- **2026-10-10 UTC (THE BOARD OPENS TO VISITORS, ROADMAP v1.7).** Tate's friends opened the site
+  and saw an empty board. Every pre-kickoff rating read "Rating publishes at kickoff." (the
+  2026-10-07 publication rule, `lib/signalGate.ts`), under two build warnings left by the failed
+  `sat_am` build.
+  - **Tate's calls:**
+    - a visitor sees the board and game page as the owner does, ratings before kickoff included,
+      in paper wording ("Paper signal", never "Bet one unit");
+    - the owner's "bet logged" chip stays his until kickoff;
+    - "Florida, 21+" goes on the site banner;
+    - the build warnings ("card built Nh ago", "build did not run") are owner-only;
+    - ship as soon as CI passes.
+  - **Unchanged:** the bet ledger, `/records` and both CSVs keep withholding a game until kickoff.
+  - **Code:** `signalGate.gateGame` no longer blanks a game, so `HIDDEN_ACTION`, `hidesSignal` and
+    `HomeGame.signalHidden` are gone.
+  - **Roadmap:** this is v1.7; the literature-nulls proposal for the 10-12 review becomes v1.8.
+
 - **2026-10-10 UTC (THE SATURDAY CARD TIMED OUT; THE WEATHER CAPTURE IS SCOPED AND CAPPED).** The
   `sat_am` build (`card.yml` run 38049849474, dispatched 11:50Z) was cancelled at the job's 30-minute
   limit with no card written. Its build step ran 18+ minutes; Friday's, the last build before #345,

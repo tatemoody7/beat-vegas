@@ -106,7 +106,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
   and the arms' first read; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.7: 3 literature nulls → REJECTED?
+  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.8: 3 literature nulls → REJECTED?
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
   shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
   engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget
@@ -154,9 +154,9 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
   plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
   (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`), and **a visitor sees no pre-kickoff signal**
-  (`lib/signalGate.ts`: board, game page, `/records`, the ledger and both CSVs): ops warnings, the My-teams chip, the Monday review on
-  Results, the research section on How it works, the log control. No dollars are public. API:
+  the cookie** (`viewerIsAuthed()`): ops and build warnings, the My-teams chip, the answer bar, the Monday review on
+  Results, the research section on How it works, the log control. **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
+  `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
   `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND

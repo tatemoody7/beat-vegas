@@ -213,6 +213,29 @@ def _load_all_games(
     return df
 
 
+def _seed_load_from(min_season: Optional[int], prior_weight: float) -> Optional[int]:
+    """The season the games loader starts at: one before the frame's floor when
+    a prior-season seed is on (so the floor's first season is seeded too), the
+    floor itself otherwise, and None (every season) when there is no floor."""
+    if min_season is None or not prior_weight:
+        return min_season
+    return int(min_season) - 1
+
+
+def _drop_postseason(games: pd.DataFrame) -> pd.DataFrame:
+    """Regular-season games only (H-MODEL-FIX, Tate 2026-10-10).
+
+    CFBD files every bowl and playoff game as week 1, so the week-ordered
+    season-to-date means let a bowl result into every later regular-season
+    mean of its own season: a leak in training (836 bowls, 2003-25) that the
+    live season never has before December. A frame without a season type
+    (a test fixture) is returned as is. Scoring bowl games live is its own
+    decision before bowl season."""
+    if "season_type" not in games.columns:
+        return games
+    return games[games["season_type"].fillna("regular") != "postseason"]
+
+
 def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
     with session_scope() as s:
         q = s.query(
@@ -234,6 +257,7 @@ def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
             Game.first_half_source,
             Game.home_pregame_elo,
             Game.away_pregame_elo,
+            Game.season_type,
         )
         if min_season is not None:
             q = q.filter(Game.season >= int(min_season))
@@ -261,6 +285,7 @@ def _query_games(min_season: Optional[int] = FRAME_MIN_SEASON) -> pd.DataFrame:
                 # only (`model/elo_line.py`); never in FEATURE_COLS.
                 "home_pregame_elo",
                 "away_pregame_elo",
+                "season_type",  # 'regular' | 'postseason' (H-MODEL-FIX, 2026-10-10)
             ],
         )
         venues = pd.DataFrame(
@@ -317,11 +342,13 @@ _STD_COLS = ["fh_pf", "fh_pa", "full_pf", "full_pa"]
 
 # How many synthetic "games" of prior-season form seed the season-to-date window.
 #
-# 0.0 reproduces the unseeded expanding mean EXACTLY, so it is the incumbent and
-# the honest default: the seed does not go live until a walk-forward report says
-# it should (scripts/level_anchor_gate.py). See _season_to_date for the problem
-# it addresses.
-PRIOR_SEASON_WEIGHT = 0.0
+# 0.0 reproduces the unseeded expanding mean EXACTLY. It stayed the default until
+# a registered test licensed the seed: H-MODEL-FIX (Tate, 2026-10-10) adopts 3,
+# the best value docs/LEVEL_ANCHOR.md measured, together with the bowl fix, the
+# 2015 floor and explicit early stopping. With a seed the frame reads one season
+# before its floor, so the floor's first season has a prior too (that season
+# never becomes a row). See _season_to_date for the problem it addresses.
+PRIOR_SEASON_WEIGHT = 3.0
 
 # Which weather_obs LEAD feeds the model, or None for the legacy `weather` table.
 #
@@ -367,7 +394,9 @@ def _prior_season_means(long: pd.DataFrame) -> pd.DataFrame:
     return g.rename(columns={c: c + "_prior" for c in _STD_COLS})
 
 
-def _season_to_date(long: pd.DataFrame, prior_weight: float = 0.0) -> pd.DataFrame:
+def _season_to_date(
+    long: pd.DataFrame, prior_weight: float = 0.0, by_date: bool = True
+) -> pd.DataFrame:
     """Expanding mean of each metric over the team's prior games this season,
     optionally seeded with `prior_weight` synthetic games of prior-season form.
 
@@ -388,8 +417,14 @@ def _season_to_date(long: pd.DataFrame, prior_weight: float = 0.0) -> pd.DataFra
 
     prior_weight=0.0 is an exact no-op -- (0*prior + sum) / (0 + n) is the
     unseeded mean -- which is what makes the incumbent the gate's own baseline
-    rather than a separate code path."""
-    long = long.sort_values(["season", "team", "week", "start_date"], na_position="last")
+    rather than a separate code path.
+
+    ORDER. A team's games are taken in kickoff order (`by_date`, H-MODEL-FIX,
+    2026-10-10). The old week-first order filed a bowl (CFBD's week 1) right
+    after week 1, ahead of games played months earlier; `by_date=False` keeps
+    that order only to reproduce the pre-fix champion in the study."""
+    keys = ["season", "team", "start_date"] if by_date else ["season", "team", "week", "start_date"]
+    long = long.sort_values(keys, na_position="last")
     if prior_weight:
         long = long.merge(_prior_season_means(long), on=["season", "team"], how="left")
     grp = long.groupby(["season", "team"], sort=False)
@@ -559,8 +594,12 @@ def build_feature_frame(
     min_season: Optional[int] = FRAME_MIN_SEASON,
     require_total: bool = True,
     total_required_from: Optional[int] = None,
+    legacy_postseason: bool = False,
 ) -> pd.DataFrame:
-    """`min_season` (default FRAME_MIN_SEASON): the earliest season read, for
+    """`legacy_postseason` (default False): True rebuilds the pre-fix frame --
+    bowls kept and week-ordered means -- for the H-MODEL-FIX incumbent only.
+
+    `min_season` (default FRAME_MIN_SEASON): the earliest season read, for
     the games AND the schedule-derived situational columns (rest days and the
     cross-season revenge/rivalry flags would otherwise see older games). None
     reads every season on file (the H-HIST study).
@@ -576,8 +615,17 @@ def build_feature_frame(
     scored row still does, and the seasons CFBD never priced stay as training
     history. None (default) = every row must carry one."""
     check_weather_lead(weather_lead, allow_diagnostic_lead)
-    games = _load_all_games(fbs_only=fbs_only, min_season=min_season)
-    std = _season_to_date(_team_long(games), prior_weight=prior_weight)
+    # With a seed, read one season before the floor so the floor's first season
+    # has a prior-season mean too; that season never becomes a row.
+    load_from = _seed_load_from(min_season, prior_weight)
+    games = _load_all_games(fbs_only=fbs_only, min_season=load_from)
+    if not legacy_postseason:
+        games = _drop_postseason(games)
+    std = _season_to_date(
+        _team_long(games), prior_weight=prior_weight, by_date=not legacy_postseason
+    )
+    if load_from != min_season:
+        games = games[games["season"] >= int(min_season)]
 
     # Merge season-to-date stats back, matching each side on its own team name.
     df = games.copy()

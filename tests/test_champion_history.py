@@ -20,7 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_the_constants_are_tates_calls():
-    assert score.CHAMPION_TRAIN_MIN_SEASON == 2003
+    # 2003 went live 2026-10-07 (H-HIST); H-MODEL-FIX (2026-10-10) moves it to
+    # 2015, one of the floors H-HIST passed.
+    assert score.CHAMPION_TRAIN_MIN_SEASON == 2015
     assert features.CFBD_TOTALS_FROM == 2013
     assert features.FRAME_MIN_SEASON == 2023  # every other frame is unchanged
 

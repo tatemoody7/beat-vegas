@@ -123,6 +123,10 @@ starts at its first eligible build after the rows merged (`protocol.WX_ARMS_STAR
 - **The forecast:** each decision build fetches the kickoff-hour forecast of the week's games not
   yet kicked off (Open-Meteo forecast API, model `icon_seamless`) into `build_forecasts`, which
   nothing else reads; a game qualifies on its newest forecast fetched at or before the build.
+  IMPLEMENTATION NOTE 2026-10-10, before any number was read: the first build on this code
+  (`sat_am`, run 38049849474) fetched all 254 of the week's games and timed the card job out, so
+  a build now fetches only the games an arm can log (Hard Rock-priced; `wx_paper.arm_game_ids`),
+  10 s a call, 2 tries, 180 s in all. The rule is unchanged.
 
 - **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
   H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.

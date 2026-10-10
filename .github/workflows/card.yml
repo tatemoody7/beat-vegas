@@ -120,6 +120,10 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      # Every print reaches the log as it happens. The 2026-10-10 sat_am build
+      # was cancelled at the job limit with its output still buffered, so the
+      # log showed nothing of the 18 minutes the build step had run.
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: ET gate (stdlib only, before any install)

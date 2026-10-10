@@ -216,3 +216,80 @@ def test_the_weather_arms_hold_slots_6_and_7_and_run_their_own_clocks():
     assert P.arm_start(P.ARM_WX_1H) == P.WX_ARMS_START is not None
     assert P.arm_start(P.ARM_1H_UNDER) is None  # the model arms stay paused (p1.1)
     assert len({spec["slot"] for spec in P.ARMS.values()}) == len(P.ARMS) <= P.K_TESTS
+
+
+def _hr_full_game(eng, quotes):
+    """quotes: [(game_id, over_price, under_price)] -> Hard Rock full-game totals."""
+    with Session(eng) as s:
+        for gid, over, under in quotes:
+            s.add(
+                OddsSnapshot(
+                    game_id=gid,
+                    book="hardrockbet",
+                    market="full_game_total",
+                    line=47.5,
+                    over_price=over,
+                    under_price=under,
+                    captured_at=NOW - timedelta(hours=1),
+                )
+            )
+        s.commit()
+
+
+def test_arm_game_ids_are_the_hard_rock_priced_games_either_arm_can_log():
+    # 2026-10-10: the sat_am capture fetched every game of the week (254) and
+    # timed the card out; only a game an arm can log is worth a forecast call.
+    eng, scope = _sqlite_scope()
+    _seed(eng, [(g, 1, KICK) for g in (1, 2, 3, 4, 5, 7)] + [(6, 1, NOW - timedelta(hours=1))])
+    _hr_full_game(eng, [(4, -110, -110), (5, -170, 135), (6, -110, -110)])
+    card = {
+        "season": 2026,
+        "week": 8,
+        "items": [
+            _item(1),  # centred, priced: the first-half arm
+            _item(2, hr_centred=False),
+            _item(3, hr_price=None),
+        ],
+    }
+    with scope() as s:
+        ids = W.arm_game_ids(s, card, 2026, 8, NOW)
+    # 4 = a centred full-game total; 5 is an off-centre rung; 6 has kicked off;
+    # 7 has no Hard Rock quote at all.
+    assert ids == [1, 4]
+
+
+def test_capture_starts_no_call_past_its_budget_and_counts_the_rest_failed():
+    eng, scope = _sqlite_scope()
+    _seed(eng, [(1, 1, KICK), (2, 3, KICK), (3, 1, KICK + timedelta(days=1))])
+    calls = []
+
+    def fetch(lat, lon, start, end, **kw):
+        calls.append((lat, start, kw.get("timeout"), kw.get("attempts")))
+        return {f"{start}T{h:02d}": {"wind_mph": 12.0} for h in range(24)}
+
+    ticks = [0.0, 0.0, 100.0, 200.0]  # start, then before each new call; holds the last
+
+    def clock():
+        return ticks.pop(0) if len(ticks) > 1 else ticks[0]
+
+    with scope() as s:
+        stats = W.capture(s, [3, 2, 1], NOW, fetch=fetch, budget_seconds=150.0, clock=clock)
+    # Kickoff order: games 1 and 2 (Saturday) are fetched; game 3 (Sunday) would
+    # start a call after the budget, so it is counted, never fetched.
+    assert [c[:2] for c in calls] == [(40.0, "2026-10-17"), (41.0, "2026-10-17")]
+    assert stats == {"stored": 2, "domes": 0, "no_venue": 0, "failed": 1, "over_budget": 1}
+    # Every build call carries the short limits, not the backfills' 60 s x 4.
+    assert {c[2:] for c in calls} == {(W.BUILD_FETCH_TIMEOUT_S, W.BUILD_FETCH_ATTEMPTS)}
+    assert (W.BUILD_FETCH_TIMEOUT_S, W.BUILD_FETCH_ATTEMPTS) == (10, 2)
+
+
+def test_the_summary_names_the_games_past_the_time_cap():
+    stats = {
+        "capture": {"stored": 2, "domes": 0, "no_venue": 0, "failed": 1, "over_budget": 1},
+        "1h": {"windy": 0, "added": 0},
+        "full": {"windy": 0, "added": 0},
+    }
+    (line,) = W.summary_lines(stats)
+    assert "failed 1, 1 past the 180 s cap" in line
+    (quiet,) = W.summary_lines({"capture": {"stored": 3, "failed": 0}})
+    assert "past the" not in quiet

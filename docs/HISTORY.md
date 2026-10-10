@@ -7,6 +7,34 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-10
+
+- **2026-10-10 UTC (THE SATURDAY CARD TIMED OUT; THE WEATHER CAPTURE IS SCOPED AND CAPPED).** The
+  `sat_am` build (`card.yml` run 38049849474, dispatched 11:50Z) was cancelled at the job's 30-minute
+  limit with no card written. Its build step ran 18+ minutes; Friday's, the last build before #345,
+  took 4 seconds.
+  - **Cause:** #345's `wx_paper.capture` fetched an Open-Meteo forecast for every game of the week, all
+    divisions (254 games, 245 venue-day calls, each with a 60 s timeout and the four-try retry ladder),
+    one after another inside the card's database transaction. The arms' savepoint catches errors, not
+    slowness, so the timeout lost the whole build, the other arms' rows included. The run's output was
+    still buffered when it was cancelled, so its log showed none of the build step.
+  - **Effect:** week 6 has no `sat_am` card; the board and real-money verdicts stayed on Friday's card.
+    The two weather arms, whose backstop clock began 2026-10-10 00:00Z, logged nothing for week 6, and
+    first-log-wins means nothing is backfilled. Arms 1-3 had logged the week's games at Friday's build.
+  - **Fix (#348, Tate's choice of four):**
+    - the capture fetches only the games either weather arm can log (`wx_paper.arm_game_ids`: the
+      card's Hard Rock first-half items plus the week's Hard Rock full-game totals; 57 games and 55
+      calls in week 6), earliest kickoff first;
+    - each call is capped at 10 s and 2 tries, the whole capture at 180 s; a game past the cap
+      counts as failed, and the card summary names it;
+    - a timing line goes to stderr unbuffered, and `card.yml` sets `PYTHONUNBUFFERED=1`.
+  - **Docs:** the registry rows H-ARM-WX1H / H-ARM-WXFG and `docs/PROTOCOL_2026.md` carry a dated
+    implementation note (Tate's call); which games qualify is unchanged.
+  - **Measured from this Mac** against the live API on week 6's 45 remaining priced games: 44 calls in
+    30 s, none failed. Tuesday's `tue_pm` build is the first production proof; a manual dispatch runs
+    `--no-paper` and skips the capture.
+  - **Open (Tate's call):** whether the weather arms' lost first Saturday needs a protocol note.
+
 ## 2026-10-06
 
 - **2026-10-09 UTC (THE WEATHER ARMS, ROADMAP v1.6).** Strategic review topic 3: Tate asked for the correct

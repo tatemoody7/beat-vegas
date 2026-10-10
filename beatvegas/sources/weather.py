@@ -115,16 +115,17 @@ def _hourly_names(source: str, lead_hours: int) -> Dict[str, str]:
     return {f"{k}_previous_day{day}": v for k, v in _VARS.items()}
 
 
-def _get(url: str, params: dict, timeout: int) -> dict:
+def _get(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> dict:
     """One Open-Meteo call, with the shared retry ladder.
 
     A 429 or 5xx is retried (honouring `Retry-After`); any other 4xx is a bad
     request and raises straight away. Exhausting the ladder raises
     `WeatherUnavailable` rather than returning empty, so a caller can tell a rate
-    limit from a venue with no data.
+    limit from a venue with no data. `attempts` shortens the ladder for a caller
+    on a clock (the card build, `wx_paper.capture`); the backfills keep all four.
     """
     last: Optional[str] = None
-    for attempt in range(_ATTEMPTS):
+    for attempt in range(attempts):
         try:
             resp = requests.get(url, params=params, timeout=timeout)
         except RETRY_EXC as e:  # noqa: PERF203
@@ -140,14 +141,14 @@ def _get(url: str, params: dict, timeout: int) -> dict:
                 wait = retry_after(resp)
                 if wait is None:
                     wait = backoff_seconds(attempt)
-                if attempt < _ATTEMPTS - 1:
+                if attempt < attempts - 1:
                     time.sleep(wait)
                 continue
             else:
                 resp.raise_for_status()
-        if attempt < _ATTEMPTS - 1:
+        if attempt < attempts - 1:
             time.sleep(backoff_seconds(attempt))
-    raise WeatherUnavailable(f"{url}: {last} after {_ATTEMPTS} attempts")
+    raise WeatherUnavailable(f"{url}: {last} after {attempts} attempts")
 
 
 def fetch_hourly_series(
@@ -160,6 +161,7 @@ def fetch_hourly_series(
     lead_hours: int = 0,
     models: Optional[str] = None,
     timeout: int = 60,
+    attempts: int = _ATTEMPTS,
     variables: Optional[Dict[str, str]] = None,
 ) -> Dict[str, dict]:
     """One ranged call -> {'YYYY-MM-DDTHH' (UTC): {temp, wind, gust, precip}}.
@@ -197,7 +199,7 @@ def fetch_hourly_series(
     }
     if models:
         params["models"] = models
-    h = _get(_URLS[source], params, timeout)
+    h = _get(_URLS[source], params, timeout, attempts)
     times: Sequence[str] = h.get("time") or []
     out: Dict[str, dict] = {}
     for i, t in enumerate(times):

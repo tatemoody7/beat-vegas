@@ -727,9 +727,11 @@ def run(
                 # The weather arms (H-ARM-WX1H / WXFG, 2026-10-09): fetch the
                 # forecast this build sees, then log windy outdoor games. Their
                 # own SAVEPOINT: a failed fetch or insert never costs the card.
+                # A slow one could: the capture fetches only the games an arm can
+                # log, on a short clock (2026-10-10, wx_paper.BUILD_*).
                 try:
                     with s.begin_nested():
-                        wx_ids = wx_paper.week_game_ids(s, season, week, now)
+                        wx_ids = wx_paper.arm_game_ids(s, card, season, week, now)
                         wx_stats = {
                             "capture": wx_paper.capture(s, wx_ids, now, slot=card.get("slot"))
                         }

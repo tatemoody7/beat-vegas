@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
-import { HIDDEN_ACTION, RESEARCH_BANNER } from "../lib/signalGate";
+import { RESEARCH_BANNER } from "../lib/signalGate";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
 // number asserted here is derived in e2e/fixture/expected.mjs from the same rows
@@ -269,9 +269,11 @@ test.describe("the board, signed out", () => {
     await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
   });
 
-  // The research season (docs/ROADMAP_2026.md, lib/signalGate): a visitor sees
-  // the slate, never a pre-kickoff rating.
-  test("a visitor reads the research-season banner and the slate with no ratings", async ({
+  // The research season, roadmap v1.7 (Tate 2026-10-10; lib/signalGate): a
+  // visitor sees the owner's board before kickoff -- the ranks, the lit BET
+  // rows, the order -- in paper wording, never bet wording, and never the
+  // owner's "bet logged" chip before kickoff.
+  test("a visitor reads the research-season banner and the board with its ratings in paper wording", async ({
     page,
   }) => {
     await page.goto("/");
@@ -286,32 +288,16 @@ test.describe("the board, signed out", () => {
     ).toHaveCount(0);
     await expect(page.getByText(/ watch · \d+ pass/)).toHaveCount(0);
     const r = await rows(page);
+    const rank = new Map(expected.rankOrder.map((id, i) => [id, i + 1]));
     const upcoming = r.filter((x) => x.section !== "Played");
     expect(upcoming.length).toBeGreaterThan(0);
     for (const x of upcoming) {
-      expect(x.lit).toBe(false);
-      expect(x.badge).toBe("—");
-      expect(x.chips).toEqual([]);
+      expect(x.badge, `${x.id}`).toBe(`#${rank.get(x.id)}`);
+      expect(x.lit, `${x.id}`).toBe(expected.betIds.includes(x.id));
+      expect(x.chips, `${x.id}`).not.toContain("bet logged");
     }
-    // The order cannot rank the games either: each day reads by kickoff, then
-    // the away team (lib/signalGate zeroes the score the board sorts on).
-    for (const day of new Set(upcoming.map((x) => x.section))) {
-      const ids = upcoming.filter((x) => x.section === day).map((x) => x.id);
-      const neutral = [...ids].sort((a, b) => {
-        const ga = byId.get(a)!;
-        const gb = byId.get(b)!;
-        return (
-          ga.kick.getTime() - gb.kick.getTime() ||
-          ga.away.localeCompare(gb.away)
-        );
-      });
-      expect(ids).toEqual(neutral);
-    }
-    await expect(
-      page.locator("section:not([aria-label='Played']) a.bv-card p", {
-        hasText: HIDDEN_ACTION,
-      }),
-    ).toHaveCount(upcoming.length);
+    await expect(page.getByText(/Bet one unit/)).toHaveCount(0);
+    await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
   });
 });
 

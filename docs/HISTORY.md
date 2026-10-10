@@ -9,6 +9,20 @@ hold the rest.
 
 ## 2026-10-10
 
+- **2026-10-10 UTC (H-MODEL-FIX REGISTERED).** After the 2003+ switch, the champion's number
+  tracked a raw early-season scoring projection (week 6: correlation 0.76, was 0.26; Georgia @
+  Alabama 34.8 against Hard Rock's 25.5). Four defects were found read-only:
+  - every bowl game (836, 2003-25) is filed as week 1, so the week-ordered season-to-date means
+    let a bowl result into every later regular-season mean of its own season;
+  - pre-2015 seasons lack most richer inputs;
+  - sklearn's `early_stopping='auto'` switched on silently above 10,000 rows;
+  - early averages carry no shrinkage.
+
+  Tate's calls: fix the model first, then market rules; test the four fixes together against the
+  live champion and adopt on a pass; start the arms' clocks as soon as possible (if the fix lands
+  after Tuesday's card, the arms restart free before the first Monday read). The row comes before
+  the script (`scripts/model_fix_study.py`).
+
 - **2026-10-10 UTC (THE BOARD OPENS TO VISITORS, ROADMAP v1.7).** Tate's friends opened the site
   and saw an empty board. Every pre-kickoff rating read "Rating publishes at kickoff." (the
   2026-10-07 publication rule, `lib/signalGate.ts`), under two build warnings left by the failed

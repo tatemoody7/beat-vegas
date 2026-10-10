@@ -41,11 +41,10 @@ def _pf(long, k):
 # --- the seeded window -------------------------------------------------------
 
 
-def test_production_seed_is_the_registered_three():
-    """The level-anchor gate found no adoption on its own; H-MODEL-FIX (Tate,
-    2026-10-10) adopts k = 3 with the bowl fix, the 2015 floor and explicit
-    early stopping. If this ever changes, a seed moved without a report."""
-    assert PRIOR_SEASON_WEIGHT == 3.0
+def test_production_default_is_zero_so_the_seed_ships_inert():
+    """The gate found no adoption, so the live feature build must be unchanged.
+    If this ever fails, a seed went live without a report."""
+    assert PRIOR_SEASON_WEIGHT == 0.0
 
 
 def test_k_zero_is_an_exact_no_op():

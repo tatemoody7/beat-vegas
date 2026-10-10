@@ -1,9 +1,11 @@
-"""H-MODEL-FIX (docs/HYPOTHESES.md, Tate 2026-10-10): the bowl-game leak, the
-seed's extra season, explicit early stopping and the run record of what the
-slate's fit did."""
+"""H-MODEL-FIX (docs/HYPOTHESES.md, Tate 2026-10-10; NOT MET, docs/MODEL_FIX.md):
+the bowl-game leak the live frame still carries, the candidate's switches (off
+everywhere live), early stopping stated, the run record of what the slate's fit
+did, and the study's two pinned arms."""
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from beatvegas.backtest import model_fix as MF
 from beatvegas.etl import features
@@ -29,10 +31,16 @@ def _season_with_bowl():
     )
 
 
-def test_the_week_ordered_mean_leaked_the_bowl_into_the_regular_season():
+def test_the_week_ordered_mean_leaks_the_bowl_into_the_regular_season():
     legacy = features._season_to_date(_season_with_bowl(), by_date=False).set_index("id")
     # Week 2's mean read week 1 AND the December bowl: (10 + 70) / 2.
     assert legacy.loc[2, "fh_pf_std"] == 40.0
+
+
+def test_the_live_order_is_still_week_first():
+    """The candidate failed, so the live frame keeps the order it was trained on."""
+    live = features._season_to_date(_season_with_bowl())
+    pd.testing.assert_frame_equal(live, features._season_to_date(_season_with_bowl(), by_date=False))
 
 
 def test_the_date_ordered_mean_never_reads_a_later_game():
@@ -54,28 +62,70 @@ def test_postseason_games_leave_the_frame_and_a_fixture_without_a_type_is_kept()
     ]
 
 
+def _games_seen_by_the_frame(monkeypatch, **kw):
+    """The games build_feature_frame hands to the season-to-date step."""
+    games = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "season": [2023] * 4,
+            "week": [1, 2, 3, 1],
+            "start_date": pd.to_datetime(["2023-09-02", "2023-09-09", "2023-09-16", "2023-12-30"]),
+            "home_team": ["A"] * 4,
+            "away_team": ["B"] * 4,
+            "season_type": ["regular", "regular", "regular", "postseason"],
+        }
+    )
+    seen = {}
+    monkeypatch.setattr(features, "_load_all_games", lambda fbs_only=True, min_season=None: games)
+
+    def stop(g):
+        seen["games"] = g
+        raise RuntimeError("stop")  # nothing past this step is under test
+
+    monkeypatch.setattr(features, "_team_long", stop)
+    with pytest.raises(RuntimeError, match="stop"):
+        features.build_feature_frame(min_games=0, **kw)
+    return seen["games"]
+
+
+def test_the_live_frame_keeps_its_bowls_and_never_carries_the_season_type(monkeypatch):
+    live = _games_seen_by_the_frame(monkeypatch)
+    assert sorted(live["id"]) == [1, 2, 3, 4]
+    assert "season_type" not in live.columns
+    candidate = _games_seen_by_the_frame(monkeypatch, model_fix_candidate=True)
+    assert sorted(candidate["id"]) == [1, 2, 3]
+    assert "season_type" not in candidate.columns
+
+
 def test_the_seed_reads_one_season_before_the_floor_and_only_with_a_seed():
     assert features._seed_load_from(2015, 3.0) == 2014
     assert features._seed_load_from(2015, 0.0) == 2015
     assert features._seed_load_from(None, 3.0) is None
 
 
-def test_early_stopping_is_off_and_stated():
-    assert bv_line.EARLY_STOPPING is False
-    assert bv_line._new_regressor().early_stopping is False
+def test_early_stopping_is_stated_as_sklearns_auto():
+    assert bv_line.EARLY_STOPPING == "auto"
+    assert bv_line._new_regressor().early_stopping == "auto"
+
+
+def _frame(seasons, n_per=120, seed=7):
+    rng = np.random.default_rng(seed)
+    n = n_per * len(seasons)
+    df = pd.DataFrame({c: rng.normal(size=n) for c in bv_line.BV_FEATURE_COLS})
+    df["season"] = np.repeat(seasons, n_per)
+    df["id"] = np.arange(1, n + 1)
+    df[bv_line.TARGET] = 24 + 3 * df[bv_line.BV_FEATURE_COLS[0]] + rng.normal(size=n)
+    df["under"] = 1.0
+    return df
 
 
 def test_the_slate_fit_records_its_trees_and_early_stopping():
-    rng = np.random.default_rng(7)
-    n = 240
-    frame = pd.DataFrame({c: rng.normal(size=n) for c in bv_line.BV_FEATURE_COLS})
-    frame["season"] = np.repeat([2024, 2025], n // 2)
-    frame[bv_line.TARGET] = 24 + 3 * frame[bv_line.BV_FEATURE_COLS[0]] + rng.normal(size=n)
+    frame = _frame([2024, 2025])
     train, target = frame[frame["season"] == 2024], frame[frame["season"] == 2025]
     preds = bv_line.bv_line_for_slate(train, target)
     assert len(preds) == len(target)
-    assert bv_line.LAST_FIT["n_iter"] == 300  # every tree grows: no silent early stop
-    assert bv_line.LAST_FIT["early_stopping"] == "False"
+    assert bv_line.LAST_FIT["n_iter"] == 300  # under 10,000 rows 'auto' never stops early
+    assert bv_line.LAST_FIT["early_stopping"] == "auto"
     assert bv_line.LAST_FIT["train_rows"] == len(train)
 
 
@@ -95,18 +145,21 @@ def test_the_criterion_is_the_frozen_non_inferiority_margin():
     assert MF.criterion({}) is None
 
 
-def _frame(seasons, n_per=120, seed=7):
-    rng = np.random.default_rng(seed)
-    n = n_per * len(seasons)
-    df = pd.DataFrame({c: rng.normal(size=n) for c in bv_line.BV_FEATURE_COLS})
-    df["season"] = np.repeat(seasons, n_per)
-    df["id"] = np.arange(1, n + 1)
-    df[bv_line.TARGET] = 24 + 3 * df[bv_line.BV_FEATURE_COLS[0]] + rng.normal(size=n)
-    df["under"] = 1.0
-    return df
+def test_the_arms_pin_their_settings():
+    assert (MF.INCUMBENT_FLOOR, MF.INCUMBENT_PRIOR_WEIGHT, MF.INCUMBENT_EARLY_STOPPING) == (
+        2003,
+        0.0,
+        "auto",
+    )
+    assert (MF.CANDIDATE_FLOOR, MF.CANDIDATE_PRIOR_WEIGHT, MF.CANDIDATE_EARLY_STOPPING) == (
+        2015,
+        3.0,
+        False,
+    )
 
 
-def test_the_incumbent_scorer_reads_its_own_frame_with_the_pre_fix_early_stopping():
+def test_the_incumbent_scorer_reads_its_own_frame_with_auto_early_stopping(monkeypatch):
+    monkeypatch.setattr(bv_line, "EARLY_STOPPING", False)  # whatever live becomes
     legacy = _frame([2023, 2024])
     score = MF.incumbent_scorer(legacy)
     target = legacy[legacy["season"] == 2024].sample(frac=1.0, random_state=1)
@@ -117,14 +170,18 @@ def test_the_incumbent_scorer_reads_its_own_frame_with_the_pre_fix_early_stoppin
     assert bv_line.EARLY_STOPPING is False  # restored after the fit
 
 
+def test_the_candidate_scorer_fits_with_early_stopping_off():
+    frame = _frame([2024, 2025])
+    train, target = frame[frame["season"] == 2024], frame[frame["season"] == 2025]
+    assert len(MF.candidate_scorer(train, target)) == len(target)
+    assert bv_line.LAST_FIT["early_stopping"] == "False"
+    assert bv_line.EARLY_STOPPING == "auto"  # restored after the fit
+
+
 def test_the_incumbent_scorer_refuses_a_game_its_frame_lacks():
     score = MF.incumbent_scorer(_frame([2023, 2024]))
-    try:
+    with pytest.raises(ValueError, match="missing from the incumbent's frame"):
         score(None, pd.DataFrame({"id": [999999], "season": [2024]}))
-    except ValueError as e:
-        assert "missing from the incumbent's frame" in str(e)
-    else:
-        raise AssertionError("a game outside the incumbent's frame must be refused")
 
 
 def test_the_extras_render_the_readings():

@@ -24,7 +24,7 @@ data that doesn't yet exist.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -54,12 +54,13 @@ _EXCLUDED = set(SERVE_UNAVAILABLE_COLS) | set(LEAKY_WEATHER_COLS)
 BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _EXCLUDED]
 
 
-# Early stopping, stated (H-MODEL-FIX, Tate 2026-10-10). sklearn's default
-# 'auto' turns it on above 10,000 training rows with a RANDOM 10% holdout, so the
-# 2003+ champion (16,683 rows) silently stopped early while every smaller fit
-# grew all 300 trees. False grows every tree on every row, whatever the size.
-# The study reproduces the pre-fix champion by patching this to 'auto'.
-EARLY_STOPPING = False
+# Early stopping, stated rather than left to sklearn's default (2026-10-10).
+# 'auto' turns it on above 10,000 training rows, holding out a random 10%
+# (random_state=7, so a refit repeats): the 2003+ champion (about 16,700 rows)
+# stops early, every smaller fit grows all 300 trees. H-MODEL-FIX tested False
+# together with three other changes and the bundle was less accurate
+# (docs/MODEL_FIX.md), so 'auto' stays; each refit records the trees it grew.
+EARLY_STOPPING: Union[str, bool] = "auto"
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:

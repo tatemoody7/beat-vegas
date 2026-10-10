@@ -43,14 +43,14 @@ from .residual import (
 
 MODEL_VERSION = "gbm_v1"  # stored tag stays gbm_v1 for ledger continuity; the engine itself is the gbm_v2 gap ranker
 
-# The champion's training floor. H-HIST (Tate, 2026-10-07) met on all three
-# floors -- 2003, 2010, 2015 within 0.01 MAE of each other, ~0.43 pts a game
-# better than 2023-25 (docs/HISTORY_DEPTH.md) -- and 2003 went live. H-MODEL-FIX
-# (Tate, 2026-10-10) moves it to 2015: seasons before it lack most of the richer
-# inputs, which left the 2003+ model leaning on raw scoring averages. Read by the
-# live scorers only (scripts/weekly_update.py, scripts/fg_shadow.py); every other
-# frame stays at features.FRAME_MIN_SEASON.
-CHAMPION_TRAIN_MIN_SEASON = 2015
+# The champion's training floor (Tate, 2026-10-07): H-HIST met -- training on
+# 2003+ instead of 2023-25 cut the first-half error ~0.43 pts a game to the
+# close's level (docs/HISTORY_DEPTH.md, start year 2003 chosen without looking
+# at the betting records). H-MODEL-FIX (2026-10-10) tested 2015 together with
+# three other changes and the bundle was less accurate (docs/MODEL_FIX.md), so
+# 2003 stays. Read by the live scorers only (scripts/weekly_update.py,
+# scripts/fg_shadow.py); every other frame stays at features.FRAME_MIN_SEASON.
+CHAMPION_TRAIN_MIN_SEASON = 2003
 
 # The prediction versions any "the model's line" read may see (2026-10-06): the
 # champion, then the display-only derived lines (card.REFERENCE_MODEL_VERSION,

@@ -54,11 +54,11 @@ def test_query_games_reads_from_the_floor_unless_a_study_opts_out(monkeypatch):
 
 
 def test_build_feature_frame_threads_the_floor_to_games_and_situational(monkeypatch):
-    """The situational reader gets the frame's floor, so rest days and the
-    cross-season revenge/rivalry flags never see a game the frame excludes. The
-    games loader reads the floor itself without a seed, and one season earlier
-    with one (H-MODEL-FIX, 2026-10-10): the floor's first season needs a
-    prior-season mean, and that earlier season never becomes a row."""
+    """Both readers get the same floor, so rest days and the cross-season
+    revenge/rivalry flags never see a game the frame itself excludes. Only the
+    H-MODEL-FIX candidate's frame, with a seed, reads one season earlier (its
+    floor's first season needs a prior-season mean; that season never becomes
+    a row); a seed on the live frame does not move the floor."""
     seen = {}
 
     def fake_games(fbs_only=True, min_season=features.FRAME_MIN_SEASON):
@@ -67,11 +67,12 @@ def test_build_feature_frame_threads_the_floor_to_games_and_situational(monkeypa
 
     monkeypatch.setattr(features, "_load_all_games", fake_games)
     for kw, want in (
-        ({"prior_weight": 0.0}, 2023),
-        ({"prior_weight": 0.0, "min_season": None}, None),
-        ({"prior_weight": 0.0, "min_season": 2003}, 2003),
-        ({"prior_weight": 3.0, "min_season": 2015}, 2014),
-        ({"prior_weight": 3.0, "min_season": None}, None),
+        ({}, 2023),
+        ({"min_season": None}, None),
+        ({"min_season": 2003}, 2003),
+        ({"prior_weight": 3.0, "min_season": 2015}, 2015),
+        ({"prior_weight": 3.0, "min_season": 2015, "model_fix_candidate": True}, 2014),
+        ({"prior_weight": 3.0, "min_season": None, "model_fix_candidate": True}, None),
     ):
         try:
             features.build_feature_frame(min_games=0, **kw)

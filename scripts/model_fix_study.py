@@ -1,11 +1,12 @@
 """H-MODEL-FIX (docs/HYPOTHESES.md, Tate 2026-10-10): the live champion against
-the same model with four fixes, once, on the runner (`study.yml`).
+the same model with four fixes, once, on the runner (`study.yml`). NOT MET on
+2026-10-10 (run 38070611660, docs/MODEL_FIX.md); a rerun is a second look.
 
     python scripts/model_fix_study.py [--test-seasons 2025 2026] [--out reports/model_fix]
 
 Each arm on its own frame (beatvegas/backtest/model_fix.py): the candidate's
 frame is the harness's shared frame, so its score pool holds no bowl game; the
-incumbent's scorer reads the same game ids from the pre-fix frame. Grading,
+incumbent's scorer reads the same game ids from the live champion's frame. Grading,
 the paired bootstrap and the verdict are the shared harness's
 (beatvegas/backtest/harness.py), exactly as `harness_report.py` runs them:
 real consensus 1H closes inside 2 h, never a proxy line.

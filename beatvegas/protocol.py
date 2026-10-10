@@ -75,24 +75,33 @@ ARM_FG_UNDER = "H-ARM-FGU"
 # model, so the leak-fix pause does not apply to them.
 ARM_WX_1H = "H-ARM-WX1H"
 ARM_WX_FG = "H-ARM-WXFG"
+# The high-total arm (Tate's calls of 2026-10-10, roadmap v1.8): a paper
+# first-half UNDER on every game whose consensus full-game total at the build is
+# 60.0 or more (beatvegas/ht_paper.py). It reads no model either.
+ARM_HT_1H = "H-ARM-HT1H"
 ARMS = {
     ARM_1H_UNDER: {"table": "manual_picks", "market": "1H", "side": "under", "slot": 1},
     ARM_1H_OVER: {"table": "challenger_picks", "market": "1H", "side": "over", "slot": 2},
     ARM_FG_UNDER: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 3},
     ARM_WX_1H: {"table": "challenger_picks", "market": "1H", "side": "under", "slot": 6},
     ARM_WX_FG: {"table": "challenger_picks", "market": "full", "side": "under", "slot": 7},
+    ARM_HT_1H: {"table": "challenger_picks", "market": "1H", "side": "under", "slot": 8},
 }
 ARMS_TAGGED_FROM = "2026-10-09T00:00:00"  # naive UTC; the first tagging build is fri_pm
 ARMS_START: Optional[str] = None  # paused 2026-10-09 (p1.1); naive UTC once set
 # The weather arms tag nothing before their rows merge, so this is a backstop:
 # their clocks run from their first eligible build.
 WX_ARMS_START = "2026-10-10T00:00:00"
+# The same backstop for the high-total arm: nothing tags it before its collector
+# merges, so its clock runs from its first eligible build.
+HT_ARM_START = "2026-10-10T00:00:00"
 ARM_STARTS: Dict[str, Optional[str]] = {
     ARM_1H_UNDER: ARMS_START,
     ARM_1H_OVER: ARMS_START,
     ARM_FG_UNDER: ARMS_START,
     ARM_WX_1H: WX_ARMS_START,
     ARM_WX_FG: WX_ARMS_START,
+    ARM_HT_1H: HT_ARM_START,
 }
 
 

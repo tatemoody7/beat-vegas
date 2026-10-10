@@ -21,7 +21,7 @@ hold the rest.
   - **Effect:** week 6 has no `sat_am` card; the board and real-money verdicts stayed on Friday's card.
     The two weather arms, whose backstop clock began 2026-10-10 00:00Z, logged nothing for week 6, and
     first-log-wins means nothing is backfilled. Arms 1-3 had logged the week's games at Friday's build.
-  - **Fix (Tate's choice of four):**
+  - **Fix (#348, Tate's choice of four):**
     - the capture fetches only the games either weather arm can log (`wx_paper.arm_game_ids`: the
       card's Hard Rock first-half items plus the week's Hard Rock full-game totals; 57 games and 55
       calls in week 6), earliest kickoff first;

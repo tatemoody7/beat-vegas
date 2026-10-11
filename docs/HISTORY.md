@@ -19,6 +19,12 @@ hold the rest.
   development reads on Mondays, the registered read at the January review. No account, no
   capture, no credits. Kalshi's reported line is one rung of its ladder: a rung 1.5+ points off
   the other books has no reading and is counted (`far_lines`).
+- **2026-10-11 UTC (THE CAPTURE DESIGN NOTE).** `docs/program/CAPTURE_DESIGN_2026-10.md`: Tate's
+  call for the next build (roadmap v2.0 decision 6) scoped to two nullable columns on
+  `odds_snapshots` (`event_id`, `book_updated_at`, both already in the feed's rows and dropped at
+  insert) plus a 6-hour Saturday lookahead for the close poll (120 → 360 minutes on Saturday ticks
+  only, about +180 credits a Saturday). The judge's 2-hour window, the arms and the protocol are
+  untouched. PR Wednesday after Tuesday's card; first denser Saturday 2026-10-17.
 
 - **2026-10-11 UTC (THE PRICE-CLV COLUMN GOES).** `clv_prob` never read the ticket's price or bet
   time (every pick on a game carried the same number: the market's own no-vig move from each

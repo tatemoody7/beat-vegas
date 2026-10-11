@@ -232,7 +232,7 @@ def test_consensus_spread_is_the_median_of_known_spreads():
     assert _consensus_spread([]) is None
 
 
-def _row(gid, book, line, spread, over=-110, under=-110):
+def _row(gid, book, line, spread, over=-110, under=-110, event_id=None, last_update=None):
     return {
         "game_id": gid,
         "book": book,
@@ -241,6 +241,8 @@ def _row(gid, book, line, spread, over=-110, under=-110):
         "over_price": over,
         "under_price": under,
         "commence_time": None,
+        "event_id": event_id,
+        "last_update": last_update,
     }
 
 
@@ -432,6 +434,34 @@ def test_close_tick_passes_markets_and_keeps_only_events_inside_the_window(monke
     with Session(eng) as s:
         snaps = s.query(OddsSnapshot).filter_by(market="full_game_total").all()
         assert [sn.game_id for sn in snaps] == [1]
+
+
+def test_full_game_rows_carry_the_feed_event_id_and_stamps(monkeypatch):
+    """Capture provenance (2026-10-11): the first capture keeps the provider's stamp;
+    a re-sighting under a newer stamp records it in feed_reseen_at and leaves the
+    first one alone; a row without a stamp stores NULL."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.add(Game(id=2, season=2026, week=6, home_team="Iowa", away_team="Ohio State"))
+        s.commit()
+    t0, t1 = datetime(2026, 10, 4, 18, 0), datetime(2026, 10, 10, 16, 0)
+    first = [
+        _row(1, "draftkings", 55.5, -7.0, event_id="ev1", last_update="2026-10-04T17:58:00Z"),
+        _row(2, "fanduel", 44.5, 3.0),  # no stamp from this source
+    ]
+    _run_poll(mod, monkeypatch, eng, first, t0)
+    again = [_row(1, "draftkings", 55.5, -7.0, event_id="ev1", last_update="2026-10-10T15:30:00Z")]
+    _run_poll(mod, monkeypatch, eng, again, t1)
+    with Session(eng) as s:
+        by = {r.game_id: r for r in s.query(OddsSnapshot).filter_by(market="full_game_total").all()}
+        assert by[1].event_id == "ev1"
+        assert by[1].feed_updated_at == datetime(2026, 10, 4, 17, 58)
+        assert by[1].feed_reseen_at == datetime(2026, 10, 10, 15, 30)
+        assert (by[1].captured_at, by[1].last_seen_at) == (t0, t1)
+        assert by[2].event_id is None and by[2].feed_updated_at is None
 
 
 def test_unchanged_full_game_line_is_re_seen_not_rewritten(monkeypatch):

@@ -830,8 +830,18 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     # 120 in the other for a day: a slot whose only kickoffs sat 76-119 min out
     # was skipped by the pre-check the widening existed for).
     assert data["env"]["CLOSE_LOOKAHEAD_MIN"] == 120
+    # Since 2026-10-11 the Saturday ticks look 6 h ahead (capture design note):
+    # the resolve step chooses per tick and BOTH consumers read its output, so the
+    # pre-check and the poll cannot drift apart again.
+    assert data["env"]["CLOSE_LOOKAHEAD_MIN_SAT"] == 360
+    resolve = next(s for s in steps if s.get("id") == "resolve")
+    assert 'lookahead="$CLOSE_LOOKAHEAD_MIN_SAT"' in resolve["run"]
+    assert 'echo "lookahead=$lookahead" >> "$GITHUB_OUTPUT"' in resolve["run"]
+    chosen = "${{ steps.resolve.outputs.lookahead }}"
+    assert close["env"]["CLOSE_LOOKAHEAD_MIN"] == chosen
     assert '--kickoff-within-min "$CLOSE_LOOKAHEAD_MIN"' in close["run"]
     precheck = next(s for s in steps if s.get("id") == "precheck")
+    assert precheck["env"]["CLOSE_LOOKAHEAD_MIN"] == chosen
     assert "CLOSE_LOOKAHEAD_MIN" in precheck["run"] and "75" not in precheck["run"]
     assert '--status-file "$RUNNER_TEMP/close_status.json"' in close["run"]
     health = steps[-1]

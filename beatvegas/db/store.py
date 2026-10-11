@@ -143,6 +143,11 @@ _MIGRATIONS = {
         "last_seen_at": "TIMESTAMP",
         "home_price": "INTEGER",
         "away_price": "INTEGER",
+        # capture provenance (2026-10-11): the feed's event id and the
+        # provider's `last_update` at first capture / newest re-sighting
+        "event_id": "VARCHAR",
+        "feed_updated_at": "TIMESTAMP",
+        "feed_reseen_at": "TIMESTAMP",
     },
     # which 1H engine froze the record (2026-09-07, after the table existed);
     # the conferences as `games` carried them at snapshot time (2026-10-04)

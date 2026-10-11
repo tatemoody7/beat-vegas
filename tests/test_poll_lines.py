@@ -28,15 +28,20 @@ def _event(eid, home, away, kick):
     return {"id": eid, "home_team": home, "away_team": away, "commence_time": _iso(kick)}
 
 
-def _payload(ev, line=24.5, over=-110, under=-110, book="hardrockbet"):
+FEED_STAMP = "2026-09-19T14:55:00Z"  # the provider's last observation, 5 min before NOW
+
+
+def _payload(ev, line=24.5, over=-110, under=-110, book="hardrockbet", last_update=FEED_STAMP):
     return {
         **ev,
         "bookmakers": [
             {
                 "key": book,
+                "last_update": last_update,
                 "markets": [
                     {
                         "key": "totals_h1",
+                        "last_update": last_update,
                         "outcomes": [
                             {"name": "Over", "price": over, "point": line},
                             {"name": "Under", "price": under, "point": line},
@@ -202,6 +207,47 @@ def test_hr_universe_falls_back_loudly_when_sunday_capture_is_missing(env, monke
     _run(mod, monkeypatch, client, "--hours-back", "0", "--days-ahead", "6", "--hr-universe")
     assert client.calls == ["e1", "e2", "e3"]
     assert "::warning::" in capsys.readouterr().out
+
+
+def test_a_new_row_carries_the_feed_event_id_and_first_capture_stamp(env, monkeypatch):
+    """Capture provenance (2026-10-11): event_id is the feed's key, feed_updated_at the
+    provider's last_update at FIRST capture (naive UTC), captured_at our own clock."""
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1,))
+    client = FakeClient(EVENTS[:1], {"e1": _payload(EVENTS[0])})
+    _run(mod, monkeypatch, client, "--hours-back", "0", "--days-ahead", "3")
+    (row,) = _snaps(eng)
+    assert row.event_id == "e1"
+    assert row.feed_updated_at == datetime(2026, 9, 19, 14, 55)
+    assert row.feed_reseen_at is None
+    assert row.captured_at == NOW
+
+
+def test_a_row_without_a_feed_stamp_stores_null_not_a_guess(env, monkeypatch):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1,))
+    client = FakeClient(EVENTS[:1], {"e1": _payload(EVENTS[0], last_update=None)})
+    _run(mod, monkeypatch, client, "--hours-back", "0", "--days-ahead", "3")
+    (row,) = _snaps(eng)
+    assert row.feed_updated_at is None and row.feed_reseen_at is None
+
+
+def test_a_resighting_keeps_the_first_stamp_and_records_a_newer_one_apart(env, monkeypatch):
+    mod, eng = env
+    _seed(eng, GAMES, hr_fg_for=(1,))
+    first = FakeClient(EVENTS[:1], {"e1": _payload(EVENTS[0])})
+    _run(mod, monkeypatch, first, "--hours-back", "0", "--days-ahead", "3")
+    # Same price, the provider re-observed it later: no new row, first stamp intact.
+    again = FakeClient(EVENTS[:1], {"e1": _payload(EVENTS[0], last_update="2026-09-19T14:59:30Z")})
+    _run(mod, monkeypatch, again, "--hours-back", "0", "--days-ahead", "3")
+    (row,) = _snaps(eng)
+    assert row.feed_updated_at == datetime(2026, 9, 19, 14, 55)
+    assert row.feed_reseen_at == datetime(2026, 9, 19, 14, 59, 30)
+    assert row.last_seen_at == NOW
+    # The same stamp again changes nothing.
+    _run(mod, monkeypatch, again, "--hours-back", "0", "--days-ahead", "3")
+    (row,) = _snaps(eng)
+    assert row.feed_reseen_at == datetime(2026, 9, 19, 14, 59, 30)
 
 
 def test_unchanged_line_touches_last_seen_at_without_a_new_row(env, monkeypatch):

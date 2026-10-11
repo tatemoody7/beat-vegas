@@ -129,9 +129,11 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // (wk2 25/72, wk3 27/72, wk4 18/57) -- and H-STOP-2's line-value clock
     // takes only those. This is the backup: one Hobby entry per UTC hour from
     // 14Z Saturday to 04Z Sunday, each firing once within its hour, every tick
-    // dispatching (everyTick); 15 entries. With CLOSE_LOOKAHEAD_MIN=120 in the
-    // workflow, ticks up to 119 minutes apart still reach every kickoff inside
-    // 2 h. The 14Z entry (added 2026-09-29) is 10:00-10:59 EDT: the noon
+    // dispatching (everyTick); 15 entries. Since 2026-10-11 a Saturday tick
+    // polls every Hard Rock-priced game kicking off in the next 6 hours
+    // (CLOSE_LOOKAHEAD_MIN_SAT=360 in the workflow; the capture design note), so
+    // a game is read about six times in its last six hours; weeknight ticks keep
+    // 120. The 14Z entry (added 2026-09-29) is 10:00-10:59 EDT: the noon
     // slate's guaranteed look. Without it the first tick (15Z) could land at
     // 11:59 and, after runner start-up, capture the noon games at 12:0x --
     // outside their 2-hour window -- leaving them to GitHub's own cron.

@@ -925,7 +925,7 @@ CONTRACTS: Dict[str, Contract] = {
     "lines_watch": Contract(
         job="lines_watch",
         workflow="lines_watch.yml",
-        window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN (120) min ahead",
+        window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN ahead (360 min on Saturday ticks since 2026-10-11, 120 on weeknights)",
         artifacts=("odds_snapshots 1H rows or last_seen_at stamps", "last_close_capture_at gauge"),
         inputs=("MARKET",),
         checks=(

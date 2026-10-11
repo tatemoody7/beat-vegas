@@ -53,6 +53,7 @@ from beatvegas.hardrock import (
     normalize_book,
 )
 from beatvegas.season import current_season
+from beatvegas.snapshots_provenance import feed_stamp_for, note_reseen
 from beatvegas.sources.odds import (
     MAX_BOOKMAKERS_ONE_REGION,
     OddsAPIClient,
@@ -468,10 +469,15 @@ def main() -> None:
                 continue
             matched += 1
             prev = _latest_snapshot(s, gid, r["book"])
+            seen_at = r.get("fetched_at") or now
+            stamp = feed_stamp_for(r, seen_at)
             if not _changed(prev, r["line"], r["over_price"], r["under_price"]):
                 # Same number: no new row, but record that we re-confirmed it now
-                # (a pre-kick confirmation is the close time for CLV).
-                prev.last_seen_at = r.get("fetched_at") or now
+                # (a pre-kick confirmation is the close time for CLV). The
+                # provider's stamp at FIRST capture stays as it was; a newer one
+                # goes to feed_reseen_at (models.OddsSnapshot).
+                prev.last_seen_at = seen_at
+                note_reseen(prev, stamp)
                 skipped += 1
                 continue
             s.add(
@@ -482,7 +488,9 @@ def main() -> None:
                     line=r["line"],
                     over_price=r["over_price"],
                     under_price=r["under_price"],
-                    captured_at=r.get("fetched_at") or now,
+                    captured_at=seen_at,
+                    event_id=r.get("event_id"),
+                    feed_updated_at=stamp,
                 )
             )
             written += 1

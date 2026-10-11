@@ -45,7 +45,6 @@ function row(over: Partial<LedgerRow> = {}): LedgerRow {
     closingCapturedAt: "2026-09-19T18:30:00.000Z",
     priceProvenance: "logged",
     clv: 0,
-    clvProb: 0.01,
     verdictAtPick: "BET",
     reason: "model_gap",
     gapAtPick: 3.45,
@@ -173,11 +172,11 @@ describe("betsToCsv", () => {
     ]);
     const lines = csv.trim().split("\n");
     expect(lines[0]).toBe(BETS_CSV_HEADER);
-    expect(BETS_CSV_HEADER.split(",")).toHaveLength(31);
+    expect(BETS_CSV_HEADER.split(",")).toHaveLength(30);
     const cells = lines[1];
     expect(
       cells.startsWith(
-        "2026,3,2026-09-18T20:12:00.000Z,,2026-09-19T19:30:00.000Z,real,Stanford,Duke,1H,under,26.5,-110,1,false,hardrockbet,logged,BET,model_gap,3.45,23.05,7,10,17,under,0.91,26.5,-112,-1,1,0.01,",
+        "2026,3,2026-09-18T20:12:00.000Z,,2026-09-19T19:30:00.000Z,real,Stanford,Duke,1H,under,26.5,-110,1,false,hardrockbet,logged,BET,model_gap,3.45,23.05,7,10,17,under,0.91,26.5,-112,-1,1,",
       ),
     ).toBe(true);
     expect(cells.endsWith('"slow pace, ""both"" defenses"')).toBe(true);

@@ -48,7 +48,6 @@ const DB_BACKED = [
   "lineCheck",
   "postmortem",
   "preview",
-  "decision-quality",
   "lineStudy",
   "rulePause",
   "homeBoard",

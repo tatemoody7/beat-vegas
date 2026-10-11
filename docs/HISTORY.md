@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (THE PRICE-CLV COLUMN GOES).** `clv_prob` never read the ticket's price or bet
+  time (every pick on a game carried the same number: the market's own no-vig move from each
+  book's first to last quote), so the ledger CSV drops it (31 → 30 columns) and the code that
+  consumed it goes with the Monday review it fed: `lib/decision-quality.ts`, its test and
+  `DecisionsStrip`. The sign pin in `lib/clvDirection.test.ts` keeps Tate's six week-2 tickets
+  without the deleted module. The DB column stays (migrations are additive) and `picks.py` still
+  writes it; nothing on the site reads it. Tate's call: drop the column and the dead code.
+
 - **2026-10-11 UTC (THE DISPLAYED CLOSE NEVER COUNTS HARD ROCK).** The October review found that
   the stored `clv` on every pick (the ledger's "line value" column) used a close that was the
   median of EVERY book's last centred quote, Hard Rock and Fliff included. Hard Rock's late quotes

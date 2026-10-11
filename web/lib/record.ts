@@ -73,8 +73,7 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
   // after the bet is the good one, and the raw mean therefore reads backwards
   // to anyone looking at a stat called "Line value". Negate it here so the
   // displayed figure is points the market came TOWARD us: +0.6 is good.
-  // See web/lib/decision-quality.ts for the full note; lib/record.test.ts pins
-  // the direction.
+  // lib/clvDirection.ts holds the rule; lib/record.test.ts pins the direction.
   const clvs = rows
     .filter((r) => r.clv !== null)
     .map((r) => -(r.clv as number));

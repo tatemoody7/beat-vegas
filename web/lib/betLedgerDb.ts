@@ -38,7 +38,6 @@ type Raw = {
   closing_captured_at?: string | null;
   price_provenance?: string | null;
   clv: number | null;
-  clv_prob?: number | null;
   ev_cons?: number | null;
   cons_excluded?: string | null;
   verdict_at_pick?: string | null;
@@ -86,7 +85,7 @@ async function selectRows(season: number): Promise<Raw[]> {
              mp.actual_first_half_total, mp.model_line_at_pick,
              mp.closing_line, mp.closing_price,
              mp.closing_captured_at::text AS closing_captured_at,
-             mp.price_provenance, mp.clv, mp.clv_prob,
+             mp.price_provenance, mp.clv,
              mp.verdict_at_pick, mp.reason, mp.gap_at_pick, mp.hr_line_at_pick, mp.blocker,
              mp.ev_cons, mp.cons_excluded
       FROM manual_picks mp
@@ -97,7 +96,7 @@ async function selectRows(season: number): Promise<Raw[]> {
     if (!isMissingColumn(e)) throw e;
   }
   // Before the 2026-09 money-path migrations: no closing price or provenance,
-  // no closing_captured_at, no clv_prob. The ledger still renders.
+  // no closing_captured_at. The ledger still renders.
   console.warn("manual_picks money-path columns missing — run the migration");
   return prisma.$queryRaw<Raw[]>`
     SELECT mp.id, mp.game_id, mp.week, mp.away_team, mp.home_team, mp.market,
@@ -145,7 +144,6 @@ async function getBetLedgerUncached(season: number): Promise<LedgerRow[]> {
       closingCapturedAt: isoFromNaive(r.closing_captured_at),
       priceProvenance: r.price_provenance ?? null,
       clv: r.clv,
-      clvProb: r.clv_prob ?? null,
       evCons: r.ev_cons ?? null,
       consExcluded: r.cons_excluded ?? null,
       verdictAtPick: asVerdict(r.verdict_at_pick),

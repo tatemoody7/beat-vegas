@@ -31,6 +31,21 @@ hold the rest.
   points of EV toward the under before kickoff, short of the vig) and 90-95-2 against the close;
   full game 94-92-4. Not an edge at the close; the pre-close move is what H-ARM-WX1H measures
   forward. Both exploratory; nothing adopted; the rows carry the numbers.
+- **2026-10-11 UTC (THE DEAD CODE GOES; ROADMAP v2.0 CUT LIST, PART 1).** Deleted, each with its tests:
+  the offline backtest engine (`backtest/engine.py`, `bv_engine.py`) and its tools (`scripts/backtest.py`,
+  `validate_engine.py`, `retrain.py`, `rank_factors.py`, `inspect_combo.py`, `explain_pbp.py`,
+  `factors/evaluate.py`, `factors/inspect.py`); the four finished gate WORKFLOWS (`residual_gate.yml`,
+  `level_anchor_gate.yml`, `intercept_gate.yml`, `inseason_gate.yml`) plus `post-lines.yml` and
+  `fg_shadow.yml` (Sunday runs both steps); the closed studies' scripts and modules (`two_sided_study`,
+  `weather_style_study`, `hr_lag_study`, `stopping_rule_candidates`); and six scripts nothing called
+  (`backfill_bv_line`, `backfill_context`, `deploy_neon_games`, `purge_demo_rows`, `weekly_report`).
+  Kept, found live during the cut: the four gate SCRIPTS (`scripts/residual_gate.py` and siblings are
+  imported by `protocol_position`, `fg_position`, `challenger_position`, `blend_gate`,
+  `sharp_book_probe`, `stopping_rule_position`), `bv_adjust` (the only writer of a table the site
+  reads), `elo_line` (a feature input), `BREAKEVEN` moved into `backtest/residual_gate.py`. Git
+  history keeps every verdict's code at the SHA its doc names. 1,645 tests pass. Part 2 (GitHub cron
+  backups) is its own PR; the residual engine's no-op card step, the margin model, the DraftKings
+  first-try poller and the post-mortem tables wait for the first Monday read (10-19).
 
 - **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
   board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),

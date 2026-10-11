@@ -64,7 +64,7 @@ EARLY_STOPPING: Union[str, bool] = "auto"
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:
-    # Mirrors backtest.engine._new_model() hyperparameters for consistency.
+    # The hyperparameters the retired offline backtest engine used (2026-10-11).
     return HistGradientBoostingRegressor(
         learning_rate=0.05,
         max_depth=3,

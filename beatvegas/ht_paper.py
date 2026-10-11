@@ -37,9 +37,7 @@ from .wx_paper import _in_window, _logged, _priced_first_half
 HT_TOTAL_MIN = 60.0  # frozen 2026-10-10: the consensus full-game total at the build
 
 
-def consensus_totals(
-    session, game_ids: Iterable[int], now: datetime
-) -> Dict[int, Dict[str, Any]]:
+def consensus_totals(session, game_ids: Iterable[int], now: datetime) -> Dict[int, Dict[str, Any]]:
     """{game_id: {"total", "books", "quotes"}} for each game that has at least
     MIN_BOOKS counted books: the median of each counted book's newest centred
     full-game total captured at or before `now`. A game short of MIN_BOOKS is
@@ -142,7 +140,9 @@ def log_first_half(
 
 def summary_lines(stats: Optional[Dict[str, Any]]) -> List[str]:
     """The card summary's line about the high-total arm."""
-    tag = f"  ARM {ARM_HT_1H} (paper first-half unders, consensus full-game total {HT_TOTAL_MIN:g}+)"
+    tag = (
+        f"  ARM {ARM_HT_1H} (paper first-half unders, consensus full-game total {HT_TOTAL_MIN:g}+)"
+    )
     if not stats:
         return [f"{tag}: not run"]
     return [

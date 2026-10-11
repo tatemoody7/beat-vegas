@@ -128,13 +128,11 @@ itself before it builds.
 | Every 30 min, evenings + all Saturday | `lines_watch.yml`   | Per-game Hard Rock 1H closes ~30–75 min before each kickoff             |
 | Daily 6:30am (retry noon)          | `grade.yml`            | Finals (completed games only) + 1H play-by-play for weeks still missing it → grade market / model / picks / records → post-mortem (2023-25 history only on Monday) |
 
-Manual-only workflows: `post-lines.yml` (derived lines for the board),
-`migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
+Manual-only workflows: `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
 `enrich_tempo.yml` (re-backfill pace), `weather_backfill.yml` (Open-Meteo into
 `weather_obs`), `weather_actuals.yml` (observed weather into the study-only
-`weather_actuals`), `rescore.yml` (re-score a played week without freezing records),
-`residual_gate.yml` and `level_anchor_gate.yml` (pre-registered model challengers;
-the report is the deliverable). Dispatch any workflow from the Mac with
+`weather_actuals`), `rescore.yml` (re-score a played week without freezing records), `study.yml`
+(every registered study; the report artifact is the deliverable). Dispatch any workflow from the Mac with
 `gh workflow run <file> --ref main` (add `-f market=1h|1h_close` for
 `lines_watch.yml`).
 

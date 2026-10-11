@@ -18,14 +18,14 @@ promote anything.**
   - A pass licenses a paper arm only; that arm then registers under `docs/PROTOCOL_2026.md` and
     spends a ledger slot.
 - **Team totals and full-game weather** are tracked edge candidates in their own right.
-- **Three looks ran, once each (2026-10-09 UTC): all NOT MET, and final.** See "Results"
-  below.
-  - Arscott 51.6% on 219, national TV 52.4% on 2,385, Bennett 46.7% on 60, against the 52.38%
-    break-even. Every p is above 0.5, and every Holm-adjusted p is 1.000.
-  - They are final because a raw p above 5% cannot pass at any Holm step, whatever Coleman, Cox
-    and Salaga show.
+- **Four looks have run, once each: all NOT MET, and final.** Arscott, national TV and Bennett on
+  2026-10-09 UTC; Cox on 2026-10-11 UTC. See "Results" below.
+  - Arscott 51.6% on 219, national TV 52.4% on 2,385, Bennett 46.7% on 60, Cox 49.0% on 147,
+    against the 52.38% break-even. Every p is above 0.5, and every Holm-adjusted p is 1.000.
+  - They are final because a raw p above 5% cannot pass at any Holm step, whatever Coleman and
+    Salaga would show.
   - The rows are `H-LIT-ARSCOTT`, `H-LIT-TV` and `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, run by
-    `scripts/literature_look.py`. `H-LIT-COX` registered 2026-10-11; Coleman and Salaga are parked.
+    `scripts/literature_look.py`; `H-LIT-COX` ran 2026-10-11. Coleman and Salaga are parked (roadmap v2.1).
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against
@@ -67,11 +67,11 @@ Holm-corrected at 5% with m = 6 fixed (a look not yet run counts as p = 1). Tate
 | Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | Frozen in `H-LIT-ARSCOTT`: the formula and both σ from the working paper; spread-0 games excluded. **Ran 2026-10-09: NOT MET** |
 | Coleman | Home favourite vs a visiting underdog that travelled one time zone east, second half of the season | 2013-2025 | **Waiting on the full text**: Tate's call is to freeze Coleman's exact "second half" cutoff and line timing, not a guess |
 | National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen in `H-LIT-TV`: any TV outlet that is exactly one of the five. **Ran 2026-10-09: NOT MET** |
-| Cox | Favourite against the spread when it won the last three meetings of a trophy rivalry (FBS series with a named trophy: `data/trophy_games.json`, Wikipedia's list frozen 2026-10-09) | 2019-2025 | Frozen in `H-LIT-COX` (2026-10-11, Tate): the paper's one result significant at 5%; prior meetings from CFBD `/teams/matchup`, bowls included, ties skipped; the two other Cox results are descriptive only |
+| Cox | Favourite against the spread when it won the last three meetings of a trophy rivalry (FBS series with a named trophy: `data/trophy_games.json`, Wikipedia's list frozen 2026-10-09) | 2019-2025 | Frozen in `H-LIT-COX` (2026-10-11, Tate): the paper's one result significant at 5%; prior meetings from CFBD `/teams/matchup`, bowls included, ties skipped; the two other Cox results are descriptive only. **Ran 2026-10-11: NOT MET** (147 graded) |
 | Bennett | Fade the previous season's final AP top 10 in its first game | 2018-2025 | Frozen in `H-LIT-BENNETT`: 2017 dropped (the paper's 2008-2016 may name the first-game seasons); the literal first game; top-10 pairs dropped. About 70 games, so it reads closer to a description than a test. **Ran 2026-10-09: NOT MET** (60 graded) |
 | Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Observed weather comes from `weather_actuals` (ERA5 hourly + a CFBD cross-check, 2013-2026; `docs/WEATHER.md` §7); the game window is fixed in the row. Uses game-time weather, so a pass does not make it bettable as stated |
 
-## Results (one `study.yml` dispatch each, 2026-10-09 UTC, at `4345320`)
+## Results (one `study.yml` dispatch each; 2026-10-09 UTC at `4345320`, Cox 2026-10-11 UTC at `afbf045`)
 
 The judge was the median closing number across CFBD's providers, with the win rate tested by a
 one-sided exact binomial against 52.38%, pushes dropped. Holm ran at 5% with m = 6.
@@ -81,13 +81,25 @@ one-sided exact binomial against 52.38%, pushes dropped. Holm ran at 5% with m =
 | Arscott: over when the bias > 1.00 | 37863814444 | 113-106 (3) | 51.6% | 0.618 | 1.000 | −3.27 | NOT MET |
 | National TV: under | 37864047692 | 1249-1136 (30) | 52.4% | 0.513 | 1.000 | −0.55 | NOT MET |
 | Bennett: fade the prior top 10 | 37864196666 | 28-32 (1) | 46.7% | 0.845 | 1.000 | −6.55 | NOT MET |
+| Cox: the favourite that won the last three meetings | 38170624665 | 72-75 (4) | 49.0% | 0.818 | 1.000 | −9.55 | NOT MET |
 
-**The three verdicts are final.** Holm's loosest step tests at 5% itself, so a raw p above 5%
-cannot pass whatever the other looks show. Coleman, Cox and Salaga will be adjusted at m = 6
-with these three p-values in the family (`literature_look --holm`).
+**The four verdicts are final.** Holm's loosest step tests at 5% itself, so a raw p above 5%
+cannot pass whatever the other looks show. The family table (`literature_look --holm` over the four
+JSON reports, 2026-10-11) reads 1.000 for each; Coleman and Salaga, if ever run, join at m = 6.
 
 **Secondary numbers.** These are descriptive only. Nothing is tested on them and no rule is
 chosen from them.
+- **Cox** (529 trophy games graded 2019-2025, 112 pairs, 7,657 meetings on CFBD):
+  - By season the streak favourite went 48.1%, 45.0%, 60.0%, 30.4%, 52.6%, 57.1%, 52.6% (2019-2025);
+    2022 alone was 7-16.
+  - By pairing: P5-P5 40-47-3 (46.0%), P5-G5 9-7 (56.2%), G5-G5 23-21-1 (52.3%). Favourite at home
+    41-37-1 (52.6%), away 31-38-3 (44.9%).
+  - The paper's other two results, read the same way: every trophy favourite against the spread
+    262-250-17 (51.2%; the paper had 48.1%, so no fade either); the G5-vs-G5 underdog 98-97-3
+    (50.3%; the paper's non-P5 underdog 55.8%). The underdog that had won the last three went
+    17-30-3 (36.2%), the one lopsided split, on 50 games.
+  - Providers: TeamRankings / numberfire / consensus / Caesars / Bovada in 2019-2020, Bovada /
+    William Hill / TeamRankings in 2021-2022, Bovada / DraftKings / ESPN Bet in 2023-2025.
 - **Arscott:**
   - 3.9% of the 5,693 graded games qualified; the paper reports about 5%.
   - The paper's in-sample 1.75 cut went 32-20-1 (61.5%, n 52).

@@ -7,6 +7,34 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-11
+
+- **2026-10-11 UTC (THE COMPLETE REASSESSMENT; `docs/program/REVIEW_2026-10.md`).** Tate asked for a
+  ground-up review of mission, strategy, hypotheses, results, data, infrastructure and business,
+  as an independent researcher, with questions grouped and answered before any change. Read-only:
+  live Neon reads, three repo sweeps, five Kalshi research lanes, his own Kalshi report
+  reconciled. Nothing in the repo or the database changed during the review.
+  - **What the evidence said:** every ledger (real, paper, every arm, the retired over arms)
+    reads −3% to −6% against the consensus close — the vig; real money 12-14, −1.43u on 26
+    tickets, 12 unjudgeable (`stale_close`); six of eight arms are unders variants and three ride
+    a model that is worse than the market on 2026 data; the two structural arms (slots 4-5) have
+    no design; stored `clv` is a median that includes Hard Rock's own late alternates and
+    `clv_prob` never reads the ticket's price; the stop rule was replaced twice then dropped; the
+    backtest is not the rule that is bet; ~$50/month but 87 scripts, 20 workflows, 30 tables,
+    20K doc lines and 17 incidents since 09-01. Kalshi: lawful from Florida today, not a softer
+    price (−110 to −121 all-in as a taker, a mirror of the books), unique for line shopping, no
+    winner limits and a free maker side on 1H totals; its data terms keep its prices off the site.
+  - **Tate's calls (sixteen, Part 2 of the review doc):** the objective is personal proof at Hard
+    Rock; every arm runs unchanged to January (readings only); +3% one-season target stays for
+    2026, re-decided in January; Kalshi is measured first on data already in `odds_snapshots`;
+    the next build is Hard Rock off-market capture; the personal ledger continues and the site's
+    mission line is scoped to promoted rules; the site is a public record and nothing more; the
+    cut list is accepted (offline backtest engine + four finished gate workflows + orphan
+    scripts, post-mortem tables and factor ledger, GitHub cron backups, owner-only site
+    sections); one committed review doc under `docs/program/`. Roadmap v2.0 follows as its own PR.
+  - The 2026-10-09 strategic review (topics 1-3 closed) was committed verbatim as Part 1; it had
+    lived untracked in the `strategy-review` worktree.
+
 ## 2026-10-10
 
 - **2026-10-10 UTC (H-ARM-HT1H REGISTERED, ROADMAP v1.8).** Tate asked whether games with higher

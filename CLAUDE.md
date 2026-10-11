@@ -80,6 +80,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
+- **Next build (roadmap v2.0, 2026-10-11)**: the Hard Rock off-market capture, `docs/program/CAPTURE_DESIGN_2026-10.md`
+  (two columns + a 6-hour Saturday lookahead; PR Wednesday 10-14, first denser Saturday 10-17).
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total

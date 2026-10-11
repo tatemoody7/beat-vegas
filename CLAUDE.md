@@ -38,10 +38,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
-- Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
-  `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+- `docs/program/REVIEW_2026-10.md` — the October review: Tate's 16 decisions of 2026-10-11 (personal
+  proof is the goal; every arm unchanged to January; cut list; Kalshi measured first). Plans:
+  `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
-
 ## Where we are (as of 2026-10-08)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the

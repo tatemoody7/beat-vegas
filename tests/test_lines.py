@@ -4,6 +4,7 @@ from types import SimpleNamespace as S
 import pytest
 
 from beatvegas.lines import (
+    CLOSE_EXCLUDED_BOOKS,
     closing_before_kickoff,
     consensus_fair_under_open_close,
     consensus_open_close,
@@ -427,3 +428,34 @@ def test_real_closes_counts_a_row_re_seen_inside_the_window():
         s.commit()
         out = real_closes(s, [1, 2], {1: kickoff, 2: kickoff}, within_hours=2.0)
         assert out == {1: 24.5}
+
+
+def test_closing_never_counts_the_bet_book_or_fliff():
+    """Hard Rock's late quotes are alternate rungs that pass the centred filter
+    (-140 to -160) and sit 1-1.5 points under the market; a close that counted
+    them flattered every under (docs/program/REVIEW_2026-10.md, roadmap v2.0)."""
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [
+        snap("hardrockbet", 27.5, 4, over=-150, under=+120),  # HR rung, pre-kick
+        snap("fliff", 26.5, 4),
+        snap("dk", 28.5, 4),
+        snap("fd", 28.5, 4),
+        snap("mgm", 29.5, 4),
+    ]
+    opening, closing, closing_at = closing_before_kickoff(
+        snaps, kickoff, exclude=CLOSE_EXCLUDED_BOOKS
+    )
+    assert closing == 28.5  # the median of dk/fd/mgm, never dragged by the rung
+    assert closing_at == datetime(2024, 11, 4, 12, 0)
+
+
+def test_closing_is_none_when_only_the_bet_book_priced_the_game():
+    kickoff = datetime(2024, 11, 5, 12, 0)
+    snaps = [snap("hardrockbet", 27.5, 4), snap("fliff", 27.5, 4)]
+    assert closing_before_kickoff(snaps, kickoff, exclude=CLOSE_EXCLUDED_BOOKS) == (
+        None,
+        None,
+        None,
+    )
+    # The study readers keep every book by default.
+    assert closing_before_kickoff(snaps, kickoff)[1] == 27.5

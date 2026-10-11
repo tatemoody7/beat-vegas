@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (THE DISPLAYED CLOSE NEVER COUNTS HARD ROCK).** The October review found that
+  the stored `clv` on every pick (the ledger's "line value" column) used a close that was the
+  median of EVERY book's last centred quote, Hard Rock and Fliff included. Hard Rock's late quotes
+  are alternate rungs priced −140 to −160, which pass the centred filter and sit 1-1.5 points under
+  the market, so the "close" leaned toward the under on exactly the tickets Hard Rock had moved
+  against. Fix: `lines.closing_before_kickoff` counts only the judge's books
+  (`lines.CLOSE_EXCLUDED_BOOKS` = Hard Rock, Fliff, the feed's consensus row; `consensus.py` now
+  reads the same set); a game only Hard Rock priced has no close. `book_closing_before_kickoff`
+  (one book's own close, the closing PRICE) is unchanged. `grade.yml` gains a `regrade` input
+  (`pick.py --regrade`, forces the probe) for the one-time recompute; the before/after per ticket is
+  in PR #357's body. The arms read `ev_cons`, so no clock moves. Tate's call: fix now, show the table.
+
 - **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
   board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),
   the Monday review's breakdown, decisions strip and factor read on Results, and the signed-in

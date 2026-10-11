@@ -507,10 +507,12 @@ def test_grade_uses_the_consensus_close_even_for_a_hard_rock_ticket():
             s.query(ManualPick).filter(ManualPick.game_id == 2).order_by(ManualPick.id).all()
         )
     assert hr.graded and hr.result == "under"
-    # Both grade at the consensus close: median of each book's last PRE-kick
-    # line (draftkings 26.5, hardrockbet 23.5) = 25.0. `book` no longer changes it.
-    assert hr.closing_line == 25.0 and hr.clv == 0.5
-    assert other.closing_line == 25.0 and other.clv == 0.5
+    # Both grade at the market close: the median of each COUNTED book's last
+    # PRE-kick line. Hard Rock never counts (lines.CLOSE_EXCLUDED_BOOKS, 2026-10-11:
+    # its late quotes are rungs that drag the median under), so the close is
+    # draftkings alone, 26.5; `book` no longer changes it.
+    assert hr.closing_line == 26.5 and hr.clv == 2.0
+    assert other.closing_line == 26.5 and other.clv == 2.0
 
 
 def test_graded_pick_fields_leave_units_none_when_unpriced():

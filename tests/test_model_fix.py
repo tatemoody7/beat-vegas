@@ -40,7 +40,9 @@ def test_the_week_ordered_mean_leaks_the_bowl_into_the_regular_season():
 def test_the_live_order_is_still_week_first():
     """The candidate failed, so the live frame keeps the order it was trained on."""
     live = features._season_to_date(_season_with_bowl())
-    pd.testing.assert_frame_equal(live, features._season_to_date(_season_with_bowl(), by_date=False))
+    pd.testing.assert_frame_equal(
+        live, features._season_to_date(_season_with_bowl(), by_date=False)
+    )
 
 
 def test_the_date_ordered_mean_never_reads_a_later_game():

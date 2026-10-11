@@ -48,6 +48,11 @@ on:
         type: boolean
         required: false
         default: false
+      regrade:
+        description: 'regrade every pick of the season (pick.py --regrade): only when the GRADING RULE changed'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: neon-writers
@@ -96,6 +101,7 @@ jobs:
         id: probe
         env:
           IN_HIST: ${{ inputs.hist }}
+          IN_REGRADE: ${{ inputs.regrade }}
         # Three triggers fire every day -- the Vercel cron's dispatch (~10:52Z)
         # and GitHub's two crons (10:30Z and 16:00Z), which run 2-4 hours late
         # -- and until 2026-09-22 all three ran every step: ~18 runner-minutes a
@@ -130,7 +136,8 @@ jobs:
                   ),
                   {"since": since},
               ).scalar() or 0
-          force = os.environ.get("IN_HIST") == "true"
+          # hist=true and regrade=true are deliberate manual passes: always run.
+          force = os.environ.get("IN_HIST") == "true" or os.environ.get("IN_REGRADE") == "true"
           print(f"need_grade={'true' if (force or recent == 0) else 'false'}")
           print(f"recent_runs={recent}")
           PY
@@ -180,7 +187,16 @@ jobs:
         if: steps.probe.outputs.need_grade == 'true'
         env:
           SEASON: ${{ steps.season.outputs.season }}
-        run: python scripts/pick.py grade --season "$SEASON"
+          IN_REGRADE: ${{ inputs.regrade }}
+        # --regrade recomputes every field of every pick (idempotent); it is for a
+        # change to the grading rule itself, e.g. 2026-10-11 when the close stopped
+        # counting Hard Rock's own rungs. The nightly run grades once.
+        run: |
+          if [ "$IN_REGRADE" = "true" ]; then
+            python scripts/pick.py grade --season "$SEASON" --regrade
+          else
+            python scripts/pick.py grade --season "$SEASON"
+          fi
       - name: Line value at each pick's exact terms (consensus engine)
         if: steps.probe.outputs.need_grade == 'true'
         # docs/CONSENSUS.md. grade_pick writes these columns for every new grade;

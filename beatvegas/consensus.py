@@ -40,12 +40,15 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 from .devig import devig_two_way, is_centred_quote
 from .grading import american_to_decimal
 from .hardrock import HR_BOOK_KEY
+from .lines import CLOSE_EXCLUDED_BOOKS
 
 CONSENSUS_VERSION = "cv1"
 HALFPOINT_VERSION = "hp1"
 DEVIG_METHOD = "multiplicative"
 # Tate's calls, 2026-10-07 (docs/CONSENSUS.md):
-EXCLUDED_BOOKS = frozenset({HR_BOOK_KEY, "fliff", "consensus"})
+EXCLUDED_BOOKS = (
+    CLOSE_EXCLUDED_BOOKS  # beatvegas/lines.py: one set for the judge and the displayed close
+)
 MIN_BOOKS = 3
 MAX_CONVERT_PTS = 1.5
 CLOSE_WINDOW_H = 2.0

@@ -65,4 +65,47 @@ review. The Monday one-page read quotes the per-market table.
 
 ## Reads
 
-(The first run's numbers are appended here by the results PR.)
+### Read 1 — 2026-10-11 UTC, `study.yml` run 38179348954 at `b04ae60` (2026 weeks 1-6, development)
+
+| market | HR states (games) | mean EV vs ref | EV>0 | ≥+1% | ≥+2% (point) | flags (lower bound) | opportunities | tiers |
+|---|---|---|---|---|---|---|---|---|
+| 1H_total | 931 (358) | −4.15% | 38 | 21 | 11 | 3 | 3 | all tier 0 |
+| full_game_total | 1,485 (469) | −3.23% | 59 | 31 | 16 | 2 | 2 | all tier 0 |
+| full_game_ml (within ±200) | 73 (35) | −3.19% | 1 | 0 | 0 | 0 | 0 | — |
+
+Drops: first half 235 alternate rungs, 24 without a confirmed reference, 6 outside the table;
+full game 12 rungs, 17 without a reference; moneylines 121 of 194 Hard Rock states lopsided
+(beyond ±200) and not compared.
+
+The five opportunities, every one a feed observation (tier 0):
+
+| market | game | captured (UTC) | h to kick | Hard Rock | reference | side @ price | EV ref | EV lower bound | EV close | market moved | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1H | Sam Houston @ Liberty | 10-08 22:31 | 0.5 | 28.5 (−110/−120) | 27.5 | under @ −120 | +4.2% | +2.4% | +4.2% | unchanged | win |
+| 1H | Ole Miss @ Vanderbilt | 10-10 11:58 | 7.5 | 28.5 (−120/−110) | 27.5 | under @ −110 | +4.8% | +2.9% | +4.8% | unchanged | loss |
+| 1H | Ball State @ Northwestern | 10-10 11:58 | 4.5 | 30.5 (−130/+100) | 30.5 | under @ +100 | +2.2% | +2.2% | +2.2% | unchanged | loss |
+| FG | Washington @ USC | 09-27 18:58 | 148.5 | 54.5 (−105/−115) | 55.5 | over @ −105 | +6.0% | +3.7% | — | unknown | loss |
+| FG | Buffalo @ Toledo | 10-09 20:11 | 23.3 | 54.5 (−110/−105) | 55.5 | over @ −110 | +4.5% | +2.2% | −2.5% | toward HR | loss |
+
+**What it says.** Hard Rock's average price is its hold below fair in every market (−3% to −4%).
+Discrepancies exist but are rare: about 4% of first-half states and 4% of full-game states read
+positive at the point estimate, and once the half-point table's sampling error is applied, 3 of 11
+first-half and 2 of 16 full-game candidates survive the +2% bar. Five opportunities in six weeks,
+less than one a week, all unverified for Florida (tier 0), 1-4 realized. In the three first-half
+cases the market never moved, so "EV vs close" there is the same disagreement counted twice; in
+one full-game case the market moved toward Hard Rock. The moneyline stratum shows nothing once
+lopsided prices are excluded; the 18 longshot "flags" the unrestricted first pass produced were
+the de-vig's favourite-longshot bias, not Hard Rock, and the rule was fixed before it froze.
+
+**What it does not say.** Nothing here is validated: the rule's +2% bar and the lower-bound
+treatment were chosen after Step 0's look at these same weeks, so this read is development
+evidence; the forward weeks are the test. No flag has a Florida screenshot or a feed stamp yet
+(the stamps begin 2026-10-13). Persistence is a lower bound at poll resolution. Spreads are
+untested for want of a spread table.
+
+**What we learned.** The table's sampling error halves the candidate count, so calibrating it
+(bootstrap, and the market's own point values from alternate ladders) is the highest-value
+modelling task. The favourite-longshot bias of multiplicative de-vig is large enough to
+manufacture flags; any future side-market comparison needs a price range or a different de-vig.
+Flags cluster inside 24 hours before kickoff on Thursday to Saturday; nothing qualified more than
+three days out, where Hard Rock's prices read a full point worse (about −5%).

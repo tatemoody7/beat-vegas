@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (H-PRICE-HR READ 1: FIVE FEED OBSERVATIONS IN SIX WEEKS, NONE VERIFIED).**
+  `study.yml` run 38179348954 at b04ae60, the first pricing read on 2026 weeks 1-6 (identical to
+  the local reproduction): first-half 931 Hard Rock states on 358 games, mean EV −4.15%, 38/21/11
+  above 0/+1%/+2% at the point estimate and **3 flags** at the lower bound of the half-point mass;
+  full-game totals 1,485 states, 59/31/16, **2 flags**; moneylines within ±200, 73 states, 1 positive,
+  **0 flags** (121 lopsided states not compared; the unrestricted pass had produced 18 longshot
+  flags at +275 to +1100, the de-vig's favourite-longshot bias, fixed before the rule froze). Five
+  opportunities, all tier 0 (feed observations, unverified for Florida), 1-4 realized; in the three
+  first-half cases the market never moved; one full-game case moved toward Hard Rock. Development
+  evidence: the bar was chosen after Step 0 on these same weeks; the forward weeks are the test.
+  `docs/PRICING_RESEARCH.md` holds the tables. Lesson: the table's sampling error halves the
+  candidate count; calibrating it is the next modelling task.
+
 - **2026-10-11 UTC (H-PRICE-HR REGISTERED: HARD ROCK AGAINST THE MARKET, RULE pv1).** The pricing
   research runs (Tate's approval: the independent, read-only exploratory study only). Row before
   code: exploratory, no alpha, read at 2026-12-07 and January; `beatvegas/pricing.py` holds the

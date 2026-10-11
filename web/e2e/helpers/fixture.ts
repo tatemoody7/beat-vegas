@@ -141,27 +141,6 @@ export type Expected = {
   rankOrder: number[];
   playedIds: number[];
   betIds: number[];
-  answer: {
-    bets: {
-      gameId: number;
-      matchup: string;
-      numbers: string;
-      picked: boolean;
-      paper: boolean;
-    }[];
-    open: number;
-    paperOpen: number;
-    closest: {
-      gameId: number;
-      matchup: string;
-      numbers: string;
-      needs: string;
-    }[];
-    used: number;
-    cap: number;
-    headline: string;
-    slotsLine: string;
-  };
   card: {
     slot: string;
     counts: {

@@ -70,7 +70,12 @@ def test_the_consensus_is_the_median_of_each_counted_books_newest_centred_quote(
         got = HT.consensus_totals(s, [1], NOW)[1]
     assert got["books"] == 4
     assert got["total"] == 59.75  # median of 58.5, 59.5, 60.0, 61.5
-    assert [q["book"] for q in got["quotes"]] == ["betmgm", "draftkings", "fanduel", "williamhill_us"]
+    assert [q["book"] for q in got["quotes"]] == [
+        "betmgm",
+        "draftkings",
+        "fanduel",
+        "williamhill_us",
+    ]
     assert {q["book"]: q["line"] for q in got["quotes"]}["draftkings"] == 61.5
 
 

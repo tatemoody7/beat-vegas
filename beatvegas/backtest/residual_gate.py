@@ -40,7 +40,10 @@ from ..model import residual as R
 from ..model.bv_line import BV_FEATURE_COLS, bv_line_for_slate
 from ..model.bv_line import TARGET as BV_TARGET
 from ..model.score import MODEL_VERSION as STORED_MODEL_VERSION
-from .engine import BREAKEVEN
+
+BREAKEVEN = (
+    0.524  # win% needed to beat standard -110 juice (was backtest.engine, retired 2026-10-11)
+)
 
 __all__ = [
     "BREAKEVEN",

@@ -89,7 +89,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
   1HO / FGU, clocks PAUSED (p1.1, v1.5) until the leak-fixed model's first card; 6-7 = weather unders,
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
-  retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
+  the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **The pause switch (`rule_paused`) is OFF since 2026-10-08 20:00 UTC, so the personal ledger is ON** (v1.4, Tate's call; written through Neon's
   HTTPS endpoint, mirroring `scripts/rule_pause.py`; it was on 2026-10-07 → 10-08).
@@ -179,13 +179,10 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
-| `fg_shadow.yml` | dispatch season/week | `predictions` `bv_fg_v1` (H-FG-P shadow; Sunday runs it too) |
-| `post-lines.yml` | dispatch season/week/source | `derived_lines` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
 | `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
-| `residual_gate.yml`, `level_anchor_gate.yml`, `intercept_gate.yml`, `inseason_gate.yml` | dispatch | a report; never the model |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every
 workflow installs `pip install --require-hashes -r requirements/lock.txt` (Python 3.11, 32 pins)
@@ -201,20 +198,20 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
 - **Positions / rule**: `protocol_position` (the registered arms, Mondays), `stopping_rule_position`,
   `neggap_position`, `fg_position`, `challenger_position`, `rule_pause`, `pick` (no `add`).
-- **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
-  `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
-  `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
-  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`,
+- **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
+  `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
+  `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
+  `neggap_level_study`, `frame_snapshot`, `margin_backtest`,
   `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX).
-- **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
+- **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
-  `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +
-  `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`, `build_trophy_games` (rivalry list),
+  `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +
+  `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `build_trophy_games` (rivalry list),
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
-- **Model / research**: `retrain`, `backtest`, `validate_engine`, `rank_factors`,
-  `inspect_combo`, `explain_pbp`, `line_study`, `weekly_report`, `model_artifacts`, `bv_adjust`.
-- **Deploy / dev**: `deploy_neon`, `deploy_neon_games` (both ADDITIVE), `pg_sim` +
+- **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (the offline backtest engine and
+  its tools went 2026-10-11, roadmap v2.0).
+- **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +
   `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 

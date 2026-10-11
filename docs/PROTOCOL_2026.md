@@ -134,7 +134,7 @@ its first eligible build after its collector merges (`protocol.HT_ARM_START` is 
 
 | Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
 |---|---|---|---|
-| H-ARM-HT1H | 8 | First-half UNDER on every game whose consensus full-game total at the build is 60.0 or more (the median of each counted book's newest centred quote at or before the build, at least 3 books, the judge's book set), at Hard Rock's centred main line and under price | `challenger_picks`, `arm = 'H-ARM-HT1H'` (`beatvegas/ht_paper.py`, its collector PR) |
+| H-ARM-HT1H | 8 | First-half UNDER on every game whose consensus full-game total at the build is 60.0 or more (the median of each counted book's newest centred quote at or before the build, at least 3 books, the judge's book set), at Hard Rock's centred main line and under price | `challenger_picks`, `arm = 'H-ARM-HT1H'` (`beatvegas/ht_paper.py`) |
 
 - **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
   H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.

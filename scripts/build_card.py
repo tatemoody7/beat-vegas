@@ -35,7 +35,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Set
 
-from beatvegas import wx_paper
+from beatvegas import ht_paper, wx_paper
 from beatvegas.arm_paper import arm_summary_lines, log_overs_mirror
 from beatvegas.card import (
     REFERENCE_MODEL_VERSION,
@@ -665,6 +665,7 @@ def run(
         arm_over_stats: Optional[Dict] = None
         arm_fg_stats: Optional[Dict] = None
         wx_stats: Optional[Dict] = None
+        ht_stats: Optional[Dict] = None
         paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
@@ -751,6 +752,16 @@ def run(
                 except Exception as e:  # noqa: BLE001 - never break the card
                     wx_stats = None
                     print(f"[card] WARNING: weather arms not logged: {e}")
+                # The high-total arm (H-ARM-HT1H, 2026-10-10): reads the
+                # full-game snapshots already on file, no model and no network.
+                try:
+                    with s.begin_nested():
+                        ht_stats = ht_paper.log_first_half(
+                            s, card, now, window_hours=paper_window_hours
+                        )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    ht_stats = None
+                    print(f"[card] WARNING: H-ARM-HT1H not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -810,6 +821,7 @@ def run(
         lines.append(fg_summary_line(fg_stats, fg_on))
         lines.extend(arm_summary_lines(arm_over_stats, arm_fg_stats))
         lines.extend(wx_paper.summary_lines(wx_stats))
+        lines.extend(ht_paper.summary_lines(ht_stats))
         if picks_added:
             # Frozen feature vectors (2026-10-04): a pick with none had no
             # game_records row (the first scoring of the game never ran).

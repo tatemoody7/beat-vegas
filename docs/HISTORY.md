@@ -55,6 +55,17 @@ hold the rest.
 
 ## 2026-10-10
 
+- **2026-10-10 UTC (H-ARM-HT1H COLLECTOR).** `beatvegas/ht_paper.py` logs the arm from every
+  decision build, in its own savepoint after the weather arms (`scripts/build_card.py`).
+  - **Rule:** the consensus full-game total is the median of each counted book's newest centred
+    `full_game_total` quote at or before the build, on the judge's books (`consensus.EXCLUDED_BOOKS`)
+    and at least `consensus.MIN_BOOKS`. At 60.0 or more, a game gets a paper first-half UNDER at
+    Hard Rock's centred main line and under price, once per game, inside the paper window.
+  - **Cost:** it reads only the snapshots on file, with no model and no network call, so it adds
+    nothing to the card's clock.
+  - **Registry:** `protocol.ARMS` slot 8, with `HT_ARM_START` as its clock backstop.
+    `protocol_position.py` reads the arm from `ARMS`. The card summary gains its line.
+
 - **2026-10-10 UTC (H-ARM-HT1H REGISTERED, ROADMAP v1.8).** Tate asked whether games with higher
   totals had done better.
   - **The answer:** yes in 2023-25. First-half unders at the real consensus close went 154-110-4

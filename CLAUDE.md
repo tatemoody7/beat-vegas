@@ -202,7 +202,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
   `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
   `neggap_level_study`, `frame_snapshot`, `margin_backtest`,
-  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX).
+  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +

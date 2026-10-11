@@ -9,6 +9,54 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (ROADMAP v2.1: THE ALIGNMENT CALLS, THE JANUARY TEMPLATE).** The evening Q&A after
+  the October review, logged as one versioned amendment (`docs/ROADMAP_2026.md` v2.1) with the
+  templates in `docs/program/JANUARY_2027_REVIEW.md`: one Monday sitting on a one-page read (arms
+  first; the long weekly report stops; light read 10-12, first full read 10-19); two decision reads,
+  2026-12-07 (mid-point, none) and 2027-01-25 (final); the 2027 default drafted (+1.5%, two-season
+  clocks, capture-based arms first; a 2026 pass = $10 live validation only); Kalshi account only on
+  a January H-VENUE-1 read of about 1 pt EV best-of-two over 100+ games on fee-inclusive prices;
+  CFBD Tier 1 on 11-06, Odds API 20K, Actions cap $20; after 10-19 one late cron per job and the
+  post-mortem tables stop; HR rung drift accepted; Cox now, Coleman and Salaga parked; weather
+  backfill on Mon-Wed; friends get one plain message; 2026 success keeps the bar with the
+  research-year deliverables beside it. Tate's deep-research Kalshi report filed as
+  `docs/external/2026-10-11-chatgpt-deep-research-kalshi-cfb.md` (review §F4b points at it; Group
+  2 answer 5 annotated with the later decision). The brief: v2.1, four stale open items cut.
+  Docs only.
+
+- **2026-10-11 UTC (H-ARM-FGU WEEK-6 SELECT REPLAYED: THE BUILD REPRODUCES EXACTLY).** The reassessment
+  had flagged a gap (a reconstruction found 11 qualifiers at a 0.70 bar against 10 logged, with
+  Kansas State and Ohio State "below the bar" and Arkansas State, Troy and Western Kentucky
+  "unlogged"). Read-only replay against Neon as of the one build that logged the arm,
+  `cards` 28 (fri_pm, 2026-10-09 20:17:48 UTC; the sat_am build never wrote a card row, run
+  38049849474 timed out): Hard Rock `full_game_total` newest snapshot per game captured before the
+  build, centred at −160, unplayed games only, `bv_fg_v1` predictions (refit 9, 2026-10-07, untouched
+  since) → universe 50, k = 10, bar 0.48, the same ten games in the same order as `cap_rank` 1-10
+  and the ten rows' frozen `bar` / `universe_n`; the run log printed "universe 50, bar 0.48, 10
+  qualify, +10 logged". Kansas State (0.64) and Ohio State (0.48, a tie at the bar, which qualifies)
+  were above the real bar. Troy (kick 10-07), Western Kentucky and Arkansas State (both 10-08) had
+  kicked off before the build, so they could not be in the universe; counting them is what pushed
+  the reconstruction's bar to 0.70. No defect, no row touched. The arm's first read stays
+  2026-10-19.
+
+- **2026-10-11 UTC (H-VENUE-1 FIRST DEVELOPMENT READ, AND THE FEE QUESTION).** `venue_check` run
+  38149958361 on week 6 (53 graded games with a Hard Rock and a Kalshi full-game total and 3+ books
+  inside the judge's window): both venues sit the same distance from the field's median (0.33 vs
+  0.35 pts, about 25% a point or more off), but the judge reads Kalshi's price about 4 points of EV
+  better on every under (−1.13% vs −5.16%, Kalshi better on 100% of games) and on 89% of overs
+  (−0.78% vs −3.63%). Same line distance, better price on every game, a gap the size of Kalshi's
+  7% taker fee (review §F: −110 to −121 all-in): the likely reading is that the feed's `us_ex` price
+  is fee-exclusive, not that Kalshi is softer. The January registered read states whether the price
+  includes the fee before any claim; the registry row is unchanged (its result cell is January's).
+
+- **2026-10-11 UTC (THE 10-11 REFIT CONFIRMED; #362 MERGED).** `sunday.yml` run 38166029060 wrote
+  `model_runs` 10 (`gbm_v1`, 2003-2025, "weekly refit", 19:19 UTC) and 11 (`bv_fg_v1` shadow refit,
+  19:20 UTC): the leak-fixed model's first card is Tuesday 10-13, which starts arms 1-3's clocks
+  (protocol p1.1). The weather step of that run failed (`need_capture`/`need_score` true, pace ok);
+  read at the light read. PR #362 (the Hard Rock off-market capture design note) merged at ae610a9;
+  the `roadmap-v2` and `capture-design` worktrees removed. The Vercel `sslmode` warning (pg v9)
+  is an open nit, moved here from the brief: set `sslmode=verify-full` explicitly on `DATABASE_URL`.
+
 - **2026-10-11 UTC (H-LIT-COX REGISTERED: THE STREAK FAVOURITE IN TROPHY GAMES).** The fourth
   literature look (roadmap v1.3; v2.1's "Cox runs now, Coleman and Salaga parked"). Tate's call on
   the rule: of Cox's three results the one tested is the favourite that won the last three meetings

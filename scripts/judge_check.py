@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from beatvegas.backtest.early_close import (  # noqa: E402
     bootstrap_mean_ci,
+    exclusion_counts,
     records,
     settle,
     units,
@@ -145,9 +146,7 @@ def read(recs: Sequence[dict]) -> dict:
         "slope_ci95": None if ci is None else ci[0],
         "intercept_ci95": None if ci is None else ci[1],
         "quintiles": quintiles(groups),
-        "excluded_no_reading": sum(
-            1 for r in recs for side in ("under", "over") if r[side]["ev"] is None
-        ),
+        "excluded_by_reason": exclusion_counts(recs),
     }
 
 
@@ -182,6 +181,10 @@ def render(result: dict, stamp: str) -> str:
             f"({_ci(r['real_ci95'])}) | {slope} ({_ci(r['slope_ci95'], pct=False)}) | "
             f"{icpt} ({_ci(r['intercept_ci95'])}) |"
         )
+    L.append("")
+    for market, r in result.items():
+        why = ", ".join(f"{k} {v}" for k, v in sorted(r["excluded_by_reason"].items())) or "none"
+        L.append(f"- {market} bets with no reading: {why}")
     for market, r in result.items():
         if not r["quintiles"]:
             continue

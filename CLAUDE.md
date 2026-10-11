@@ -38,8 +38,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
-- `docs/program/REVIEW_2026-10.md` — the October review: Tate's 16 decisions of 2026-10-11 (personal
-  proof is the goal; every arm unchanged to January; cut list; Kalshi measured first). Plans:
+- `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11). Plans:
   `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 ## Where we are (as of 2026-10-08)
@@ -165,9 +164,9 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
   − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS` − `LEAKY_WEATHER_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
   `data/fbs_teams.json`), trained on 2003+ (`score.CHAMPION_TRAIN_MIN_SEASON`; other frames
-  2023+), global intercept, re-fitted every Sunday. `score_slate`
-  ranks by `gap = line − bv_line`; the 0-100 score, tier and kill line all derive from the gap
-  against the slate bar. `bv_sigma` is one slate-wide number — no probability from it.
+  2023+), global intercept, re-fitted every Sunday. `score_slate` ranks by `gap = line − bv_line`;
+  the 0-100 score, tier and kill line all derive from the gap against the slate bar. `bv_sigma` is
+  one slate-wide number — no probability from it.
 
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
@@ -237,8 +236,9 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   never null; bonus is set at log only). `uq_manual_pick_per_ledger` stops duplicates.
 - Grading is side-aware in one place each: `grading.units_won(side)`,
   `picks.graded_pick_fields(side)`, `lines.book_closing_price_before_kickoff(side)`. Stored
-  `clv = closing − bet`, so **negative is the good direction for an under**; the site shows `−clv`
-  (`lib/clvDirection.test.ts` pins it). `price_provenance` ∈ logged / backfilled_close / unknown;
+  `clv = closing − bet` (the close never counts Hard Rock, Fliff or the feed's consensus row:
+  `lines.CLOSE_EXCLUDED_BOOKS`), so **negative is the good direction for an under**; the site shows
+  `−clv` (`lib/clvDirection.test.ts` pins it). `price_provenance` ∈ logged / backfilled_close / unknown;
   only `logged` feeds price CLV.
 - Real: `manual_picks` (`is_paper=false`). Paper: `manual_picks` (`is_paper=true`, 1 unit, build
   only). Challengers: `challenger_picks` only — one missed filter contaminates the champion's clock.

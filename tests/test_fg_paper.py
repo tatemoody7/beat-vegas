@@ -271,7 +271,9 @@ def test_grade_challenger_picks_settles_a_full_game_under_at_the_full_game_close
         assert p.graded and p.result == "under" and p.actual_first_half_total == 44
         assert round(p.units, 4) == 0.9091
         assert p.closing_line == 49.5 and p.clv == -1.0  # closing - bet: favourable for an under
-        assert p.closing_captured_at == SAT - timedelta(hours=1)
+        # draftkings/fanduel's stamp: Hard Rock's own row never counts toward the
+    # close (lines.CLOSE_EXCLUDED_BOOKS, 2026-10-11).
+    assert p.closing_captured_at == SAT - timedelta(hours=2)
 
 
 def test_fg_constants_are_frozen_as_registered():

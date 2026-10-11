@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import statistics
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple
 
 from .db.models import OddsSnapshot
 from .devig import devig_two_way, is_centred_quote, is_hr_rung
@@ -180,8 +180,18 @@ def consensus_fair_under_open_close(
     return statistics.median(opens), statistics.median(closes)
 
 
+# The books that never count toward a graded ledger's CLOSE: the book being bet
+# into (its late quotes are alternate rungs priced -140 to -160, which pass the
+# centred filter and sit 1-1.5 points under the market, flattering an under),
+# Fliff, and the feed's synthetic "consensus" row. Tate's calls of 2026-10-07 for
+# the judge (docs/CONSENSUS.md) and of 2026-10-11 for the displayed line value
+# (docs/program/REVIEW_2026-10.md, roadmap v2.0). beatvegas/consensus.py reads
+# the same set; picks.grade_pick and scripts/grade.py's market ledgers pass it.
+CLOSE_EXCLUDED_BOOKS = frozenset({HR_BOOK_KEY, "fliff", "consensus"})
+
+
 def closing_before_kickoff(
-    snaps: Sequence, kickoff
+    snaps: Sequence, kickoff, exclude: Collection[str] = ()
 ) -> Tuple[Optional[float], Optional[float], Optional[object]]:
     """(opening, closing, closing_captured_at) using only PRE-kickoff snapshots.
 
@@ -189,7 +199,13 @@ def closing_before_kickoff(
     near kickoff — not a stray poll that ran after the game started. We keep
     snapshots with captured_at <= kickoff (all of them if kickoff/captured_at is
     unknown), and report the freshest used timestamp as the trust signal.
+
+    `exclude`: book keys that never count. The graded ledgers pass
+    CLOSE_EXCLUDED_BOOKS (the bet book's late quotes are alternate rungs that
+    drag the median under); the study readers keep every book by default.
     """
+    if exclude:
+        snaps = [s for s in snaps if normalize_book(getattr(s, "book", None) or "") not in exclude]
     pre = pre_kickoff(snaps, kickoff)
     opening, closing = consensus_open_close(pre)
     stamps = []

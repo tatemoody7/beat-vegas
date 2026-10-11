@@ -26,6 +26,7 @@ from .grading import (
 )
 from .hardrock import normalize_book
 from .lines import (
+    CLOSE_EXCLUDED_BOOKS,
     book_closing_price_before_kickoff,
     closing_before_kickoff,
     fair_under_before_kickoff,
@@ -349,8 +350,13 @@ def grade_pick(session, pick, game) -> bool:
     # `book` was NULL.
     #
     # consensus_open_close already drops non-centred quotes (lines.centred_snaps),
-    # so a book still contributes its last real number.
-    opening, closing, closing_at = closing_before_kickoff(snaps, game.start_date)
+    # so a book still contributes its last real number. Since 2026-10-11 the close
+    # also never counts Hard Rock, Fliff or the feed's synthetic consensus row
+    # (lines.CLOSE_EXCLUDED_BOOKS, the judge's own set): Hard Rock's late rungs
+    # pass the centred filter at -140/-160 and sit 1-1.5 points under the market.
+    opening, closing, closing_at = closing_before_kickoff(
+        snaps, game.start_date, exclude=CLOSE_EXCLUDED_BOOKS
+    )
     # THE CLOSING PRICE GOES IN ITS OWN COLUMN. It used to be written into
     # `pick.price` whenever a Hard Rock ticket had none, which silently turned the
     # price at the DECISION into the price at the CLOSE. Any price-based CLV over

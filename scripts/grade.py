@@ -26,6 +26,7 @@ from beatvegas.grading import (
     units_won,
 )
 from beatvegas.lines import (
+    CLOSE_EXCLUDED_BOOKS,
     REAL_FG_CLOSE_WINDOW_H,
     close_in_window,
     closing_before_kickoff,
@@ -57,7 +58,9 @@ def _closings(session, season: int):
             .filter(OddsSnapshot.game_id == g.id, OddsSnapshot.market == "1H_total")
             .all()
         )
-        opening, closing, closing_at = closing_before_kickoff(snaps, g.start_date)
+        opening, closing, closing_at = closing_before_kickoff(
+            snaps, g.start_date, exclude=CLOSE_EXCLUDED_BOOKS
+        )
         fair = fair_under_before_kickoff(snaps, g.start_date)
         out[g.id] = (g, (opening, closing), closing_at, fair)
     return out
@@ -88,9 +91,11 @@ def _closings_fg(session, season: int):
         # rows captured or re-seen inside REAL_FG_CLOSE_WINDOW_H (3 h). Before
         # 2026-10-06 no window applied and the 2026 ledger graded Sunday
         # openers as closes (9 of 380 rows had a snapshot inside 3 h).
-        opening, _, _ = closing_before_kickoff(snaps, g.start_date)
+        opening, _, _ = closing_before_kickoff(snaps, g.start_date, exclude=CLOSE_EXCLUDED_BOOKS)
         in_window = [s for s in snaps if _in_fg_window(s, g.start_date)]
-        _, closing, closing_at = closing_before_kickoff(in_window, g.start_date)
+        _, closing, closing_at = closing_before_kickoff(
+            in_window, g.start_date, exclude=CLOSE_EXCLUDED_BOOKS
+        )
         fair = fair_under_before_kickoff(in_window, g.start_date)
         out[g.id] = (g, (opening, closing), closing_at, fair)
     return out

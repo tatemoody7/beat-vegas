@@ -38,25 +38,23 @@ def test_grade_market_fg_full_game():
             )
         )
         # full-game opener 52.0 (a week out), close 50.0 captured 2 h before
-        # kickoff -- inside REAL_FG_CLOSE_WINDOW_H (3 h)
-        s.add(
-            OddsSnapshot(
-                game_id=1,
-                book="hardrockbet",
-                market="full_game_total",
-                line=52.0,
-                captured_at=datetime(2026, 8, 25, 12),
+        # kickoff -- inside REAL_FG_CLOSE_WINDOW_H (3 h). A counted book
+        # (draftkings); Hard Rock's own rows never count toward a close
+        # (lines.CLOSE_EXCLUDED_BOOKS, 2026-10-11) and are ignored here.
+        for book, line, at in [
+            ("draftkings", 52.0, datetime(2026, 8, 25, 12)),
+            ("draftkings", 50.0, datetime(2026, 9, 1, 10)),
+            ("hardrockbet", 48.0, datetime(2026, 9, 1, 10)),
+        ]:
+            s.add(
+                OddsSnapshot(
+                    game_id=1,
+                    book=book,
+                    market="full_game_total",
+                    line=line,
+                    captured_at=at,
+                )
             )
-        )
-        s.add(
-            OddsSnapshot(
-                game_id=1,
-                book="hardrockbet",
-                market="full_game_total",
-                line=50.0,
-                captured_at=datetime(2026, 9, 1, 10),
-            )
-        )
         s.commit()
 
         closings = grade._closings_fg(s, 2026)

@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (ROADMAP v2.0).** The October review's sixteen decisions logged as one versioned
+  amendment at the bottom of `docs/ROADMAP_2026.md` (objective = personal proof at Hard Rock; the
+  site a public record only; every arm, the judge and the protocol frozen to the January review;
+  +3% one-season target for 2026; Kalshi measured first on captured data; Hard Rock off-market
+  capture next; the personal ledger continues, labelled a personal stake; the cut list; the
+  measurement fixes; bookkeeping). Body edits: the three literature nulls read REJECTED in the
+  hypothesis ledger (deferred since v1.5); `docs/PROTOCOL_2026.md` reads 8 betting slots (v1.8);
+  the brief says the pause switch is off and the personal ledger ON. No code changed.
+
 - **2026-10-11 UTC (THE COMPLETE REASSESSMENT; `docs/program/REVIEW_2026-10.md`).** Tate asked for a
   ground-up review of mission, strategy, hypotheses, results, data, infrastructure and business,
   as an independent researcher, with questions grouped and answered before any change. Read-only:

@@ -28,7 +28,7 @@ to any rule here is a new protocol version and a roadmap amendment, never an edi
 Every ending spends the arm's 0.5%. **Restarts (p1.1, 2026-10-09):** abandoning a test and
 restarting it is an ending, and spends the slot, once any completed week of it has been read; a
 restart before any completed week is free, because no result has been looked at. A new arm enters only while ledger slots remain (10 in total
-for 2026, 7 betting slots at a time). Correlated arms (the first-half unders and their over mirror
+for 2026, 8 betting slots at a time since roadmap v1.8). Correlated arms (the first-half unders and their over mirror
 read the same slates) need no adjustment: the ledger is a Bonferroni split, valid under any
 dependence.
 

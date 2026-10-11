@@ -1,6 +1,6 @@
 """The literature looks (docs/HYPOTHESES.md, "The literature looks"; roadmap v1.3).
 
-Three of the six one-shot history looks, each a published college-football
+Four of the six one-shot history looks, each a published college-football
 betting rule re-run on the seasons after the paper's own sample. Every rule
 here was frozen in its registry row before this file existed (Tate's calls of
 2026-10-08):
@@ -11,6 +11,11 @@ here was frozen in its registry row before this file existed (Tate's calls of
   (Weinbach & Paul 2009), 2013-2025.
 - H-LIT-BENNETT: fade the previous season's final AP top 10 against the spread
   in its first game played (Bennett 2019), first games of 2018-2025.
+- H-LIT-COX: in a trophy rivalry (data/trophy_games.json), the FAVOURITE against
+  the closing spread when it won each of the last three meetings straight up
+  (Cox 2026, the paper's one result significant at 5%), 2019-2025; prior
+  meetings from CFBD /teams/matchup, bowls included, ties skipped. Registered
+  2026-10-11 (Tate's call).
 
 Shared rules: regular season only; FBS-vs-FBS (data/fbs_teams.json); the line
 is each game's median closing number across every provider CFBD `/lines` lists
@@ -30,7 +35,7 @@ from __future__ import annotations
 import statistics
 from collections import Counter
 from statistics import NormalDist
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from ..grading import american_to_decimal
 from .stats import holm_adjust
@@ -43,11 +48,13 @@ WIN_UNITS = american_to_decimal(-110) - 1.0  # 0.909 units for a win at -110
 ARSCOTT = "H-LIT-ARSCOTT"
 TV = "H-LIT-TV"
 BENNETT = "H-LIT-BENNETT"
+COX = "H-LIT-COX"
 # Each look's seasons (for Bennett, the seasons of the first games).
 LOOKS: Dict[str, Tuple[int, int]] = {
     ARSCOTT: (2018, 2025),
     TV: (2013, 2025),
     BENNETT: (2018, 2025),
+    COX: (2019, 2025),
 }
 
 # Arscott's Tobit fits for the implied team scores (working paper, SSRN 4197428,
@@ -60,6 +67,12 @@ ARSCOTT_ALT_CUT = 1.75  # the paper's in-sample alternative: descriptive only
 NATIONAL_OUTLETS = frozenset({"ABC", "CBS", "NBC", "FOX", "ESPN"})
 AP_POLL = "AP Top 25"
 TOP_N = 10
+
+# Cox: the favourite must have won this many consecutive prior meetings.
+COX_STREAK = 3
+# Descriptive only (the conference-pairing split): the power conferences as CFBD
+# names them over 2019-2025; the Pac-12 counts for the seasons it existed.
+P5_CONFERENCES = frozenset({"SEC", "Big Ten", "Big 12", "ACC", "Pac-12"})
 
 _N = NormalDist()
 
@@ -397,6 +410,115 @@ def bennett_rows(
                 "result": ats_result(
                     float(g["homePoints"]), float(g["awayPoints"]), spread, bet_home=not team_home
                 ),
+            }
+        )
+    return rows, drops
+
+
+# --- H-LIT-COX ------------------------------------------------------------------
+
+
+def prior_meetings(
+    history: Optional[Iterable[Mapping[str, Any]]], before: str
+) -> List[Mapping[str, Any]]:
+    """The series' games dated strictly before `before` (an ISO-8601 UTC string, as
+    CFBD gives `startDate` and the matchup `date`), newest first. A game with no
+    score on either side is skipped (never played)."""
+    out = [
+        g
+        for g in history or ()
+        if str(g.get("date") or "") < before
+        and g.get("homeScore") is not None
+        and g.get("awayScore") is not None
+    ]
+    return sorted(out, key=lambda g: str(g.get("date") or ""), reverse=True)
+
+
+def streak_winner(
+    prior: Sequence[Mapping[str, Any]], n: int = COX_STREAK
+) -> Tuple[Optional[str], int]:
+    """(the team that won each of the `n` most recent decided meetings, or None;
+    how many decided meetings there were). A tie (`winner` null, or equal scores)
+    is skipped: it neither counts toward `n` nor breaks the streak (Tate
+    2026-10-11). Fewer than `n` decided meetings -> (None, count)."""
+    decided: List[str] = []
+    for g in prior:
+        hs, as_ = float(g["homeScore"]), float(g["awayScore"])
+        if hs == as_:
+            continue
+        decided.append(str(g.get("winner") or (g["homeTeam"] if hs > as_ else g["awayTeam"])))
+    if len(decided) < n:
+        return None, len(decided)
+    last = decided[:n]
+    return (last[0] if all(w == last[0] for w in last) else None), len(decided)
+
+
+def conference_pairing(home_conf: Optional[str], away_conf: Optional[str]) -> str:
+    """P5-P5 / P5-G5 / G5-G5 by P5_CONFERENCES (descriptive only)."""
+    p5 = sum(1 for c in (home_conf, away_conf) if (c or "") in P5_CONFERENCES)
+    return {2: "P5-P5", 1: "P5-G5"}.get(p5, "G5-G5")
+
+
+def cox_rows(
+    games: Iterable[Mapping[str, Any]],
+    lines_by_id: Mapping[int, Sequence[Mapping[str, Any]]],
+    pairs: Set[FrozenSet[str]],
+    history: Mapping[FrozenSet[str], Sequence[Mapping[str, Any]]],
+    fbs: Mapping[int, Set[str]],
+) -> Tuple[List[Dict[str, Any]], Counter]:
+    """Every graded FBS-vs-FBS regular-season TROPHY game with a median closing
+    spread and at least COX_STREAK decided prior meetings: the favourite against
+    the spread, `qualifies` marking the games where the favourite won the last
+    three (the tested set). Drops: not played, no provider, pick'em (no
+    favourite), fewer than three decided prior meetings."""
+    rows: List[Dict[str, Any]] = []
+    drops: Counter = Counter()
+    for g in games:
+        if not regular(g) or not fbs_vs_fbs(g, fbs):
+            continue
+        pair = frozenset((g["homeTeam"], g["awayTeam"]))
+        if pair not in pairs:
+            continue
+        drops["universe"] += 1
+        if not played(g):
+            drops["not_played"] += 1
+            continue
+        spread, n_spread = median_close(lines_by_id.get(int(g["id"]), ()), "spread")
+        if spread is None:
+            drops["no_provider"] += 1
+            continue
+        if spread == 0:
+            drops["pickem"] += 1
+            continue
+        fav_home = spread < 0
+        favourite = g["homeTeam"] if fav_home else g["awayTeam"]
+        underdog = g["awayTeam"] if fav_home else g["homeTeam"]
+        prior = prior_meetings(history.get(pair), str(g.get("startDate") or ""))
+        winner, decided = streak_winner(prior)
+        if decided < COX_STREAK:
+            drops["lt3_meetings"] += 1
+            continue
+        hp, ap = float(g["homePoints"]), float(g["awayPoints"])
+        rows.append(
+            {
+                "season": int(g["season"]),
+                "week": int(g["week"]),
+                "game_id": int(g["id"]),
+                "home": g["homeTeam"],
+                "away": g["awayTeam"],
+                "favourite": favourite,
+                "favourite_home": fav_home,
+                "underdog": underdog,
+                "spread": spread,
+                "providers_spread": n_spread,
+                "pairing": conference_pairing(g.get("homeConference"), g.get("awayConference")),
+                "prior_decided": decided,
+                "streak_team": winner or "",
+                "qualifies": winner == favourite,
+                "home_points": hp,
+                "away_points": ap,
+                "result": ats_result(hp, ap, spread, bet_home=fav_home),
+                "underdog_result": ats_result(hp, ap, spread, bet_home=not fav_home),
             }
         )
     return rows, drops

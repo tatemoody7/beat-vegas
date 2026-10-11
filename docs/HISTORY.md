@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (H-LIT-COX REGISTERED: THE STREAK FAVOURITE IN TROPHY GAMES).** The fourth
+  literature look (roadmap v1.3; v2.1's "Cox runs now, Coleman and Salaga parked"). Tate's call on
+  the rule: of Cox's three results the one tested is the favourite that won the last three meetings
+  (56.6% on 454 in the paper, its only result significant at 5%); the rivalry-favourite fade and
+  the non-P5 underdog are reported as descriptive numbers only. The row before the code: 2019-2025
+  regular-season FBS-vs-FBS games whose pair is one of the 112 trophy pairs frozen 2026-10-09
+  (`data/trophy_games.json`); favourite by the median CFBD closing spread (pick'em dropped); prior
+  meetings from CFBD `/teams/matchup` (new `CFBDClient.matchup`, one call a pair), any season type
+  and any year, ties skipped, fewer than three decided meetings dropped; graded on the final margin.
+  `literature_look --row H-LIT-COX` (`beatvegas/backtest/literature.py::cox_rows`); the family
+  stays m = 6, Holm 5%, outside the ledger. One dispatch after the merge; the results PR writes
+  `docs/LITERATURE.md`.
+
 - **2026-10-11 UTC (H-VENUE-1 REGISTERED: HARD ROCK AGAINST KALSHI ON CAPTURED DATA).** Roadmap v2.0
   decision 5 (Kalshi is measured before anything is built). The row before the script: on every
   graded 2026 game with a Hard Rock and a Kalshi full-game total inside the judge's 2-hour window

@@ -1,5 +1,4 @@
 import { getSeasons } from "@/lib/board";
-import { buildAnswer } from "@/lib/answerBar";
 import { etClock12 } from "@/lib/et";
 import {
   buildStatus,
@@ -14,14 +13,12 @@ import {
   parseFilters,
   tierCounts,
 } from "@/lib/homeBoard";
-import { nextBuild } from "@/lib/nextBuild";
 import { getLatestCard } from "@/lib/card";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
 import { viewerIsAuthed } from "@/lib/session";
 import Link from "next/link";
-import AnswerBar from "@/app/components/AnswerBar";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import OpsBanner from "@/app/components/OpsBanner";
 import BoardFilters from "@/app/components/BoardFilters";
@@ -93,8 +90,6 @@ export default async function BoardPage({
   const upcoming = games.filter((g) => !g.kickedOff);
   const played = games.filter((g) => g.kickedOff);
   const days = groupByDay(upcoming);
-  const answer = buildAnswer(all, board.bankroll.weekBets, board.bankroll.cap);
-  const build = nextBuild(new Date());
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -134,9 +129,6 @@ export default async function BoardPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      {/* What is live this week is a pre-kickoff signal: the owner's only. */}
-      {authed && <AnswerBar answer={answer} nextBuild={build?.label ?? null} />}
-
       {board.slate.n > 0 && (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
           {/* Shortened 2026-09-28 (Tate): the rows already say why a game is
@@ -146,7 +138,7 @@ export default async function BoardPage({
       )}
 
       <div className="mb-3">
-        <BoardFilters current={filters} showMine={authed} />
+        <BoardFilters current={filters} />
       </div>
 
       {/* The build warnings are the owner's (Tate 2026-10-10): a visitor's

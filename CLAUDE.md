@@ -38,10 +38,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
-- Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
-  `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+- `docs/program/REVIEW_2026-10.md` — the October review: Tate's 16 decisions of 2026-10-11 (personal
+  proof is the goal; every arm unchanged to January; cut list; Kalshi measured first). Plans:
+  `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
-
 ## Where we are (as of 2026-10-08)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
@@ -92,7 +92,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
-- **Real-money switch: OFF since 2026-10-08 20:00 UTC** (v1.4, Tate's call; written through Neon's
+- **The pause switch (`rule_paused`) is OFF since 2026-10-08 20:00 UTC, so the personal ledger is ON** (v1.4, Tate's call; written through Neon's
   HTTPS endpoint, mirroring `scripts/rule_pause.py`; it was on 2026-10-07 → 10-08).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
@@ -154,8 +154,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
   plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
   (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`): ops and build warnings, the My-teams chip, the answer bar, the Monday review on
-  Results, the research section on How it works, the log control. **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
+  the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
+  control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
   `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the

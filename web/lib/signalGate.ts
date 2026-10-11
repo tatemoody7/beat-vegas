@@ -14,9 +14,10 @@ import type { RecordRow } from "@/lib/records";
 // gates below, server-side, before anything is rendered or serialised.
 
 /** The site-wide banner (Tate's wording, 2026-10-08, roadmap v1.4; "Florida,
- *  21+" from docs/LEGAL_MEMO_2026-10.md, roadmap v1.7). */
+ *  21+" from docs/LEGAL_MEMO_2026-10.md, roadmap v1.7; the ledger named a
+ *  personal stake, roadmap v2.0, 2026-10-11). */
 export const RESEARCH_BANNER =
-  "2026 is a research season. Every strategy runs on paper and is judged against the closing line; the owner also bets first-half unders with real money, recorded separately. Florida, 21+.";
+  "2026 is a research season. Every strategy runs on paper and is judged against the closing line. The owner also bets first-half unders with real money as a personal stake, recorded separately and never evidence for any strategy. Florida, 21+.";
 
 /** A kickoff (UTC ISO string or epoch ms) has passed at `now`. An unknown
  *  kickoff has NOT passed: the gate fails closed. A string without a zone is

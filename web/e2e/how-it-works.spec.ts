@@ -172,51 +172,12 @@ test.describe("how it works", () => {
       );
     }
   });
-
-  test("signed in, the live season panel, the flags and the method fold follow", async ({
-    page,
-  }) => {
-    await page.goto("/how-it-works");
-    const research = page.locator('section[aria-label="Research, signed in"]');
-    await expect(research).toBeVisible();
-    const head = research.getByRole("heading", {
-      name: `${week.season} so far`,
-    });
-    await expect(head).toContainText("106 of 190 rated games graded · 10 bets");
-    const panel = research
-      .locator("dl")
-      .filter({ hasText: "Average miss, points" });
-    await expect(panel).toContainText("Hard Rock’s line8.7");
-    await expect(panel).toContainText("HR at market28-32-1P · 29-31-1P");
-    await expect(
-      research.getByText(/Eleven statements are judged on this page/),
-    ).toBeVisible();
-    await expect(research.getByText("holds up", { exact: true })).toBeVisible();
-    const fold = research
-      .locator("details")
-      .filter({ hasText: "Method and sanity checks" });
-    await expect(fold).not.toHaveAttribute("open", "");
-    await fold.locator("summary").click();
-    await expect(fold).toHaveAttribute("open", "");
-    await expect(
-      fold.locator('table[aria-label="Records at an estimated line"] tbody tr'),
-    ).toHaveCount(2);
-    // No --good / --bad anywhere below the estimated heading: colour is the
-    // grade language and an estimated line is not a grade.
-    const coloured = await fold.evaluate((d) =>
-      [...d.querySelectorAll<HTMLElement>("td, span, p")]
-        .map((el) => el.getAttribute("style") ?? "")
-        .filter((s) => /--good|--bad/.test(s)),
-    );
-    expect(coloured).toEqual([]);
-    await expect(fold).toContainText("Overall1934-0.12");
-  });
 });
 
 test.describe("how it works, signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("a visitor reads the page without the research section", async ({
+  test("the page carries no research section (roadmap v2.0), signed out", async ({
     page,
   }) => {
     await page.goto("/how-it-works");

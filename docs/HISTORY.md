@@ -9,6 +9,23 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (H-PRICE-HR REGISTERED: HARD ROCK AGAINST THE MARKET, RULE pv1).** The pricing
+  research runs (Tate's approval: the independent, read-only exploratory study only). Row before
+  code: exploratory, no alpha, read at 2026-12-07 and January; `beatvegas/pricing.py` holds the
+  frozen rule (main quote only; reference = median of 3+ other centred books confirmed at the
+  capture minute, Fliff and the consensus row excluded; totals converted through `hp1` within 1.5
+  pts; a flag is EV >= +2% at the LOWER bound of the table's integer masses; moneylines compared
+  without conversion; spreads refused for want of a spread table; one opportunity per game-side).
+  Every flag carries an evidence tier (0 feed observation, 1 fresh stamp and re-seen, 2 Florida
+  screenshot, 3 ticket); tiers 0-1 are never called available. `scripts/pricing_check.py` on
+  `study.yml` writes `reports/pricing_check_*.{md,json,csv}`; `docs/PRICING_RESEARCH.md` is the
+  doc. Dispatch only: a Monday schedule is a separate automation decision. Nothing an arm, the
+  judge, the card, grading, the ledger or the site reads changed. Correction to the same day's
+  audit: the parser discards extra point pairs only when the feed sends several, which it did zero
+  times in the recent card and Sunday runs; the alternate ladder is a separate feed market
+  (`alternate_totals_h1`, a credit an event) that was never requested, so nothing is being thrown
+  away today, and capturing it is a credit decision for Tate.
+
 - **2026-10-11 UTC (CAPTURE STEP 1: THE FEED'S STAMPS AND EVENT IDS, A 6-HOUR SATURDAY LOOK-AHEAD,
   THE HARD ROCK KEY PROBE).** The first build of the pricing-inefficiency programme (Tate's approval
   2026-10-11; `docs/program/CAPTURE_DESIGN_2026-10.md`, corrected). Three nullable columns on

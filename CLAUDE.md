@@ -37,7 +37,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
-  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
+  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10), `PRICING_RESEARCH` (Hard Rock against the market, exploratory) (all in `docs/`).
 - `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11);
   `docs/program/JANUARY_2027_REVIEW.md` — the two reads (12-07, 2027-01-25) and the 2027 default (v2.1);
   `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
@@ -207,6 +207,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (the offline backtest engine and
   its tools went 2026-10-11, roadmap v2.0).
+- **Pricing research (exploratory, read-only)**: `pricing_check` (H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
 - **Probes**: `probe_hr_keys` (one-off, by hand: `hardrockbet` vs `hardrockbet_fl` with the feed's
   raw keys and stamps kept; prints the credits it spent; writes nothing).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +

@@ -38,6 +38,7 @@ sys.path.insert(0, str(ROOT))
 
 from beatvegas.backtest.early_close import (  # noqa: E402
     bootstrap_mean_ci,
+    exclusion_counts,
     records,
     settle,
     units,
@@ -101,7 +102,7 @@ def summarize(recs: List[dict]) -> dict:
         "close_wilson95": (lo, hi),
         "close_p_vs_breakeven": binomial_p(wins, n) if n else None,
         "close_units": round(sum(profit), 2) if profit else None,
-        "excluded_line_value": sum(1 for r in recs if r["under"]["ev"] is None),
+        "excluded_line_value": exclusion_counts(recs, sides=("under",)),
         "excluded_close": sum(1 for x in results if x is None),
     }
 
@@ -154,6 +155,13 @@ def render(result: dict, stamp: str) -> str:
                 f"{_fmt(r['line_value_mean'])} ({ci_s}) | {r['close_record']} | {wr} | {p} | "
                 f"{r['close_units']} |"
             )
+    L.append("")
+    for market, groups in result.items():
+        for name in ("windy", "calm"):
+            if name in groups:
+                why = groups[name]["excluded_line_value"]
+                why_s = ", ".join(f"{k} {v}" for k, v in sorted(why.items())) or "none"
+                L.append(f"- {market} {name}: unders with no line-value reading: {why_s}")
     return "\n".join(L) + "\n"
 
 

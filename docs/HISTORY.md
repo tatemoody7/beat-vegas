@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (H-VENUE-1 REGISTERED: HARD ROCK AGAINST KALSHI ON CAPTURED DATA).** Roadmap v2.0
+  decision 5 (Kalshi is measured before anything is built). The row before the script: on every
+  graded 2026 game with a Hard Rock and a Kalshi full-game total inside the judge's 2-hour window
+  and three other books, `scripts/venue_check.py` (study.yml) reads each venue's offset from the
+  other books' median, the judge's EV of both sides at each venue's own close and price (the judge
+  counts neither venue), realized units, and per side the better of the two venues. Exploratory,
+  accruing (39 games at registration, week 6; the full-game close polls started 2026-10-06);
+  development reads on Mondays, the registered read at the January review. No account, no
+  capture, no credits. Kalshi's reported line is one rung of its ladder: a rung 1.5+ points off
+  the other books has no reading and is counted (`far_lines`).
+
 - **2026-10-11 UTC (THE PRICE-CLV COLUMN GOES).** `clv_prob` never read the ticket's price or bet
   time (every pick on a game carried the same number: the market's own no-vig move from each
   book's first to last quote), so the ledger CSV drops it (31 → 30 columns) and the code that

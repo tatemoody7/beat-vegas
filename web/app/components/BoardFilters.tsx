@@ -3,56 +3,29 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { BoardFilters as Filters } from "@/lib/homeBoard";
 
-// My-teams / Hard Rock filters for the board. Everything lives in the URL
-// (?mine=1&hr=1) so a filtered board is a shareable link and the server does
-// the filtering. The explainer line under the chips went on 2026-09-16: the
-// chip labels say what they do, and the teams are the ones you follow.
-export default function BoardFilters({
-  current,
-  showMine = true,
-}: {
-  current: Filters;
-  /** "My teams" is the owner's chip (Tate's four programs); visitors get only
-   *  the Hard Rock filter (site review 2026-09-28). `?mine=1` still parses. */
-  showMine?: boolean;
-}) {
+// The Hard Rock filter for the board. It lives in the URL (?hr=1) so a
+// filtered board is a shareable link and the server does the filtering. The
+// owner's "My teams" chip went with roadmap v2.0 (2026-10-11: the site is a
+// public record and nothing more); `?mine=1` still parses server-side.
+export default function BoardFilters({ current }: { current: Filters }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
 
-  function push(mut: (p: URLSearchParams) => void) {
+  function toggleHr(on: boolean) {
     const next = new URLSearchParams(params.toString());
-    mut(next);
+    next.delete("mine");
+    next.delete("hr");
+    if (!on) next.set("hr", "1");
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  // One filter at a time (Tate 2026-09-16): the two answer different
-  // questions, and "my teams that Hard Rock has priced" is a view nobody asked
-  // for. Turning one on turns the other off; clicking the active one clears it.
-  function toggleFlag(key: "mine" | "hr", on: boolean) {
-    push((p) => {
-      p.delete("mine");
-      p.delete("hr");
-      if (!on) p.set(key, "1");
-    });
-  }
-
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {showMine && (
-        <button
-          type="button"
-          onClick={() => toggleFlag("mine", current.myTeams)}
-          aria-pressed={current.myTeams}
-          className="bv-chip"
-        >
-          My teams
-        </button>
-      )}
       <button
         type="button"
-        onClick={() => toggleFlag("hr", current.hrOnly)}
+        onClick={() => toggleHr(current.hrOnly)}
         aria-pressed={current.hrOnly}
         className="bv-chip"
       >

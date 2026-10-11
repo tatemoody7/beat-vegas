@@ -134,47 +134,6 @@ test.describe("the board", () => {
     ).toBeVisible();
   });
 
-  test("the answer bar names the live bet, the placed one, the closest three and the next update", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    const bar = page.locator('div[aria-label="This week at a glance"]');
-    await expect(bar).toBeVisible();
-    await expect(bar).toContainText(expected.answer.headline);
-    await expect(bar).toContainText(expected.answer.slotsLine);
-    const items = bar.locator("ul").first().locator("li");
-    await expect(items).toHaveCount(expected.answer.bets.length);
-    for (const [i, b] of expected.answer.bets.entries()) {
-      const li = items.nth(i);
-      await expect(li.getByRole("link")).toHaveText(b.matchup);
-      await expect(li.getByRole("link")).toHaveAttribute(
-        "href",
-        `/game/${b.gameId}`,
-      );
-      await expect(li).toContainText(b.numbers);
-      await expect(li.locator(".bv-badge")).toHaveCount(
-        b.picked || b.paper ? 1 : 0,
-      );
-      if (b.picked)
-        await expect(li.locator(".bv-badge")).toHaveText("bet logged");
-      else if (b.paper)
-        await expect(li.locator(".bv-badge")).toHaveText("paper signal");
-    }
-    await expect(
-      bar.getByRole("heading", { name: "Closest to a bet" }),
-    ).toBeVisible();
-    const near = bar.locator("ul").nth(1).locator("li");
-    await expect(near).toHaveCount(expected.answer.closest.length);
-    for (const [i, c] of expected.answer.closest.entries()) {
-      await expect(near.nth(i).getByRole("link")).toHaveText(c.matchup);
-      await expect(near.nth(i)).toContainText(c.numbers);
-      await expect(near.nth(i)).toContainText(c.needs);
-    }
-    await expect(bar).toContainText(
-      /Next update (Tue|Thu|Fri|Sat) \d{1,2}:\d{2}(am|pm)?–\d{1,2}:\d{2}(am|pm) ET/,
-    );
-  });
-
   test("marks the game with a logged ticket", async ({ page }) => {
     await page.goto("/");
     const r = await rows(page);
@@ -201,29 +160,6 @@ test.describe("the board", () => {
     await expect(
       page.getByText(`· ${thisWeek.length} games before filters`),
     ).toBeVisible();
-  });
-
-  test("My teams shows only the followed program, one filter at a time", async ({
-    page,
-  }) => {
-    await page.goto("/?hr=1");
-    const mine = page.getByRole("button", { name: "My teams" });
-    await mine.click();
-    await page.waitForURL(/\?mine=1$/);
-    await expect(mine).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      page.getByRole("button", { name: "Hard Rock line posted" }),
-    ).toHaveAttribute("aria-pressed", "false");
-    const r = await rows(page);
-    const followed = thisWeek
-      .filter((g) => g.away === "Kansas State" || g.home === "Kansas State")
-      .map((g) => g.id);
-    expect(followed.length).toBeGreaterThan(0);
-    expect(r.map((x) => x.id).sort()).toEqual(followed.sort());
-    // Clicking the active chip clears it.
-    await mine.click();
-    await page.waitForURL((u) => u.search === "");
-    await expect(mine).toHaveAttribute("aria-pressed", "false");
   });
 
   test("?days=sat keeps only Saturday’s games", async ({ page }) => {
@@ -259,13 +195,14 @@ test.describe("the board", () => {
 test.describe("the board, signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("a visitor gets the Hard Rock filter but not the My teams chip", async ({
+  test("the Hard Rock filter is the only chip, signed in or out", async ({
     page,
   }) => {
     await page.goto("/");
     await expect(
       page.getByRole("button", { name: "Hard Rock line posted" }),
     ).toBeVisible();
+    await expect(page.locator("button.bv-chip")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
   });
 

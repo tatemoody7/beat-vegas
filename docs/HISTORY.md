@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
+  board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),
+  the Monday review's breakdown, decisions strip and factor read on Results, and the signed-in
+  research section on How it works (live-season strip, flags, method fold, line study). Kept, on
+  Tate's call: the owner's pick list with its edit/delete controls (the only place a pending real
+  ticket is edited before kickoff) and the ops and build warnings (the failure surface). The banner
+  names the owner's real bets a personal stake, recorded separately and never evidence. e2e: five
+  tests removed, two retitled, `FEATURE_PARITY.md` matched; 241 passed on the fixture lane.
+
 - **2026-10-11 UTC (ROADMAP v2.0).** The October review's sixteen decisions logged as one versioned
   amendment at the bottom of `docs/ROADMAP_2026.md` (objective = personal proof at Hard Rock; the
   site a public record only; every arm, the judge and the protocol frozen to the January review;

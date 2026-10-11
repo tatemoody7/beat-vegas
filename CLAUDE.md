@@ -3,7 +3,7 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1.8) governs 2026**: every
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.1) governs 2026**: every
 strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
 first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.8): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.1): what is tested, how an edge is judged,
   what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -38,10 +38,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
-- `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11). Plans:
-  `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+- `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11);
+  `docs/program/JANUARY_2027_REVIEW.md` — the two reads (12-07, 2027-01-25) and the 2027 default (v2.1);
+  `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
-## Where we are (as of 2026-10-08)
+## Where we are (as of 2026-10-11)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
   vig-free median-of-books consensus close (newest snapshot ≤2 h before kickoff) — designed for +3%
@@ -87,10 +88,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
   probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
-  Arscott/TV/Bennett all NOT MET 10-09 (final); Coleman waits on full text, Salaga on weather; team
+  Arscott/TV/Bennett all NOT MET 10-09 (final); `H-LIT-COX` registered 10-11; Coleman/Salaga parked; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
-  1HO / FGU, clocks PAUSED (p1.1, v1.5) until the leak-fixed model's first card; 6-7 = weather unders,
-  10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
+  1HO / FGU, clocks start at the 10-13 card (p1.1); 6-7 = weather unders,
+  10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **The pause switch (`rule_paused`) is OFF since 2026-10-08 20:00 UTC, so the personal ledger is ON** (v1.4, Tate's call; written through Neon's
@@ -101,25 +102,18 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Arms paused (2026-10-09, v1.5)** until the leak-fixed model's first card (pace re-pulled as of the
-  Sunday before, 2023-25) starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile dev data.
-  `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
-- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
-  and the arms' first read; H-MODEL-FIX (NOT MET) and v1.8's 60+ arm; the 12
-  proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.9: 3 literature nulls → REJECTED?
-- **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
-  shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
-  engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget
-  up to ~$150/month through the season; The Odds API on 20K, CFBD on Tier 3 via the boomtatermac
-  key (`docs/OPS_ACCOUNTS.md` 2-3).
+- **Arms 1-3 start at the 2026-10-13 card** (the 10-11 refit ran: `model_runs` 10); `cards.id` +
+  `protocol.ARMS_START`. `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
+- **Reads (v2.1)**: light read 2026-10-12; first one-page Monday read 2026-10-19 (then weekly); mid-point
+  2026-12-07 (with H6, no decisions); final 2027-01-25. After 10-19: one late GitHub cron per job,
+  post-mortem tables stop. Cox look running (`H-LIT-COX`); Coleman and Salaga parked.
+- **Accounts (v2.1)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key, `docs/OPS_ACCOUNTS.md`);
+  The Odds API stays on 20K; Actions cap to $20. Kalshi account only on the January H-VENUE-1 read.
 - **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
   stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
   against ~2,830 measured: watch the budget page in the last week of each month.
 - **2026-12-07**: the one confirmatory look for `docs/WHEN_TO_BET.md` (H6); the script refuses
   `--confirmatory` before then.
-- **Vercel `DATABASE_URL`**: the pg driver warns at every cold start that `sslmode=require` changes
-  meaning in pg v9; set `sslmode=verify-full` explicitly (same behaviour as today). Seen 2026-09-28.
 
 ## Decision calendar (all times ET; GitHub crons are the backup, Vercel is the trigger)
 | When | Job | What |

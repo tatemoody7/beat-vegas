@@ -1,7 +1,8 @@
 """The literature looks (docs/HYPOTHESES.md H-LIT-ARSCOTT / H-LIT-TV / H-LIT-BENNETT,
-Tate's calls of 2026-10-08): the median close, Arscott's censoring bias, the
-national-TV reading, Bennett's first game played, the grading signs, the exact
-binomial, Holm with m = 6 fixed, and the script end to end on a fake CFBD."""
+Tate's calls of 2026-10-08; H-LIT-COX, 2026-10-11): the median close, Arscott's
+censoring bias, the national-TV reading, Bennett's first game played, Cox's
+last-three streak, the grading signs, the exact binomial, Holm with m = 6 fixed,
+and the script end to end on a fake CFBD."""
 
 from __future__ import annotations
 
@@ -208,6 +209,127 @@ def test_bennett_rows_fades_and_drops():
     assert ("GHOST", "no_game_played") in detail and ("C", "not_fbs_vs_fbs") in detail
 
 
+# --- Cox ---------------------------------------------------------------------------
+
+
+def _meeting(date, home, away, hs, as_):
+    winner = None if hs == as_ else (home if hs > as_ else away)
+    return {
+        "season": int(date[:4]),
+        "seasonType": "regular",
+        "date": date,
+        "homeTeam": home,
+        "awayTeam": away,
+        "homeScore": hs,
+        "awayScore": as_,
+        "winner": winner,
+    }
+
+
+PAIRS = {frozenset({"A", "B"}), frozenset({"C", "D"}), frozenset({"E", "F"})}
+SERIES = {
+    # A won the last three (a tie in between is skipped, not a break); older loss ignored.
+    frozenset({"A", "B"}): [
+        _meeting("2014-11-01T20:00:00.000Z", "B", "A", 30, 10),
+        _meeting("2015-11-01T20:00:00.000Z", "A", "B", 21, 14),
+        _meeting("2016-11-01T20:00:00.000Z", "B", "A", 17, 17),
+        _meeting("2017-11-01T20:00:00.000Z", "B", "A", 7, 24),
+        _meeting("2018-01-01T20:00:00.000Z", "A", "B", 35, 31),  # a bowl counts
+        _meeting("2019-12-01T20:00:00.000Z", "A", "B", 99, 0),  # AFTER the 2019 game: ignored
+    ],
+    # C and D split the last three.
+    frozenset({"C", "D"}): [
+        _meeting("2016-11-01T20:00:00.000Z", "C", "D", 20, 10),
+        _meeting("2017-11-01T20:00:00.000Z", "D", "C", 20, 10),
+        _meeting("2018-11-01T20:00:00.000Z", "C", "D", 20, 10),
+    ],
+    # E and F have met twice.
+    frozenset({"E", "F"}): [
+        _meeting("2017-11-01T20:00:00.000Z", "E", "F", 20, 10),
+        _meeting("2018-11-01T20:00:00.000Z", "E", "F", 20, 10),
+    ],
+}
+
+
+def test_prior_meetings_and_streak_winner_skip_ties_and_later_games():
+    prior = L.prior_meetings(SERIES[frozenset({"A", "B"})], "2019-09-07T16:00:00.000Z")
+    assert [m["date"][:4] for m in prior] == ["2018", "2017", "2016", "2015", "2014"]
+    assert L.streak_winner(prior) == ("A", 4)  # the tie is skipped; 2014's loss is 4th
+    assert L.streak_winner(prior[:3]) == (None, 2)  # A, A and a tie: only two decided
+    assert L.streak_winner(L.prior_meetings(SERIES[frozenset({"C", "D"})], "2019-09-07")) == (
+        None,
+        3,
+    )
+    assert L.streak_winner(L.prior_meetings(SERIES[frozenset({"E", "F"})], "2019-09-07")) == (
+        None,
+        2,
+    )
+    assert L.streak_winner([]) == (None, 0)
+    # A meeting without a score (never played) is not a meeting.
+    unplayed = [
+        {
+            "date": "2018-11-01",
+            "homeTeam": "A",
+            "awayTeam": "B",
+            "homeScore": None,
+            "awayScore": None,
+        }
+    ]
+    assert L.prior_meetings(unplayed, "2019-01-01") == []
+
+
+def test_conference_pairing():
+    assert L.conference_pairing("SEC", "Big Ten") == "P5-P5"
+    assert L.conference_pairing("SEC", "Sun Belt") == "P5-G5"
+    assert L.conference_pairing("MAC", None) == "G5-G5"
+
+
+def test_cox_rows_tests_the_streak_favourite_and_drops():
+    games = [
+        _game(
+            1, "A", "B", 31, 10, hc="SEC", ac="SEC"
+        ),  # A -7 favourite, won last 3 -> qualifies, covers
+        _game(2, "D", "C", 20, 30, hc="MAC", ac="MAC"),  # split series: a row, not qualifying
+        _game(3, "E", "F", 20, 10),  # two prior meetings: dropped
+        _game(4, "A", "C", 40, 0),  # not a trophy pair: outside the universe
+        _game(5, "B", "A", None, None, date="2019-11-30T20:00:00.000Z"),  # not played
+        _game(6, "A", "B", 20, 20, date="2019-11-15T20:00:00.000Z"),  # pick'em
+        _game(7, "C", "D", 20, 20, date="2019-11-20T20:00:00.000Z"),  # no provider
+    ]
+    lines = {
+        1: _lines((-7, 50), (-6.5, 51)),
+        2: _lines((3, 44)),  # D +3 at home: C the favourite, C won by 10 -> covers
+        3: _lines((-10, 40)),
+        4: _lines((-30, 50)),
+        6: _lines((0, 50)),
+    }
+    rows, drops = L.cox_rows(games, lines, PAIRS, SERIES, FBS)
+    assert drops == {
+        "universe": 6,
+        "not_played": 1,
+        "pickem": 1,
+        "no_provider": 1,
+        "lt3_meetings": 1,
+    }
+    assert [r["game_id"] for r in rows] == [1, 2]
+    a, c = rows
+    assert (a["favourite"], a["favourite_home"], a["streak_team"], a["qualifies"]) == (
+        "A",
+        True,
+        "A",
+        True,
+    )
+    assert a["spread"] == -6.75 and a["result"] == "win" and a["pairing"] == "P5-P5"
+    assert a["underdog_result"] == "loss" and a["prior_decided"] == 4
+    assert (c["favourite"], c["favourite_home"], c["streak_team"], c["qualifies"]) == (
+        "C",
+        False,
+        "",
+        False,
+    )
+    assert c["result"] == "win" and c["underdog_result"] == "loss" and c["pairing"] == "G5-G5"
+
+
 # --- the test and the family -------------------------------------------------------
 
 
@@ -240,16 +362,21 @@ def test_holm_family_fixes_m_at_six_and_counts_unrun_looks_as_one():
         L.holm_family({f"L{i}": 0.5 for i in range(7)})
 
 
-def test_each_look_ran_once_and_a_second_look_is_refused(capsys):
-    """All three looks ran on 2026-10-09 UTC and are decided: the registry gate
-    refuses each, so the script exits 2 before any CFBD call."""
+def test_decided_looks_are_refused_and_cox_is_runnable(capsys):
+    """The three looks of 2026-10-09 are decided: the registry gate refuses each,
+    so the script exits 2 before any CFBD call. H-LIT-COX (registered 2026-10-11)
+    is pre-registered and runnable once."""
     mod = _script()
-    for rid in L.LOOKS:
+    for rid in (L.ARSCOTT, L.TV, L.BENNETT):
         assert find_row(parse_registry(), rid).status == "tested-null"
         with pytest.raises(HarnessRefusal):
             require_runnable_row(rid)
         assert mod.main(["--row", rid]) == 2
     assert "REFUSED" in capsys.readouterr().err
+    cox = find_row(parse_registry(), L.COX)
+    assert cox.status in {"pre-registered", "tested-null", "tested-positive"}
+    if cox.status == "pre-registered":
+        assert require_runnable_row(L.COX).criterion.startswith("PASS = ")
 
 
 # --- the script --------------------------------------------------------------------
@@ -283,14 +410,27 @@ class _FakeCFBD:
         self.calls.append(("rankings", year, season_type))
         return [_poll(1, [(2, "A")])]
 
+    def matchup(self, team1, team2, min_year=None):
+        self.calls.append(("matchup", team1, team2))
+        return {"team1": team1, "team2": team2, "games": SERIES.get(frozenset({team1, team2}), [])}
+
 
 @pytest.mark.parametrize("row_id", sorted(L.LOOKS))
 def test_run_look_end_to_end_writes_md_json_csv(tmp_path, monkeypatch, row_id):
     mod = _script()
     monkeypatch.setattr(L, "LOOKS", {**L.LOOKS, row_id: (2019, 2020)})
     client = _FakeCFBD()
-    res = mod.run_look(row_id, client, FBS)
-    if row_id == L.BENNETT:
+    res = mod.run_look(row_id, client, FBS, pairs=PAIRS if row_id == L.COX else None)
+    if row_id == L.COX:
+        assert ("matchup", "A", "B") in client.calls and len(
+            [c for c in client.calls if c[0] == "matchup"]
+        ) == len(PAIRS)
+        # A -30 at home, won the last three, won by 38 -> covers, both seasons. C -3 at D is a
+        # trophy game too, but the series is split, so it is a row that does not qualify.
+        assert res["record"]["n"] == 2 and res["record"]["wins"] == 2
+        assert res["drops"] == {"universe": 4}
+        assert res["secondary"]["qualifying_share"] == 0.5
+    elif row_id == L.BENNETT:
         assert ("rankings", 2018, "postseason") in client.calls
         assert res["record"]["n"] == 2  # fade A (-30) twice; A won by 38 -> losses
         assert res["record"]["losses"] == 2

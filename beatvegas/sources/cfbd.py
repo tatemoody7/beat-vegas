@@ -244,6 +244,13 @@ class CFBDClient:
         poll's final release. Read by the H-LIT-BENNETT look."""
         return self._get("/rankings", {"year": year, "seasonType": season_type})
 
+    def matchup(self, team1: str, team2: str, min_year: Optional[int] = None) -> Dict:
+        """The head-to-head series between two schools in one call: `games[]`
+        with `season`, `seasonType`, `date`, `homeTeam`, `awayTeam`, `homeScore`,
+        `awayScore` and `winner` (null on a tie), every year CFBD holds unless
+        `min_year` is given. One call per pair. Read by the H-LIT-COX look."""
+        return self._get("/teams/matchup", {"team1": team1, "team2": team2, "minYear": min_year})
+
     def sp_ratings(self, year: int, team: Optional[str] = None) -> List[Dict]:
         return self._get("/ratings/sp", {"year": year, "team": team})
 

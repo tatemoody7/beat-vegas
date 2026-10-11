@@ -25,7 +25,7 @@ promote anything.**
   - They are final because a raw p above 5% cannot pass at any Holm step, whatever Coleman, Cox
     and Salaga show.
   - The rows are `H-LIT-ARSCOTT`, `H-LIT-TV` and `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, run by
-    `scripts/literature_look.py`. Coleman, Cox and Salaga follow in their own PRs.
+    `scripts/literature_look.py`. `H-LIT-COX` registered 2026-10-11; Coleman and Salaga are parked.
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against
@@ -67,7 +67,7 @@ Holm-corrected at 5% with m = 6 fixed (a look not yet run counts as p = 1). Tate
 | Arscott | Over at the closing total when the expected censoring bias exceeds 1.0 point | 2018-2025 | Frozen in `H-LIT-ARSCOTT`: the formula and both σ from the working paper; spread-0 games excluded. **Ran 2026-10-09: NOT MET** |
 | Coleman | Home favourite vs a visiting underdog that travelled one time zone east, second half of the season | 2013-2025 | **Waiting on the full text**: Tate's call is to freeze Coleman's exact "second half" cutoff and line timing, not a guess |
 | National TV | Under on games carried by ABC, CBS, NBC, FOX or ESPN (not ESPN2), from CFBD's media listing | 2013-2025 | Frozen in `H-LIT-TV`: any TV outlet that is exactly one of the five. **Ran 2026-10-09: NOT MET** |
-| Cox | Rivalry games = FBS series with a named trophy (Wikipedia's trophy-game list, frozen on the registration date) | 2019-2025 | Which of Cox's rules are tested (rivalry underdog; the favourite that won the last 3 meetings) is fixed in the row |
+| Cox | Favourite against the spread when it won the last three meetings of a trophy rivalry (FBS series with a named trophy: `data/trophy_games.json`, Wikipedia's list frozen 2026-10-09) | 2019-2025 | Frozen in `H-LIT-COX` (2026-10-11, Tate): the paper's one result significant at 5%; prior meetings from CFBD `/teams/matchup`, bowls included, ties skipped; the two other Cox results are descriptive only |
 | Bennett | Fade the previous season's final AP top 10 in its first game | 2018-2025 | Frozen in `H-LIT-BENNETT`: 2017 dropped (the paper's 2008-2016 may name the first-game seasons); the literal first game; top-10 pairs dropped. About 70 games, so it reads closer to a description than a test. **Ran 2026-10-09: NOT MET** (60 graded) |
 | Salaga | Under when wind, temperature and humidity pass the paper's cutoffs, outdoor games | 2016-2025 | Observed weather comes from `weather_actuals` (ERA5 hourly + a CFBD cross-check, 2013-2026; `docs/WEATHER.md` §7); the game window is fixed in the row. Uses game-time weather, so a pass does not make it bettable as stated |
 

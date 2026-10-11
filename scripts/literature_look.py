@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-"""H-LIT-ARSCOTT / H-LIT-TV / H-LIT-BENNETT (docs/HYPOTHESES.md, "The literature
-looks"): ONE literature look per dispatch, on CFBD data only.
+"""H-LIT-ARSCOTT / H-LIT-TV / H-LIT-BENNETT / H-LIT-COX (docs/HYPOTHESES.md, "The
+literature looks"): ONE literature look per dispatch, on CFBD data only.
 
     study.yml -> literature_look --row H-LIT-ARSCOTT
 
 Refuses (exit 2) a row that is not runnable (beatvegas/registry.py), so a look
 already decided cannot be run a second time. Fetches each season's
-regular-season /games and /lines, plus /games/media for H-LIT-TV and the
-previous season's postseason /rankings for H-LIT-BENNETT, grades the frozen
+regular-season /games and /lines, plus /games/media for H-LIT-TV, the
+previous season's postseason /rankings for H-LIT-BENNETT and one /teams/matchup
+per trophy pair (data/trophy_games.json) for H-LIT-COX, grades the frozen
 rule (beatvegas/backtest/literature.py) and writes
 reports/literature_<row>_<UTC>.{md,json,csv}. READ-ONLY: no table, no Odds API
 credits, no database. Exits 0 whatever the numbers say.
@@ -31,9 +32,10 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from beatvegas.backtest import literature as L
 from beatvegas.etl.fbs import load_fbs_teams
+from beatvegas.etl.trophy_games import load_pairs
 from beatvegas.registry import HarnessRefusal, require_runnable_row
 
-SLUG = {L.ARSCOTT: "arscott", L.TV: "tv", L.BENNETT: "bennett"}
+SLUG = {L.ARSCOTT: "arscott", L.TV: "tv", L.BENNETT: "bennett", L.COX: "cox"}
 
 
 def _pct(x: Optional[float]) -> str:
@@ -57,6 +59,8 @@ def tested(row_id: str, rows: Iterable[Mapping[str, Any]]) -> List[Mapping[str, 
         return [r for r in rows if r["qualifies"]]
     if row_id == L.TV:
         return [r for r in rows if r["group"] == "national"]
+    if row_id == L.COX:
+        return [r for r in rows if r["qualifies"]]
     return list(rows)
 
 
@@ -69,8 +73,23 @@ def _by(
     return {k: L.record(v) for k, v in sorted(groups.items(), key=lambda kv: str(kv[0]))}
 
 
-def run_look(row_id: str, client: Any, fbs: Mapping[int, set]) -> Dict[str, Any]:
-    """Fetch every season of the look, build its rows, and summarise them."""
+def fetch_series(
+    client: Any, pairs: Iterable[frozenset]
+) -> Dict[frozenset, List[Mapping[str, Any]]]:
+    """One /teams/matchup call per trophy pair: the whole series, every year CFBD
+    holds, bowls included (H-LIT-COX)."""
+    out: Dict[frozenset, List[Mapping[str, Any]]] = {}
+    for pair in sorted(pairs, key=sorted):
+        a, b = sorted(pair)
+        out[pair] = list((client.matchup(a, b) or {}).get("games") or [])
+    return out
+
+
+def run_look(
+    row_id: str, client: Any, fbs: Mapping[int, set], pairs: Optional[set] = None
+) -> Dict[str, Any]:
+    """Fetch every season of the look, build its rows, and summarise them. `pairs`
+    (H-LIT-COX only) defaults to the frozen data/trophy_games.json."""
     start, end = L.LOOKS[row_id]
     rows: List[Dict[str, Any]] = []
     drops: Counter = Counter()
@@ -82,6 +101,14 @@ def run_look(row_id: str, client: Any, fbs: Mapping[int, set]) -> Dict[str, Any]
         if row_id == L.ARSCOTT
         else (("overUnder",) if row_id == L.TV else ("spread",))
     )
+    history: Dict[frozenset, List[Mapping[str, Any]]] = {}
+    if row_id == L.COX:
+        pairs = set(pairs) if pairs is not None else load_pairs()
+        history = fetch_series(client, pairs)
+        notes.append(
+            f"{len(pairs)} trophy pairs; series fetched for {sum(1 for v in history.values() if v)} "
+            f"({sum(len(v) for v in history.values())} meetings on CFBD)"
+        )
     for season in range(start, end + 1):
         games = client.games(season, season_type="regular")
         lines_by_id = {
@@ -95,6 +122,8 @@ def run_look(row_id: str, client: Any, fbs: Mapping[int, set]) -> Dict[str, Any]
             for m in client.game_media(season, season_type="regular"):
                 media_by_id[int(m["id"])].append(m)
             got, d = L.tv_rows(games, lines_by_id, media_by_id, fbs)
+        elif row_id == L.COX:
+            got, d = L.cox_rows(games, lines_by_id, pairs or set(), history, fbs)
         else:
             top10 = L.final_top10(client.rankings(season - 1, season_type="postseason"))
             if not top10:
@@ -131,6 +160,24 @@ def run_look(row_id: str, client: Any, fbs: Mapping[int, set]) -> Dict[str, Any]
             str(s): dict(Counter(r["group"] for r in rows if r["season"] == s))
             for s in range(start, end + 1)
         }
+    elif row_id == L.COX:
+        secondary["by_pairing"] = _by(sel, lambda r: r["pairing"])
+        secondary["by_favourite_home"] = _by(
+            sel, lambda r: "favourite at home" if r["favourite_home"] else "favourite away"
+        )
+        # Cox's two other results, descriptive only (Tate 2026-10-11): every trophy
+        # favourite against the spread (the paper: 48.1%), and the underdog in a
+        # G5-vs-G5 pairing (the paper's non-P5 underdog, 55.8%).
+        secondary["all_trophy_favourites_ats"] = L.record(r["result"] for r in rows)
+        secondary["g5_vs_g5_underdog_ats"] = L.record(
+            r["underdog_result"] for r in rows if r["pairing"] == "G5-G5"
+        )
+        secondary["streak_but_underdog_ats"] = L.record(
+            r["underdog_result"]
+            for r in rows
+            if r["streak_team"] and r["streak_team"] == r["underdog"]
+        )
+        secondary["qualifying_share"] = (len(sel) / len(rows)) if rows else None
     else:
         secondary["by_opponent_conference"] = _by(
             sel, lambda r: r["opponent_conference"] or "(none)"

@@ -3,7 +3,7 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1.4) governs 2026**: every
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1.8) governs 2026**: every
 strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
 first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.4): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.8): what is tested, how an edge is judged,
   what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -37,19 +37,19 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
-  behind the six history looks) (all in `docs/`).
-- Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
-  `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
+- `docs/program/REVIEW_2026-10.md` — the October review: Tate's 16 decisions of 2026-10-11 (personal
+  proof is the goal; every arm unchanged to January; cut list; Kalshi measured first). Plans:
+  `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
-
 ## Where we are (as of 2026-10-08)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
   vig-free median-of-books consensus close (newest snapshot ≤2 h before kickoff) — designed for +3%
   EV, inside a 5% family-wise budget held as a fixed ledger (K = 10 tests, 0.5% each, never
-  recycled). Promotion → $10 flat live validation. Up to 7 uncapped paper arms: 1H unders, 1H overs
-  (bottom 20% of the slate), full-game unders, derivative consistency, early/stale lines, two open
-  (team totals, literature passes); shadow engines sit outside the slots. Every confirmatory clock
+  recycled). Promotion → $10 flat live validation. Up to 8 uncapped paper arms (v1.8): 1H unders,
+  1H overs (bottom 20%), full-game unders, derivative consistency + stale lines (4-5, not built),
+  weather (6-7), 60+ totals (8); shadow engines sit outside the slots. Every confirmatory clock
   starts after the Statistical Protocol is registered; all earlier rows are development evidence.
 - **Real money: Tate's personal first-half-unders ledger since 2026-10-08 (v1.4)** — the old rule
   (BET at the per-slate bar, top 5 a week by gap, every money-path check), $10 flat, no stop rule,
@@ -64,8 +64,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   average first-half miss 8.34 vs Hard Rock 8.22 over 213 games; H-HIST pooled 8.75 vs the close
   8.73, live on 2003+ training since 2026-10-07); the 2026 factor screen found no input, nor the
   gap, predicting the residual against the close (87 comparisons, best p 0.117); in weeks 4-5 the
-  gap did not sort unders from overs. Closed null: 1H game-total censoring, weather × style,
-  two-sided overs, Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model against the spread.
+  gap did not sort unders from overs. Closed null: 1H censoring, weather × style, two-sided overs,
+  Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model, the four-fix model (H-MODEL-FIX).
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
   judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
 - **The model and bar as built** (they feed the paper arms): market-blind HGB, 55 inputs (B-SERVE
@@ -89,10 +89,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   Arscott/TV/Bennett all NOT MET 10-09 (final); Coleman waits on full text, Salaga on weather; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
   1HO / FGU, clocks PAUSED (p1.1, v1.5) until the leak-fixed model's first card; 6-7 = weather unders,
-  10+ mph forecast, v1.6, `wx_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
+  10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
   retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
-- **Real-money switch: OFF since 2026-10-08 20:00 UTC** (v1.4, Tate's call; written through Neon's
+- **The pause switch (`rule_paused`) is OFF since 2026-10-08 20:00 UTC, so the personal ledger is ON** (v1.4, Tate's call; written through Neon's
   HTTPS endpoint, mirroring `scripts/rule_pause.py`; it was on 2026-10-07 → 10-08).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
@@ -104,9 +104,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   Sunday before, 2023-25) starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile dev data.
   `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
 - **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
-  and the arms' first read; the 12
+  and the arms' first read; H-MODEL-FIX (NOT MET) and v1.8's 60+ arm; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.7: 3 literature nulls → REJECTED?
+  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.9: 3 literature nulls → REJECTED?
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
   shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
   engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget
@@ -154,9 +154,9 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
   plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
   (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`), and **a visitor sees no pre-kickoff signal**
-  (`lib/signalGate.ts`: board, game page, `/records`, the ledger and both CSVs): ops warnings, the My-teams chip, the Monday review on
-  Results, the research section on How it works, the log control. No dollars are public. API:
+  the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
+  control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
+  `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
   `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
@@ -206,7 +206,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
   `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`,
-  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`.
+  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +

@@ -59,6 +59,7 @@ from beatvegas.lines import (
     pre_kickoff,
     real_closes,
 )
+from beatvegas.model import bv_line
 from beatvegas.model.artifacts import (
     fingerprint_changed,
     latest_artifact,
@@ -264,6 +265,10 @@ def record_weekly_refit(
             "skew_guard_train_rows": int(skew.attrs.get("n_train", 0) or 0),
             "target_rows": int(skew.attrs.get("n_target", 0) or 0),
             "scored_rows": int(n),
+            # Trees the slate's fit grew and its early-stopping setting
+            # (H-MODEL-FIX, 2026-10-10: 'auto' once stopped early unseen).
+            "n_iter": bv_line.LAST_FIT.get("n_iter"),
+            "early_stopping": bv_line.LAST_FIT.get("early_stopping"),
             "frame_fingerprint": frame_fingerprint or fingerprint_hash(fingerprint(df)),
             "run_id": os.environ.get("GITHUB_RUN_ID"),
         }

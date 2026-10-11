@@ -290,8 +290,8 @@ def test_the_era5_variable_set_and_the_fixed_lead_refusal(monkeypatch):
 
     sent = {}
 
-    def fake_get(url, params, timeout):
-        sent.update(params, url=url)
+    def fake_get(url, params, timeout, attempts=None):
+        sent.update(params, url=url, attempts=attempts)
         return {"time": ["2016-09-03T16:00"], "relative_humidity_2m": [71]}
 
     monkeypatch.setattr(wx, "_get", fake_get)
@@ -306,6 +306,7 @@ def test_the_era5_variable_set_and_the_fixed_lead_refusal(monkeypatch):
     )
     assert sent["url"].startswith("https://archive-api.open-meteo.com")
     assert sent["models"] == "era5" and sent["timezone"] == "UTC"
+    assert sent["attempts"] == wx._ATTEMPTS == 4  # a backfill keeps the full retry ladder
     assert "relative_humidity_2m" in sent["hourly"] and "dew_point_2m" in sent["hourly"]
     assert out["2016-09-03T16"]["humidity_pct"] == 71
     with pytest.raises(ValueError):

@@ -350,9 +350,6 @@ export type HomeGame = {
   capRank: number | null;
   /** BET beyond the weekly cap: every gate passed, paper only (docs/BETTING_POLICY.md). */
   overCap: boolean;
-  /** Set by `lib/signalGate.gateGame` for a visitor before kickoff: the rating,
-   *  rank, our number and the action are withheld (research season, 2026-10-07). */
-  signalHidden?: boolean;
 };
 
 export type SlateBar = {

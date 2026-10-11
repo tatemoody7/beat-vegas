@@ -31,7 +31,6 @@ const HEADER_PX = 69;
 
 /** The sub-24px targets production already has (see the file comment). */
 const KNOWN_SMALL_TARGETS: RegExp[] = [
-  /^a\S* "[^"]* @ [^"]*" \d+x20$/, // answer-bar matchup links
   /^button\S* "details" \d+x16$/, // PicksList row expander
   /^button\S* "(edit|delete)" \d+x16$/, // PicksList controls (signed in)
   /^a\S* "← Back to the board" \d+x16$/, // game page

@@ -28,7 +28,7 @@ to any rule here is a new protocol version and a roadmap amendment, never an edi
 Every ending spends the arm's 0.5%. **Restarts (p1.1, 2026-10-09):** abandoning a test and
 restarting it is an ending, and spends the slot, once any completed week of it has been read; a
 restart before any completed week is free, because no result has been looked at. A new arm enters only while ledger slots remain (10 in total
-for 2026, 7 betting slots at a time). Correlated arms (the first-half unders and their over mirror
+for 2026, 8 betting slots at a time since roadmap v1.8). Correlated arms (the first-half unders and their over mirror
 read the same slates) need no adjustment: the ledger is a Bonferroni split, valid under any
 dependence.
 
@@ -123,6 +123,18 @@ starts at its first eligible build after the rows merged (`protocol.WX_ARMS_STAR
 - **The forecast:** each decision build fetches the kickoff-hour forecast of the week's games not
   yet kicked off (Open-Meteo forecast API, model `icon_seamless`) into `build_forecasts`, which
   nothing else reads; a game qualifies on its newest forecast fetched at or before the build.
+  IMPLEMENTATION NOTE 2026-10-10, before any number was read: the first build on this code
+  (`sat_am`, run 38049849474) fetched all 254 of the week's games and timed the card job out, so
+  a build now fetches only the games an arm can log (Hard Rock-priced; `wx_paper.arm_game_ids`),
+  10 s a call, 2 tries, 180 s in all. The rule is unchanged.
+
+**The high-total arm (roadmap v1.8, Tate 2026-10-10), ledger slot 8.** Registered under p1.1
+with the same test. It reads no model, so the pause above does not apply, and its clock starts at
+its first eligible build after its collector merges (`protocol.HT_ARM_START` is the backstop).
+
+| Arm | Slot | Rule (every qualifier, uncapped) | Where its picks live |
+|---|---|---|---|
+| H-ARM-HT1H | 8 | First-half UNDER on every game whose consensus full-game total at the build is 60.0 or more (the median of each counted book's newest centred quote at or before the build, at least 3 books, the judge's book set), at Hard Rock's centred main line and under price | `challenger_picks`, `arm = 'H-ARM-HT1H'` (`beatvegas/ht_paper.py`, its collector PR) |
 
 - **The development collectors retired** when these started: H-NEGGAP-P (`NEGGAP_COLLECT`) and
   H-FG-P (`FG_COLLECT`) are no longer switched on by `card.yml`.

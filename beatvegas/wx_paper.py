@@ -13,7 +13,9 @@ arm reads the model, so the leak-fix pause (p1.1) does not touch them.
 `capture` fetches the forecast during the build and writes `build_forecasts`
 (decision-safe by construction: the build's own clock precedes the kickoff it
 describes), pinned to the same weather model as `weather_obs`'s history so the
-2024-25 history look (H-WX-HIST) and these arms read the same kind of number.
+2024-25 history look (H-WX-HIST) and these arms read the same kind of number. It
+fetches only the games an arm can log (`arm_game_ids`) and runs on the build's
+clock (2026-10-10): fetching every game of the week ran the card job out of time.
 
 Every row here is PAPER, in `challenger_picks`, never `manual_picks`. There is
 no real-money path through this file.
@@ -22,6 +24,8 @@ no real-money path through this file.
 from __future__ import annotations
 
 import json
+import sys
+import time
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
@@ -42,6 +46,15 @@ from .sources.weather import (
 WIND_MIN_MPH = 10.0  # frozen 2026-10-09: sustained 10 m wind at the kickoff hour
 WEATHER_MODEL = "icon_seamless"  # scripts/backfill_weather.py::DECISION_MODEL
 
+# The capture runs inside the card build, whose whole job has 30 minutes
+# (card.yml). On 2026-10-10 it fetched every game of the week -- 254 games, 245
+# venue calls on the full retry ladder -- and the sat_am build was cancelled at
+# the limit with no card written. A build call is short, and no new call starts
+# once the budget is spent.
+BUILD_FETCH_TIMEOUT_S = 10  # seconds per Open-Meteo call
+BUILD_FETCH_ATTEMPTS = 2  # the backfills keep sources/weather.py's four
+BUILD_CAPTURE_BUDGET_S = 180.0  # the whole capture
+
 
 def capture(
     session,
@@ -49,10 +62,20 @@ def capture(
     now: datetime,
     slot: Optional[str] = None,
     fetch: Callable[..., Dict[str, dict]] = fetch_hourly_series,
+    *,
+    timeout: int = BUILD_FETCH_TIMEOUT_S,
+    attempts: int = BUILD_FETCH_ATTEMPTS,
+    budget_seconds: Optional[float] = BUILD_CAPTURE_BUDGET_S,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Dict[str, int]:
     """Fetch and store the kickoff-hour forecast of every listed game not yet
-    kicked off. One call per venue and UTC day; a dome stores a row with no
-    weather and costs no call. A failed fetch is counted, never fatal."""
+    kicked off, earliest kickoff first. One call per venue and UTC day; a dome
+    stores a row with no weather and costs no call. A failed fetch is counted,
+    never fatal.
+
+    Each call gets `timeout` seconds and `attempts` tries. Once `budget_seconds`
+    have passed no new call starts: the games still waiting count as failed, and
+    as `over_budget`, a key present only when the budget ran out."""
     ids = [int(g) for g in game_ids]
     stats = {"stored": 0, "domes": 0, "no_venue": 0, "failed": 0}
     if not ids:
@@ -60,8 +83,10 @@ def capture(
     games = (
         session.query(Game.id, Game.start_date, Game.venue_id)
         .filter(Game.id.in_(ids), Game.start_date > now)
+        .order_by(Game.start_date.asc(), Game.id.asc())
         .all()
     )
+    started = clock()
     vids = {int(v) for _, _, v in games if v is not None}
     venues = {int(v.id): v for v in session.query(Venue).filter(Venue.id.in_(vids)).all()}
     series_by: Dict[tuple, Optional[Dict[str, dict]]] = {}
@@ -80,6 +105,10 @@ def capture(
             day = kick.strftime("%Y-%m-%d")
             key = (int(vid), day)
             if key not in series_by:
+                if budget_seconds is not None and clock() - started >= budget_seconds:
+                    stats["failed"] += 1
+                    stats["over_budget"] = stats.get("over_budget", 0) + 1
+                    continue
                 try:
                     series_by[key] = fetch(
                         v.latitude,
@@ -88,6 +117,8 @@ def capture(
                         day,
                         source=SOURCE_FORECAST,
                         models=WEATHER_MODEL,
+                        timeout=timeout,
+                        attempts=attempts,
                     )
                 except WeatherUnavailable as e:
                     print(f"[wx] forecast unavailable for venue {vid} {day}: {e}")
@@ -118,6 +149,13 @@ def capture(
         )
         stats["stored"] += 1
     session.flush()
+    # To stderr, unbuffered: a build killed later still leaves this line in its
+    # log, and the card summary on stdout keeps its first lines.
+    print(
+        f"[wx] forecast capture: {len(series_by)} calls in {clock() - started:.0f} s, {stats}",
+        file=sys.stderr,
+        flush=True,
+    )
     return stats
 
 
@@ -168,6 +206,45 @@ def _logged(session, arm: str) -> set:
     return {int(g) for (g,) in rows}
 
 
+def _priced_first_half(it: Dict) -> bool:
+    """A card item the first-half arm can log: Hard Rock's centred main line
+    with an under price."""
+    return bool(
+        it.get("hr_centred") and it.get("hr_line") is not None and it.get("hr_price") is not None
+    )
+
+
+def _priced_full_game(session, season: int, week: int, now: datetime) -> List[tuple]:
+    """(game, quote) for the week's games not yet kicked off whose newest Hard Rock
+    full-game total is centred with a line and an under price: the full-game
+    arm's universe (H-ARM-FGU's quote rule)."""
+    games = (
+        session.query(Game)
+        .filter(Game.season == int(season), Game.week == int(week), Game.start_date > now)
+        .all()
+    )
+    quotes = _hr_quotes(session, [int(g.id) for g in games], now)
+    out = []
+    for g in games:
+        q = quotes.get(int(g.id))
+        if q is None or q.line is None or q.under_price is None:
+            continue
+        if not is_centred_quote(q.over_price, q.under_price):
+            continue
+        out.append((g, q))
+    return out
+
+
+def arm_game_ids(session, card: Dict, season: int, week: int, now: datetime) -> List[int]:
+    """The games either weather arm can log at this build -- the card's Hard Rock
+    first-half items and the week's Hard Rock full-game totals -- and so the
+    only games worth a forecast call. A forecast for any other game is one
+    nothing reads, paid for out of the card's clock."""
+    ids = {int(it["game_id"]) for it in card.get("items", []) if _priced_first_half(it)}
+    ids.update(int(g.id) for g, _ in _priced_full_game(session, season, week, now))
+    return sorted(ids)
+
+
 def _in_window(kick: Optional[datetime], now: datetime, window_hours: Optional[float]) -> bool:
     if kick is None or kick <= now:
         return False
@@ -187,11 +264,7 @@ def log_first_half(
     added = windy = 0
     for it in card.get("items", []):
         gid = int(it["game_id"])
-        if not (
-            it.get("hr_centred")
-            and it.get("hr_line") is not None
-            and it.get("hr_price") is not None
-        ):
+        if not _priced_first_half(it):
             continue
         fc = forecasts.get(gid)
         if not qualifies(fc):
@@ -232,21 +305,10 @@ def log_full_game(
 ) -> Dict[str, int]:
     """H-ARM-WXFG: a paper full-game UNDER at Hard Rock's newest centred
     full-game total and under price on every qualifying game in the window."""
-    games = (
-        session.query(Game)
-        .filter(Game.season == int(season), Game.week == int(week), Game.start_date > now)
-        .all()
-    )
-    quotes = _hr_quotes(session, [int(g.id) for g in games], now)
     logged = _logged(session, ARM_WX_FG)
     added = windy = 0
-    for g in games:
+    for g, q in _priced_full_game(session, season, week, now):
         gid = int(g.id)
-        q = quotes.get(gid)
-        if q is None or q.line is None or q.under_price is None:
-            continue
-        if not is_centred_quote(q.over_price, q.under_price):
-            continue
         fc = forecasts.get(gid)
         if not qualifies(fc):
             continue
@@ -275,25 +337,17 @@ def log_full_game(
     return {"windy": windy, "added": added}
 
 
-def week_game_ids(session, season: int, week: int, now: datetime) -> List[int]:
-    """The week's games not yet kicked off: what a build fetches forecasts for."""
-    rows = (
-        session.query(Game.id)
-        .filter(Game.season == int(season), Game.week == int(week), Game.start_date > now)
-        .all()
-    )
-    return [int(g) for (g,) in rows]
-
-
 def summary_lines(stats: Optional[Dict[str, Any]]) -> List[str]:
     """The card summary's lines about the weather arms."""
     tag = f"  ARMS {ARM_WX_1H} / {ARM_WX_FG} (paper unders, forecast wind {WIND_MIN_MPH:g}+ mph)"
     if not stats:
         return [f"{tag}: not run"]
     c, h, f = stats.get("capture", {}), stats.get("1h", {}), stats.get("full", {})
+    over = c.get("over_budget")
+    cap = f", {over} past the {BUILD_CAPTURE_BUDGET_S:g} s cap" if over else ""
     return [
         f"{tag}: forecasts stored {c.get('stored', 0)} (domes {c.get('domes', 0)}, "
-        f"failed {c.get('failed', 0)}); first half {h.get('windy', 0)} windy, "
+        f"failed {c.get('failed', 0)}{cap}); first half {h.get('windy', 0)} windy, "
         f"+{h.get('added', 0)} logged; full game {f.get('windy', 0)} windy, "
         f"+{f.get('added', 0)} logged"
     ]

@@ -31,24 +31,19 @@ export default function GameRow({ g }: { g: HomeGame }) {
       : played
         ? `Final · first half ${fmt(row.firstHalfTotal, 0)}. No first-half line was posted, so nothing to grade.`
         : null;
-  // A visitor before kickoff (lib/signalGate): no colour, no rank, no tier —
-  // the row is a game on the slate until its rating publishes.
-  const hidden = g.signalHidden === true;
-  const lit = !hidden && edge.tier === "BET" && !g.kickedOff;
+  const lit = edge.tier === "BET" && !g.kickedOff;
 
   return (
     <Link
       id={`game-${row.gameId}`}
       href={`/game/${row.gameId}`}
       className={`bv-card scroll-mt-4 block p-4 ${lit ? "bv-card--lit" : ""} ${
-        !hidden && edge.tier === "PASS" && g.settled === null
-          ? "opacity-85"
-          : ""
+        edge.tier === "PASS" && g.settled === null ? "opacity-85" : ""
       }`}
     >
       <div className="flex items-start gap-3">
         <ScoreBadge
-          score={hidden ? null : edge.score}
+          score={edge.score}
           rank={g.boardRank}
           kickedOff={g.kickedOff}
           inPlay={g.inPlay}

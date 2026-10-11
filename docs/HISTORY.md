@@ -7,6 +7,144 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-11
+
+- **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
+  board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),
+  the Monday review's breakdown, decisions strip and factor read on Results, and the signed-in
+  research section on How it works (live-season strip, flags, method fold, line study). Kept, on
+  Tate's call: the owner's pick list with its edit/delete controls (the only place a pending real
+  ticket is edited before kickoff) and the ops and build warnings (the failure surface). The banner
+  names the owner's real bets a personal stake, recorded separately and never evidence. e2e: five
+  tests removed, two retitled, `FEATURE_PARITY.md` matched; 241 passed on the fixture lane.
+
+- **2026-10-11 UTC (ROADMAP v2.0).** The October review's sixteen decisions logged as one versioned
+  amendment at the bottom of `docs/ROADMAP_2026.md` (objective = personal proof at Hard Rock; the
+  site a public record only; every arm, the judge and the protocol frozen to the January review;
+  +3% one-season target for 2026; Kalshi measured first on captured data; Hard Rock off-market
+  capture next; the personal ledger continues, labelled a personal stake; the cut list; the
+  measurement fixes; bookkeeping). Body edits: the three literature nulls read REJECTED in the
+  hypothesis ledger (deferred since v1.5); `docs/PROTOCOL_2026.md` reads 8 betting slots (v1.8);
+  the brief says the pause switch is off and the personal ledger ON. No code changed.
+
+- **2026-10-11 UTC (THE COMPLETE REASSESSMENT; `docs/program/REVIEW_2026-10.md`).** Tate asked for a
+  ground-up review of mission, strategy, hypotheses, results, data, infrastructure and business,
+  as an independent researcher, with questions grouped and answered before any change. Read-only:
+  live Neon reads, three repo sweeps, five Kalshi research lanes, his own Kalshi report
+  reconciled. Nothing in the repo or the database changed during the review.
+  - **What the evidence said:** every ledger (real, paper, every arm, the retired over arms)
+    reads −3% to −6% against the consensus close — the vig; real money 12-14, −1.43u on 26
+    tickets, 12 unjudgeable (`stale_close`); six of eight arms are unders variants and three ride
+    a model that is worse than the market on 2026 data; the two structural arms (slots 4-5) have
+    no design; stored `clv` is a median that includes Hard Rock's own late alternates and
+    `clv_prob` never reads the ticket's price; the stop rule was replaced twice then dropped; the
+    backtest is not the rule that is bet; ~$50/month but 87 scripts, 20 workflows, 30 tables,
+    20K doc lines and 17 incidents since 09-01. Kalshi: lawful from Florida today, not a softer
+    price (−110 to −121 all-in as a taker, a mirror of the books), unique for line shopping, no
+    winner limits and a free maker side on 1H totals; its data terms keep its prices off the site.
+  - **Tate's calls (sixteen, Part 2 of the review doc):** the objective is personal proof at Hard
+    Rock; every arm runs unchanged to January (readings only); +3% one-season target stays for
+    2026, re-decided in January; Kalshi is measured first on data already in `odds_snapshots`;
+    the next build is Hard Rock off-market capture; the personal ledger continues and the site's
+    mission line is scoped to promoted rules; the site is a public record and nothing more; the
+    cut list is accepted (offline backtest engine + four finished gate workflows + orphan
+    scripts, post-mortem tables and factor ledger, GitHub cron backups, owner-only site
+    sections); one committed review doc under `docs/program/`. Roadmap v2.0 follows as its own PR.
+  - The 2026-10-09 strategic review (topics 1-3 closed) was committed verbatim as Part 1; it had
+    lived untracked in the `strategy-review` worktree.
+
+## 2026-10-10
+
+- **2026-10-10 UTC (H-ARM-HT1H REGISTERED, ROADMAP v1.8).** Tate asked whether games with higher
+  totals had done better.
+  - **The answer:** yes in 2023-25. First-half unders at the real consensus close went 154-110-4
+    (58.3%, n 268) where the full-game total was 60 or more (`docs/POST_MORTEM.md`). The pattern
+    was found by slicing after the fact, and 2026 is too thin to say.
+  - **Tate's calls:**
+    - test it forward as a paper arm: first-half UNDERS on every game whose consensus full-game
+      total at the build is 60.0 or more, at Hard Rock's price;
+    - the consensus uses the judge's books: every centred book except Hard Rock, Fliff and the
+      synthetic consensus, at least 3;
+    - ledger slot 8, with its clock starting at its first eligible build (it reads no model);
+    - the cap on paper arms rises from 7 to 8.
+  - **Order:** the row comes before the collector (`beatvegas/ht_paper.py`, its own PR). The
+    literature-nulls amendment moves to v1.9.
+
+- **2026-10-10 UTC (H-MODEL-FIX NOT MET; MODEL WORK STOPS).** One `study.yml` dispatch
+  (run 38070611660, branch `model/fix-2026-10` at 1e6bce5; `docs/MODEL_FIX.md`).
+  - **Result:** with the four fixes, the champion's first-half number was less accurate:
+    - Δ|err| +0.163 [+0.025, +0.294] against the +0.10 margin, over 760 games graded at a real
+      consensus 1H close;
+    - worse in 2025 (8.85 → 9.02) and in 2026 (7.98 → 8.10);
+    - more often 6+ points from the close (19 games against 8).
+  - **The live champion is level with the close** on those games (8.69 against 8.72).
+  - **Disclosed after the run:** the incumbent's 2025 test games saw the 2025 bowls (week-ordered,
+    as live trains). The candidate's deficit was larger on the games the bowls could not touch, so
+    the flaw does not explain the verdict.
+  - **Tate's calls:**
+    - model work stops and the live model stays;
+    - arms 1-3 start their clocks at the 2026-10-13 card on the 2026-10-11 refit;
+    - PR #351 keeps the study re-runnable with every switch off live, and states early stopping as
+      `'auto'` (sklearn's default, unchanged);
+    - each refit records the trees it grew in `model_runs.metrics`;
+    - next comes the 60+ first-half-unders arm, triggered on the judge's books.
+
+- **2026-10-10 UTC (H-MODEL-FIX REGISTERED).** After the 2003+ switch, the champion's number
+  tracked a raw early-season scoring projection (week 6: correlation 0.76, was 0.26; Georgia @
+  Alabama 34.8 against Hard Rock's 25.5). Four defects were found read-only:
+  - every bowl game (836, 2003-25) is filed as week 1, so the week-ordered season-to-date means
+    let a bowl result into every later regular-season mean of its own season;
+  - pre-2015 seasons lack most richer inputs;
+  - sklearn's `early_stopping='auto'` switched on silently above 10,000 rows;
+  - early averages carry no shrinkage.
+
+  Tate's calls: fix the model first, then market rules; test the four fixes together against the
+  live champion and adopt on a pass; start the arms' clocks as soon as possible (if the fix lands
+  after Tuesday's card, the arms restart free before the first Monday read). The row comes before
+  the script (`scripts/model_fix_study.py`).
+
+- **2026-10-10 UTC (THE BOARD OPENS TO VISITORS, ROADMAP v1.7).** Tate's friends opened the site
+  and saw an empty board. Every pre-kickoff rating read "Rating publishes at kickoff." (the
+  2026-10-07 publication rule, `lib/signalGate.ts`), under two build warnings left by the failed
+  `sat_am` build.
+  - **Tate's calls:**
+    - a visitor sees the board and game page as the owner does, ratings before kickoff included,
+      in paper wording ("Paper signal", never "Bet one unit");
+    - the owner's "bet logged" chip stays his until kickoff;
+    - "Florida, 21+" goes on the site banner;
+    - the build warnings ("card built Nh ago", "build did not run") are owner-only;
+    - ship as soon as CI passes.
+  - **Unchanged:** the bet ledger, `/records` and both CSVs keep withholding a game until kickoff.
+  - **Code:** `signalGate.gateGame` no longer blanks a game, so `HIDDEN_ACTION`, `hidesSignal` and
+    `HomeGame.signalHidden` are gone.
+  - **Roadmap:** this is v1.7; the literature-nulls proposal for the 10-12 review becomes v1.8.
+
+- **2026-10-10 UTC (THE SATURDAY CARD TIMED OUT; THE WEATHER CAPTURE IS SCOPED AND CAPPED).** The
+  `sat_am` build (`card.yml` run 38049849474, dispatched 11:50Z) was cancelled at the job's 30-minute
+  limit with no card written. Its build step ran 18+ minutes; Friday's, the last build before #345,
+  took 4 seconds.
+  - **Cause:** #345's `wx_paper.capture` fetched an Open-Meteo forecast for every game of the week, all
+    divisions (254 games, 245 venue-day calls, each with a 60 s timeout and the four-try retry ladder),
+    one after another inside the card's database transaction. The arms' savepoint catches errors, not
+    slowness, so the timeout lost the whole build, the other arms' rows included. The run's output was
+    still buffered when it was cancelled, so its log showed none of the build step.
+  - **Effect:** week 6 has no `sat_am` card; the board and real-money verdicts stayed on Friday's card.
+    The two weather arms, whose backstop clock began 2026-10-10 00:00Z, logged nothing for week 6, and
+    first-log-wins means nothing is backfilled. Arms 1-3 had logged the week's games at Friday's build.
+  - **Fix (#348, Tate's choice of four):**
+    - the capture fetches only the games either weather arm can log (`wx_paper.arm_game_ids`: the
+      card's Hard Rock first-half items plus the week's Hard Rock full-game totals; 57 games and 55
+      calls in week 6), earliest kickoff first;
+    - each call is capped at 10 s and 2 tries, the whole capture at 180 s; a game past the cap
+      counts as failed, and the card summary names it;
+    - a timing line goes to stderr unbuffered, and `card.yml` sets `PYTHONUNBUFFERED=1`.
+  - **Docs:** the registry rows H-ARM-WX1H / H-ARM-WXFG and `docs/PROTOCOL_2026.md` carry a dated
+    implementation note (Tate's call); which games qualify is unchanged.
+  - **Measured from this Mac** against the live API on week 6's 45 remaining priced games: 44 calls in
+    30 s, none failed. Tuesday's `tue_pm` build is the first production proof; a manual dispatch runs
+    `--no-paper` and skips the capture.
+  - **Open (Tate's call):** whether the weather arms' lost first Saturday needs a protocol note.
+
 ## 2026-10-06
 
 - **2026-10-09 UTC (H-WX-HIST / H-JUDGE FIRST RUNS READ NO LINE VALUE: A MARKET-NAME BUG).** `study.yml`

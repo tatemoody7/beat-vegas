@@ -46,7 +46,6 @@ export type LedgerRow = {
   priceProvenance: string | null;
   /** Stored `closing - bet`: NEGATIVE is the good direction for an under. */
   clv: number | null;
-  clvProb: number | null;
   /** EV at the wager's exact terms against the vig-free consensus close
    *  (docs/CONSENSUS.md, `ev_cons`): POSITIVE is good, 0.021 = +2.1%. Written
    *  at grading, so it never exists before kickoff. */
@@ -195,7 +194,6 @@ export const BETS_CSV_HEADER = [
   "closing_price",
   "clv_points_stored",
   "line_value_displayed",
-  "clv_prob",
   "note",
 ].join(",");
 
@@ -233,7 +231,6 @@ export function betsToCsv(season: number, rows: LedgerRow[]): string {
       r.closingPrice,
       r.clv,
       displayLineValue(r.clv),
-      r.clvProb,
       r.note,
     ]
       .map(csvCell)

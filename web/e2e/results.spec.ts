@@ -186,7 +186,7 @@ test.describe("results", () => {
     );
     const lines = (await res.text()).trim().split("\n");
     expect(lines[0]).toBe(
-      "season,week,placed_at_utc,bet_at_utc,kickoff_utc,ledger,away,home,market,bet,line,price,stake,bonus,book,price_provenance,verdict_at_pick,reason,gap_at_pick,model_line_at_pick,away_1h,home_1h,first_half_total,result,units,closing_line,closing_price,clv_points_stored,line_value_displayed,clv_prob,note",
+      "season,week,placed_at_utc,bet_at_utc,kickoff_utc,ledger,away,home,market,bet,line,price,stake,bonus,book,price_provenance,verdict_at_pick,reason,gap_at_pick,model_line_at_pick,away_1h,home_1h,first_half_total,result,units,closing_line,closing_price,clv_points_stored,line_value_displayed,note",
     );
     expect(lines.length - 1).toBe(expected.picks.length);
     expect(lines.filter((l) => l.includes(",real,"))).toHaveLength(

@@ -20,6 +20,17 @@ hold the rest.
   (one book's own close, the closing PRICE) is unchanged. `grade.yml` gains a `regrade` input
   (`pick.py --regrade`, forces the probe) for the one-time recompute; the before/after per ticket is
   in PR #357's body. The arms read `ev_cons`, so no clock moves. Tate's call: fix now, show the table.
+- **2026-10-11 UTC (H-JUDGE AND H-WX-HIST READ, ONE LOOK EACH).** Re-dispatched after #347 fixed the
+  market-name bug that had emptied their line-value readings (Tate's call: dispatch both).
+  **H-JUDGE** (run 38147535009): does the judge's line value predict returns? First half 2023-25,
+  3,664 bets: mean predicted −4.47% against realized −4.48%; slope 0.48 (−0.14 to 1.15), intercept
+  −2.33%; the top quintile (predicted +2.7%) realized +0.35% (−5.97 to +6.48). The sign is right on
+  average; the slope sits below one with an interval spanning 0 and 1, so a +3% reading has
+  realized about +0.4% in this sample. **H-WX-HIST** (run 38147537131): windy (10+ mph, 72-hour
+  forecast) first-half unders read −3.56% line value against calm −4.82% (the market moves about 1.3
+  points of EV toward the under before kickoff, short of the vig) and 90-95-2 against the close;
+  full game 94-92-4. Not an edge at the close; the pre-close move is what H-ARM-WX1H measures
+  forward. Both exploratory; nothing adopted; the rows carry the numbers.
 
 - **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
   board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),

@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (H-LIT-COX READ: NOT MET, FINAL).** `study.yml` run 38170624665 at afbf045, the
+  one dispatch: on 2019-2025 trophy games the favourite that had won the last three meetings went
+  72-75-4 (147 graded of 529, 49.0%), p 0.818 against 52.38%, Holm-adjusted 1.000, units −9.55 at
+  −110; final, since a raw p above 5% cannot pass at any Holm step. All four looks run (Arscott, TV,
+  Bennett, Cox) read NOT MET; the family table over the four JSON reports prints 1.000 for each;
+  Coleman and Salaga stay parked (roadmap v2.1). Descriptive only: every trophy favourite 51.2%
+  on 512, the G5-vs-G5 underdog 50.3% on 195, the streak underdog 36.2% on 47; 2022 was 7-16.
+  The registry row is tested-null; `docs/LITERATURE.md` holds the table. CFBD calls left 73,780.
+
 - **2026-10-11 UTC (ROADMAP v2.1: THE ALIGNMENT CALLS, THE JANUARY TEMPLATE).** The evening Q&A after
   the October review, logged as one versioned amendment (`docs/ROADMAP_2026.md` v2.1) with the
   templates in `docs/program/JANUARY_2027_REVIEW.md`: one Monday sitting on a one-page read (arms

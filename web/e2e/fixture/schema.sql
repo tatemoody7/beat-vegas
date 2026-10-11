@@ -696,7 +696,10 @@ CREATE TABLE public.odds_snapshots (
     home_price integer,
     away_price integer,
     captured_at timestamp without time zone,
-    last_seen_at timestamp without time zone
+    last_seen_at timestamp without time zone,
+    event_id character varying,
+    feed_updated_at timestamp without time zone,
+    feed_reseen_at timestamp without time zone
 );
 
 --

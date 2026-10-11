@@ -388,6 +388,19 @@ class OddsSnapshot(Base):
     # number unchanged leaves no row; it stamps the moment it re-confirmed this
     # one instead. lines.closing_before_kickoff reads it as the close time.
     last_seen_at = Column(DateTime)
+    # Capture provenance (2026-10-11, docs/program/CAPTURE_DESIGN_2026-10.md).
+    # Three stamps, three meanings: `captured_at` is OUR first poll that saw
+    # this price state; `last_seen_at` is our last poll that still saw it
+    # unchanged; `feed_updated_at` is The Odds API's `last_update` for the quote
+    # at that first capture -- the PROVIDER's last observation of the book, not
+    # when the book posted it, and never overwritten. A later poll that finds
+    # the same price under a newer provider stamp records that stamp in
+    # `feed_reseen_at` (the newest such stamp), so the original freshness
+    # reading survives. Availability in the Florida app is a fourth fact no
+    # column holds. `event_id` is the feed's own key for the event.
+    event_id = Column(String)
+    feed_updated_at = Column(DateTime)
+    feed_reseen_at = Column(DateTime)
 
 
 class Prediction(Base):

@@ -109,8 +109,15 @@ concurrency:
 # day, so a slot whose only kickoffs sat 76-119 min out was skipped by the check
 # the widening existed for). Vercel Hobby ticks can be 119 min apart; 120 still
 # reaches every kickoff inside the registered 2 h close window, 130 would not.
+# Since 2026-10-11 (docs/program/CAPTURE_DESIGN_2026-10.md) the Saturday ticks
+# look 6 hours ahead instead: the resolve step picks CLOSE_LOOKAHEAD_MIN_SAT for
+# a tick inside Saturday's window (14Z Saturday to 05Z Sunday), and the pre-check
+# and the poll read the chosen value from the same step output, so the two can
+# never disagree again. Weeknights keep 120 (one or two games, the question is
+# a Saturday one). The judge's 2-hour close window does not move.
 env:
   CLOSE_LOOKAHEAD_MIN: 120
+  CLOSE_LOOKAHEAD_MIN_SAT: 360
 
 jobs:
   watch:
@@ -152,7 +159,16 @@ jobs:
             *) echo "::error::unknown market '$market'"; exit 1 ;;
           esac
           echo "market=$market" >> "$GITHUB_OUTPUT"
-          echo "resolved market=$market (schedule='$SCHEDULE')"
+          # The close look-ahead for THIS tick: Saturday's window (UTC Saturday
+          # from 14Z, or UTC Sunday before 05Z) reads 6 h ahead, else 2 h.
+          dow=$(date -u +%u); hour=$(date -u +%H)
+          if { [ "$dow" = "6" ] && [ "$hour" -ge 14 ]; } || { [ "$dow" = "7" ] && [ "$hour" -lt 5 ]; }; then
+            lookahead="$CLOSE_LOOKAHEAD_MIN_SAT"
+          else
+            lookahead="$CLOSE_LOOKAHEAD_MIN"
+          fi
+          echo "lookahead=$lookahead" >> "$GITHUB_OUTPUT"
+          echo "resolved market=$market (schedule='$SCHEDULE') lookahead=${lookahead}min"
           # The run's clock for the health contract (last step): every fact it
           # checks must have been written after this instant.
           echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
@@ -161,6 +177,7 @@ jobs:
         if: steps.resolve.outputs.market == '1h_close'
         env:
           KEY: ${{ secrets.ODDS_API_KEY }}
+          CLOSE_LOOKAHEAD_MIN: ${{ steps.resolve.outputs.lookahead }}
         run: |
           now=$(date -u +%s)
           until=$(( now + CLOSE_LOOKAHEAD_MIN*60 ))
@@ -194,6 +211,8 @@ jobs:
       - name: 1H per-game close (games kicking off within CLOSE_LOOKAHEAD_MIN)
         id: close
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
+        env:
+          CLOSE_LOOKAHEAD_MIN: ${{ steps.resolve.outputs.lookahead }}
         # --status-file records the poll's COVERAGE (events in the window,
         # events polled, credits) for the health contract below.
         run: python scripts/poll_lines.py --hr-universe --kickoff-within-min "$CLOSE_LOOKAHEAD_MIN" --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"

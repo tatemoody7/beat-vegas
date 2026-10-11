@@ -39,7 +39,28 @@ Two nullable columns on `odds_snapshots` (`beatvegas/db/models.py::OddsSnapshot`
 | column | type | meaning |
 |---|---|---|
 | `event_id` | VARCHAR | The Odds API's event id for the row (the feed's own key) |
-| `book_updated_at` | TIMESTAMP (naive UTC) | the bookmaker's `last_update` for that market, as the feed reports it |
+| `feed_updated_at` | TIMESTAMP (naive UTC) | the feed's `last_update` for that market at FIRST capture of this price state; never overwritten |
+| `feed_reseen_at` | TIMESTAMP (naive UTC) | the newest feed `last_update` seen while the price stayed unchanged, when it differs from the first |
+
+**Correction (Tate, 2026-10-11, before implementation):** the note first called the column
+`book_updated_at`. The Odds API's `last_update` is when the PROVIDER last observed the
+bookmaker's odds, not when the bookmaker changed them, so the column is named for what it is.
+Three stamps, three meanings, and a fourth fact no column holds:
+
+| stamp | set by | means | does not mean |
+|---|---|---|---|
+| `feed_updated_at` | the provider | its last observation of the quote, at our first capture | when Hard Rock posted the price |
+| `captured_at` | us | our first poll that saw this price state | when the price appeared |
+| `last_seen_at` | us | our last poll that still saw it unchanged | that it stood continuously in between |
+| the Florida app | Tate | a screenshot or a ticket | — |
+
+Two polls seeing the same price prove it was quoted at both instants, not that it was available
+between them; the reader owns that distinction. A missing or unparseable stamp is NULL, never
+invented (`beatvegas/sources/odds.py::parse_feed_stamp`); a stamp more than ten minutes ahead of
+our own clock is reported in the run log and kept. Rows written before the columns existed keep
+`feed_updated_at` NULL for good: it means "at first capture" or nothing; stamps seen on later
+re-sightings of those rows go to `feed_reseen_at`. The shared logic is
+`beatvegas/snapshots_provenance.py`.
 
 Rows written before the change stay NULL; nothing reads the columns on the site, so
 `web/prisma/schema.prisma` is untouched (the app reads `odds_snapshots` by raw SQL, and only the
@@ -48,20 +69,20 @@ columns it names).
 ### Writers (one line each)
 
 - `scripts/poll_lines.py` (1H): the `OddsSnapshot(...)` at the end of the match loop gains
-  `event_id=r["event_id"], book_updated_at=_naive_utc(r["last_update"])`; the re-sighting branch
-  (`prev.last_seen_at = ...`) also refreshes `prev.book_updated_at` when the feed's stamp moved,
-  so a frozen quote and a re-confirmed one stay distinguishable.
+  `event_id` and `feed_updated_at`; the re-sighting branch (`prev.last_seen_at = ...`) calls
+  `note_reseen`, which leaves the first stamp alone and records a newer one in `feed_reseen_at`.
 - `scripts/poll_full_game.py` (three `OddsSnapshot(...)` sites: totals, spreads, moneylines):
   the same two fields.
-- `_naive_utc` parses the feed's ISO-8601 `Z` stamp to a naive UTC `datetime` (the project's
-  convention: naive UTC everywhere, `Z` appended only at the display edge).
+- `parse_feed_stamp` (`beatvegas/sources/odds.py`) parses the feed's ISO-8601 stamp to a naive UTC
+  `datetime` (the project's convention) or None.
 - The two history backfills (`backfill_1h_history.py`, `backfill_fg_history.py`) are not touched:
   their source rows carry no update stamp.
 
 ### The Saturday poll
 
-`CLOSE_LOOKAHEAD_MIN` 120 → **360** for the Saturday ticks only (`lines_watch.yml` env, read by the
-precheck and the poll step). Each Vercel tick (one per UTC hour, 14Z–04Z, 15 entries) then polls
+`CLOSE_LOOKAHEAD_MIN` 120 → **360** for the Saturday ticks only: the workflow's resolve step picks
+`CLOSE_LOOKAHEAD_MIN_SAT` for a tick inside Saturday's window (14Z Saturday to 05Z Sunday) and both
+the precheck and the poll read that one step output, so they cannot disagree. Each Vercel tick (one per UTC hour, 14Z–04Z, 15 entries) then polls
 every Hard Rock-priced game kicking off in the next 6 hours, so a game is read about six times
 inside its last six hours instead of about twice inside two. Weeknight ticks keep 120: the
 weeknight slate is one or two games and the question is a Saturday one.
@@ -113,3 +134,15 @@ honest version of "denser".
    per tick stays under the cap; `close_coverage_pct` unchanged (1.000 on 10-10).
 5. One `study.yml` read the following Monday (a development read, no row): rows per game inside
    6 h, before and after.
+
+## Implemented 2026-10-11 (Step 1 of the pricing-inefficiency programme)
+
+Shipped as one PR with the corrections above, plus `scripts/probe_hr_keys.py`: a by-hand probe
+that asks the feed for `hardrockbet` and `hardrockbet_fl` together with the keys left as spelled
+(the capture folds every state key into `hardrockbet`; the Odds API's bookmaker table calls that
+key the Indiana book, "currently same odds as several other states"). One matching slate proves
+nothing beyond that slate; any Florida-specific research must cite verified Florida data. The
+scheduler fact, checked on 2026-10-11 over the last 40 `lines_watch` runs: 28 were Vercel
+`workflow_dispatch` ticks (`lines-close` / `close-weeknight`) and 12 were GitHub `schedule`
+runs, so both schedulers write rows; the resolve step chooses the look-ahead from the clock, not
+the trigger, so a tick from either reads the same window. Verification steps and the probe's table: `docs/HISTORY.md` 2026-10-11.

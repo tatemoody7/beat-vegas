@@ -120,7 +120,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 |---|---|---|
 | Tue / Thu / Fri, gate 3:45–5:15pm | `card.yml` slots `tue_pm` `thu_pm` `fri_pm` | whole-week 1H sweep + injuries → FINAL card; paper windows 48 h / 24 h / rest of week |
 | Sat, dispatch 7:00–8:15am, gate 7:45–9:15am | `card.yml` slot `sat_am` | same sweep before the morning sitting; paper window rest of week |
-| Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, `CLOSE_LOOKAHEAD_MIN=120`; GitHub's every-30-min crons stay |
+| Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, 6 h look-ahead on Saturday ticks (`CLOSE_LOOKAHEAD_MIN_SAT=360`, since 2026-10-11; weeknights 120); GitHub's every-30-min crons stay |
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
 | Daily 10Z (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
@@ -207,6 +207,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (the offline backtest engine and
   its tools went 2026-10-11, roadmap v2.0).
+- **Probes**: `probe_hr_keys` (one-off, by hand: `hardrockbet` vs `hardrockbet_fl` with the feed's
+  raw keys and stamps kept; prints the credits it spent; writes nothing).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +
   `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.

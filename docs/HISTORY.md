@@ -9,6 +9,30 @@ hold the rest.
 
 ## 2026-10-11
 
+- **2026-10-11 UTC (CAPTURE STEP 1: THE FEED'S STAMPS AND EVENT IDS, A 6-HOUR SATURDAY LOOK-AHEAD,
+  THE HARD ROCK KEY PROBE).** The first build of the pricing-inefficiency programme (Tate's approval
+  2026-10-11; `docs/program/CAPTURE_DESIGN_2026-10.md`, corrected). Three nullable columns on
+  `odds_snapshots`: `event_id` (the feed's key), `feed_updated_at` (The Odds API's `last_update` at
+  FIRST capture of a price state, the PROVIDER's last observation, never overwritten) and
+  `feed_reseen_at` (the newest provider stamp seen while the price stayed unchanged); rows written
+  before the columns keep `feed_updated_at` NULL for good. Both pollers write them
+  (`beatvegas/snapshots_provenance.py`: a missing stamp is NULL, a stamp more than ten minutes
+  ahead of our clock is reported and kept). `lines_watch.yml` reads 360 minutes ahead on Saturday
+  ticks (14Z Saturday to 05Z Sunday, chosen by the resolve step from the clock, so the pre-check
+  and the poll cannot disagree) and 120 on weeknights; the judge's 2-hour window is untouched.
+  Scheduler fact: of the last 40 `lines_watch` runs, 28 were Vercel dispatches and 12 GitHub
+  schedule runs; both write rows. **The Florida key probe** (`scripts/probe_hr_keys.py`, run
+  2026-10-11 21:25 UTC, 16 credits measured: 1 bulk `us2` call + 15 per-event calls at 1 each
+  despite two markets): the `us2` region returned `rebet`, `ballybet`, `betparx`, `espnbet`,
+  `courtside`, `hardrockbet` and `betanysports`; **`hardrockbet_fl` appeared in no response**,
+  neither in bulk nor in 15 explicit `bookmakers=hardrockbet,hardrockbet_fl` requests (57
+  Hard Rock full-game totals, 0 Florida rows, 0 first-half totals yet on a Sunday night). So the
+  feed offers one Hard Rock key, which its bookmaker table calls the Indiana book "currently same
+  odds as several other states"; whether the Florida app shows those numbers cannot be settled
+  from the feed, only from Tate's screenshots or a ticket. The provider's stamp sat 54 seconds
+  before our capture on every row of the probe. Nothing about an arm, the judge, the protocol,
+  the ledger, grading or the site changed; no history was bought.
+
 - **2026-10-11 UTC (H-LIT-COX READ: NOT MET, FINAL).** `study.yml` run 38170624665 at afbf045, the
   one dispatch: on 2019-2025 trophy games the favourite that had won the last three meetings went
   72-75-4 (147 graded of 529, 49.0%), p 0.818 against 52.38%, Holm-adjusted 1.000, units −9.55 at

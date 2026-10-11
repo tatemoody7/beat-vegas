@@ -40,6 +40,7 @@ from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
 from beatvegas.hardrock import normalize_book
 from beatvegas.season import current_season
+from beatvegas.snapshots_provenance import feed_stamp_for, note_reseen
 from beatvegas.sources.cfbd import CFBDClient
 from beatvegas.sources.cfbd_lines import full_game_rows as cfbd_full_game_rows
 from beatvegas.sources.draftkings import (
@@ -306,6 +307,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             line = r["line"]
             if prev is None and r.get("line_open") is not None:
                 line = r["line_open"]
+            stamp = feed_stamp_for(r, now)
             if _changed(prev, line, r.get("spread"), r["over_price"], r["under_price"]):
                 s.add(
                     OddsSnapshot(
@@ -317,6 +319,8 @@ def main(argv: Optional[List[str]] = None) -> None:
                         over_price=r["over_price"],
                         under_price=r["under_price"],
                         captured_at=now,
+                        event_id=r.get("event_id"),
+                        feed_updated_at=stamp,
                     )
                 )
                 written_fg += 1
@@ -329,6 +333,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                 # on it). Without this, an unmoved full-game line could never
                 # grade as a close inside REAL_FG_CLOSE_WINDOW_H.
                 prev.last_seen_at = now
+                note_reseen(prev, stamp)
                 skipped += 1
             # Remember the best-book row per game (not feed order): the Game
             # update below must not depend on which book happened to come last.
@@ -368,6 +373,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             seen_side.add((gid, r["book"], r["market"]))
             prev = _latest_snapshot(s, gid, r["book"], r["market"])
             home, away = r.get("home_price"), r.get("away_price")
+            stamp = feed_stamp_for(r, now)
             if _changed(prev, r["line"], None, None, None, home=home, away=away):
                 s.add(
                     OddsSnapshot(
@@ -378,11 +384,14 @@ def main(argv: Optional[List[str]] = None) -> None:
                         home_price=home,
                         away_price=away,
                         captured_at=now,
+                        event_id=r.get("event_id"),
+                        feed_updated_at=stamp,
                     )
                 )
                 written_side[r["market"]] += 1
             else:
                 prev.last_seen_at = now
+                note_reseen(prev, stamp)
 
         seen_h1: set = set()
         for r in h1_rows:
@@ -391,6 +400,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                 continue
             seen_h1.add((gid, r["book"]))
             prev = _latest_snapshot(s, gid, r["book"], "1H_total")
+            stamp = feed_stamp_for(r, now)
             if _changed(prev, r["line"], None, r["over_price"], r["under_price"]):
                 s.add(
                     OddsSnapshot(
@@ -401,9 +411,14 @@ def main(argv: Optional[List[str]] = None) -> None:
                         over_price=r["over_price"],
                         under_price=r["under_price"],
                         captured_at=now,
+                        event_id=r.get("event_id"),
+                        feed_updated_at=stamp,
                     )
                 )
                 written_h1 += 1
+            else:
+                prev.last_seen_at = now
+                note_reseen(prev, stamp)
 
     print(
         f"source={source} dk_events={dk_events} "

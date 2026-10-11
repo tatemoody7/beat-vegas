@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -36,6 +37,33 @@ from ..hardrock import normalize_book
 # per-event call naming <= 10 books costs the same as a single-region call.
 # Naming an 11th quietly doubles it (see OddsAPIClient.__init__).
 MAX_BOOKMAKERS_ONE_REGION = 10
+
+
+def parse_feed_stamp(value: Any) -> Optional[datetime]:
+    """The feed's ISO-8601 `last_update` ("2026-10-10T15:04:05Z", or with an
+    offset) as a NAIVE UTC datetime, the project's convention. None for a
+    missing or unparseable value: a stamp is never invented, and a row without
+    one carries NULL so no reader can mistake it for a fresh observation. The
+    stamp is the PROVIDER's last observation of the bookmaker's odds, not the
+    bookmaker's own change time (The Odds API docs; Tate 2026-10-11)."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        s = str(value).strip()
+        if not s:
+            return None
+        if s.endswith("Z") or s.endswith("z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
 
 # Retries, mirroring sources/cfbd.py. The FREE data source retried and the PAID
 # one did not, so a single transient 429/5xx mid-sweep failed the whole card
@@ -263,6 +291,27 @@ class OddsAPIClient:
         resp = self._get(url, params)
         if resp.status_code == 404:
             return {}  # event has no odds posted yet
+        _raise_for_status(resp)
+        return resp.json()
+
+    def event_odds_raw(self, event_id: str, markets: str, bookmakers: List[str]) -> Dict[str, Any]:
+        """One per-event odds call with an EXPLICIT bookmaker list and the
+        bookmaker keys left as the feed spells them (no normalize_book), for
+        probes that must tell `hardrockbet` from `hardrockbet_fl`. Billed
+        (markets x 1) credits: the list is one region. Nothing writes from it."""
+        if len(bookmakers) > MAX_BOOKMAKERS_ONE_REGION:
+            raise ValueError("more than one region's worth of bookmaker keys")
+        url = f"{self.base_url}/sports/{self.sport}/events/{event_id}/odds"
+        params = {
+            "apiKey": self.api_key,
+            "markets": markets,
+            "oddsFormat": self.odds_format,
+            "dateFormat": "iso",
+            "bookmakers": ",".join(bookmakers),
+        }
+        resp = self._get(url, params)
+        if resp.status_code == 404:
+            return {}
         _raise_for_status(resp)
         return resp.json()
 

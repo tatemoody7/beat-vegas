@@ -74,13 +74,13 @@ def _predictions(session, game_ids: List[int], version: str) -> Dict[int, Predic
     return {int(p.game_id): p for p in rows}
 
 
-def _logged_this_week(session, season: int, week: int) -> List[int]:
+def _logged_this_week(session, season: int, week: int, arm: str = ARM) -> List[int]:
     """Game ids the arm already logged this week, in placed order. Each holds
     its cap slot: a decision made Thursday is not undone Saturday."""
     rows = (
         session.query(ChallengerPick.game_id)
         .filter(
-            ChallengerPick.arm == ARM,
+            ChallengerPick.arm == arm,
             ChallengerPick.market == MARKET,
             ChallengerPick.season == int(season),
             ChallengerPick.week == int(week),
@@ -138,21 +138,30 @@ def universe(session, season: int, week: int, now: datetime) -> List[Dict[str, A
 
 
 def select(
-    items: List[Dict[str, Any]], logged: List[int], cap: int = WEEKLY_BET_CAP
+    items: List[Dict[str, Any]],
+    logged: List[int],
+    cap: Optional[int] = WEEKLY_BET_CAP,
+    require_positive: bool = False,
 ) -> Dict[str, Any]:
     """The champion's rule on the full-game gap: qualify at or above the slate
     bar (ties qualify), then rank the not-yet-logged qualifiers by gap (desc),
     kickoff, away team behind the slots the week's logged rows already hold.
     Every item gets `qualifies` and, if it qualifies, `cap_rank`; `selected`
-    is the cap_rank <= cap set. Pure: no database, no clock."""
+    is the cap_rank <= cap set, or every fresh qualifier when `cap` is None
+    (H-ARM-FGU, uncapped). `require_positive` adds gap > 0 (H-ARM-FGU, the
+    mirror of the first-half unders arm). Pure: no database, no clock."""
     bar = slate_bar([it["gap"] for it in items])
     done = set(logged)
     used = len(done)
-    quals = [it for it in items if bar is not None and it["gap"] >= bar]
+
+    def ok(it: Dict[str, Any]) -> bool:
+        return bar is not None and it["gap"] >= bar and (not require_positive or it["gap"] > 0)
+
+    quals = [it for it in items if ok(it)]
     fresh = [it for it in quals if it["game_id"] not in done]
     fresh.sort(key=lambda it: (-it["gap"], it["kick"] or datetime.max, it["away"] or ""))
     for it in items:
-        it["qualifies"] = bar is not None and it["gap"] >= bar
+        it["qualifies"] = ok(it)
         it["cap_rank"] = None
     for i, it in enumerate(fresh):
         it["cap_rank"] = used + i + 1
@@ -161,7 +170,7 @@ def select(
         "n": len(items),
         "qualifying": len(quals),
         "held": used,
-        "selected": [it for it in fresh if it["cap_rank"] <= cap],
+        "selected": [it for it in fresh if cap is None or it["cap_rank"] <= cap],
     }
 
 
@@ -197,17 +206,21 @@ def log_fg_picks(
     card: Dict,
     now: datetime,
     window_hours: Optional[float] = None,
+    arm: str = ARM,
+    cap: Optional[int] = WEEKLY_BET_CAP,
+    require_positive: bool = False,
 ) -> Dict[str, Any]:
     """Insert this build's paper full-game UNDERS. Mirrors
     scripts/build_card.py::log_paper_picks: the same paper window (a selected
     game kicking off beyond `window_hours` waits for the next build, its rank
     unchanged), one row per game (a row already on file is never re-logged).
     Returns {"added", "universe", "bar", "qualifying", "held"}. Never touches
-    `manual_picks`."""
+    `manual_picks`. H-ARM-FGU (2026-10-08) calls it with its own `arm`,
+    `cap=None` and `require_positive=True`."""
     season, week = int(card["season"]), int(card["week"])
     items = universe(session, season, week, now)
-    logged = _logged_this_week(session, season, week)
-    sel = select(items, logged)
+    logged = _logged_this_week(session, season, week, arm)
+    sel = select(items, logged, cap=cap, require_positive=require_positive)
     added = 0
     for it in sel["selected"]:
         kick = it["kick"]
@@ -217,7 +230,7 @@ def log_fg_picks(
         p = it["pred"]
         add_challenger_pick(
             session,
-            arm=ARM,
+            arm=arm,
             game_id=it["game_id"],
             season=season,
             week=week,
@@ -263,4 +276,20 @@ def summary_line(stats: Optional[Dict[str, Any]], enabled: bool) -> str:
     return (
         f"{tag}: universe {stats['universe']}, bar {bar}, {stats['qualifying']} qualify, "
         f"{stats['held']} held this week, +{stats['added']} logged"
+    )
+
+
+def arm_summary_line(stats: Optional[Dict[str, Any]]) -> str:
+    """The card summary's line about the registered full-game arm H-ARM-FGU."""
+    from .protocol import ARM_FG_UNDER
+
+    tag = f"  ARM {ARM_FG_UNDER} (paper full-game unders, uncapped)"
+    if not stats:
+        return f"{tag}: not run"
+    if not stats["universe"]:
+        return f"{tag}: no game with a Hard Rock full-game price and a bv_fg_v1 read"
+    bar = "—" if stats["bar"] is None else f"{stats['bar']:.2f}"
+    return (
+        f"{tag}: universe {stats['universe']}, bar {bar}, "
+        f"{stats['qualifying']} qualify, +{stats['added']} logged"
     )

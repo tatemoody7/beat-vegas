@@ -222,7 +222,10 @@ def test_card_row_written_and_every_qualifying_game_becomes_a_paper_pick(env):
     assert p.model_line_at_pick == 22.4 and p.model_score_at_pick is None
     assert p.season == SEASON and p.week == WEEK and p.placed_at == NOW
     assert p.home_team == "Missouri" and p.away_team == "Kansas"
-    assert p.note.startswith("card 2026-09-18 [none]: Paper signal")
+    assert p.note.startswith("card 2026-09-18 [none]: Bet one unit")
+    # Every paper pick is a reading for the registered arm H-ARM-1HU (2026-10-08),
+    # the price-blocked qualifier included (arm 1 counts every qualifier).
+    assert p.arm == "H-ARM-1HU" and q.arm == "H-ARM-1HU"
     chips = json.loads(p.factors_json_at_pick)["chips"]
     assert chips["total_band"] == "45–52" and chips["hook_side"] == "key+0.5"
     assert chips["tier"] == "BET" and chips["cap_rank"] == 1
@@ -584,7 +587,7 @@ def test_step_summary_lists_the_bets(env, tmp_path, monkeypatch):
     assert "## Bet card 2026 wk3" in text
     assert "**1 BET · 2 EDGE · 1 PASS**" in text
     assert (
-        "- Paper signal: first-half under 24.5 at -110 on Hard Rock. (Kansas @ Missouri)"
+        "- Bet one unit: first-half under 24.5 at -110 on Hard Rock. (Kansas @ Missouri)"
         " | kill: below u24.5 or worse than -120" in text
     )
 

@@ -47,14 +47,48 @@ def _run_blocks(data: dict):
 
 
 def test_every_neon_writer_shares_the_concurrency_group():
+    """Every JOB that can reach Neon (it, or its workflow, holds DATABASE_URL) is
+    in neon-writers -- through the workflow-level group or its own. Job-level
+    lets a long job that never touches Neon sit outside the queue
+    (weather_actuals.yml's fetch, 2026-10-08) while its writing jobs stay in it."""
     writers = [p for p in _workflows() if _writes_neon(_load(p))]
     assert writers, "expected at least one Neon-writing workflow"
+    checked = 0
     for p in writers:
-        conc = _load(p).get("concurrency") or {}
-        assert conc.get("group") == NEON_GROUP, f"{p.name}: concurrency.group must be {NEON_GROUP}"
-        assert conc.get("cancel-in-progress") is False, (
-            f"{p.name}: cancel-in-progress must be false"
-        )
+        data = _load(p)
+        wf_conc = data.get("concurrency") or {}
+        wf_has_db = "secrets.DATABASE_URL" in yaml.safe_dump(data.get("env") or {})
+        for jname, job in (data.get("jobs") or {}).items():
+            if not (wf_has_db or "secrets.DATABASE_URL" in yaml.safe_dump(job)):
+                continue
+            conc = job.get("concurrency") or wf_conc
+            assert conc.get("group") == NEON_GROUP, (
+                f"{p.name}:{jname}: concurrency.group must be {NEON_GROUP}"
+            )
+            assert conc.get("cancel-in-progress") is False, (
+                f"{p.name}:{jname}: cancel-in-progress must be false"
+            )
+            checked += 1
+    assert checked >= len(writers)
+
+
+def test_weather_actuals_fetches_outside_the_queue_and_writes_inside_it():
+    """The hours of ERA5 fetching hold no DATABASE_URL and no queue slot; the
+    plan and promote jobs, which reach Neon, hold both. Promote runs after a
+    fetch cut off at its limit, but never without a plan."""
+    data = _load(WF_DIR / "weather_actuals.yml")
+    assert "concurrency" not in data  # job-level only, or the fetch would hold it
+    jobs = data["jobs"]
+    fetch = yaml.safe_dump(jobs["fetch"])
+    assert "DATABASE_URL" not in fetch and "concurrency" not in jobs["fetch"]
+    assert "--plan data/cache/weather_actuals_plan.json" in fetch
+    for name in ("plan", "promote"):
+        assert jobs[name]["concurrency"] == {"group": NEON_GROUP, "cancel-in-progress": False}
+        assert "secrets.DATABASE_URL" in yaml.safe_dump(jobs[name]["env"])
+    assert jobs["fetch"]["needs"] == "plan"
+    assert jobs["promote"]["needs"] == ["plan", "fetch"]
+    cond = jobs["promote"]["if"]
+    assert "always()" in cond and "needs.plan.result == 'success'" in cond
 
 
 def test_ci_keeps_its_own_group():
@@ -834,10 +868,12 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
 
 def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_the_job():
     """Since 2026-10-06 the 1h_close run also captures the FULL-GAME close for
-    events inside REAL_FG_CLOSE_WINDOW_H (3 h): one bulk `totals` call over
-    `us,us2` (2 credits a tick). It runs only after a successful 1H close poll,
-    can never redden the job (continue-on-error + --allow-empty), and the
-    health contract stays the last step."""
+    events inside REAL_FG_CLOSE_WINDOW_H (3 h). Since 2026-10-07 (roadmap step
+    4) that one bulk call carries the spread and the moneyline too, with the
+    exchanges: `totals,spreads,h2h` x `us,us2,us_ex` (9 credits a tick). It
+    runs only after a successful 1H close poll, can never redden the job
+    (continue-on-error + --allow-empty), and the health contract stays the
+    last step."""
     data = _load(WF_DIR / "lines_watch.yml")
     steps = data["jobs"]["watch"]["steps"]
     fg = next(s for s in steps if "poll_full_game.py" in str(s.get("run", "")))
@@ -846,8 +882,8 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
     run = fg["run"]
     for flag in (
         "--source oddsapi",
-        "--regions us,us2",
-        "--markets totals",
+        "--regions us,us2,us_ex",
+        "--markets totals,spreads,h2h",
         "--kickoff-within-min 180",
         "--credit-floor",
         "--allow-empty",
@@ -855,6 +891,28 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
         assert flag in run, flag
     assert steps.index(fg) < steps.index(next(s for s in steps if s.get("id") == "health"))
     assert steps[-1].get("id") == "health"
+
+
+def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
+    """Roadmap step 4 (2026-10-07, Tate's calls): the Sunday opener, the
+    card-day refresh and the close ticks all price on `us,us2,us_ex`, and none
+    narrows the markets below poll_full_game's default `totals,spreads,h2h`
+    (the close step names them explicitly). A pull that dropped `us_ex` or the
+    side markets would quietly thin the consensus the judge reads."""
+    pulls = {
+        "sunday.yml": "Capture full-game openers",
+        "card.yml": "Full-game refresh",
+        "lines_watch.yml": "Full-game close",
+    }
+    for wf, prefix in pulls.items():
+        data = _load(WF_DIR / wf)
+        steps = [s for job in data["jobs"].values() for s in job.get("steps", [])]
+        step = next(s for s in steps if s.get("name", "").startswith(prefix))
+        run = step["run"]
+        assert "poll_full_game.py --source oddsapi" in run, wf
+        assert "--regions us,us2,us_ex" in run, wf
+        if "--markets" in run:
+            assert "--markets totals,spreads,h2h" in run, wf
 
 
 def test_every_study_choice_is_in_the_case_line():
@@ -895,15 +953,14 @@ def test_every_vercel_cron_job_input_is_declared_by_its_workflow():
             )
 
 
-def test_neggap_collection_is_switched_on_only_in_the_card_build():
-    """H-NEGGAP-P (2026-09-28): the paper over arms log from the decision builds;
-    no other workflow may set NEGGAP_COLLECT."""
+def test_the_development_collectors_are_retired_everywhere():
+    """H-NEGGAP-P and H-FG-P logged from the decision builds until 2026-10-08,
+    when the registered arms H-ARM-1HO and H-ARM-FGU replaced them (Tate's
+    call): no workflow sets NEGGAP_COLLECT or FG_COLLECT any more."""
     for p in _workflows():
         text = p.read_text()
-        if p.name == "card.yml":
-            assert 'NEGGAP_COLLECT: "1"' in text
-        else:
-            assert "NEGGAP_COLLECT" not in text, p.name
+        for switch in ("NEGGAP_COLLECT:", "FG_COLLECT:"):
+            assert switch not in text, (p.name, switch)
     data = _load(WF_DIR / "study.yml")
     assert "neggap_position" in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
 
@@ -926,6 +983,7 @@ def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():
     assert '--game-id "$GAME_ID"' in one["run"]
     assert "--max-credits-per-run 2" in one["run"]
     assert not INLINE_EXPR.search(one["run"])
+
 
 def test_study_runs_post_mortem_only_as_a_dry_run():
     """study.yml regenerates docs/POST_MORTEM.md read-only (2026-10-07): the run

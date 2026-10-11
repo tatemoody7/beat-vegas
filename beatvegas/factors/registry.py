@@ -193,7 +193,7 @@ _FACTORS: List[Factor] = [
     Factor("home_revenge", "situational", "Home lost the last meeting"),
     Factor("away_revenge", "situational", "Away lost the last meeting"),
     Factor("night_game", "situational", "Night kickoff (>=6pm local)"),
-    Factor("rivalry_game", "situational", "Recurring annual rivalry matchup"),
+    Factor("rivalry_game", "situational", "Named trophy game (frozen list, 2026-10-09)"),
     Factor("conference_game", "situational", "Conference matchup"),
     # --- venue (CFBD /venues; static, leak-free) ----------------------------
     Factor("venue_elevation", "venue", "Stadium elevation (m)"),

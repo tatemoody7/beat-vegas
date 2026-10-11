@@ -2,35 +2,17 @@ import { unitColor } from "@/lib/format";
 import {
   bandTable,
   coverage,
-  dedupeByCode,
-  flagsFrom,
   headline,
   HIST_SCOPE,
-  liveNotesFrom,
-  liveScopeOf,
   loadPostMortem,
   accuracyLine,
   loadModelAccuracy,
   type ModelAccuracy,
 } from "@/lib/postmortem";
-import {
-  BREAKEVEN_PCT,
-  DEFAULT_MIN_GAMES,
-  getLineStudy,
-} from "@/lib/lineStudy";
-import { CALIB_SEGMENT_TEXT, labelOf } from "@/lib/labels";
-import { getBvCalibration, getEdgeStats } from "@/lib/proof";
-import { getRecordSeasons } from "@/lib/records";
-import { viewerIsAuthed } from "@/lib/session";
+import { BREAKEVEN_PCT } from "@/lib/lineStudy";
 import { BET_GAP_PTS, WEEKLY_BET_CAP } from "@/lib/verdict";
-import BandTable from "@/app/components/BandTable";
-import Fold from "@/app/components/Fold";
 import GapLadderChart from "@/app/components/GapLadderChart";
 import Glossary from "@/app/components/Glossary";
-import LineStudyView from "@/app/components/LineStudyView";
-import MinGamesSelect from "@/app/components/MinGamesSelect";
-import PmFlags from "@/app/components/PmFlags";
-import PmLiveNotes from "@/app/components/PmLiveNotes";
 import RecordTable from "@/app/components/RecordTable";
 import { EmptyLine } from "@/app/components/Section";
 import Link from "next/link";
@@ -43,15 +25,16 @@ export const dynamic = "force-dynamic";
 // terms, and the helpline. It took over the research half of the old Track
 // record page (/proof); the ledger half went to Results.
 //
-// Everything a visitor would not need or understand -- the live season's
-// diagnostic strip, the post-mortem's flags and the method fold -- renders
-// only behind the cookie. Nothing here gates a bet.
+// The owner-only research section (the live season's diagnostic strip, the
+// post-mortem's flags, the method fold, the line study) went with roadmap
+// v2.0 (2026-10-11): the site is a public record and nothing more. Everyone
+// reads the same page. Nothing here gates a bet.
 
 const KEYS: { color: string; term: string; text: string }[] = [
   {
     color: "var(--good)",
     term: "Green",
-    text: "a paper signal. The row says the line and price: “Paper signal: first-half under 24.5 at -110 on Hard Rock.” In the 2026 research season a rating publishes at kickoff.",
+    text: "a paper signal. The row says the line and price: “Paper signal: first-half under 24.5 at -110 on Hard Rock.” Since 2026-10-10 a visitor sees every rating before kickoff, in paper wording.",
   },
   {
     color: "var(--warn)",
@@ -65,50 +48,12 @@ const KEYS: { color: string; term: string; text: string }[] = [
   },
 ];
 
-export default async function HowItWorksPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ season?: string; minGames?: string }>;
-}) {
-  const authed = await viewerIsAuthed();
-  const sp = await searchParams;
-  const minGames =
-    sp.minGames && Number(sp.minGames) > 0
-      ? Number(sp.minGames)
-      : DEFAULT_MIN_GAMES;
-  const one =
-    sp.season && sp.season !== "all" && Number.isFinite(Number(sp.season))
-      ? Number(sp.season)
-      : null;
-
-  // The visitor's page needs only the post-mortem. The owner's research
-  // section (behind the cookie) needs the rest; nothing is loaded for a
-  // visitor that they will not see.
+export default async function HowItWorksPage() {
   const [pm, acc] = await Promise.all([loadPostMortem(), loadModelAccuracy()]);
-  const seasons = authed ? await getRecordSeasons() : [];
-  const studySeasons = one !== null ? [one] : seasons;
-  const scopeLabel = one !== null ? `${one}` : "all seasons";
-  const [edge, calib, study] = authed
-    ? await Promise.all([
-        getEdgeStats(one ?? undefined),
-        getBvCalibration(),
-        studySeasons.length > 0
-          ? getLineStudy(studySeasons, minGames)
-          : Promise.resolve(null),
-      ])
-    : [null, null, null];
 
   const runs = pm?.runs ?? [];
   const buckets = pm?.buckets ?? [];
   const hist = runs.find((r) => r.scope === HIST_SCOPE);
-  const liveScope = liveScopeOf(runs);
-  const live = liveScope ? runs.find((r) => r.scope === liveScope) : undefined;
-  const liveSeason = liveScope ? liveScope.replace("live_", "") : "";
-  const ln = liveNotesFrom(live);
-  const flags = dedupeByCode([...flagsFrom(hist), ...flagsFrom(live)]).filter(
-    (f) => f.code !== "multiple_comparisons",
-  );
-  const mc = flagsFrom(hist).find((f) => f.code === "multiple_comparisons");
 
   const lead =
     runs.length > 0
@@ -124,29 +69,7 @@ export default async function HowItWorksPage({
     "real",
     "gap_band",
   );
-  const gapEstimated = bandTable(
-    buckets,
-    HIST_SCOPE,
-    "fbs_only",
-    "step",
-    "gap_band",
-  );
-  const hrVsMarket = liveScope
-    ? bandTable(buckets, liveScope, "live", "hr", "hr_vs_market", "all_hr")
-    : [];
-  const hrVsMarketClose = liveScope
-    ? bandTable(
-        buckets,
-        liveScope,
-        "live",
-        "market_close",
-        "hr_vs_market",
-        "all_hr",
-      )
-    : [];
-  const computed = (hist?.computed_at ?? live?.computed_at ?? "")
-    .slice(0, 16)
-    .replace("T", " ");
+  const computed = (hist?.computed_at ?? "").slice(0, 16).replace("T", " ");
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -323,206 +246,6 @@ export default async function HowItWorksPage({
           1-833-PLAYWISE.
         </p>
       </div>
-
-      {authed && runs.length > 0 && (
-        <section
-          aria-label="Research, signed in"
-          className="mt-12 border-t border-dashed border-[var(--border-strong)] pt-6"
-        >
-          <p className="mb-4 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">
-            Signed in only · research
-          </p>
-
-          {liveScope && (
-            <PmLiveNotes
-              liveSeason={liveSeason}
-              ln={ln}
-              hrVsMarket={hrVsMarket}
-              hrVsMarketClose={hrVsMarketClose}
-            />
-          )}
-
-          <h2 className="mb-2 mt-10 text-sm font-semibold text-[var(--text)]">
-            What to change
-            {computed && (
-              <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                {`computed ${computed} UTC`}
-              </span>
-            )}
-          </h2>
-          {mc && (
-            <p className="mb-2 text-xs leading-relaxed text-[var(--text-dim)]">
-              {mc.text}
-            </p>
-          )}
-          <PmFlags flags={flags} />
-
-          <Fold
-            title="Method and sanity checks"
-            hint="the estimated-line grade, how the number is built, its out-of-sample miss, and which totals go under most"
-          >
-            <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">
-              Against an estimated line
-              <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                no book priced these games; nothing here is coloured
-              </span>
-            </h3>
-            <RecordTable
-              ariaLabel="Records at an estimated line"
-              basis="estimated"
-              rows={[
-                {
-                  key: "cap5",
-                  label: `2023–25, the same cap-${WEEKLY_BET_CAP} rule`,
-                  rec: headline(
-                    buckets,
-                    HIST_SCOPE,
-                    "fbs_only",
-                    "step",
-                    "cap5",
-                  ),
-                  empty: "nothing graded yet",
-                },
-                {
-                  key: "gap175",
-                  label: `2023–25, every gap ${BET_GAP_PTS}+`,
-                  rec: headline(
-                    buckets,
-                    HIST_SCOPE,
-                    "fbs_only",
-                    "step",
-                    "gap175",
-                  ),
-                  empty: "nothing graded yet",
-                },
-              ]}
-            />
-            <BandTable
-              title="Win rate by gap size, at an estimated line"
-              rows={gapEstimated}
-              basis="estimated"
-            />
-
-            <h3 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-              How the number is built
-              <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                {`every finished FBS-vs-FBS game, ${scopeLabel}`}
-              </span>
-            </h3>
-            {edge ? (
-              <div className="bv-table-wrap px-4 py-1">
-                <dl className="grid grid-cols-1 gap-x-10 sm:grid-cols-3">
-                  <Stat
-                    label="Games looked at"
-                    value={edge.games.toLocaleString()}
-                  />
-                  <Stat
-                    label="First half’s share of the full game"
-                    value={`${(100 * edge.mean).toFixed(1)}%`}
-                  />
-                  <Stat
-                    label="Middle value"
-                    value={`${(100 * edge.median).toFixed(1)}%`}
-                  />
-                </dl>
-              </div>
-            ) : (
-              <EmptyLine>{`No finished games for ${scopeLabel} yet.`}</EmptyLine>
-            )}
-
-            <h3 className="mb-2 mt-8 text-sm font-semibold text-[var(--text)]">
-              How accurate our number is
-              {calib && (
-                <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                  {`average miss in points over ${calib.n.toLocaleString()} games it never trained on; near zero is on target`}
-                </span>
-              )}
-            </h3>
-            {calib ? (
-              <div className="bv-table-wrap">
-                <table className="bv-table">
-                  <thead>
-                    <tr>
-                      <th>Group</th>
-                      <th className="bv-num">Games</th>
-                      <th className="bv-num">Average miss</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="font-medium text-[var(--text)]">
-                        Overall
-                      </td>
-                      <td className="bv-num text-[var(--text-muted)]">
-                        {calib.n}
-                      </td>
-                      <td className="bv-num font-mono text-[var(--text-muted)]">
-                        {calib.overall ?? "—"}
-                      </td>
-                    </tr>
-                    {calib.segments.map((sg) => (
-                      <tr key={sg.label}>
-                        <td className="text-[var(--text-muted)]">
-                          {labelOf(CALIB_SEGMENT_TEXT, sg.label, sg.label)}
-                        </td>
-                        <td className="bv-num text-[var(--text-muted)]">
-                          {sg.n}
-                        </td>
-                        <td
-                          className="bv-num font-mono"
-                          style={{
-                            color:
-                              sg.meanResidual === null
-                                ? "var(--text-dim)"
-                                : Math.abs(sg.meanResidual) <= 0.5
-                                  ? "var(--text)"
-                                  : "var(--warn)",
-                          }}
-                        >
-                          {sg.meanResidual ?? "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyLine>
-                No model run has recorded its out-of-sample misses yet.
-              </EmptyLine>
-            )}
-
-            <div className="mb-2 mt-8 flex flex-wrap items-end justify-between gap-3">
-              <h3 className="text-sm font-semibold text-[var(--text)]">
-                {`Which first-half totals go under most often`}
-                <span className="ml-2 text-xs font-normal text-[var(--text-dim)]">
-                  {`${scopeLabel} · by the total the book opened at`}
-                </span>
-              </h3>
-              <MinGamesSelect current={minGames} />
-            </div>
-            {!study || study.buckets.length === 0 ? (
-              <EmptyLine>
-                {`No total has ${minGames}+ graded games in ${scopeLabel} yet. Lower the minimum, or check back later in the season.`}
-              </EmptyLine>
-            ) : (
-              <LineStudyView
-                buckets={study.buckets}
-                breakeven={BREAKEVEN_PCT}
-              />
-            )}
-          </Fold>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-t border-[var(--border)] py-2 text-sm first:border-t-0 sm:border-t-0">
-      <dt className="text-[var(--text-muted)]">{label}</dt>
-      <dd className="font-mono tabular-nums text-[var(--text)]">{value}</dd>
     </div>
   );
 }

@@ -2,27 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { LedgerRow } from "./betLedger";
 import type { HomeGame } from "./homeBoard";
 import type { RecordRow } from "./records";
-import {
-  gateGame,
-  gateLedger,
-  gateRecords,
-  HIDDEN_ACTION,
-  hidesSignal,
-  kickoffPassed,
-} from "./signalGate";
+import { gateGame, gateLedger, gateRecords, kickoffPassed } from "./signalGate";
 
 const NOW = new Date(Date.UTC(2026, 9, 10, 18, 0));
 const BEFORE = Date.UTC(2026, 9, 10, 17, 0);
 const AFTER = Date.UTC(2026, 9, 10, 19, 30);
-
-describe("hidesSignal", () => {
-  it("hides only from a visitor, only before kickoff", () => {
-    expect(hidesSignal(false, false)).toBe(true);
-    expect(hidesSignal(true, false)).toBe(false);
-    expect(hidesSignal(false, true)).toBe(false);
-    expect(hidesSignal(true, true)).toBe(false);
-  });
-});
 
 describe("kickoffPassed", () => {
   it("compares epoch ms and ISO strings to now", () => {
@@ -64,25 +48,44 @@ const game = (kickedOff: boolean): HomeGame =>
   }) as unknown as HomeGame;
 
 describe("gateGame", () => {
-  it("strips every signal from a visitor's pre-kickoff game", () => {
-    const g = gateGame(game(false), false);
-    expect(g.signalHidden).toBe(true);
-    expect(g.edge.action).toBe(HIDDEN_ACTION);
-    expect(g.edge.kill).toEqual({ line: null, price: null, text: "" });
-    expect(g.edge.gap).toBeNull();
-    expect(g.edge.score).toBe(0);
-    expect(g.gap).toBeNull();
-    expect(g.boardRank).toBeNull();
-    expect(g.capRank).toBeNull();
+  it("shows a visitor the owner's board before kickoff, without his bet-logged chip (roadmap v1.7)", () => {
+    const pre = game(false);
+    const g = gateGame(pre, false);
+    expect(g.edge.score).toBe(81);
+    expect(g.edge.gap).toBe(3.4);
+    expect(g.edge.kill).toEqual(pre.edge.kill);
+    expect(g.edge.action).toBe(pre.edge.action);
+    expect(g.gap).toBe(3.4);
+    expect(g.boardRank).toBe(1);
+    expect(g.capRank).toBe(1);
+    expect(g.row.bvLine).toBe(24.1);
+    expect(g.row.factors.factor_board).toEqual([{ key: "wind" }]);
+    // His real ticket stays his until kickoff, as the ledger withholds it.
     expect(g.picked).toBe(false);
-    expect(g.row.bvLine).toBeNull();
-    expect(g.row.factors.factor_board).toEqual([]);
   });
-  it("passes the owner's game and any kicked-off game through untouched", () => {
+  it("passes the owner's game through untouched; a kicked-off game keeps its chip", () => {
     const pre = game(false);
     expect(gateGame(pre, true)).toBe(pre);
     const post = game(true);
-    expect(gateGame(post, false)).toBe(post);
+    expect(gateGame(post, false)).toEqual(post);
+  });
+
+  it("never shows a visitor bet wording, before or after kickoff (roadmap v1.4)", () => {
+    const post = game(true);
+    const bet = {
+      ...post,
+      edge: {
+        ...post.edge,
+        action: "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
+      },
+    };
+    expect(gateGame(bet, false).edge.action).toBe(
+      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
+    );
+    expect(gateGame(bet, true).edge.action).toBe(bet.edge.action);
+    expect(gateGame({ ...bet, kickedOff: false }, false).edge.action).toBe(
+      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
+    );
   });
 });
 

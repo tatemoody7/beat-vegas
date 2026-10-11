@@ -264,6 +264,98 @@ class WeatherObs(Base):
     )
 
 
+class BuildForecast(Base):
+    """The forecast a card build SAW: one row per game per build that fetched it.
+
+    Written by `beatvegas.wx_paper.capture` during each decision build (registry
+    rows H-ARM-WX1H / H-ARM-WXFG, Tate's calls of 2026-10-09). Decision-safe by
+    construction: `fetched_at` is the build's own clock and always precedes the
+    kickoff it describes. Kept out of `weather_obs` on purpose: that table's
+    backfill deletes and rewrites rows by lead, and its studies read fixed
+    leads, so build-time rows there could be wiped or mixed into a frozen study.
+    Nothing but the weather arms reads it.
+    """
+
+    __tablename__ = "build_forecasts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
+    fetched_at = Column(DateTime, nullable=False)  # the build's clock, naive UTC
+    kickoff = Column(DateTime)  # the game's start_date when fetched (naive UTC)
+    lead_hours = Column(Float)  # kickoff - fetched_at, in hours
+    slot = Column(String)  # the build that fetched it
+    temperature_f = Column(Float)
+    wind_mph = Column(Float)  # sustained 10 m wind at the kickoff hour
+    wind_gust_mph = Column(Float)
+    precipitation = Column(Float)
+    dome = Column(Boolean)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    source = Column(String)  # beatvegas.sources.weather.SOURCE_FORECAST
+    weather_model = Column(String)  # pinned, as weather_obs's history
+
+    __table_args__ = (Index("ix_build_forecasts_game_fetched", "game_id", "fetched_at"),)
+
+
+class WeatherActual(Base):
+    """OBSERVED weather around a played game, hour by hour -- a study table.
+
+    Written by scripts/backfill_weather_actuals.py (2026-10-08, roadmap v1.3) for
+    the Salaga & Howley history look (docs/LITERATURE.md): wind and rain averaged
+    over the game, temperature and humidity at kickoff. NOTHING ELSE READS IT. It
+    is kept out of `weather` (the champion reads that table) and out of
+    `weather_obs` (studies read that table's newest lead-0 row per game, which
+    ERA5 rows would shadow), so filling it can never move the model or a frozen
+    study.
+
+    These are actuals, never decision-safe: what the conditions WERE, not what
+    anyone could have known before kickoff.
+
+    Two sources, side by side (a cross-check, not a blend):
+      open_meteo_era5_archive  ERA5 reanalysis, hourly, `models=era5` pinned so
+                               every season comes from one model; one row per
+                               hour from `hour_offset` -1 to +4 around the
+                               kickoff hour (offset 0 = the UTC hour the game
+                               kicks off in).
+      cfbd_games_weather       CFBD /games/weather, one reading per game
+                               (provider unnamed), stored at hour_offset 0.
+    """
+
+    __tablename__ = "weather_actuals"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
+    source = Column(String, nullable=False)
+    hour_offset = Column(Integer, nullable=False)  # hours from the kickoff hour
+    valid_time = Column(DateTime)  # the UTC hour this row describes
+    kickoff_utc = Column(DateTime)  # Game.start_date as fetched (naive UTC)
+    temperature_f = Column(Float)
+    humidity_pct = Column(Float)
+    dew_point_f = Column(Float)
+    wind_mph = Column(Float)
+    wind_gust_mph = Column(Float)
+    wind_direction_deg = Column(Float)
+    precipitation_in = Column(Float)  # ERA5: the hour's total; CFBD: as reported
+    snowfall_in = Column(Float)  # CFBD only, as reported
+    pressure = Column(Float)  # CFBD only, as reported (unit undocumented)
+    weather_code = Column(Integer)  # CFBD weatherConditionCode
+    game_indoors = Column(Boolean)  # CFBD gameIndoors; NULL for ERA5 rows
+    latitude = Column(Float)  # the coordinates actually used (ERA5 rows)
+    longitude = Column(Float)
+    weather_model = Column(String)  # Open-Meteo `models=` (era5)
+    dataset_version = Column(String, nullable=False)
+    retrieved_at = Column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "game_id",
+            "source",
+            "hour_offset",
+            "dataset_version",
+            name="uq_weather_actual_reading",
+        ),
+        Index("ix_weather_actuals_game", "game_id"),
+    )
+
+
 class OddsSnapshot(Base):
     """One row per (game, book, market) observation. Repeated polling builds the
     full movement history; the earliest captured_at = posting time."""
@@ -279,11 +371,18 @@ class OddsSnapshot(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     game_id = Column(Integer, ForeignKey("games.id"), index=True)
     book = Column(String)
-    market = Column(String)  # '1H_total' | 'full_game_total'
-    line = Column(Float)  # the total for this market
-    spread = Column(Float)  # home-relative spread (full_game rows)
-    over_price = Column(Integer)
+    # '1H_total' | 'full_game_total' | 'full_game_spread' | 'full_game_ml'
+    # (the last two since 2026-10-07, roadmap step 4; every reader filters on it)
+    market = Column(String)
+    # The total for a totals market; the HOME point for 'full_game_spread'
+    # (negative = home favoured); NULL for 'full_game_ml'.
+    line = Column(Float)
+    spread = Column(Float)  # home-relative spread (full_game_total rows)
+    over_price = Column(Integer)  # totals markets only
     under_price = Column(Integer)
+    # Side markets ('full_game_spread', 'full_game_ml'): each team's price.
+    home_price = Column(Integer)
+    away_price = Column(Integer)
     captured_at = Column(DateTime, index=True)
     # Snapshots are written on CHANGE only, so a pre-kick poll that finds the
     # number unchanged leaves no row; it stamps the moment it re-confirmed this
@@ -455,6 +554,10 @@ class ManualPick(Base):
     ev_cons = Column(Float)  # EV per unit vs the consensus close: the judge
     ev_hr = Column(Float)  # EV per unit vs Hard Rock's own closing main quote (secondary)
     cons_excluded = Column(String(32))  # why there is no reading (few_books, ...)
+    # The registered protocol arm a PAPER pick belongs to (docs/HYPOTHESES.md,
+    # e.g. 'H-ARM-1HU'; 2026-10-08). Written by the card build from the arm's
+    # first eligible build on; NULL on real tickets and on development rows.
+    arm = Column(String(16))
 
 
 class BvAdjustment(Base):

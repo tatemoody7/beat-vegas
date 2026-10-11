@@ -120,6 +120,10 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      # Every print reaches the log as it happens. The 2026-10-10 sat_am build
+      # was cancelled at the job limit with its output still buffered, so the
+      # log showed nothing of the 18 minutes the build step had run.
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: ET gate (stdlib only, before any install)
@@ -240,16 +244,18 @@ jobs:
           print(f"need_preview={'true' if (force_preview or previews == 0) else 'false'}")
           PY
           cat "$GITHUB_OUTPUT"
-      - name: Full-game refresh (every build; totals+spreads, 4 credits, 4x/wk)
+      - name: Full-game refresh (every build; totals+spreads+moneylines, 9 credits, 4x/wk)
         # Sunday's opener capture is the only other writer of Game.spread /
         # full_game_total; by midweek the market has moved. One bulk call
-        # (us,us2 x totals,spreads) over the same 6-day window the morning sweep
-        # covers keeps the spread current for the 1H share and the HR-vs-market
-        # read. Optional: the card still builds on Sunday's numbers if the Odds
-        # API is down.
+        # (us,us2,us_ex x totals,spreads,h2h; the exchanges and moneylines since
+        # 2026-10-07, roadmap step 4) over the same 6-day window the morning
+        # sweep covers keeps the spread current for the 1H share and the
+        # HR-vs-market read, and logs every book's spread and moneyline prices.
+        # Optional: the card still builds on Sunday's numbers if the Odds API is
+        # down.
         if: steps.slot.outputs.force_sweep == 'true' && steps.active.outputs.week != ''
         continue-on-error: true
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2 --days-ahead 6
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --days-ahead 6
       - name: 1H sweep (forced on every scheduled build; else only when today's is missing)
         id: sweep
         if: steps.inputs.outputs.need_sweep == 'true'
@@ -319,12 +325,10 @@ jobs:
           SLOT: ${{ steps.slot.outputs.slot }}
           PAPER_WINDOW: ${{ steps.slot.outputs.paper_window }}
           NO_PAPER: ${{ steps.slot.outputs.no_paper }}
-          # H-NEGGAP-P (docs/NEGGAP_PAPER.md): the paper OVER arms log beside the
-          # champion's paper picks. Unset to switch the collection off.
-          NEGGAP_COLLECT: "1"
-          # H-FG-P (docs/FG_MARKET.md): paper FULL-GAME unders from the bv_fg_v1
-          # shadow, into challenger_picks (market='full'). Unset to switch it off.
-          FG_COLLECT: "1"
+          # H-NEGGAP-P and H-FG-P (development collectors) retired 2026-10-08 when
+          # the registered arms H-ARM-1HO and H-ARM-FGU started (Tate's call):
+          # NEGGAP_COLLECT and FG_COLLECT are no longer set. The registered arms
+          # (docs/HYPOTHESES.md) log on every decision build and need no switch.
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           SWEEP_OUTCOME: ${{ steps.sweep.outcome }}
         run: |

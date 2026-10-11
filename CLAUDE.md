@@ -3,9 +3,9 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1) governs 2026**: real money is
-paused and every strategy runs on paper, judged by line value against the de-vigged consensus
-close. It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v1.8) governs 2026**: every
+strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
+first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
 automates gambling.** Site: https://beat-vegas.vercel.app — readable by anyone with the link,
 password guards writes.
@@ -17,9 +17,10 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.1): what is tested, how an edge is judged,
-  what is paused. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
-  is the judge it names (engine `cv1`, table `hp1`).
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v1.8): what is tested, how an edge is judged,
+  what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
+  is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
+  runs (weekly SPRT, alpha 0.5% each, K = 10).
 - `docs/HISTORY.md` — what happened, by date (2026-05 → today). Read the top entry before touching
   anything that shipped this week.
 - `docs/HYPOTHESES.md` — the registry: every study ever run or proposed, its status and criterion.
@@ -35,21 +36,26 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `DATA_STACK_REVIEW_2026-10-05`, `CFBD_TIER3_REVIEW_2026-10-05`, `WEPA_F`, `CFBD_CATALOGUE`,
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
-  `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough) (all in `docs/`).
-- Plans: `~/.claude/plans/` (each review names its plan file in HISTORY). Private skills:
-  `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+  `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
+  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10) (all in `docs/`).
+- `docs/program/REVIEW_2026-10.md` — the October review: Tate's 16 decisions of 2026-10-11 (personal
+  proof is the goal; every arm unchanged to January; cut list; Kalshi measured first). Plans:
+  `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
-
-## Where we are (as of 2026-10-07)
-- **The reset (`docs/ROADMAP_2026.md`)**: real money PAUSED until a strategy passes a
+## Where we are (as of 2026-10-08)
+- **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
   pre-registered sequential test on line value — EV at the wager's exact terms against the
   vig-free median-of-books consensus close (newest snapshot ≤2 h before kickoff) — designed for +3%
   EV, inside a 5% family-wise budget held as a fixed ledger (K = 10 tests, 0.5% each, never
-  recycled). Promotion → $10 flat live validation. Up to 7 uncapped paper arms: 1H unders, 1H overs
-  (bottom 20% of the slate), full-game unders, derivative consistency, early/stale lines, two open
-  (team totals, literature passes); shadow engines sit outside the slots. Every confirmatory clock
+  recycled). Promotion → $10 flat live validation. Up to 8 uncapped paper arms (v1.8): 1H unders,
+  1H overs (bottom 20%), full-game unders, derivative consistency + stale lines (4-5, not built),
+  weather (6-7), 60+ totals (8); shadow engines sit outside the slots. Every confirmatory clock
   starts after the Statistical Protocol is registered; all earlier rows are development evidence.
-- **Real money ended 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
+- **Real money: Tate's personal first-half-unders ledger since 2026-10-08 (v1.4)** — the old rule
+  (BET at the per-slate bar, top 5 a week by gap, every money-path check), $10 flat, no stop rule,
+  never an observation for any arm; paused 2026-10-07 → 10-08. Signed in, a BET inside the cap
+  reads "Bet one unit", past it "Paper signal"; visitors never see bet wording.
+- **Real money stood 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
   placed 2026-10-06 before the pause (`manual_picks` 102, 103; they grade as normal). H-STOP-2
   closed inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73); H-NEGGAP-P, H-FG-P,
   H-PCT-TIE, H-TIMING and H-CLOSE-W superseded; H-MARGIN closed (Pick'em dropped). The existing
@@ -58,13 +64,13 @@ disagree, **this file wins**; memory files hold lessons and point here.
   average first-half miss 8.34 vs Hard Rock 8.22 over 213 games; H-HIST pooled 8.75 vs the close
   8.73, live on 2003+ training since 2026-10-07); the 2026 factor screen found no input, nor the
   gap, predicting the residual against the close (87 comparisons, best p 0.117); in weeks 4-5 the
-  gap did not sort unders from overs. Closed null: 1H game-total censoring, weather × style,
-  two-sided overs, Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model against the spread.
+  gap did not sort unders from overs. Closed null: 1H censoring, weather × style, two-sided overs,
+  Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model, the four-fix model (H-MODEL-FIX).
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
-  judged on the years after the paper's own sample.
-- **The model and bar as built** (they feed the paper arms): market-blind HGB (B-SERVE removed 57
-  inputs that were NaN at serving; `weekly_update.py` fails a scoring run whose target rows are
-  >90% NaN on a column training is <10% NaN on). The per-slate bar (H-PCT) is the k-th largest gap
+  judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
+- **The model and bar as built** (they feed the paper arms): market-blind HGB, 55 inputs (B-SERVE
+  dropped 57 NaN at serving, the leak fix 3 kickoff-weather; rivalry = trophy games; `weekly_update.py`
+  fails a run >90% NaN on a column training has <10% NaN). The per-slate bar (H-PCT) is the k-th largest gap
   over the slate's Hard-Rock-priced games, k = max(1, round(0.2 × N)) — `model/score.py::slate_bar`
   mirrored by `verdict.ts::slateBar`, golden vectors in `tests/fixtures/slate_bar_vectors.json`;
   `BET_GAP_PTS = 1.75` survives only as the empty-slate fallback. The weekly refit writes a
@@ -75,25 +81,32 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: Statistical
-  Protocol + simulation, sized on `docs/CONSENSUS.md`'s development read (Tate approves the
-  numbers; it settles the shadow engines' budget and defines "shows in two seasons") → multi-book
-  spreads + moneylines and one team-total probe → literature looks (citations verified; Tate picks
-  the rivalry list) → arms re-registered and live → shadow engines → public research-lab page →
-  retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools).
-- **Real-money switch: ON since 2026-10-07** (Tate's call; written through Neon's HTTPS endpoint,
-  mirroring `scripts/rule_pause.py`): the site refuses every real ticket until a promotion.
+- **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
+  spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
+  `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
+  probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
+  verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
+  Arscott/TV/Bennett all NOT MET 10-09 (final); Coleman waits on full text, Salaga on weather; team
+  totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
+  1HO / FGU, clocks PAUSED (p1.1, v1.5) until the leak-fixed model's first card; 6-7 = weather unders,
+  10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines → public research-lab page →
+  retire the offline backtest engine (`backtest/engine.py::_new_model` and its four tools). The
+  full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
+- **The pause switch (`rule_paused`) is OFF since 2026-10-08 20:00 UTC, so the personal ledger is ON** (v1.4, Tate's call; written through Neon's
+  HTTPS endpoint, mirroring `scripts/rule_pause.py`; it was on 2026-10-07 → 10-08).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
   candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Weeknight closes (shipped 2026-10-06, Tate's call: Tue–Fri)**: confirm the first Thursday
-  (10-08) ticks wrote 1H + full-game rows inside the windows for every Thursday game.
-- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset; the 12
+- **Arms paused (2026-10-09, v1.5)** until the leak-fixed model's first card (pace re-pulled as of the
+  Sunday before, 2023-25) starts the clocks (`cards.id` + `protocol.ARMS_START`); meanwhile dev data.
+  `weather_actuals` fetch ~46% (2013-mid 2019); run 37870394348 resumes it; bad gusts blanked.
+- **Monday program review #1, 2026-10-12** (week 7, under `docs/program/`): the reset, v1.3, v1.4
+  and the arms' first read; H-MODEL-FIX (NOT MET) and v1.8's 60+ arm; the 12
   proposed rows in `docs/KNOWLEDGE.md` and `docs/CFBD_PACK.md`'s two (H-BOOM-R, H-FHDRIVE) plus its
-  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body).
+  licence question; the six author flags in `docs/ASSUMPTIONS.md` (PR #281 body); v1.9: 3 literature nulls → REJECTED?
 - **Data-review calls (2026-10-05)**: PR7 weekly snapshot tables, H-FHBOX and the `bv_residual`
   shadow are parked under the roadmap unless an arm needs them; drop `sp_sos` from the shadow
   engine (null since 2019); CFBD Tier 3 ($10) or Tier 1 ($1) at the **Nov 6** renewal. Data budget
@@ -128,7 +141,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade, run by GitHub Actions.
   Nothing runs on the Mac on a schedule and nothing texts Tate; the board is the failure surface.
   Data: CFBD (games, PBP, SP+, talent, returning production), The Odds API (`totals_h1` per
-  event, full-game bulk), TeamRankings tempo, Open-Meteo weather, Rotowire injuries, ESPN scores.
+  event; full-game bulk totals + spreads + moneylines), TeamRankings tempo, Open-Meteo weather,
+  Rotowire injuries, ESPN scores.
 - **DB**: SQLAlchemy (`beatvegas/db/models.py`, `_MIGRATIONS` + `_DATA_MIGRATIONS` in
   `db/store.py`). `DATABASE_URL` → Neon Postgres (psycopg3); unset → `data/beatvegas.db`. A
   schema change is Python first, `migrate.yml`, then the new columns **hand-added** to the
@@ -140,16 +154,16 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
   plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
   (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`), and **a visitor sees no pre-kickoff signal**
-  (`lib/signalGate.ts`: board, game page, `/records`, the ledger and both CSVs): ops warnings, the My-teams chip, the Monday review on
-  Results, the research section on How it works, the log control. No dollars are public. API:
+  the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
+  control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
+  `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
   `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
   `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
   `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on
   `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
-  − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
+  − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS` − `LEAKY_WEATHER_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
   `data/fbs_teams.json`), trained on 2003+ (`score.CHAMPION_TRAIN_MIN_SEASON`; other frames
   2023+), global intercept, re-fitted every Sunday. `score_slate`
   ranks by `gap = line − bv_line`; the 0-100 score, tier and kill line all derive from the gap
@@ -159,7 +173,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | File | Trigger | Writes |
 |---|---|---|
 | `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks`, `challenger_picks` (`NEGGAP_COLLECT=1`, `FG_COLLECT=1`), preview |
-| `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H) |
+| `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; input hist | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
@@ -171,6 +185,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
+| `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
 | `residual_gate.yml`, `level_anchor_gate.yml`, `intercept_gate.yml`, `inseason_gate.yml` | dispatch | a report; never the model |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every
@@ -185,16 +200,17 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
-- **Positions / rule**: `stopping_rule_position` (`--clock 2` default), `neggap_position`, `fg_position`,
-  `challenger_position`, `rule_pause`, `pick` (`list`, `grade`, `summary`; no `add`).
+- **Positions / rule**: `protocol_position` (the registered arms, Mondays), `stopping_rule_position`,
+  `neggap_position`, `fg_position`, `challenger_position`, `rule_pause`, `pick` (no `add`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `intercept_gate`, `inseason_gate`,
   `level_anchor_gate`, `residual_gate`, `weather_gate`, `blend_gate`, `gates_study`,
   `when_to_bet_study`, `hr_lag_study`, `sharp_book_probe`, `two_sided_study`, `censoring_study`,
-  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`.
+  `neggap_level_study`, `weather_style_study`, `stopping_rule_candidates`, `frame_snapshot`, `margin_backtest`,
+  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`, `backfill_bv_line`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_context`, `backfill_enrichment` (pace), `backfill_weather` +
-  `weather_validate`, `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`,
+  `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `purge_demo_rows`, `build_trophy_games` (rivalry list),
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `retrain`, `backtest`, `validate_engine`, `rank_factors`,
@@ -204,8 +220,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)
-- **Paused 2026-10-07** (`docs/BETTING_POLICY.md`): built, working and frozen; it applies again only to
-  a strategy promoted under the roadmap.
+- **Live again for the personal ledger since 2026-10-08** (`docs/BETTING_POLICY.md`, v1.4; paused
+  2026-10-07 → 10-08); a promoted strategy's live validation will be its own track.
 - POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
   Hard Rock's own MAIN line, a **live** verifiable price seen ≤6 h ago (`lib/lineCheck.ts`; none →
   `PRICE UNAVAILABLE`, old → `PRICE STALE` + the form's Refresh price), a price at or better than the kill
@@ -253,8 +269,8 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   `bv-site-check` first.
 
 ## Honest status of the edge (don't oversell)
-- **Live evidence first.** Real money ended 10-10 (−0.29u) on 20 tickets, inside its Wilson
-  interval either way; H-STOP-2 (`docs/STOPPING_RULE.md`) closed inconclusive. From 2026-10-07 the
+- **Live evidence first.** Real money stood 10-10 (−0.29u) on 20 tickets when it paused, inside its
+  Wilson interval either way (the v1.4 personal ledger is never evidence); H-STOP-2 (`docs/STOPPING_RULE.md`) closed inconclusive. From 2026-10-07 the
   only judge is each arm's registered sequential test on line value against the consensus close;
   the site states every rate with its interval and labels the bankroll "modelled from the ledger,
   not reconciled". Line value against the close is the one edge measure that needs no proxy; it

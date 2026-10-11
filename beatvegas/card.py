@@ -807,8 +807,11 @@ def build_item(
     # "Not yet —" states the condition and names the number or price that would
     # change it, rather than instructing the reader to wait.
     if tier == "BET":
+        # Inside the week's real-money cap a BET is a bet (roadmap v1.4,
+        # 2026-10-08); apply_weekly_cap rewrites the 6th+ as paper only. The
+        # site swaps the same opening by cap slot (web/lib/edge.ts BET_ACTION).
         at = f" at {american(hr_price)}" if hr_price is not None else ""
-        action = f"Paper signal: first-half under {fmt(hr_line)}{at} on Hard Rock."
+        action = f"Bet one unit: first-half under {fmt(hr_line)}{at} on Hard Rock."
     elif not has_model:
         action = (
             f"Pass: no model number yet. Hard Rock pays about {fmt((ev or 0) * 100)}% more than "

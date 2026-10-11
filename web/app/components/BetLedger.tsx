@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import {
   betTime,
+  consensusCell,
   groupByWeek,
   hoursBeforeKickoff,
   ledgerSummary,
@@ -232,6 +233,12 @@ export default function BetLedger({
                     <th className="bv-num">Units</th>
                     <th className="bv-num">Running units</th>
                     <th className="bv-num">Line value</th>
+                    <th
+                      className="bv-num"
+                      title="Expected value at your exact line and price against the vig-free consensus close of the other books (docs/CONSENSUS.md). Positive is good."
+                    >
+                      vs consensus
+                    </th>
                     <th></th>
                   </tr>
                 </thead>
@@ -361,6 +368,24 @@ function LedgerRowView({
         </td>
         <td className="bv-num font-mono text-[var(--text-muted)]">
           {num(displayLineValue(p.clv))}
+        </td>
+        <td
+          className="bv-num font-mono"
+          title={
+            p.evCons === null && p.consExcluded
+              ? `No consensus reading: ${p.consExcluded.replace(/_/g, " ")}`
+              : undefined
+          }
+          style={{
+            color:
+              p.evCons === null
+                ? "var(--text-dim)"
+                : p.evCons >= 0
+                  ? "var(--good)"
+                  : "var(--bad)",
+          }}
+        >
+          {consensusCell(p.evCons)}
         </td>
         <td className="whitespace-nowrap">
           <button

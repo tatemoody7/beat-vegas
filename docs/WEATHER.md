@@ -193,3 +193,51 @@ the CI, check sign stability by season, hold it against the vig hurdle. Reuse
 `brier`, `log_loss`, `wilson` and `reliability` from
 `beatvegas/backtest/censoring.py`. It runs on `decision_safe` rows only, and its
 usable sample is **2024-2026**.
+
+## 7. Observed weather for the history looks (`weather_actuals`, 2026-10-08)
+
+The Salaga & Howley look (`docs/LITERATURE.md`, roadmap v1.3) needs what the
+conditions WERE in 2016-2025, and we held weather only from 2023. Tate's calls
+(2026-10-08): ERA5 as the study's data, CFBD's `/games/weather` beside it as a
+cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
+
+- **Why a new table.** The champion reads `weather`. Studies read the newest
+  lead-0 row per game from `weather_obs`, which ERA5 rows would shadow, and it has
+  no humidity column. `weather_actuals` is read by nothing but the look;
+  `tests/test_weather_actuals.py` fails if any module, script or web file starts
+  reading it.
+- **ERA5.** Open-Meteo's archive, `models=era5` pinned so every season comes from
+  one reanalysis, `timezone=UTC`.
+  - One row per hour from one hour before the kickoff hour to four after
+    (`hour_offset` -1..+4), so the look's "over the game" window is a choice made
+    in its registry row, not baked into the data.
+  - Temperature, humidity, dew point, wind, gusts, direction, and the hour's
+    precipitation.
+  - One call per venue-season, each game sliced from it.
+    - The first full run (2026-10-08) made one call per game. GitHub's shared runners are
+      throttled per request, so it managed about 2.6 games a minute and was cut off at its
+      350-minute limit with 925 games staged.
+    - An 86-day venue-season call returns in under a second.
+  - Domes are skipped, and games newer than six days wait for the archive.
+  - Checked live on 2026-10-08 against a 2016 game: every variable populated.
+- **CFBD.** One reading per game, as reported (provider unnamed, whole-number
+  wind), at `hour_offset` 0, two calls a season. Probed 2026-10-08: 60 of 60 rows
+  (2016 week 10) and 54 of 54 (2019 week 12), with every numeric present.
+- **Running it.** `weather_actuals.yml` (dispatch) has three jobs, so the hours of
+  fetching never hold the Neon-writer queue:
+  - **plan** (in `neon-writers`, seconds): reads games and venues and writes a plan file.
+  - **fetch** (no `DATABASE_URL`, outside the queue): ERA5 and CFBD into a staging file.
+  - **promote** (in `neon-writers`, minutes): runs `--check` (out-of-range values, gust below
+    wind), then writes. It also runs after a fetch cut off at its limit.
+  - **A gust more than 0.5 mph below its hour's wind is blanked, not refused** (Tate
+    2026-10-08). The first full promote met 37 such ERA5 hours of 27,660 (0.13%; short by a
+    median 1.2 mph, at most 8.1) and refused all 37,577 rows.
+    - `null_inverted_gusts` sets only those gusts to NULL. It keeps the hour's wind,
+      temperature and humidity, and reports the count by source as `gusts_nulled`.
+    - It runs before `--check` in both `--check` and `--promote`, and the rule stays in `check`.
+    - Salaga's look reads wind, temperature and humidity, never gust.
+  - The staging file is cached between runs, so a re-dispatch resumes.
+- **These rows are never decision-safe** and never a model input. A
+  forecast-based weather arm (the tracked candidate in roadmap v1.3) reads
+  `weather_obs` leads 24/72 instead.
+

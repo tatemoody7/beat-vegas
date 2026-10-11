@@ -100,3 +100,22 @@ def test_places_we_never_play_are_rejected(lat, lon):
 def test_bounds_are_stated_not_guessed():
     assert PLAUSIBLE_LAT == (18.0, 62.0)
     assert PLAUSIBLE_LON == (-180.0, 15.0)
+
+
+def test_verified_foreign_venues_pass_only_at_their_checked_location():
+    """Two real Sydney venues sit outside the US-shaped bounds (2026-10-08). They
+    pass at their published coordinates, and a swapped or moved pair for the same
+    id is still caught; an unlisted venue at the same spot is still flagged."""
+    from beatvegas.etl.venues import VERIFIED_VENUES
+
+    anz = {"id": 5221, "name": "ANZ Stadium", "latitude": -33.846991, "longitude": 151.063435}
+    sfs = {"id": 5363, "name": "Allianz Stadium", "latitude": -33.888907, "longitude": 151.225343}
+    assert set(VERIFIED_VENUES) == {5221, 5363}
+    assert coord_problems([anz, sfs]) == []
+    swapped = dict(anz, latitude=151.063435, longitude=-33.846991)
+    moved = dict(sfs, latitude=-33.95)
+    unlisted = dict(anz, id=999999)
+    problems = dict(coord_problems([swapped, moved, unlisted]))
+    assert "verified location of ANZ Stadium" in problems[5221]
+    assert "verified location of Allianz Stadium" in problems[5363]
+    assert "implausible latitude" in problems[999999]

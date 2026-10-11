@@ -193,6 +193,7 @@ def add_pick(
     model_line: Optional[float] = None,
     bet_at: Optional[datetime] = None,
     refit_id: Optional[int] = None,
+    arm: Optional[str] = None,
 ) -> ManualPick:
     """Insert (and flush) one under pick. A paper pick always stakes
     `PAPER_STAKE` regardless of `stake` — nothing is at risk, and a flat unit
@@ -208,6 +209,7 @@ def add_pick(
     off the card item (build_card). `model_score_at_pick` is never written any
     more (classifier retired 2026-10-04); legacy rows keep theirs."""
     pick = ManualPick(
+        arm=arm,
         game_id=game_id,
         season=season,
         week=week,

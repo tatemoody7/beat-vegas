@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
-import { HIDDEN_ACTION, RESEARCH_BANNER } from "../lib/signalGate";
+import { RESEARCH_BANNER } from "../lib/signalGate";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
 // number asserted here is derived in e2e/fixture/expected.mjs from the same rows
@@ -34,7 +34,7 @@ test.describe("the board", () => {
     await page.goto("/");
     const strip = page.locator('p[aria-label="What this is"]');
     await expect(strip).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means a paper signal. Every result, losses included, is on Results. How it works →",
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet, inside this week’s cap; past it, a paper signal. Every result, losses included, is on Results. How it works →",
     );
     await expect(strip.getByRole("link")).toHaveAttribute(
       "href",
@@ -119,7 +119,7 @@ test.describe("the board", () => {
     const c = expected.counts;
     await expect(
       page.getByText(
-        `${c.bet} paper ${c.bet === 1 ? "signal" : "signals"} · ${c.edge} watch · ${c.pass} pass`,
+        `${c.bet} ${c.bet === 1 ? "bet" : "bets"} · ${c.edge} watch · ${c.pass} pass`,
         {
           exact: true,
         },
@@ -132,43 +132,6 @@ test.describe("the board", () => {
     await expect(
       page.getByText(expected.barLine, { exact: true }),
     ).toBeVisible();
-  });
-
-  test("the answer bar names the live bet, the placed one, the closest three and the next update", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    const bar = page.locator('div[aria-label="This week at a glance"]');
-    await expect(bar).toBeVisible();
-    await expect(bar).toContainText(expected.answer.headline);
-    await expect(bar).toContainText(expected.answer.slotsLine);
-    const items = bar.locator("ul").first().locator("li");
-    await expect(items).toHaveCount(expected.answer.bets.length);
-    for (const [i, b] of expected.answer.bets.entries()) {
-      const li = items.nth(i);
-      await expect(li.getByRole("link")).toHaveText(b.matchup);
-      await expect(li.getByRole("link")).toHaveAttribute(
-        "href",
-        `/game/${b.gameId}`,
-      );
-      await expect(li).toContainText(b.numbers);
-      await expect(li.locator(".bv-badge")).toHaveCount(b.picked ? 1 : 0);
-      if (b.picked)
-        await expect(li.locator(".bv-badge")).toHaveText("bet logged");
-    }
-    await expect(
-      bar.getByRole("heading", { name: "Closest to a signal" }),
-    ).toBeVisible();
-    const near = bar.locator("ul").nth(1).locator("li");
-    await expect(near).toHaveCount(expected.answer.closest.length);
-    for (const [i, c] of expected.answer.closest.entries()) {
-      await expect(near.nth(i).getByRole("link")).toHaveText(c.matchup);
-      await expect(near.nth(i)).toContainText(c.numbers);
-      await expect(near.nth(i)).toContainText(c.needs);
-    }
-    await expect(bar).toContainText(
-      /Next update (Tue|Thu|Fri|Sat) \d{1,2}:\d{2}(am|pm)?–\d{1,2}:\d{2}(am|pm) ET/,
-    );
   });
 
   test("marks the game with a logged ticket", async ({ page }) => {
@@ -197,29 +160,6 @@ test.describe("the board", () => {
     await expect(
       page.getByText(`· ${thisWeek.length} games before filters`),
     ).toBeVisible();
-  });
-
-  test("My teams shows only the followed program, one filter at a time", async ({
-    page,
-  }) => {
-    await page.goto("/?hr=1");
-    const mine = page.getByRole("button", { name: "My teams" });
-    await mine.click();
-    await page.waitForURL(/\?mine=1$/);
-    await expect(mine).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      page.getByRole("button", { name: "Hard Rock line posted" }),
-    ).toHaveAttribute("aria-pressed", "false");
-    const r = await rows(page);
-    const followed = thisWeek
-      .filter((g) => g.away === "Kansas State" || g.home === "Kansas State")
-      .map((g) => g.id);
-    expect(followed.length).toBeGreaterThan(0);
-    expect(r.map((x) => x.id).sort()).toEqual(followed.sort());
-    // Clicking the active chip clears it.
-    await mine.click();
-    await page.waitForURL((u) => u.search === "");
-    await expect(mine).toHaveAttribute("aria-pressed", "false");
   });
 
   test("?days=sat keeps only Saturday’s games", async ({ page }) => {
@@ -255,19 +195,22 @@ test.describe("the board", () => {
 test.describe("the board, signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("a visitor gets the Hard Rock filter but not the My teams chip", async ({
+  test("the Hard Rock filter is the only chip, signed in or out", async ({
     page,
   }) => {
     await page.goto("/");
     await expect(
       page.getByRole("button", { name: "Hard Rock line posted" }),
     ).toBeVisible();
+    await expect(page.locator("button.bv-chip")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
   });
 
-  // The research season (docs/ROADMAP_2026.md, lib/signalGate): a visitor sees
-  // the slate, never a pre-kickoff rating.
-  test("a visitor reads the research-season banner and the slate with no ratings", async ({
+  // The research season, roadmap v1.7 (Tate 2026-10-10; lib/signalGate): a
+  // visitor sees the owner's board before kickoff -- the ranks, the lit BET
+  // rows, the order -- in paper wording, never bet wording, and never the
+  // owner's "bet logged" chip before kickoff.
+  test("a visitor reads the research-season banner and the board with its ratings in paper wording", async ({
     page,
   }) => {
     await page.goto("/");
@@ -282,32 +225,16 @@ test.describe("the board, signed out", () => {
     ).toHaveCount(0);
     await expect(page.getByText(/ watch · \d+ pass/)).toHaveCount(0);
     const r = await rows(page);
+    const rank = new Map(expected.rankOrder.map((id, i) => [id, i + 1]));
     const upcoming = r.filter((x) => x.section !== "Played");
     expect(upcoming.length).toBeGreaterThan(0);
     for (const x of upcoming) {
-      expect(x.lit).toBe(false);
-      expect(x.badge).toBe("—");
-      expect(x.chips).toEqual([]);
+      expect(x.badge, `${x.id}`).toBe(`#${rank.get(x.id)}`);
+      expect(x.lit, `${x.id}`).toBe(expected.betIds.includes(x.id));
+      expect(x.chips, `${x.id}`).not.toContain("bet logged");
     }
-    // The order cannot rank the games either: each day reads by kickoff, then
-    // the away team (lib/signalGate zeroes the score the board sorts on).
-    for (const day of new Set(upcoming.map((x) => x.section))) {
-      const ids = upcoming.filter((x) => x.section === day).map((x) => x.id);
-      const neutral = [...ids].sort((a, b) => {
-        const ga = byId.get(a)!;
-        const gb = byId.get(b)!;
-        return (
-          ga.kick.getTime() - gb.kick.getTime() ||
-          ga.away.localeCompare(gb.away)
-        );
-      });
-      expect(ids).toEqual(neutral);
-    }
-    await expect(
-      page.locator("section:not([aria-label='Played']) a.bv-card p", {
-        hasText: HIDDEN_ACTION,
-      }),
-    ).toHaveCount(upcoming.length);
+    await expect(page.getByText(/Bet one unit/)).toHaveCount(0);
+    await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
   });
 });
 

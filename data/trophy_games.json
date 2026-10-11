@@ -1,0 +1,808 @@
+{
+ "source": "Wikipedia, List of NCAA college football rivalry games",
+ "revid": 1379225783,
+ "frozen": "2026-10-09",
+ "decided_by": "Tate, 2026-10-09 (strategic review topic 3)",
+ "rule": "a row counts when its Trophy cell is filled; multi-team trophies count every pair of their current teams",
+ "unmapped": [
+  "Boston University",
+  "Delaware State",
+  "Holy Cross",
+  "Indiana State",
+  "Lamar",
+  "McNeese",
+  "Murray State",
+  "Nicholls",
+  "Pacific",
+  "Saint Mary's",
+  "Southeastern Louisiana",
+  "Villanova",
+  "Youngstown State"
+ ],
+ "pairs": [
+  {
+   "teams": [
+    "Air Force",
+    "Army"
+   ],
+   "trophy": "Commander-in-Chief's Trophy"
+  },
+  {
+   "teams": [
+    "Air Force",
+    "Colorado State"
+   ],
+   "trophy": "Ram–Falcon Trophy"
+  },
+  {
+   "teams": [
+    "Air Force",
+    "Hawai'i"
+   ],
+   "trophy": "Kuter Trophy"
+  },
+  {
+   "teams": [
+    "Air Force",
+    "Navy"
+   ],
+   "trophy": "Commander-in-Chief's Trophy"
+  },
+  {
+   "teams": [
+    "Akron",
+    "Kent State"
+   ],
+   "trophy": "Wagon Wheel"
+  },
+  {
+   "teams": [
+    "Alabama",
+    "Auburn"
+   ],
+   "trophy": "James E. Foy, V-ODK Sportsmanship Trophy"
+  },
+  {
+   "teams": [
+    "Arizona",
+    "Arizona State"
+   ],
+   "trophy": "Territorial Cup"
+  },
+  {
+   "teams": [
+    "Arkansas",
+    "LSU"
+   ],
+   "trophy": "Golden Boot"
+  },
+  {
+   "teams": [
+    "Arkansas",
+    "Missouri"
+   ],
+   "trophy": "Battle Line Trophy"
+  },
+  {
+   "teams": [
+    "Arkansas",
+    "Texas A&M"
+   ],
+   "trophy": "Southwest Classic Trophy"
+  },
+  {
+   "teams": [
+    "Army",
+    "Navy"
+   ],
+   "trophy": "Commander-in-Chief's Trophy"
+  },
+  {
+   "teams": [
+    "BYU",
+    "Utah"
+   ],
+   "trophy": "Beehive Boot"
+  },
+  {
+   "teams": [
+    "BYU",
+    "Utah State"
+   ],
+   "trophy": "Beehive Boot"
+  },
+  {
+   "teams": [
+    "Ball State",
+    "Northern Illinois"
+   ],
+   "trophy": "Bronze Stalk Trophy"
+  },
+  {
+   "teams": [
+    "Baylor",
+    "TCU"
+   ],
+   "trophy": "Bluebonnet Shield"
+  },
+  {
+   "teams": [
+    "Boise State",
+    "Fresno State"
+   ],
+   "trophy": "Milk Can"
+  },
+  {
+   "teams": [
+    "Boston College",
+    "Clemson"
+   ],
+   "trophy": "O'Rourke–McFadden Trophy"
+  },
+  {
+   "teams": [
+    "Boston College",
+    "Notre Dame"
+   ],
+   "trophy": "Ireland Trophy"
+  },
+  {
+   "teams": [
+    "Bowling Green",
+    "Kent State"
+   ],
+   "trophy": "Anniversary Award"
+  },
+  {
+   "teams": [
+    "Bowling Green",
+    "Toledo"
+   ],
+   "trophy": "Battle of I-75 Trophy"
+  },
+  {
+   "teams": [
+    "California",
+    "Stanford"
+   ],
+   "trophy": "The Axe"
+  },
+  {
+   "teams": [
+    "Central Michigan",
+    "Eastern Michigan"
+   ],
+   "trophy": "Michigan MAC Trophy"
+  },
+  {
+   "teams": [
+    "Central Michigan",
+    "Western Michigan"
+   ],
+   "trophy": "Michigan MAC Trophy"
+  },
+  {
+   "teams": [
+    "Cincinnati",
+    "Louisville"
+   ],
+   "trophy": "The Keg of Nails"
+  },
+  {
+   "teams": [
+    "Cincinnati",
+    "Miami (OH)"
+   ],
+   "trophy": "Victory Bell"
+  },
+  {
+   "teams": [
+    "Clemson",
+    "NC State"
+   ],
+   "trophy": "Textile Bowl"
+  },
+  {
+   "teams": [
+    "Colorado",
+    "Colorado State"
+   ],
+   "trophy": "Centennial Cup"
+  },
+  {
+   "teams": [
+    "Colorado State",
+    "Wyoming"
+   ],
+   "trophy": "Bronze Boot"
+  },
+  {
+   "teams": [
+    "Duke",
+    "North Carolina"
+   ],
+   "trophy": "Victory Bell"
+  },
+  {
+   "teams": [
+    "East Carolina",
+    "NC State"
+   ],
+   "trophy": "Victory Barrel"
+  },
+  {
+   "teams": [
+    "Eastern Michigan",
+    "Western Michigan"
+   ],
+   "trophy": "Michigan MAC Trophy"
+  },
+  {
+   "teams": [
+    "Florida",
+    "Florida State"
+   ],
+   "trophy": "Florida Cup"
+  },
+  {
+   "teams": [
+    "Florida",
+    "Georgia"
+   ],
+   "trophy": "Okefenokee Oar"
+  },
+  {
+   "teams": [
+    "Florida",
+    "Miami"
+   ],
+   "trophy": "Florida Cup"
+  },
+  {
+   "teams": [
+    "Florida Atlantic",
+    "Florida International"
+   ],
+   "trophy": "Don Shula Award"
+  },
+  {
+   "teams": [
+    "Florida State",
+    "Miami"
+   ],
+   "trophy": "Florida Cup"
+  },
+  {
+   "teams": [
+    "Florida State",
+    "Virginia"
+   ],
+   "trophy": "Jefferson–Eppes Trophy"
+  },
+  {
+   "teams": [
+    "Fresno State",
+    "Hawai'i"
+   ],
+   "trophy": "Golden Screwdriver"
+  },
+  {
+   "teams": [
+    "Fresno State",
+    "San Diego State"
+   ],
+   "trophy": "Oil Can"
+  },
+  {
+   "teams": [
+    "Fresno State",
+    "San José State"
+   ],
+   "trophy": "Valley Trophy"
+  },
+  {
+   "teams": [
+    "Georgia",
+    "Georgia Tech"
+   ],
+   "trophy": "Governor's Cup"
+  },
+  {
+   "teams": [
+    "Georgia Tech",
+    "Vanderbilt"
+   ],
+   "trophy": "Gold Cowbell"
+  },
+  {
+   "teams": [
+    "Hawai'i",
+    "San José State"
+   ],
+   "trophy": "Dick Tomey Legacy Trophy"
+  },
+  {
+   "teams": [
+    "Hawai'i",
+    "Wyoming"
+   ],
+   "trophy": "Paniolo Trophy"
+  },
+  {
+   "teams": [
+    "Houston",
+    "Rice"
+   ],
+   "trophy": "Bayou Bucket"
+  },
+  {
+   "teams": [
+    "Illinois",
+    "Missouri"
+   ],
+   "trophy": "Arch Rivalry Trophy"
+  },
+  {
+   "teams": [
+    "Illinois",
+    "Northwestern"
+   ],
+   "trophy": "Land of Lincoln Trophy"
+  },
+  {
+   "teams": [
+    "Illinois",
+    "Ohio State"
+   ],
+   "trophy": "Illibuck"
+  },
+  {
+   "teams": [
+    "Illinois",
+    "Purdue"
+   ],
+   "trophy": "Purdue Cannon"
+  },
+  {
+   "teams": [
+    "Indiana",
+    "Kentucky"
+   ],
+   "trophy": "The Bourbon Barrel"
+  },
+  {
+   "teams": [
+    "Indiana",
+    "Michigan State"
+   ],
+   "trophy": "Old Brass Spittoon"
+  },
+  {
+   "teams": [
+    "Indiana",
+    "Purdue"
+   ],
+   "trophy": "Old Oaken Bucket"
+  },
+  {
+   "teams": [
+    "Iowa",
+    "Iowa State"
+   ],
+   "trophy": "Cy-Hawk Trophy"
+  },
+  {
+   "teams": [
+    "Iowa",
+    "Minnesota"
+   ],
+   "trophy": "Floyd of Rosedale"
+  },
+  {
+   "teams": [
+    "Iowa",
+    "Nebraska"
+   ],
+   "trophy": "Heroes Trophy"
+  },
+  {
+   "teams": [
+    "Iowa",
+    "Wisconsin"
+   ],
+   "trophy": "Heartland Trophy"
+  },
+  {
+   "teams": [
+    "Iowa State",
+    "Missouri"
+   ],
+   "trophy": "Telephone Trophy"
+  },
+  {
+   "teams": [
+    "Jacksonville State",
+    "Troy"
+   ],
+   "trophy": "Ol' School Bell"
+  },
+  {
+   "teams": [
+    "James Madison",
+    "Old Dominion"
+   ],
+   "trophy": "Royal Rivalry Trophy"
+  },
+  {
+   "teams": [
+    "Kansas",
+    "Kansas State"
+   ],
+   "trophy": "Governor's Cup"
+  },
+  {
+   "teams": [
+    "Kansas",
+    "Missouri"
+   ],
+   "trophy": "Indian War Drum; Lamar Hunt Trophy"
+  },
+  {
+   "teams": [
+    "Kentucky",
+    "Louisville"
+   ],
+   "trophy": "Governor's Cup"
+  },
+  {
+   "teams": [
+    "LSU",
+    "Ole Miss"
+   ],
+   "trophy": "Magnolia Bowl Trophy"
+  },
+  {
+   "teams": [
+    "LSU",
+    "Tulane"
+   ],
+   "trophy": "Tiger Rag"
+  },
+  {
+   "teams": [
+    "Louisiana",
+    "UL Monroe"
+   ],
+   "trophy": "Wooden Boot"
+  },
+  {
+   "teams": [
+    "Louisville",
+    "Miami"
+   ],
+   "trophy": "Schnellenberger Trophy"
+  },
+  {
+   "teams": [
+    "Marshall",
+    "Ohio"
+   ],
+   "trophy": "The Bell"
+  },
+  {
+   "teams": [
+    "Maryland",
+    "Navy"
+   ],
+   "trophy": "Crab Bowl Trophy"
+  },
+  {
+   "teams": [
+    "Memphis",
+    "UAB"
+   ],
+   "trophy": "The Bones"
+  },
+  {
+   "teams": [
+    "Michigan",
+    "Michigan State"
+   ],
+   "trophy": "Paul Bunyan Trophy"
+  },
+  {
+   "teams": [
+    "Michigan",
+    "Minnesota"
+   ],
+   "trophy": "Little Brown Jug"
+  },
+  {
+   "teams": [
+    "Michigan",
+    "Northwestern"
+   ],
+   "trophy": "George Jewitt Trophy"
+  },
+  {
+   "teams": [
+    "Michigan State",
+    "Notre Dame"
+   ],
+   "trophy": "Megaphone Trophy"
+  },
+  {
+   "teams": [
+    "Michigan State",
+    "Penn State"
+   ],
+   "trophy": "Land Grant Trophy"
+  },
+  {
+   "teams": [
+    "Middle Tennessee",
+    "Troy"
+   ],
+   "trophy": "The Palladium Trophy"
+  },
+  {
+   "teams": [
+    "Minnesota",
+    "Nebraska"
+   ],
+   "trophy": "$5 Bits of Broken Chair Trophy"
+  },
+  {
+   "teams": [
+    "Minnesota",
+    "Penn State"
+   ],
+   "trophy": "Governor's Victory Bell"
+  },
+  {
+   "teams": [
+    "Minnesota",
+    "Wisconsin"
+   ],
+   "trophy": "Paul Bunyan's Axe"
+  },
+  {
+   "teams": [
+    "Mississippi State",
+    "Ole Miss"
+   ],
+   "trophy": "Golden Egg Trophy"
+  },
+  {
+   "teams": [
+    "Missouri",
+    "Nebraska"
+   ],
+   "trophy": "Victory Bell"
+  },
+  {
+   "teams": [
+    "Missouri",
+    "Oklahoma"
+   ],
+   "trophy": "Tiger–Sooner Peace Pipe"
+  },
+  {
+   "teams": [
+    "Missouri",
+    "South Carolina"
+   ],
+   "trophy": "Mayor's Cup"
+  },
+  {
+   "teams": [
+    "Navy",
+    "Notre Dame"
+   ],
+   "trophy": "Rip Miller Trophy"
+  },
+  {
+   "teams": [
+    "Navy",
+    "SMU"
+   ],
+   "trophy": "Gansz Trophy"
+  },
+  {
+   "teams": [
+    "Nebraska",
+    "Wisconsin"
+   ],
+   "trophy": "Freedom Trophy"
+  },
+  {
+   "teams": [
+    "Nevada",
+    "UNLV"
+   ],
+   "trophy": "Fremont Cannon"
+  },
+  {
+   "teams": [
+    "New Mexico",
+    "New Mexico State"
+   ],
+   "trophy": "The Roaster"
+  },
+  {
+   "teams": [
+    "New Mexico State",
+    "UTEP"
+   ],
+   "trophy": "Silver Spade"
+  },
+  {
+   "teams": [
+    "North Dakota State",
+    "Wyoming"
+   ],
+   "trophy": "Drill Bit"
+  },
+  {
+   "teams": [
+    "Notre Dame",
+    "Purdue"
+   ],
+   "trophy": "Shillelagh Trophy"
+  },
+  {
+   "teams": [
+    "Notre Dame",
+    "Stanford"
+   ],
+   "trophy": "Legends Trophy"
+  },
+  {
+   "teams": [
+    "Notre Dame",
+    "USC"
+   ],
+   "trophy": "Jeweled Shillelagh"
+  },
+  {
+   "teams": [
+    "Oklahoma",
+    "Oklahoma State"
+   ],
+   "trophy": "Bedlam Bell"
+  },
+  {
+   "teams": [
+    "Oklahoma",
+    "Texas"
+   ],
+   "trophy": "Golden Hat"
+  },
+  {
+   "teams": [
+    "Oregon",
+    "Oregon State"
+   ],
+   "trophy": "Platypus Trophy"
+  },
+  {
+   "teams": [
+    "Penn State",
+    "Pittsburgh"
+   ],
+   "trophy": "Old Ironsides"
+  },
+  {
+   "teams": [
+    "Penn State",
+    "West Virginia"
+   ],
+   "trophy": "Old Ironsides"
+  },
+  {
+   "teams": [
+    "Pittsburgh",
+    "West Virginia"
+   ],
+   "trophy": "Old Ironsides"
+  },
+  {
+   "teams": [
+    "Rice",
+    "SMU"
+   ],
+   "trophy": "Mayor's Cup"
+  },
+  {
+   "teams": [
+    "SMU",
+    "TCU"
+   ],
+   "trophy": "Iron Skillet"
+  },
+  {
+   "teams": [
+    "South Alabama",
+    "Troy"
+   ],
+   "trophy": "The Belt"
+  },
+  {
+   "teams": [
+    "South Florida",
+    "UCF"
+   ],
+   "trophy": "War on I–4 Trophy"
+  },
+  {
+   "teams": [
+    "Southern Miss",
+    "Tulane"
+   ],
+   "trophy": "The Bell"
+  },
+  {
+   "teams": [
+    "Syracuse",
+    "West Virginia"
+   ],
+   "trophy": "Ben Schwartzwalder Trophy"
+  },
+  {
+   "teams": [
+    "TCU",
+    "Texas Tech"
+   ],
+   "trophy": "Saddle Trophy"
+  },
+  {
+   "teams": [
+    "Texas",
+    "Texas Tech"
+   ],
+   "trophy": "Chancellor's Spurs"
+  },
+  {
+   "teams": [
+    "UCLA",
+    "USC"
+   ],
+   "trophy": "Victory Bell"
+  },
+  {
+   "teams": [
+    "Utah",
+    "Utah State"
+   ],
+   "trophy": "Beehive Boot"
+  },
+  {
+   "teams": [
+    "Utah State",
+    "Wyoming"
+   ],
+   "trophy": "Bridger Rifle"
+  },
+  {
+   "teams": [
+    "Virginia",
+    "Virginia Tech"
+   ],
+   "trophy": "Commonwealth Cup"
+  },
+  {
+   "teams": [
+    "Virginia Tech",
+    "West Virginia"
+   ],
+   "trophy": "Black Diamond Trophy"
+  },
+  {
+   "teams": [
+    "Washington",
+    "Washington State"
+   ],
+   "trophy": "Apple Cup Trophy"
+  }
+ ]
+}

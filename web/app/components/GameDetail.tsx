@@ -240,9 +240,7 @@ function WhySection({ g }: { g: HomeGame }) {
         </div>
       ) : (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
-          {g.signalHidden
-            ? `The factor read publishes at kickoff.`
-            : `Nothing here yet. It fills in when the week is scored.`}
+          Nothing here yet. It fills in when the week is scored.
         </p>
       )}
       <div className="space-y-1">
@@ -378,7 +376,7 @@ function NewsSection({ g }: { g: HomeGame }) {
 
 /** Tier colour, the same language the board badge speaks. */
 function tierTone(g: HomeGame): string {
-  if (g.settled !== null || g.signalHidden) return "var(--push)";
+  if (g.settled !== null) return "var(--push)";
   if (g.edge.tier === "BET") return "var(--good)";
   if (g.edge.tier === "PASS") return "var(--bad)";
   return "var(--warn)";
@@ -469,13 +467,7 @@ export default function GameDetail({
           />
           <Stat
             label="Our number"
-            value={
-              g.signalHidden
-                ? "at kickoff"
-                : row.bvLine === null
-                  ? "—"
-                  : fmt(row.bvLine)
-            }
+            value={row.bvLine === null ? "—" : fmt(row.bvLine)}
           />
         </div>
 

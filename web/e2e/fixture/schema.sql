@@ -76,6 +76,46 @@ CREATE SEQUENCE public.app_settings_log_id_seq
 ALTER SEQUENCE public.app_settings_log_id_seq OWNED BY public.app_settings_log.id;
 
 --
+-- Name: build_forecasts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.build_forecasts (
+    id integer NOT NULL,
+    game_id integer NOT NULL,
+    fetched_at timestamp without time zone NOT NULL,
+    kickoff timestamp without time zone,
+    lead_hours double precision,
+    slot character varying,
+    temperature_f double precision,
+    wind_mph double precision,
+    wind_gust_mph double precision,
+    precipitation double precision,
+    dome boolean,
+    latitude double precision,
+    longitude double precision,
+    source character varying,
+    weather_model character varying
+);
+
+--
+-- Name: build_forecasts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.build_forecasts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: build_forecasts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.build_forecasts_id_seq OWNED BY public.build_forecasts.id;
+
+--
 -- Name: bv_adjustments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -546,7 +586,8 @@ CREATE TABLE public.manual_picks (
     cons_p_push double precision,
     ev_cons double precision,
     ev_hr double precision,
-    cons_excluded character varying(32)
+    cons_excluded character varying(32),
+    arm character varying(16)
 );
 
 --
@@ -652,6 +693,8 @@ CREATE TABLE public.odds_snapshots (
     spread double precision,
     over_price integer,
     under_price integer,
+    home_price integer,
+    away_price integer,
     captured_at timestamp without time zone,
     last_seen_at timestamp without time zone
 );
@@ -1135,6 +1178,53 @@ CREATE TABLE public.weather (
 );
 
 --
+-- Name: weather_actuals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.weather_actuals (
+    id integer NOT NULL,
+    game_id integer NOT NULL,
+    source character varying NOT NULL,
+    hour_offset integer NOT NULL,
+    valid_time timestamp without time zone,
+    kickoff_utc timestamp without time zone,
+    temperature_f double precision,
+    humidity_pct double precision,
+    dew_point_f double precision,
+    wind_mph double precision,
+    wind_gust_mph double precision,
+    wind_direction_deg double precision,
+    precipitation_in double precision,
+    snowfall_in double precision,
+    pressure double precision,
+    weather_code integer,
+    game_indoors boolean,
+    latitude double precision,
+    longitude double precision,
+    weather_model character varying,
+    dataset_version character varying NOT NULL,
+    retrieved_at timestamp without time zone
+);
+
+--
+-- Name: weather_actuals_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.weather_actuals_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: weather_actuals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.weather_actuals_id_seq OWNED BY public.weather_actuals.id;
+
+--
 -- Name: weather_obs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1182,6 +1272,12 @@ ALTER SEQUENCE public.weather_obs_id_seq OWNED BY public.weather_obs.id;
 --
 
 ALTER TABLE ONLY public.app_settings_log ALTER COLUMN id SET DEFAULT nextval('public.app_settings_log_id_seq'::regclass);
+
+--
+-- Name: build_forecasts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.build_forecasts ALTER COLUMN id SET DEFAULT nextval('public.build_forecasts_id_seq'::regclass);
 
 --
 -- Name: bv_adjustments id; Type: DEFAULT; Schema: public; Owner: -
@@ -1328,6 +1424,12 @@ ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_
 ALTER TABLE ONLY public.venues ALTER COLUMN id SET DEFAULT nextval('public.venues_id_seq'::regclass);
 
 --
+-- Name: weather_actuals id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_actuals ALTER COLUMN id SET DEFAULT nextval('public.weather_actuals_id_seq'::regclass);
+
+--
 -- Name: weather_obs id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1346,6 +1448,13 @@ ALTER TABLE ONLY public.app_settings_log
 
 ALTER TABLE ONLY public.app_settings
     ADD CONSTRAINT app_settings_pkey PRIMARY KEY (key);
+
+--
+-- Name: build_forecasts build_forecasts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.build_forecasts
+    ADD CONSTRAINT build_forecasts_pkey PRIMARY KEY (id);
 
 --
 -- Name: bv_adjustments bv_adjustments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1537,11 +1646,25 @@ ALTER TABLE ONLY public.team_tempo
     ADD CONSTRAINT uq_tempo_week UNIQUE (season, week, team);
 
 --
+-- Name: weather_actuals uq_weather_actual_reading; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_actuals
+    ADD CONSTRAINT uq_weather_actual_reading UNIQUE (game_id, source, hour_offset, dataset_version);
+
+--
 -- Name: venues venues_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.venues
     ADD CONSTRAINT venues_pkey PRIMARY KEY (id);
+
+--
+-- Name: weather_actuals weather_actuals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_actuals
+    ADD CONSTRAINT weather_actuals_pkey PRIMARY KEY (id);
 
 --
 -- Name: weather_obs weather_obs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1568,6 +1691,18 @@ CREATE INDEX ix_app_settings_log_key ON public.app_settings_log USING btree (key
 --
 
 CREATE INDEX ix_app_settings_log_written_at ON public.app_settings_log USING btree (written_at);
+
+--
+-- Name: ix_build_forecasts_game_fetched; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_build_forecasts_game_fetched ON public.build_forecasts USING btree (game_id, fetched_at);
+
+--
+-- Name: ix_build_forecasts_game_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_build_forecasts_game_id ON public.build_forecasts USING btree (game_id);
 
 --
 -- Name: ix_bv_adjustments_game_id; Type: INDEX; Schema: public; Owner: -
@@ -1864,6 +1999,12 @@ CREATE INDEX ix_team_week_features_week ON public.team_week_features USING btree
 CREATE INDEX ix_teams_school ON public.teams USING btree (school);
 
 --
+-- Name: ix_weather_actuals_game; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_weather_actuals_game ON public.weather_actuals USING btree (game_id);
+
+--
 -- Name: ix_weather_obs_decision_safe; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1892,6 +2033,13 @@ CREATE UNIQUE INDEX uq_manual_pick_per_ledger ON public.manual_picks USING btree
 --
 
 CREATE UNIQUE INDEX uq_weather_obs_reading ON public.weather_obs USING btree (game_id, lead_hours, COALESCE(source, ''::character varying), COALESCE(weather_model, ''::character varying), COALESCE(model_run_time, '1970-01-01 00:00:00'::timestamp without time zone));
+
+--
+-- Name: build_forecasts build_forecasts_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.build_forecasts
+    ADD CONSTRAINT build_forecasts_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id);
 
 --
 -- Name: bv_adjustments bv_adjustments_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1962,6 +2110,13 @@ ALTER TABLE ONLY public.predictions
 
 ALTER TABLE ONLY public.results
     ADD CONSTRAINT results_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id);
+
+--
+-- Name: weather_actuals weather_actuals_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_actuals
+    ADD CONSTRAINT weather_actuals_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id);
 
 --
 -- Name: weather weather_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

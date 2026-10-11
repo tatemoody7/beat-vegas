@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Poll for full-game totals + spreads and store snapshots (the OPENER engine).
+"""Poll for full-game totals, spreads and moneylines and store snapshots (the OPENER engine).
 
 Full-game totals open Sunday; retail 1H totals post later. We capture the
 full-game opener (earliest snapshot per game/book/market = a genuine opener) and
@@ -11,9 +11,12 @@ exists.
 Sources (`--source`):
   dk      — DraftKings hidden API (free, fresh; may 403 datacenter IPs)
   cfbd    — CFBD /lines (key-based, reachable from anywhere incl. GitHub Actions)
-  oddsapi — The Odds API bulk /odds, `totals,spreads` (MULTI-BOOK incl. Hard Rock;
+  oddsapi — The Odds API bulk /odds, `totals,spreads,h2h` (MULTI-BOOK incl. Hard Rock;
             cloud-safe; the source for the HR-vs-market comparison; prod runs this
-            from sunday.yml and the card-day refresh in card.yml)
+            from sunday.yml, the card-day refresh in card.yml and every close tick
+            in lines_watch.yml). Besides the `full_game_total` rows it writes each
+            book's spread (`full_game_spread`) and moneyline (`full_game_ml`) with
+            both teams' prices (roadmap step 4, 2026-10-07).
   auto    — try DK, fall back to CFBD if DK returns nothing (default)
 
     python scripts/poll_full_game.py                      # auto, local
@@ -44,7 +47,7 @@ from beatvegas.sources.draftkings import (
     normalize_first_half,
     normalize_full_game,
 )
-from beatvegas.sources.odds import OddsAPIClient
+from beatvegas.sources.odds import SIDE_MARKETS, OddsAPIClient, normalize_full_game_sides
 from beatvegas.sources.odds import normalize_full_game as oa_normalize_full_game
 
 
@@ -57,10 +60,11 @@ def _candidate_games(session, season: int) -> List[Dict]:
     return [{"id": r[0], "home_team": r[1], "away_team": r[2], "start_date": r[3]} for r in rows]
 
 
-# The bulk /odds markets the Sunday opener and the card-day refresh pull. The
-# Saturday close ticks pass `--markets totals` (half the credits; the spread
-# is already on file by then).
-DEFAULT_MARKETS = "totals,spreads"
+# The bulk /odds markets every Odds API pull asks for: the Sunday opener, the
+# card-day refresh and (since 2026-10-07, roadmap step 4) every close tick, so
+# the spread and the moneyline have a multi-book close as well as the total.
+# Billed (markets x regions) for the whole slate: 9 credits on us,us2,us_ex.
+DEFAULT_MARKETS = "totals,spreads,h2h"
 
 
 def _latest_snapshot(session, game_id: int, book: str, market: str):
@@ -76,14 +80,25 @@ def _latest_snapshot(session, game_id: int, book: str, market: str):
     )
 
 
-def _changed(prev, line, spread, over, under) -> bool:
+def _changed(prev, line, spread, over, under, home=None, away=None) -> bool:
     if prev is None:
         return True
     # spread=None means the source doesn't carry one (Odds API totals rows), not
     # that it moved — otherwise every DK->oddsapi source switch would write a
     # redundant snapshot for an unchanged number.
     spread_moved = spread is not None and prev.spread != spread
-    return prev.line != line or spread_moved or prev.over_price != over or prev.under_price != under
+    # A side-market row (spread / moneyline) moves on either team's price; a
+    # totals row carries neither, so both sides compare None == None.
+    side_moved = (
+        getattr(prev, "home_price", None) != home or getattr(prev, "away_price", None) != away
+    )
+    return (
+        prev.line != line
+        or spread_moved
+        or prev.over_price != over
+        or prev.under_price != under
+        or side_moved
+    )
 
 
 def _normalize_books(rows: List[Dict]) -> List[Dict]:
@@ -102,7 +117,10 @@ def _fetch(
     credit_floor: int = 60,
     markets: str = DEFAULT_MARKETS,
 ) -> Tuple[List[Dict], List[Dict], str, int]:
-    """Return (full_game_rows, first_half_rows, source_used, event_count)."""
+    """Return (full_game_rows, first_half_rows, source_used, event_count).
+
+    The Odds API's full-game rows also carry the side-market rows (spread,
+    moneyline), told apart by their `market` key; main() splits them."""
     fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor, markets)
     return _normalize_books(fg), _normalize_books(h1), used, n
 
@@ -126,11 +144,19 @@ def _fetch_raw(
                 "full-game pull. Pass --credit-floor 0 to override."
             )
             return [], [], "oddsapi", 0
-        # Billed (markets x regions) for the whole slate: `totals,spreads` x
-        # `us,us2` = 4 credits (the Sunday opener / card-day refresh);
-        # `totals` x `us,us2` = 2 (the Saturday full-game close ticks).
+        # Billed (markets x regions) for the whole slate: `totals,spreads,h2h`
+        # x `us,us2,us_ex` = 9 credits (the Sunday opener, the card-day refresh
+        # and every close tick since 2026-10-07).
         events = client.list_full_game_odds(regions=regions, markets=markets)
-        return oa_normalize_full_game(events), [], "oddsapi", len(events)
+        c = getattr(client, "last_credits", None)
+        if c is not None:
+            print(
+                f"credits: markets={markets} regions={regions} "
+                f"spent={c.last_cost if c.last_cost is not None else 'unknown'} "
+                f"remaining={c.remaining if c.remaining is not None else 'unknown'}"
+            )
+        rows = oa_normalize_full_game(events) + normalize_full_game_sides(events)
+        return rows, [], "oddsapi", len(events)
     h1: List[Dict] = []
     if source in ("dk", "auto"):
         payload = DraftKingsClient().fetch_ncaaf()
@@ -242,8 +268,13 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     fg_rows = [r for r in fg_rows if _in_window(r)]
     h1_rows = [r for r in h1_rows if _in_window(r)]
+    # The side markets ride in the same list from the Odds API (tagged with
+    # `market`); the totals rows below never carry one.
+    side_rows = [r for r in fg_rows if r.get("market") in SIDE_MARKETS.values()]
+    fg_rows = [r for r in fg_rows if r.get("market") is None]
 
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
+    written_side = {m: 0 for m in SIDE_MARKETS.values()}
     unmatched_names: List[str] = []
     best_row: Dict[int, Dict] = {}  # gid -> highest-priority book's row this run
     rows_by_gid: Dict[int, List[Dict]] = {}  # gid -> every matched book row this run
@@ -325,6 +356,34 @@ def main(argv: Optional[List[str]] = None) -> None:
                 g.full_game_total_source = source
             games_updated += 1
 
+        # Spread and moneyline rows: written on change, re-seen otherwise, one
+        # per (game, book, market) per run. They never touch Game.spread or
+        # the full_game_total rows (whose own `spread` column the existing
+        # readers keep using).
+        seen_side: set = set()
+        for r in side_rows:
+            gid = _resolve_gid(r, games, ids)
+            if gid is None or (gid, r["book"], r["market"]) in seen_side:
+                continue
+            seen_side.add((gid, r["book"], r["market"]))
+            prev = _latest_snapshot(s, gid, r["book"], r["market"])
+            home, away = r.get("home_price"), r.get("away_price")
+            if _changed(prev, r["line"], None, None, None, home=home, away=away):
+                s.add(
+                    OddsSnapshot(
+                        game_id=gid,
+                        book=r["book"],
+                        market=r["market"],
+                        line=r["line"],
+                        home_price=home,
+                        away_price=away,
+                        captured_at=now,
+                    )
+                )
+                written_side[r["market"]] += 1
+            else:
+                prev.last_seen_at = now
+
         seen_h1: set = set()
         for r in h1_rows:
             gid = _resolve_gid(r, games, ids)
@@ -350,6 +409,8 @@ def main(argv: Optional[List[str]] = None) -> None:
         f"source={source} dk_events={dk_events} "
         f"fg_rows={len(fg_rows)} h1_rows={len(h1_rows)} matched={matched} "
         f"unmatched={unmatched} new_fg={written_fg} new_h1={written_h1} "
+        f"side_rows={len(side_rows)} new_spread={written_side['full_game_spread']} "
+        f"new_ml={written_side['full_game_ml']} "
         f"unchanged={skipped} games_updated={games_updated}"
     )
     if unmatched_names:

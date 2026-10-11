@@ -7,7 +7,393 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-11
+
+- **2026-10-11 UTC (THE SITE IS A PUBLIC RECORD AND NOTHING MORE; ROADMAP v2.0).** Gone: the
+  board's answer bar, the My-teams chip (only the Hard Rock chip remains; `?mine=1` still parses),
+  the Monday review's breakdown, decisions strip and factor read on Results, and the signed-in
+  research section on How it works (live-season strip, flags, method fold, line study). Kept, on
+  Tate's call: the owner's pick list with its edit/delete controls (the only place a pending real
+  ticket is edited before kickoff) and the ops and build warnings (the failure surface). The banner
+  names the owner's real bets a personal stake, recorded separately and never evidence. e2e: five
+  tests removed, two retitled, `FEATURE_PARITY.md` matched; 241 passed on the fixture lane.
+
+- **2026-10-11 UTC (ROADMAP v2.0).** The October review's sixteen decisions logged as one versioned
+  amendment at the bottom of `docs/ROADMAP_2026.md` (objective = personal proof at Hard Rock; the
+  site a public record only; every arm, the judge and the protocol frozen to the January review;
+  +3% one-season target for 2026; Kalshi measured first on captured data; Hard Rock off-market
+  capture next; the personal ledger continues, labelled a personal stake; the cut list; the
+  measurement fixes; bookkeeping). Body edits: the three literature nulls read REJECTED in the
+  hypothesis ledger (deferred since v1.5); `docs/PROTOCOL_2026.md` reads 8 betting slots (v1.8);
+  the brief says the pause switch is off and the personal ledger ON. No code changed.
+
+- **2026-10-11 UTC (THE COMPLETE REASSESSMENT; `docs/program/REVIEW_2026-10.md`).** Tate asked for a
+  ground-up review of mission, strategy, hypotheses, results, data, infrastructure and business,
+  as an independent researcher, with questions grouped and answered before any change. Read-only:
+  live Neon reads, three repo sweeps, five Kalshi research lanes, his own Kalshi report
+  reconciled. Nothing in the repo or the database changed during the review.
+  - **What the evidence said:** every ledger (real, paper, every arm, the retired over arms)
+    reads −3% to −6% against the consensus close — the vig; real money 12-14, −1.43u on 26
+    tickets, 12 unjudgeable (`stale_close`); six of eight arms are unders variants and three ride
+    a model that is worse than the market on 2026 data; the two structural arms (slots 4-5) have
+    no design; stored `clv` is a median that includes Hard Rock's own late alternates and
+    `clv_prob` never reads the ticket's price; the stop rule was replaced twice then dropped; the
+    backtest is not the rule that is bet; ~$50/month but 87 scripts, 20 workflows, 30 tables,
+    20K doc lines and 17 incidents since 09-01. Kalshi: lawful from Florida today, not a softer
+    price (−110 to −121 all-in as a taker, a mirror of the books), unique for line shopping, no
+    winner limits and a free maker side on 1H totals; its data terms keep its prices off the site.
+  - **Tate's calls (sixteen, Part 2 of the review doc):** the objective is personal proof at Hard
+    Rock; every arm runs unchanged to January (readings only); +3% one-season target stays for
+    2026, re-decided in January; Kalshi is measured first on data already in `odds_snapshots`;
+    the next build is Hard Rock off-market capture; the personal ledger continues and the site's
+    mission line is scoped to promoted rules; the site is a public record and nothing more; the
+    cut list is accepted (offline backtest engine + four finished gate workflows + orphan
+    scripts, post-mortem tables and factor ledger, GitHub cron backups, owner-only site
+    sections); one committed review doc under `docs/program/`. Roadmap v2.0 follows as its own PR.
+  - The 2026-10-09 strategic review (topics 1-3 closed) was committed verbatim as Part 1; it had
+    lived untracked in the `strategy-review` worktree.
+
+## 2026-10-10
+
+- **2026-10-10 UTC (H-ARM-HT1H REGISTERED, ROADMAP v1.8).** Tate asked whether games with higher
+  totals had done better.
+  - **The answer:** yes in 2023-25. First-half unders at the real consensus close went 154-110-4
+    (58.3%, n 268) where the full-game total was 60 or more (`docs/POST_MORTEM.md`). The pattern
+    was found by slicing after the fact, and 2026 is too thin to say.
+  - **Tate's calls:**
+    - test it forward as a paper arm: first-half UNDERS on every game whose consensus full-game
+      total at the build is 60.0 or more, at Hard Rock's price;
+    - the consensus uses the judge's books: every centred book except Hard Rock, Fliff and the
+      synthetic consensus, at least 3;
+    - ledger slot 8, with its clock starting at its first eligible build (it reads no model);
+    - the cap on paper arms rises from 7 to 8.
+  - **Order:** the row comes before the collector (`beatvegas/ht_paper.py`, its own PR). The
+    literature-nulls amendment moves to v1.9.
+
+- **2026-10-10 UTC (H-MODEL-FIX NOT MET; MODEL WORK STOPS).** One `study.yml` dispatch
+  (run 38070611660, branch `model/fix-2026-10` at 1e6bce5; `docs/MODEL_FIX.md`).
+  - **Result:** with the four fixes, the champion's first-half number was less accurate:
+    - Δ|err| +0.163 [+0.025, +0.294] against the +0.10 margin, over 760 games graded at a real
+      consensus 1H close;
+    - worse in 2025 (8.85 → 9.02) and in 2026 (7.98 → 8.10);
+    - more often 6+ points from the close (19 games against 8).
+  - **The live champion is level with the close** on those games (8.69 against 8.72).
+  - **Disclosed after the run:** the incumbent's 2025 test games saw the 2025 bowls (week-ordered,
+    as live trains). The candidate's deficit was larger on the games the bowls could not touch, so
+    the flaw does not explain the verdict.
+  - **Tate's calls:**
+    - model work stops and the live model stays;
+    - arms 1-3 start their clocks at the 2026-10-13 card on the 2026-10-11 refit;
+    - PR #351 keeps the study re-runnable with every switch off live, and states early stopping as
+      `'auto'` (sklearn's default, unchanged);
+    - each refit records the trees it grew in `model_runs.metrics`;
+    - next comes the 60+ first-half-unders arm, triggered on the judge's books.
+
+- **2026-10-10 UTC (H-MODEL-FIX REGISTERED).** After the 2003+ switch, the champion's number
+  tracked a raw early-season scoring projection (week 6: correlation 0.76, was 0.26; Georgia @
+  Alabama 34.8 against Hard Rock's 25.5). Four defects were found read-only:
+  - every bowl game (836, 2003-25) is filed as week 1, so the week-ordered season-to-date means
+    let a bowl result into every later regular-season mean of its own season;
+  - pre-2015 seasons lack most richer inputs;
+  - sklearn's `early_stopping='auto'` switched on silently above 10,000 rows;
+  - early averages carry no shrinkage.
+
+  Tate's calls: fix the model first, then market rules; test the four fixes together against the
+  live champion and adopt on a pass; start the arms' clocks as soon as possible (if the fix lands
+  after Tuesday's card, the arms restart free before the first Monday read). The row comes before
+  the script (`scripts/model_fix_study.py`).
+
+- **2026-10-10 UTC (THE BOARD OPENS TO VISITORS, ROADMAP v1.7).** Tate's friends opened the site
+  and saw an empty board. Every pre-kickoff rating read "Rating publishes at kickoff." (the
+  2026-10-07 publication rule, `lib/signalGate.ts`), under two build warnings left by the failed
+  `sat_am` build.
+  - **Tate's calls:**
+    - a visitor sees the board and game page as the owner does, ratings before kickoff included,
+      in paper wording ("Paper signal", never "Bet one unit");
+    - the owner's "bet logged" chip stays his until kickoff;
+    - "Florida, 21+" goes on the site banner;
+    - the build warnings ("card built Nh ago", "build did not run") are owner-only;
+    - ship as soon as CI passes.
+  - **Unchanged:** the bet ledger, `/records` and both CSVs keep withholding a game until kickoff.
+  - **Code:** `signalGate.gateGame` no longer blanks a game, so `HIDDEN_ACTION`, `hidesSignal` and
+    `HomeGame.signalHidden` are gone.
+  - **Roadmap:** this is v1.7; the literature-nulls proposal for the 10-12 review becomes v1.8.
+
+- **2026-10-10 UTC (THE SATURDAY CARD TIMED OUT; THE WEATHER CAPTURE IS SCOPED AND CAPPED).** The
+  `sat_am` build (`card.yml` run 38049849474, dispatched 11:50Z) was cancelled at the job's 30-minute
+  limit with no card written. Its build step ran 18+ minutes; Friday's, the last build before #345,
+  took 4 seconds.
+  - **Cause:** #345's `wx_paper.capture` fetched an Open-Meteo forecast for every game of the week, all
+    divisions (254 games, 245 venue-day calls, each with a 60 s timeout and the four-try retry ladder),
+    one after another inside the card's database transaction. The arms' savepoint catches errors, not
+    slowness, so the timeout lost the whole build, the other arms' rows included. The run's output was
+    still buffered when it was cancelled, so its log showed none of the build step.
+  - **Effect:** week 6 has no `sat_am` card; the board and real-money verdicts stayed on Friday's card.
+    The two weather arms, whose backstop clock began 2026-10-10 00:00Z, logged nothing for week 6, and
+    first-log-wins means nothing is backfilled. Arms 1-3 had logged the week's games at Friday's build.
+  - **Fix (#348, Tate's choice of four):**
+    - the capture fetches only the games either weather arm can log (`wx_paper.arm_game_ids`: the
+      card's Hard Rock first-half items plus the week's Hard Rock full-game totals; 57 games and 55
+      calls in week 6), earliest kickoff first;
+    - each call is capped at 10 s and 2 tries, the whole capture at 180 s; a game past the cap
+      counts as failed, and the card summary names it;
+    - a timing line goes to stderr unbuffered, and `card.yml` sets `PYTHONUNBUFFERED=1`.
+  - **Docs:** the registry rows H-ARM-WX1H / H-ARM-WXFG and `docs/PROTOCOL_2026.md` carry a dated
+    implementation note (Tate's call); which games qualify is unchanged.
+  - **Measured from this Mac** against the live API on week 6's 45 remaining priced games: 44 calls in
+    30 s, none failed. Tuesday's `tue_pm` build is the first production proof; a manual dispatch runs
+    `--no-paper` and skips the capture.
+  - **Open (Tate's call):** whether the weather arms' lost first Saturday needs a protocol note.
+
 ## 2026-10-06
+
+- **2026-10-09 UTC (THE WEATHER ARMS, ROADMAP v1.6).** Strategic review topic 3: Tate asked for the correct
+  weather test instead of a verdict. The legacy weather inputs left the model as a leak (#344); weather as
+  an edge now runs as its own tests.
+  - **Two forward paper arms under p1.1**, ledger slots 6 and 7 (4-5 stay reserved for derivative
+    consistency and stale lines): H-ARM-WX1H (first-half unders) and H-ARM-WXFG (full-game unders) on
+    every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph, at
+    Hard Rock's price, uncapped, no model read. `beatvegas/wx_paper.py`; the build fetches forecasts into
+    the new `build_forecasts` table (Open-Meteo forecast API, `icon_seamless`), kept out of
+    `weather_obs` because that table's backfill deletes and rewrites rows by lead.
+  - **Sizing (counts only, no outcomes):** about 95 priced outdoor games a season had a 10+ mph forecast
+    72 h out in 2024-25, about 6 a week; 186 of them have both a 48-hour first-half line and a close (the
+    history look's universe).
+  - **Correction recorded:** only R09 (1H gust × style) was a weather null; R06 was rejected on blast
+    radius, not signal.
+  - Also on 2026-10-09: the 2023-25 pace re-pull (enrich_tempo run 37992138665) rewrote every row as of
+    the Sunday before its week (6,310 rows, all Sunday-dated).
+
+- **2026-10-09 UTC (TWO EXPLORATORY LOOKS REGISTERED: H-WX-HIST, H-JUDGE).** Strategic review topic 3,
+  Tate's calls. Rows first, scripts in the same PR, each read once through `study.yml` after merge.
+  - **H-WX-HIST** (`scripts/weather_history_look.py`): 2024-25 outdoor FBS games, the decision-safe
+    72-hour forecast, windy at 10+ mph against calm. Line value of the under at the early consensus
+    line against the close (first half), and the under's record against the closing line (both
+    markets), plus wind bands.
+  - **H-JUDGE** (`scripts/judge_check.py`): does `ev_cons` predict returns? Both sides of every
+    2023-25 first-half game at the early line, -110: predicted EV beside realized units, by quintile,
+    and the slope of realized on predicted, with week-resampled intervals.
+  - Both read spent 2023-25 data, so both are exploratory; the shared frame is
+    `beatvegas/backtest/early_close.py` (bowls keyed apart from week 1).
+
+- **2026-10-09 UTC (THE LEAK-FIXED MODEL).** Strategic review topic 3, Tate's calls. The model under
+  the arms had information from after the game in its training rows; each fix below is pinned by
+  `tests/test_trophy_games.py`.
+  - **Pace:** the 2023-25 `team_tempo` rows were pulled as of each week's median kickoff date
+    (2025's rows are dated the Saturday of the game week), so midweek teams carried their own game.
+    `backfill_enrichment.py` now reads the Sunday before the week's first regular-season kickoff
+    (Eastern), as `sunday.yml` does live; `enrich_tempo.yml` re-pulls 2023-25 after merge.
+  - **Weather:** `wx_temp`, `wx_wind`, `wx_precip` leave `BV_FEATURE_COLS`
+    (`features.LEAKY_WEATHER_COLS`): kickoff observations on the old clock for 2023-25 only, while
+    live reads a six-day forecast. `wx_dome` stays. Weather as an edge gets its own tests
+    (history look, Salaga, two forward arms at 10+ mph; registry rows follow).
+  - **Rivalry:** "met in 8+ distinct seasons across the dataset" counted future meetings; it is
+    now the named trophy games, frozen from Wikipedia revision 1379225783 into
+    `data/trophy_games.json` (112 FBS pairs; `scripts/build_trophy_games.py`). Counting only
+    earlier meetings would have flagged nothing before 2011, since games start in 2003.
+  - **Conference:** read from each game's own conference fields (realignment honoured: Texas Big
+    12 through 2023, SEC from 2024; none missing on 17,632 FBS-vs-FBS games); two independents
+    no longer count as a conference game.
+  - **Kept, Tate's call:** same-season talent and roster experience, returning production,
+    prior-season PPA/success (their risk is CFBD revising numbers, not after-game information).
+  - 58 → 55 model inputs. Sunday's refit trains the leak-fixed model; the first card on it starts
+    the arms' clocks (`protocol.ARMS_START` + `cards.id`, a follow-up PR).
+
+- **2026-10-09 UTC (STRATEGIC REVIEW; ARMS PAUSED, PROTOCOL p1.1, ROADMAP v1.5).** Tate opened an
+  evidence-first review of the whole project (one topic at a time; its record lands as one docs PR
+  when the review ends).
+  - **Topic 1 (goals):** proof is the goal, at small stakes on Hard Rock only (bankroll under $1K);
+    proof = an arm passes its line-value test, then 2027 real tickets; two seasons fine; the
+    personal ledger stays; the stop rule is set in January.
+  - **Topic 2 (the odds):** every pick with a closing reading averages about −5% EV against the
+    consensus close (real n 9, paper n 27, overs n 27): the vig and nothing else. Tate's and my
+    estimate: about 1 in 10 that a strategy earns the proof by the end of 2027.
+  - **Topic 3 (the test):** the protocol is sound; +3% is the smallest edge it can find in one
+    season. Verified: CFBD files bowls as week 1, so the bowl season would enter as one week; one
+    ungradable pick freezes its week. **Tate's calls:** fix the model's training leaks now (pace,
+    weather, same-season roster and talent, rivalry and conference flags; inputs with no clean
+    history come back to him one by one) and **pause the three arms' clocks before any completed
+    week**: they start at the first card on the leak-fixed model. A restart before any read is
+    free; after one it spends the slot. Bookkeeping fixes and four side readings queued as PRs.
+  - **This PR:** `protocol.ARMS_START = None` (paused), `PROTOCOL_VERSION = "p1.1"`,
+    `protocol_position` reads PAUSED with the logged count; `PROTOCOL_2026.md`, the three
+    `H-ARM-*` rows and `H-PROGRAM-2026` amended; roadmap v1.5. The literature-ledger question
+    deferred to Monday is renumbered v1.6.
+
+- **2026-10-09 UTC (WEATHER PROMOTE REFUSED; INVERTED GUSTS NOW BLANKED).** Run 37833098273's
+  fetch hit its 350-minute cap at 01:26Z. Its staging file was saved (1.06 MiB): 4,610 of
+  10,097 planned ERA5 games (2013 to mid-2019) and every CFBD season.
+  - **The refusal:** the promote's `--check` refused all 37,577 rows. 37 ERA5 hours had a gust
+    more than 0.5 mph below the wind (median 1.2, max 8.1). There were no out-of-range values,
+    and ERA5 vs CFBD agreed to 2.0 °F, 7.0% humidity and 2.8 mph wind. `weather_actuals` holds
+    nothing yet.
+  - **Tate's call:** blank those gusts (`null_inverted_gusts`) and promote the rest. The real
+    staging file now passes `--check` with 37 gusts blanked.
+  - **The fetch:** resumed fetch-only (run 37870394348, `promote=false`).
+  - **Deferred:** the roadmap ledger edit for the three literature nulls goes to Monday's review
+    (v1.5, Tate).
+
+- **2026-10-09 UTC (THREE LITERATURE LOOKS: ALL NOT MET).** One `study.yml` dispatch each, at
+  `4345320`, judged on the median CFBD close. `docs/LITERATURE.md` "Results" has the tables.
+  - **H-LIT-ARSCOTT** (run 37863814444): 113-106-3, 51.6%, p 0.618.
+  - **H-LIT-TV** (run 37864047692): 1249-1136-30, 52.4%, p 0.513.
+  - **H-LIT-BENNETT** (run 37864196666): 28-32-1, 46.7%, p 0.845.
+  - **Holm (m = 6):** every adjusted p is 1.000. The verdicts are final: a raw p above 5% cannot
+    pass at any Holm step, whatever Coleman, Cox and Salaga show.
+  - **No paper arm is licensed.** The rows are `tested-null`, and a second run is refused (exit
+    2).
+  - **Descriptive only:** the 1.75 Arscott cut (32-20-1, n 52) and Bennett faded-away (11-4-1)
+    were never tests. They are not candidates without their own row.
+  - **Not changed:** the roadmap's hypothesis ledger still lists the six looks under NEEDS MORE
+    EVIDENCE. Moving three to REJECTED is a versioned amendment, so it is Tate's call.
+
+- **2026-10-08 (THE LITERATURE LOOK SCRIPT).** `scripts/literature_look.py` +
+  `beatvegas/backtest/literature.py` run H-LIT-ARSCOTT, H-LIT-TV and H-LIT-BENNETT, one
+  `study.yml` dispatch each, on CFBD data only (`/games`, `/lines`, `/games/media`,
+  `/rankings`; the two new client calls are `game_media` and `rankings`). It refuses a row that
+  is not runnable, quotes the criterion verbatim, and `--holm` builds the family table (m = 6).
+  - **Tate's call:** Bennett's first game is the first game PLAYED; a cancelled or postponed
+    opener is skipped.
+  - **Probe before the code (about 20 CFBD calls):**
+    - CFBD's providers change by era. 2013-16 has `consensus` (spread, no total) beside
+      `teamrankings` and `numberfire`, two near-identical feeds. Books arrive in 2018, and they
+      agree tightly from then on.
+    - No look reads a 2013-16 spread. TV's 2013-16 totals come from those two feeds.
+    - `/games` returns FCS openers.
+    - The final AP poll is one postseason release, and its first 10 places can include a tie.
+
+- **2026-10-08 (THREE LITERATURE LOOKS PRE-REGISTERED: H-LIT-ARSCOTT, H-LIT-TV, H-LIT-BENNETT).**
+  Roadmap step 5, part two. Three of the six v1.3 looks are now rows in `docs/HYPOTHESES.md`;
+  no script exists yet. Tate's calls:
+  - **The line:** each game's median close across CFBD's providers, re-fetched by the script.
+    The provider stored in `games` changes by era (TeamRankings 2013-16, consensus 2017-22, one
+    book 2023-25).
+  - **The test:** one-sided exact binomial against 52.38%, pushes dropped. Holm at 5% with
+    m = 6 fixed; a look not yet run counts as p = 1. Each look runs once its script merges.
+  - **Scope:** regular season only.
+  - **Arscott:** the working paper's formula and σ; spread-0 games are excluded.
+  - **National TV:** any TV outlet that is exactly ABC, CBS, NBC, FOX or ESPN qualifies.
+  - **Bennett:** first games of 2018-2025, since the paper's 2008-2016 may name first-game
+    seasons; the team's literal first game; a game between two prior top-10 teams is dropped.
+  - Coleman (full text), Cox (which rules) and Salaga (the weather backfill) still wait.
+
+- **2026-10-08 (WEEKNIGHT CLOSES CONFIRMED).** The first Thursday ticks (shipped 2026-10-06) closed every
+  Thursday game inside its windows: 4 of 4 with first-half closes (2 h) and full-game total,
+  spread and moneyline closes (3 h). The first spread and moneyline capture (thu_pm refresh,
+  9 credits): 1,241 spread rows and 1,187 moneyline rows from 24 books on 56 games.
+
+- **2026-10-08 (THE FIRST ARMS REGISTER: H-ARM-1HU, H-ARM-1HO, H-ARM-FGU).** Roadmap step 6, Tate's calls.
+  - **The rows:** three pre-registered rows under protocol p1, ledger slots 1-3 at 0.5% each
+    (7 of 10 remain). The rows were committed before any collector.
+  - **Arm 1** (first-half unders) counts every qualifier at the per-slate bar, uncapped and whatever
+    the money-path flags. Its paper picks carry the new `manual_picks.arm`.
+  - **Arm 2** (first-half overs) is the bottom-20% mirror with the gap below zero, logged by the new
+    `beatvegas/arm_paper.py`.
+  - **Arm 3** (full-game unders) is H-FG-P's rule without its cap, plus gap above zero.
+  - **Clocks:** they start at the fri_pm build of 2026-10-09.
+  - **Retired:** H-NEGGAP-P and H-FG-P.
+  - **Exclusions:** an unpriced paper pick is now excluded as `no_price`.
+  - **Monday read:** `scripts/protocol_position.py`, through `study.yml`.
+
+- **2026-10-08 (REAL MONEY RESUMES AS A PERSONAL LEDGER; ROADMAP v1.4).** Tate kept the 7 paper
+  arms as planned and resumed real-money first-half unders beside them.
+  - **What is bet:** the old rule (BET at the per-slate bar, the top 5 a week by gap, every
+    money-path check), $10 flat.
+  - **Never evidence:** the protocol reads only an arm's own paper picks, so no real ticket is an
+    observation, and every real bet has its paper twin.
+  - **No stop rule**, to season end. A promotion's $10 live validation stays a separate track.
+  - **The switch:** `rule_paused` set off at 20:00 UTC (it had been on since 2026-10-07 21:40 UTC).
+    Tickets 102 and 103 hold 2 of week 6's 5 slots.
+  - **The site:**
+    - The banner names both tracks.
+    - Signed in, a BET inside the cap reads "Bet one unit", past it "Paper signal" (the cap now
+      also counts tickets on games that kicked off, mirroring `card.py`'s `prior_bet_game_ids`).
+    - The answer bar reads "U of 5 bets placed — L left this week".
+    - A visitor never sees bet wording (`signalGate.gateGame`).
+    - Results shows line value vs the consensus close (`ev_cons`) per ticket.
+  - **The card build:** `card.py`'s BET sentence is "Bet one unit" again.
+
+- **2026-10-08 (OBSERVED WEATHER FOR THE HISTORY LOOKS: `weather_actuals`).** Roadmap v1.3's
+  Salaga look needs 2016-2025 observed weather; we held 2023+.
+  - **Tate's calls:**
+    - ERA5 (Open-Meteo archive, `models=era5`) as the data, with CFBD's `/games/weather` beside
+      it as a cross-check.
+    - Every played FBS-vs-FBS game 2013-2026.
+    - A new study-only table.
+  - **What it stores:** ERA5 is one row per hour from one hour before the kickoff hour to four
+    after; CFBD is one reading per game.
+  - **Nothing reads it but the look.** `tests/test_weather_actuals.py` pins that, so the
+    champion (`weather`) and the frozen studies (`weather_obs`) cannot move.
+  - **Running it:** `weather_actuals.yml` stages, checks and promotes, and resumes across the two
+    UTC days a full ERA5 pass needs.
+  - **Checked:** the CFBD Starter Pack has no weather at all; CFBD's endpoint covered 60 of 60 and
+    54 of 54 probed games; one live ERA5 call returned every variable for a 2016 game.
+  - **First dispatch (run 37780538551):** CFBD staged 9,917 of 10,097 games. ERA5 was refused by
+    the coordinate guard on two real Sydney venues: ANZ Stadium (2016 Hawai'i vs California) and
+    Allianz Stadium (2017 Rice vs Stanford). Tate's call: allow-list both at their published
+    coordinates (`etl/venues.py::VERIFIED_VENUES`, ±0.01°); the guard stays strict for every other
+    venue.
+  - **Second dispatch (37782514919):** about 2.6 games a minute (Open-Meteo throttles GitHub's
+    shared runner addresses per request). It reached the 350-minute limit with 859 games staged
+    (925 done keys) and an empty log, because Python buffered its prints.
+  - **Tate's call:** fetch one call per venue-season (about 1,700 requests for the range) and set
+    `PYTHONUNBUFFERED`. #331 had already made a cut-off run resumable.
+  - **The queue:** the run held `neon-writers` from 13:12 to 19:02Z, and the 16:00Z grade backup
+    waited 90 minutes behind it. Tate's call: split the workflow into plan / fetch / promote, with
+    only plan and promote in the queue; the fetch job holds no `DATABASE_URL`.
+    - `test_every_neon_writer_shares_the_concurrency_group` now checks every job that can reach
+      Neon, whether it joins the queue at workflow or job level.
+
+- **2026-10-08 (THE LITERATURE, VERIFIED; ROADMAP v1.3).** Roadmap step 5, part one: a six-lane
+  research run checked every paper the deep-research report cited (`docs/LITERATURE.md`; lanes and
+  sources in the gitignored `research/swarm/2026-10-08-literature-step5/`).
+  - **The papers:** all 11 exist, but the report misdescribes most of them.
+    - Arscott bets full-game OVERS at the close (1996-2017, 56% on 691, p 0.08), not team totals.
+    - Coleman's effect is the home favourite against a visitor that came one zone EAST (2004-2011,
+      ~55%).
+    - Cox's only 5% result is a streak favourite.
+    - Bennett is 2008-2016, n 83.
+    - Salaga & Howley is a real college weather study (2012-2015, observed weather).
+  - **Tate's calls:** six history looks, one look each on the post-sample years, Holm at 5% outside
+    the K = 10 ledger.
+    - National TV = ABC, CBS, NBC, FOX, ESPN (not ESPN2).
+    - Rivalry = trophy games.
+    - Coleman's cutoff comes from his full text.
+    - Salaga waits for a 2016-22 weather backfill.
+    - Team totals and full-game weather are added as tracked candidates (amendment v1.3).
+  - **Doc corrections:** `DATA_STACK_REVIEW` called Arscott "team totals"; `EXTERNAL_REVIEW`'s
+    source list now has full citations.
+
+- **2026-10-07 (CAPTURE: FULL-GAME SPREADS + MONEYLINES).** Roadmap step 4, part one, Tate's calls
+  on the credit math (plan `~/.claude/plans/pasted-content-id-3a47-session-handoff-shiny-bunny.md`).
+  - **What gets captured:** every Odds API full-game pull (Sunday opener, card-day refresh, every
+    Saturday and weeknight close tick) asks for `totals,spreads,h2h` on `us,us2,us_ex`, 9 credits
+    for the whole slate.
+  - **New rows:** each book's spread and moneyline are written as their own `odds_snapshots` rows
+    (`full_game_spread`: line = the home point; `full_game_ml`: line NULL) with the new
+    `home_price` / `away_price` columns.
+  - **What stays unchanged:** the `full_game_total` rows keep their own `spread` column, so every
+    existing reader is unchanged; each reader filters on `market` (checked reader by reader).
+  - **Change detection:** a price move on either side writes a new row, and a standing quote
+    stamps `last_seen_at` so it can grade as the close.
+  - **Credits:** +200 a week, +860 a month, about 3,300 a month of 20K in all. The weeknight tick
+    count is an estimate; the pull now prints `credits: ... spent= remaining=`.
+  - **Not done here:** no site display (capture only). The judge still grades totals only; a
+    spread needs a margin table in a later engine version.
+  - **Next:** the `H-MKT-PROBE` (5 games, `us,us2`, Saturday 10-10 morning, ≤ 50 credits) is the
+    second part.
+
+- **2026-10-07 (THE TEST: STATISTICAL PROTOCOL p1).** Roadmap step 3 (`docs/PROTOCOL_2026.md`,
+  `H-PROGRAM-2026`, amendment v1.2), Tate's calls: Wald SPRT per arm on line value at Hard Rock's
+  price, H0 0 vs H1 +3% EV, alpha 0.5% (5% / K = 10, never recycled), beta 0.20, spread 0.06 per bet,
+  at least 30 readings over 3+ weeks; promote → $10 live validation, the sequential lower bound
+  stops an arm as NEEDS MORE EVIDENCE, timeout 200 readings or season end. The first simulation
+  showed a shared Saturday move would leak the budget (1–5.5% false promotion), so WEEK-SHOCK was
+  registered and run (study.yml 37712076009): the week move is 0.005 (2023–25, 42 weeks, to 0.007)
+  and 0.012 (2026, 6 weeks, to 0.020); full game not measurable yet. Tate chose the WEEKLY-average
+  design (assume 0.02): no-edge false promotion ≤ 0.08% everywhere measured; a real +3% edge found
+  57% (8 bets/wk) to 80% (15/wk) of the time this season; a −5% arm stops in 3–4 weeks. Shadow
+  engines left the alpha budget (exploratory). "Two seasons" = the unchanged rule passes again in 2027.
 
 - **2026-10-07 (THE JUDGE: CONSENSUS ENGINE cv1).** Roadmap step 2, specified by Tate (amendment
   v1.1, `docs/CONSENSUS.md`): EV per unit of each wager at its own line and price against the median

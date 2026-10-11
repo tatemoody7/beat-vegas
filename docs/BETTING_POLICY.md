@@ -3,18 +3,28 @@
 Decided 2026-09-01 (week 1 audit). This is the rulebook the site enforces and
 the bet card follows. Change it here first, then in code.
 
-## Real money is paused (2026-10-07)
+## Real money: the personal first-half-unders ledger (from 2026-10-08)
 
-**No real-money bets until a strategy is promoted under `docs/ROADMAP_2026.md`.** Tate's call on
-2026-10-07: 2026 is the research season; every strategy runs on paper and is judged by line value
-against the de-vigged consensus close. A strategy that passes its pre-registered sequential test is
-promoted to **$10 flat live validation**, at whatever weekly volume that strategy produces. Tate
-places no personal bets until then, and official plays are exactly what the promoted rule outputs.
+**Tate bets first-half unders with real money again, as a personal ledger kept apart from the
+research (roadmap amendment v1.4, Tate's call 2026-10-08).** 2026 stays the research season: every
+strategy runs on paper, is judged by line value against the de-vigged consensus close, and the paper
+arms run exactly as planned. The personal ledger:
 
-The two tickets placed 2026-10-06, before the pause (`manual_picks` 102 and 103), stand and grade as
-normal. The money path below (BET verdict, weekly cap, price checks, bonus bets) stays built and
-working but frozen: nothing new is built on it while money is paused, and it applies again only to a
-promoted strategy, under the rules the protocol writes for it.
+- **What is bet: the old rule.** BET picks at the per-slate bar, the top 5 a week in order of gap
+  (`WEEKLY_BET_CAP`), with every money-path check below: Hard Rock's main line, a live price seen
+  ≤ 6 h ago, the kill price, ≥ 2 FBS games for both teams; bonus bets as below.
+- **Stake: $10 flat**, one unit on the $100 bankroll (below).
+- **Never evidence.** No real ticket is ever an observation for any arm's test
+  (`docs/PROTOCOL_2026.md` reads only an arm's own paper picks). Every real bet also has its paper
+  twin, written by the build.
+- **No stop rule.** It runs to the season's end.
+- **A promotion is separate.** A promoted arm's $10 flat live validation (roadmap) is a fresh track
+  of its own; the personal ledger stays apart before and after.
+- **Shown on Results** as before, with line value against the consensus close (`ev_cons`,
+  `docs/CONSENSUS.md`) beside each ticket. No dollars are public; a visitor never sees bet wording.
+
+Real money was paused from 2026-10-07 21:40 UTC to 2026-10-08 20:00 UTC (roadmap v1). The two
+tickets placed 2026-10-06 (`manual_picks` 102 and 103) stand and count toward week 6's cap.
 
 ## Bankroll and stakes
 
@@ -218,8 +228,10 @@ after a minute, so they fired only when the laptop happened to be awake —
 `web/lib/boardHealth.ts` surfaces a stale-results banner and a missed-build
 banner, and GitHub emails failed runs.
 
-Odds API: ~567 credits a week expected (`lines_watch.yml` header), comfortably
-inside the **100K/month** tier the project has been on since 2026-09-06.
+Odds API: ~3,300 credits a month expected since the 2026-10-07 side-market
+capture (`lines_watch.yml` header: ~567 a week for the first half and the
+full-game totals, plus ~200 a week for spreads, moneylines and the exchanges),
+comfortably inside the **20K/month** plan the project has been on since 2026-10-05.
 
 | When (ET)                    | What                                                    | Where               |
 | ---------------------------- | ------------------------------------------------------- | ------------------- |
@@ -320,5 +332,6 @@ is refused** on the site (`POST /api/picks`, its own `RULE PAUSED` rejection), t
 place real money is logged. **The build's paper picks continue** and still count toward
 the record. When the state cannot be read at all, real money is
 refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch that is off.
-`docs/STOPPING_RULE.md` says what throws it — a pre-registered failure boundary on the
-paper rule — and that nothing resumes real money until the rule has been reviewed.
+`docs/STOPPING_RULE.md` says what threw it first (a pre-registered failure boundary, now closed).
+It was on from 2026-10-07 (roadmap v1, real money paused) and turned off on 2026-10-08 for the
+personal ledger (v1.4); the ledger has no stop rule, so nothing throws it automatically.

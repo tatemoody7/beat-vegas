@@ -24,7 +24,7 @@ data that doesn't yet exist.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from ..etl.features import (
     BANNED_LINE_COLS,
     FEATURE_COLS,
+    LEAKY_WEATHER_COLS,
     MARKET_COLS,
     SERVE_UNAVAILABLE_COLS,
 )
@@ -47,8 +48,19 @@ _MIN_SEGMENT = 200  # min rows to report a segment residual
 # ...and it never sees the first-half PBP season-to-date columns: they are NaN
 # on every row the live model scores and present on every row it trains on
 # (features.SERVE_UNAVAILABLE_COLS, B-SERVE 2026-09-22).
-_SERVE_UNAVAILABLE = set(SERVE_UNAVAILABLE_COLS)
-BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _SERVE_UNAVAILABLE]
+# ...nor the legacy weather values, kickoff observations that live serving never
+# has (features.LEAKY_WEATHER_COLS, strategic review 2026-10-09).
+_EXCLUDED = set(SERVE_UNAVAILABLE_COLS) | set(LEAKY_WEATHER_COLS)
+BV_FEATURE_COLS = [c for c in FEATURE_COLS if c not in MARKET_COLS and c not in _EXCLUDED]
+
+
+# Early stopping, stated rather than left to sklearn's default (2026-10-10).
+# 'auto' turns it on above 10,000 training rows, holding out a random 10%
+# (random_state=7, so a refit repeats): the 2003+ champion (about 16,700 rows)
+# stops early, every smaller fit grows all 300 trees. H-MODEL-FIX tested False
+# together with three other changes and the bundle was less accurate
+# (docs/MODEL_FIX.md), so 'auto' stays; each refit records the trees it grew.
+EARLY_STOPPING: Union[str, bool] = "auto"
 
 
 def _new_regressor() -> HistGradientBoostingRegressor:
@@ -60,6 +72,7 @@ def _new_regressor() -> HistGradientBoostingRegressor:
         l2_regularization=1.0,
         min_samples_leaf=40,
         random_state=7,
+        early_stopping=EARLY_STOPPING,
     )
 
 
@@ -184,9 +197,21 @@ def bv_line_for_slate(
         return np.array([], dtype=float)
     cols = list(BV_FEATURE_COLS if feature_cols is None else feature_cols)
     model = fit_bv_regressor(train_df, target, cols, drop_all_nan)
+    # What the slate's fit actually did, for the weekly run record
+    # (scripts/weekly_update.py; H-MODEL-FIX: early stopping once hid here).
+    LAST_FIT.clear()
+    LAST_FIT.update(
+        n_iter=int(model.n_iter_),
+        early_stopping=str(model.early_stopping),
+        train_rows=int(len(_played(train_df, target))),
+    )
     raw = model.predict(target_df[model.bv_cols_])
     corrections = bias_corrections(train_df, target, cols, drop_all_nan)
     return apply_bias(raw, target_df, corrections)
+
+
+# The last bv_line_for_slate fit: trees grown, the early-stopping setting, rows.
+LAST_FIT: Dict[str, object] = {}
 
 
 def residual_band(

@@ -1,5 +1,4 @@
 import { getSeasons } from "@/lib/board";
-import { buildAnswer } from "@/lib/answerBar";
 import { etClock12 } from "@/lib/et";
 import {
   buildStatus,
@@ -14,14 +13,12 @@ import {
   parseFilters,
   tierCounts,
 } from "@/lib/homeBoard";
-import { nextBuild } from "@/lib/nextBuild";
 import { getLatestCard } from "@/lib/card";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
 import { viewerIsAuthed } from "@/lib/session";
 import Link from "next/link";
-import AnswerBar from "@/app/components/AnswerBar";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import OpsBanner from "@/app/components/OpsBanner";
 import BoardFilters from "@/app/components/BoardFilters";
@@ -93,8 +90,6 @@ export default async function BoardPage({
   const upcoming = games.filter((g) => !g.kickedOff);
   const played = games.filter((g) => g.kickedOff);
   const days = groupByDay(upcoming);
-  const answer = buildAnswer(all, board.bankroll.weekBets, board.bankroll.cap);
-  const build = nextBuild(new Date());
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -105,8 +100,11 @@ export default async function BoardPage({
         aria-label="What this is"
       >
         Beat Vegas rates college football first-half unders, priced at Hard Rock
-        Bet.{authed ? " Green means a paper signal." : ""} Every result, losses
-        included, is on Results.{" "}
+        Bet.
+        {authed
+          ? " Green means bet, inside this week’s cap; past it, a paper signal."
+          : ""}{" "}
+        Every result, losses included, is on Results.{" "}
         <Link
           href="/how-it-works"
           className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
@@ -131,9 +129,6 @@ export default async function BoardPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      {/* What is live this week is a pre-kickoff signal: the owner's only. */}
-      {authed && <AnswerBar answer={answer} nextBuild={build?.label ?? null} />}
-
       {board.slate.n > 0 && (
         <p className="mb-3 text-xs text-[var(--text-dim)]">
           {/* Shortened 2026-09-28 (Tate): the rows already say why a game is
@@ -143,10 +138,12 @@ export default async function BoardPage({
       )}
 
       <div className="mb-3">
-        <BoardFilters current={filters} showMine={authed} />
+        <BoardFilters current={filters} />
       </div>
 
-      <CardStatusBanner card={card} />
+      {/* The build warnings are the owner's (Tate 2026-10-10): a visitor's
+          first screen is the board, not our ops. */}
+      {authed && <CardStatusBanner card={card} />}
 
       {authed && <OpsBanner />}
 
@@ -161,7 +158,7 @@ export default async function BoardPage({
         </div>
       )}
 
-      {buildHealth.missed && (
+      {authed && buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
             {`${buildHealth.day}'s build did not run.`}
@@ -226,7 +223,7 @@ export default async function BoardPage({
               <span className="font-mono font-semibold text-[var(--good)]">
                 {counts.bet}
               </span>
-              {` paper ${counts.bet === 1 ? "signal" : "signals"} · `}
+              {` ${counts.bet === 1 ? "bet" : "bets"} · `}
               <span className="font-mono font-semibold text-[var(--warn)]">
                 {counts.edge}
               </span>

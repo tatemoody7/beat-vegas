@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
@@ -66,6 +66,10 @@ EX_FAR = "far_lines"  # enough fresh books, too few within MAX_CONVERT_PTS of th
 EX_OUTSIDE_TABLE = "outside_table"
 EX_NO_HR_CLOSE = "no_hr_close"
 EX_NO_TABLE = "no_table"
+# The pick carries no price (a paper pick logged before Hard Rock priced its
+# line): the consensus is read, but EV at the wager's terms cannot be. Named so
+# the protocol counts it as an exclusion rather than a silent gap (2026-10-08).
+EX_NO_PRICE = "no_price"
 
 
 # --- the half-point table ------------------------------------------------------
@@ -352,4 +356,6 @@ def fields_for_pick(snaps: Sequence, kickoff, pick, table: Optional[HalfPointTab
         return pick_fields(Reading(excluded=EX_NO_TABLE), Reading(excluded=EX_NO_TABLE))
     cons = consensus_reading(snaps, kickoff, market, pick.line, side, pick.price, t)
     hr = hr_reading(snaps, kickoff, market, pick.line, side, pick.price, t)
+    if pick.price is None and cons.excluded is None:
+        cons = replace(cons, excluded=EX_NO_PRICE)
     return pick_fields(cons, hr)

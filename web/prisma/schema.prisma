@@ -90,6 +90,8 @@ model manual_picks {
   blocker                 String?   @db.VarChar
   games                   games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   refit_id                Int?
+  /// The registered protocol arm of a paper pick (docs/HYPOTHESES.md H-ARM-1HU; 2026-10-08).
+  arm                     String?   @db.VarChar(16)
 
   @@index([season], map: "ix_manual_picks_season")
   @@index([game_id], map: "ix_manual_picks_game_id")
@@ -108,16 +110,19 @@ model model_runs {
 }
 
 model odds_snapshots {
-  id          Int       @id @default(autoincrement())
-  game_id     Int?
-  book        String?   @db.VarChar
-  market      String?   @db.VarChar
-  line        Float?
-  spread      Float?
-  over_price  Int?
-  under_price Int?
-  captured_at DateTime? @db.Timestamp(6)
-  games       games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id           Int       @id @default(autoincrement())
+  game_id      Int?
+  book         String?   @db.VarChar
+  market       String?   @db.VarChar
+  line         Float?
+  spread       Float?
+  over_price   Int?
+  under_price  Int?
+  home_price   Int?
+  away_price   Int?
+  captured_at  DateTime? @db.Timestamp(6)
+  last_seen_at DateTime? @db.Timestamp(6)
+  games        games?    @relation(fields: [game_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([game_id, book, market, captured_at], map: "uq_odds_snapshot")
   @@index([captured_at], map: "ix_odds_snapshots_captured_at")

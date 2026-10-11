@@ -1,26 +1,23 @@
 import type { LedgerRow } from "@/lib/betLedger";
+import { withBetOpening } from "@/lib/edge";
 import type { HomeGame } from "@/lib/homeBoard";
 import type { RecordRow } from "@/lib/records";
 
-// The research season (docs/ROADMAP_2026.md, Tate 2026-10-07): real money is
-// paused, every strategy runs on paper, and a visitor sees a game's rating only
-// once the game has kicked off — results after the close, never a pre-kickoff
-// signal someone could mistake for a recommendation. The signed-in owner sees
-// everything, as before. Every public surface that carries a rating, our
-// number, a gap or a paper pick passes through one of the three gates below,
-// server-side, before anything is rendered or serialised.
+// The research season (docs/ROADMAP_2026.md): every strategy runs on paper.
+// Since roadmap v1.7 (Tate, 2026-10-10) a visitor sees the board and the game
+// page as the owner does, ratings before kickoff included; the owner's real
+// bets stay his (v1.4), so a visitor never reads bet wording ("Bet one unit"
+// becomes "Paper signal") and never sees his "bet logged" chip before kickoff.
+// The bet ledger, /records and both CSVs still withhold a game until it kicks
+// off. The signed-in owner sees everything. Every public surface that carries
+// a rating, our number, a gap or a paper pick passes through one of the three
+// gates below, server-side, before anything is rendered or serialised.
 
-/** The site-wide banner (Tate's wording, 2026-10-07). */
+/** The site-wide banner (Tate's wording, 2026-10-08, roadmap v1.4; "Florida,
+ *  21+" from docs/LEGAL_MEMO_2026-10.md, roadmap v1.7; the ledger named a
+ *  personal stake, roadmap v2.0, 2026-10-11). */
 export const RESEARCH_BANNER =
-  "2026 is a research season. Real money is paused; every strategy runs on paper and is judged against the closing line. Ratings publish at kickoff.";
-
-/** What a visitor reads in place of the action line before kickoff. */
-export const HIDDEN_ACTION = "Rating publishes at kickoff.";
-
-/** True when this viewer must not see this game's signal yet. */
-export function hidesSignal(kickedOff: boolean, authed: boolean): boolean {
-  return !authed && !kickedOff;
-}
+  "2026 is a research season. Every strategy runs on paper and is judged against the closing line. The owner also bets first-half unders with real money as a personal stake, recorded separately and never evidence for any strategy. Florida, 21+.";
 
 /** A kickoff (UTC ISO string or epoch ms) has passed at `now`. An unknown
  *  kickoff has NOT passed: the gate fails closed. A string without a zone is
@@ -41,36 +38,19 @@ export function kickoffPassed(
   return Number.isFinite(ms) && ms <= now.getTime();
 }
 
-/** The board and the game page: a pre-kickoff game, for a visitor, keeps its
- *  matchup, kickoff, lines, form and news, and loses everything that says what
- *  to bet — rating, rank, cap slot, our number, the gap, the kill line, the
- *  factor read and the "bet logged" chip. */
+/** The board and the game page: a visitor sees the owner's board — rating,
+ *  rank, our number, the gap, the kill line and the factor read, before kickoff
+ *  too (roadmap v1.7) — in paper wording, never bet wording: the owner's real
+ *  bets are his, recorded separately (v1.4). Before kickoff his "bet logged"
+ *  chip stays his as well, as the bet ledger withholds the ticket until then
+ *  (`gateLedger`). */
 export function gateGame(g: HomeGame, authed: boolean): HomeGame {
-  if (!hidesSignal(g.kickedOff, authed)) return g;
-  return {
+  if (authed) return g;
+  const paper = {
     ...g,
-    signalHidden: true,
-    picked: false,
-    gap: null,
-    boardRank: null,
-    capRank: null,
-    overCap: false,
-    row: {
-      ...g.row,
-      bvLine: null,
-      factors: { ...g.row.factors, factor_board: [] },
-    },
-    edge: {
-      ...g.edge,
-      // The board sorts a day by score then gap (homeBoard.sortGames): zeroing
-      // both makes a hidden day sort by kickoff and name, so the ORDER of the
-      // rows cannot rank the games either.
-      score: 0,
-      action: HIDDEN_ACTION,
-      kill: { line: null, price: null, text: "" },
-      gap: null,
-    },
+    edge: { ...g.edge, action: withBetOpening(g.edge.action, false) },
   };
+  return g.kickedOff ? paper : { ...paper, picked: false };
 }
 
 /** /records and its CSV: our number, the gap, its z and the rank stay blank

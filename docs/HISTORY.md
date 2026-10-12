@@ -7,6 +7,25 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-12
+
+- **2026-10-12 UTC (THE MONDAY PRICING REPORT; pv1 FROZEN; FORWARD FROM 2026-10-13).** Tate's
+  approval of items 2 and 3 as one PR. `.github/workflows/pricing_monday.yml` (dispatch only,
+  read-only, the report on the run's Summary page and the `pricing-report` artifact) is
+  dispatched by the Vercel `pricing-monday` entries at 12Z with a 15Z retry (6am-noon ET window;
+  the route re-dispatches only after a failed run). No GitHub cron: a scheduled Neon job needs a
+  health contract, which reaches into the site's health list; `gh workflow run` is the fallback.
+  `pricing.FORWARD_CUTOFF` = 2026-10-13: every earlier state is development evidence, printed
+  apart; the cumulative verdict (insufficient below 40 forward opportunities; strengthening /
+  weakening / inconclusive from the toward-Hard-Rock share's 90% Wilson bounds and the close EV
+  interval, thresholds in `docs/PRICING_RESEARCH.md`) reads forward opportunities only. `pv1`'s
+  constants are pinned by `tests/test_pricing.py`; any change is `pv2`. `data/fl_app_checks.csv`
+  holds Tate's Florida screenshots; a state rises to tier 2 only on an exact match of game,
+  market, line, prices and a capture within ten minutes; mismatch and ambiguous stay unverified,
+  unreadable rows are counted and skipped. Nothing about an arm, the judge, the card, grading,
+  the ledger or the site's pages changed (the cron table gained one job; the owner-only trigger
+  gauge follows from it).
+
 ## 2026-10-11
 
 - **2026-10-11 UTC (H-PRICE-HR READ 1: FIVE FEED OBSERVATIONS IN SIX WEEKS, NONE VERIFIED).**

@@ -67,6 +67,18 @@ CONSERVATIVE_Z = 1.96
 GRACE_MIN = 0  # a reference quote must be confirmed at the capture minute
 FRESH_MIN = 5  # tier 1 needs the provider's stamp this close to our capture
 ML_MAX_ABS_PRICE = 200  # moneylines compared only when both HR prices are within +/-200
+# Development / forward cutoff (Tate 2026-10-11): every state captured before this
+# instant is DEVELOPMENT evidence (the rule was chosen after looking at it); states
+# from this instant on are the forward test. The first day with provider stamps.
+FORWARD_CUTOFF = datetime(2026, 10, 13, 0, 0)
+# The cumulative verdict on the forward opportunities (docs/PRICING_RESEARCH.md):
+VERDICT_MIN_OPPS = 40  # below this the verdict is "insufficient", never a direction
+TOWARD_HR_NULL = 0.5  # Hard Rock as often right as wrong
+TOWARD_HR_ALT = 0.25  # Hard Rock mostly off-market
+VERDICT_EV_CLOSE_MIN = 0.01  # strengthening needs this much EV vs the close, interval above zero
+FL_MATCH_WINDOW_MIN = (
+    10  # a Florida screenshot counts for a state captured within this many minutes
+)
 EXCLUDED_BOOKS = frozenset({HR_BOOK_KEY, "fliff", "consensus"})
 TOTALS_MARKETS = ("1H_total", "full_game_total")
 SIDE_MARKETS = ("full_game_ml",)
@@ -545,3 +557,202 @@ def _group(states: Iterable[Dict[str, Any]], key: str) -> Dict[Any, List[Dict[st
     for s in states:
         g[s[key]].append(s)
     return g
+
+
+# --- development vs forward, the Florida checks, the verdict -------------------------
+
+
+def is_forward(state: Mapping[str, Any]) -> bool:
+    return state["captured_at"] >= FORWARD_CUTOFF
+
+
+def split_dev_forward(
+    states: Iterable[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """(development, forward) by FORWARD_CUTOFF on the capture time."""
+    dev, fwd = [], []
+    for s in states:
+        (fwd if is_forward(s) else dev).append(s)
+    return dev, fwd
+
+
+FL_CHECK_COLUMNS = (
+    "checked_at_utc",
+    "game_id",
+    "market",
+    "app_line",
+    "app_over",
+    "app_under",
+    "app_home",
+    "app_away",
+    "note",
+)
+
+
+def load_fl_checks(path) -> List[Dict[str, Any]]:
+    """data/fl_app_checks.csv: one row per Florida-app screenshot, Tate's record.
+    Columns: checked_at_utc (ISO, naive UTC), game_id (games.id), market
+    (1H_total / full_game_total / full_game_ml), the app's line and prices as shown,
+    note. A row with a missing or unparseable time, game id or market is skipped
+    and counted in the report, never guessed."""
+    import csv
+
+    out: List[Dict[str, Any]] = []
+    p = path
+    if not p.exists():
+        return out
+    with p.open(newline="") as fh:
+        for raw in csv.DictReader(fh):
+            try:
+                t = datetime.fromisoformat(
+                    str(raw.get("checked_at_utc") or "").strip().replace("Z", "")
+                )
+                gid = int(str(raw.get("game_id")).strip())
+                market = str(raw.get("market") or "").strip()
+            except (TypeError, ValueError):
+                out.append({"invalid": True, "raw": dict(raw)})
+                continue
+            if market not in MARKETS:
+                out.append({"invalid": True, "raw": dict(raw)})
+                continue
+
+            out.append(
+                {
+                    "invalid": False,
+                    "checked_at": t,
+                    "game_id": gid,
+                    "market": market,
+                    "app_line": _num(raw, "app_line"),
+                    "app_over": _num(raw, "app_over"),
+                    "app_under": _num(raw, "app_under"),
+                    "app_home": _num(raw, "app_home"),
+                    "app_away": _num(raw, "app_away"),
+                    "note": str(raw.get("note") or ""),
+                }
+            )
+    return out
+
+
+def _num(raw: Mapping[str, Any], key: str) -> Optional[float]:
+    v = str(raw.get(key) or "").strip()
+    return None if v == "" else float(v)
+
+
+def _same_quote(state: Mapping[str, Any], chk: Mapping[str, Any]) -> bool:
+    if state["market"] in TOTALS_MARKETS:
+        return (
+            chk["app_line"] is not None
+            and float(chk["app_line"]) == float(state["hr_line"])
+            and chk["app_over"] is not None
+            and int(chk["app_over"]) == int(state["hr_over"])
+            and chk["app_under"] is not None
+            and int(chk["app_under"]) == int(state["hr_under"])
+        )
+    return (
+        chk["app_home"] is not None
+        and int(chk["app_home"]) == int(state["hr_home"])
+        and chk["app_away"] is not None
+        and int(chk["app_away"]) == int(state["hr_away"])
+    )
+
+
+def apply_fl_checks(
+    states: Iterable[Dict[str, Any]], checks: Sequence[Mapping[str, Any]]
+) -> Counter:
+    """Set each state's `fl_check` from the screenshots that match its game, market
+    and a capture within FL_MATCH_WINDOW_MIN minutes: `match` (every matching check
+    shows the same line and prices -> tier 2), `mismatch` (a check shows a different
+    quote), `ambiguous` (matches and mismatches both), `none`. Only `match` changes
+    a tier; a missing or ambiguous comparison stays unverified. Returns the counts."""
+    counts: Counter = Counter()
+    valid = [c for c in checks if not c.get("invalid")]
+    for st in states:
+        near = [
+            c
+            for c in valid
+            if c["game_id"] == st["game_id"]
+            and c["market"] == st["market"]
+            and abs((c["checked_at"] - st["captured_at"]).total_seconds())
+            <= FL_MATCH_WINDOW_MIN * 60
+        ]
+        if not near:
+            st["fl_check"] = "none"
+        else:
+            same = [c for c in near if _same_quote(st, c)]
+            if len(same) == len(near):
+                st["fl_check"] = "match"
+                st["tier"] = max(int(st["tier"]), 2)
+                st["evidence"] = TIER_LABEL[st["tier"]]
+            elif same:
+                st["fl_check"] = "ambiguous"
+            else:
+                st["fl_check"] = "mismatch"
+        counts[st["fl_check"]] += 1
+    counts["invalid_rows"] = sum(1 for c in checks if c.get("invalid"))
+    return counts
+
+
+def wilson(k: int, n: int, z: float = 1.645) -> Tuple[Optional[float], Optional[float]]:
+    """A two-sided 90% Wilson interval for a share (z = 1.645)."""
+    if n <= 0:
+        return None, None
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return max(0.0, c - h), min(1.0, c + h)
+
+
+def verdict(forward_opps: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """The cumulative research verdict on FORWARD opportunities only, from the
+    thresholds fixed in docs/PRICING_RESEARCH.md. Fewer than VERDICT_MIN_OPPS ->
+    "insufficient" with the count; otherwise "strengthening" when the 90% upper
+    bound of the toward-Hard-Rock share is below TOWARD_HR_NULL and the mean EV vs
+    the close clears VERDICT_EV_CLOSE_MIN with its interval above zero;
+    "weakening" when the share's lower bound is above 0.4 or the close EV mean is
+    at or below zero; else "inconclusive"."""
+    n = len(forward_opps)
+    known = [
+        o
+        for o in forward_opps
+        if o.get("market_moved") in ("toward_hr", "away_from_hr", "unchanged")
+    ]
+    toward = sum(1 for o in known if o["market_moved"] == "toward_hr")
+    lo, hi = wilson(toward, len(known))
+    close = _mean_ci([o.get("ev_close") for o in forward_opps])
+    out = {
+        "opportunities": n,
+        "min_required": VERDICT_MIN_OPPS,
+        "toward_hr": toward,
+        "resolved": len(known),
+        "toward_hr_share_90": (lo, hi),
+        "ev_close": close,
+        "fl_verified": sum(1 for o in forward_opps if int(o.get("tier", 0)) >= 2),
+    }
+    if n < VERDICT_MIN_OPPS:
+        out["verdict"] = "insufficient"
+        out["why"] = (
+            f"{n} forward opportunities of the {VERDICT_MIN_OPPS} needed before any direction is read"
+        )
+        return out
+    if lo is not None and lo > 0.4 or (close["mean"] is not None and close["mean"] <= 0):
+        out["verdict"] = "weakening"
+        out["why"] = (
+            "the market moves toward Hard Rock as often as not, or the close EV is at or below zero"
+        )
+    elif (
+        hi is not None
+        and hi < TOWARD_HR_NULL
+        and close["mean"] is not None
+        and close["mean"] >= VERDICT_EV_CLOSE_MIN
+        and close["ci"] is not None
+        and close["ci"][0] > 0
+    ):
+        out["verdict"] = "strengthening"
+        out["why"] = (
+            "the market rarely moves toward Hard Rock and the close EV is positive with its interval above zero"
+        )
+    else:
+        out["verdict"] = "inconclusive"
+        out["why"] = "the forward sample does not yet separate the two readings"
+    return out

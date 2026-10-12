@@ -168,6 +168,22 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateCloseMin: null,
     everyTick: true,
   },
+  "pricing-monday": {
+    // The Monday pricing report (H-PRICE-HR, docs/PRICING_RESEARCH.md; Tate's
+    // approval 2026-10-12). Read-only: the workflow writes a report, no table, so
+    // a second run cannot double-count. Two entries, 12Z and 15Z (8am/11am EDT,
+    // 7am/10am EST), both inside a 6am-noon ET window: the later tick is the
+    // retry -- suppressedBy re-dispatches when the first run failed and stays
+    // quiet when it succeeded. No GitHub cron (a scheduled Neon job needs a
+    // health contract); `gh workflow run pricing_monday.yml` is the fallback.
+    workflow: "pricing_monday.yml",
+    inputs: {},
+    days: ["Mon"],
+    dispatchOpenMin: 6 * 60,
+    dispatchCloseMin: 12 * 60,
+    gateOpenMin: null,
+    gateCloseMin: null,
+  },
   grade: {
     workflow: "grade.yml",
     // grade.yml declares one OPTIONAL input (`hist`, the 2023-25 post-mortem

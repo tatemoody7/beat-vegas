@@ -220,6 +220,14 @@
     {
       "path": "/api/cron/close-weeknight",
       "schedule": "0 3 * * 6"
+    },
+    {
+      "path": "/api/cron/pricing-monday",
+      "schedule": "0 12 * * 1"
+    },
+    {
+      "path": "/api/cron/pricing-monday",
+      "schedule": "0 15 * * 1"
     }
   ]
 }

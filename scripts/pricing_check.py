@@ -3,13 +3,18 @@
 Rock's prices against the vig-free market reference at the same moment, on the
 odds_snapshots already captured. The frozen rule is `pv1` (beatvegas/pricing.py).
 
-    study.yml -> pricing_check [--season 2026] [--markets 1H_total,full_game_total,full_game_ml]
+    pricing_monday.yml -> pricing_check            (Monday, Vercel-dispatched)
+    study.yml          -> pricing_check [--season N] [--markets ...] [--fl-checks FILE]
 
 READ-ONLY: writes reports/pricing_check_<UTC>.{md,json,csv}, no table. Refuses
-(exit 2) when the registry row is not runnable (beatvegas/registry.py). Every
-flag is labelled with its evidence tier; nothing below tier 2 is ever called
-available in Florida. Independent of every arm, the judge and the card: it
-reads the same snapshot table and writes nothing they read.
+(exit 2) when the registry row is not runnable (beatvegas/registry.py). The
+report separates DEVELOPMENT states (captured before pricing.FORWARD_CUTOFF,
+2026-10-13: the rule was chosen after looking at them) from FORWARD states, and
+the cumulative verdict reads the forward opportunities only. Every flag carries
+an evidence tier; a tier rises to 2 only when a row of data/fl_app_checks.csv
+(Tate's Florida screenshots) matches the same game, market, line, prices and a
+capture within ten minutes. Nothing below tier 2 is ever called available in
+Florida. Independent of every arm, the judge and the card.
 """
 
 from __future__ import annotations
@@ -30,6 +35,9 @@ from beatvegas import pricing as P  # noqa: E402
 from beatvegas.db.models import Game, OddsSnapshot  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 from beatvegas.registry import HarnessRefusal, require_runnable_row  # noqa: E402
+from beatvegas.season import current_season  # noqa: E402
+
+FL_CHECKS_PATH = ROOT / "data" / "fl_app_checks.csv"
 
 
 def load(session, season: int, markets: List[str]):
@@ -81,92 +89,37 @@ def _ci(d: Mapping[str, Any]) -> str:
     s = _pct(d["mean"])
     if d.get("ci"):
         s += f" ({_pct(d['ci'][0])} to {_pct(d['ci'][1])})"
-    return s + f", n {d['n']}"
+    return s
 
 
-def render(
-    row: Any,
-    season: int,
-    per_market: Dict[str, Dict[str, Any]],
-    opps: List[Dict[str, Any]],
-    stamp: str,
-) -> str:
+def _share(lo, hi) -> str:
+    return "—" if lo is None else f"{100 * lo:.0f}% to {100 * hi:.0f}%"
+
+
+def _market_rows(label: str, by_market: Dict[str, Dict[str, Any]]) -> List[str]:
     out = [
-        f"# {P.ROW_ID} — Hard Rock against the market reference, rule `{P.RULE_VERSION}` ({stamp})",
+        f"### {label}",
         "",
-        f"Season {season}; markets {', '.join(per_market)}. Reference = the median of every other centred book "
-        f"confirmed present at the capture minute (at least {P.MIN_BOOKS}; Fliff and the feed's consensus row excluded), "
-        f"de-vigged {P.DEVIG}, converted to Hard Rock's exact line through the frozen table (within {P.MAX_CONVERT_PTS} pts). "
-        f"A FLAG needs EV >= {P.EV_FLAG:+.0%} at the LOWER bound of the table's integer masses; one opportunity per game-side "
-        "(the first qualifying state). Spreads are not compared (no frozen spread table).",
-        "",
-        "**Every flag below tier 2 is UNVERIFIED for Florida.** Tiers: 0 = one feed observation; 1 = provider stamp within "
-        f"{P.FRESH_MIN} min of our capture and the price re-seen at a later poll (quoted and persisting, NOT available between polls); "
-        "2 = Florida-app screenshot; 3 = ticket. Tiers 2-3 come from Tate's records, never from this script. The feed offers no "
-        "Florida-specific Hard Rock key (probe 2026-10-11).",
-        "",
-        "## The registry row's criterion (verbatim)",
-        "",
-        f"> {row.criterion}",
-        "",
-        "## Per market",
-        "",
-        "| market | HR states compared (games) | mean EV vs ref | EV>0 | >=+1% | >=+2% (point) | flagged (lower bound) | opportunities | tiers |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| market | HR states (games) | mean EV vs ref | ≥+2% (point) | flags (lower bound) | opportunities | EV vs ref (lower) | EV vs close | market moved | Florida | record | units |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    for m, s in per_market.items():
+    for m, s in by_market.items():
+        fl = s.get("fl_checks", {})
+        fl_txt = f"{fl.get('match', 0)} match / {fl.get('mismatch', 0)} mismatch / {s['opportunities'] - fl.get('match', 0) - fl.get('mismatch', 0) - fl.get('ambiguous', 0)} unverified"
         out.append(
-            f"| {m} | {s['states_compared']} ({s['games']}) | {_pct(s['mean_ev_ref'])} | {s['ev_pos']} | {s['ev_ge1_point']} | "
-            f"{s['ev_ge2_point']} | {s['flagged_lower_bound']} | {s['opportunities']} | {s['opps_tiers']} |"
+            f"| {m} | {s['states_compared']} ({s['games']}) | {_pct(s['mean_ev_ref'])} | {s['ev_ge2_point']} | "
+            f"{s['flagged_lower_bound']} | {s['opportunities']} | {_ci(s['opps_ev_ref_lower'])} | {_ci(s['opps_ev_close'])} | "
+            f"{s['opps_market_moved'] or '—'} | {fl_txt} | {s['opps_record'] or '—'} | {s['opps_units']:+.2f} |"
         )
-    out += [
-        "",
-        "## The opportunities, per market (first qualifying state per game-side)",
-        "",
-        "| market | n | EV vs ref (point) | EV vs ref (lower bound) | EV vs close | line value | market moved | record | units |",
-        "|---|---|---|---|---|---|---|---|---|",
+    return out + [""]
+
+
+def _opp_rows(opps: List[Dict[str, Any]]) -> List[str]:
+    out = [
+        "| market | week | game | captured (UTC) | h to kick | Hard Rock | ref | side @ price | EV ref | EV lower | EV close | moved | tier | Florida | result |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    for m, s in per_market.items():
-        lv = s["opps_line_clv"]["mean"]
-        lv_txt = "—" if lv is None else f"{lv:+.2f} pts"
-        out.append(
-            f"| {m} | {s['opportunities']} | {_ci(s['opps_ev_ref'])} | {_ci(s['opps_ev_ref_lower'])} | "
-            f"{_ci(s['opps_ev_close'])} | {lv_txt} | {s['opps_market_moved']} | {s['opps_record']} | "
-            f"{s['opps_units']:+.2f} |"
-        )
-    out += [
-        "",
-        "Reading the columns: *EV vs close* is NOT independent evidence when the close is the same number as the reference "
-        "(the market did not move); *market moved* is the honest reading of that: `toward_hr` means the close agreed with Hard "
-        "Rock more than the reference did. *record* and *units* are realized outcomes with the variance that implies.",
-        "",
-        "## Where the states sit (hours to kickoff; flag share)",
-        "",
-    ]
-    for m, s in per_market.items():
-        out.append(
-            f"- **{m}**: "
-            + "; ".join(
-                f"{k}: n {v['n']}, flags {v['flag_share']:.1%}, mean EV {_pct(v['mean_ev_ref'])}"
-                for k, v in s["by_hours_to_kick"].items()
-            )
-        )
-        out.append(
-            "  - by weekday (ET): "
-            + ", ".join(f"{k} {v['n']}/{v['flags']}" for k, v in s["by_weekday"].items())
-            + " (states/flags)"
-        )
-    out += ["", "## Drops", ""]
-    for m, s in per_market.items():
-        out.append(f"- {m}: {json.dumps(s['drops'])}")
-    out += [
-        "",
-        "## Every opportunity",
-        "",
-        "| market | week | game | captured (UTC) | h to kick | HR | ref line | side @ price | EV ref | EV lower | EV close | moved | tier | result |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for o in sorted(opps, key=lambda r: (r["market"], r["captured_at"])):
+    for o in sorted(opps, key=lambda r: (r["captured_at"], r["market"])):
         hr = (
             f"{o['hr_line']} ({o['hr_over']}/{o['hr_under']})"
             if o["market"] in P.TOTALS_MARKETS
@@ -175,12 +128,71 @@ def render(
         out.append(
             f"| {o['market']} | {o['week']} | {o['game']} | {o['captured_at'].strftime('%m-%d %H:%M')} | {o['hrs_to_kick']:.1f} | {hr} | "
             f"{o['ref_line'] if o['ref_line'] is not None else '—'} | {o['side']} @ {o['price']} | {_pct(o['ev_ref'])} | {_pct(o['ev_ref_lower'])} | "
-            f"{_pct(o['ev_close'])} | {o['market_moved']} | {o['tier']} | {o['result'] or '—'} |"
+            f"{_pct(o['ev_close'])} | {o['market_moved']} | {o['tier']} | {o.get('fl_check', 'none')} | {o['result'] or '—'} |"
         )
+    return out
+
+
+def render(
+    row: Any,
+    season: int,
+    dev: Dict[str, Dict[str, Any]],
+    fwd: Dict[str, Dict[str, Any]],
+    v: Dict[str, Any],
+    opps_fwd: List[Dict[str, Any]],
+    opps_dev: List[Dict[str, Any]],
+    fl_counts: Mapping[str, int],
+    stamp: str,
+) -> str:
+    lo, hi = v["toward_hr_share_90"]
+    out = [
+        f"# Pricing research, week ending {stamp[:8]} — {P.ROW_ID}, rule `{P.RULE_VERSION}`",
+        "",
+        f"## Verdict (forward observations since {P.FORWARD_CUTOFF:%Y-%m-%d} only): **{v['verdict'].upper()}**",
+        "",
+        f"- {v['why']}.",
+        f"- Forward opportunities: **{v['opportunities']}** of the {v['min_required']} needed before a direction is read; "
+        f"{v['fl_verified']} verified in the Florida app (tier 2+).",
+        f"- Market moved toward Hard Rock in {v['toward_hr']} of {v['resolved']} resolved ({_share(lo, hi)} at 90%); "
+        f"reads as Hard Rock off-market when the upper bound is below 50%, as Hard Rock right when the lower bound is above 40%.",
+        f"- EV against the close on forward opportunities: {_ci(v['ev_close'])} (n {v['ev_close']['n']}). Not independent when the close equals the reference.",
+        "",
+        "**Every flag below tier 2 is UNVERIFIED for Florida.** Tiers: 0 one feed observation; 1 provider stamp within "
+        f"{P.FRESH_MIN} min and re-seen (quoted and persisting, not available between polls); 2 Florida-app screenshot matching the "
+        "game, market, line, prices and a capture within 10 minutes (data/fl_app_checks.csv); 3 ticket. The feed has no "
+        "Florida key (probe 2026-10-11).",
+        "",
+        "## Forward (the evidence)",
+        "",
+    ]
+    out += _market_rows(f"Since {P.FORWARD_CUTOFF:%Y-%m-%d}", fwd)
+    out += ["#### Forward opportunities", ""]
+    out += _opp_rows(opps_fwd) if opps_fwd else ["(none yet)"]
     out += [
         "",
-        "Exploratory: counts and intervals only. Nothing is adopted from this report; a rule that looks better here is `pv2`, "
-        "a second row read beside this one, never a replacement.",
+        "## Development (weeks before the cutoff; the rule was chosen after seeing these, so they are context, not evidence)",
+        "",
+    ]
+    out += _market_rows(f"Before {P.FORWARD_CUTOFF:%Y-%m-%d}", dev)
+    out += ["<details><summary>Development opportunities</summary>", ""]
+    out += _opp_rows(opps_dev) if opps_dev else ["(none)"]
+    out += ["", "</details>", "", "## Florida checks on file", ""]
+    out.append(
+        f"- Screenshot rows: {sum(fl_counts.get(k, 0) for k in ('match', 'mismatch', 'ambiguous'))} matched to a compared state "
+        f"({fl_counts.get('match', 0)} match, {fl_counts.get('mismatch', 0)} mismatch, {fl_counts.get('ambiguous', 0)} ambiguous); "
+        f"{fl_counts.get('invalid_rows', 0)} rows unreadable (skipped, never guessed)."
+    )
+    out += [
+        "",
+        "## Rule and reading",
+        "",
+        f"Reference = median of every other centred book confirmed present at the capture minute (≥ {P.MIN_BOOKS}; Fliff and the "
+        f"consensus row excluded), de-vigged {P.DEVIG}; totals converted to Hard Rock's exact line through the frozen table within "
+        f"{P.MAX_CONVERT_PTS} pts; a FLAG is EV ≥ {P.EV_FLAG:+.0%} at the LOWER bound of the table's integer masses; moneylines only "
+        f"within ±{P.ML_MAX_ABS_PRICE}; spreads not compared; one opportunity per game-side (the first). Season {season}. "
+        "Exploratory: nothing is adopted from this report; a changed rule is `pv2`, read beside this one.",
+        "",
+        "> " + row.criterion,
     ]
     return "\n".join(out) + "\n"
 
@@ -189,11 +201,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--season", type=int, default=2026)
+    ap.add_argument("--season", type=int, default=None, help="default: the current season")
     ap.add_argument("--markets", default=",".join(P.MARKETS))
     ap.add_argument("--out", default="reports")
+    ap.add_argument(
+        "--fl-checks", type=Path, default=FL_CHECKS_PATH, help="Tate's Florida screenshot CSV"
+    )
     ap.add_argument("--no-init", action="store_true", help="skip init_db (a local read-only run)")
     args = ap.parse_args(argv)
+    season = args.season or current_season()
     markets = [m.strip() for m in args.markets.split(",") if m.strip()]
     for m in markets:
         if m in P.REFUSED_MARKETS:
@@ -210,21 +226,40 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.no_init and not try_init_db():
         return 1
     table = P.MassTable.load()
+    checks = P.load_fl_checks(args.fl_checks)
     with session_scope() as s:
-        games, snaps = load(s, args.season, markets)
-    per_market: Dict[str, Dict[str, Any]] = {}
-    opps: List[Dict[str, Any]] = []
+        games, snaps = load(s, season, markets)
+    dev_by: Dict[str, Dict[str, Any]] = {}
+    fwd_by: Dict[str, Dict[str, Any]] = {}
+    opps_dev: List[Dict[str, Any]] = []
+    opps_fwd: List[Dict[str, Any]] = []
     states_all: List[Dict[str, Any]] = []
+    fl_counts: Dict[str, int] = defaultdict(int)
     for m in markets:
         states, drops = P.price_states(games, snaps, m, table)
-        per_market[m] = P.summarize_market(states, drops)
-        opps += P.first_per_game_side(states)
+        for k, n in P.apply_fl_checks(states, checks).items():
+            fl_counts[k] += n
+        dev, fwd = P.split_dev_forward(states)
+        dev_by[m] = P.summarize_market(dev, drops)
+        fwd_by[m] = P.summarize_market(fwd, drops)
+        for block, summary in ((dev, dev_by[m]), (fwd, fwd_by[m])):
+            o = P.first_per_game_side(block)
+            summary["fl_checks"] = dict(
+                (k, sum(1 for x in o if x.get("fl_check") == k))
+                for k in ("match", "mismatch", "ambiguous")
+            )
+        opps_dev += P.first_per_game_side(dev)
+        opps_fwd += P.first_per_game_side(fwd)
         states_all += states
         print(
-            f"[pricing] {m}: {per_market[m]['states_compared']} states, {per_market[m]['flagged_lower_bound']} flagged, {per_market[m]['opportunities']} opportunities, drops {dict(drops)}"
+            f"[pricing] {m}: dev {dev_by[m]['states_compared']} states / {dev_by[m]['opportunities']} opps; "
+            f"forward {fwd_by[m]['states_compared']} states / {fwd_by[m]['opportunities']} opps; drops {dict(drops)}"
         )
+    fl_counts["invalid_rows"] = sum(1 for c in checks if c.get("invalid"))
+    v = P.verdict(opps_fwd)
+    print(f"[pricing] verdict: {v['verdict']} ({v['why']})")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    md = render(row, args.season, per_market, opps, stamp)
+    md = render(row, season, dev_by, fwd_by, v, opps_fwd, opps_dev, fl_counts, stamp)
     outdir = ROOT / args.out
     outdir.mkdir(parents=True, exist_ok=True)
     stem = outdir / f"pricing_check_{stamp}"
@@ -233,10 +268,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         json.dumps(
             {
                 "rule": P.RULE_VERSION,
-                "season": args.season,
+                "season": season,
                 "run_at": stamp,
-                "per_market": per_market,
-                "opportunities": opps,
+                "forward_cutoff": P.FORWARD_CUTOFF.isoformat(),
+                "verdict": v,
+                "development": dev_by,
+                "forward": fwd_by,
+                "opportunities_forward": opps_fwd,
+                "opportunities_development": opps_dev,
+                "fl_checks": dict(fl_counts),
                 "criterion": row.criterion,
             },
             indent=1,

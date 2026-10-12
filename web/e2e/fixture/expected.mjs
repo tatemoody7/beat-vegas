@@ -571,6 +571,8 @@ export const CRON_JOBS = {
     openMin: 18 * 60,
     closeMin: 24 * 60 - 1,
   },
+  // The Monday pricing report (2026-10-12): read-only, 12Z tick with a 15Z retry.
+  "pricing-monday": { days: ["Mon"], openMin: 6 * 60, closeMin: 12 * 60 },
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
 };
 

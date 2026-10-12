@@ -171,3 +171,120 @@ def test_script_refuses_spreads_before_touching_the_database(capsys):
     assert mod.main(["--markets", "full_game_spread", "--no-init"]) == 2
     assert "REFUSED market" in capsys.readouterr().err
     assert mod.main(["--markets", "nonsense", "--no-init"]) == 2
+
+
+# --- pv1 is frozen; development vs forward; the Florida checks; the verdict -----------
+
+
+def test_pv1_constants_are_pinned_and_a_change_needs_a_new_version():
+    """Tate 2026-10-12: a change to any threshold, filter or probability treatment is
+    pv2, a new row read beside this one. Changing a value here without bumping the
+    version fails CI on purpose."""
+    assert P.RULE_VERSION == "pv1"
+    assert (P.MIN_BOOKS, P.MAX_CONVERT_PTS, P.DEVIG) == (3, 1.5, "multiplicative")
+    assert (P.EV_FLAG, P.CONSERVATIVE_Z, P.GRACE_MIN, P.FRESH_MIN) == (0.02, 1.96, 0, 5)
+    assert P.ML_MAX_ABS_PRICE == 200
+    assert P.FORWARD_CUTOFF == datetime(2026, 10, 13)
+    assert (P.VERDICT_MIN_OPPS, P.TOWARD_HR_NULL, P.TOWARD_HR_ALT, P.VERDICT_EV_CLOSE_MIN) == (
+        40,
+        0.5,
+        0.25,
+        0.01,
+    )
+    assert P.FL_MATCH_WINDOW_MIN == 10
+
+
+def test_split_dev_forward_on_the_cutoff():
+    before = {"captured_at": datetime(2026, 10, 12, 23, 59)}
+    at = {"captured_at": datetime(2026, 10, 13, 0, 0)}
+    dev, fwd = P.split_dev_forward([before, at])
+    assert dev == [before] and fwd == [at]
+
+
+def _state(
+    gid=1,
+    market="1H_total",
+    captured=T,
+    line=28.5,
+    over=-110,
+    under=-110,
+    tier=0,
+    moved="unchanged",
+    ev_close=0.02,
+):
+    return {
+        "game_id": gid,
+        "market": market,
+        "captured_at": captured,
+        "hr_line": line,
+        "hr_over": over,
+        "hr_under": under,
+        "hr_home": None,
+        "hr_away": None,
+        "tier": tier,
+        "evidence": P.TIER_LABEL[tier],
+        "market_moved": moved,
+        "ev_close": ev_close,
+    }
+
+
+def test_fl_checks_match_only_the_same_quote_within_ten_minutes(tmp_path):
+    csv_path = tmp_path / "fl.csv"
+    csv_path.write_text(
+        "checked_at_utc,game_id,market,app_line,app_over,app_under,app_home,app_away,note\n"
+        f"{(T + timedelta(minutes=4)).isoformat()},1,1H_total,28.5,-110,-110,,,same quote\n"  # match
+        f"{(T + timedelta(minutes=6)).isoformat()},99,1H_total,30.5,-110,-110,,,other game\n"  # a game with no state
+        f"{(T + timedelta(minutes=30)).isoformat()},3,1H_total,28.5,-110,-110,,,too late\n"  # outside the window
+        f"{(T + timedelta(minutes=2)).isoformat()},4,1H_total,27.5,-110,-110,,,app showed 27.5\n"  # mismatch
+        f"{(T + timedelta(minutes=1)).isoformat()},5,1H_total,28.5,-110,-110,,,one agrees\n"
+        f"{(T + timedelta(minutes=3)).isoformat()},5,1H_total,28.5,-105,-115,,,one disagrees\n"  # -> ambiguous
+        "not-a-time,6,1H_total,28.5,-110,-110,,,bad row\n"  # invalid, counted, skipped
+        f"{T.isoformat()},7,full_game_spread,3.5,,,,,wrong market\n"  # invalid market
+    )
+    checks = P.load_fl_checks(csv_path)
+    assert sum(1 for c in checks if c["invalid"]) == 2
+    states = [_state(gid=g) for g in (1, 2, 3, 4, 5)]
+    counts = P.apply_fl_checks(states, checks)
+    by = {s["game_id"]: s for s in states}
+    assert by[1]["fl_check"] == "match" and by[1]["tier"] == 2
+    assert by[2]["fl_check"] == "none" and by[2]["tier"] == 0
+    assert by[3]["fl_check"] == "none"
+    assert by[4]["fl_check"] == "mismatch" and by[4]["tier"] == 0
+    assert by[5]["fl_check"] == "ambiguous" and by[5]["tier"] == 0
+    assert (
+        counts["match"] == 1
+        and counts["mismatch"] == 1
+        and counts["ambiguous"] == 1
+        and counts["invalid_rows"] == 2
+    )
+    assert P.load_fl_checks(tmp_path / "missing.csv") == []
+
+
+def test_verdict_is_insufficient_below_the_minimum_then_reads_the_thresholds():
+    few = [_state(gid=i) for i in range(10)]
+    v = P.verdict(few)
+    assert v["verdict"] == "insufficient" and "10 forward opportunities" in v["why"]
+    # 40 forward opportunities, market never toward HR, close EV +2% each: strengthening.
+    strong = [_state(gid=i, moved="unchanged", ev_close=0.02 + (i % 3) * 0.001) for i in range(40)]
+    assert P.verdict(strong)["verdict"] == "strengthening"
+    # Three in five moved toward Hard Rock (the 90% lower bound clears 40%): weakening.
+    weak = [
+        _state(gid=i, moved="toward_hr" if i % 5 < 3 else "unchanged", ev_close=0.02)
+        for i in range(40)
+    ]
+    assert P.verdict(weak)["verdict"] == "weakening"
+    # Close EV at zero: weakening even if the market never moved.
+    flat = [_state(gid=i, moved="unchanged", ev_close=0.0) for i in range(40)]
+    assert P.verdict(flat)["verdict"] == "weakening"
+    # 18 of 40 toward (90% bounds about 33% to 57%): neither bound crossed -> inconclusive.
+    mid = [
+        _state(gid=i, moved="toward_hr" if i % 20 < 9 else "unchanged", ev_close=0.02)
+        for i in range(40)
+    ]
+    assert P.verdict(mid)["verdict"] == "inconclusive"
+
+
+def test_wilson_interval_hand_checked():
+    lo, hi = P.wilson(10, 40)
+    assert 0.15 < lo < 0.17 and 0.36 < hi < 0.38  # 25% on 40 at 90%: about 16% to 37%
+    assert P.wilson(0, 0) == (None, None)

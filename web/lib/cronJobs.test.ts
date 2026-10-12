@@ -383,6 +383,7 @@ describe("vercel.json stays in lock-step with the table", () => {
     const dayOf: Record<string, Record<string, string>> = {
       // A date in each month matching the cron's weekday.
       "0": { [july]: "2026-07-12", [december]: "2026-12-13" },
+      "1": { [july]: "2026-07-13", [december]: "2026-12-14" },
       "2": { [july]: "2026-07-14", [december]: "2026-12-15" },
       "3": { [july]: "2026-07-15", [december]: "2026-12-16" },
       "4": { [july]: "2026-07-16", [december]: "2026-12-17" },

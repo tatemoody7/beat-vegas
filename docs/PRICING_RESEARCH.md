@@ -53,15 +53,55 @@ independent evidence when the close is the same number as the reference** (the m
 move): the `market moved` column is the honest reading of that. Breakdowns are descriptive and can
 never become a criterion without a new row.
 
+## Development versus forward (Tate, 2026-10-12)
+
+Every state captured before **2026-10-13 00:00 UTC** (`pricing.FORWARD_CUTOFF`, the first day with
+provider stamps) is DEVELOPMENT evidence: the rule was chosen after looking at it. Every state from
+that instant on is the forward test. The report prints the two blocks apart and the cumulative
+verdict reads the forward opportunities only. `pv1` is frozen (`tests/test_pricing.py` pins every
+constant); any change to a threshold, a market filter or a probability treatment is `pv2`, a new
+row read beside this one, never a replacement.
+
+## The weekly verdict (forward opportunities only)
+
+| reading | rule |
+|---|---|
+| **insufficient** | fewer than 40 forward opportunities; the count is printed and no direction is read |
+| **strengthening** | the 90% upper bound of the share of opportunities where the market moved toward Hard Rock is below 50%, AND the mean EV against the close is at least +1% with its interval above zero |
+| **weakening** | the share's 90% lower bound is above 40% (Hard Rock as often right as wrong), OR the mean EV against the close is at or below zero |
+| **inconclusive** | neither |
+
+EV against the close is not independent evidence when the close equals the reference; the
+"market moved" share is the honest reading of that, and it is the first thing the verdict uses.
+
+## Florida verification (`data/fl_app_checks.csv`)
+
+Tate's screenshots, one row each: `checked_at_utc` (ISO, naive UTC), `game_id` (`games.id`),
+`market` (`1H_total`, `full_game_total`, `full_game_ml`), the app's `app_line`, `app_over`,
+`app_under` (totals) or `app_home`, `app_away` (moneyline) exactly as shown, `note`. A compared
+state rises to tier 2 only when every check for the same game and market within ten minutes of its
+capture shows the same line and prices. A different quote is a **mismatch**; agreeing and
+disagreeing checks together are **ambiguous**; no check is **none**. Only a match changes a tier;
+a missing, mismatched or ambiguous comparison stays unverified. Rows with an unreadable time,
+game id or market are counted as invalid and skipped, never guessed.
+
 ## How it runs
 
-Dispatch only, no schedule (adding a Monday cron is an automation decision for Tate):
+Every Monday, the Vercel `pricing-monday` entries dispatch `.github/workflows/pricing_monday.yml`:
+a primary tick at 12Z and a retry at 15Z (8am and 11am EDT), both inside a 6am to noon ET window.
+The cron route re-dispatches only when the first run failed and suppresses the retry when it
+succeeded; two runs on one Monday cannot double-count, because the script writes no table and
+both would print the same numbers from the same rows. There is no GitHub schedule (a scheduled Neon
+job must carry a health contract, which would reach into the site's health list); the manual
+fallback is
 
-    gh workflow run study.yml --ref main -f script=pricing_check -f args="--season 2026"
+    gh workflow run pricing_monday.yml --ref main
 
-The report lands in the `study-pricing_check` artifact as `pricing_check_<UTC>.{md,json,csv}`;
-the CSV holds every compared state. Reads: 2026-12-07 (mid-point, no decision) and the January
-review. The Monday one-page read quotes the per-market table.
+**Where to read it:** the run's Summary page at
+https://github.com/tatemoody7/beat-vegas/actions/workflows/pricing_monday.yml (the newest run,
+"Summary" tab shows the whole report), and the `pricing-report` artifact
+(`pricing_check_<UTC>.{md,json,csv}`; the CSV holds every compared state). `study.yml` can still
+run `pricing_check` by hand. Decision reads: 2026-12-07 (mid-point, none) and the January review.
 
 ## Reads
 

@@ -1,0 +1,54 @@
+# The Monday pricing report (H-PRICE-HR, docs/PRICING_RESEARCH.md; Tate's approval
+# 2026-10-12). READ-ONLY: scripts/pricing_check.py writes a report, never a table,
+# so two runs on one Monday cannot double-count anything -- they print the same
+# numbers from the same rows. Dispatched by the Vercel `pricing-monday` entries
+# (web/lib/cronJobs.ts: a primary tick and a later retry tick; the route
+# re-dispatches only when the first run failed, and suppresses the retry when it
+# succeeded). No GitHub schedule: a scheduled Neon job must carry a health
+# contract (tests/test_workflows.py), which would reach into the site's health
+# list; the retry entry is the backup, and `gh workflow run pricing_monday.yml`
+# is the manual fallback. The report is the run's Summary page and the
+# `pricing-report` artifact.
+name: Pricing report (Monday)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/lock.txt
+      - name: Install
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Pricing report (read-only)
+        run: python scripts/pricing_check.py
+      - name: Publish the report on this run's summary page
+        if: always()
+        run: |
+          f=$(ls -t reports/pricing_check_*.md 2>/dev/null | head -1)
+          if [ -n "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; else echo "no report written" >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pricing-report
+          path: reports/*
+          if-no-files-found: warn

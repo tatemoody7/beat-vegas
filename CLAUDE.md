@@ -252,8 +252,8 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
 - Worktrees go under `.claude/worktrees/<name>` only; never edit the main checkout from a session
   that shares it. A worktree serves its own dev server: `bash web/scripts/dev-worktree.sh start`
   (own port 3100-3199, clean `.next`, refuses a Neon URL without `--allow-neon`).
-- `.claude/settings.json` is tracked: `scripts/hooks/post_edit.sh` (ruff + matching tests + tsc
-  on every Edit/Write) and `scripts/hooks/on_stop.sh` (full pytest + vitest + tsc once per turn).
+- `.claude/settings.json` is tracked: `post_edit.sh` (ruff + matching tests + tsc per edit; refuses an
+  added skip/xfail/only), `on_stop.sh` (full suites once per turn) and `pre_bash.sh` (push on green only, merge on all-green CI, no masked test runs) in `scripts/hooks/`.
 - Lint: `ruff check` + `ruff format` (no pyupgrade — py3.9 runtime); `npm run lint` / `npm run
   format` in `web/` (`web/data/*.json` are prettier-ignored, keep them so).
 - Local week sandbox: `scripts/pg_sim.py` + `scripts/simulate_week.py` (throwaway PG16, port

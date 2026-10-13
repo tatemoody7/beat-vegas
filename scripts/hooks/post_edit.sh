@@ -5,6 +5,7 @@
 # edit that broke it rather than at the end of the turn:
 #   *.py            ruff --fix, then tests/test_<name>.py and tests/test_<name>_*.py if they exist
 #   web/**/*.ts(x)  the sibling lib/<name>.test.ts if it exists, then tsc --noEmit (incremental)
+#   any test file   refused (exit 2) when the edit adds a skip/xfail/only
 # Quiet on success. On failure it prints the last 40 lines to stderr and exits 2,
 # which feeds the failure back to the model (Tate, 2026-09-22: feedback, not a log).
 # The repo root is resolved from the FILE, not from cwd, so edits inside a git
@@ -31,6 +32,24 @@ rel=${f#"$ROOT/"}
 
 LOG=$(mktemp); trap 'rm -f "$LOG"' EXIT
 fail() { echo "[post_edit] $1 failed for $rel:" >&2; tail -n 40 "$LOG" >&2; exit 2; }
+
+# A skip, xfail or .only added to a test is Tate's call, never a way to green
+# (2026-10-13); pre_bash.sh refuses the push for the same lines.
+case "$rel" in
+  tests/*.py|*.test.ts|*.test.tsx|*.spec.ts)
+    if git -C "$ROOT" ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
+      diff=$(git -C "$ROOT" diff HEAD -- "$rel")
+    else
+      diff=$(printf '+++ b/%s\n' "$rel"; sed 's/^/+/' "$f")
+    fi
+    skips=$(printf '%s\n' "$diff" | "$PY" "$ROOT/scripts/hooks/classify_bash.py" --skips)
+    if [ -n "$skips" ]; then
+      echo "[post_edit] $rel adds a skip/xfail/only -- take it out, or ask Tate first:" >&2
+      printf '%s\n' "$skips" >&2
+      exit 2
+    fi
+    ;;
+esac
 
 case "$rel" in
   *.py)

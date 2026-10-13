@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-13
 
+- **2026-10-13 UTC (EVIDENCE RULES IN THE BRIEF).** From the usage review of the same day (an
+  unsupported count of scoreless halves Tate had to ask for repeatedly; a "failed cron" that was
+  a hand dispatch from another session). Analysis Rules: every number carries the query, script
+  or run id that produced it and its row count, an inference is labelled, a count Tate cannot
+  re-run is not stated. The GHA-cron gotcha: check `gh run list --event workflow_dispatch` before
+  calling a job missed. Neighbouring lines tightened; the brief stays at 398 lines. The private
+  skill `bv-weekly-review` (the long report v2.1 stopped) is retired to `~/.claude/skills/_retired/`;
+  `bv-monday-read` builds the one-page Monday read with a `[Qn]` appendix behind every number.
 - **2026-10-13 UTC (CATCH-UP TICKS FOR THE NO-DEADLINE JOBS; ROADMAP v2.2).** From the usage
   review of the same day (jobs that missed a whole window were re-run by hand) and Tate's call:
   only jobs with no deadline get an automatic second chance. `web/vercel.json` gains grade at 20Z

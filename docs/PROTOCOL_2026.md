@@ -100,7 +100,7 @@ card of 2026-10-09** on.
 in the model's training inputs (pace, weather, same-season roster and talent, the rivalry and
 conference flags). The model under the three arms is re-fitted without those leaks first. Each
 arm's clock starts at the **first card built on the leak-fixed model**; its `cards.id` and time are
-written here and into `beatvegas/protocol.py::ARMS_START` when it runs. Every pick the arms log
+written here and into `beatvegas/protocol.py::ARMS_START` when it runs. **Set 2026-10-13:** `cards.id` 29, slot `tue_pm`, built 2026-10-13 20:51:39.533351 UTC (Tate's approval); rows placed at or after that instant count, the 2026-10-09 rows (10 per arm) stay development evidence. Every pick the arms log
 until then is development evidence, like every row before 2026-10-09. No week has been read, so
 the restart spends no alpha; the selection rules, slots and test are otherwise unchanged.
 

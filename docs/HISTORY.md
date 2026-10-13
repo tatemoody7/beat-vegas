@@ -9,6 +9,18 @@ hold the rest.
 
 ## 2026-10-13
 
+- **2026-10-13 UTC (ARMS 1-3 CLOCKS STARTED: ARMS_START = THE TUE_PM CARD).** Tate's approval of the
+  one-line change the protocol had been waiting for (p1.1, roadmap v1.5/v1.8): the first card built on
+  the leak-fixed model ran 2026-10-13 (run 38463679608, 23 min, all six arms logged their lines;
+  `cards.id` 29, built 20:51:39.533351 UTC). `beatvegas/protocol.py::ARMS_START` holds that instant;
+  the position reader counts rows placed at or after it (one H-ARM-1HO row at the build; the
+  2026-10-09 rows, ten per model arm, stay development evidence). No rule, threshold, grading
+  method or record changed; the weather and 60+ arms keep their own backstop starts. Verified
+  after the merge by a `study.yml` `protocol_position` dispatch. Same build: the weather capture
+  stored 26 forecasts and lost 31 to Open-Meteo timeouts and the 180 s cap (investigated,
+  unchanged; a game without a forecast is treated as not windy, which the arm cannot tell from
+  calm -- a fix proposal is with Tate).
+
 - **2026-10-13 UTC (EVIDENCE RULES IN THE BRIEF).** From the usage review of the same day (an
   unsupported count of scoreless halves Tate had to ask for repeatedly; a "failed cron" that was
   a hand dispatch from another session). Analysis Rules: every number carries the query, script

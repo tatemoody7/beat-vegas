@@ -102,8 +102,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   (2 credits an event, one probe first), report to The Odds API, or accept. (The Vercel
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
-- **Arms 1-3 start at the 2026-10-13 card** (the 10-11 refit ran: `model_runs` 10); `cards.id` +
-  `protocol.ARMS_START`. `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
+- **Arms 1-3 clocks started at the 2026-10-13 tue_pm card** (`cards.id` 29, 20:51:39Z; `protocol.ARMS_START`;
+  the 10-11 refit `model_runs` 10). First read 10-19. `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
 - **Reads (v2.1)**: light read 2026-10-12; first one-page Monday read 2026-10-19 (then weekly); mid-point
   2026-12-07 (with H6, no decisions); final 2027-01-25. After 10-19: one late GitHub cron per job,
   post-mortem tables stop. Cox look running (`H-LIT-COX`); Coleman and Salaga parked.

@@ -9,6 +9,27 @@ hold the rest.
 
 ## 2026-10-13
 
+- **2026-10-13 UTC (WEATHER CAPTURE BATCHED; A MISSING FORECAST IS UNKNOWN, NEVER CALM).** Tate's
+  approval of the fix to the Tuesday finding (26 forecasts stored, 31 lost to seven Open-Meteo
+  timeouts and the 180 s cap; a game without a forecast read as "not windy" and never appeared in the
+  arm summary). `wx_paper.capture` now sends the outdoor venues of each UTC day in one Open-Meteo
+  multi-location request (at most 25 venues a request; `sources/weather.py::fetch_hourly_series_batch`,
+  the body is a JSON array in request order, each block checked within 0.5 degrees of the venue
+  asked for or discarded); a failed request is retried in halves down to single venues (each venue
+  asked at most once per level), the 180 s budget is checked before every request, and a venue whose
+  forecast never arrives stores NOTHING. Every build now reports: the capture line (requests, stored,
+  domes, failed, unavailable, past the cap) and, per arm, priced games split into a forecast from
+  this build, one carried from an earlier build (with the oldest age in hours), domes, and UNKNOWN
+  (no forecast) named by game id. Unchanged on purpose: the 10 mph gust rule, the selection rules,
+  the windows, grading, history, and `newest()` carrying an older build's forecast (its age is now
+  reported; capping it would be a rule change). `tests/test_weather_batch.py` (parsing: order,
+  single-point dict body, short or displaced blocks, failed request) and `tests/test_wx_paper.py`
+  (one request per day matched to its venue; a partial body counts unknown; a failed batch splits
+  4 -> 2 -> 1; no request past the budget; the per-venue and batched paths store identical rows on
+  the same synthetic slate; the arm accounting). Forecast freshness, measured: the runner's
+  timeouts were against Open-Meteo's forecast endpoint, which answered the Mac in under a second
+  the same day; the model is `icon_seamless` as before. First denser build: Friday 10-16.
+
 - **2026-10-13 UTC (ARMS 1-3 CLOCKS STARTED: ARMS_START = THE TUE_PM CARD).** Tate's approval of the
   one-line change the protocol had been waiting for (p1.1, roadmap v1.5/v1.8): the first card built on
   the leak-fixed model ran 2026-10-13 (run 38463679608, 23 min, all six arms logged their lines;

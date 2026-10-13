@@ -346,6 +346,68 @@ describe("suppressedBy", () => {
   });
 });
 
+describe("catch-up ticks for the no-deadline jobs (2026-10-13, roadmap v2.2)", () => {
+  const ok = (created_at: string, conclusion: string | null = "success") => ({
+    id: 7,
+    event: "workflow_dispatch",
+    created_at,
+    conclusion,
+  });
+
+  // Each case: the job, the catch-up tick at the top of its hour in EDT and EST,
+  // and a run earlier the same ET day inside the window.
+  const cases = [
+    {
+      id: "sunday",
+      edt: "2026-10-18T23:00:00Z", // 7pm EDT
+      est: "2026-12-13T23:00:00Z", // 6pm EST
+      earlier: { edt: "2026-10-18T18:20:00Z", est: "2026-12-13T19:20:00Z" },
+    },
+    {
+      id: "pricing-monday",
+      edt: "2026-10-19T18:00:00Z", // 2pm EDT
+      est: "2026-12-14T18:00:00Z", // 1pm EST
+      earlier: { edt: "2026-10-19T12:20:00Z", est: "2026-12-14T12:20:00Z" },
+    },
+    {
+      id: "grade",
+      edt: "2026-10-19T20:00:00Z", // 4pm EDT
+      est: "2026-12-14T20:00:00Z", // 3pm EST
+      earlier: { edt: "2026-10-19T10:40:00Z", est: "2026-12-14T10:40:00Z" },
+    },
+  ] as const;
+
+  for (const c of cases) {
+    const job = CRON_JOBS[c.id];
+    it(`${c.id}: the catch-up tick lands in-window across its whole hour, both DST regimes`, () => {
+      for (const iso of [c.edt, c.est]) {
+        const first = at(iso);
+        const last = new Date(first.getTime() + 59 * 60_000);
+        expect(dispatchDecision(job, first).allowed, iso).toBe(true);
+        expect(dispatchDecision(job, last).allowed, iso).toBe(true);
+      }
+    });
+
+    it(`${c.id}: stays quiet after a success earlier that day`, () => {
+      expect(suppressedBy([ok(c.earlier.edt)], job, at(c.edt))).not.toBeNull();
+      expect(suppressedBy([ok(c.earlier.est)], job, at(c.est))).not.toBeNull();
+    });
+
+    it(`${c.id}: dispatches when nothing ran or the run failed`, () => {
+      expect(suppressedBy([], job, at(c.edt))).toBeNull();
+      expect(
+        suppressedBy([ok(c.earlier.edt, "failure")], job, at(c.edt)),
+      ).toBeNull();
+    });
+  }
+
+  it("leaves the card, close-poll and weeknight windows where they were", () => {
+    expect(CRON_JOBS["card-sat-am"].dispatchCloseMin).toBe(8 * 60 + 15);
+    expect(CRON_JOBS["lines-close"].dispatchCloseMin).toBe(24 * 60 - 1);
+    expect(CRON_JOBS["close-weeknight"].dispatchCloseMin).toBe(24 * 60 - 1);
+  });
+});
+
 describe("vercel.json stays in lock-step with the table", () => {
   const crons = JSON.parse(
     readFileSync(join(__dirname, "..", "vercel.json"), "utf8"),

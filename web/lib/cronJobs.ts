@@ -111,8 +111,12 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // Wide window because nothing downstream has a deadline: capture is gated
     // to one per ET day inside the workflow (sunday.yml), so several ticks
     // landing in the same afternoon cannot double-spend the 6 credits.
+    // The catch-up (2026-10-13, roadmap v2.2): the window runs to 8pm ET so a
+    // fourth entry at 23Z (7pm EDT / 6pm EST) is in-window. suppressedBy lets it
+    // dispatch only when no run since 1pm succeeded -- one automatic retry for
+    // an afternoon whose three ticks all failed or never fired.
     dispatchOpenMin: 13 * 60,
-    dispatchCloseMin: 17 * 60,
+    dispatchCloseMin: 20 * 60,
     gateOpenMin: null,
     gateCloseMin: null,
   },
@@ -176,11 +180,14 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     // retry -- suppressedBy re-dispatches when the first run failed and stays
     // quiet when it succeeded. No GitHub cron (a scheduled Neon job needs a
     // health contract); `gh workflow run pricing_monday.yml` is the fallback.
+    // The catch-up (2026-10-13, roadmap v2.2): the window runs to 3pm ET and a
+    // third entry at 18Z (2pm EDT / 1pm EST) retries once more if neither
+    // morning tick produced a successful run.
     workflow: "pricing_monday.yml",
     inputs: {},
     days: ["Mon"],
     dispatchOpenMin: 6 * 60,
-    dispatchCloseMin: 12 * 60,
+    dispatchCloseMin: 15 * 60,
     gateOpenMin: null,
     gateCloseMin: null,
   },
@@ -194,6 +201,8 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     days: null,
     // No window: grading is idempotent, spends no Odds credits and has no
     // deadline, so the hour it drifts across the DST change does not matter.
+    // The catch-up (2026-10-13, roadmap v2.2): a second entry at 20Z dispatches
+    // only when no grade run since midnight ET succeeded (suppressedBy).
     dispatchOpenMin: 0,
     dispatchCloseMin: 24 * 60 - 1,
     gateOpenMin: null,

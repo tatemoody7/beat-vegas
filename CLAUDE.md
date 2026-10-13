@@ -3,7 +3,7 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.1) governs 2026**: every
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.2) governs 2026**: every
 strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
 first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.1): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.2): what is tested, how an edge is judged,
   what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -122,9 +122,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Sat, dispatch 7:00–8:15am, gate 7:45–9:15am | `card.yml` slot `sat_am` | same sweep before the morning sitting; paper window rest of week |
 | Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, 6 h look-ahead on Saturday ticks (`CLOSE_LOOKAHEAD_MIN_SAT=360`, since 2026-10-11; weeknights 120); GitHub's every-30-min crons stay |
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
-| Sun 1–5pm (ticks 18/19/20Z) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
-| Mon 6am–noon ET (ticks 12Z, 15Z retry) | `pricing-monday` → `pricing_monday.yml` | the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13); read-only, no health contract |
-| Daily 10Z (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
+| Sun 1–5pm (ticks 18/19/20Z; 23Z catch-up, v2.2) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
+| Mon 6am–noon ET (ticks 12Z, 15Z retry; 18Z catch-up) | `pricing-monday` → `pricing_monday.yml` | the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13); read-only, no health contract |
+| Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
 in `web/lib/cronJobs.ts` (mirrored by `web/vercel.json`, which **must live in `web/`**). A
@@ -173,7 +173,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; input hist | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
-| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry), dispatch | — (the Monday pricing report, read-only: run Summary + `pricing-report` artifact) |
+| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up), dispatch | — (the Monday pricing report, read-only: run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |

@@ -9,6 +9,16 @@ hold the rest.
 
 ## 2026-10-13
 
+- **2026-10-13 UTC (CATCH-UP TICKS FOR THE NO-DEADLINE JOBS; ROADMAP v2.2).** From the usage
+  review of the same day (jobs that missed a whole window were re-run by hand) and Tate's call:
+  only jobs with no deadline get an automatic second chance. `web/vercel.json` gains grade at 20Z
+  daily, Sunday at 23Z (the window now closes 8pm ET) and pricing-monday at 18Z (window to 3pm
+  ET); `suppressedBy` (unchanged) lets each dispatch only when no run since the window opened
+  succeeded. No catch-up for a card build or a close poll: a late card would log arm picks
+  outside their registered window, a close poll is useless after kickoff; the board's dispatch
+  and health banners still show those misses. Tests in `web/lib/cronJobs.test.ts` (both DST
+  regimes, suppressed after a success, dispatched after a failure or nothing). Nothing about an
+  arm, the judge, the protocol or money changed.
 - **2026-10-13 UTC (THE PUSH/MERGE GATE AND THE PRODUCTION SMOKE CHECK).** From the usage report
   of the same day (masked test runs and a red suite pushed; stacked PRs merged into the wrong
   base) and Tate's call for a hard block. `scripts/hooks/pre_bash.sh` (PreToolUse, Bash) refuses

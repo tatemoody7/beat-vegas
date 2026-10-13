@@ -6,6 +6,10 @@
       "schedule": "0 10 * * *"
     },
     {
+      "path": "/api/cron/grade",
+      "schedule": "0 20 * * *"
+    },
+    {
       "path": "/api/cron/card-tue-pm",
       "schedule": "0 19 * * 2"
     },
@@ -64,6 +68,10 @@
     {
       "path": "/api/cron/sunday",
       "schedule": "0 20 * * 0"
+    },
+    {
+      "path": "/api/cron/sunday",
+      "schedule": "0 23 * * 0"
     },
     {
       "path": "/api/cron/lines-close",
@@ -228,6 +236,10 @@
     {
       "path": "/api/cron/pricing-monday",
       "schedule": "0 15 * * 1"
+    },
+    {
+      "path": "/api/cron/pricing-monday",
+      "schedule": "0 18 * * 1"
     }
   ]
 }

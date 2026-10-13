@@ -252,7 +252,7 @@ Failure modes on record:
 ### sunday
 
 - Workflow: `.github/workflows/sunday.yml`
-- Window: Sunday 18:00Z / 19:00Z / 20:30Z crons plus the Vercel dispatch, 1-5pm ET
+- Window: Sunday 18:00Z / 19:00Z / 20:30Z crons plus the Vercel dispatch, 1-5pm ET; one Vercel catch-up at 23Z (window to 8pm ET, roadmap v2.2) dispatches only when no run since 1pm succeeded
 - Artifacts: `odds_snapshots full_game_total`, `team_tempo (season, week)`, `weather rows`, `predictions (model + derived_lines)`
 - Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SEASON`, `WEEK`, `NEED_CAPTURE`, `NEED_SCORE`, `OUTCOME_PACE`, `OUTCOME_WEATHER`
 

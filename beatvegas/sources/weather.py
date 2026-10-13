@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
-from typing import Dict, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import requests
 
@@ -115,8 +115,8 @@ def _hourly_names(source: str, lead_hours: int) -> Dict[str, str]:
     return {f"{k}_previous_day{day}": v for k, v in _VARS.items()}
 
 
-def _get(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> dict:
-    """One Open-Meteo call, with the shared retry ladder.
+def _request(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> Any:
+    """One Open-Meteo call, with the shared retry ladder; the parsed JSON body.
 
     A 429 or 5xx is retried (honouring `Retry-After`); any other 4xx is a bad
     request and raises straight away. Exhausting the ladder raises
@@ -133,7 +133,7 @@ def _get(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> dic
         else:
             if resp.status_code < 400:
                 try:
-                    return resp.json().get("hourly", {}) or {}
+                    return resp.json()
                 except ValueError as e:
                     last = f"bad json: {e}"
             elif resp.status_code == 429 or resp.status_code >= 500:
@@ -149,6 +149,12 @@ def _get(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> dic
         if attempt < attempts - 1:
             time.sleep(backoff_seconds(attempt))
     raise WeatherUnavailable(f"{url}: {last} after {attempts} attempts")
+
+
+def _get(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) -> dict:
+    """The `hourly` block of one Open-Meteo call (see `_request`)."""
+    body = _request(url, params, timeout, attempts)
+    return (body.get("hourly", {}) if isinstance(body, dict) else {}) or {}
 
 
 def fetch_hourly_series(
@@ -208,6 +214,90 @@ def fetch_hourly_series(
             vals = h.get(api_name) or []
             row[col] = vals[i] if i < len(vals) else None
         out[t[:13]] = row  # key 'YYYY-MM-DDTHH', UTC
+    return out
+
+
+# One request can carry several locations (comma-separated latitude and
+# longitude lists); the body comes back as a JSON array in request order. The
+# build-time capture (wx_paper.capture, 2026-10-13) uses this so a slate's
+# venues cost one or two calls instead of one each.
+COORD_TOLERANCE_DEG = 0.5  # a returned grid point must sit this close to what was asked
+
+
+def _series_from_hourly(h: Dict[str, Any], names: Dict[str, str]) -> Dict[str, dict]:
+    times: Sequence[str] = h.get("time") or []
+    out: Dict[str, dict] = {}
+    for i, t in enumerate(times):
+        row = {}
+        for api_name, col in names.items():
+            vals = h.get(api_name) or []
+            row[col] = vals[i] if i < len(vals) else None
+        out[t[:13]] = row  # key 'YYYY-MM-DDTHH', UTC
+    return out
+
+
+def fetch_hourly_series_batch(
+    points: Sequence[Tuple[float, float]],
+    start_date: str,
+    end_date: str,
+    *,
+    source: str = SOURCE_FORECAST,
+    models: Optional[str] = None,
+    timeout: int = 60,
+    attempts: int = _ATTEMPTS,
+) -> List[Optional[Dict[str, dict]]]:
+    """`fetch_hourly_series` for several (lat, lon) points in ONE request.
+
+    Returns one series per point, in order; an entry is None when the body held
+    no usable block for that point (too few items, no `hourly`, or a grid point
+    more than COORD_TOLERANCE_DEG from the one asked for -- the caller counts it
+    as unavailable, never as calm). A failed request raises WeatherUnavailable
+    for the whole batch, so the caller can retry it in smaller pieces.
+    """
+    if not points:
+        return []
+    if source not in _URLS:
+        raise ValueError(f"unknown weather source: {source!r}")
+    names = _hourly_names(source, 0)
+    params = {
+        "latitude": ",".join(f"{float(lat):.4f}" for lat, _ in points),
+        "longitude": ",".join(f"{float(lon):.4f}" for _, lon in points),
+        "start_date": start_date,
+        "end_date": end_date,
+        "hourly": ",".join(names),
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "UTC",  # load-bearing -- see the module docstring
+    }
+    if models:
+        params["models"] = models
+    body = _request(_URLS[source], params, timeout, attempts)
+    items: List[Any] = body if isinstance(body, list) else [body]
+    out: List[Optional[Dict[str, dict]]] = []
+    for idx, (lat, lon) in enumerate(points):
+        item = items[idx] if idx < len(items) else None
+        if not isinstance(item, dict) or not isinstance(item.get("hourly"), dict):
+            out.append(None)
+            continue
+        got_lat, got_lon = item.get("latitude"), item.get("longitude")
+        try:
+            off = (
+                got_lat is None
+                or got_lon is None
+                or abs(float(got_lat) - float(lat)) > COORD_TOLERANCE_DEG
+                or abs(float(got_lon) - float(lon)) > COORD_TOLERANCE_DEG
+            )
+        except (TypeError, ValueError):
+            off = True
+        if off:
+            print(
+                f"[weather] batch item {idx} came back for ({got_lat}, {got_lon}), "
+                f"asked ({lat}, {lon}): discarded"
+            )
+            out.append(None)
+            continue
+        out.append(_series_from_hourly(item["hourly"], names))
     return out
 
 

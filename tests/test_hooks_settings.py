@@ -1,8 +1,9 @@
 """The Claude Code hooks in .claude/settings.json (2026-09-22).
 
-Two scripts under scripts/hooks/: post_edit.sh runs the checks matching an
+Three scripts under scripts/hooks/: post_edit.sh runs the checks matching an
 edited file and feeds a failure back (exit 2); on_stop.sh runs the full suites
-once per turn and blocks the first stop on red. These tests pin the wiring, not
+once per turn and blocks the first stop on red; pre_bash.sh (2026-10-13) gates
+git push and gh pr merge on a green suite and refuses masked test runs. These tests pin the wiring, not
 the behaviour -- a hook whose script is missing, unreadable or times out is a
 hook that silently never ran.
 """
@@ -13,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ("post_edit.sh", "on_stop.sh")
+SCRIPTS = ("post_edit.sh", "on_stop.sh", "pre_bash.sh")
 
 
 def _settings():
@@ -29,6 +30,15 @@ def test_post_edit_hook_is_wired_to_edits_and_writes():
     assert hook["command"].startswith('"$CLAUDE_PROJECT_DIR/')
     assert hook["command"].endswith('scripts/hooks/post_edit.sh"')
     assert hook["timeout"] >= 90
+
+
+def test_pre_bash_hook_gates_every_bash_call_with_time_for_the_suite():
+    pre = _settings()["hooks"]["PreToolUse"]
+    assert len(pre) == 1 and pre[0]["matcher"] == "Bash"
+    hook = pre[0]["hooks"][0]
+    assert hook["command"] == '"$CLAUDE_PROJECT_DIR/scripts/hooks/pre_bash.sh"'
+    # A push on a stale stamp runs the full suite (~150 s) inside the hook.
+    assert hook["timeout"] >= 240
 
 
 def test_stop_hook_runs_the_full_suites_with_time_to_finish():
@@ -53,4 +63,8 @@ def test_hooks_exit_zero_on_empty_or_irrelevant_input():
     post = ROOT / "scripts" / "hooks" / "post_edit.sh"
     for stdin in ("", "{}", json.dumps({"tool_input": {"file_path": "/nonexistent/x.py"}})):
         r = subprocess.run([str(post)], input=stdin, text=True, capture_output=True)
+        assert r.returncode == 0, (stdin, r.stderr)
+    pre = ROOT / "scripts" / "hooks" / "pre_bash.sh"
+    for stdin in ("", "{}", json.dumps({"tool_input": {"command": "ls -la"}})):
+        r = subprocess.run([str(pre)], input=stdin, text=True, capture_output=True)
         assert r.returncode == 0, (stdin, r.stderr)

@@ -7,6 +7,22 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-13
+
+- **2026-10-13 UTC (THE PUSH/MERGE GATE AND THE PRODUCTION SMOKE CHECK).** From the usage report
+  of the same day (masked test runs and a red suite pushed; stacked PRs merged into the wrong
+  base) and Tate's call for a hard block. `scripts/hooks/pre_bash.sh` (PreToolUse, Bash) refuses
+  `git push` unless the full suite is green on that exact tree (the `on_stop` stamp, now shared
+  through `scripts/hooks/_suite.sh`, or a run inside the hook) and the branch adds no
+  skip/xfail/only to a test; refuses `gh pr merge` unless `gh pr checks` shows web, python and e2e
+  all passing; refuses a test run piped into tail/head/grep without `pipefail` or followed by
+  `|| true`. `post_edit.sh` refuses an edit that adds a skip, xfail or `.only` to a test.
+  `scripts/hooks/classify_bash.py` decides (stdlib, tested in `tests/test_hooks.py` against a
+  stubbed suite and a stubbed `gh`). `web/scripts/smoke.mjs` is the post-deploy check `bv-ship`
+  runs: pages 200 signed out, the first board game 200, every `next.config.ts` moved route 308 to
+  its destination, `/api/health` ok, the season's records CSV non-empty. Nothing about an arm,
+  the judge, the card, grading, the ledger or the site changed.
+
 ## 2026-10-12
 
 - **2026-10-12 UTC (THE MONDAY PRICING REPORT; pv1 FROZEN; FORWARD FROM 2026-10-13).** Tate's

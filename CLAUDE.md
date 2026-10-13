@@ -40,7 +40,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10), `PRICING_RESEARCH` (Hard Rock against the market, exploratory) (all in `docs/`).
 - `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11);
   `docs/program/JANUARY_2027_REVIEW.md` — the two reads (12-07, 2027-01-25) and the 2027 default (v2.1);
-  `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-weekly-review`, `bv-card-check`, `bv-ship`, `bv-site-check`.
+  `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-monday-read` (the one-page Monday read; replaced bv-weekly-review 2026-10-13), `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 ## Where we are (as of 2026-10-11)
 - **The reset (`docs/ROADMAP_2026.md`)**: a strategy is promoted only by passing a
@@ -263,8 +263,7 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   endpoint (`POST https://<pooler-host>/sql`, header `Neon-Connection-String`, body `{"query"}`).
 - Dispatch by hand: `gh workflow run <file>.yml --ref main -f key=value`. Check the exit code of
   every test run yourself — `pytest | tail -1` masks it and let a red suite push once.
-- Merge with `bv-ship` (squash, CI incl. e2e, prod health, routes 200); site PRs go through
-  `bv-site-check` first.
+- Merge with `bv-ship` (squash, CI incl. e2e, prod health, routes 200); site PRs: `bv-site-check` first.
 
 ## Honest status of the edge (don't oversell)
 - **Live evidence first.** Real money stood 10-10 (−0.29u) on 20 tickets when it paused, inside its
@@ -287,8 +286,7 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
 - Captures come from headless Chrome via Playwright: `cd web && node scripts/shots.mjs --base
   http://localhost:<port> --label <name>` (every route at 1440 and 390 with height / overflow /
   header / tap-target metrics), then `--diff before after` (`--pixdiff` via odiff). **Never the
-  Browser pane for captures** (it caps at 800x500); its `javascript_tool` is still the right way
-  to measure the DOM.
+  Browser pane for captures** (it caps at 800x500); its `javascript_tool` still measures the DOM.
 - A worktree verifies against **its own dev server on its own port with a clean `.next`**
   (`dev-worktree.sh`). Never point shots at the main checkout's server on 3000 — the preview pane
   serves main even from a worktree.
@@ -303,12 +301,13 @@ Before any CLV, win-rate, hit-rate or model recommendation is reported, state, i
 - The line source — consensus vs one book, first half vs full game — and the price provenance
   (`manual_picks.price_provenance`: `logged` / `backfilled_close` / `unknown`; only `logged` may
   feed price CLV; a price is never assumed to be −110).
-- Whether any row is proxy-graded. A proxy number is never presented as a real-line number; every
-  table is split on `line_real IS NOT NULL` with both n stated.
+- Whether any row is proxy-graded (never presented as a real-line number; every table splits on
+  `line_real IS NOT NULL` with both n stated).
 - The sign convention, checked against one hand-worked pick: stored `clv` is `closing − bet`, so
   **negative is the good direction for an under** and the site displays `−clv`.
-- Any number about the LIVE model comes from a runner dispatch and names its frame fingerprint
-  (this Mac's CFBD cache has disagreed with the runner's before).
+- Any number about the LIVE model comes from a runner dispatch and names its frame fingerprint.
+- **Every number carries the query, script or run id that produced it, and its row count**; an
+  inference is labelled as one. A count or list Tate cannot re-run is not stated (2026-10-13).
 Nothing in an analysis changes a gate, a model constant or a registry row; fixes are proposed as a
 list and land through their own registered row or PR.
 
@@ -371,8 +370,9 @@ list and land through their own registered row or PR.
   deploy — the write path throws on a missing column, only the read path degrades.
 - **GHA cron is unreliable, not just late** (fired 2 of 19, then 0 of 5, then 3 of 18). Vercel
   Hobby fires within the HOUR after the minute, so every job carries several UTC entries and the
-  route refuses ticks outside its ET window; `boardHealth.ts` warns when a job's last closed
-  window saw no tick. `card.yml` runs its own missing inputs before it builds.
+  route refuses out-of-window ticks; `boardHealth.ts` warns on a closed window with no tick.
+  `card.yml` runs its own missing inputs. Before calling a job missed or failed, run `gh run list
+  --workflow <file> --event workflow_dispatch`: a hand run from another session counts.
 - **`web/lib` exports with no TypeScript caller can be load-bearing**: `tests/test_gate_parity.py`
   reads constants out of `verdict.ts`, `grade.ts`, `edge.ts`, `lineCheck.ts`, `books.ts`,
   `card.ts` by regex; `test_pick_columns_parity.py` reads both INSERT column lists;

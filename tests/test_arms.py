@@ -52,8 +52,12 @@ def test_the_arms_are_registered_with_their_slots():
     assert P.ARMS[P.ARM_FG_UNDER]["market"] == "full" and P.ARMS[P.ARM_FG_UNDER]["slot"] == 3
     assert P.ARMS_TAGGED_FROM == "2026-10-09T00:00:00"
     # p1.1 (roadmap v1.5, 2026-10-09): paused before any completed week, until the
-    # first card built on the leak-fixed model
-    assert P.ARMS_START is None and P.PROTOCOL_VERSION == "p1.1"
+    # first card built on the leak-fixed model -- the 2026-10-13 tue_pm card
+    # (Tate's approval 2026-10-13). The 2026-10-09 rows sit before it.
+    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.1"
+    assert P.ARMS_START > P.ARMS_TAGGED_FROM
+    for arm in (P.ARM_1H_UNDER, P.ARM_1H_OVER, P.ARM_FG_UNDER):
+        assert P.arm_start(arm) == P.ARMS_START
 
 
 def test_a_paused_arm_reports_no_reading_and_says_so(load_script):

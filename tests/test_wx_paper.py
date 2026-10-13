@@ -214,7 +214,7 @@ def test_the_weather_arms_hold_slots_6_and_7_and_run_their_own_clocks():
     }
     assert P.ARMS[P.ARM_WX_FG]["market"] == "full" and P.ARMS[P.ARM_WX_FG]["slot"] == 7
     assert P.arm_start(P.ARM_WX_1H) == P.WX_ARMS_START is not None
-    assert P.arm_start(P.ARM_1H_UNDER) is None  # the model arms stay paused (p1.1)
+    assert P.arm_start(P.ARM_1H_UNDER) == P.ARMS_START is not None  # clocks started 2026-10-13
     assert len({spec["slot"] for spec in P.ARMS.values()}) == len(P.ARMS) <= P.K_TESTS
 
 

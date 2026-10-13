@@ -63,9 +63,9 @@ MAX_OBS = 200  # readings
 # The registered arms (docs/HYPOTHESES.md, Tate's calls of 2026-10-08). Each is
 # one sequential test with its own 0.5% ledger slot; `table` + `arm` + `market`
 # + `side` select its paper picks. The builds tag them from ARMS_TAGGED_FROM
-# on; ARMS_START is the earliest placed_at that counts toward a clock, and None
-# while the clocks are paused (p1.1, 2026-10-09: until the first card built on
-# the leak-fixed model, whose time is written here when it runs).
+# on; ARMS_START is the earliest placed_at that counts toward a clock. It was
+# None while the clocks were paused (p1.1, 2026-10-09) and holds the first card
+# built on the leak-fixed model since 2026-10-13.
 ARM_1H_UNDER = "H-ARM-1HU"
 ARM_1H_OVER = "H-ARM-1HO"
 ARM_FG_UNDER = "H-ARM-FGU"
@@ -88,7 +88,10 @@ ARMS = {
     ARM_HT_1H: {"table": "challenger_picks", "market": "1H", "side": "under", "slot": 8},
 }
 ARMS_TAGGED_FROM = "2026-10-09T00:00:00"  # naive UTC; the first tagging build is fri_pm
-ARMS_START: Optional[str] = None  # paused 2026-10-09 (p1.1); naive UTC once set
+# Set 2026-10-13 (Tate's approval): the first card built on the leak-fixed model,
+# cards row for 2026 week 7, slot tue_pm, built_at 2026-10-13T20:51:39.533351 (naive UTC). Rows
+# placed at or after this instant count; the 2026-10-09 rows stay development.
+ARMS_START: Optional[str] = "2026-10-13T20:51:39.533351"
 # The weather arms tag nothing before their rows merge, so this is a backstop:
 # their clocks run from their first eligible build.
 WX_ARMS_START = "2026-10-10T00:00:00"

@@ -57,7 +57,8 @@ describe("gateGame", () => {
     expect(g.edge.action).toBe(pre.edge.action);
     expect(g.gap).toBe(3.4);
     expect(g.boardRank).toBe(1);
-    expect(g.capRank).toBe(1);
+    // The cap slot is the owner's real-money rule: hidden before kickoff (2026-10-14).
+    expect(g.capRank).toBeNull();
     expect(g.row.bvLine).toBe(24.1);
     expect(g.row.factors.factor_board).toEqual([{ key: "wind" }]);
     // His real ticket stays his until kickoff, as the ledger withholds it.
@@ -68,6 +69,32 @@ describe("gateGame", () => {
     expect(gateGame(pre, true)).toBe(pre);
     const post = game(true);
     expect(gateGame(post, false)).toEqual(post);
+  });
+
+  it("never shows a visitor the owner's cap slot, the over-cap chip or the real-money threshold (2026-10-14)", () => {
+    const base = game(false);
+    const g: HomeGame = {
+      ...base,
+      capRank: 3,
+      overCap: true,
+      edge: {
+        ...base.edge,
+        action:
+          "Paper only — 1 game played this season; real money needs 2. Everything else clears: first-half under 27.5 at -110 on Hard Rock.",
+      },
+    };
+    const v = gateGame(g, false);
+    expect(v.capRank).toBeNull();
+    expect(v.overCap).toBe(false);
+    expect(v.edge.action).toContain("a rating needs 2.");
+    expect(v.edge.action).not.toContain("real money");
+    const after = gateGame({ ...g, kickedOff: true }, false);
+    expect(after.capRank).toBe(3); // the ledger shows the ticket after kickoff
+    expect(after.edge.action).not.toContain("real money");
+    const owner = gateGame(g, true);
+    expect(owner.capRank).toBe(3);
+    expect(owner.overCap).toBe(true);
+    expect(owner.edge.action).toContain("real money needs 2.");
   });
 
   it("never shows a visitor bet wording, before or after kickoff (roadmap v1.4)", () => {

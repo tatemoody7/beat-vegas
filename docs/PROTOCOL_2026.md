@@ -51,13 +51,17 @@ reading-week order (regular weeks, then the postseason weeks).
 picks (`scripts/protocol_position.py::week_closes_at`). Before both hold, the week is `pending`. The
 read's clock is the Monday workflow's own run time (`pricing_monday.yml`).
 
-**Not in force: the seven-day exclusion (R3 of the draft).** Tate asked (2026-10-14) whether a permanent
-exclusion could bias the test or discard observations that could still be verified. It need not
-exist at all: an arm's observation is the judge's value at the close (`ev_cons`), which uses only the
-close and the price, never the result. A pick's reading can therefore be taken once its close exists,
-graded or not; a late or unprovable result then never holds a week and nothing is discarded. That is
-the recommendation in `docs/program/P1_2_AMENDMENT_DRAFT.md` (R3′), waiting on Tate. Until he decides,
-an ungradable pick keeps its week pending, as before p1.2 (none exists: queries G2, G9).
+**R3′ — a reading never waits for the score (Tate, 2026-10-14; roadmap v2.5).** An arm's observation is
+the judge's value at the close (`ev_cons`, `beatvegas/consensus.py`): the de-vigged median of the other
+books' last quotes captured **before kickoff**, each confirmed inside the 2 hours before kickoff, at least 3
+books, within 1.5 points of the pick's line, converted through hp1 and priced at the logged Hard Rock price.
+It reads no score. Anything short of that is a named exclusion (`few_books`, `stale_close`, `far_lines`,
+`outside_table`, `no_price`), counted and never an observation. So the judge reads every pick once its
+game kicked off at least an hour ago, graded or not (`scripts/consensus_backfill.py::needs_reading`,
+`READ_AFTER_KICKOFF_H` = 1), and a reading week is complete under R2 when every pick in it has the
+judge's decision (`protocol_position.judged`). Outcome grading is separate and unchanged: a pick whose
+result is not verified stays ungraded and is reported beside the arm as "result not verified yet". The
+draft's seven-day permanent exclusion was not adopted: nothing is discarded for a missing score.
 
 Impact on 2026-10-14 (measured): no reading changes. H-ARM-1HO's one week-7 pick, graded on 10-14,
 now reads `pending` until the read of Monday 2026-10-19 12:00 UTC instead of entering mid-week.

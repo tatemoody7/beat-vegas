@@ -121,6 +121,7 @@ def with_games(session, rows: Sequence[Any]) -> List[Any]:
                 season=r.season,
                 week=r.week,
                 graded=r.graded,
+                cons_version=getattr(r, "cons_version", None),
                 ev_cons=r.ev_cons,
                 cons_excluded=r.cons_excluded,
                 cons_books=getattr(r, "cons_books", None),
@@ -131,18 +132,28 @@ def with_games(session, rows: Sequence[Any]) -> List[Any]:
     return out
 
 
+def judged(row: Any) -> bool:
+    """R3' (p1.2, Tate 2026-10-14): the judge has decided this pick -- a reading
+    (`ev_cons`) or a named exclusion (`cons_excluded`), stamped `cons_version`.
+    The reading uses only pre-kickoff quotes, so it never waits on the score;
+    whether the result is verified is a separate fact (`graded`)."""
+    if getattr(row, "cons_version", None) is not None:
+        return True
+    return row.ev_cons is not None or getattr(row, "cons_excluded", None) is not None
+
+
 def completed(rows: Sequence[Any], now: Optional[datetime] = None) -> List[Any]:
-    """The rows of the reading weeks that are complete (R2): every pick in the
-    week graded AND, when `now` is given, the read runs at or after the Monday
-    12:00 UTC following the week's latest kickoff. Rows come back in reading-week
-    order (R1), placed order within a week."""
+    """The rows of the reading weeks that are complete: every pick in the week
+    judged (R3') AND, when `now` is given, the read runs at or after the Monday
+    12:00 UTC following the week's latest kickoff (R2). Rows come back in
+    reading-week order (R1), placed order within a week."""
     by_week: Dict[Any, List[Any]] = defaultdict(list)
     for r in rows:
         by_week[reading_key(r)].append(r)
     done: List[Any] = []
     for key in sorted(by_week):
         rs = by_week[key]
-        if not rs or not all(bool(r.graded) for r in rs):
+        if not rs or not all(judged(r) for r in rs):
             continue
         if now is not None:
             kicks = [getattr(r, "kickoff", None) for r in rs]
@@ -170,6 +181,10 @@ def read_arm(
     return {
         "logged": len(rows),
         "pending": len(rows) - len(done),
+        # Outcome grading stays separate: picks inside complete weeks whose
+        # result is not verified yet. They count as readings or exclusions by
+        # the judge; their result is marked unverified until grading lands.
+        "results_unverified": sum(1 for r in done if not bool(r.graded)),
         "completed_weeks": [key_label(k) for k in weeks],
         "readings": pos.n,
         "excluded": excluded,
@@ -196,6 +211,7 @@ def paused_arm(logged: int) -> Dict[str, Any]:
         "excluded": 0,
         "excluded_by_reason": {},
         "excluded_by_books": {},
+        "results_unverified": 0,
         "weeks": 0,
         "llr": 0.0,
         "state": P.PAUSED,
@@ -241,6 +257,11 @@ def render(result: Dict[str, Any]) -> str:
         if r["excluded_by_reason"]:
             why = ", ".join(f"{k} {v}" for k, v in sorted(r["excluded_by_reason"].items()))
             L.append(f"- {arm} exclusions: {why}")
+        if r.get("results_unverified"):
+            L.append(
+                f"- {arm}: {r['results_unverified']} judged pick(s) whose result is not verified yet"
+                " (read from the close; graded when the score is proven)"
+            )
         if r.get("excluded_by_books"):
             nb = ", ".join(f"{k} books {v}" for k, v in sorted(r["excluded_by_books"].items()))
             L.append(f"- {arm} exclusions by close book count (the judge needs 3+): {nb}")

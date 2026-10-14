@@ -81,8 +81,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Waiting on Tate (2026-10-14)**: p1.2's R3′ (`docs/program/P1_2_AMENDMENT_DRAFT.md`); the Board alignment PR #393 (built,
-  verified, unmerged); H-ARM-EVP option A or B (`docs/program/EVP_SPEC_2026-10.md`); alternate probe Sat 10-17 ~3pm ET.
+- **This week (2026-10-14)**: alternate-line probe Sat 10-17 ~3pm ET with app screenshots (`probe_alt_totals_h1`);
+  first scheduled Monday read 10-19; H-ARM-EVP runs exploratory (`docs/program/EVP_SPEC_2026-10.md`), decided in January.
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total

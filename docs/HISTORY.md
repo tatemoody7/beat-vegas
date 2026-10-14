@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (P1.2 R3′: A READING NEVER WAITS FOR THE SCORE).** Tate approved R3′ in place of the draft's
+  seven-day permanent exclusion, asking that only valid, trustworthy closing-line data can produce a reading
+  and that outcome grading stays separate. Verified in the code: the judge reads only quotes captured before
+  kickoff, confirmed inside 2 hours of it, from 3+ books, within 1.5 points of the pick's line; anything less
+  is a named exclusion. `scripts/consensus_backfill.py` now reads every pick an hour after kickoff, graded or
+  not (`needs_reading`); `protocol_position.completed` completes a week when every pick is judged; ungraded
+  results are counted beside each arm as "result not verified yet"; grading is untouched. Roadmap v2.5.
+  Measured today: one pick is newly read -- H-ARM-1HO's development row on Old Dominion @ App State (10-10,
+  the 0-0 line-score half awaiting proof). **Correction:** earlier episodes today said that game carries no
+  arm pick; it carries this development row, placed 10-09 before the arm's clock, so it never counts.
+
 - **2026-10-14 UTC (BOARD ALIGNMENT: ONE BAR, SCHEDULED CARDS ONLY, ONE QB READ, THE HELD GROUP).** Tate approved all
   four behaviour items with "verify every change against existing games before activating" and "missing or
   uncertain information should never silently become a favourable betting signal". B1: the Board's bar over

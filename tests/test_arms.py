@@ -275,3 +275,37 @@ def test_exclusions_are_reported_by_the_close_book_count(load_script):
     assert r["excluded_by_books"] == {"0": 1, "2": 1} and r["excluded"] == 2
     md = pos.render({"generated_at": "now", "arms": {P.ARM_1H_UNDER: {**r, "slot": 1}}})
     assert "exclusions by close book count (the judge needs 3+): 0 books 1, 2 books 1" in md
+
+
+def test_r3_prime_a_judged_pick_counts_whatever_its_result_and_stays_marked_unverified(load_script):
+    """p1.2 R3' (Tate, 2026-10-14): the reading is the close, never the score. A
+    pick the judge has read completes its week even while its result is unproven;
+    the result is reported unverified, not hidden and not discarded."""
+    pos = load_script("protocol_position")
+    kick = _dt(2026, 10, 17, 19, 30)
+    proven = _prow(7, kick, graded=True, ev=0.02)
+    unproven = _prow(7, kick, graded=False, ev=0.04)  # read from the close, 0-0 half unproven
+    unproven.cons_version = "cv1"
+    r = pos.read_arm([proven, unproven], now=_dt(2026, 10, 19, 12, 0))
+    assert r["readings"] == 2 and r["completed_weeks"] == ["2026-w7"]
+    assert r["results_unverified"] == 1 and r["pending"] == 0
+    md = pos.render({"generated_at": "now", "arms": {P.ARM_1H_UNDER: {**r, "slot": 1}}})
+    assert "1 judged pick(s) whose result is not verified yet" in md
+
+
+def test_r3_prime_an_unjudged_pick_still_holds_its_week(load_script):
+    pos = load_script("protocol_position")
+    kick = _dt(2026, 10, 17, 19, 30)
+    not_read = _prow(7, kick, graded=False, ev=None)
+    r = pos.read_arm([_prow(7, kick), not_read], now=_dt(2026, 10, 26, 12, 0))
+    assert r["readings"] == 0 and r["pending"] == 2
+
+
+def test_r3_prime_the_judge_reads_a_pick_an_hour_after_kickoff(load_script):
+    cb = load_script("consensus_backfill")
+    kick = _dt(2026, 10, 17, 19, 30)
+    assert cb.READ_AFTER_KICKOFF_H == 1.0
+    assert cb.needs_reading(True, None, kick) is True  # graded rows, as before
+    assert cb.needs_reading(False, kick, _dt(2026, 10, 17, 20, 29)) is False
+    assert cb.needs_reading(False, kick, _dt(2026, 10, 17, 20, 30)) is True
+    assert cb.needs_reading(False, None, _dt(2026, 10, 30, 0, 0)) is False  # no kickoff: never read

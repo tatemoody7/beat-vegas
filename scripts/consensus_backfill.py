@@ -1,10 +1,14 @@
 #!/usr/bin/env python
-"""Line value at the wager's exact terms for graded picks (docs/CONSENSUS.md).
+"""Line value at the wager's exact terms for every pick whose close exists (docs/CONSENSUS.md).
 
     python scripts/consensus_backfill.py                 # report only (no writes)
     python scripts/consensus_backfill.py --write --missing-only   # grade.yml, nightly
 
-Reads every GRADED row of manual_picks (real and paper) and challenger_picks,
+Reads every row of manual_picks (real and paper) and challenger_picks that is
+GRADED or whose game kicked off at least READ_AFTER_KICKOFF_H ago (protocol p1.2
+R3', Tate 2026-10-14: the reading uses only quotes captured before kickoff, never
+the score, so a pick is read once its close exists, graded or not; an unverified
+result stays ungraded and is reported as such),
 computes the consensus engine's columns (`beatvegas.consensus.fields_for_pick`,
 the same call `picks.grade_pick` makes) and either writes them (--write) or only
 reports. The report is the protocol's input: per ledger, market and side, how
@@ -28,10 +32,11 @@ import json
 import statistics
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import load_only
 
 from beatvegas.consensus import CONSENSUS_VERSION, SNAP_MARKET, HalfPointTable, fields_for_pick
@@ -41,6 +46,18 @@ from beatvegas.db.store import session_scope, try_init_db
 ROOT = Path(__file__).resolve().parent.parent
 CHUNK = 500
 IN_BLOCK = 1000
+# p1.2 R3': a pick is read this long after its kickoff, graded or not. The judge
+# ignores every quote captured after kickoff, so the reading is final from
+# kickoff on; the hour lets a close poll that started before kickoff finish.
+READ_AFTER_KICKOFF_H = 1.0
+
+
+def needs_reading(graded: bool, kickoff: Optional[datetime], now: datetime) -> bool:
+    """R3' (pure): a pick is due its judge reading when it is graded, or when its
+    game kicked off at least READ_AFTER_KICKOFF_H ago (naive UTC)."""
+    if graded:
+        return True
+    return kickoff is not None and kickoff <= now - timedelta(hours=READ_AFTER_KICKOFF_H)
 
 
 def _ledger(pick) -> str:
@@ -75,8 +92,15 @@ def main(argv=None) -> int:
     written = 0
     with session_scope() as s:
         picks: list = []
+        cutoff = datetime.utcnow() - timedelta(hours=READ_AFTER_KICKOFF_H)
         for model in (ManualPick, ChallengerPick):
-            q = s.query(model).filter(model.graded.is_(True))
+            # R3' (p1.2): graded, or kicked off at least an hour ago -- the same
+            # rule as `needs_reading`, in SQL.
+            q = (
+                s.query(model)
+                .outerjoin(Game, Game.id == model.game_id)
+                .filter(or_(model.graded.is_(True), Game.start_date <= cutoff))
+            )
             if args.missing_only:
                 q = q.filter(model.cons_version.is_(None))
             if not args.write and not args.missing_only:

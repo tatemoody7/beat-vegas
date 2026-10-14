@@ -75,6 +75,30 @@ test.describe("the board", () => {
     expect(r[r.length - 1].section).toBe("Played");
   });
 
+  test("carries the research status strip above the board: one line, a pill per hypothesis, the link", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const strip = page.locator('div[aria-label="Research status"]');
+    await expect(strip).toContainText(
+      "6 strategies on paper · up to 12 of 30 readings · next read",
+    );
+    await expect(strip.locator(".bv-pill")).toHaveCount(7);
+    await expect(strip.locator('[data-hypothesis="H-ARM-1HU"]')).toHaveText(
+      "1H unders 14",
+    );
+    await expect(strip.locator('[data-hypothesis="H-PRICE-HR"]')).toHaveText(
+      "Hard Rock pricing 3 / 40",
+    );
+    await expect(
+      strip.getByRole("link", { name: "Research →" }),
+    ).toHaveAttribute("href", "/research");
+    // It sits above the week heading, never inside the board.
+    const stripBox = await strip.boundingBox();
+    const heading = await page.locator("h1.bv-page-title").boundingBox();
+    expect(stripBox!.y).toBeLessThan(heading!.y);
+  });
+
   test("numbers the week best to worst in the expected order", async ({
     page,
   }) => {
@@ -232,6 +256,10 @@ test.describe("the board, signed out", () => {
     }
     await expect(page.getByText(/Bet one unit/)).toHaveCount(0);
     await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
+    // The research status strip is public too (2026-10-14).
+    await expect(
+      page.locator('div[aria-label="Research status"]'),
+    ).toContainText("6 strategies on paper");
     // The owner's weekly cap is his real-money rule: no slot, no over-cap
     // chip, no "real money needs" clause for a visitor (2026-10-14). The
     // fixture's ticketed BET carries a cap slot for the owner (game.spec.ts).

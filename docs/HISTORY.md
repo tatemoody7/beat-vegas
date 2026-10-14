@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THE RESEARCH STATUS STRIP ABOVE THE BOARD).** Step 12 of the 2026-10-14
+  programme (Tate: the Board stays first, with a thin status strip above it). One line -- how many
+  strategies run on paper, the most readings any has toward 30, the next Monday read -- and a pill
+  per hypothesis with what it has logged (the pricing study: forward opportunities of 40), with the
+  link to Research. It reads the same stored Monday row the cards do (`web/lib/armPositions.ts`)
+  and touches no rating; a visitor sees the same line. The Board's rows, order and wording are
+  unchanged (e2e: the strip sits above the week heading, never inside the board).
+
 - **2026-10-14 UTC (ARM POSITIONS STORED: ONE ROW PER HYPOTHESIS PER MONDAY READ).** Step 10 of the
   2026-10-14 programme. Until now the six arms' position lived only in a `study.yml` artifact and the
   pricing verdict only in a report file, so the site could not show either and a missing Monday read

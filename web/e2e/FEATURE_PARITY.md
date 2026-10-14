@@ -11,6 +11,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Board
 
+- [board] The research status strip above the board: one line (strategies on paper, readings toward 30, next read), a pill per hypothesis with what it logged, the link to /research; public — board.spec.ts › "carries the research status strip above the board: one line, a pill per hypothesis, the link"
 - [board] Every row is a link to `/game/<id>` and the id set is exactly the fixture week's — board.spec.ts › "every row links to its game page and the ids are the fixture's week"
 - [board] Games group by ET day Thu, Fri, Sat, with played games in a `Played · N` section last — board.spec.ts › "groups the week Thu, Fri, Sat, then Played last"
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"

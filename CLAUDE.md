@@ -81,8 +81,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **Next build (roadmap v2.0, 2026-10-11)**: the Hard Rock off-market capture, `docs/program/CAPTURE_DESIGN_2026-10.md`
-  (two columns + a 6-hour Saturday lookahead; PR Wednesday 10-14, first denser Saturday 10-17).
+- **Waiting on Tate (2026-10-14)**: p1.2 (`docs/program/P1_2_AMENDMENT_DRAFT.md`), the Board behaviour items
+  (`docs/program/BOARD_ALIGNMENT_2026-10.md`), the proposals (`docs/program/PROPOSALS_2026-10.md`); nothing runs before.
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
@@ -147,10 +147,11 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `prisma db pull`: it introspects every table in the shared Neon database (22 models the app
   reads by raw SQL on purpose, six `swfl_*` fishing tables) and strips the comments (2026-10-04).
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
-  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`),
-  Results (`/results`, read-only, opens on the bet ledger), How it works (`/how-it-works`) —
-  plus `/game/[id]` (the only place a pick is logged) and `/records`. Thirteen legacy routes
-  (incl. `/proof`) are 308 redirects in `next.config.ts`. **Owner-only content renders behind
+  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`, the
+  research strip above it), Results (`/results`: the personal stake, the arms' forward picks, the
+  pricing opportunities), Research (`/research`: a card per hypothesis from `arm_positions`, the closed
+  hypotheses from `web/data/hypotheses.json`) — plus `/game/[id]` (the only place a pick is logged)
+  and `/records`. Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. **Owner-only content renders behind
   the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
   control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
   `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:

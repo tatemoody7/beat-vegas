@@ -146,9 +146,9 @@ game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and 
 line saying what to do; each row links to **`/game/[id]`**, where the decision, the
 lines, the reasons, the news and the Log-pick button live), **Results** (read-only:
 every bet as logged with its record in units, line value and the CSV; the owner's
-pick list with its controls only when signed in), **How it works** (`/how-it-works`: what this is,
-how to read the Board, the 2023–25 backtest headed as a backtest, the gap ladder,
-the terms; no research section since roadmap v2.0); `/records` is
+pick list with its controls only when signed in), **Research** (`/research`, since 2026-10-14: one
+card per registered hypothesis from the stored Monday read, the protocol in plain words, the closed
+hypotheses with their verdicts, how to read the Board, the terms; `/how-it-works` redirects here); `/records` is
 every rated game by week, with a CSV). Plain-English,
 modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` classes
 in `web/app/globals.css`).

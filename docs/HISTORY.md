@@ -9,6 +9,12 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (FINAL AUDIT OF THE PROGRAMME).** After steps 1-14 and the three decision memos
+  merged (#375-#389), a read of the repo, database, workflows, production and the research record
+  found two records lost to a refused command: this file had no episode for the Research page (#385)
+  and the brief's and README's site paragraphs still named How it works. Both are restored here (the
+  episode below, dated as merged). Audit results are in the PR.
+
 - **2026-10-14 UTC (THREE DECISION MEMOS FOR TATE: P1.2, BOARD ALIGNMENT, FOUR PROPOSALS).** Programme
   steps 9, 15 and 16: documents only, nothing activated. `docs/program/P1_2_AMENDMENT_DRAFT.md` (the
   reading unit with postseason ISO weeks, a week completes only after the next Monday's read, the
@@ -55,6 +61,21 @@ hold the rest.
   and the pricing study's forward opportunities, which the stored H-PRICE-HR row now carries
   (`positions.pricing_position` payload, `compact_opportunity`), so the site recomputes nothing.
   No rule, grading or ticket logic changes.
+
+- **2026-10-14 UTC (THE RESEARCH PAGE: ONE CARD PER HYPOTHESIS FROM THE STORED MONDAY READ).** Step 11
+  of the 2026-10-14 programme (#385; Tate's calls: the Board stays the homepage; Option A cards;
+  nothing ranked before an arm's first decision window; everything shown and labelled). `/research`
+  replaces How it works (308; `/glossary` → `/research#glossary`): seven cards in ledger-slot order
+  from `arm_positions` (`web/lib/armPositions.ts`, never recomputed) showing each hypothesis's own
+  standard (readings of 30 / forward opportunities of 40), weeks, exclusions, pending, the judge's EV
+  with its interval only from ten readings, the SPRT position between STOP and PROMOTE, the read date
+  with its run id, the next read, "outdated" past eight days and "not yet read" with no row; the
+  protocol in plain words (numbers pinned to `protocol.py`/`pricing.py` by
+  `tests/test_research_parity.py`); the closed hypotheses with their verdicts from
+  `web/data/hypotheses.json` (`scripts/export_registry.py`, parity-tested against
+  `docs/HYPOTHESES.md`); the Board key, the glossary, the records link and the helpline. The 2023-25
+  backtest card, the gap ladder and the accuracy block went with the old page. Nothing on the Board,
+  in the ledger or in any rule changed.
 
 - **2026-10-14 UTC (THE RESEARCH STATUS STRIP ABOVE THE BOARD).** Step 12 of the 2026-10-14
   programme (Tate: the Board stays first, with a thin status strip above it). One line -- how many

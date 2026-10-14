@@ -97,6 +97,39 @@ test.describe("GET /api/health", () => {
     }
   });
 
+  test.describe("signed out", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    // The owner's operational detail rides only on the cookie (2026-10-14):
+    // a visitor never reads the real-money pause switch, the API budgets or a
+    // job's run note, and the keys are absent, not null.
+    test("a visitor reads the flags, coverage, dispatch times and verdicts, nothing more", async ({
+      request,
+    }) => {
+      const body = await (await request.get("/api/health")).json();
+      expect(Object.keys(body).sort()).toEqual(
+        HEALTH_KEYS.filter(
+          (k) => !["rulePaused", "rulePauseReadable"].includes(k),
+        ),
+      );
+      expect(Object.keys(body.gauges).sort()).toEqual(
+        GAUGE_KEYS.filter(
+          (k) => !["cfbdCallsRemaining", "oddsCreditsRemaining"].includes(k),
+        ),
+      );
+      expect(body.ok).toBe(true);
+      expect(body.resultsStale).toBe(false);
+      expect(body.buildMissed).toBe(false);
+      expect(body.gauges.closeCoveragePct).toBe(0.93);
+      for (const h of Object.values(body.gauges.health) as Record<
+        string,
+        unknown
+      >[]) {
+        expect(Object.keys(h).sort()).toEqual(["at", "verdict"]);
+      }
+      expect(JSON.stringify(body)).not.toMatch(/run=\d+|Run: https/);
+    });
+  });
+
   test("sends the security headers next.config.ts declares", async ({
     request,
   }) => {

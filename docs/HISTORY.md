@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (/api/health: THE OWNER'S DETAIL RIDES ONLY ON THE COOKIE).** Step 3 of the
+  2026-10-14 programme. The public endpoint carried the real-money pause switch, the CFBD and Odds
+  API budgets, every job's run note and the private repo's run links inside the warnings. A visitor
+  now reads `ok`, the stale/missed flags, the capture counts, close coverage, dispatch times and
+  each job's verdict with its time (`lib/healthBody.ts::publicBody`, keys removed, never nulled;
+  each warning cut before its "Run:" link); the signed-in owner reads the full body as before. The
+  smoke check and the board's banners read what they always read. Unit test on the projection;
+  the e2e health spec gains a signed-out case.
 - **2026-10-14 UTC (THE FULL-GAME ARM'S INPUT HAS A HEALTH CHECK).** Step 6 of the 2026-10-14
   programme (integrity). H-ARM-FGU selects on `bv_fg_v1` reads that only the Sunday shadow step
   writes (`scripts/fg_shadow.py`), and that step is `continue-on-error` so a shadow failure never

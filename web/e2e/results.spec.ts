@@ -349,6 +349,11 @@ test.describe("results", () => {
         page.locator('section[aria-label="The Monday review, signed in"]'),
       ).toHaveCount(0);
       await expect(page.getByText("Your decisions")).toHaveCount(0);
+      // No dollars are public (2026-10-14): the bankroll curve is a client
+      // prop, so its points must carry units only, and nothing on the page
+      // reads as a dollar amount to a visitor.
+      expect(await page.content()).not.toContain('"usd"');
+      expect(await page.locator("body").innerText()).not.toMatch(/\$\s?\d/);
     });
   });
 

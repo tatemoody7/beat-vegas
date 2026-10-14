@@ -363,41 +363,31 @@ describe("parseFilters", () => {
 // --- bankroll curve ---------------------------------------------------------
 
 describe("bankrollCurve", () => {
-  it("starts at the starting bankroll and compounds settled units by week", () => {
-    const curve = bankrollCurve(
-      [
-        pick({ id: 1, week: 2, units: 0.91 }),
-        pick({ id: 2, week: 2, units: -1 }),
-        pick({ id: 3, week: 3, units: 0.91 }),
-      ],
-      100,
-      10,
-    );
+  it("starts at zero and compounds settled units by week (units only: it is a client prop)", () => {
+    const curve = bankrollCurve([
+      pick({ id: 1, week: 2, units: 0.91 }),
+      pick({ id: 2, week: 2, units: -1 }),
+      pick({ id: 3, week: 3, units: 0.91 }),
+    ]);
     expect(curve).toEqual([
-      { week: 1, units: 0, usd: 100 },
-      { week: 2, units: -0.09, usd: 99.1 },
-      { week: 3, units: 0.82, usd: 108.2 },
+      { week: 1, units: 0 },
+      { week: 2, units: -0.09 },
+      { week: 3, units: 0.82 },
     ]);
   });
 
   it("ignores pending, paper and full-game picks", () => {
-    const curve = bankrollCurve(
-      [
-        pick({ id: 1, week: 2, units: 5, graded: false }),
-        pick({ id: 2, week: 2, units: 5, isPaper: true }),
-        pick({ id: 3, week: 2, units: 5, market: "full" }),
-        pick({ id: 4, week: 2, units: 1 }),
-      ],
-      100,
-      10,
-    );
-    expect(curve[curve.length - 1]).toEqual({ week: 2, units: 1, usd: 110 });
+    const curve = bankrollCurve([
+      pick({ id: 1, week: 2, units: 5, graded: false }),
+      pick({ id: 2, week: 2, units: 5, isPaper: true }),
+      pick({ id: 3, week: 2, units: 5, market: "full" }),
+      pick({ id: 4, week: 2, units: 1 }),
+    ]);
+    expect(curve[curve.length - 1]).toEqual({ week: 2, units: 1 });
   });
 
   it("is just the starting point with nothing settled", () => {
-    expect(bankrollCurve([], 250, 25)).toEqual([
-      { week: 0, units: 0, usd: 250 },
-    ]);
+    expect(bankrollCurve([])).toEqual([{ week: 0, units: 0 }]);
   });
 });
 

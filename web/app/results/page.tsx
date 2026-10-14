@@ -1,6 +1,6 @@
 import { getSeasons } from "@/lib/board";
 import { getBetLedger } from "@/lib/betLedgerDb";
-import { bankrollCurve, bankrollEnv } from "@/lib/homeBoard";
+import { bankrollCurve } from "@/lib/homeBoard";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
 import { resolveSeason } from "@/lib/season";
@@ -56,8 +56,7 @@ export default async function ResultsPage({
     getBetLedger(season),
   ]);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
-  const { startUsd, unitUsd } = bankrollEnv();
-  const curve = bankrollCurve(allPicks, startUsd, unitUsd);
+  const curve = bankrollCurve(allPicks); // units only: it is a client prop
   const hasRecord =
     ledger.market !== null ||
     ledger.you !== null ||

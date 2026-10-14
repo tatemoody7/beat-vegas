@@ -2,7 +2,11 @@
 // Kept out of the route file so the projection can be unit-tested: a Next route
 // module may export only its handlers.
 
-export type JobHealth = { verdict: string; at: string | null; note: string };
+export type JobHealth = {
+  verdict: string | null;
+  at: string | null;
+  note: string | null;
+};
 export type HealthBody = {
   ok: true;
   rulePaused: boolean;

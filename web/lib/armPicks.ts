@@ -77,8 +77,8 @@ export async function getArmPicks(
              mp.market, mp.side, mp.line, mp.price, mp.result, mp.units,
              mp.ev_cons, mp.cons_excluded, CAST(mp.placed_at AS TEXT) AS placed_at
       FROM manual_picks mp
-      WHERE mp.season = ${season} AND mp.is_paper IS TRUE AND mp.market = '1H'
-        AND mp.side = 'under' AND mp.graded IS TRUE
+      WHERE mp.season = ${season} AND mp.arm = 'H-ARM-1HU' AND mp.is_paper IS TRUE
+        AND mp.market = '1H' AND mp.side = 'under' AND mp.graded IS TRUE
         AND mp.placed_at >= ${earliest}::timestamp
       UNION ALL
       SELECT cp.arm, cp.id, cp.week, cp.away_team, cp.home_team, cp.market, cp.side,

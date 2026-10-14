@@ -434,6 +434,13 @@
     "doc": "`docs/PRICING_RESEARCH.md` (study.yml `pricing_check`; the first run is written there)"
   },
   {
+    "id": "H-ARM-EVP",
+    "question": "Do paper first-half unders chosen by estimated value at Hard Rock's price, rather than by the model's gap, carry positive value against the consensus close?",
+    "status": "exploratory",
+    "family": "exploratory (no ledger slot, no alpha, no sequential test; roadmap v2.5; a 2027 confirmatory registration is decided at the January 2027 review)",
+    "doc": "`docs/program/EVP_SPEC_2026-10.md`"
+  },
+  {
     "id": "H-MODEL-FIX",
     "question": "Is the champion with four fixes -- (1) bowl games out of the frame and season-to-date means ordered by date, (2) a 2015 training floor instead of 2003, (3) early-season averages seeded with last season's (`PRIOR_SEASON_WEIGHT` = 3), (4) early stopping off, stated explicitly -- at least as accurate on first halves as the live champion?",
     "status": "tested-null",

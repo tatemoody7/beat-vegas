@@ -75,6 +75,37 @@ test.describe("research", () => {
     ).toHaveCount(0);
   });
 
+  test("the exploratory collector sits apart, with no decision bar and the gap rule beside it", async ({
+    page,
+  }) => {
+    await page.goto("/research");
+    await expect(
+      page.locator(
+        'section[aria-label="The strategies on paper"] article[data-hypothesis="H-ARM-EVP"]',
+      ),
+    ).toHaveCount(0);
+    const evp = page.locator(
+      'section[aria-label="Exploratory"] article[data-hypothesis="H-ARM-EVP"]',
+    );
+    await expect(evp).toHaveCount(1);
+    await expect(evp).toContainText("exploratory");
+    await expect(evp.getByTestId("status")).toHaveText("collecting");
+    await expect(evp).toContainText(
+      "4 readings · 2 weeks · 1 excluded · 1 pending · 6 logged",
+    );
+    await expect(evp).toContainText(
+      "EV vs close: not enough data (4 of 10 to show one)",
+    );
+    await expect(evp.getByTestId("comparison")).toContainText(
+      "Same weeks, first-half unders by the gap: 11 readings, EV vs close -1.5% (-6.1% to +3.1%). Games both chose: 3; this rule only: 1; the gap only: 8.",
+    );
+    await expect(evp).toContainText("no error budget");
+    await expect(evp.getByRole("progressbar")).toHaveCount(0);
+    await expect(
+      evp.getByLabel("position between the stop and promote boundaries"),
+    ).toHaveCount(0);
+  });
+
   test("explains the judge in plain words with the protocol's numbers, and names the personal stake as never evidence", async ({
     page,
   }) => {

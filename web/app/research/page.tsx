@@ -1,8 +1,14 @@
 import Link from "next/link";
 import ArmCard from "@/app/components/ArmCard";
+import ExploratoryCard from "@/app/components/ExploratoryCard";
 import Glossary from "@/app/components/Glossary";
-import { getArmPositions } from "@/lib/armPositions";
-import { PROTOCOL, cardsFor } from "@/lib/research";
+import { getArmPositions, getPositionPayload } from "@/lib/armPositions";
+import {
+  EXPLORATORY,
+  PROTOCOL,
+  cardsFor,
+  exploratoryCardFor,
+} from "@/lib/research";
 import hypotheses from "../../data/hypotheses.json";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +65,15 @@ const docName = (doc: string) => {
 export default async function ResearchPage() {
   const positions = await getArmPositions();
   const cards = cardsFor(positions);
+  const exploratoryCards = await Promise.all(
+    EXPLORATORY.map(async (m) =>
+      exploratoryCardFor(
+        m,
+        positions.get(m.id),
+        await getPositionPayload(m.id),
+      ),
+    ),
+  );
   const rows = hypotheses as Row[];
   const closed = rows.filter((r) => r.status in CLOSED);
   const exploratory = rows.filter((r) => r.status === "exploratory");
@@ -97,6 +112,22 @@ export default async function ResearchPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {cards.map((c) => (
             <ArmCard key={c.meta.id} card={c} />
+          ))}
+        </div>
+      </section>
+
+      <section aria-label="Exploratory" className="mb-8">
+        <h2 className="mb-1 text-lg font-semibold text-[var(--text)]">
+          Exploratory
+        </h2>
+        <p className="mb-3 max-w-[68ch] text-sm leading-relaxed text-[var(--text-muted)]">
+          Collected on paper and read by the same judge, but outside the
+          strategies above: no part of the error budget, no sequential test, and
+          nothing decided from it this season.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {exploratoryCards.map((c) => (
+            <ExploratoryCard key={c.meta.id} card={c} />
           ))}
         </div>
       </section>

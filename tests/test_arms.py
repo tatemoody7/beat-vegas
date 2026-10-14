@@ -309,3 +309,71 @@ def test_r3_prime_the_judge_reads_a_pick_an_hour_after_kickoff(load_script):
     assert cb.needs_reading(False, kick, _dt(2026, 10, 17, 20, 29)) is False
     assert cb.needs_reading(False, kick, _dt(2026, 10, 17, 20, 30)) is True
     assert cb.needs_reading(False, None, _dt(2026, 10, 30, 0, 0)) is False  # no kickoff: never read
+
+
+# --- H-ARM-EVP, exploratory (Tate's option A, 2026-10-14) ---------------------------
+
+
+def _xrow(gid, week, kick, ev=0.01, excluded=None):
+    return SimpleNamespace(
+        game_id=gid,
+        season=2026,
+        week=week,
+        graded=True,
+        cons_version="cv1",
+        ev_cons=ev,
+        cons_excluded=excluded,
+        cons_books=5,
+        kickoff=kick,
+        season_type="regular",
+    )
+
+
+def test_the_exploratory_read_compares_with_the_gap_rule_over_the_same_weeks(load_script):
+    pos = load_script("protocol_position")
+    sat7, sat8 = _dt(2026, 10, 17, 19), _dt(2026, 10, 24, 19)
+    evp = [
+        _xrow(1, 8, sat7, 0.04),
+        _xrow(2, 8, sat7, None, "far_lines"),
+        _xrow(3, 9, sat8, 0.02),  # week 9 not closed at this read: pending
+    ]
+    gap = [
+        _xrow(1, 8, sat7, 0.04),  # the same game, both rules
+        _xrow(4, 8, sat7, -0.06),
+        _xrow(5, 7, _dt(2026, 10, 10, 19), 0.5),  # a week EVP has no pick in: left out
+    ]
+    now = _dt(2026, 10, 19, 12, 30)
+    x = pos.exploratory_read(evp, gap, now)
+    assert (x["logged"], x["readings"], x["excluded"], x["pending"], x["weeks"]) == (3, 1, 1, 1, 1)
+    assert x["excluded_by_reason"] == {"far_lines": 1}
+    assert x["picks_per_week"] == {"2026-w8": 2, "2026-w9": 1}
+    assert x["mean_ev"] == 0.04 and x["ev_lo"] is None  # one reading: no interval
+    c = x["comparison"]
+    assert c["against"] == "H-ARM-1HU" and c["weeks"] == ["2026-w8"]
+    assert c["gap_rule"]["n"] == 2 and c["gap_rule"]["mean_ev"] == -0.01
+    assert c["gap_rule"]["excluded"] == 0
+    assert (c["both"], c["evp_only"], c["gap_only"]) == (1, 1, 1)
+    assert x["state"] == "exploratory" and x["label"] == "EXPLORATORY"
+
+
+def test_the_exploratory_row_has_no_llr_and_no_readings_target():
+    from beatvegas import positions as X
+
+    line = {
+        "logged": 3,
+        "readings": 1,
+        "weeks": 1,
+        "excluded": 1,
+        "pending": 1,
+        "mean_ev": 0.04,
+        "ev_lo": None,
+        "ev_hi": None,
+        "state": "exploratory",
+        "label": "EXPLORATORY",
+        "comparison": {"both": 1},
+    }
+    row = X.exploratory_position("H-ARM-EVP", line, _dt(2026, 10, 19, 12, 30), "123")
+    assert row["standard"] == X.STANDARD_EXPLORATORY == "exploratory"
+    assert row["llr"] is None and row["needed"] is None
+    assert row["read_date"] == "2026-10-19" and row["next_read"] == "2026-10-26"
+    assert "H-ARM-EVP" in X.EXPLORATORY_IDS and "H-ARM-EVP" not in P.ARMS

@@ -1,6 +1,12 @@
-# H-ARM-EVP — exact rules, assumptions and method, for Tate's confirmation (not registered, not running)
+# H-ARM-EVP — exact rules, assumptions and method (exploratory collector since 2026-10-14)
 
-Status: **specification, 2026-10-14.** Tate: "I'm interested in testing this, but I want to confirm the
+Status: **option A approved by Tate, 2026-10-14: an exploratory collector, no ledger slot, no alpha.**
+The collector is `beatvegas/evp_paper.py` (registry row `H-ARM-EVP`, `docs/HYPOTHESES.md`); it logs from
+its first scheduled build after it merged, and the Monday workflow stores its read with the gap rule's
+readings over the same weeks. The rule below is what it runs; it reproduces this file's replay exactly
+(5 / 3 / 2 / 0 picks in weeks 4-7, the same games and values). The original framing follows.
+
+Specification, 2026-10-14. Tate: "I'm interested in testing this, but I want to confirm the
 exact rules, model assumptions, and statistical methodology before activating it." Nothing here logs a
 pick or takes a ledger slot. It is separate from the six registered arms and from H-PRICE-HR (pv1).
 

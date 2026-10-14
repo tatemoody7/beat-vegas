@@ -58,9 +58,9 @@ const movedRoutes: { source: string; destination: string }[] = [
   { source: "/picks", destination: "/results" },
   { source: "/weekly-review", destination: "/results" },
   // -> how it works (Track record's research half, 2026-09-28)
-  { source: "/line-study", destination: "/how-it-works" },
-  { source: "/research", destination: "/how-it-works" },
-  { source: "/glossary", destination: "/how-it-works#glossary" },
+  { source: "/line-study", destination: "/research" },
+  { source: "/how-it-works", destination: "/research" },
+  { source: "/glossary", destination: "/research#glossary" },
   // -> every game we have rated
   { source: "/research/records", destination: "/records" },
   { source: "/proof/records", destination: "/records" },

@@ -4,7 +4,7 @@
 //   node scripts/smoke.mjs --base https://beat-vegas.vercel.app
 //
 // Checks, each one PASS/FAIL on its own line; exits 1 if any failed:
-//   - the pages answer 200 signed out (/, /results, /how-it-works, /records,
+//   - the pages answer 200 signed out (/, /results, /research, /records,
 //     /login) and / is not bounced to /login
 //   - the board links at least one game, and that game page answers 200
 //   - every moved route in next.config.ts answers 308 to its destination
@@ -49,7 +49,7 @@ export function movedRoutes(src) {
 }
 
 async function main() {
-  for (const p of ["/", "/results", "/how-it-works", "/records", "/login"]) {
+  for (const p of ["/", "/results", "/research", "/records", "/login"]) {
     const r = await get(p);
     if (r.status === 200) pass(`${p} 200`);
     else

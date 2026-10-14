@@ -1136,3 +1136,87 @@ export function buildExpected(week) {
     ),
   };
 }
+
+/**
+ * arm_positions (2026-10-14, programme step 10/11): what the Monday read stored,
+ * as the Research page shows it. One hypothesis (H-ARM-HT1H) has no row ("not
+ * yet read"); the pricing row is from two Mondays back ("outdated" past 8 days);
+ * 1HU has enough readings to show an EV, 1HO has not.
+ */
+export function armPositionsFor(now) {
+  const monday = new Date(now.getTime());
+  monday.setUTCHours(12, 5, 0, 0);
+  while (monday.getUTCDay() !== 1 || monday.getTime() > now.getTime()) {
+    monday.setUTCDate(monday.getUTCDate() - 1);
+  }
+  const twoAgo = new Date(monday.getTime() - 7 * 86_400_000);
+  const nextMonday = new Date(monday.getTime() + 7 * 86_400_000);
+  const d = (x) => x.toISOString().slice(0, 10);
+  const base = (hypothesis, over) => ({
+    hypothesis,
+    standard: "sprt",
+    read_date: d(monday),
+    read_at: monday,
+    run_id: "38590000009",
+    state: "running",
+    label: "IN FORWARD TEST",
+    logged: 0,
+    readings: 0,
+    weeks: 0,
+    excluded: 0,
+    pending: 0,
+    needed: 30,
+    llr: 0,
+    mean_ev: null,
+    ev_lo: null,
+    ev_hi: null,
+    next_read: d(nextMonday),
+    payload_json: "{}",
+    ...over,
+  });
+  return [
+    base("H-ARM-1HU", {
+      logged: 14,
+      readings: 12,
+      weeks: 2,
+      excluded: 2,
+      llr: 0.412,
+      mean_ev: -0.0123,
+      ev_lo: -0.0511,
+      ev_hi: 0.0265,
+    }),
+    base("H-ARM-1HO", {
+      logged: 3,
+      readings: 1,
+      weeks: 1,
+      excluded: 2,
+      llr: -0.05,
+      mean_ev: 0.04,
+    }),
+    base("H-ARM-FGU", {
+      logged: 4,
+      readings: 0,
+      weeks: 0,
+      excluded: 0,
+      pending: 4,
+    }),
+    base("H-ARM-WX1H", {}),
+    base("H-ARM-WXFG", {}),
+    base("H-PRICE-HR", {
+      standard: "pricing",
+      read_date: d(twoAgo),
+      read_at: twoAgo,
+      run_id: "38590000003",
+      state: "insufficient",
+      label: "INSUFFICIENT",
+      logged: 130,
+      readings: 3,
+      weeks: null,
+      excluded: 11,
+      needed: 40,
+      llr: null,
+      mean_ev: 0.021,
+      next_read: d(monday),
+    }),
+  ];
+}

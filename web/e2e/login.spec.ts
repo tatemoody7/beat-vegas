@@ -14,7 +14,7 @@ import { E2E_PASSWORD } from "./helpers/env";
 const PUBLIC_GETS = [
   "/",
   "/results",
-  "/how-it-works",
+  "/research",
   "/records",
   "/game/900001",
   "/api/health",

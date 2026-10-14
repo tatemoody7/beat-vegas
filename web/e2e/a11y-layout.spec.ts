@@ -20,7 +20,7 @@ import { collectSilence, layoutMetrics } from "./helpers/metrics";
 const PAGES: [string, string][] = [
   ["board", "/"],
   ["results", "/results?week=all"],
-  ["how", "/how-it-works"],
+  ["research", "/research"],
   ["records", "/records"],
   ["game", "/game/900001"],
   ["login", "/login"],

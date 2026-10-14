@@ -215,7 +215,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   raw keys and stamps kept; prints the credits it spent; writes nothing).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +
   `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
-  (each August), `dump_e2e_schema`, `hooks/post_edit.sh`, `hooks/on_stop.sh`.
+  (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)
 - **Live again for the personal ledger since 2026-10-08** (`docs/BETTING_POLICY.md`, v1.4; paused

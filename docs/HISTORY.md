@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THE FULL-GAME ARM'S INPUT HAS A HEALTH CHECK).** Step 6 of the 2026-10-14
+  programme (integrity). H-ARM-FGU selects on `bv_fg_v1` reads that only the Sunday shadow step
+  writes (`scripts/fg_shadow.py`), and that step is `continue-on-error` so a shadow failure never
+  costs the champion's Sunday; nothing reported the failure, so an empty FGU week would have been
+  silent. `sunday.fg_shadow_scored` (degraded: at least one `bv_fg_v1` prediction for the week's
+  games since ET midnight) joins the Sunday contract; the step is relabelled as the arm's input
+  (it was still "H-FG-P"); `docs/HEALTH.md` regenerated. No rule, window or grading changes.
 - **2026-10-14 UTC (A HAND DISPATCH OF A SCHEDULED SLOT OBEYS THE ET GATE).** Step 5 of the
   2026-10-14 programme (integrity). `ci.resolve_slot` gated only cron ticks; a `workflow_dispatch`
   naming `tue_pm` / `thu_pm` / `fri_pm` / `sat_am` built at any hour and, being a scheduled slot,

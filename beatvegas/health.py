@@ -508,6 +508,31 @@ def sunday_predictions_today(ctx: Ctx) -> Result:
     return Result(n > 0, f"{n} model predictions for {ctx.season} w{ctx.week} since ET midnight")
 
 
+def sunday_fg_shadow_scored(ctx: Ctx) -> Result:
+    """H-ARM-FGU selects on `bv_fg_v1` reads that only the Sunday shadow step
+    writes (scripts/fg_shadow.py), and that step is continue-on-error so a
+    shadow failure never costs the champion's Sunday. Until 2026-10-14 nothing
+    reported the failure, so an empty FGU week would have been silent."""
+    from .db.models import Game, Prediction
+    from .fg_paper import FG_MODEL_VERSION
+
+    since = et_midnight_as_naive_utc(ctx.now)
+    n = (
+        ctx.session.query(Prediction.id)
+        .join(Game, Game.id == Prediction.game_id)
+        .filter(
+            Game.season == ctx.season,
+            Game.week == ctx.week,
+            Prediction.created_at >= since,
+            Prediction.model_version == FG_MODEL_VERSION,
+        )
+        .count()
+    )
+    return Result(
+        n > 0, f"{n} {FG_MODEL_VERSION} predictions for {ctx.season} w{ctx.week} since ET midnight"
+    )
+
+
 def sunday_model_run_recorded(ctx: Ctx) -> Result:
     """The refit left its run-log row (scripts/weekly_update.py::record_weekly_refit):
     a model_runs row noted `weekly refit` for SEASON/WEEK created since ET
@@ -876,6 +901,12 @@ CONTRACTS: Dict[str, Contract] = {
                 "degraded",
                 "at least one predictions row for the week's games with model_version == derived_lines created since ET midnight",
                 sunday_derived_lines_posted,
+            ),
+            Check(
+                "sunday.fg_shadow_scored",
+                "degraded",
+                "at least one predictions row for the week's games with model_version == bv_fg_v1 (H-ARM-FGU's input, scripts/fg_shadow.py) created since ET midnight",
+                sunday_fg_shadow_scored,
             ),
             Check(
                 "sunday.model_run_recorded",

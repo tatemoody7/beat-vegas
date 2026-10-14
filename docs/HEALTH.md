@@ -261,6 +261,7 @@ Failure modes on record:
 | `sunday.fg_snapshot_today` | failed | at least one odds_snapshots row with market full_game_total captured since ET midnight |
 | `sunday.predictions_today` | failed | at least one predictions row for the week's games with model_version != derived_lines created since ET midnight |
 | `sunday.derived_lines_posted` | degraded | at least one predictions row for the week's games with model_version == derived_lines created since ET midnight |
+| `sunday.fg_shadow_scored` | degraded | at least one predictions row for the week's games with model_version == bv_fg_v1 (H-ARM-FGU's input, scripts/fg_shadow.py) created since ET midnight |
 | `sunday.model_run_recorded` | degraded | a model_runs row noted `weekly refit` whose metrics name SEASON and WEEK, created since ET midnight (inputs, intercept, train rows, frame fingerprint) |
 | `sunday.pace_coverage` | degraded | share of the week's FBS slate teams with a team_tempo(SEASON, WEEK) row carrying seconds_per_play >= PACE_COVERAGE_MIN [0.8] |
 | `sunday.weather_coverage` | degraded | share of the week's FBS games with a weather row >= WX_COVERAGE_MIN [0.8] |

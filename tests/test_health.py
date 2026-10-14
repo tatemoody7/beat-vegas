@@ -483,6 +483,46 @@ class TestSunday:
             r = fn(self._sctx(s))
             assert r.ok and r.detail.startswith("1 full-game snapshots")
 
+    def test_the_full_game_shadow_has_its_own_check(self, db):
+        """2026-10-14: H-ARM-FGU reads bv_fg_v1 rows that only the continue-on-error
+        shadow step writes; a silent miss used to mean a silent empty FGU week."""
+        eng, scope = db
+        fn = _check("sunday", "sunday.fg_shadow_scored").fn
+        assert _check("sunday", "sunday.fg_shadow_scored").severity == "degraded"
+        with Session(eng) as s:
+            s.add(_game(1))
+            s.add(
+                Prediction(
+                    game_id=1, model_version="gbm_v1", bv_line=24.0, created_at=self.AFTER_MIDNIGHT
+                )
+            )
+            s.add(
+                Prediction(
+                    game_id=1,
+                    model_version="bv_fg_v1",
+                    bv_line=50.0,
+                    created_at=self.BEFORE_MIDNIGHT,
+                )
+            )
+            s.commit()
+        with scope() as s:
+            r = fn(self._sctx(s))
+            assert not r.ok and r.detail.startswith(
+                "0 bv_fg_v1 predictions"
+            )  # champion rows do not count
+        with Session(eng) as s:
+            s.add(
+                Prediction(
+                    game_id=1,
+                    model_version="bv_fg_v1",
+                    bv_line=50.0,
+                    created_at=self.AFTER_MIDNIGHT,
+                )
+            )
+            s.commit()
+        with scope() as s:
+            assert fn(self._sctx(s)).ok
+
     def test_predictions_and_derived_lines_are_told_apart(self, db):
         eng, scope = db
         model = _check("sunday", "sunday.predictions_today").fn

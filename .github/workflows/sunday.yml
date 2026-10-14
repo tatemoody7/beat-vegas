@@ -206,10 +206,12 @@ jobs:
           SEASON: ${{ steps.active.outputs.season }}
           WEEK: ${{ steps.active.outputs.week }}
         run: python scripts/post_derived_lines.py --season "$SEASON" --week "$WEEK" --refs "$RUNNER_TEMP/factor_refs.json"
-      - name: Score the full-game shadow (H-FG-P, bv_fg_v1; paper only)
+      - name: Score the full-game shadow (bv_fg_v1 — H-ARM-FGU's input; paper only)
         # After the champion: a shadow failure must never cost the champion's
         # Sunday, so this step cannot fail the job. Its rows are invisible to
-        # every "the model's line" read (score.CHAMPION_READ_VERSIONS).
+        # every "the model's line" read (score.CHAMPION_READ_VERSIONS). A
+        # silent miss is caught by `sunday.fg_shadow_scored` (degraded) since
+        # 2026-10-14: the registered full-game arm selects on these rows.
         if: steps.captured.outputs.need_score == 'true'
         continue-on-error: true
         timeout-minutes: 10

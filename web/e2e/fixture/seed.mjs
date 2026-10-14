@@ -23,6 +23,7 @@ import {
   lineUsedFor,
   round2,
   armPositionsFor,
+  armForwardPicksFor,
 } from "./expected.mjs";
 
 export const DEFAULT_URL =
@@ -855,6 +856,30 @@ export function fixtureRows(week, expected) {
   ];
 
   const hourAgo = ts(new Date(now.getTime() - 3_600_000));
+  rows.challenger_picks = armForwardPicksFor(week).map((p) => ({
+    id: p.id,
+    arm: p.arm,
+    game_id: p.game.id,
+    season,
+    week: p.week,
+    home_team: p.game.home,
+    away_team: p.game.away,
+    side: p.side,
+    market: p.market,
+    line: p.line,
+    price: p.price,
+    stake: 1.0,
+    book: HR,
+    slot: "fri_pm",
+    placed_at: ts(p.placedAt),
+    graded: p.graded,
+    result: p.result,
+    units: p.units,
+    ev_cons: p.ev_cons,
+    cons_excluded: p.cons_excluded,
+    cons_version: p.cons_version ?? null,
+  }));
+
   rows.arm_positions = armPositionsFor(now).map((r) => ({
     ...r,
     read_at: ts(r.read_at),

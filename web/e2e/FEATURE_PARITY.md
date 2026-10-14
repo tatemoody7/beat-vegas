@@ -66,9 +66,12 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [results] Signed in, pending real tickets offer edit and delete; paper and graded picks offer neither — results.spec.ts › "signed in, pending real tickets can be edited or deleted; paper and graded ones cannot"
 - [results] Signed out: the bet ledger reads with details and no edit or delete, the comparison has three rows, and the Monday review is absent — results.spec.ts › "a visitor gets the ledger and three comparison rows, not the Monday review"
 - [results] `/results` opens on the latest week with a pick and the signed-in picks table drops the Week column when filtered to one — results.spec.ts › "the default view is the latest week with a pick"
+- [results] Paper rows placed before the 1H-unders clock started carry the "development" tag — results.spec.ts › "paper rows placed before the 1H-unders clock started are tagged development"
+- [results] Every arm's forward picks with its value vs the close or the reason it has none; development rows never listed — results.spec.ts › "the forward picks of every arm, each with its value or the reason it has none; development never listed"
+- [results] The pricing study's forward opportunities from the stored Monday row — results.spec.ts › "the pricing study's forward opportunities come from the stored Monday row"
+- [results] The season comparison carries the Wilson interval on every win rate — results.spec.ts › "the season comparison carries the Wilson interval on every win rate"
 
 ## How it works
-
 
 ## Every game we have rated
 

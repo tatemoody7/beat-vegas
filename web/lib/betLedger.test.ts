@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  evSummary,
   BETS_CSV_HEADER,
   betsToCsv,
   betTime,
@@ -231,5 +232,33 @@ describe("consensusCell", () => {
     expect(consensusCell(0)).toBe("0.0%");
     expect(consensusCell(null)).toBe("—");
     expect(row().evCons).toBe(0.021);
+  });
+});
+
+describe("evSummary (the judge's reading, programme B6)", () => {
+  it("averages ev_cons over judged graded rows with a 95% interval from two readings", () => {
+    const s = evSummary([
+      row({ id: 1, graded: true, evCons: 0.02 }),
+      row({ id: 2, graded: true, evCons: -0.04 }),
+      row({ id: 3, graded: true, evCons: null, consExcluded: "far_lines" }),
+      row({ id: 4, graded: false, evCons: null }),
+    ]);
+    expect(s.judged).toBe(2);
+    expect(s.excluded).toBe(1);
+    expect(s.mean).toBeCloseTo(-0.01, 6);
+    expect(s.lo).not.toBeNull();
+    expect(s.lo! < -0.01 && -0.01 < s.hi!).toBe(true);
+  });
+  it("gives no interval from one reading and nothing from none", () => {
+    expect(evSummary([row({ id: 1, graded: true, evCons: 0.03 })])).toEqual({
+      judged: 1,
+      excluded: 0,
+      mean: 0.03,
+      lo: null,
+      hi: null,
+    });
+    expect(
+      evSummary([row({ id: 1, graded: true, evCons: null })]).mean,
+    ).toBeNull();
   });
 });

@@ -18,6 +18,31 @@ export const PROTOCOL = {
   EV_INTERVAL_MIN_READINGS: 10, // the site shows an EV only from here (honest-leaderboard rule)
 } as const;
 
+/** Each arm's clock start, naive UTC (protocol.ARMS_START / WX_ARMS_START /
+ *  HT_ARM_START; pinned by tests/test_research_parity.py). A paper pick placed
+ *  before its arm's start is development evidence and never a reading. */
+export const ARM_STARTS: Record<string, string> = {
+  "H-ARM-1HU": "2026-10-13T20:51:39.533351",
+  "H-ARM-1HO": "2026-10-13T20:51:39.533351",
+  "H-ARM-FGU": "2026-10-13T20:51:39.533351",
+  "H-ARM-WX1H": "2026-10-10T00:00:00",
+  "H-ARM-WXFG": "2026-10-10T00:00:00",
+  "H-ARM-HT1H": "2026-10-10T00:00:00",
+};
+
+/** The 1H-unders arm reads the paper picks the card logs; true when this pick
+ *  was placed at or after its clock start. */
+export function isForward(arm: string, placedAtIso: string | null): boolean {
+  const start = ARM_STARTS[arm];
+  if (!start || placedAtIso === null) return false;
+  const t = Date.parse(
+    /[zZ]|[+-]\d\d:?\d\d$/.test(placedAtIso)
+      ? placedAtIso
+      : `${placedAtIso.replace(" ", "T")}Z`,
+  );
+  return t >= Date.parse(`${start.slice(0, 23)}Z`);
+}
+
 export type Standard = "sprt" | "pricing";
 
 export type HypothesisMeta = {

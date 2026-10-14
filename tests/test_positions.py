@@ -107,3 +107,39 @@ def test_freshness_words():
     assert X.freshness(None, now) == "missing"
     assert X.freshness(datetime(2026, 10, 19, 12, 0), now) == "outdated"
     assert X.freshness(datetime(2026, 10, 26, 12, 0), now) == "current"
+
+
+def test_the_pricing_row_carries_the_forward_opportunities_for_the_site():
+    import json as _json
+
+    v = {
+        "verdict": "insufficient",
+        "opportunities": 1,
+        "min_required": 40,
+        "ev_close": {"n": 1, "mean": 0.04, "ci": None},
+    }
+    opp = {
+        "market": "1H_total",
+        "week": 7,
+        "game": "Ole Miss @ Vanderbilt",
+        "captured_at": datetime(2026, 10, 17, 11, 58),
+        "hrs_to_kick": 7.5,
+        "hr_line": 28.5,
+        "ref_line": 27.5,
+        "side": "under",
+        "price": -110,
+        "ev_ref": 0.0478,
+        "ev_ref_lower": 0.0292,
+        "ev_close": 0.0478,
+        "market_moved": "unchanged",
+        "tier": 0,
+        "fl_check": "none",
+        "result": "loss",
+        "hr_over": -120,  # not carried: the site lists only the report's columns
+    }
+    r = X.pricing_position(v, {}, datetime(2026, 10, 19, 12, 6), "-", [opp])
+    payload = _json.loads(r["payload_json"])
+    assert payload["verdict"]["verdict"] == "insufficient"
+    assert payload["opportunities"] == [
+        {k: (opp[k].isoformat() if k == "captured_at" else opp[k]) for k in X.OPPORTUNITY_FIELDS}
+    ]

@@ -74,13 +74,46 @@ def arm_position(arm: str, line: Mapping[str, Any], now: datetime, run_id: str) 
     }
 
 
+OPPORTUNITY_FIELDS = (
+    "market",
+    "week",
+    "game",
+    "captured_at",
+    "hrs_to_kick",
+    "hr_line",
+    "ref_line",
+    "side",
+    "price",
+    "ev_ref",
+    "ev_ref_lower",
+    "ev_close",
+    "market_moved",
+    "tier",
+    "fl_check",
+    "result",
+)
+
+
+def compact_opportunity(o: Mapping[str, Any]) -> Dict[str, Any]:
+    """One forward opportunity as the site lists it (Results, 2026-10-14): the
+    fields the Monday report's table prints, timestamps as naive-UTC ISO text."""
+    out: Dict[str, Any] = {}
+    for k in OPPORTUNITY_FIELDS:
+        v = o.get(k)
+        out[k] = v.isoformat() if isinstance(v, datetime) else v
+    return out
+
+
 def pricing_position(
     verdict: Mapping[str, Any],
     forward_by_market: Mapping[str, Mapping[str, Any]],
     now: datetime,
     run_id: str,
+    opportunities: Sequence[Mapping[str, Any]] = (),
 ) -> Dict[str, Any]:
-    """The row for H-PRICE-HR from `pricing.verdict` and the forward summaries."""
+    """The row for H-PRICE-HR from `pricing.verdict` and the forward summaries.
+    `payload_json` carries the verdict and the forward opportunities, so the
+    site lists the same rows the Monday report prints without recomputing."""
     close = verdict.get("ev_close") or {}
     ci = close.get("ci")
     return {
@@ -104,7 +137,13 @@ def pricing_position(
         "ev_lo": ci[0] if ci else None,
         "ev_hi": ci[1] if ci else None,
         "next_read": next_monday(now),
-        "payload_json": json.dumps(dict(verdict), default=str),
+        "payload_json": json.dumps(
+            {
+                "verdict": dict(verdict),
+                "opportunities": [compact_opportunity(o) for o in opportunities],
+            },
+            default=str,
+        ),
     }
 
 

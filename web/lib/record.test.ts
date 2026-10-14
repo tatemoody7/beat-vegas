@@ -146,4 +146,12 @@ describe("recordFrom carries wins, decided and the interval", () => {
     expect(rec.decided).toBe(161);
     expect(rec.hitLo).toBeCloseTo(0.475652, 6);
   });
+  it("a bonus bet's units count but its stake never enters ROI (it risked nothing)", () => {
+    const rec = recordFrom([
+      { result: "under", units: 0.91, clv: null, stake: 1, isBonus: true },
+      { result: "over", units: -1, clv: null, stake: 1 },
+    ]);
+    expect(rec?.units).toBe("-0.09");
+    expect(rec?.roi).toBe("-9.0%"); // -0.09 over the ONE unit actually risked
+  });
 });

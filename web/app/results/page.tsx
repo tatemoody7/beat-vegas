@@ -1,6 +1,9 @@
 import { getSeasons } from "@/lib/board";
 import { getBetLedger } from "@/lib/betLedgerDb";
 import { bankrollCurve } from "@/lib/homeBoard";
+import { getArmPicks, getPricingOpportunities } from "@/lib/armPicks";
+import ArmPicksSection from "@/app/components/ArmPicksSection";
+import PricingOpportunities from "@/app/components/PricingOpportunities";
 import { getLedger } from "@/lib/ledger";
 import { loadPicks } from "@/lib/picks";
 import { resolveSeason } from "@/lib/season";
@@ -49,12 +52,15 @@ export default async function ResultsPage({
         ? Number(sp.week)
         : undefined;
 
-  const [ledger, review, allPicks, bets] = await Promise.all([
-    getLedger(season),
-    getWeeklyReview(season, wantWeek),
-    loadPicks(season),
-    getBetLedger(season),
-  ]);
+  const [ledger, review, allPicks, bets, armPicks, opportunities] =
+    await Promise.all([
+      getLedger(season),
+      getWeeklyReview(season, wantWeek),
+      loadPicks(season),
+      getBetLedger(season),
+      getArmPicks(season),
+      getPricingOpportunities(),
+    ]);
   const weekLabel = review.week === null ? "all weeks" : `week ${review.week}`;
   const curve = bankrollCurve(allPicks); // units only: it is a client prop
   const hasRecord =
@@ -76,14 +82,14 @@ export default async function ResultsPage({
     {
       key: "paper",
       label: "Every game that cleared the bar, on paper",
-      note: "no 5-a-week cap · tracked with no money",
+      note: "no 5-a-week cap · development before 2026-10-13",
       rec: ledger.paper,
       empty: "no paper picks graded yet",
     },
     {
       key: "you",
-      label: "Our bets",
-      lead: true,
+      label: "Personal stake",
+      note: "never evidence for any strategy",
       rec: ledger.you,
       empty: "no real bets graded yet",
     },
@@ -139,8 +145,17 @@ export default async function ResultsPage({
             : "nothing has settled yet. It fills in as games are graded."
         }
       >
-        <RecordTable ariaLabel="Season summary" showClv rows={comparison} />
+        <RecordTable
+          ariaLabel="Season summary"
+          showClv
+          showInterval
+          rows={comparison}
+        />
       </Section>
+
+      <ArmPicksSection picks={armPicks} />
+
+      <PricingOpportunities rows={opportunities} />
 
       {authed && (
         <section

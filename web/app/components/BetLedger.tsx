@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   betTime,
   consensusCell,
+  evSummary,
   groupByWeek,
   hoursBeforeKickoff,
   ledgerSummary,
@@ -29,6 +30,7 @@ import { loggedAs } from "@/lib/loggedAs";
 import { isOffPolicy } from "@/lib/pickRules";
 import { EmptyLine } from "@/app/components/Section";
 import BankrollCurve from "@/app/components/BankrollCurve";
+import { isForward } from "@/lib/research";
 import type { BankrollPoint } from "@/lib/homeBoard";
 
 // Every bet we have placed, at the top of Results (Track record until
@@ -40,11 +42,16 @@ import type { BankrollPoint } from "@/lib/homeBoard";
 // our number, the closing line and the note -- frozen when the pick was
 // logged. Nothing here is a tooltip: a phone never shows one.
 
+// "Personal stake" (Tate, 2026-10-14): the real-money tickets are the owner's
+// own bets, recorded separately and never evidence for any strategy; the paper
+// rows are H-ARM-1HU's, development before its clock started (2026-10-13).
 const VIEW_LABEL: Record<LedgerView, string> = {
-  real: "Our bets",
-  paper: "Every game that cleared the bar, on paper",
+  real: "Personal stake",
+  paper: "First-half unders, on paper",
   all: "Both ledgers",
 };
+
+const evPct = (v: number) => `${v >= 0 ? "+" : ""}${(100 * v).toFixed(1)}%`;
 
 const pct = (v: number) => `${(100 * v).toFixed(0)}%`;
 const num = (n: number | null, dp = 2) => (n === null ? "—" : signed(n, dp));
@@ -95,13 +102,14 @@ export default function BetLedger({
   const summary = ledgerSummary(shown);
   const groups = groupByWeek(withRunningUnits(shown));
   const rec = summary.record;
+  const ev = evSummary(shown);
   const interval =
     rec && rec.hitLo !== null && rec.hitHi !== null
       ? `could plausibly be ${pct(rec.hitLo)}–${pct(rec.hitHi)}`
       : "nothing decided yet";
 
   const VIEWS: { id: LedgerView; label: string; n: number }[] = [
-    { id: "real", label: "Our bets", n: realCount },
+    { id: "real", label: "Personal stake", n: realCount },
     { id: "paper", label: "Paper", n: paperCount },
     { id: "all", label: "All", n: rows.length },
   ];
@@ -128,26 +136,41 @@ export default function BetLedger({
                   <span style={{ color: unitColor(rec.units) }}>
                     {`${rec.units}u`}
                   </span>
-                  {` · ROI ${rec.roi}`}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-dim)]">
                   {interval}
                 </p>
+                {view === "real" && (
+                  <p className="mt-1 text-xs text-[var(--text-dim)]">
+                    Never evidence for any strategy; units modelled from the
+                    ledger, not reconciled.
+                  </p>
+                )}
               </>
             )}
           </div>
           <div>
-            <span className="bv-stat-label">Line value</span>
+            {/* The judge's number (2026-10-14, programme B6): value at the
+                bet's exact line and price against the vig-free consensus
+                close. The point move of the line is the secondary line. */}
+            <span className="bv-stat-label">Value vs the close</span>
             <p className="mt-2 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-none tabular-nums text-[var(--text)]">
-              {rec?.clv ?? "—"}
+              {ev.mean === null ? "—" : evPct(ev.mean)}
             </p>
             <p className="mt-2.5 text-sm text-[var(--text-muted)]">
-              points the market came toward us
+              {ev.judged === 0
+                ? "no bet has a usable close yet"
+                : ev.lo === null || ev.hi === null
+                  ? `per bet at Hard Rock’s price · ${ev.judged} read`
+                  : `per bet at Hard Rock’s price · could plausibly be ${evPct(ev.lo)} to ${evPct(ev.hi)} · ${ev.judged} read`}
+              {ev.excluded > 0
+                ? ` · ${ev.excluded} without a usable close`
+                : ""}
             </p>
             <p className="mt-1 text-xs text-[var(--text-dim)]">
               {summary.closes === 0
-                ? "no closes captured yet"
-                : `${pct(summary.movedOurWay / summary.closes)} of ${summary.closes} lines moved our way`}
+                ? "Line move: no closes captured yet"
+                : `Line move: ${rec?.clv ?? "—"} points toward us on average · ${pct(summary.movedOurWay / summary.closes)} of ${summary.closes} lines moved our way`}
             </p>
           </div>
           <div>
@@ -305,6 +328,11 @@ function LedgerRowView({
           )}
           {p.isPaper && (
             <span className="bv-badge bv-badge--warn ml-1">paper</span>
+          )}
+          {p.isPaper && !isForward("H-ARM-1HU", p.placedAt) && (
+            <span className="bv-badge ml-1">
+              development — before the clock started
+            </span>
           )}
           {p.isBonus && (
             <span className="bv-badge ml-1">bonus — a loss costs nothing</span>

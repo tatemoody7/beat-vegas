@@ -44,7 +44,7 @@ const EXTRA = String(args.extra ?? "")
 const PAGES = [
   ["board", "/"],
   ["results", "/results?week=all"],
-  ["how", "/how-it-works"],
+  ["research", "/research"],
   ["records", "/records"],
   ["login", "/login"],
   ...GAMES.map((id, i) => [`game_${i}_${id}`, `/game/${id}`]),

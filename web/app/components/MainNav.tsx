@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Three tabs, one job each: scan the week, see the money, learn how it works.
+// Three tabs, one job each: scan the week, see the record, follow the research.
 // The retired routes (/board, /preview, /line-check, /line-study, /movement,
-// /ledger, /weekly-review, /picks, /research, /proof, /glossary) redirect
+// /ledger, /weekly-review, /picks, /how-it-works, /proof, /glossary) redirect
 // into these. /records (every game rated) lights no tab; it is reached from
-// How it works and Results.
+// Research and Results.
 const LINKS = [
   { href: "/", label: "Board" },
   { href: "/results", label: "Results" },
-  { href: "/how-it-works", label: "How it works" },
+  { href: "/research", label: "Research" },
 ];
 
 export default function MainNav() {

@@ -1,0 +1,443 @@
+[
+  {
+    "id": "R01",
+    "question": "Does training and scoring on FBS-vs-FBS only improve the top-20%-by-gap rule?",
+    "status": "adopted",
+    "family": "exploratory",
+    "doc": "`research/swarm/2026-09-01-1h-under-edges/FBS_FILTER_RESULTS.md` (local only — `/research/` is gitignored; the adopted artefact in git is `data/fbs_teams.json` + `etl/fbs.py`)"
+  },
+  {
+    "id": "R02",
+    "question": "Which proxy share (flat, linear, step) predicts the realized 1H total best?",
+    "status": "adopted",
+    "family": "exploratory",
+    "doc": "`research/swarm/2026-09-01-1h-under-edges/PROXY_FIX_RESULTS.md` (local only — gitignored; the adopted artefact in git is `data/multiplier.json`)"
+  },
+  {
+    "id": "R03",
+    "question": "Does a residual engine (market-conditioned) beat the incumbent and the close?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`scripts/residual_gate.py` (report gitignored; close 8.73 / residual 9.01 / incumbent 9.23 / stored 8.96 recorded in the 2026-09-08 session handoff, outside the repo)"
+  },
+  {
+    "id": "R04",
+    "question": "Does seeding season-to-date features with prior-season form fix early-season scoring?",
+    "status": "rejected",
+    "family": "exploratory",
+    "doc": "`docs/LEVEL_ANCHOR.md`"
+  },
+  {
+    "id": "R05",
+    "question": "Does censoring of the underdog's 1H score leave information the price has not absorbed?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`docs/CENSORING_STUDY.md`"
+  },
+  {
+    "id": "R06",
+    "question": "Does activating decision-safe weather move the board within an acceptable blast radius?",
+    "status": "rejected",
+    "family": "exploratory",
+    "doc": "`docs/WEATHER.md`"
+  },
+  {
+    "id": "R07",
+    "question": "Does a negative gap carry over-side information?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`docs/TWO_SIDED.md`"
+  },
+  {
+    "id": "R08",
+    "question": "Does Hard Rock lag the market, and does its price move before its number?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`docs/HR_LAG.md`"
+  },
+  {
+    "id": "R09",
+    "question": "Does decision-time gust × offensive style predict market error after the price control?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`docs/WEATHER_STYLE.md`"
+  },
+  {
+    "id": "R10",
+    "question": "Does gap ≥ 1.75 at Hard Rock's number hold prospectively?",
+    "status": "superseded",
+    "family": "stopping-rule",
+    "doc": "`docs/STOPPING_RULE.md` -- the CONSTANT bar is retired 2026-09-22 (Tate): validated as \"top 20% by gap\" and deployed as 1.75, it selected 47-51% of Hard-Rock-priced games once the model's level moved (`docs/MODEL_LEVEL_2026.md`), and two registered level fixes failed. Its prospective evidence is H-STOP's 30 observations (superseded). The rule going forward is H-PCT."
+  },
+  {
+    "id": "B-SERVE",
+    "question": "Does the live model score upcoming games with inputs it never saw missing in training -- and is that the \"level deficit\"?",
+    "status": "adopted",
+    "family": "serving-defect",
+    "doc": "`docs/MODEL_LEVEL_2026.md` (section \"The serving skew\")"
+  },
+  {
+    "id": "H-PCT",
+    "question": "The champion's qualification rule: the top 20% of the slate by gap, instead of a constant 1.75-point bar.",
+    "status": "live-tracking",
+    "family": "champion-rule",
+    "doc": "`docs/STOPPING_RULE.md` (Clock 2); its universe's \"centred Hard Rock quote\" is REPLACED by H-PCT-U (written 2026-09-25, before the first observation)"
+  },
+  {
+    "id": "H-PCT-U",
+    "question": "Which Hard Rock quote is \"centred\" for H-PCT's universe, now that the feed is known to serve Hard Rock's alternate lines as its 1H total?",
+    "status": "live-tracking",
+    "family": "champion-rule",
+    "doc": "`docs/RANKING_AND_TRUST.md` (section 9b)"
+  },
+  {
+    "id": "H-STOP-2",
+    "question": "When does the paper record of the H-PCT rule end the test, either way?",
+    "status": "superseded",
+    "family": "stopping-rule",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`, Tate's reset): real money paused, so both clocks (real tickets only) stopped at profit n=10, LLR −0.26 and line value n=9, LLR +0.73 after week 5, with no boundary crossed — INCONCLUSIVE. The two week-6 tickets placed 2026-10-06 before the pause (`manual_picks` 102, 103) grade into the ledger but feed no clock. Its observations stay as development evidence. `docs/STOPPING_RULE.md` (Clock 2); \"the H-PCT rule\" is H-PCT with the universe of H-PCT-U -- 2026-10-07: the champion's training floor moved 2023 -> 2003 (H-HIST); the clock keeps running (Tate's call), observations reported before/after the switch (`docs/STOPPING_RULE.md`)."
+  },
+  {
+    "id": "H6",
+    "question": "Which of the four decision builds gives the best line value?",
+    "status": "pre-registered",
+    "family": "H6",
+    "doc": "`docs/WHEN_TO_BET.md` (PR 2)"
+  },
+  {
+    "id": "H3A",
+    "question": "What weight w on the market close minimises MAE of w·close + (1−w)·bv_line?",
+    "status": "tested-positive",
+    "family": "H3a-global",
+    "doc": "`docs/BLEND.md` — BLEND WINS AT CLOSE by the letter; blend−close paired CI spans zero in both seasons; frozen w = 0.80 in `data/blend.json`"
+  },
+  {
+    "id": "H3B",
+    "question": "Does a spread-bucket w beat the global w?",
+    "status": "tested-null",
+    "family": "H3a-buckets",
+    "doc": "`docs/BLEND.md` — no bucket passes in both seasons; 14-21 in 2024 alone (Holm 0.072)"
+  },
+  {
+    "id": "H4G",
+    "question": "What did each of the seven gates block, and how did those games do?",
+    "status": "exploratory",
+    "family": "exploratory",
+    "doc": "`docs/GATES.md` — price gate blocked 15 alone (5-5 graded); off_market 0 alone; cap 4 (2-2)"
+  },
+  {
+    "id": "H4P",
+    "question": "Would a fixed −115 kill ceiling have blocked a different, better or worse, set than the market-relative price gate?",
+    "status": "exploratory",
+    "family": "exploratory",
+    "doc": "`docs/GATES.md` — the two gates disagree on 26 of 52; price-only set 6-2 graded (n 8)"
+  },
+  {
+    "id": "H4C",
+    "question": "Does a trust-adjusted cap ranking (gap × shrunk reliability by spread bucket) pick a better five than gap alone?",
+    "status": "exploratory",
+    "family": "exploratory",
+    "doc": "`docs/GATES.md` — nothing to reorder until a week's pool exceeds five; 2023-25 trust flat (0.93-1.05)"
+  },
+  {
+    "id": "H5",
+    "question": "Does any sharp book (Pinnacle, Circa, BookMaker, BetOnline) post CFB 1H totals through the Odds API, and how often?",
+    "status": "tested-null",
+    "family": "exploratory",
+    "doc": "`docs/SHARP_BOOKS.md` — Pinnacle 2 of 75, BetOnline 3 of 75, both only where Hard Rock posted; BetUS (retail) 55; no swap; a late-week repeat would test whether coverage widens"
+  },
+  {
+    "id": "H-STOP",
+    "question": "When does the paper record of the 1.75 rule end the test, either way?",
+    "status": "superseded",
+    "family": "stopping-rule",
+    "doc": "`docs/STOPPING_RULE.md` -- CLOCK 1 CLOSED 2026-09-22 at n=30 with NO boundary crossed (profit LLR -0.44, CLV LLR -0.51 against +3.47 / -1.58): SUPERSEDED, not decided. The champion it measured changes with B-SERVE (57 inputs the model never saw missing in training were missing on every row it scored) and its constant bar is replaced by H-PCT, so the observations from week 5 on are a different rule. The 30 observations are kept as history and never mixed into H-STOP-2. Two defects in this row are corrected in H-STOP-2: the CLV benchmark is named as Hard Rock's strict close here but the code grades against the centred consensus close (`beatvegas/picks.py`), and sd 1.714 was week 2's value alone (week 3 read 0.984)."
+  },
+  {
+    "id": "H-SHARE",
+    "question": "Does a market-conditioned discrete 1H-split engine beat the market's close and earn a prospective paper arm?",
+    "status": "superseded",
+    "family": "share-engine",
+    "doc": "`docs/SHARE_ENGINE.md` (PR later) — spec `docs/superpowers/specs/2026-09-15-share-engine.md` -- WITHDRAWN (Tate, 2026-10-06, system review): its gate is judged only on 2023-25, which the registry declared spent for rule selection on 2026-09-22; it cannot be run honestly. Spec kept for reference."
+  },
+  {
+    "id": "H-NEGGAP",
+    "question": "Does a negative live gap (Hard Rock's line BELOW our number) run over at a rate the 2023-25 history did not show?",
+    "status": "live-tracking",
+    "family": "exploratory",
+    "doc": "`docs/TWO_SIDED.md` (R07 is the 2023-25 arm; this is the prospective 2026 one)"
+  },
+  {
+    "id": "H-NEGGAP-L",
+    "question": "Under each H-INSEASON arm's corrected level, what is the OVER rate of Hard-Rock-priced games whose ARM gap is negative at the decision build -- and does the champion's live negative band (H-NEGGAP) survive once the level deficit is removed?",
+    "status": "live-tracking",
+    "family": "two-sided",
+    "doc": "`docs/TWO_SIDED.md` (live section)"
+  },
+  {
+    "id": "H-NEGGAP-P",
+    "question": "Prospectively, does betting the OVER when Hard Rock's MAIN first-half line sits below our number earn paper profit at Hard Rock's over price and favourable line value against the close?",
+    "status": "superseded",
+    "family": "neggap-paper",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`): the over arm restarts as ONE arm, the bottom 20% of gaps on each slate, registered under the 2026 Statistical Protocol before it logs; the three nested arms' rows (the collector keeps running until then) are development evidence only. `docs/NEGGAP_PAPER.md`"
+  },
+  {
+    "id": "H-LEVEL",
+    "question": "Does the prior-season level anchor reduce `bv_line`'s LEVEL BIAS and restore the gate's selectivity? (R04 asked the MAE question and its own doc says this is a different hypothesis)",
+    "status": "tested-null",
+    "family": "level-anchor",
+    "doc": "`docs/MODEL_LEVEL_2026.md`"
+  },
+  {
+    "id": "H-INTERCEPT",
+    "question": "Is `bv_line`'s global calibration intercept doing more harm than good, and does shrinking or dropping it reduce LEVEL BIAS without costing accuracy?",
+    "status": "tested-null",
+    "family": "level-anchor",
+    "doc": "`docs/MODEL_LEVEL_2026.md` -- NO ARM ADOPTED. Every challenger beat the incumbent on mean and worst, and all failed the every-season clause: 2025 needs MORE correction at every lambda, and 2024 has no scorable fold so the clause is unsatisfiable there. Grid {0, 0.25, 0.5, 0.75, 1.0} declared in the same doc before the run."
+  },
+  {
+    "id": "H-INSEASON",
+    "question": "Does re-estimating the calibration intercept from the current season's own completed games reduce LEVEL BIAS where the prior-season intercept does not transfer?",
+    "status": "tested-null",
+    "family": "in-season-calibration",
+    "doc": "`docs/MODEL_LEVEL_2026.md` -- TESTED-NULL on the run of record (Tate, 2026-09-22). The gate was run twice on one frozen criterion and disagreed: Holm-adjusted p 0.0040 on a frame built from CFBD reference tables cached in June 2026 (this Mac), 0.0560 on a frame built from the tables CFBD served in September 2026 (the runner, which refetches weekly and is what the live board is fitted on). Reconciled the same day (MODEL_LEVEL_2026.md, Reconciliation): same frame + same library reproduce to six decimals on both machines, thread count is irrelevant, the library version moves the intercept by ~0.1 and never a verdict; the ONLY difference is the reference-data snapshot (40 of 196 columns: advanced-stat PPA/explosiveness/success, roster experience, returning production, revised by CFBD between June and September). The criterion is applied to the September data because that is what the system uses: every arm still beats the incumbent on both primaries with intervals below zero, but Holm p 0.056 does not clear 0.05, so NO ARM PASSES. Run of record: inseason_gate.yml run 35747948770 on frame snapshot 2026-09-22T15:56Z (study.yml run 35750576666). The developmental caveat stands regardless: the primary was partly mechanical for this estimator. A pass on data that a vendor revision can flip is not a pass."
+  },
+  {
+    "id": "H-INSEASON-P",
+    "question": "Prospectively, does any arm of the H-INSEASON challenger family earn paper profit at actually available prices and positive line value against the close?",
+    "status": "superseded",
+    "family": "in-season-paper",
+    "doc": "`docs/INSEASON_PAPER.md` -- WITHDRAWN before the first pick (Tate, 2026-09-22): H-INSEASON did not pass on the run of record, so nothing licensed this collection. No observation was ever logged."
+  },
+  {
+    "id": "H-FACTOR-SCREEN",
+    "question": "Which of the champion's inputs, and the gap itself, predict the first-half residual against the consensus close in 2026 -- and do any of the 2023-25 bucket rates on record survive a second look?",
+    "status": "exploratory",
+    "family": "exploratory",
+    "doc": "`docs/SYSTEM_REVIEW_2026-10-04.md` §4 -- nothing crossed 0.00058; best p 0.117 (`away_tz_shift`, rho −0.11); the gap itself rho −0.056, p 0.41 on 212 games"
+  },
+  {
+    "id": "H-PCT-TIE",
+    "question": "Does requiring a margin above the slate bar improve the H-PCT paper ledger's profit and line value?",
+    "status": "superseded",
+    "family": "champion-rule-paper",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`): folded into the first-half unders arm, which restarts uncapped and CLV-judged under the 2026 Statistical Protocol; no collector was ever built. `docs/SYSTEM_REVIEW_2026-10-04.md` §7 -- KEPT and FOLDED (Tate, 2026-10-06): this row IS the margin-above-the-bar ranking test Tate approved after the system review (near-bar picks went 8-17 on paper in weeks 2-5, stated as the prompt, not evidence); its arms and criterion stand as written; the collector is a later PR."
+  },
+  {
+    "id": "H-TIMING",
+    "question": "Does betting a card BET off the first build that rates it BET cost line value or price against betting the same game off the `fri_pm` build?",
+    "status": "superseded",
+    "family": "timing",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`): absorbed into the early/stale-lines arm, registered under the 2026 Statistical Protocol; never run. `docs/SYSTEM_REVIEW_2026-10-04.md` §7 -- KEPT as a measurement (Tate, 2026-10-06): no bets, cheap, answers Tuesday-vs-Friday; its paired read stays as written; the script is a later PR."
+  },
+  {
+    "id": "H-MOVE",
+    "question": "Does the direction and size of the first-half line move from the decision build to the close -- Hard Rock's and the consensus's, on main lines -- predict the outcome at the close?",
+    "status": "superseded",
+    "family": "line-movement",
+    "doc": "`docs/SYSTEM_REVIEW_2026-10-04.md` §7 -- WITHDRAWN before the first observation (Tate, 2026-10-06, system review): its first test half (weeks 2-8) includes weeks 2-5, whose under rates the row itself printed, so it could not be read cleanly. No collector was ever built."
+  },
+  {
+    "id": "H-TOP3",
+    "question": "Does taking only the three largest qualifying gaps a week beat the cap-5 champion on paper?",
+    "status": "superseded",
+    "family": "champion-rule-paper",
+    "doc": "`docs/SYSTEM_REVIEW_2026-10-04.md` §7 -- WITHDRAWN before the first observation (Tate, 2026-10-06, system review): three-vs-five a week cannot separate at this volume in 2026, and every new arm spends the program's false-positive budget. No row was ever logged."
+  },
+  {
+    "id": "H-SHADOW-F",
+    "question": "Does a shadow feature set beat the champion when scored beside it every week: the champion's 58 inputs plus prior-season offensive and defensive explosiveness, defensive success, SP+ special teams and SP+ strength of schedule, the opener flags -- with the legacy `wx_*` inputs nulled?",
+    "status": "exploratory",
+    "family": "shadow-engine",
+    "doc": "`docs/SYSTEM_REVIEW_2026-10-04.md` §11"
+  },
+  {
+    "id": "H-INSEASON-T",
+    "question": "Does refitting each Sunday on prior seasons plus the current season's completed games beat the frozen prior-season regressor on MAE and paper line value?",
+    "status": "exploratory",
+    "family": "shadow-engine",
+    "doc": "`docs/SYSTEM_REVIEW_2026-10-04.md` §11"
+  },
+  {
+    "id": "H-WEPA-F",
+    "question": "Does dated in-season WEPA (CFBD's opponent-adjusted efficiency from `/wepa/team/season`, frozen each Sunday \"through week N−1\" in the Patreon weekly files) explain the champion's first-half residual against the real consensus close in 2025, learned walk-forward within the season -- and, prospectively, does a shadow engine carrying WEPA + CORE + pregame Elo in place of the season+1 quality columns beat the champion in 2026 weeks 6-15?",
+    "status": "tested-null",
+    "family": "shadow-engine",
+    "doc": "`docs/WEPA_F.md` (run 37491506377, 2026-10-06; NOT MET; ARM P not licensed)"
+  },
+  {
+    "id": "H-FG-U-R",
+    "question": "Does a market-blind regressor fitted to the FULL-GAME total, under the champion's selection rule, pick full-game UNDERS that beat the real full-game close in 2023-25?",
+    "status": "tested-positive",
+    "family": "fg-market",
+    "doc": "`docs/FG_MARKET.md` (run 37498128236, 2026-10-06). The row's \"selected picks\" was ambiguous between the qualifying set (lower bound 50.1%, fails) and the cap-5 set (78-44-2, 63.9%, lower bound 55.1%, 53.8% Holm; units +12.55 / +14.36; passes). **Tate ruled 2026-10-06 that the champion's rule includes the weekly cap, so the capped set is the selected set: MET.** **POST-HOC READING (relabelled 2026-10-06, Tate's call): the reading that passes was chosen after both readings' numbers were read; the pre-registered text did not decide it, and the qualifying-set reading fails. Quote this row as 'positive on a post-hoc reading', never as a clean pass.** Licenses H-FG-P (paper only)."
+  },
+  {
+    "id": "H-FG-O-R",
+    "question": "Same regressor and rule, mirrored: does it pick full-game OVERS that beat the real full-game close in 2023-25? R07 (`docs/TWO_SIDED.md`) found no over-side signal on the FIRST-HALF gap; this is the full-game question, asked once.",
+    "status": "tested-null",
+    "family": "fg-market",
+    "doc": "`docs/FG_MARKET.md` (run 37498146230, 2026-10-06; NOT MET on every reading — lower bounds 46.0% / 43.3%, 2025 units negative)"
+  },
+  {
+    "id": "H-FG-P",
+    "question": "Prospectively, does the full-game-target regressor's capped UNDER selection earn paper profit at Hard Rock's full-game price and favourable line value against the real full-game close in 2026?",
+    "status": "superseded",
+    "family": "fg-market-paper",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`): the full-game unders arm restarts uncapped and CLV-judged under the 2026 Statistical Protocol; rows logged under this row (the collector keeps running until then) are development evidence only. `docs/FG_MARKET.md` (PR5 of the 2026-10-06 program; first `cards.id` TBD) -- 2026-10-07: `bv_fg_v1` trains like the champion on 2003+ (Tate's call, same switch)."
+  },
+  {
+    "id": "H-HIST",
+    "question": "Does training the champion's regressor on a longer history (from 2003, 2010 or 2015) instead of 2023-25 make its first-half number more accurate without making its picks worse?",
+    "status": "tested-positive",
+    "family": "train-history",
+    "doc": "`docs/HISTORY_DEPTH.md` (run 37567344521, 2026-10-07): MET on all three arms -- Δ\\|err\\| −0.43 / −0.43 / −0.42 [intervals exclude zero], Holm p 0.002; pooled MAE 9.17 → 8.74-8.76 vs the close's 8.73; units not worse. Licenses a proposal to raise the training window (Tate's call)."
+  },
+  {
+    "id": "H-ELO-F",
+    "question": "Do CFBD's pregame Elo ratings, added as two inputs to the champion's regressor on its own 2023+ window, make its first-half number more accurate without making its picks worse?",
+    "status": "tested-null",
+    "family": "elo-input",
+    "doc": "`docs/ELO_F.md` (run 37566955440, 2026-10-07): NOT MET -- Δ\\|err\\| −0.019 [−0.087, +0.050], p 0.62; units +0.018 [−0.000, +0.036]."
+  },
+  {
+    "id": "CONS-DEV",
+    "question": "How much does line value at the wager's exact terms vary per bet, and how often is there no reading, on the 2026 development rows?",
+    "status": "exploratory",
+    "family": "consensus-measurement (no confirmatory alpha)",
+    "doc": "`docs/CONSENSUS.md` (study.yml run 37703161461)"
+  },
+  {
+    "id": "WEEK-SHOCK",
+    "question": "How much of line value per bet is shared by every bet in the same week (a market-wide Saturday move), against the part unique to each game?",
+    "status": "exploratory",
+    "family": "protocol-sizing (no confirmatory alpha)",
+    "doc": "`docs/PROTOCOL_2026.md` (study.yml run 37712076009): week move 0.005 (2023-25, to 0.007), 0.012 (2026, to 0.020)"
+  },
+  {
+    "id": "H-PROGRAM-2026",
+    "question": "The 2026 Statistical Protocol p1: under what rule is each confirmatory arm promoted to $10 live validation, stopped, or timed out?",
+    "status": "pre-registered",
+    "family": "program (5% family-wise, fixed ledger K = 10)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-1HU",
+    "question": "Under protocol p1, do paper first-half UNDERS on every game at or above the per-slate bar carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1, ledger slot 1)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-1HO",
+    "question": "Under protocol p1, do paper first-half OVERS on the bottom 20% of the slate, with the model above Hard Rock's line, carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1, ledger slot 2)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-FGU",
+    "question": "Under protocol p1, do paper full-game UNDERS on every game at or above the full-game slate bar carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1, ledger slot 3)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-WX1H",
+    "question": "Under protocol p1.1, do paper first-half UNDERS on every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1.1, ledger slot 6)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-WXFG",
+    "question": "Under protocol p1.1, do paper full-game UNDERS on every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1.1, ledger slot 7)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-ARM-HT1H",
+    "question": "Under protocol p1.1, do paper first-half UNDERS on every game whose consensus full-game total at the build is 60.0 or more carry +3% EV against the consensus close at Hard Rock's price?",
+    "status": "pre-registered",
+    "family": "program (H-PROGRAM-2026, p1.1, ledger slot 8)",
+    "doc": "`docs/PROTOCOL_2026.md`"
+  },
+  {
+    "id": "H-LIT-ARSCOTT",
+    "question": "Does Arscott's (2023) rule, the full-game OVER at the close when the expected censoring bias of the total exceeds 1.0 point, beat the −110 break-even on the seasons after the paper's sample?",
+    "status": "tested-null",
+    "family": "literature-looks (Holm 5% across six, m = 6, outside the ledger)",
+    "doc": "`docs/LITERATURE.md` (study.yml run 37863814444, 2026-10-09 UTC, at 4345320): NOT MET -- 113-106-3, 51.6%, p 0.618, Holm-adjusted 1.000, units −3.27. Final: a raw p above 5% cannot pass at any Holm step."
+  },
+  {
+    "id": "H-LIT-TV",
+    "question": "Do game totals on national-network games (ABC, CBS, NBC, FOX, ESPN) go UNDER at the close more often than the −110 break-even (Weinbach & Paul 2009)?",
+    "status": "tested-null",
+    "family": "literature-looks (Holm 5% across six, m = 6, outside the ledger)",
+    "doc": "`docs/LITERATURE.md` (study.yml run 37864047692, 2026-10-09 UTC, at 4345320): NOT MET -- 1249-1136-30, 52.4%, p 0.513, Holm-adjusted 1.000, units −0.55. Final: a raw p above 5% cannot pass at any Holm step."
+  },
+  {
+    "id": "H-LIT-BENNETT",
+    "question": "Does fading the previous season's final AP top 10 against the spread in its first game beat the −110 break-even on the seasons after Bennett's (2019) sample?",
+    "status": "tested-null",
+    "family": "literature-looks (Holm 5% across six, m = 6, outside the ledger)",
+    "doc": "`docs/LITERATURE.md` (study.yml run 37864196666, 2026-10-09 UTC, at 4345320): NOT MET -- 28-32-1, 46.7%, p 0.845, Holm-adjusted 1.000, units −6.55. Final: a raw p above 5% cannot pass at any Holm step."
+  },
+  {
+    "id": "H-LIT-COX",
+    "question": "In a trophy rivalry, does the favourite that won the last three meetings cover the closing spread above the −110 break-even on the seasons after Cox's (2008-2018) sample?",
+    "status": "tested-null",
+    "family": "literature-looks (Holm 5% across six, m = 6, outside the ledger)",
+    "doc": "`docs/LITERATURE.md` (study.yml run 38170624665, 2026-10-11 UTC, at afbf045): NOT MET -- 72-75-4, 49.0%, p 0.818, Holm-adjusted 1.000, units −9.55. Final: a raw p above 5% cannot pass at any Holm step."
+  },
+  {
+    "id": "H-CLOSE-W",
+    "question": "Does H-STOP-2's line-value verdict depend on the 2-hour close window it froze?",
+    "status": "superseded",
+    "family": "sensitivity (no confirmatory alpha)",
+    "doc": "SUPERSEDED 2026-10-07 (`docs/ROADMAP_2026.md`): it read H-STOP-2's verdict, and H-STOP-2 closed inconclusive before any read; never run. not yet run; the read is reported in `docs/STOPPING_RULE.md`"
+  },
+  {
+    "id": "H-MARGIN",
+    "question": "How close does a market-blind full-game margin regressor, built on the champion's inputs, get to the Vegas closing spread?",
+    "status": "exploratory",
+    "family": "margin-measurement (outside the program budget)",
+    "doc": "CLOSED 2026-10-07 (`docs/ROADMAP_2026.md`): the Pick'em entry is dropped; no weekly scoring or submission is built. `docs/MARGIN.md` — run once 2026-10-07 (study.yml 37670166376, frame `23cb43a0a69c29aa`): model MAE 13.16 vs the closing spread's 11.76 on 1,058 games (+1.40, 95% +1.04 to +1.77), ATS 49.1%. Licenses nothing; the Pick'em entry stands (Tate)."
+  },
+  {
+    "id": "H-WX-HIST",
+    "question": "In 2024-25, did windy forecasts move the totals market toward the under before kickoff, or beat the close?",
+    "status": "exploratory",
+    "family": "weather-measurement (no confirmatory alpha)",
+    "doc": "`docs/program/REVIEW_2026-10.md` (study.yml run 38147537131, 2026-10-11 UTC, at 7e902a2, after #347): first half, 72-hour forecast, windy = 10+ mph: line value −3.56% (−4.46 to −2.62; n 176) against calm −4.82% (−5.17 to −4.47; n 1,026); record against the close 90-95-2 (48.6%, Wilson 41.5-55.8, p 0.862); by band: 10-15 mph 70-82-2, 15+ mph 20-13-0 (n 33, −2.06% line value). Full game: windy 94-92-4 against the close (50.5%, p 0.718); no early line, so no line value. READ: the market moves about 1.3 points of EV toward the under on windy games before kickoff, short of the vig, and the close is not under-priced. NOT an edge at the close; the pre-close move is the quantity H-ARM-WX1H measures forward. Exploratory; nothing adopted."
+  },
+  {
+    "id": "H-JUDGE",
+    "question": "Does the judge's line value (EV of a wager against the vig-free consensus close) predict what bets actually return?",
+    "status": "exploratory",
+    "family": "judge-validation (no confirmatory alpha)",
+    "doc": "`docs/program/REVIEW_2026-10.md` (study.yml run 38147535009, 2026-10-11 UTC, at 7e902a2, after #347's reader fix): first half 2023-25, 3,664 bets over 1,902 games (far_lines 102, no_early_line 30 excluded); mean predicted −4.47% (−4.48 to −4.46) against mean realized −4.48% (−4.50 to −4.46); least-squares slope of realized on predicted 0.48 (−0.14 to 1.15), intercept −2.33% (−5.11 to +0.68); by quintile of predicted EV: −11.6% → −9.2%, −6.6% → −3.6%, −4.5% → −4.6%, −2.3% → −5.4%, +2.7% → +0.35% (−5.97 to +6.48). Full game: 0 readings (no early line). READ: the judge's sign is right on average and the top quintile is the only one that realized above the vig, but the slope sits below one with an interval spanning both 0 and 1, so a +3% reading has realized about +0.4% in this sample. Exploratory; nothing adopted."
+  },
+  {
+    "id": "H-VENUE-1",
+    "question": "On captured 2026 full-game totals, how do Hard Rock's and Kalshi's closes sit against the other books, what line value does the judge read at each venue's own terms, and what would a bettor free to take either venue have booked?",
+    "status": "exploratory",
+    "family": "venue-measurement (no confirmatory alpha; roadmap v2.0 decision 5: measure before any Kalshi account or capture)",
+    "doc": "pending (study.yml `venue_check`)"
+  },
+  {
+    "id": "H-PRICE-HR",
+    "question": "At the moments we captured it, is Hard Rock's price ever better than the vig-free market reference for the same wager, by how much, how often, where in the week, and does the market later move toward Hard Rock (Hard Rock knew) or not (Hard Rock was off)?",
+    "status": "exploratory",
+    "family": "pricing-research (no confirmatory alpha; roadmap v2.1: the pricing-inefficiency programme, read at 2026-12-07 and the January review; a 2027 arm needs its own row)",
+    "doc": "`docs/PRICING_RESEARCH.md` (study.yml `pricing_check`; the first run is written there)"
+  },
+  {
+    "id": "H-MODEL-FIX",
+    "question": "Is the champion with four fixes -- (1) bowl games out of the frame and season-to-date means ordered by date, (2) a 2015 training floor instead of 2003, (3) early-season averages seeded with last season's (`PRIOR_SEASON_WEIGHT` = 3), (4) early stopping off, stated explicitly -- at least as accurate on first halves as the live champion?",
+    "status": "tested-null",
+    "family": "model-fix",
+    "doc": "`docs/MODEL_FIX.md` (run 38070611660, 2026-10-10): NOT MET -- Δ\\|err\\| +0.163 [+0.025, +0.294] against the +0.10 margin, worse in both seasons; the live model stays (Tate)."
+  }
+]

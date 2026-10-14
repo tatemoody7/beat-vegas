@@ -18,7 +18,12 @@ import pg from "pg";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { buildWeek, HR } from "./week.mjs";
-import { buildExpected, lineUsedFor, round2 } from "./expected.mjs";
+import {
+  buildExpected,
+  lineUsedFor,
+  round2,
+  armPositionsFor,
+} from "./expected.mjs";
 
 export const DEFAULT_URL =
   "postgresql://postgres@127.0.0.1:54329/beatvegas_e2e";
@@ -40,6 +45,7 @@ export const TABLES = [
   "factor_ledger",
   "bv_adjustments",
   "app_settings",
+  "arm_positions",
   "games",
   "teams",
 ];
@@ -849,6 +855,11 @@ export function fixtureRows(week, expected) {
   ];
 
   const hourAgo = ts(new Date(now.getTime() - 3_600_000));
+  rows.arm_positions = armPositionsFor(now).map((r) => ({
+    ...r,
+    read_at: ts(r.read_at),
+  }));
+
   rows.app_settings = [
     {
       key: "rule_paused",

@@ -14,9 +14,9 @@ const MOVED: [string, string][] = [
   ["/ledger", "/results"],
   ["/picks", "/results"],
   ["/weekly-review", "/results"],
-  ["/line-study", "/how-it-works"],
-  ["/research", "/how-it-works"],
-  ["/glossary", "/how-it-works#glossary"],
+  ["/line-study", "/research"],
+  ["/how-it-works", "/research"],
+  ["/glossary", "/research#glossary"],
   ["/research/records", "/records"],
   ["/proof/records", "/records"],
   ["/proof", "/results"],
@@ -50,7 +50,7 @@ test("a moved route keeps its query string", async ({ request }) => {
 test("the three tabs and the game route are not redirects", async ({
   request,
 }) => {
-  for (const path of ["/", "/results", "/how-it-works", "/records", "/login"]) {
+  for (const path of ["/", "/results", "/research", "/records", "/login"]) {
     const res = await request.get(path, { maxRedirects: 0 });
     expect(res.status(), path).toBe(200);
   }

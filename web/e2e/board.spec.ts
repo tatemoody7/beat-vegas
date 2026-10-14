@@ -34,12 +34,9 @@ test.describe("the board", () => {
     await page.goto("/");
     const strip = page.locator('p[aria-label="What this is"]');
     await expect(strip).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet, inside this week’s cap; past it, a paper signal. Every result, losses included, is on Results. How it works →",
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet, inside this week’s cap; past it, a paper signal. Every result, losses included, is on Results. Research →",
     );
-    await expect(strip.getByRole("link")).toHaveAttribute(
-      "href",
-      "/how-it-works",
-    );
+    await expect(strip.getByRole("link")).toHaveAttribute("href", "/research");
   });
 
   test("every row links to its game page and the ids are the fixture's week", async ({
@@ -218,7 +215,7 @@ test.describe("the board, signed out", () => {
       RESEARCH_BANNER,
     );
     await expect(page.locator('p[aria-label="What this is"]')).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Every result, losses included, is on Results. How it works →",
+      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Every result, losses included, is on Results. Research →",
     );
     await expect(
       page.locator('div[aria-label="This week at a glance"]'),

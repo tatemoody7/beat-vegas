@@ -68,15 +68,6 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## How it works
 
-- [how] The page opens on what this is, the three-colour key for the Board (with the best time to look) and where bets are priced — how-it-works.spec.ts › "says what this is, how to read the Board and where bets are priced"
-- [how] The (hist_2023_25, fbs_only, real, cap5, all) bucket is headed `Backtest, 2023–25 (not money bet)`: win rate, W-L-P, units, ROI, a "could plausibly be" interval, no "Without the cap" sentence — how-it-works.spec.ts › "the backtest is headed as a backtest and carries the cap-5 record"
-- [how] The gap ladder draws one bar per band (≥ 4, every bar non-zero height) and the 52.4% break-even rule — how-it-works.spec.ts › "the gap ladder draws one bar per band and the break-even line"
-- [how] The real-close records table is the one uncapped 2023–25 row with its interval — how-it-works.spec.ts › "the real-close records table is the one uncapped row"
-- [how] The glossary sits at `#glossary` (where `/glossary` redirects) with exactly the ten visitor terms in order — how-it-works.spec.ts › "the glossary is where /glossary lands, with the visitor's ten terms"
-- [how] The page links to `/records` and names 1-833-PLAYWISE — how-it-works.spec.ts › "links to every game we have rated and names the helpline"
-- [how] No research section renders for anyone (roadmap v2.0); the backtest shows — how-it-works.spec.ts › "the page carries no research section (roadmap v2.0), signed out"
-- [how] Our number's average miss beside Hard Rock's, public, same games, the sentence follows the numbers — how-it-works.spec.ts › "shows our number's average miss beside Hard Rock's, in public"
-- [how] Every page carries the footer's responsible-gambling line — how-it-works.spec.ts › "every page carries the footer's responsible-gambling line"
 
 ## Every game we have rated
 
@@ -89,6 +80,15 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Health and records API
 
+- [research] One card per registered hypothesis (six arms + the pricing study) in slot order; nothing ranked — research.spec.ts › "one card per registered hypothesis, in slot order, never ranked"
+- [research] A card shows its own standard (readings of 30 / opportunities of 40), weeks, excluded, logged, the EV with its interval, the read date with its run id and the next read — research.spec.ts › "each card shows its own standard, the counts, the read date and the next read"
+- [research] No EV below ten readings; a read older than eight days is `outdated`; a hypothesis with no row reads `not yet read` — research.spec.ts › "not enough data stays a status: no EV below ten readings, outdated past eight days, no row reads not yet read"
+- [research] The judge in plain words with the protocol's numbers (30 readings over 3 weeks, +3%, 200, 40) and the personal stake named as never evidence — research.spec.ts › "explains the judge in plain words with the protocol's numbers, and names the personal stake as never evidence"
+- [research] The closed hypotheses from the registry export with their verdicts; no backtest card — research.spec.ts › "lists the closed hypotheses from the registry with their verdicts"
+- [research] The glossary sits at `#glossary` (where `/glossary` redirects) with exactly the ten visitor terms in order — research.spec.ts › "the glossary is where /glossary lands, with the visitor's ten terms"
+- [research] The Board key, the link to `/records` and 1-833-PLAYWISE — research.spec.ts › "keeps the Board key, links to every game we have rated and names the helpline"
+- [research] Every page carries the footer's responsible-gambling line — research.spec.ts › "every page carries the footer's responsible-gambling line"
+- [research] Signed out, the same seven cards and no dollar figure — research.spec.ts › "a visitor reads the same cards and no dollar figure"
 - [health] `/api/health` answers 200 with exactly the documented top-level and gauge keys — health.spec.ts › "answers 200 with exactly the documented keys"
 - [health] On the clean fixture: ok, not paused, not stale, no missed build, no warnings, the seeded gauge values (incl. close-window coverage 67 of 72), UTC timestamps — health.spec.ts › "reports the clean fixture as healthy"
 - [health] One `lastDispatch` gauge per CRON_JOBS id, each a past instant — health.spec.ts › "carries one dispatch gauge per cron job, each inside its last window"

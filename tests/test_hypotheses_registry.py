@@ -193,3 +193,18 @@ def test_the_promotion_tier_shares_one_five_percent_budget():
     for rid, share in promo.items():
         assert rid in rows, rid
         assert share in rows[rid]["criterion"], (rid, share)
+
+
+def test_the_site_export_matches_the_registry():
+    """web/data/hypotheses.json (scripts/export_registry.py) is what the Research page
+    shows as the closed-hypothesis timeline; it must never drift from the registry."""
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("export_registry", root / "scripts" / "export_registry.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    out = root / "web" / "data" / "hypotheses.json"
+    assert out.exists(), "run scripts/export_registry.py"
+    assert out.read_text(encoding="utf-8") == mod.render()

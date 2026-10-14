@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THREE DECISION MEMOS FOR TATE: P1.2, BOARD ALIGNMENT, FOUR PROPOSALS).** Programme
+  steps 9, 15 and 16: documents only, nothing activated. `docs/program/P1_2_AMENDMENT_DRAFT.md` (the
+  reading unit with postseason ISO weeks, a week completes only after the next Monday's read, the
+  seven-day `ungradable` exclusion made permanent through an additive `arm_exclusions` table so grading
+  is untouched; measured impact today: none). `docs/program/BOARD_ALIGNMENT_2026-10.md` (B1 Board bar from
+  upcoming games: 0-3 games a Saturday checkpoint would change tier in weeks 4-6; B2b fallback bar: 0
+  occurrences; B4 QB-out: 1 disagreement, no would-be Bet; B3 Held: 0 degraded cards).
+  `docs/program/PROPOSALS_2026-10.md` (H-ARM-EVP recommended, ledger slot 9, +2% at Hard Rock's price;
+  book count already stored as `cons_books`, every exclusion had 0 or 2 books, so a Monday report line
+  instead of a new field; the late-line collector NOT recommended -- zero Saturday games first priced
+  after the morning build in weeks 4-6; the alternate-line probe recommended, about 20 credits).
 - **2026-10-14 UTC (THE REGISTRY STATUSES MATCH THE STATE).** Programme step 8b (Tate's rule from the Q&A:
   set every row to its true state). The six arms `pre-registered` → `live-tracking` with their clock
   starts in the data cell; H-NEGGAP and H-NEGGAP-L `live-tracking` → `superseded` (no reader since

@@ -54,7 +54,7 @@ def test_the_arms_are_registered_with_their_slots():
     # p1.1 (roadmap v1.5, 2026-10-09): paused before any completed week, until the
     # first card built on the leak-fixed model -- the 2026-10-13 tue_pm card
     # (Tate's approval 2026-10-13). The 2026-10-09 rows sit before it.
-    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.1"
+    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.2"
     assert P.ARMS_START > P.ARMS_TAGGED_FROM
     for arm in (P.ARM_1H_UNDER, P.ARM_1H_OVER, P.ARM_FG_UNDER):
         assert P.arm_start(arm) == P.ARMS_START
@@ -192,3 +192,86 @@ def test_an_unpriced_pick_is_excluded_by_name(monkeypatch):
 def test_manual_picks_carries_the_arm_column():
     assert "arm" in ManualPick.__table__.columns
     assert _MIGRATIONS["manual_picks"]["arm"] == "VARCHAR(16)"
+
+
+# --- p1.2 (Tate, 2026-10-14): the reading unit and the Monday rule ------------------
+from datetime import datetime as _dt  # noqa: E402
+
+
+def _prow(week, kick, graded=True, ev=0.01, season_type="regular", excluded=None, books=5):
+    return SimpleNamespace(
+        season=2026,
+        week=week,
+        graded=graded,
+        ev_cons=ev,
+        cons_excluded=excluded,
+        cons_books=books,
+        kickoff=kick,
+        season_type=season_type,
+    )
+
+
+def test_a_week_closes_at_the_monday_noon_utc_after_its_last_kickoff(load_script):
+    pos = load_script("protocol_position")
+    assert pos.week_closes_at(_dt(2026, 10, 17, 23, 30)) == _dt(
+        2026, 10, 19, 12, 0
+    )  # Saturday night
+    assert pos.week_closes_at(_dt(2026, 10, 19, 0, 30)) == _dt(
+        2026, 10, 19, 12, 0
+    )  # Sunday night ET
+    assert pos.week_closes_at(_dt(2026, 10, 19, 12, 30)) == _dt(
+        2026, 10, 26, 12, 0
+    )  # a Monday game
+
+
+def test_a_mid_week_read_counts_no_partial_week(load_script):
+    """R2: every row logged so far graded is not enough; the week must be over."""
+    pos = load_script("protocol_position")
+    rows = [_prow(7, _dt(2026, 10, 14, 0, 0)), _prow(7, _dt(2026, 10, 17, 19, 30))]
+    wednesday = pos.read_arm(rows, now=_dt(2026, 10, 15, 12, 0))
+    assert (
+        wednesday["readings"] == 0
+        and wednesday["pending"] == 2
+        and wednesday["completed_weeks"] == []
+    )
+    just_before = pos.read_arm(rows, now=_dt(2026, 10, 19, 11, 59))
+    assert just_before["readings"] == 0
+    monday = pos.read_arm(rows, now=_dt(2026, 10, 19, 12, 0))
+    assert monday["readings"] == 2 and monday["completed_weeks"] == ["2026-w7"]
+    # An ungraded row still holds its week, whatever the clock says.
+    held = pos.read_arm(
+        rows + [_prow(7, _dt(2026, 10, 17, 19, 30), graded=False, ev=None)],
+        now=_dt(2026, 10, 26, 12, 0),
+    )
+    assert held["readings"] == 0 and held["pending"] == 3
+
+
+def test_bowls_read_by_iso_week_across_new_year_after_the_regular_season(load_script):
+    """R1: CFBD files every bowl as week 1; the reading unit is the ISO week of kickoff."""
+    pos = load_script("protocol_position")
+    rows = [
+        _prow(1, _dt(2026, 12, 30, 1, 0), season_type="postseason", ev=0.02),
+        _prow(
+            1, _dt(2027, 1, 2, 20, 0), season_type="postseason", ev=0.04
+        ),  # same ISO week 2026-W53
+        _prow(1, _dt(2027, 1, 12, 0, 30), season_type="postseason", ev=-0.01),  # 2027-W02
+        _prow(14, _dt(2026, 11, 28, 19, 0), ev=0.0),  # the last regular week
+    ]
+    r = pos.read_arm(rows, now=_dt(2027, 1, 19, 12, 0))
+    assert r["completed_weeks"] == ["2026-w14", "2026-post-2026W53", "2026-post-2027W02"]
+    assert r["readings"] == 4 and r["weeks"] == 3
+    assert [pos.key_label(pos.reading_key(x)) for x in rows[:2]] == ["2026-post-2026W53"] * 2
+
+
+def test_exclusions_are_reported_by_the_close_book_count(load_script):
+    """Programme 4.2: a report line beside each arm, never a gate."""
+    pos = load_script("protocol_position")
+    rows = [
+        _prow(6, _dt(2026, 10, 10, 19, 0), ev=None, excluded="stale_close", books=0),
+        _prow(6, _dt(2026, 10, 10, 19, 0), ev=None, excluded="few_books", books=2),
+        _prow(6, _dt(2026, 10, 10, 19, 0), ev=0.01, books=6),
+    ]
+    r = pos.read_arm(rows, now=_dt(2026, 10, 12, 12, 0))
+    assert r["excluded_by_books"] == {"0": 1, "2": 1} and r["excluded"] == 2
+    md = pos.render({"generated_at": "now", "arms": {P.ARM_1H_UNDER: {**r, "slot": 1}}})
+    assert "exclusions by close book count (the judge needs 3+): 0 books 1, 2 books 1" in md

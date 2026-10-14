@@ -25,16 +25,17 @@ import json
 import os
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from residual_gate import append_step_summary, report_paths  # noqa: E402
 
 from beatvegas import protocol as P  # noqa: E402
-from beatvegas.db.models import ChallengerPick, ManualPick  # noqa: E402
+from beatvegas.db.models import ChallengerPick, Game, ManualPick  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 from beatvegas.positions import arm_position, mean_ci, upsert_position  # noqa: E402
 
@@ -72,30 +73,108 @@ def arm_rows(session, arm: str, spec: Dict[str, Any], since: Optional[str] = Non
     return q.order_by(model.placed_at, model.id).all()
 
 
-def completed(rows: Sequence[Any]) -> List[Any]:
-    """The graded rows of the weeks whose every pick is graded."""
+# --- p1.2 (Tate, 2026-10-14): the reading unit and when a week is complete ----------
+
+
+def reading_key(row: Any) -> Tuple[int, int, int, int]:
+    """R1: a regular-season pick reads in (season, CFBD week); a postseason pick
+    (`games.season_type = 'postseason'`, which CFBD files as week 1) reads in the
+    ISO week (Monday-Sunday, UTC) of its kickoff, which is defined across New Year,
+    so bowl season yields several readings in order and the season stays put."""
+    season = int(getattr(row, "season", 0) or 0)
+    kick = getattr(row, "kickoff", None)
+    if getattr(row, "season_type", None) == "postseason" and kick is not None:
+        iso = kick.isocalendar()
+        return (season, 1, int(iso[0]), int(iso[1]))
+    return (season, 0, int(getattr(row, "week", 0) or 0), 0)
+
+
+def key_label(key: Tuple[int, int, int, int]) -> str:
+    season, post, a, b = key
+    return f"{season}-post-{a}W{b:02d}" if post else f"{season}-w{a}"
+
+
+def week_closes_at(latest_kickoff: datetime) -> datetime:
+    """R2: the earliest Monday 12:00 UTC strictly after the week's latest kickoff
+    (naive UTC). Grading has landed by then (grade.yml runs at the 10Z tick)."""
+    t = datetime(latest_kickoff.year, latest_kickoff.month, latest_kickoff.day, 12)
+    t += timedelta(days=(0 - t.weekday()) % 7)
+    if t <= latest_kickoff:
+        t += timedelta(days=7)
+    return t
+
+
+def with_games(session, rows: Sequence[Any]) -> List[Any]:
+    """Each pick as the reader needs it: its own fields plus its game's kickoff
+    and season type (R1/R2). Copies, so nothing is written back."""
+    ids = {int(r.game_id) for r in rows if r.game_id is not None}
+    games = (
+        {int(g.id): g for g in session.query(Game).filter(Game.id.in_(list(ids))).all()}
+        if ids
+        else {}
+    )
+    out = []
+    for r in rows:
+        g = games.get(int(r.game_id)) if r.game_id is not None else None
+        out.append(
+            SimpleNamespace(
+                season=r.season,
+                week=r.week,
+                graded=r.graded,
+                ev_cons=r.ev_cons,
+                cons_excluded=r.cons_excluded,
+                cons_books=getattr(r, "cons_books", None),
+                kickoff=None if g is None else g.start_date,
+                season_type=None if g is None else g.season_type,
+            )
+        )
+    return out
+
+
+def completed(rows: Sequence[Any], now: Optional[datetime] = None) -> List[Any]:
+    """The rows of the reading weeks that are complete (R2): every pick in the
+    week graded AND, when `now` is given, the read runs at or after the Monday
+    12:00 UTC following the week's latest kickoff. Rows come back in reading-week
+    order (R1), placed order within a week."""
     by_week: Dict[Any, List[Any]] = defaultdict(list)
     for r in rows:
-        by_week[(r.season, r.week)].append(r)
-    done = {k for k, rs in by_week.items() if rs and all(bool(r.graded) for r in rs)}
-    return [r for r in rows if (r.season, r.week) in done]
+        by_week[reading_key(r)].append(r)
+    done: List[Any] = []
+    for key in sorted(by_week):
+        rs = by_week[key]
+        if not rs or not all(bool(r.graded) for r in rs):
+            continue
+        if now is not None:
+            kicks = [getattr(r, "kickoff", None) for r in rs]
+            if any(k is None for k in kicks) or now < week_closes_at(max(kicks)):
+                continue
+        done.extend(rs)
+    return done
 
 
-def read_arm(rows: Sequence[Any], season_over: bool = False) -> Dict[str, Any]:
-    """Pure: the arm's position over its completed weeks, plus its tallies."""
-    done = completed(rows)
-    obs, excluded = P.observations_from_rows(done)
+def read_arm(
+    rows: Sequence[Any], season_over: bool = False, now: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """Pure: the arm's position over its complete reading weeks, plus its tallies.
+    `now` turns on R2's Monday rule (the Monday workflow passes its clock)."""
+    done = completed(rows, now)
+    obs = [(key_label(reading_key(r)), float(r.ev_cons)) for r in done if r.ev_cons is not None]
+    excluded = sum(1 for r in done if r.ev_cons is None)
     pos = P.position(obs, season_over=season_over)
     reasons = Counter(r.cons_excluded or "unexplained" for r in done if r.ev_cons is None)
+    # Programme 4.2 (Tate, 2026-10-14): exclusions by the close's book count, a
+    # report line beside the arm. The judge needs 3+ books inside 2 h of kickoff.
+    books = Counter(str(getattr(r, "cons_books", None)) for r in done if r.ev_cons is None)
+    weeks = sorted({reading_key(r) for r in done})
     _m, lo, hi = mean_ci(e for _, e in obs)
-    weeks = sorted({(r.season, r.week) for r in done})
     return {
         "logged": len(rows),
         "pending": len(rows) - len(done),
-        "completed_weeks": [f"{s}-w{w}" for s, w in weeks],
+        "completed_weeks": [key_label(k) for k in weeks],
         "readings": pos.n,
         "excluded": excluded,
         "excluded_by_reason": dict(reasons),
+        "excluded_by_books": dict(books),
         "weeks": pos.weeks,
         "llr": round(pos.llr, 3),
         "state": pos.state,
@@ -116,6 +195,7 @@ def paused_arm(logged: int) -> Dict[str, Any]:
         "readings": 0,
         "excluded": 0,
         "excluded_by_reason": {},
+        "excluded_by_books": {},
         "weeks": 0,
         "llr": 0.0,
         "state": P.PAUSED,
@@ -133,8 +213,10 @@ def render(result: Dict[str, Any]) -> str:
         "",
         f"Generated {result['generated_at']}. Boundaries: PROMOTE at LLR >= {P.UPPER:.3f}, "
         f"STOP at LLR <= {P.LOWER:.3f}; no decision before {P.MIN_OBS} readings over "
-        f"{P.MIN_WEEKS}+ weeks; timeout {P.MAX_OBS} readings or season end. Only completed weeks "
-        "enter; an exclusion is counted, never an observation.",
+        f"{P.MIN_WEEKS}+ weeks; timeout {P.MAX_OBS} readings or season end. A reading week "
+        "(regular season: the CFBD week; postseason: the ISO week of kickoff) enters only when every "
+        "pick in it is graded and the read runs at or after the Monday 12:00 UTC after its last "
+        "kickoff (p1.2); an exclusion is counted, never an observation.",
         "",
     ]
     if any(r["state"] == P.PAUSED for r in result["arms"].values()):
@@ -159,6 +241,9 @@ def render(result: Dict[str, Any]) -> str:
         if r["excluded_by_reason"]:
             why = ", ".join(f"{k} {v}" for k, v in sorted(r["excluded_by_reason"].items()))
             L.append(f"- {arm} exclusions: {why}")
+        if r.get("excluded_by_books"):
+            nb = ", ".join(f"{k} books {v}" for k, v in sorted(r["excluded_by_books"].items()))
+            L.append(f"- {arm} exclusions by close book count (the judge needs 3+): {nb}")
     return "\n".join(L) + "\n"
 
 
@@ -167,15 +252,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not try_init_db():
         return 1
     arms: Dict[str, Dict[str, Any]] = {}
+    now = datetime.utcnow()
     with session_scope() as s:
         for arm, spec in P.ARMS.items():
             start = P.arm_start(arm)
             if start is None:
                 line = paused_arm(len(arm_rows(s, arm, spec, since=P.ARMS_TAGGED_FROM)))
             else:
-                line = read_arm(arm_rows(s, arm, spec, since=start), args.season_over)
+                line = read_arm(
+                    with_games(s, arm_rows(s, arm, spec, since=start)), args.season_over, now
+                )
             arms[arm] = {**line, "slot": spec["slot"]}
-    now = datetime.utcnow()
     result = {"generated_at": now.isoformat() + "Z", "arms": arms}
     if args.write:
         with session_scope() as s:

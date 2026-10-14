@@ -1,6 +1,7 @@
 # Protocol amendment p1.2 — DRAFT for Tate's approval (not in force)
 
-Status: **draft, 2026-10-14.** Nothing here changes `beatvegas/protocol.py`,
+Status: **R1 and R2 approved by Tate and in force as p1.2 (2026-10-14, roadmap v2.4). R3 NOT adopted; R3′ below
+waits on Tate.** The original draft follows; nothing here changes `beatvegas/protocol.py`,
 `scripts/protocol_position.py`, grading or any arm until Tate approves this text. Programme
 step 9 (`~/.claude/plans/pasted-content-id-a68f…`, Part 10 §4). On approval the text below is
 copied into `docs/PROTOCOL_2026.md` as p1.2 and into each arm's registry row, then the reader
@@ -73,3 +74,37 @@ No reading, exclusion or position changes on approval. The App State–Old Domin
 - On approval: one PR — `docs/PROTOCOL_2026.md` p1.2, the registry rows, `arm_exclusions` (additive,
   `migrate.yml`), the reader change with fixtures for a mid-week read, a bowl season across New
   Year, and an ungradable pick that later grades.
+
+## R3′ — the recommendation that replaces R3 (Tate's question, 2026-10-14)
+
+**The question.** Would a permanent seven-day exclusion bias the test, or throw away a pick that could
+still be verified?
+
+**What the code says.** An arm's observation is the judge's value at the close, `ev_cons`
+(`beatvegas/consensus.py::consensus_reading` → `read_at_terms`): the de-vigged median of the books'
+closing quotes inside two hours of kickoff, converted to the pick's line, priced at the logged Hard
+Rock price. It reads no score. The only link to the result is operational: `scripts/consensus_backfill.py`
+runs on GRADED rows, so a pick with no final never gets its reading, and the week waits.
+
+**Why R3 was the wrong fix.** Excluding a pick because its result is missing removes an observation
+whose reading was available all along. And the missingness is not neutral: the commonest unprovable
+case is a 0-0 first half reported by line scores, which is an under that won; dropping such picks would
+lean the record against unders, even though the reading itself does not use the result.
+
+**R3′ (recommended).** The judge reads every pick once its close exists — kickoff plus a 6-hour grace
+for the close polls — graded or not. A week completes under R2 when every pick has a reading or a
+judge exclusion (`cons_excluded`: few books, stale close, far lines, no price), whatever the state of
+its result. Nothing is ever excluded for a missing result, nothing is permanent except what the judge
+itself decides, and no week can be reread. Grading, the judge's arithmetic, `ev_cons`, the readings
+already taken and every arm's rule stay as they are; only the judge's run order changes (it would read
+kicked-off picks in the grade workflow, not just graded ones).
+
+**Edge cases.** A game postponed after a pick: the reading waits for the new kickoff and the week stays
+`pending` until then (R2). A cancelled game: no close, so the judge excludes it as `stale_close` — a
+judge exclusion, counted, as today.
+
+**Measured impact.** None today: every 2026 pick that kicked off has been graded within two days except
+the 09-15 backfill, and 0 picks are ungradable (queries G1, G2, G9).
+
+**Decision for Tate.** Approve R3′ (one PR: the backfill's selection, the reader's completion test,
+fixtures for a pick read before it grades), or keep today's behaviour (an ungradable pick holds its week).

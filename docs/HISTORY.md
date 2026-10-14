@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (H-ARM-EVP SPECIFIED; NOT REGISTERED).** Tate asked to confirm the value-at-price arm's exact rules,
+  assumptions and method before activation. `docs/program/EVP_SPEC_2026-10.md`: the rule step by step (fair
+  centre = market + 0.2 × (model − market) with the frozen w = 0.80, the hp1 conversion with fractional
+  shifts, ev at Hard Rock's under price ≥ +2%), the assumptions, protocol p1.2's method, and a development
+  replay on weeks 4-7 cards: 5 / 3 / 2 / 0 picks a week at +2%. At about 2 readings a week, 30 readings take
+  12-15 weeks, longer than the season left, so a confirmatory arm would almost certainly time out and
+  spend its ledger slot. Recommended: an exploratory collector in 2026 (no slot), a 2027 confirmatory
+  decision in January. Waiting on Tate.
+
 - **2026-10-14 UTC (THE ALTERNATE-LINE PROBE, READY FOR ONE RUN).** Programme 4.4, approved by Tate as a one-time
   experiment within about 20 credits. `scripts/probe_alt_totals_h1.py` asks the feed, for the next games
   kicking off (default: within 2 h, 10 games), for Hard Rock's `totals_h1` and `alternate_totals_h1`, and

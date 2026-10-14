@@ -2,7 +2,7 @@
 
 Status: **proposals, 2026-10-14. Tate's decisions the same day: 4.2 approved (shipped with p1.2, #391); 4.3 kept
 documented and deferred; 4.4 approved as one run (`scripts/probe_alt_totals_h1.py`); 4.1 needs its exact
-rules, assumptions and method confirmed before activation (its spec follows in its own PR).** Programme step 16. Nothing below logs a pick, spends a credit or
+rules, assumptions and method confirmed before activation (`docs/program/EVP_SPEC_2026-10.md`).** Programme step 16. Nothing below logs a pick, spends a credit or
 takes a ledger slot until Tate approves the row text. Where the evidence argues against building
 something, the memo says so.
 

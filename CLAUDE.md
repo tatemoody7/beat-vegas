@@ -213,7 +213,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   its tools went 2026-10-11, roadmap v2.0).
 - **Pricing research (exploratory, read-only)**: `pricing_check` (H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
 - **Probes**: `probe_hr_keys` (one-off, by hand: `hardrockbet` vs `hardrockbet_fl` with the feed's
-  raw keys and stamps kept; prints the credits it spent; writes nothing).
+  raw keys and stamps kept; prints the credits it spent; writes nothing); `probe_alt_totals_h1` (programme 4.4, one run, ≤24 credits).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +
   `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.

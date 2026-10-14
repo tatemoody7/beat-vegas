@@ -9,6 +9,13 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THE ALTERNATE-LINE PROBE, READY FOR ONE RUN).** Programme 4.4, approved by Tate as a one-time
+  experiment within about 20 credits. `scripts/probe_alt_totals_h1.py` asks the feed, for the next games
+  kicking off (default: within 2 h, 10 games), for Hard Rock's `totals_h1` and `alternate_totals_h1`, and
+  prints whether the row fed as the 1H total is an alternate rung and whether the ladder still carries a
+  main-priced line. 2 credits a game, a hard cap of 12 games (24 credits); writes nothing; separate from
+  every arm and from pv1. To run once on Saturday 2026-10-17 around 3pm ET, beside Florida-app
+  screenshots logged in `data/fl_app_checks.csv`.
 - **2026-10-14 UTC (PROTOCOL P1.2: THE READING UNIT AND THE MONDAY COMPLETION RULE).** Tate approved R1 and R2
   of the p1.2 draft; roadmap v2.4. R1: postseason picks read in the ISO week of kickoff (CFBD files every
   bowl as week 1, which would have made the bowl season one reading). R2: a reading week enters only

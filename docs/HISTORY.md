@@ -9,6 +9,16 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (FOCUSED AUDIT AFTER TATE'S DECISIONS).** After #391-#394 merged and today's Monday read was re-run
+  under p1.2 (run 38638358028): the Board lights exactly Tuesday's card's two Bets (Louisiana Tech @ UL Monroe,
+  Virginia @ SMU; bar 0.8 over 55 priced games); the money path is unchanged (pause off since 10-08, 26 tickets,
+  all graded, −1.43u); the six arms' and H-PRICE-HR's registry criteria and every arm, judge, grading and pv1
+  constant are unchanged since the programme began (only `PROTOCOL_VERSION` moved to p1.2); `arm_positions`
+  holds one row per hypothesis for 10-14, all from one run, which the Research page shows; H-ARM-1HO's
+  week-7 pick reads pending, as p1.2 intends. One consistency fix: the Results page's forward picks for
+  H-ARM-1HU now also require the arm tag, as the reader does (0 untagged rows today). Grade's health still
+  reads degraded for the App State half awaiting proof.
+
 - **2026-10-14 UTC (H-ARM-EVP SPECIFIED; NOT REGISTERED).** Tate asked to confirm the value-at-price arm's exact rules,
   assumptions and method before activation. `docs/program/EVP_SPEC_2026-10.md`: the rule step by step (fair
   centre = market + 0.2 × (model − market) with the frozen w = 0.80, the hp1 conversion with fractional

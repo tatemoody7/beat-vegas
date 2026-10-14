@@ -609,7 +609,7 @@ export function lastClosedCardSlot(now) {
 
 /** The scheduled Neon-writing jobs that end with a health contract
  *  (beatvegas/health.py CONTRACTS; lib/boardHealth.ts HEALTH_JOB_IDS). */
-export const HEALTH_JOBS = ["card", "grade", "sunday", "lines_watch"];
+export const HEALTH_JOBS = ["card", "grade", "sunday", "monday", "lines_watch"];
 
 /** For every cron job: an instant five minutes into its last closed window -- a tick that acted in time, so opsWarnings stays silent. */
 export function lastDispatchTicks(now) {

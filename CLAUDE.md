@@ -123,7 +123,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, 6 h look-ahead on Saturday ticks (`CLOSE_LOOKAHEAD_MIN_SAT=360`, since 2026-10-11; weeknights 120); GitHub's every-30-min crons stay |
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z; 23Z catch-up, v2.2) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
-| Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up) | `pricing-monday` → `pricing_monday.yml` | the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13); read-only, no health contract |
+| Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up; GitHub 12:30Z backup) | `pricing-monday` → `pricing_monday.yml` | the Monday read: the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13) and every arm's position, one `arm_positions` row per hypothesis per read date (the site, the Monday read and January read that row); health contract `monday` |
 | Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
@@ -174,7 +174,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
-| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up), dispatch | — (the Monday pricing report, read-only: run Summary + `pricing-report` artifact) |
+| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
@@ -195,7 +195,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
-- **Positions / rule**: `protocol_position` (the registered arms, Mondays), `stopping_rule_position`,
+- **Positions / rule**: `protocol_position` (the registered arms; `--write` stores `arm_positions`, Monday workflow only), `stopping_rule_position`,
   `neggap_position`, `fg_position`, `challenger_position`, `rule_pause`, `pick` (no `add`).
 - **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
   `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,

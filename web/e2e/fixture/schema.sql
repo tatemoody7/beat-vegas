@@ -76,6 +76,51 @@ CREATE SEQUENCE public.app_settings_log_id_seq
 ALTER SEQUENCE public.app_settings_log_id_seq OWNED BY public.app_settings_log.id;
 
 --
+-- Name: arm_positions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.arm_positions (
+    id integer NOT NULL,
+    hypothesis character varying NOT NULL,
+    standard character varying NOT NULL,
+    read_date character varying NOT NULL,
+    read_at timestamp without time zone NOT NULL,
+    run_id character varying,
+    state character varying,
+    label character varying,
+    logged integer,
+    readings integer,
+    weeks integer,
+    excluded integer,
+    pending integer,
+    needed integer,
+    llr double precision,
+    mean_ev double precision,
+    ev_lo double precision,
+    ev_hi double precision,
+    next_read character varying,
+    payload_json text
+);
+
+--
+-- Name: arm_positions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.arm_positions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: arm_positions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.arm_positions_id_seq OWNED BY public.arm_positions.id;
+
+--
 -- Name: build_forecasts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1277,6 +1322,12 @@ ALTER SEQUENCE public.weather_obs_id_seq OWNED BY public.weather_obs.id;
 ALTER TABLE ONLY public.app_settings_log ALTER COLUMN id SET DEFAULT nextval('public.app_settings_log_id_seq'::regclass);
 
 --
+-- Name: arm_positions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.arm_positions ALTER COLUMN id SET DEFAULT nextval('public.arm_positions_id_seq'::regclass);
+
+--
 -- Name: build_forecasts id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1453,6 +1504,13 @@ ALTER TABLE ONLY public.app_settings
     ADD CONSTRAINT app_settings_pkey PRIMARY KEY (key);
 
 --
+-- Name: arm_positions arm_positions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.arm_positions
+    ADD CONSTRAINT arm_positions_pkey PRIMARY KEY (id);
+
+--
 -- Name: build_forecasts build_forecasts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1614,6 +1672,13 @@ ALTER TABLE ONLY public.teams
     ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
 
 --
+-- Name: arm_positions uq_arm_position_per_read_date; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.arm_positions
+    ADD CONSTRAINT uq_arm_position_per_read_date UNIQUE (hypothesis, read_date);
+
+--
 -- Name: fh_team_game uq_fh_team_game; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1694,6 +1759,12 @@ CREATE INDEX ix_app_settings_log_key ON public.app_settings_log USING btree (key
 --
 
 CREATE INDEX ix_app_settings_log_written_at ON public.app_settings_log USING btree (written_at);
+
+--
+-- Name: ix_arm_positions_hypothesis; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_arm_positions_hypothesis ON public.arm_positions USING btree (hypothesis);
 
 --
 -- Name: ix_build_forecasts_game_fetched; Type: INDEX; Schema: public; Owner: -

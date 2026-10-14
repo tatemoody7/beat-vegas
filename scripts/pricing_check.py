@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -236,6 +237,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument(
         "--fl-checks", type=Path, default=FL_CHECKS_PATH, help="Tate's Florida screenshot CSV"
     )
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="upsert the H-PRICE-HR arm_positions row (the Monday workflow only)",
+    )
+    ap.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID") or "-")
     ap.add_argument("--no-init", action="store_true", help="skip init_db (a local read-only run)")
     args = ap.parse_args(argv)
     season = args.season or current_season()
@@ -289,6 +296,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     fl_counts["invalid_rows"] = sum(1 for c in checks if c.get("invalid"))
     v = P.verdict(opps_fwd)
     print(f"[pricing] verdict: {v['verdict']} ({v['why']})")
+    if args.write:
+        from beatvegas.positions import pricing_position, upsert_position
+
+        now = datetime.utcnow()
+        with session_scope() as s:
+            upsert_position(s, pricing_position(v, fwd_by, now, args.run_id))
+        print(f"[pricing] wrote the {P.ROW_ID} arm_positions row (run {args.run_id})")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     md = render(row, season, dev_by, fwd_by, v, opps_fwd, opps_dev, fl_counts, stamp)
     outdir = ROOT / args.out

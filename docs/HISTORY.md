@@ -9,6 +9,22 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (ARM POSITIONS STORED: ONE ROW PER HYPOTHESIS PER MONDAY READ).** Step 10 of the
+  2026-10-14 programme. Until now the six arms' position lived only in a `study.yml` artifact and the
+  pricing verdict only in a report file, so the site could not show either and a missing Monday read
+  was invisible. `arm_positions` (`beatvegas/positions.py`; unique on hypothesis + read date) is
+  written ONLY by `pricing_monday.yml`: `pricing_check.py --write` (H-PRICE-HR: forward
+  opportunities of 40, the verdict word, close-EV mean and interval) and `protocol_position.py
+  --write` (each arm: readings of 30, weeks, LLR, mean EV with its interval, exclusions, pending,
+  the next Monday). A retry on the same Monday rewrites the same rows with the newer run id. The
+  workflow gains a 12:30Z GitHub backup cron, a run clock and the `monday` health contract
+  (`monday.positions_written` FAILED = email; `monday.pricing_report_written` degraded); `monday`
+  joins `HEALTH_JOBS` on both sides and the e2e fixture. The site reads the newest row per
+  hypothesis through `web/lib/armPositions.ts` (never recomputes; "outdated" past 8 days,
+  "sufficient" at readings >= needed); the Prisma model is hand-added; the e2e schema is
+  regenerated. Nothing about the arms' rules, the judge, pv1 or grading changes; a `study.yml`
+  dispatch of `protocol_position` still writes nothing.
+
 - **2026-10-14 UTC (THE WRITTEN RECORD CATCHES UP WITH THE CODE).** Step 8 of the 2026-10-14
   programme (docs only; nothing runs differently). From the whole-system review's drift list:
   `CLAUDE.md` (Cox closed NOT MET 10-11, not "running"; the neggap/H-FG-P collectors retired 10-08,

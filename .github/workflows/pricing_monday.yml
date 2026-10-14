@@ -1,17 +1,19 @@
-# The Monday pricing report (H-PRICE-HR, docs/PRICING_RESEARCH.md; Tate's approval
-# 2026-10-12). READ-ONLY: scripts/pricing_check.py writes a report, never a table,
-# so two runs on one Monday cannot double-count anything -- they print the same
-# numbers from the same rows. Dispatched by the Vercel `pricing-monday` entries
-# (web/lib/cronJobs.ts: a primary tick and a later retry tick; the route
-# re-dispatches only when the first run failed, and suppresses the retry when it
-# succeeded). No GitHub schedule: a scheduled Neon job must carry a health
-# contract (tests/test_workflows.py), which would reach into the site's health
-# list; the retry entry is the backup, and `gh workflow run pricing_monday.yml`
-# is the manual fallback. The report is the run's Summary page and the
-# `pricing-report` artifact.
+# The Monday read (programme step 10, 2026-10-14): the pricing report
+# (H-PRICE-HR, docs/PRICING_RESEARCH.md; Tate's approval 2026-10-12) and the
+# six arms' protocol positions, each written ONCE per read date into
+# `arm_positions` (unique on hypothesis + read_date, so a retry on the same
+# Monday rewrites the same rows with the newer run id -- nothing double-counts).
+# The site, the Monday read and the January review read that row. Dispatched by
+# the Vercel `pricing-monday` entries (web/lib/cronJobs.ts: 12Z, a 15Z retry, an
+# 18Z catch-up; the route re-dispatches only when no run since the window opened
+# succeeded); the 12:30Z GitHub cron is the backup. Grading has landed by then
+# (grade.yml runs at the 10Z tick). The `monday` health contract (docs/HEALTH.md)
+# is how a missing or failed read surfaces on the board and /api/health.
 name: Pricing report (Monday)
 
 on:
+  schedule:
+    - cron: '30 12 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -38,8 +40,17 @@ jobs:
         run: |
           pip install --require-hashes -r requirements/lock.txt
           pip install --no-deps --no-build-isolation -e .
-      - name: Pricing report (read-only)
-        run: python scripts/pricing_check.py
+      - name: Run clock
+        id: clock
+        run: |
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
+      - name: Pricing report (writes the H-PRICE-HR arm_positions row)
+        id: pricing
+        run: python scripts/pricing_check.py --write
+      - name: Protocol positions (writes one arm_positions row per arm)
+        id: positions
+        if: always()
+        run: python scripts/protocol_position.py --write
       - name: Publish the report on this run's summary page
         if: always()
         run: |
@@ -52,3 +63,15 @@ jobs:
           name: pricing-report
           path: reports/*
           if-no-files-found: warn
+      - name: Health contract (docs/HEALTH.md; writes last_health_monday)
+        id: health
+        # Did this run leave one arm_positions row per registered hypothesis and
+        # a pricing report? A `failed` verdict exits 1 (email); `degraded` is
+        # board-only. Every value crosses via env:, never inlined.
+        if: always()
+        env:
+          SKIPPED: 'false'
+          RUN_STARTED_AT: ${{ steps.clock.outputs.started }}
+          OUTCOME_PRICING: ${{ steps.pricing.outcome }}
+          OUTCOME_POSITIONS: ${{ steps.positions.outcome }}
+        run: python scripts/health_check.py --job monday

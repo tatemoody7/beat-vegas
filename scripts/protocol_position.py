@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -35,6 +36,7 @@ from residual_gate import append_step_summary, report_paths  # noqa: E402
 from beatvegas import protocol as P  # noqa: E402
 from beatvegas.db.models import ChallengerPick, ManualPick  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
+from beatvegas.positions import arm_position, mean_ci, upsert_position  # noqa: E402
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -42,6 +44,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--out", default="reports/protocol")
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="upsert one arm_positions row per arm (the Monday workflow only; a study dispatch never writes)",
+    )
+    ap.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID") or "-")
     ap.add_argument(
         "--season-over", action="store_true", help="the season has ended: running arms time out"
     )
@@ -79,6 +87,7 @@ def read_arm(rows: Sequence[Any], season_over: bool = False) -> Dict[str, Any]:
     obs, excluded = P.observations_from_rows(done)
     pos = P.position(obs, season_over=season_over)
     reasons = Counter(r.cons_excluded or "unexplained" for r in done if r.ev_cons is None)
+    _m, lo, hi = mean_ci(e for _, e in obs)
     weeks = sorted({(r.season, r.week) for r in done})
     return {
         "logged": len(rows),
@@ -93,6 +102,8 @@ def read_arm(rows: Sequence[Any], season_over: bool = False) -> Dict[str, Any]:
         "label": P.label(pos.state),
         "decided_at_week": pos.decided_at_week,
         "mean_ev": round(sum(e for _, e in obs) / len(obs), 4) if obs else None,
+        "ev_lo": None if lo is None else round(lo, 4),
+        "ev_hi": None if hi is None else round(hi, 4),
     }
 
 
@@ -111,6 +122,8 @@ def paused_arm(logged: int) -> Dict[str, Any]:
         "label": P.label(P.PAUSED),
         "decided_at_week": None,
         "mean_ev": None,
+        "ev_lo": None,
+        "ev_hi": None,
     }
 
 
@@ -162,7 +175,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 line = read_arm(arm_rows(s, arm, spec, since=start), args.season_over)
             arms[arm] = {**line, "slot": spec["slot"]}
-    result = {"generated_at": datetime.utcnow().isoformat() + "Z", "arms": arms}
+    now = datetime.utcnow()
+    result = {"generated_at": now.isoformat() + "Z", "arms": arms}
+    if args.write:
+        with session_scope() as s:
+            for arm, line in arms.items():
+                upsert_position(s, arm_position(arm, line, now, args.run_id))
+        result["written"] = {"run_id": args.run_id, "read_date": now.strftime("%Y-%m-%d")}
+        print(f"[protocol] wrote {len(arms)} arm_positions rows (run {args.run_id})")
     md = render(result)
     md_path, json_path, _csv = report_paths(args.out)
     md_path.parent.mkdir(parents=True, exist_ok=True)

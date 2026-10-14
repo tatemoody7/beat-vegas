@@ -1,8 +1,9 @@
-# The 2026 Statistical Protocol — `p1.1`
+# The 2026 Statistical Protocol — `p1.2`
 
 **Status: frozen on Tate's approval of the simulated numbers below (2026-10-07); amended `p1.1`
 on 2026-10-09 (roadmap v1.5: the three arms' clocks paused before any completed week, and the
-restart rule below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
+restart rule below); amended `p1.2` on 2026-10-14 (roadmap v2.4: the reading unit and when a week is
+complete, below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
 is one test under this protocol, registered as its own row before it logs anything; every
 confirmatory clock starts at the first eligible build after that row exists. Everything logged
 before is development evidence. Code: `beatvegas/protocol.py` (the test),
@@ -23,7 +24,7 @@ to any rule here is a new protocol version and a roadmap amendment, never an edi
 | STOP | LLR ≤ ln(0.2/0.995) = −1.604 → **NEEDS MORE EVIDENCE** (stopped: no +3% edge) | Tate: the sequential lower bound; a thin real edge can stop here and is not called negative |
 | TIMEOUT | 200 readings or the season's end → **NEEDS MORE EVIDENCE** (timed out) | roadmap; may restart in 2027 as a new test with new alpha |
 | Exclusions | a pick with no reading (`cons_excluded`) is not an observation; every exclusion is counted and reported beside the arm | `docs/CONSENSUS.md` |
-| Reading cadence | the Monday program review reads each arm over completed weeks | roadmap |
+| Reading cadence | the Monday program review reads each arm over completed weeks (**p1.2**: R1 and R2 below) | roadmap |
 
 Every ending spends the arm's 0.5%. **Restarts (p1.1, 2026-10-09):** abandoning a test and
 restarting it is an ending, and spends the slot, once any completed week of it has been read; a
@@ -35,6 +36,31 @@ dependence.
 **"The edge shows in two seasons"** (the 2027 business gate, defined now, before any 2027 data): a
 rule promoted in 2026 is re-registered **unchanged** for 2027 with fresh alpha and must pass this
 same test again on 2027 games at Hard Rock's price.
+
+## p1.2 — the reading unit and when a week is complete (Tate, 2026-10-14; roadmap v2.4)
+
+**R1 — the reading unit.** A regular-season pick belongs to the reading week (season, CFBD week). A
+postseason pick (`games.season_type = 'postseason'`, which CFBD files as week 1) belongs to the ISO
+week (Monday–Sunday, UTC) of its kickoff; ISO weeks are defined across New Year (2026-12-28 →
+2027-01-03 is 2026-W53), so a 12-30 bowl and a 01-02 bowl share one reading and the season stays
+2026. Conference-championship games keep their regular-season week. Readings enter the test in
+reading-week order (regular weeks, then the postseason weeks).
+
+**R2 — when a reading week is complete.** A reading week enters only when every pick in it is graded
+**and** the read runs at or after 12:00 UTC on the first Monday after the latest kickoff among its
+picks (`scripts/protocol_position.py::week_closes_at`). Before both hold, the week is `pending`. The
+read's clock is the Monday workflow's own run time (`pricing_monday.yml`).
+
+**Not in force: the seven-day exclusion (R3 of the draft).** Tate asked (2026-10-14) whether a permanent
+exclusion could bias the test or discard observations that could still be verified. It need not
+exist at all: an arm's observation is the judge's value at the close (`ev_cons`), which uses only the
+close and the price, never the result. A pick's reading can therefore be taken once its close exists,
+graded or not; a late or unprovable result then never holds a week and nothing is discarded. That is
+the recommendation in `docs/program/P1_2_AMENDMENT_DRAFT.md` (R3′), waiting on Tate. Until he decides,
+an ungradable pick keeps its week pending, as before p1.2 (none exists: queries G2, G9).
+
+Impact on 2026-10-14 (measured): no reading changes. H-ARM-1HO's one week-7 pick, graded on 10-14,
+now reads `pending` until the read of Monday 2026-10-19 12:00 UTC instead of entering mid-week.
 
 ## WEEK-SHOCK — how much of line value a week shares
 

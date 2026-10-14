@@ -9,6 +9,19 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (PROTOCOL P1.2: THE READING UNIT AND THE MONDAY COMPLETION RULE).** Tate approved R1 and R2
+  of the p1.2 draft; roadmap v2.4. R1: postseason picks read in the ISO week of kickoff (CFBD files every
+  bowl as week 1, which would have made the bowl season one reading). R2: a reading week enters only
+  when every pick is graded and the read runs at or after the Monday 12:00 UTC after its last kickoff
+  (`protocol_position.week_closes_at`), so no partial week can enter mid-week. The reader now joins each
+  pick to its game for kickoff and season type (`with_games`); `PROTOCOL_VERSION` p1.2. The seven-day
+  permanent exclusion (draft R3) was NOT adopted: the arms' observation is `ev_cons`, which uses only
+  the close and the price, so a missing result never needs to discard a reading; the replacement R3′
+  (the judge reads a pick once its close exists, graded or not) waits on Tate. Same PR, programme 4.2:
+  each arm's report now lists exclusions by the close's book count (`excluded_by_books`, also in the
+  stored position payload). Measured impact: no reading changes; H-ARM-1HO's graded week-7 pick reads
+  `pending` until Monday 10-19 12:00 UTC.
+
 - **2026-10-14 UTC (FINAL AUDIT OF THE PROGRAMME).** After steps 1-14 and the three decision memos
   merged (#375-#389), a read of the repo, database, workflows, production and the research record
   found two records lost to a refused command: this file had no episode for the Research page (#385)

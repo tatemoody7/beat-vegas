@@ -319,7 +319,7 @@
     "question": "The 2026 Statistical Protocol p1: under what rule is each confirmatory arm promoted to $10 live validation, stopped, or timed out?",
     "status": "pre-registered",
     "family": "program (5% family-wise, fixed ledger K = 10)",
-    "doc": "`docs/PROTOCOL_2026.md`"
+    "doc": "`docs/PROTOCOL_2026.md` (amended p1.2 2026-10-14, roadmap v2.4: the reading unit and the Monday completion rule)"
   },
   {
     "id": "H-ARM-1HU",

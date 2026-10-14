@@ -90,7 +90,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
   Arscott/TV/Bennett all NOT MET 10-09 and Cox NOT MET 10-11 (final); Coleman/Salaga parked; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
-  1HO / FGU, clocks start at the 10-13 card (p1.1); 6-7 = weather unders,
+  1HO / FGU, clocks start at the 10-13 card (p1.1; weeks per p1.2, 10-14); 6-7 = weather unders,
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).

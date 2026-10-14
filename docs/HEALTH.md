@@ -145,15 +145,16 @@ carries `HEALTH: <verdict> <note>`.
 
 ### The full-game close step (since 2026-10-06)
 
-The `1h_close` run also calls `scripts/poll_full_game.py --markets totals --kickoff-within-min
-180 --allow-empty` after a successful 1H close poll: one bulk Odds API call over `us,us2`
-(2 credits a tick) captures or re-seens (`last_seen_at`) every book's full-game total for games
-kicking off inside `REAL_FG_CLOSE_WINDOW_H` (3 h). It exists so the full-game reference ledger
+The `1h_close` run also calls `scripts/poll_full_game.py --markets totals,spreads,h2h --regions
+us,us2,us_ex --kickoff-within-min 180 --allow-empty` after a successful 1H close poll: one bulk
+Odds API call (9 credits a tick since 2026-10-07: three markets over three regions) captures or
+re-seens (`last_seen_at`) every book's full-game total, spread and moneyline for games kicking
+off inside `REAL_FG_CLOSE_WINDOW_H` (3 h). It exists so the full-game reference ledger
 (`results.model_version='market_fg'`, `scripts/grade.py::_closings_fg`, now windowed at 3 h)
 and the H-FG-U-R / H-FG-O-R retrospectives grade at a REAL close -- before this, 9 of 380 graded
 2026 games had a full-game snapshot inside 3 h. The step is `continue-on-error` and carries no
-contract check yet; a `lines_watch.fg_rows_touched` degraded check follows once the first
-Saturday shows rows.
+contract check (2026-10-14: the Saturday close-coverage gauge covers the 1H side; a full-game
+check is not planned while the judge's full-game reads are secondary).
 
 ### When lines_watch is degraded
 

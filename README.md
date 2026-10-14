@@ -16,9 +16,8 @@ logs your bets, and reviews each week (market vs model vs you, with CLV). Decisi
 a step share of the full-game total — **0.4975 below a 21-point spread, 0.5375 at
 21+** — fitted MAE-optimally on FBS-vs-FBS games (`data/multiplier.json`,
 `scripts/derive_multiplier.py`). Against that fair proxy, blanket *and*
-model-selected 1H unders show no confirmed edge. (The 52.4% figure you will see on
-the Line Study page is the **-110 breakeven** win rate — a different thing from any
-first-half share.) The true edge, if any, lives in the gap between the **real** 1H
+model-selected 1H unders show no confirmed edge. (52.4% is the **-110 breakeven** win rate — a
+different thing from any first-half share.) The true edge, if any, lives in the gap between the **real** 1H
 line and actual results, so the season's job is to collect real Hard Rock lines and
 measure closing-line value (CLV). See `docs/BETTING_POLICY.md`.
 
@@ -41,7 +40,7 @@ top-20% ranking rule, read per slate (the k-th largest gap; 1.75 only on an empt
 never in σ. Full write-up: `docs/BV_LINE.md`.
 
 Components: CFBD REST client (`sources/cfbd.py`), 1H points ETL (`etl/first_half.py`),
-leak-free features (`etl/features.py`), walk-forward backtest (`backtest/engine.py`),
+leak-free features (`etl/features.py`), the registered-arm reader (`beatvegas/protocol.py`),
 The Odds API client for `totals_h1` (`sources/odds.py`), event→game matcher
 (`etl/match.py`), line poller with movement dedupe (`scripts/poll_lines.py`),
 open/close grading + CLV ledger (`scripts/grade.py`, `beatvegas/grading.py`).
@@ -70,7 +69,6 @@ python scripts/poll_full_game.py --source oddsapi        # full-game openers (pr
 python scripts/poll_lines.py                             # 1H totals + movement
 python scripts/weekly_update.py                          # score + rank the board
 python scripts/grade.py --season 2026                    # grade unders vs real close + CLV
-python scripts/backtest.py                               # the proxy-graded edge gate
 ```
 
 Data lands in Neon when `DATABASE_URL` is set, else `data/beatvegas.db`
@@ -84,9 +82,8 @@ python scripts/pick.py summary                 # your hit rate, units, CLV
 ```
 
 **Line Study** — how often the under cashed by opening-line value (real opening
-lines where captured, else proxy). On the site it sits in the signed-in research
-section of How it works;
-the CLI is the full version:
+lines where captured, else proxy). Research-only since roadmap v2.0 (the site's research
+section was removed 2026-10-11); the CLI is the full version:
 ```bash
 python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
@@ -125,10 +122,12 @@ itself before it builds.
 | Tue / Thu ~4:05pm (ET-gated 3:45–5:15) | `card.yml` slots `tue_pm` / `thu_pm` | Full 1H sweep of the rolling week + injury refresh → FINAL card → paper-log the qualifying games kicking off before the next build (48 h / 24 h), each with its blocker |
 | Fri ~4:05pm (ET-gated 3:45–5:15)   | `card.yml` slot `fri_pm` | The decision build for the weekend: same sweep, and it paper-logs the REST OF THE WEEK — 78% of Hard Rock's 1H lines are up by Friday afternoon and they barely move afterwards |
 | Sat ~8:05am (ET-gated 7:45–9:15)   | `card.yml` slot `sat_am` | Same whole-week sweep before the morning sitting; also on the rest of the week, but Friday has priced most of it, so it logs only what newly qualifies |
-| Every 30 min, evenings + all Saturday | `lines_watch.yml`   | Per-game Hard Rock 1H closes ~30–75 min before each kickoff             |
+| Hourly Tue–Fri evenings + all Saturday (Vercel), every 30 min backup crons | `lines_watch.yml` | Per-game closes inside a 2 h look-ahead (6 h on Saturday ticks): 1H, and full-game totals, spreads and moneylines |
+| Mon 6am–3pm ET (12Z, 15Z retry, 18Z catch-up) | `pricing_monday.yml` | The read-only pricing report (H-PRICE-HR, rule `pv1`): run Summary + `pricing-report` artifact |
 | Daily 6:30am (retry noon)          | `grade.yml`            | Finals (completed games only) + 1H play-by-play for weeks still missing it → grade market / model / picks / records → post-mortem (2023-25 history only on Monday) |
 
 Manual-only workflows: `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
+`history_load.yml` (2003-22 games + Elo, study-only), `backfill_intercept.yml`,
 `enrich_tempo.yml` (re-backfill pace), `weather_backfill.yml` (Open-Meteo into
 `weather_obs`), `weather_actuals.yml` (observed weather into the study-only
 `weather_actuals`), `rescore.yml` (re-score a played week without freezing records), `study.yml`
@@ -146,10 +145,10 @@ plus a game page: **Board** (the home page — one rolling week grouped by day, 
 game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and one
 line saying what to do; each row links to **`/game/[id]`**, where the decision, the
 lines, the reasons, the news and the Log-pick button live), **Results** (read-only:
-every bet as logged with its record in units, line value and the CSV; the Monday
-review tables only when signed in), **How it works** (`/how-it-works`: what this is,
+every bet as logged with its record in units, line value and the CSV; the owner's
+pick list with its controls only when signed in), **How it works** (`/how-it-works`: what this is,
 how to read the Board, the 2023–25 backtest headed as a backtest, the gap ladder,
-the terms; the research flags and method fold only when signed in; `/records` is
+the terms; no research section since roadmap v2.0); `/records` is
 every rated game by week, with a CSV). Plain-English,
 modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` classes
 in `web/app/globals.css`).
@@ -157,8 +156,8 @@ in `web/app/globals.css`).
 **Architecture:** Neon Postgres is the single source of truth. GitHub Actions writes
 it; the Vercel app reads it and writes manual picks. `web/lib/*.ts` hold the
 SQL/scoring logic; API routes under `web/app/api/` mirror those queries.
-`GET /api/health` (ungated, aggregate timestamps only) tells the Sunday routine
-whether today's opener capture landed.
+`GET /api/health` (ungated: flags, coverage, dispatch times and verdicts; the owner's detail
+only with the cookie) is what the smoke check and the ship skill read after a deploy.
 
 ### Local dev
 ```bash
@@ -183,9 +182,10 @@ which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the write g
   author email isn't tied to the repo's GitHub account (`git config user.email`).
 - **Schema changes start in Python** (it owns the SQLAlchemy schema): edit
   `beatvegas/db/models.py` + `_MIGRATIONS`, run `migrate.yml`, then
-  `cd web && npx prisma db pull && npx prisma generate`, then push.
+  hand-add the new columns to the curated `web/prisma/schema.prisma` (never commit a full
+  `prisma db pull`: the Neon database is shared), `npx prisma generate`, then push.
 
-## Data sources (all free)
+## Data sources
 - **CollegeFootballData** — games, line scores, play-by-play, advanced stats, SP+, full-game lines, venues
 - **The Odds API** — full-game totals (bulk) and first-half totals (per event); Hard Rock via region `us2`, no-vig exchanges via `us_ex` (price comparison only)
 - **TeamRankings** — tempo (seconds/play); unofficial, fail-silent

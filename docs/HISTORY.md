@@ -9,6 +9,23 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THE WRITTEN RECORD CATCHES UP WITH THE CODE).** Step 8 of the 2026-10-14
+  programme (docs only; nothing runs differently). From the whole-system review's drift list:
+  `CLAUDE.md` (Cox closed NOT MET 10-11, not "running"; the neggap/H-FG-P collectors retired 10-08,
+  not "keep logging"; the card.yml row names the arms it writes, not `NEGGAP_COLLECT`/`FG_COLLECT`;
+  pricing-monday's window is 6am-3pm ET; lines_watch is also dispatched by `close-weeknight`;
+  grade.yml takes `regrade`; "every scheduled Neon-writing job" ends with the health check);
+  `docs/HEALTH.md` (the full-game close step pulls totals, spreads and moneylines over `us,us2,us_ex`
+  at 9 credits; the promised `fg_rows_touched` check is dropped, not pending); `docs/ASSUMPTIONS.md`
+  (H-STOP-2 superseded; the live instrument is each arm's protocol test); `docs/OPS_ACCOUNTS.md`
+  (the $20 Actions cap and Tier 1 at Nov 6 are decided, account-side for Tate); `README.md`
+  (deleted `scripts/backtest.py` and `backtest/engine.py`, the removed research section, the real
+  close look-ahead, the pricing row, no `prisma db pull`, "all free" dropped); the 10-13 weather
+  episode says sustained wind, not gust; `docs/program/REVIEW_2026-10.md` carries a bracketed
+  correction (six of eight arms were registered by 10-11); `docs/ROADMAP_2026.md` v2.3 records Cox
+  and the retired collectors in the ledger table and adopts the 17-step programme. The registry
+  status diff (step 8b) is its own PR, held for Tate's approval row by row.
+
 - **2026-10-14 UTC (PRICING REPORT: THE TRUSTED HALF, EACH ERA'S OWN DROPS, THE TWO MISSING TABLES).**
   Step 7 of the 2026-10-14 programme (report only; pv1's constants untouched and still pinned by
   `tests/test_pricing.py`). The Monday report graded first halves on the raw `games.first_half_total`,
@@ -91,7 +108,7 @@ hold the rest.
   forecast never arrives stores NOTHING. Every build now reports: the capture line (requests, stored,
   domes, failed, unavailable, past the cap) and, per arm, priced games split into a forecast from
   this build, one carried from an earlier build (with the oldest age in hours), domes, and UNKNOWN
-  (no forecast) named by game id. Unchanged on purpose: the 10 mph gust rule, the selection rules,
+  (no forecast) named by game id. Unchanged on purpose: the 10 mph sustained-wind rule, the selection rules,
   the windows, grading, history, and `newest()` carrying an older build's forecast (its age is now
   reported; capping it would be a rule change). `tests/test_weather_batch.py` (parsing: order,
   single-point dict body, short or displaced blocks, failed request) and `tests/test_wx_paper.py`

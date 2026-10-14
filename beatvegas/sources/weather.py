@@ -145,7 +145,11 @@ def _request(url: str, params: dict, timeout: int, attempts: int = _ATTEMPTS) ->
                     time.sleep(wait)
                 continue
             else:
-                resp.raise_for_status()
+                # Any other 4xx is a bad request: no retry, but still the one
+                # exception the callers handle (2026-10-14: a raw HTTPError
+                # escaped `wx_paper.capture`'s halving retry and cost a whole
+                # build its weather arms).
+                raise WeatherUnavailable(f"{url}: HTTP {resp.status_code} (not retried)")
         if attempt < attempts - 1:
             time.sleep(backoff_seconds(attempt))
     raise WeatherUnavailable(f"{url}: {last} after {attempts} attempts")

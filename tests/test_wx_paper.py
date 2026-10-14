@@ -394,6 +394,49 @@ def test_batch_capture_sends_one_request_per_day_and_matches_each_game_to_its_ve
     assert rows[3].dome is True and rows[3].wind_mph is None
 
 
+def test_a_null_wind_hour_stores_nothing_and_leaves_the_older_forecast_in_place():
+    """2026-10-14: the provider can answer with a block whose kickoff hour has no wind
+    value. That used to store a fresh row with wind NULL -- read as calm, counted as
+    "forecast this build", and newer than any valid forecast on file."""
+    eng, scope = _sqlite_scope()
+    _seed(eng, [(1, 1, KICK), (2, 3, KICK)])
+    earlier = NOW - timedelta(days=2)
+    with Session(eng) as s:
+        s.add(BuildForecast(game_id=1, fetched_at=earlier, kickoff=KICK, wind_mph=14.0, dome=False))
+        s.commit()
+
+    def fetch_batch(points, start, end, **kw):
+        out = []
+        for lat, _lon in points:
+            wind = None if lat == 40.0 else 6.0  # venue 1's hour arrives with no wind
+            out.append(
+                {
+                    f"{start}T{h:02d}": {
+                        "wind_mph": wind,
+                        "wind_gust_mph": None,
+                        "temperature_f": 50.0,
+                        "precipitation": 0.0,
+                    }
+                    for h in range(24)
+                }
+            )
+        return out
+
+    with scope() as s:
+        stats = W.capture(s, [1, 2], NOW, fetch_batch=fetch_batch)
+        assert (stats["stored"], stats["failed"], stats["unavailable"]) == (1, 1, 1)
+        assert stats["failed_game_ids"] == [1]
+        newest = W.newest(s, [1, 2], NOW)
+        assert (
+            newest[1].fetched_at == earlier and newest[1].wind_mph == 14.0
+        )  # the valid forecast survives
+        assert newest[2].wind_mph == 6.0
+    with Session(eng) as s:
+        assert (
+            s.query(BuildForecast).filter(BuildForecast.game_id == 1).count() == 1
+        )  # no NULL row added
+
+
 def test_batch_capture_counts_a_missing_block_as_unknown_never_calm():
     eng, scope = _sqlite_scope()
     _seed(eng, [(1, 1, KICK), (2, 3, KICK)])

@@ -177,9 +177,11 @@ def test_exhausted_retries_raise_rather_than_returning_empty(calls):
         W.fetch_hourly_series(30.0, -96.0, "2024-10-12", "2024-10-12")
 
 
-def test_a_bad_request_is_not_retried(calls):
+def test_a_bad_request_is_not_retried_and_is_the_one_exception_callers_handle(calls):
+    """2026-10-14: a 4xx used to escape as a raw HTTPError, which `wx_paper.capture`'s
+    halving retry does not catch, so one bad request cost a build both weather arms."""
     calls.queue.append(_Resp(404))
-    with pytest.raises(requests.HTTPError):
+    with pytest.raises(W.WeatherUnavailable, match="HTTP 404"):
         W.fetch_hourly_series(30.0, -96.0, "2024-10-12", "2024-10-12")
     assert len([c for c in calls if "url" in c]) == 1
 

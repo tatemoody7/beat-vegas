@@ -14,6 +14,9 @@ import {
   tierCounts,
 } from "@/lib/homeBoard";
 import { getLatestCard } from "@/lib/card";
+import { getArmPositions } from "@/lib/armPositions";
+import { cardsFor } from "@/lib/research";
+import ResearchStrip from "@/app/components/ResearchStrip";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
@@ -112,6 +115,10 @@ export default async function BoardPage({
           Research →
         </Link>
       </p>
+
+      {/* The research status, one line + a pill per hypothesis, from the stored
+          Monday read (Tate, 2026-10-14). It never touches a rating. */}
+      <ResearchStrip cards={cardsFor(await getArmPositions())} />
 
       <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
         <h1 className="bv-page-title">

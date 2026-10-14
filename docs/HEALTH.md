@@ -160,7 +160,8 @@ check is not planned while the judge's full-game reads are secondary).
 
 1. `monday.positions_written` missed (FAILED, email) -> the Monday run did not leave one
    `arm_positions` row per registered hypothesis (the six arms from `scripts/protocol_position.py
-   --write`, H-PRICE-HR from `scripts/pricing_check.py --write`). Read the run log for the step that
+   --write`, which also writes the exploratory H-ARM-EVP row; H-PRICE-HR from `scripts/pricing_check.py
+   --write`). Read the run log for the step that
    failed; re-run with `gh workflow run pricing_monday.yml --ref main` -- a second run on the same
    Monday rewrites the same rows (unique on hypothesis + read date), nothing double-counts. Until it
    lands, the Research page shows the previous read with its date and the board's health banner
@@ -296,7 +297,7 @@ Failure modes on record:
 
 | Check | Severity | Positive fact |
 |---|---|---|
-| `monday.positions_written` | failed | one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR) with read_at >= RUN_STARTED_AT |
+| `monday.positions_written` | failed | one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR + the exploratory H-ARM-EVP) with read_at >= RUN_STARTED_AT |
 | `monday.pricing_report_written` | degraded | a reports/pricing_check_<stamp>.md written since RUN_STARTED_AT |
 
 Failure modes on record:

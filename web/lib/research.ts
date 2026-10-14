@@ -217,3 +217,121 @@ export function cardsFor(
 
 export const pct = (v: number) =>
   `${v >= 0 ? "+" : ""}${(100 * v).toFixed(1)}%`;
+
+// --- Exploratory collectors (no error budget, no sequential test) -------------
+
+export type ExploratoryMeta = {
+  id: string;
+  name: string;
+  rule: string;
+  decides: string;
+};
+
+/** H-ARM-EVP (Tate's option A, 2026-10-14; beatvegas/evp_paper.py). Not one of
+ *  the registered arms: it never takes a slot in the error budget, and nothing
+ *  is adopted from it; the January 2027 review decides whether a 2027 test is
+ *  registered. */
+export const EXPLORATORY: readonly ExploratoryMeta[] = [
+  {
+    id: "H-ARM-EVP",
+    name: "Value at Hard Rock’s price",
+    rule: "The first-half under when its estimated value at Hard Rock’s price is +2% or more: the market’s vig-free line moved a fifth of the way toward our number.",
+    decides:
+      "Exploratory: no error budget and no decision this season. The January 2027 review decides whether it becomes a registered test.",
+  },
+];
+
+type Summary = {
+  n: number;
+  mean_ev: number | null;
+  ev_lo: number | null;
+  ev_hi: number | null;
+};
+
+export type ExploratoryCard = {
+  meta: ExploratoryMeta;
+  status: "not yet read" | "collecting";
+  logged: number;
+  readings: number;
+  weeks: number;
+  excluded: number;
+  pending: number;
+  ev: { mean: number; lo: number | null; hi: number | null } | null;
+  /** The gap rule (H-ARM-1HU) over exactly the same weeks, from the same row. */
+  gap: {
+    readings: number;
+    excluded: number;
+    ev: { mean: number; lo: number | null; hi: number | null } | null;
+  } | null;
+  both: number;
+  evpOnly: number;
+  gapOnly: number;
+  readAt: Date | null;
+  runId: string | null;
+  nextRead: string | null;
+  outdated: boolean;
+};
+
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+/** An EV only from EV_INTERVAL_MIN_READINGS readings (the same honest rule as the arms). */
+function evOf(s: Summary | null) {
+  if (s === null || s.mean_ev === null) return null;
+  if (s.n < PROTOCOL.EV_INTERVAL_MIN_READINGS) return null;
+  return { mean: s.mean_ev, lo: s.ev_lo, hi: s.ev_hi };
+}
+
+function summaryOf(v: unknown): (Summary & { excluded: number }) | null {
+  if (v === null || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  return {
+    n: num(o.n) ?? 0,
+    mean_ev: num(o.mean_ev),
+    ev_lo: num(o.ev_lo),
+    ev_hi: num(o.ev_hi),
+    excluded: num(o.excluded) ?? 0,
+  };
+}
+
+/** Pure: the exploratory card from its newest stored row and that row's payload. */
+export function exploratoryCardFor(
+  meta: ExploratoryMeta,
+  pos: ArmPosition | undefined,
+  payload: Record<string, unknown> | null,
+): ExploratoryCard {
+  const readings = pos?.readings ?? 0;
+  const cmp =
+    payload && typeof payload.comparison === "object" && payload.comparison
+      ? (payload.comparison as Record<string, unknown>)
+      : null;
+  const gap = summaryOf(cmp?.gap_rule ?? null);
+  return {
+    meta,
+    status: pos ? "collecting" : "not yet read",
+    logged: pos?.logged ?? 0,
+    readings,
+    weeks: pos?.weeks ?? 0,
+    excluded: pos?.excluded ?? 0,
+    pending: pos?.pending ?? 0,
+    ev: pos
+      ? evOf({
+          n: readings,
+          mean_ev: pos.mean_ev,
+          ev_lo: pos.ev_lo,
+          ev_hi: pos.ev_hi,
+        })
+      : null,
+    gap:
+      gap === null
+        ? null
+        : { readings: gap.n, excluded: gap.excluded, ev: evOf(gap) },
+    both: num(cmp?.both) ?? 0,
+    evpOnly: num(cmp?.evp_only) ?? 0,
+    gapOnly: num(cmp?.gap_only) ?? 0,
+    readAt: pos?.readAt ?? null,
+    runId: pos?.run_id ?? null,
+    nextRead: pos?.next_read ?? null,
+    outdated: pos?.freshness === "outdated",
+  };
+}

@@ -1003,7 +1003,7 @@ CONTRACTS: Dict[str, Contract] = {
             Check(
                 "monday.positions_written",
                 "failed",
-                "one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR) with read_at >= RUN_STARTED_AT",
+                "one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR + the exploratory H-ARM-EVP) with read_at >= RUN_STARTED_AT",
                 monday_positions_written,
             ),
             Check(

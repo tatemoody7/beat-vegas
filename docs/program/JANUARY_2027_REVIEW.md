@@ -41,6 +41,7 @@ Not on the page: the personal ledger (Results shows it), the weekly report, mode
 | Each arm's final SPRT position (PASS / KILL / timeout) | `protocol_position`, every completed week | promote to $10 live validation / end / carry into 2027 under new rules: ______ |
 | The judge validated | H-JUDGE re-read on the full season; the four side readings | keep `cv1` / amend (own row): ______ |
 | H-VENUE-1 registered read | `venue_check`, every week captured, fee-inclusive prices stated | Kalshi account: yes only if best-of-two beats Hard Rock alone by about 1 pt EV over 100+ games (CPA first): ______ |
+| H-ARM-EVP, exploratory (value at Hard Rock's price, +2%) | the newest `arm_positions` row: mean `ev_cons` with its interval, exclusions, and the gap rule's readings over the same weeks | register a 2027 confirmatory arm (its own row, fresh alpha) / drop: ______ |
 | The Hard Rock capture dataset | `odds_snapshots` with `event_id` / `book_updated_at` | design slots 4-5 for 2027: ______ |
 | The personal ledger | Results, never evidence | continue / stop (Tate's own call): ______ |
 | Research-year deliverables | this file, `docs/HISTORY.md` | written beside the promotion bar: ______ |

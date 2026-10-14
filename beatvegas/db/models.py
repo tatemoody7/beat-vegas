@@ -280,7 +280,7 @@ class ArmPosition(Base):
     )
     id = Column(Integer, primary_key=True, autoincrement=True)
     hypothesis = Column(String, nullable=False, index=True)  # registry id
-    standard = Column(String, nullable=False)  # sprt (an arm) | pricing (H-PRICE-HR)
+    standard = Column(String, nullable=False)  # sprt (an arm) | pricing (H-PRICE-HR) | exploratory (H-ARM-EVP)
     read_date = Column(String, nullable=False)  # YYYY-MM-DD, the UTC date of the read
     read_at = Column(DateTime, nullable=False)  # naive UTC
     run_id = Column(String)  # GITHUB_RUN_ID of the writer, '-' locally

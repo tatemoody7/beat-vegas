@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 // review read the same row, so none of the three can disagree. Timestamps come
 // back as text and are read as UTC (lib/et.ts convention).
 
-export const ARM_STANDARDS = ["sprt", "pricing"] as const;
+export const ARM_STANDARDS = ["sprt", "pricing", "exploratory"] as const;
 export type ArmStandard = (typeof ARM_STANDARDS)[number];
 
 /** A Monday read older than this reads "outdated" (beatvegas/positions.py). */
@@ -94,6 +94,30 @@ export async function getArmPositions(
     return newestByHypothesis(rows, now);
   } catch (e) {
     if (isMissingTable(e)) return new Map();
+    throw e;
+  }
+}
+
+/** The newest row's payload for one hypothesis, parsed; null with no row or no
+ *  payload. The exploratory card reads its comparison from it (the Monday
+ *  workflow wrote it; nothing here recomputes it). */
+export async function getPositionPayload(
+  hypothesis: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const rows = await prisma.$queryRaw<{ payload_json: string | null }[]>`
+      SELECT payload_json FROM arm_positions
+      WHERE hypothesis = ${hypothesis}
+      ORDER BY read_at DESC, id DESC
+      LIMIT 1`;
+    const raw = rows[0]?.payload_json;
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch (e) {
+    if (isMissingTable(e)) return null;
     throw e;
   }
 }

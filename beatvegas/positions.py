@@ -1,6 +1,7 @@
 """The stored arm positions (`arm_positions`, 2026-10-14, programme step 10).
 
-One row per registered hypothesis per read date. The six paper arms are written
+One row per registered hypothesis per read date. The six paper arms (and the
+exploratory H-ARM-EVP, standard 'exploratory', 2026-10-14) are written
 by `scripts/protocol_position.py --write` from the protocol reader's line; the
 pricing study by `scripts/pricing_check.py --write` from its verdict. The site
 (`web/lib/armPositions.ts`), the Monday read and the January review all read the
@@ -21,8 +22,12 @@ from .db.models import ArmPosition
 
 STANDARD_SPRT = "sprt"
 STANDARD_PRICING = "pricing"
+STANDARD_EXPLORATORY = "exploratory"
 PRICING_ID = "H-PRICE-HR"
-HYPOTHESES: Tuple[str, ...] = tuple(P.ARMS) + (PRICING_ID,)
+# Exploratory collectors read on Mondays beside the arms, never as one (no alpha,
+# no SPRT): H-ARM-EVP since 2026-10-14 (beatvegas/evp_paper.py).
+EXPLORATORY_IDS: Tuple[str, ...] = ("H-ARM-EVP",)
+HYPOTHESES: Tuple[str, ...] = tuple(P.ARMS) + (PRICING_ID,) + EXPLORATORY_IDS
 OUTDATED_AFTER_DAYS = 8  # a Monday read older than this is "outdated" on the site
 
 
@@ -66,6 +71,34 @@ def arm_position(arm: str, line: Mapping[str, Any], now: datetime, run_id: str) 
         "pending": int(line.get("pending") or 0),
         "needed": P.MIN_OBS,
         "llr": line.get("llr"),
+        "mean_ev": line.get("mean_ev"),
+        "ev_lo": line.get("ev_lo"),
+        "ev_hi": line.get("ev_hi"),
+        "next_read": next_monday(now),
+        "payload_json": json.dumps(dict(line), default=str),
+    }
+
+
+def exploratory_position(
+    hypothesis: str, line: Mapping[str, Any], now: datetime, run_id: str
+) -> Dict[str, Any]:
+    """The row for an exploratory collector from `protocol_position.exploratory_read`:
+    counts and an interval only -- no LLR, no readings target."""
+    return {
+        "hypothesis": hypothesis,
+        "standard": STANDARD_EXPLORATORY,
+        "read_date": read_date(now),
+        "read_at": now,
+        "run_id": run_id,
+        "state": line.get("state"),
+        "label": line.get("label"),
+        "logged": int(line.get("logged") or 0),
+        "readings": int(line.get("readings") or 0),
+        "weeks": int(line.get("weeks") or 0),
+        "excluded": int(line.get("excluded") or 0),
+        "pending": int(line.get("pending") or 0),
+        "needed": None,
+        "llr": None,
         "mean_ev": line.get("mean_ev"),
         "ev_lo": line.get("ev_lo"),
         "ev_hi": line.get("ev_hi"),

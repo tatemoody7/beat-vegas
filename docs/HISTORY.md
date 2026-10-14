@@ -9,6 +9,20 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (H-ARM-EVP COLLECTS, EXPLORATORY).** Tate chose option A for the value-at-price idea: collect in
+  2026 with no ledger slot, no alpha and no sequential test, keep the +2% threshold and the calculation documented,
+  treat the design replay as development evidence, compare it with the gap rule, decide in January 2027.
+  `beatvegas/evp_paper.py` runs the spec's rule on each scheduled build's card items (Hard Rock's main line and
+  under price, the card's fair under, market centre and model number; w = 0.80 frozen from H3A; hp1; value >= +2%),
+  logs to `challenger_picks` with arm `H-ARM-EVP` inside its own savepoint, and counts every unread game by reason;
+  missing inputs or a table that does not cover the shift never qualify. Run against the stored weeks 4-7 cards it
+  reproduces the spec's replay exactly (5 / 3 / 2 / 0 picks, the same games and values); that replay wrote no row.
+  The Monday workflow's `protocol_position.py --write` stores an `arm_positions` row (standard `exploratory`) over
+  the same complete reading weeks the arms use, with H-ARM-1HU's forward readings over exactly those weeks and the
+  games both rules chose; the `monday.positions_written` contract now expects it. Research shows it in its own
+  Exploratory section, with no progress bar or LLR and the ten-reading rule on both sides of the comparison. Not in
+  `protocol.ARMS`; the six arms, the judge, pv1, grading, the Board and the personal ledger are unchanged. Registry
+  row `H-ARM-EVP`; January review slot added.
 - **2026-10-14 UTC (P1.2 R3′: A READING NEVER WAITS FOR THE SCORE).** Tate approved R3′ in place of the draft's
   seven-day permanent exclusion, asking that only valid, trustworthy closing-line data can produce a reading
   and that outcome grading stays separate. Verified in the code: the judge reads only quotes captured before

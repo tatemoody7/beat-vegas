@@ -35,7 +35,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Set
 
-from beatvegas import ht_paper, wx_paper
+from beatvegas import evp_paper, ht_paper, wx_paper
 from beatvegas.arm_paper import arm_summary_lines, log_overs_mirror
 from beatvegas.card import (
     REFERENCE_MODEL_VERSION,
@@ -666,6 +666,7 @@ def run(
         arm_fg_stats: Optional[Dict] = None
         wx_stats: Optional[Dict] = None
         ht_stats: Optional[Dict] = None
+        evp_stats: Optional[Dict] = None
         paper_stats: Dict[str, int] = {}
         if not dry_run and card["items"]:
             if not no_paper:
@@ -762,6 +763,18 @@ def run(
                 except Exception as e:  # noqa: BLE001 - never break the card
                     ht_stats = None
                     print(f"[card] WARNING: H-ARM-HT1H not logged: {e}")
+                # H-ARM-EVP (2026-10-14, Tate's option A): the EXPLORATORY
+                # value-at-price collector -- no ledger slot, not in
+                # protocol.ARMS; reads only this card's items and the frozen
+                # hp1 table, and its own SAVEPOINT keeps a failure off the card.
+                try:
+                    with s.begin_nested():
+                        evp_stats = evp_paper.log_first_half(
+                            s, card, now, window_hours=paper_window_hours, predictions=preds
+                        )
+                except Exception as e:  # noqa: BLE001 - never break the card
+                    evp_stats = None
+                    print(f"[card] WARNING: H-ARM-EVP not logged: {e}")
                 # H-INSEASON-P: the challenger family logs beside the champion,
                 # from the same snapshot, into its own table.
                 #
@@ -822,6 +835,7 @@ def run(
         lines.extend(arm_summary_lines(arm_over_stats, arm_fg_stats))
         lines.extend(wx_paper.summary_lines(wx_stats))
         lines.extend(ht_paper.summary_lines(ht_stats))
+        lines.extend(evp_paper.summary_lines(evp_stats))
         if picks_added:
             # Frozen feature vectors (2026-10-04): a pick with none had no
             # game_records row (the first scoring of the game never ran).

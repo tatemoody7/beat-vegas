@@ -37,7 +37,13 @@ from residual_gate import append_step_summary, report_paths  # noqa: E402
 from beatvegas import protocol as P  # noqa: E402
 from beatvegas.db.models import ChallengerPick, Game, ManualPick  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
-from beatvegas.positions import arm_position, mean_ci, upsert_position  # noqa: E402
+from beatvegas.evp_paper import ARM_EVP  # noqa: E402
+from beatvegas.positions import (  # noqa: E402
+    arm_position,
+    exploratory_position,
+    mean_ci,
+    upsert_position,
+)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -118,6 +124,7 @@ def with_games(session, rows: Sequence[Any]) -> List[Any]:
         g = games.get(int(r.game_id)) if r.game_id is not None else None
         out.append(
             SimpleNamespace(
+                game_id=r.game_id,
                 season=r.season,
                 week=r.week,
                 graded=r.graded,
@@ -201,6 +208,76 @@ def read_arm(
     }
 
 
+def exploratory_rows(session) -> List[Any]:
+    """H-ARM-EVP's paper picks (2026-10-14, exploratory): every row the collector
+    wrote. It logs only from scheduled builds after it merged, so there are no
+    development rows to separate."""
+    return (
+        session.query(ChallengerPick)
+        .filter(
+            ChallengerPick.arm == ARM_EVP,
+            ChallengerPick.market == "1H",
+            ChallengerPick.side == "under",
+        )
+        .order_by(ChallengerPick.placed_at, ChallengerPick.id)
+        .all()
+    )
+
+
+def _summary(values: Sequence[float]) -> Dict[str, Any]:
+    m, lo, hi = mean_ci(values)
+    return {
+        "n": len(values),
+        "mean_ev": None if m is None else round(m, 4),
+        "ev_lo": None if lo is None else round(lo, 4),
+        "ev_hi": None if hi is None else round(hi, 4),
+    }
+
+
+def exploratory_read(
+    evp: Sequence[Any], gap: Sequence[Any], now: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """Pure: H-ARM-EVP's exploratory read and its comparison with the gap rule.
+
+    No sequential test and no alpha: the judge's readings over the same complete
+    reading weeks the arms use (R2/R3'), their mean with a 95% interval, the
+    exclusions by reason, picks per week, and -- over exactly the reading weeks
+    EVP has -- H-ARM-1HU's forward readings beside it, with the games both rules
+    chose. Nothing here is a reading for any arm."""
+    done = completed(evp, now)
+    weeks = sorted({reading_key(r) for r in done})
+    ev = [float(r.ev_cons) for r in done if r.ev_cons is not None]
+    reasons = Counter(r.cons_excluded or "unexplained" for r in done if r.ev_cons is None)
+    per_week = Counter(key_label(reading_key(r)) for r in evp)
+    gap_done = [r for r in completed(gap, now) if reading_key(r) in set(weeks)]
+    gap_ev = [float(r.ev_cons) for r in gap_done if r.ev_cons is not None]
+    evp_games = {int(r.game_id) for r in done if r.game_id is not None}
+    gap_games = {int(r.game_id) for r in gap_done if r.game_id is not None}
+    s = _summary(ev)
+    return {
+        "logged": len(evp),
+        "pending": len(evp) - len(done),
+        "readings": len(ev),
+        "excluded": len(done) - len(ev),
+        "excluded_by_reason": dict(reasons),
+        "weeks": len(weeks),
+        "picks_per_week": dict(sorted(per_week.items())),
+        "mean_ev": s["mean_ev"],
+        "ev_lo": s["ev_lo"],
+        "ev_hi": s["ev_hi"],
+        "comparison": {
+            "against": P.ARM_1H_UNDER,
+            "weeks": [key_label(k) for k in weeks],
+            "gap_rule": {**_summary(gap_ev), "excluded": len(gap_done) - len(gap_ev)},
+            "both": len(evp_games & gap_games),
+            "evp_only": len(evp_games - gap_games),
+            "gap_only": len(gap_games - evp_games),
+        },
+        "state": "exploratory",
+        "label": "EXPLORATORY",
+    }
+
+
 def paused_arm(logged: int) -> Dict[str, Any]:
     """Pure: a paused arm's line -- no readings, whatever it has logged."""
     return {
@@ -265,6 +342,30 @@ def render(result: Dict[str, Any]) -> str:
         if r.get("excluded_by_books"):
             nb = ", ".join(f"{k} books {v}" for k, v in sorted(r["excluded_by_books"].items()))
             L.append(f"- {arm} exclusions by close book count (the judge needs 3+): {nb}")
+    x = result.get("exploratory")
+    if x:
+        c = x["comparison"]
+        g = c["gap_rule"]
+
+        def ev_txt(m, lo, hi):
+            if m is None:
+                return "—"
+            return f"{m:+.4f}" + ("" if lo is None else f" ({lo:+.4f} to {hi:+.4f})")
+
+        L += [
+            "",
+            f"## Exploratory: {ARM_EVP} (no alpha, no sequential test, never a reading for an arm)",
+            "",
+            f"- Logged {x['logged']}, judged readings {x['readings']} over {x['weeks']} complete "
+            f"weeks, excluded {x['excluded']}, pending {x['pending']}; mean EV "
+            f"{ev_txt(x['mean_ev'], x['ev_lo'], x['ev_hi'])}.",
+            f"- Same weeks, the gap rule ({c['against']}): readings {g['n']}, excluded "
+            f"{g['excluded']}, mean EV {ev_txt(g['mean_ev'], g['ev_lo'], g['ev_hi'])}; games both "
+            f"rules chose {c['both']}, EVP only {c['evp_only']}, gap only {c['gap_only']}.",
+        ]
+        if x["excluded_by_reason"]:
+            why = ", ".join(f"{k} {v}" for k, v in sorted(x["excluded_by_reason"].items()))
+            L.append(f"- {ARM_EVP} exclusions: {why}")
     return "\n".join(L) + "\n"
 
 
@@ -284,13 +385,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     with_games(s, arm_rows(s, arm, spec, since=start)), args.season_over, now
                 )
             arms[arm] = {**line, "slot": spec["slot"]}
-    result = {"generated_at": now.isoformat() + "Z", "arms": arms}
+        # H-ARM-EVP (exploratory, 2026-10-14): read beside the arms, never as one.
+        exploratory = exploratory_read(
+            with_games(s, exploratory_rows(s)),
+            with_games(s, arm_rows(s, P.ARM_1H_UNDER, P.ARMS[P.ARM_1H_UNDER])),
+            now,
+        )
+    result = {"generated_at": now.isoformat() + "Z", "arms": arms, "exploratory": exploratory}
     if args.write:
         with session_scope() as s:
             for arm, line in arms.items():
                 upsert_position(s, arm_position(arm, line, now, args.run_id))
+            upsert_position(s, exploratory_position(ARM_EVP, exploratory, now, args.run_id))
         result["written"] = {"run_id": args.run_id, "read_date": now.strftime("%Y-%m-%d")}
-        print(f"[protocol] wrote {len(arms)} arm_positions rows (run {args.run_id})")
+        print(f"[protocol] wrote {len(arms) + 1} arm_positions rows (run {args.run_id})")
     md = render(result)
     md_path, json_path, _csv = report_paths(args.out)
     md_path.parent.mkdir(parents=True, exist_ok=True)

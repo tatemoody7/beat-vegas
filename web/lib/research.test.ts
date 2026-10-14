@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ArmPosition } from "./armPositions";
 import {
+  EXPLORATORY,
   HYPOTHESES,
   PROTOCOL,
   cardFor,
   cardsFor,
+  exploratoryCardFor,
   llrShare,
   statusOf,
 } from "./research";
@@ -91,5 +93,58 @@ describe("research cards", () => {
     expect(c.runId).toBe("38590000001");
     expect(c.nextRead).toBe("2026-10-26");
     expect(c.readAt?.toISOString()).toBe("2026-10-19T12:05:00.000Z");
+  });
+});
+
+describe("exploratory cards", () => {
+  const evp = EXPLORATORY[0];
+  const row = pos({
+    hypothesis: "H-ARM-EVP",
+    standard: "exploratory",
+    state: "exploratory",
+    needed: null,
+    llr: null,
+    readings: 12,
+    mean_ev: 0.021,
+    ev_lo: -0.01,
+    ev_hi: 0.05,
+  });
+  const payload = {
+    comparison: {
+      gap_rule: { n: 4, mean_ev: -0.03, ev_lo: null, ev_hi: null, excluded: 1 },
+      both: 2,
+      evp_only: 10,
+      gap_only: 2,
+    },
+  };
+
+  it("is never one of the registered strategies", () => {
+    expect(evp.id).toBe("H-ARM-EVP");
+    expect(HYPOTHESES.map((h) => h.id)).not.toContain("H-ARM-EVP");
+    expect(
+      cardsFor(new Map([["H-ARM-EVP", row]])).map((c) => c.meta.id),
+    ).not.toContain("H-ARM-EVP");
+  });
+
+  it("reads not yet read with no row, and collecting with one", () => {
+    expect(exploratoryCardFor(evp, undefined, null).status).toBe(
+      "not yet read",
+    );
+    expect(exploratoryCardFor(evp, row, payload).status).toBe("collecting");
+  });
+
+  it("applies the ten-reading rule to both sides of the comparison", () => {
+    const c = exploratoryCardFor(evp, row, payload);
+    expect(c.ev).toEqual({ mean: 0.021, lo: -0.01, hi: 0.05 });
+    expect(c.gap).toEqual({ readings: 4, excluded: 1, ev: null });
+    expect([c.both, c.evpOnly, c.gapOnly]).toEqual([2, 10, 2]);
+    const thin = exploratoryCardFor(evp, { ...row, readings: 9 }, payload);
+    expect(thin.ev).toBeNull();
+  });
+
+  it("survives a row with no comparison", () => {
+    const c = exploratoryCardFor(evp, row, {});
+    expect(c.gap).toBeNull();
+    expect([c.both, c.evpOnly, c.gapOnly]).toEqual([0, 0, 0]);
   });
 });

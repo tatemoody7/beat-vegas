@@ -1142,7 +1142,8 @@ export function buildExpected(week) {
  * arm_positions (2026-10-14, programme step 10/11): what the Monday read stored,
  * as the Research page shows it. One hypothesis (H-ARM-HT1H) has no row ("not
  * yet read"); the pricing row is from two Mondays back ("outdated" past 8 days);
- * 1HU has enough readings to show an EV, 1HO has not.
+ * 1HU has enough readings to show an EV, 1HO has not; the exploratory H-ARM-EVP
+ * row sits apart from the arms.
  */
 export function armPositionsFor(now) {
   const monday = new Date(now.getTime());
@@ -1221,6 +1222,39 @@ export function armPositionsFor(now) {
       payload_json: JSON.stringify({
         verdict: { verdict: "insufficient" },
         opportunities: [PRICING_OPPORTUNITY],
+      }),
+    }),
+    // The exploratory collector (H-ARM-EVP, 2026-10-14): no LLR, no target;
+    // too few readings for its own EV, enough on the gap side of the comparison.
+    base("H-ARM-EVP", {
+      standard: "exploratory",
+      state: "exploratory",
+      label: "EXPLORATORY",
+      logged: 6,
+      readings: 4,
+      weeks: 2,
+      excluded: 1,
+      pending: 1,
+      needed: null,
+      llr: null,
+      mean_ev: 0.031,
+      ev_lo: -0.02,
+      ev_hi: 0.082,
+      payload_json: JSON.stringify({
+        comparison: {
+          against: "H-ARM-1HU",
+          weeks: ["2026-w7", "2026-w8"],
+          gap_rule: {
+            n: 11,
+            mean_ev: -0.015,
+            ev_lo: -0.061,
+            ev_hi: 0.031,
+            excluded: 2,
+          },
+          both: 3,
+          evp_only: 1,
+          gap_only: 8,
+        },
       }),
     }),
   ];

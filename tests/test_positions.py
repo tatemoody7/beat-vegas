@@ -35,8 +35,8 @@ LINE = {
 }
 
 
-def test_the_row_set_is_every_arm_plus_the_pricing_study():
-    assert X.HYPOTHESES == tuple(P.ARMS) + ("H-PRICE-HR",)
+def test_the_row_set_is_every_arm_plus_the_pricing_study_plus_the_exploratory_collector():
+    assert X.HYPOTHESES == tuple(P.ARMS) + ("H-PRICE-HR", "H-ARM-EVP")
     assert X.PRICING_ID == "H-PRICE-HR"
 
 

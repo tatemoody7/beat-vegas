@@ -93,6 +93,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [health] On the clean fixture: ok, not paused, not stale, no missed build, no warnings, the seeded gauge values (incl. close-window coverage 67 of 72), UTC timestamps — health.spec.ts › "reports the clean fixture as healthy"
 - [health] One `lastDispatch` gauge per CRON_JOBS id, each a past instant — health.spec.ts › "carries one dispatch gauge per cron job, each inside its last window"
 - [health] One `health` verdict per scheduled job (card, grade, sunday, lines_watch), each `{verdict, at, note}` and ok — health.spec.ts › "carries one health verdict per scheduled job, each ok with its run note"
+- [health] Signed out, `/api/health` carries no pause switch, no API budgets and no run notes: the flags, coverage, dispatch times and verdicts only, keys removed not nulled — health.spec.ts › "a visitor reads the flags, coverage, dispatch times and verdicts, nothing more"
 - [health] The five security headers from `next.config.ts` are on every response — health.spec.ts › "sends the security headers next.config.ts declares"
 - [health] `/api/records?season=` streams the season as CSV with the documented columns, one row per game — health.spec.ts › "streams the season as CSV with the documented columns"
 - [health] `/api/records` without a valid season is a 400 — health.spec.ts › "refuses a missing or malformed season"

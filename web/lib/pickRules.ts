@@ -551,3 +551,21 @@ export function parsePickEdit(body: unknown): ParsedEdit | Rejection {
   }
   return { ok: true, edit };
 }
+
+/**
+ * When the server's judgement of a ticket differs from the Board's (2026-10-14,
+ * programme B2a): the Board rates a game with its own live bar, the server with
+ * the newest card's bar and model number, so after the card is built the two
+ * can disagree. The ticket is stored with the SERVER's verdict as it always was;
+ * this only makes the difference visible instead of silent. Null when they agree
+ * or the request carried no Board verdict.
+ */
+export function verdictDisagreement(
+  board: Verdict | null | undefined,
+  server: Verdict,
+): string | null {
+  if (!board || board === server) return null;
+  const word = (v: Verdict) =>
+    v === "BET" ? "Bet" : v === "WATCH" ? "Watch" : "Pass";
+  return `Logged. The Board showed ${word(board)}, but the server rated this ${word(server)} from the latest card's bar and our number at that build, and recorded it that way${server === "BET" ? "" : " (it will show as off the rule on Results)"}.`;
+}

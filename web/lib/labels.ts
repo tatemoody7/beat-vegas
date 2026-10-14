@@ -312,6 +312,29 @@ export type HrQuote = {
  * is the last MAIN line on file, so it carries its capture time in ET:
  * "u27.5 -105 · as of Thu 4:07pm". `hrAsOf` is naive UTC text from Postgres.
  */
+/**
+ * How long ago a poll last SAW Hard Rock's price (2026-10-14, programme B5):
+ * "price seen 3 h ago". The board's verdict carries no age, while the server
+ * refuses a ticket on a price older than `maxAgeH` (lineCheck.HR_PRICE_MAX_AGE_H,
+ * passed in so this module stays free of the database); past it the line says
+ * so before you try to log. Display only: nothing here changes a verdict.
+ * `seenAt` is naive UTC text from Postgres.
+ */
+export function priceAgeText(
+  seenAt: string | null | undefined,
+  now: Date,
+  maxAgeH: number,
+): string | null {
+  if (!seenAt) return null;
+  const t = new Date(`${seenAt.trim().replace(" ", "T")}Z`);
+  if (Number.isNaN(t.getTime())) return null;
+  const h = Math.floor((now.getTime() - t.getTime()) / 3_600_000);
+  const ago = h < 1 ? "price seen under an hour ago" : `price seen ${h} h ago`;
+  return h >= maxAgeH
+    ? `${ago} · refresh before logging (a bet needs one seen within ${maxAgeH} h)`
+    : ago;
+}
+
 export function hrQuoteText(q: HrQuote | null | undefined): string {
   if (q == null || q.hrLine == null) return "no line yet";
   const price = q.hrUnderPrice == null ? "" : ` ${american(q.hrUnderPrice)}`;

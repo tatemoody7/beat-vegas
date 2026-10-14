@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  priceAgeText,
   hrQuoteText,
   basisPhrase,
   BLOCKER_SHORT,
@@ -109,5 +110,26 @@ describe("hrQuoteText", () => {
     expect(hrQuoteText({ hrLine: null, hrUnderPrice: null })).toBe(
       "no line yet",
     );
+  });
+});
+
+describe("priceAgeText (B5: a lit BET says how old its price is)", () => {
+  const now = new Date("2026-10-17T18:00:00Z");
+  it("reads naive UTC and counts whole hours", () => {
+    expect(priceAgeText("2026-10-17 17:20:00", now, 6)).toBe(
+      "price seen under an hour ago",
+    );
+    expect(priceAgeText("2026-10-17 15:00:00", now, 6)).toBe(
+      "price seen 3 h ago",
+    );
+  });
+  it("says to refresh once the price is as old as the log refuses", () => {
+    expect(priceAgeText("2026-10-17 12:00:00", now, 6)).toBe(
+      "price seen 6 h ago · refresh before logging (a bet needs one seen within 6 h)",
+    );
+  });
+  it("shows nothing without a time", () => {
+    expect(priceAgeText(null, now, 6)).toBeNull();
+    expect(priceAgeText("not a time", now, 6)).toBeNull();
   });
 });

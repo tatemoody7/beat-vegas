@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (A LIT BET SAYS HOW OLD ITS PRICE IS; THE SERVER'S VERDICT IS NEVER SILENT).** Step 14
+  of the 2026-10-14 programme (B5 and B2a; display and reply only -- no rule, verdict or stored value
+  changes). A lit BET row on the Board and the game page's Hard Rock stat now say when a poll last saw
+  the price ("price seen 3 h ago"; past `HR_PRICE_MAX_AGE_H`, "refresh before logging"), since the log
+  refuses a price older than 6 h while the Board's colour carries no age (`labels.priceAgeText`). The
+  ticket route now returns the server's verdict beside the Board's, and when they differ a plain
+  `disagreement` message ("The Board showed Watch, but the server rated this Bet from the latest
+  card's bar...") that the log form shows instead of closing silently; the ticket is stored with the
+  server's verdict exactly as before (`pickRules.verdictDisagreement`). The behaviour items that WOULD
+  change which games read Bet or how a ticket is judged (B1 Board bar, B2b fallback bar, B4 QB-out, B3
+  Held) wait for Tate's separate decision.
 - **2026-10-14 UTC (RESULTS RELABELLED: THE PERSONAL STAKE, THE JUDGE'S VALUE, THE ARMS' FORWARD PICKS).**
   Step 13 of the 2026-10-14 programme (Tate's calls: the personal ledger shown as a record only,
   labelled never evidence; no ROI without an interval; everything shown and labelled). The real-money

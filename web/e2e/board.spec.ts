@@ -135,6 +135,20 @@ test.describe("the board", () => {
     expect(ids).toEqual([...expected.betIds].sort());
   });
 
+  test("every lit BET row says how old its Hard Rock price is; no other row does", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const lit = page.locator("a.bv-card--lit");
+    const n = await lit.count();
+    for (let i = 0; i < n; i++) {
+      await expect(lit.nth(i).getByTestId("price-age")).toHaveText(
+        /^price seen (under an hour|\d+ h) ago/,
+      );
+    }
+    await expect(page.getByTestId("price-age")).toHaveCount(n);
+  });
+
   test("states the tier counts", async ({ page }) => {
     await page.goto("/");
     const c = expected.counts;

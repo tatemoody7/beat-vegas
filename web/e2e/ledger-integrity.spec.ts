@@ -225,16 +225,25 @@ test.describe("backdated logs", () => {
   }) => {
     await withCardBuilt30hAgo(async () => {
       // Bet 23 h ago: the card (30 h) was in force and the 24 h-old quote was
-      // 1 h old. It is recorded as the BET it was; then removed again.
+      // 1 h old. It is recorded as the BET it was; then removed again. The
+      // request says the Board showed Watch: the reply names the disagreement
+      // and the stored verdict stays the server's (B2a, 2026-10-14).
       const res = await request.post("/api/picks", {
         data: {
           gameId: BET_TWO,
           line: 53.5,
           price: -110,
           betAt: hoursAgoIso(23),
+          verdict: "WATCH",
         },
       });
       expect(res.status(), await res.text()).toBe(201);
+      const body = await res.json();
+      expect(body.verdict).toBe("BET");
+      expect(body.boardVerdict).toBe("WATCH");
+      expect(body.disagreement).toMatch(
+        /^Logged\. The Board showed Watch, but the server rated this Bet/,
+      );
       const rows = await query<{ id: number; verdict_at_pick: string }>(
         "SELECT id, verdict_at_pick FROM manual_picks WHERE game_id = $1",
         [BET_TWO],

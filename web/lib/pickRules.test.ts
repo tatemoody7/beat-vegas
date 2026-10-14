@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  verdictDisagreement,
   BACKDATE_MIN_MINUTES,
   BET_AT_MAX_AGE_DAYS,
   betAtCheck,
@@ -727,5 +728,20 @@ describe("a ticket logged after it was written (bet_at, 2026-09-28)", () => {
     expect(verdictAtBetTime({ tier: "EDGE" })).toBe("WATCH");
     expect(verdictAtBetTime({ tier: "PASS" })).toBe("PASS");
     expect(verdictAtBetTime(null)).toBe("WATCH");
+  });
+});
+
+describe("verdictDisagreement (B2a: the server's judgement is never silent)", () => {
+  it("says nothing when the Board and the server agree or the Board said nothing", () => {
+    expect(verdictDisagreement("BET", "BET")).toBeNull();
+    expect(verdictDisagreement(null, "WATCH")).toBeNull();
+  });
+  it("names both verdicts, and the off-rule label when the server did not rate it Bet", () => {
+    expect(verdictDisagreement("BET", "WATCH")).toBe(
+      "Logged. The Board showed Bet, but the server rated this Watch from the latest card's bar and our number at that build, and recorded it that way (it will show as off the rule on Results).",
+    );
+    expect(verdictDisagreement("WATCH", "BET")).toBe(
+      "Logged. The Board showed Watch, but the server rated this Bet from the latest card's bar and our number at that build, and recorded it that way.",
+    );
   });
 });

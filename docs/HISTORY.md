@@ -9,6 +9,15 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (NO DOLLARS ARE PUBLIC: THE BANKROLL CURVE CARRIES UNITS ONLY).** Step 1 of the
+  2026-10-14 programme. `/results` passed the bankroll curve into the client `BetLedger`, and every
+  point carried a `usd` value (the starting bankroll compounded by the unit size), so each visitor's
+  page payload held dollar amounts although the chart has drawn units only since 2026-09-28. The
+  curve is now `{week, units}`; `bankrollCurve(picks)` takes no bankroll; the Results page no longer
+  reads `bankrollEnv`. The game page still hands the unit size only to the signed-in log form (a
+  server component; nothing reaches a visitor). The signed-out e2e test now asserts the page carries
+  no `"usd"` key and no dollar figure in its text.
+
 - **2026-10-14 UTC (WEATHER CAPTURE: A NULL WIND HOUR IS UNKNOWN; A 4XX IS RETRIED IN HALVES).** Step 4
   of the 2026-10-14 programme (the whole-system review; Tate's approval of all 17 steps the same
   day; plan file `pasted-content-id-a68f`). Two edge cases #374 left: a forecast block whose

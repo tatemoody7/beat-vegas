@@ -70,18 +70,18 @@ export function bankrollEnv(): { startUsd: number; unitUsd: number } {
   };
 }
 
-export type BankrollPoint = { week: number; units: number; usd: number };
+// Units only (2026-10-14): the curve is a client-component prop, so anything on
+// a point reaches every visitor's page payload. The dollar series it used to
+// carry was never drawn (the chart has been in units since 2026-09-28) and
+// broke "no dollars are public".
+export type BankrollPoint = { week: number; units: number };
 
 /**
  * Pure: cumulative real-money first-half units by week, oldest first, with a
- * week-0 starting point so the curve begins at the starting bankroll. Only
- * GRADED picks move it — a pending bet has not won or lost anything yet.
+ * week-0 starting point at zero. Only GRADED picks move it — a pending bet has
+ * not won or lost anything yet.
  */
-export function bankrollCurve(
-  picks: PickFull[],
-  startUsd: number,
-  unitUsd: number,
-): BankrollPoint[] {
+export function bankrollCurve(picks: PickFull[]): BankrollPoint[] {
   const settled = picks.filter(
     (p) => isRealFirstHalf(p) && p.graded && p.week !== null,
   );
@@ -89,16 +89,12 @@ export function bankrollCurve(
     (a, b) => a - b,
   );
   const out: BankrollPoint[] = [
-    { week: weeks.length > 0 ? weeks[0] - 1 : 0, units: 0, usd: startUsd },
+    { week: weeks.length > 0 ? weeks[0] - 1 : 0, units: 0 },
   ];
   let cum = 0;
   for (const w of weeks) {
     for (const p of settled.filter((p) => p.week === w)) cum += p.units ?? 0;
-    out.push({
-      week: w,
-      units: round2(cum),
-      usd: Math.round((startUsd + cum * unitUsd) * 100) / 100,
-    });
+    out.push({ week: w, units: round2(cum) });
   }
   return out;
 }

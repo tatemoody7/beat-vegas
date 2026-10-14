@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (PRICING REPORT: THE TRUSTED HALF, EACH ERA'S OWN DROPS, THE TWO MISSING TABLES).**
+  Step 7 of the 2026-10-14 programme (report only; pv1's constants untouched and still pinned by
+  `tests/test_pricing.py`). The Monday report graded first halves on the raw `games.first_half_total`,
+  skipping the 0-0 guard every pick's grading uses, so a false-zero half would have read as an under
+  win; it now grades on `trusted_first_half_total` with the half's source. One drop counter served
+  both the development and the forward summaries, so `forward.drops` carried development drops;
+  `price_states` now counts every drop per era beside the flat count and `drops_for` serves each
+  block its own. The two tables the registry criterion names and the report never printed -- every
+  drop reason per market, and the flag share by hours to kickoff and by weekday (ET) -- now render
+  under each era. Before/after on the data: all five development opportunities' halves are
+  `linescores` with non-zero finals, so no result changes; the forward block is still empty.
 - **2026-10-14 UTC (/api/health: THE OWNER'S DETAIL RIDES ONLY ON THE COOKIE).** Step 3 of the
   2026-10-14 programme. The public endpoint carried the real-money pause switch, the CFBD and Odds
   API budgets, every job's run note and the private repo's run links inside the warnings. A visitor

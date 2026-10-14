@@ -288,3 +288,26 @@ def test_wilson_interval_hand_checked():
     lo, hi = P.wilson(10, 40)
     assert 0.15 < lo < 0.17 and 0.36 < hi < 0.38  # 25% on 40 at 90%: about 16% to 37%
     assert P.wilson(0, 0) == (None, None)
+
+
+def test_a_false_zero_half_grades_as_no_result_never_an_under_win():
+    """2026-10-14: the report graded first halves on the raw total; a line-score 0
+    with a non-zero final (the false-zero corruption) read as an under win."""
+    bad = P.GameRow(1, 6, "Home", "Away", KICK, 24, 17, 0, "linescores")
+    assert P._result_totals(bad, "1H_total", 27.5, "under") is None
+    pbp_zero = P.GameRow(1, 6, "Home", "Away", KICK, 24, 17, 0, "pbp")
+    assert P._result_totals(pbp_zero, "1H_total", 27.5, "under") == "win"
+    good = P.GameRow(1, 6, "Home", "Away", KICK, 24, 17, 21, "linescores")
+    assert P._result_totals(good, "1H_total", 27.5, "under") == "win"
+    assert P._result_totals(good, "full_game_total", 40.5, "over") == "win"
+
+
+def test_drops_are_counted_per_era_beside_the_flat_counter():
+    from collections import Counter
+
+    drops = Counter(
+        {"hr_states": 5, "rung": 2, "dev:hr_states": 3, "dev:rung": 2, "forward:hr_states": 2}
+    )
+    assert P.drops_for(drops, "dev") == Counter({"hr_states": 3, "rung": 2})
+    assert P.drops_for(drops, "forward") == Counter({"hr_states": 2})
+    assert drops["rung"] == 2  # the flat counter is untouched

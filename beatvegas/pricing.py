@@ -55,6 +55,7 @@ from zoneinfo import ZoneInfo
 
 from . import consensus as C
 from .devig import devig_two_way, is_centred_quote, is_hr_rung
+from .grading import trusted_first_half_total
 from .hardrock import HR_BOOK_KEY
 
 RULE_VERSION = "pv1"
@@ -118,6 +119,7 @@ class GameRow:
     home_points: Optional[int] = None
     away_points: Optional[int] = None
     first_half_total: Optional[int] = None
+    first_half_source: Optional[str] = None  # games.first_half_source (linescores / pbp)
 
 
 # --- the table's sampling error ---------------------------------------------------
@@ -258,8 +260,13 @@ TIER_LABEL = {
 
 
 def _result_totals(g: GameRow, market: str, line: float, side: str) -> Optional[str]:
+    # The first half is graded on the TRUSTED total (2026-10-14): a line-score 0
+    # with a non-zero final is the known false-zero corruption and reads as no
+    # result, never as an under win -- the same guard every pick's grading uses.
     total = (
-        g.first_half_total
+        trusted_first_half_total(
+            g.first_half_total, g.home_points, g.away_points, g.first_half_source
+        )
         if market == "1H_total"
         else (
             None
@@ -364,18 +371,24 @@ def price_states(
             if s.book != HR_BOOK_KEY or s.market != market or s.captured_at >= g.kickoff:
                 continue
             drops["hr_states"] += 1
+            era = "forward" if s.captured_at >= FORWARD_CUTOFF else "dev"
+            drops[f"{era}:hr_states"] += 1
             refs = reference_quotes(gs, market, s.captured_at, grace_min)
             if market in TOTALS_MARKETS:
                 if s.line is None or s.over_price is None or s.under_price is None:
                     drops["unpriced"] += 1
+                    drops[f"{era}:unpriced"] += 1
                     continue
                 if is_hr_rung(s.over_price, s.under_price, s.line, [r.line for r in refs]):
                     drops["rung"] += 1
+                    drops[f"{era}:rung"] += 1
                     continue
                 point = ev_totals(s, refs, table, conservative=False)
                 lower = ev_totals(s, refs, table, conservative=True)
                 if point is None or lower is None:
-                    drops["no_reference" if len(refs) < MIN_BOOKS else "outside_table"] += 1
+                    why = "no_reference" if len(refs) < MIN_BOOKS else "outside_table"
+                    drops[why] += 1
+                    drops[f"{era}:{why}"] += 1
                     continue
                 side = "under" if point["ev_under"] >= point["ev_over"] else "over"
                 ev_point = point[f"ev_{side}"]
@@ -385,13 +398,16 @@ def price_states(
             else:
                 if s.home_price is None or s.away_price is None:
                     drops["unpriced"] += 1
+                    drops[f"{era}:unpriced"] += 1
                     continue
                 if max(abs(s.home_price), abs(s.away_price)) > ML_MAX_ABS_PRICE:
                     drops["lopsided"] += 1
+                    drops[f"{era}:lopsided"] += 1
                     continue
                 point = ev_moneyline(s, refs)
                 if point is None:
                     drops["no_reference"] += 1
+                    drops[f"{era}:no_reference"] += 1
                     continue
                 side = "home" if point["ev_home"] >= point["ev_away"] else "away"
                 ev_point = ev_lower = point[f"ev_{side}"]
@@ -480,6 +496,15 @@ def _mean_ci(xs: Sequence[Optional[float]]) -> Dict[str, Any]:
         return {"n": len(v), "mean": m, "ci": None}
     h = 1.96 * statistics.stdev(v) / math.sqrt(len(v))
     return {"n": len(v), "mean": m, "ci": (m - h, m + h)}
+
+
+def drops_for(drops: Mapping[str, int], era: str) -> Counter:
+    """One era's drop counts (`dev` or `forward`), keys stripped of the era
+    prefix. `price_states` counts every drop twice: flat, and per era by the
+    state's capture time against FORWARD_CUTOFF (2026-10-14), so the
+    development and forward summaries no longer share one counter."""
+    pre = f"{era}:"
+    return Counter({k[len(pre) :]: n for k, n in drops.items() if k.startswith(pre)})
 
 
 def summarize_market(states: List[Dict[str, Any]], drops: Counter) -> Dict[str, Any]:

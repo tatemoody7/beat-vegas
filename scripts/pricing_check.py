@@ -52,6 +52,7 @@ def load(session, season: int, markets: List[str]):
             home_points=g.home_points,
             away_points=g.away_points,
             first_half_total=g.first_half_total,
+            first_half_source=g.first_half_source,
         )
     snaps: Dict[int, List[P.Snap]] = defaultdict(list)
     q = (
@@ -133,6 +134,32 @@ def _opp_rows(opps: List[Dict[str, Any]]) -> List[str]:
     return out
 
 
+def _drops_and_shares(by_market: Dict[str, Dict[str, Any]]) -> List[str]:
+    """The two tables the criterion names and the report did not print until
+    2026-10-14: every drop reason per market, and the flag share by hours to
+    kickoff and by weekday (ET)."""
+    out = ["", "| market | drops (reason: states) |", "|---|---|"]
+    for m, sm in by_market.items():
+        d = sm.get("drops") or {}
+        txt = ", ".join(f"{k} {v}" for k, v in sorted(d.items())) or "none"
+        out.append(f"| {m} | {txt} |")
+    out += [
+        "",
+        "| market | hours to kickoff | states | flag share | mean EV vs ref |",
+        "|---|---|---|---|---|",
+    ]
+    for m, sm in by_market.items():
+        for band, r in (sm.get("by_hours_to_kick") or {}).items():
+            out.append(
+                f"| {m} | {band} | {r['n']} | {r['flag_share']:.1%} | {_pct(r['mean_ev_ref'])} |"
+            )
+    out += ["", "| market | weekday (ET) | states | flags |", "|---|---|---|---|"]
+    for m, sm in by_market.items():
+        for day, r in (sm.get("by_weekday") or {}).items():
+            out.append(f"| {m} | {day} | {r['n']} | {r['flags']} |")
+    return out + [""]
+
+
 def render(
     row: Any,
     season: int,
@@ -166,6 +193,7 @@ def render(
         "",
     ]
     out += _market_rows(f"Since {P.FORWARD_CUTOFF:%Y-%m-%d}", fwd)
+    out += _drops_and_shares(fwd)
     out += ["#### Forward opportunities", ""]
     out += _opp_rows(opps_fwd) if opps_fwd else ["(none yet)"]
     out += [
@@ -174,6 +202,7 @@ def render(
         "",
     ]
     out += _market_rows(f"Before {P.FORWARD_CUTOFF:%Y-%m-%d}", dev)
+    out += _drops_and_shares(dev)
     out += ["<details><summary>Development opportunities</summary>", ""]
     out += _opp_rows(opps_dev) if opps_dev else ["(none)"]
     out += ["", "</details>", "", "## Florida checks on file", ""]
@@ -240,8 +269,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         for k, n in P.apply_fl_checks(states, checks).items():
             fl_counts[k] += n
         dev, fwd = P.split_dev_forward(states)
-        dev_by[m] = P.summarize_market(dev, drops)
-        fwd_by[m] = P.summarize_market(fwd, drops)
+        # Each era's own drops (2026-10-14): one shared counter used to put the
+        # development drops into the forward summary as well.
+        dev_by[m] = P.summarize_market(dev, P.drops_for(drops, "dev"))
+        fwd_by[m] = P.summarize_market(fwd, P.drops_for(drops, "forward"))
         for block, summary in ((dev, dev_by[m]), (fwd, fwd_by[m])):
             o = P.first_per_game_side(block)
             summary["fl_checks"] = dict(

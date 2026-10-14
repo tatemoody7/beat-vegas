@@ -202,7 +202,10 @@ def capture(
                 failed_ids.append(int(gid))
                 continue
             hour = None if series is None else series.get(kick.strftime("%Y-%m-%dT%H"))
-            if hour is None:
+            # A missing hour, or an hour with no wind value (the provider can
+            # return null for a slot), stores NOTHING: it is unknown, never calm,
+            # and never overrides an older valid forecast in `newest()` (2026-10-14).
+            if hour is None or hour.get("wind_mph") is None:
                 stats["failed"] += 1
                 stats["unavailable"] = stats.get("unavailable", 0) + 1
                 failed_ids.append(int(gid))

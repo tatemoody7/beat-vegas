@@ -7,6 +7,21 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+## 2026-10-14
+
+- **2026-10-14 UTC (WEATHER CAPTURE: A NULL WIND HOUR IS UNKNOWN; A 4XX IS RETRIED IN HALVES).** Step 4
+  of the 2026-10-14 programme (the whole-system review; Tate's approval of all 17 steps the same
+  day; plan file `pasted-content-id-a68f`). Two edge cases #374 left: a forecast block whose
+  kickoff hour carries no wind value was stored as a fresh row with `wind_mph` NULL -- read as calm,
+  counted as "forecast this build", and newer than any valid forecast on file; and a non-429 4xx from
+  Open-Meteo escaped as a raw `HTTPError`, which `wx_paper.capture`'s halving retry does not catch,
+  so one bad request cost a build both weather arms. Now a null-wind hour stores nothing and its
+  games read UNKNOWN by id (an older valid forecast stays the newest), and every 4xx raises
+  `WeatherUnavailable` (not retried, but handled). Before/after on the data: the 10-13 build stored 23
+  of 23 outdoor rows with a wind value, so no stored row changes. The 10 mph rule, the arms, the
+  windows and grading are untouched. Tests: `test_wx_paper` (null hour, older forecast survives, no
+  NULL row), `test_weather_source` (404 → `WeatherUnavailable`, one call).
+
 ## 2026-10-13
 
 - **2026-10-13 UTC (WEATHER CAPTURE BATCHED; A MISSING FORECAST IS UNKNOWN, NEVER CALM).** Tate's

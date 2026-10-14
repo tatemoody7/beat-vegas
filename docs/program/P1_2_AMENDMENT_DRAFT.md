@@ -1,7 +1,7 @@
 # Protocol amendment p1.2 — DRAFT for Tate's approval (not in force)
 
-Status: **R1 and R2 approved by Tate and in force as p1.2 (2026-10-14, roadmap v2.4). R3 NOT adopted; R3′ below
-waits on Tate.** The original draft follows; nothing here changes `beatvegas/protocol.py`,
+Status: **R1, R2 (roadmap v2.4) and R3′ (roadmap v2.5) approved by Tate and in force as p1.2, 2026-10-14. R3 NOT
+adopted.** The original draft follows; nothing here changes `beatvegas/protocol.py`,
 `scripts/protocol_position.py`, grading or any arm until Tate approves this text. Programme
 step 9 (`~/.claude/plans/pasted-content-id-a68f…`, Part 10 §4). On approval the text below is
 copied into `docs/PROTOCOL_2026.md` as p1.2 and into each arm's registry row, then the reader

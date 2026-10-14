@@ -123,6 +123,11 @@ export type CardItem = {
   degradedInputs: string[];
   /** On a degraded item, the gate result the failure overrode: "none" (every gate passed) or the gate; null otherwise. */
   gateBlocker: string | null;
+  /** The build's own injury read (research_preview, per build): a starting QB
+   *  listed out. null on cards built before the field was parsed. When the read
+   *  itself failed, the card is degraded (`preview`) and the item is held. */
+  qbOut: boolean | null;
+  qbOutDetail: string | null;
 };
 
 export type CardSlate = {
@@ -266,7 +271,50 @@ function parseItem(raw: unknown): CardItem | null {
       : null,
     degradedInputs: strList(raw.degraded_inputs),
     gateBlocker: str(raw.gate_blocker),
+    qbOut: typeof raw.qb_out === "boolean" ? raw.qb_out : null,
+    qbOutDetail: str(raw.qb_out_detail),
   };
+}
+
+/** A held item (BETTING_POLICY "Held"): a failed input on this build touched
+ *  the game, so whatever its tier, it is paper only until a clean build. */
+export function isHeld(
+  item: Pick<CardItem, "blocker"> | null | undefined,
+): boolean {
+  return item?.blocker === "degraded";
+}
+
+/** The newest SCHEDULED card (no `manual` preview) for a week, or the one in
+ *  force at `asOf`. The Board, the server's ticket check and the paper arms all
+ *  read the scheduled builds; a manual run is a preview and decides nothing. */
+export async function getScheduledCard(
+  season: number,
+  week?: number,
+  asOf?: Date,
+): Promise<Card | null> {
+  const naive =
+    asOf === undefined
+      ? null
+      : asOf.toISOString().slice(0, 19).replace("T", " ");
+  let rows: CardRowRaw[];
+  try {
+    rows = await prisma.$queryRaw<CardRowRaw[]>`
+      SELECT payload, built_at FROM cards
+      WHERE season = ${season}
+        AND (${week ?? null}::int IS NULL OR week = ${week ?? null}::int)
+        AND (${naive}::timestamp IS NULL OR built_at <= ${naive}::timestamp)
+        AND COALESCE(payload::jsonb->>'slot', '') <> 'manual'
+      ORDER BY built_at DESC LIMIT 1
+    `;
+  } catch (e) {
+    console.warn("cards unavailable:", (e as Error)?.message ?? e);
+    return null;
+  }
+  const row = rows[0];
+  if (!row) return null;
+  const card = parseCard(row.payload);
+  if (card === null) return null;
+  return { ...card, builtAt: card.builtAt ?? asIso(row.built_at) };
 }
 
 /** Does this degraded list flip the card's status? Only a build-wide input
@@ -662,7 +710,12 @@ export async function getLatestCard(
   season: number,
   week?: number,
   asOf?: Date,
+  /** Board alignment B2b (2026-10-14): only the scheduled builds (tue_pm,
+   *  thu_pm, fri_pm, sat_am) -- a hand-run `manual` preview never decides a
+   *  Board tier or a ticket. */
+  scheduledOnly = false,
 ): Promise<Card | null> {
+  if (scheduledOnly) return getScheduledCard(season, week, asOf);
   const naive =
     asOf === undefined
       ? null

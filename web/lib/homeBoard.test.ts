@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { BoardRow } from "./board";
 import type { EdgeResult, EdgeTier } from "./edge";
 import {
+  applyCardHold,
+  qbOutFrom,
+  upcomingSlateGaps,
   assignBoardRanks,
   assignCapRanks,
   bankrollCurve,
@@ -581,5 +584,73 @@ describe("settledAgainst", () => {
 
   it("is null until the game is played", () => {
     expect(settledAgainst("hardrock", null, 24.5)).toBeNull();
+  });
+});
+
+describe("Board alignment (2026-10-14)", () => {
+  const now = new Date("2026-10-17T20:00:00Z");
+  const row = (gameId: number, start: string, bvLine: number | null = 24) =>
+    ({ gameId, bvLine, startDate: start }) as unknown as BoardRow;
+  const checks = new Map([
+    [1, { hrLine: 27, hrCentred: true }],
+    [2, { hrLine: 30, hrCentred: true }],
+    [3, { hrLine: 26, hrCentred: false }],
+  ]);
+  it("B1: the bar reads upcoming games only; a kicked-off game no longer moves it", () => {
+    const gaps = upcomingSlateGaps(
+      [
+        row(1, "2026-10-17T23:30:00"), // upcoming
+        row(2, "2026-10-17T16:00:00"), // kicked off at 4pm UTC
+        row(3, "2026-10-18T00:00:00"), // a rung: never in the slate
+      ],
+      checks,
+      now,
+    );
+    expect(gaps).toEqual([3, null, null]);
+  });
+  const cardItem = (o: Record<string, unknown>) =>
+    ({
+      gameId: 1,
+      blocker: null,
+      paperBlocker: null,
+      action:
+        "Paper only — the injury report could not be read on this build. Check Hard Rock’s number and the injury list yourself before betting.",
+      qbOut: false,
+      qbOutDetail: null,
+      ...o,
+    }) as never;
+  it("B4: the scheduled build's own QB read; an older card falls back to its blocker", () => {
+    expect(qbOutFrom(cardItem({ qbOut: true }))).toBe(true);
+    expect(qbOutFrom(cardItem({ qbOut: false }))).toBe(false);
+    expect(qbOutFrom(cardItem({ qbOut: null, blocker: "qb_out" }))).toBe(true);
+  });
+  const bet = {
+    ...edge(80, "BET"),
+    action: "Bet one unit: first-half under 27 at -110 on Hard Rock.",
+  } as EdgeResult;
+  it("B3: a BET the build held is not lit and carries the card's paper-only words", () => {
+    const r = applyCardHold(bet, cardItem({ blocker: "degraded" }), false);
+    expect(r.hold).toBe("degraded");
+    expect(r.edge.tier).toBe("EDGE");
+    expect(r.edge.blocker).toBe("held");
+    expect(r.edge.action).toMatch(/^Paper only/);
+  });
+  it("B4: a BET no scheduled build has read is not lit; missing information is never a signal", () => {
+    const r = applyCardHold(bet, null, false);
+    expect(r.hold).toBe("unread");
+    expect(r.edge.tier).toBe("EDGE");
+    expect(r.edge.blocker).toBe("not_on_card");
+  });
+  it("a clean read, a non-BET and a played game pass through untouched", () => {
+    expect(applyCardHold(bet, cardItem({}), false)).toEqual({
+      edge: bet,
+      hold: null,
+    });
+    const watch = edge(60, "EDGE");
+    expect(applyCardHold(watch, null, false)).toEqual({
+      edge: watch,
+      hold: null,
+    });
+    expect(applyCardHold(bet, null, true)).toEqual({ edge: bet, hold: null });
   });
 });

@@ -689,7 +689,8 @@ export function buildExpected(week) {
   if (bar === null || cardBar !== bar) {
     throw new Error(`fixture bar mismatch: board ${bar} vs card ${cardBar}`);
   }
-  const slate = { bar, n: boardGaps.length, share: PCT_SHARE, basis: "slate" };
+  // Board alignment B1 (2026-10-14): the Board counts UPCOMING priced games, as the card does.
+  const slate = { bar, n: cardGaps.length, share: PCT_SHARE, basis: "slate" };
 
   const pickedIds = new Set([900001, 900013, 900014]);
   const paperLogged = new Set([900003, 900004]);

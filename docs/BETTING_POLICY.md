@@ -151,6 +151,18 @@ The site is one page: every game on the week in a single ranked list.
   summary, and the board carries the card-status banner beside the missed-build
   and stale-results ones.
 
+## The Board, the card and the server read one rule (Board alignment, 2026-10-14)
+
+- The Board's bar is computed over the week's **upcoming** priced games, as the card's is; a game that
+  has kicked off no longer moves it.
+- The Board and the server read the newest **scheduled** card (tue_pm, thu_pm, fri_pm, sat_am); a hand-run
+  `manual` preview never decides a tier or a ticket, and no ticket is judged against the empty-slate
+  fallback bar.
+- A starting-QB check comes from the scheduled build's own injury read. A game no scheduled build has
+  read is never lit as a bet; when a build's injury read fails, the card is degraded and the game is held.
+- A held game (a failed input touched it on the scheduled build) shows under **Held** on the Board, is not
+  lit, and a ticket on it is recorded as the off-policy Watch it is.
+
 ## What BET means (lib/verdict.ts)
 
 A game is BET when all of these hold:

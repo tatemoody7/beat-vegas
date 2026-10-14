@@ -645,7 +645,7 @@ describe("PRICE MISSING: every real ticket carries its price", () => {
 describe("serverVerdict (the client's word is not consulted)", () => {
   const live = {
     bvLine: 24,
-    bar: null,
+    bar: 2,
     hrLine: 27,
     hrUnderPrice: -110,
     hrCentred: true,
@@ -671,6 +671,18 @@ describe("serverVerdict (the client's word is not consulted)", () => {
   });
   it("a slate bar of exactly the gap is in the band", () => {
     expect(serverVerdict({ ...live, bar: 3 })).toBe("BET");
+  });
+  it("Board alignment (2026-10-14): no slate bar, a held game, or an unread QB status is never a BET", () => {
+    expect(serverVerdict({ ...live, bar: null })).toBe("WATCH"); // B2b: no fallback bar
+    expect(serverVerdict({ ...live, held: true })).toBe("WATCH"); // B3
+    expect(serverVerdict({ ...live, qbOut: null })).toBe("WATCH"); // B4: not read
+    expect(serverVerdict({ ...live, held: false, qbOut: false })).toBe("BET");
+  });
+  it("a held BET on the card in force at bet time is not a BET", () => {
+    expect(verdictAtBetTime({ tier: "BET", blocker: "degraded" })).toBe(
+      "WATCH",
+    );
+    expect(verdictAtBetTime({ tier: "BET", blocker: null })).toBe("BET");
   });
 });
 

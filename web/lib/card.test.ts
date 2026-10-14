@@ -122,6 +122,8 @@ const item = (o: Partial<CardItem> = {}): CardItem => ({
   gateBlocker: null,
   bar: null,
   hrCentred: null,
+  qbOut: false,
+  qbOutDetail: null,
   ...o,
 });
 
@@ -1212,5 +1214,24 @@ describe("parseCard — early_season blocker", () => {
     );
     expect(c?.items[0].blocker).toBe("early_season");
     expect(c?.items[0].paperBlocker).toBe("early_season");
+  });
+});
+
+describe("the card's own QB read and the hold (Board alignment, 2026-10-14)", () => {
+  it("parses qb_out and qb_out_detail, and null when the payload predates them", async () => {
+    const { parseCard, isHeld } = await import("./card");
+    const payload = (extra: Record<string, unknown>) =>
+      JSON.stringify({
+        season: 2026,
+        week: 7,
+        items: [{ game_id: 1, away: "A", home: "B", tier: "BET", ...extra }],
+      });
+    const c1 = parseCard(payload({ qb_out: true, qb_out_detail: "B: QB out" }));
+    expect(c1?.items[0].qbOut).toBe(true);
+    expect(c1?.items[0].qbOutDetail).toBe("B: QB out");
+    expect(parseCard(payload({}))?.items[0].qbOut).toBeNull();
+    expect(isHeld({ blocker: "degraded" })).toBe(true);
+    expect(isHeld({ blocker: "price" })).toBe(false);
+    expect(isHeld(null)).toBe(false);
   });
 });

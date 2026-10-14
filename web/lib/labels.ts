@@ -69,6 +69,8 @@ export const BLOCKER_SHORT: Record<AnyBlocker, string> = {
   no_model: "No model number",
   cap: "Past the weekly cap",
   degraded: "An input failed",
+  held: "Held — an input failed",
+  not_on_card: "Not read by a build yet",
 };
 
 /** Results "what blocked it" rows (includes the two non-blocker ledger keys). */
@@ -85,6 +87,8 @@ export const GATE_TEXT: Record<AnyBlocker | "none" | "untagged", string> = {
   no_model: "No model number yet",
   cap: `Past the ${WEEKLY_BET_CAP}-bet week`,
   degraded: "An input failed that morning",
+  held: "An input failed on the build",
+  not_on_card: "No build had read the game",
   untagged: "Logged before we tracked this",
 };
 
@@ -131,6 +135,10 @@ export function blockerTag(
       return "Starting QB out — recheck";
     case "early_season":
       return `Paper only — a team has under ${MIN_GAMES_FOR_REAL_MONEY} games this season`;
+    case "held":
+      return "Held — an input failed on this build; paper only";
+    case "not_on_card":
+      return "Not yet — no scheduled build has read this game";
     case "gap":
       return ctx.killLine != null
         ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`

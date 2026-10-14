@@ -9,6 +9,14 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (THE REGISTRY STATUSES MATCH THE STATE).** Programme step 8b (Tate's rule from the Q&A:
+  set every row to its true state). The six arms `pre-registered` → `live-tracking` with their clock
+  starts in the data cell; H-NEGGAP and H-NEGGAP-L `live-tracking` → `superseded` (no reader since
+  10-13; collector off since 10-08, zero rows); H-PCT names H-ARM-1HU as its live test; H-VENUE-1's
+  result doc is the 10-11 development read; H-SHARE points at a file that exists; `live-tracking` is
+  defined in the vocabulary. No criterion, rule or result changed. `web/data/hypotheses.json`
+  regenerated (the Research page's closed table now lists H-NEGGAP and H-NEGGAP-L as superseded).
+
 - **2026-10-14 UTC (A LIT BET SAYS HOW OLD ITS PRICE IS; THE SERVER'S VERDICT IS NEVER SILENT).** Step 14
   of the 2026-10-14 programme (B5 and B2a; display and reply only -- no rule, verdict or stored value
   changes). A lit BET row on the Board and the game page's Hard Rock stat now say when a poll last saw

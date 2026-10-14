@@ -158,21 +158,21 @@
     "question": "Does a market-conditioned discrete 1H-split engine beat the market's close and earn a prospective paper arm?",
     "status": "superseded",
     "family": "share-engine",
-    "doc": "`docs/SHARE_ENGINE.md` (PR later) — spec `docs/superpowers/specs/2026-09-15-share-engine.md` -- WITHDRAWN (Tate, 2026-10-06, system review): its gate is judged only on 2023-25, which the registry declared spent for rule selection on 2026-09-22; it cannot be run honestly. Spec kept for reference."
+    "doc": "`docs/EXTERNAL_REVIEW.md` (the engine's review; no SHARE_ENGINE doc was written) — spec `docs/superpowers/specs/2026-09-15-share-engine.md` -- WITHDRAWN (Tate, 2026-10-06, system review): its gate is judged only on 2023-25, which the registry declared spent for rule selection on 2026-09-22; it cannot be run honestly. Spec kept for reference."
   },
   {
     "id": "H-NEGGAP",
     "question": "Does a negative live gap (Hard Rock's line BELOW our number) run over at a rate the 2023-25 history did not show?",
-    "status": "live-tracking",
+    "status": "superseded",
     "family": "exploratory",
-    "doc": "`docs/TWO_SIDED.md` (R07 is the 2023-25 arm; this is the prospective 2026 one)"
+    "doc": "`docs/TWO_SIDED.md` (R07 is the 2023-25 arm; this is the prospective 2026 one) SUPERSEDED 2026-10-14: no weekly reader since bv-weekly-review was retired 2026-10-13; the post-mortem band is measured, not gated; the rows it wrote stay as history."
   },
   {
     "id": "H-NEGGAP-L",
     "question": "Under each H-INSEASON arm's corrected level, what is the OVER rate of Hard-Rock-priced games whose ARM gap is negative at the decision build -- and does the champion's live negative band (H-NEGGAP) survive once the level deficit is removed?",
-    "status": "live-tracking",
+    "status": "superseded",
     "family": "two-sided",
-    "doc": "`docs/TWO_SIDED.md` (live section)"
+    "doc": "`docs/TWO_SIDED.md` (live section) SUPERSEDED 2026-10-14: its collector (CHALLENGER_COLLECT) has been off since 2026-10-08 and the table holds zero rows; the rows it wrote stay as history."
   },
   {
     "id": "H-NEGGAP-P",
@@ -324,42 +324,42 @@
   {
     "id": "H-ARM-1HU",
     "question": "Under protocol p1, do paper first-half UNDERS on every game at or above the per-slate bar carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1, ledger slot 1)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
   {
     "id": "H-ARM-1HO",
     "question": "Under protocol p1, do paper first-half OVERS on the bottom 20% of the slate, with the model above Hard Rock's line, carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1, ledger slot 2)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
   {
     "id": "H-ARM-FGU",
     "question": "Under protocol p1, do paper full-game UNDERS on every game at or above the full-game slate bar carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1, ledger slot 3)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
   {
     "id": "H-ARM-WX1H",
     "question": "Under protocol p1.1, do paper first-half UNDERS on every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1.1, ledger slot 6)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
   {
     "id": "H-ARM-WXFG",
     "question": "Under protocol p1.1, do paper full-game UNDERS on every outdoor game whose newest build-time forecast has a sustained kickoff-hour wind of 10+ mph carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1.1, ledger slot 7)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
   {
     "id": "H-ARM-HT1H",
     "question": "Under protocol p1.1, do paper first-half UNDERS on every game whose consensus full-game total at the build is 60.0 or more carry +3% EV against the consensus close at Hard Rock's price?",
-    "status": "pre-registered",
+    "status": "live-tracking",
     "family": "program (H-PROGRAM-2026, p1.1, ledger slot 8)",
     "doc": "`docs/PROTOCOL_2026.md`"
   },
@@ -424,7 +424,7 @@
     "question": "On captured 2026 full-game totals, how do Hard Rock's and Kalshi's closes sit against the other books, what line value does the judge read at each venue's own terms, and what would a bettor free to take either venue have booked?",
     "status": "exploratory",
     "family": "venue-measurement (no confirmatory alpha; roadmap v2.0 decision 5: measure before any Kalshi account or capture)",
-    "doc": "pending (study.yml `venue_check`)"
+    "doc": "`docs/HISTORY.md` 2026-10-11 (development read, study run 38149958361, fee caveat); the registered read is January's (`docs/program/JANUARY_2027_REVIEW.md`)"
   },
   {
     "id": "H-PRICE-HR",

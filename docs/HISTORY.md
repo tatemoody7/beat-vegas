@@ -9,6 +9,16 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (A HAND DISPATCH OF A SCHEDULED SLOT OBEYS THE ET GATE).** Step 5 of the
+  2026-10-14 programme (integrity). `ci.resolve_slot` gated only cron ticks; a `workflow_dispatch`
+  naming `tue_pm` / `thu_pm` / `fri_pm` / `sat_am` built at any hour and, being a scheduled slot,
+  paper-logged the registered arms at that moment's lines (Vercel's ticks are gated on their side;
+  people were not). A named slot dispatched outside its window now skips with the reason, before
+  the Neon probe; `force=true` is the one explicit override (it already bypassed the built-today
+  probe) and `manual` stays the ungated preview that logs nothing. Before/after on the data: no
+  logged arm row came from an out-of-gate dispatch (the only dispatch-event card run since
+  ARMS_START was the Vercel tick, run 38463679608). Tests: `tests/test_ci_slots.py`.
+
 - **2026-10-14 UTC (A VISITOR NEVER SEES THE OWNER'S CAP SLOT BEFORE KICKOFF).** Step 2 of the
   2026-10-14 programme. `signalGate.gateGame` rewrote only the action sentence and the "bet logged"
   chip; the "cap slot N" and "past the 5-bet cap · paper only" chips and the early-season clause

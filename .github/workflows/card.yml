@@ -87,7 +87,7 @@ on:
         required: false
         default: ''
       force:
-        description: 'rebuild even if this slot already built today (ET)'
+        description: 'build a named slot outside its ET window or when it already built today (the one override; a scheduled slot paper-logs the arms)'
         type: boolean
         required: false
         default: false

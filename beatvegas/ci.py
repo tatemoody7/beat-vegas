@@ -233,10 +233,26 @@ def resolve_slot(
         if slot not in SWEEP_ARGS:
             raise ValueError(f"unknown slot input '{input_slot}'")
         reason = "workflow_dispatch"
-        if slot in SCHEDULED_SLOTS and not force and slot in built_today:
-            return _skip(
-                f"{slot} card already built today (ET); re-dispatch with force=true to rebuild"
-            )
+        if slot in SCHEDULED_SLOTS and not force:
+            # A named slot dispatched by hand obeys the same ET gate as its
+            # crons (2026-10-14, programme step 5): a scheduled slot paper-logs
+            # the registered arms at that moment's lines, so a slot run at the
+            # wrong hour would enter the forward record with lines no build
+            # was meant to see. `force=true` is the explicit override, and
+            # `manual` stays a preview that logs nothing.
+            gate = SLOT_GATE_ET.get(slot)
+            if gate is not None:
+                et = now_utc.astimezone(ET)
+                lo, hi = gate
+                if not (lo <= et.time() <= hi):
+                    return _skip(
+                        f"{slot} dispatched at {et:%H:%M} ET, outside {lo:%H:%M}-{hi:%H:%M} ET;"
+                        " re-dispatch with force=true to build anyway"
+                    )
+            if slot in built_today:
+                return _skip(
+                    f"{slot} card already built today (ET); re-dispatch with force=true to rebuild"
+                )
     else:
         if schedule not in CRON_SLOTS:
             raise ValueError(f"unmapped cron '{schedule}' - add it to beatvegas.ci.CRON_SLOTS")

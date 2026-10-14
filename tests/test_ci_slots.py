@@ -206,6 +206,34 @@ def test_a_named_dispatch_respects_the_probe_unless_forced():
     assert r["slot"] == "manual"
 
 
+def test_a_named_dispatch_obeys_the_et_gate_unless_forced():
+    """2026-10-14 (programme step 5): a hand dispatch of a scheduled slot used to
+    skip the ET gate, so `sat_am` run on a Tuesday evening would paper-log the
+    registered arms at that moment's lines. Vercel's ticks are gated on their
+    side; people are not, so the resolver gates them. `force=true` is the one
+    explicit override; `manual` is a preview and never gated."""
+    tuesday_evening = utc(2026, 9, 15, 20, 5)  # 4:05pm ET, inside tue_pm, outside sat_am
+    r = resolve_slot("", tuesday_evening, input_slot="sat_am", built_today=set())
+    assert r["slot"] == "skip" and "outside" in r["reason"] and "force=true" in r["reason"]
+    r = resolve_slot("", tuesday_evening, input_slot="tue_pm", built_today=set())
+    assert r["slot"] == "tue_pm"
+    r = resolve_slot("", tuesday_evening, input_slot="sat_am", built_today=set(), force=True)
+    assert r["slot"] == "sat_am"
+    # Outside every window, a named slot skips and a manual preview still builds.
+    midnight = utc(2026, 9, 16, 4, 0)  # midnight ET
+    for slot in SCHEDULED:
+        assert resolve_slot("", midnight, input_slot=slot)["slot"] == "skip", slot
+    assert resolve_slot("", midnight)["slot"] == "manual"
+    # The gate runs before the probe, so an out-of-window dispatch never needs Neon.
+    r = resolve_for_cli(
+        "",
+        midnight,
+        input_slot="fri_pm",
+        probe=lambda _now: (_ for _ in ()).throw(AssertionError("probed")),
+    )
+    assert r["slot"] == "skip"
+
+
 def test_only_a_manual_build_skips_paper_logging():
     """A manual build is a PREVIEW, never the one to bet off, so it must not
     create the permanent paper record either. The first log of a game wins
@@ -237,7 +265,9 @@ def test_legacy_slot_inputs_are_rejected():
         with pytest.raises(ValueError):
             resolve_slot("", utc(2026, 9, 17, 15, 0), input_slot=legacy)
     for slot, window in (("tue_pm", "48"), ("thu_pm", "24"), ("fri_pm", ""), ("sat_am", "")):
-        r = resolve_slot("", utc(2026, 9, 15, 20, 5), input_slot=slot)
+        # force=True: a Tuesday 4:05pm ET dispatch is outside every other
+        # slot's ET gate (2026-10-14), and this test is about the windows.
+        r = resolve_slot("", utc(2026, 9, 15, 20, 5), input_slot=slot, force=True)
         assert r["slot"] == slot and r["paper_window"] == window
         # A scheduled slot always paper-logs, whatever its window (no_paper is
         # what stops a build logging, and only `manual` sets it).

@@ -1,4 +1,4 @@
-import { getLatestCard } from "@/lib/card";
+import { getLatestCard, isHeld } from "@/lib/card";
 import { breakEvenPrice } from "@/lib/edge";
 import { getLineCheck, HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { getSlate } from "@/lib/picks";
@@ -144,11 +144,13 @@ export async function evaluateRealTicket(args: {
     : Promise.resolve([]);
   // The week's card, for this game's kill numbers (null without a card row);
   // as of bet time, the card in force when the ticket was written.
+  // Scheduled builds only (B2b, 2026-10-14): a manual preview never judges a ticket.
   const cardQ = game
     ? getLatestCard(
         game.season,
         game.week,
         mode === "as_of_bet_time" ? (betAtDate ?? undefined) : undefined,
+        true,
       )
     : Promise.resolve(null);
   // The market read — the same loader the board renders from, so the gate and
@@ -265,12 +267,21 @@ export async function evaluateRealTicket(args: {
       ? verdictAtBetTime(item)
       : serverVerdict({
           bvLine: item?.bvLine ?? null,
-          bar: item?.bar ?? null,
+          // B2b: only a bar the scheduled card read from its slate; the
+          // empty-slate fallback never decides a ticket.
+          bar: card?.slate?.basis === "slate" ? (item?.bar ?? null) : null,
           hrLine: row?.hrLine ?? null,
           hrUnderPrice: row?.hrUnderPrice ?? null,
           hrCentred: row?.hrCentred ?? null,
           ev: row?.ev ?? null,
-          qbOut: item?.blocker === "qb_out" || item?.paperBlocker === "qb_out",
+          // B4: the build's own injury read (null = not read: never favourable);
+          // a card from before the field was parsed falls back to its blocker.
+          qbOut:
+            item === null
+              ? null
+              : (item.qbOut ??
+                (item.blocker === "qb_out" || item.paperBlocker === "qb_out")),
+          held: isHeld(item),
           minGamesPlayed,
         }));
 

@@ -92,7 +92,10 @@ export default async function BoardPage({
   // bets with no rank.
   const upcoming = games.filter((g) => !g.kickedOff);
   const played = games.filter((g) => g.kickedOff);
-  const days = groupByDay(upcoming);
+  // Held (BETTING_POLICY, B3 2026-10-14): a failed input on the scheduled
+  // build touched these; paper only until a clean build, in their own group.
+  const held = upcoming.filter((g) => g.hold === "degraded");
+  const days = groupByDay(upcoming.filter((g) => g.hold !== "degraded"));
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -253,6 +256,20 @@ export default async function BoardPage({
                 <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
                   {`Nothing clears the bar this week: no paper signals, nothing to watch. Zero is a normal week.`}
                 </p>
+              )}
+              {held.length > 0 && (
+                <section aria-label="Held">
+                  <h2 className="bv-day-head">{`Held · ${held.length}`}</h2>
+                  <p className="mb-2 text-xs text-[var(--text-dim)]">
+                    An input failed on the latest scheduled build for these
+                    games, so they are paper only until a clean build.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {held.map((g) => (
+                      <GameRow key={g.row.gameId} g={g} />
+                    ))}
+                  </div>
+                </section>
               )}
               {days.map((grp) => (
                 <section key={grp.label} aria-label={grp.label}>

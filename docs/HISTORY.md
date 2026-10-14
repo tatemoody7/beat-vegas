@@ -9,6 +9,20 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (BOARD ALIGNMENT: ONE BAR, SCHEDULED CARDS ONLY, ONE QB READ, THE HELD GROUP).** Tate approved all
+  four behaviour items with "verify every change against existing games before activating" and "missing or
+  uncertain information should never silently become a favourable betting signal". B1: the Board's bar over
+  upcoming games only (`homeBoard.upcomingSlateGaps`). B2b: the server and the Board read the newest
+  scheduled card (`card.getScheduledCard`), and `serverVerdict` returns Watch without a slate bar (no 1.75
+  fallback). B4: the QB check is the scheduled build's own injury read (`CardItem.qbOut`); an unread status
+  is never favourable (server `qbOut: null` → Watch; Board: a game no scheduled build has read is not lit,
+  `not_on_card`). B3: a game a failed input touched is Held -- its own group on the Board, not lit, and a
+  ticket on it is recorded as Watch (`serverVerdict held`, `verdictAtBetTime`). Verified on real games:
+  B1 changes 0-3 upcoming games per Saturday checkpoint in weeks 4-6 and none on this week's Board as of
+  10-14 20:51Z (bar 0.85 either way); B2b, B3 and B4 had no occurrence in weeks 4-7 (no empty-slate manual
+  card, no degraded card, one QB disagreement touching no game at the bar); the unread hold would have kept
+  two week-4 games (Sam Houston @ Texas Tech, Colorado State @ UTSA) from lighting on Monday 9-21 before
+  Tuesday's card, which the server already rated Pass then. `docs/BETTING_POLICY.md` gains the section.
 - **2026-10-14 UTC (FOCUSED AUDIT AFTER TATE'S DECISIONS).** After #391-#394 merged and today's Monday read was re-run
   under p1.2 (run 38638358028): the Board lights exactly Tuesday's card's two Bets (Louisiana Tech @ UL Monroe,
   Virginia @ SMU; bar 0.8 over 55 priced games); the money path is unchanged (pause off since 10-08, 26 tickets,

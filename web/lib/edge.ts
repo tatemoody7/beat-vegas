@@ -58,6 +58,10 @@ export type EdgeBlocker =
   | "qb_out"
   /** A team on this row has fewer than MIN_GAMES_FOR_REAL_MONEY games this season: paper only. */
   | "early_season"
+  /** Board alignment B3 (2026-10-14): a failed input on the scheduled build touched this game; paper only. */
+  | "held"
+  /** Board alignment B4: no scheduled card has read this game's line and injury report yet. */
+  | "not_on_card"
   | "gap";
 
 export type EdgeResult = {

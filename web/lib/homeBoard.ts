@@ -15,6 +15,7 @@ import {
 import { round2 } from "@/lib/format";
 import { MIN_GAMES_FOR_REAL_MONEY } from "@/lib/verdict";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
+import { getScheduledCard, isHeld, type CardItem } from "@/lib/card";
 import { getMovements, type Movement } from "@/lib/movement";
 import {
   getPicks,
@@ -311,6 +312,11 @@ export type HomeGame = {
   row: BoardRow;
   check: LineCheckRow | null;
   edge: EdgeResult;
+  /** Board alignment (2026-10-14): a game the card's rule would rate BET but
+   *  that is not lit -- "degraded" (a failed input touched it on the scheduled
+   *  build: Held, paper only) or "unread" (no scheduled build has read it yet).
+   *  null otherwise. */
+  hold: "degraded" | "unread" | null;
   movement: Movement | null;
   /** Injuries + news for the game (unofficial), when the preview job has run. */
   preview: PreviewGame | null;
@@ -511,6 +517,65 @@ export async function getHomeGame(
   return game === undefined ? null : { game, board };
 }
 
+/** B1 (pure): the slate's gaps over the week's UPCOMING rows with a centred
+ *  Hard Rock quote and a model read -- the card's universe. A kicked-off game
+ *  is null, so its last pre-kick quote no longer moves the bar. */
+export function upcomingSlateGaps(
+  rows: Pick<BoardRow, "gameId" | "bvLine" | "startDate">[],
+  checkById: Map<number, Pick<LineCheckRow, "hrLine" | "hrCentred">>,
+  now: Date,
+): (number | null)[] {
+  return rows.map((row) => {
+    const start = asDate(row.startDate);
+    if (start === null || start.getTime() <= now.getTime()) return null;
+    const c = checkById.get(row.gameId);
+    if (!c || c.hrLine === null || row.bvLine === null || c.hrCentred === false)
+      return null;
+    return round2(c.hrLine - row.bvLine);
+  });
+}
+
+/** B4 (pure): the QB read the Board uses -- the scheduled build's own. A card
+ *  from before the field was parsed falls back to its blocker; no card item
+ *  means no read, which `applyCardHold` keeps from ever lighting a BET. */
+export function qbOutFrom(item: CardItem | null): boolean {
+  if (item === null) return false; // the hold below decides; never lit
+  return (
+    item.qbOut ?? (item.blocker === "qb_out" || item.paperBlocker === "qb_out")
+  );
+}
+
+/** B3 + B4 (pure): a row the rule rates BET is not lit when the scheduled
+ *  build held it (a failed input touched it: Held, paper only) or has not read
+ *  it at all (no injury read, no card line). Missing information never becomes
+ *  a lit signal. Played rows pass through: there is nothing left to decide. */
+export function applyCardHold(
+  edge: EdgeResult,
+  item: CardItem | null,
+  kickedOff: boolean,
+): { edge: EdgeResult; hold: "degraded" | "unread" | null } {
+  if (edge.tier !== "BET" || kickedOff) return { edge, hold: null };
+  if (item === null) {
+    return {
+      edge: {
+        ...edge,
+        tier: "EDGE",
+        blocker: "not_on_card",
+        action:
+          "Not yet — no scheduled build has read this game’s Hard Rock line and injury report; it is not a bet until one does.",
+      },
+      hold: "unread",
+    };
+  }
+  if (isHeld(item)) {
+    return {
+      edge: { ...edge, tier: "EDGE", blocker: "held", action: item.action },
+      hold: "degraded",
+    };
+  }
+  return { edge, hold: null };
+}
+
 export async function getHomeBoard(
   season: number,
   requestedWeek?: number,
@@ -530,13 +595,22 @@ export async function getHomeBoard(
     requestedWeek !== undefined && weeks.includes(requestedWeek)
       ? requestedWeek
       : defaultWeek(universe, now);
-  const [board, checks, { picks, record, paperRecord }] = await Promise.all([
-    week === null ? Promise.resolve([] as BoardRow[]) : getBoard(season, week),
-    week === null
-      ? Promise.resolve([] as LineCheckRow[])
-      : getLineCheck(season, "1h", week),
-    getPicks(season),
-  ]);
+  const [board, checks, { picks, record, paperRecord }, card] =
+    await Promise.all([
+      week === null
+        ? Promise.resolve([] as BoardRow[])
+        : getBoard(season, week),
+      week === null
+        ? Promise.resolve([] as LineCheckRow[])
+        : getLineCheck(season, "1h", week),
+      getPicks(season),
+      // Board alignment (2026-10-14): the newest SCHEDULED build of the week
+      // decides the QB read and the hold, as it does for the server.
+      week === null ? Promise.resolve(null) : getScheduledCard(season, week),
+    ]);
+  const itemById = new Map<number, CardItem>(
+    (card?.items ?? []).map((i) => [i.gameId, i]),
+  );
   const rows = board.filter((b) => b.week === week);
   const [previews, movements] = await Promise.all([
     week === null
@@ -548,12 +622,10 @@ export async function getHomeBoard(
   // H-PCT: the bar is a property of the SLATE. Read it over the week's rows
   // with a centred Hard Rock quote and a model read -- the same universe the
   // card uses -- before any row is judged. BET_GAP_PTS only when none qualify.
-  const slateGaps = rows.map((row) => {
-    const c = checkById.get(row.gameId);
-    if (!c || c.hrLine === null || row.bvLine === null || c.hrCentred === false)
-      return null;
-    return round2(c.hrLine - row.bvLine);
-  });
+  // B1 (2026-10-14): UPCOMING games only, as the card computes it, so the
+  // Board, the card, the paper arm and the server read one bar after the
+  // week's first kickoffs.
+  const slateGaps = upcomingSlateGaps(rows, checkById, now);
   const barValue = slateBar(slateGaps);
   const slate: SlateBar = {
     bar: barValue ?? BET_GAP_PTS,
@@ -585,8 +657,9 @@ export async function getHomeBoard(
       ev: check?.ev ?? null,
       evVerdict: check?.evVerdict ?? "na",
       fhShare: row.factors.fh_share ?? null,
-      qbOut: Boolean(row.factors.qb_out_home || row.factors.qb_out_away),
-      qbOutDetail: row.factors.qb_out_detail ?? null,
+      // B4: the scheduled build's own injury read; Sunday's flag is not used.
+      qbOut: qbOutFrom(itemById.get(row.gameId) ?? null),
+      qbOutDetail: itemById.get(row.gameId)?.qbOutDetail ?? null,
       minGamesPlayed: minGamesPlayedFrom(row.factors),
       bvAdjust: row.bvAdjust,
       bvAdjustReason: row.bvAdjustReason,
@@ -599,7 +672,14 @@ export async function getHomeBoard(
       hrCentred: check?.hrCentred ?? null,
       hrLive: check?.hrLive ?? null,
     };
-    const edge = edgeScore(input);
+    const scored = edgeScore(input);
+    const start0 = asDate(row.startDate);
+    const kicked0 = start0 !== null && start0.getTime() <= now.getTime();
+    const { edge, hold } = applyCardHold(
+      scored,
+      itemById.get(row.gameId) ?? null,
+      kicked0,
+    );
     // edge.ts names the basis (`edge.lineBasis`: Hard Rock, else the market,
     // else the reference line) and measures the gap against it; the value of
     // that line is the same lookup, in the same order. `edge.lineBasis` is set
@@ -634,6 +714,7 @@ export async function getHomeBoard(
       boardRank: null,
       capRank: null,
       overCap: false,
+      hold,
     };
   });
 

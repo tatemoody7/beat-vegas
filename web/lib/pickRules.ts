@@ -254,9 +254,11 @@ export function betAtCheck(
  *  line read would be. Used only for a BACKDATED log: the card that existed at
  *  bet time is the read the bet was made on; the live read at log time is not. */
 export function verdictAtBetTime(
-  item: { tier: "BET" | "EDGE" | "PASS" } | null,
+  item: { tier: "BET" | "EDGE" | "PASS"; blocker?: string | null } | null,
 ): Verdict {
   if (item === null) return "WATCH";
+  // A held BET keeps its tier on the card but is paper only (B3, 2026-10-14).
+  if (item.tier === "BET" && item.blocker === "degraded") return "WATCH";
   return item.tier === "BET" ? "BET" : item.tier === "PASS" ? "PASS" : "WATCH";
 }
 
@@ -313,14 +315,18 @@ export type PolicyContext = {
 export type ServerVerdictInput = {
   /** Our number for the game (the week's card item); null = no model read. */
   bvLine: number | null;
-  /** H-PCT: the card's slate bar; null = the fallback constant. */
+  /** H-PCT: the scheduled card's slate bar; null = no slate bar (never a BET, B2b). */
   bar: number | null;
   /** The LIVE Hard Rock read (lib/lineCheck.ts), not the card's. */
   hrLine: number | null;
   hrUnderPrice: number | null;
   hrCentred: boolean | null;
   ev: number | null;
-  qbOut: boolean;
+  /** The build's own QB read: true = out, false = read and not out, null = not
+   *  read (never favourable: B4, 2026-10-14). */
+  qbOut: boolean | null;
+  /** A failed input on the build touched this game: held, paper only (B3). */
+  held?: boolean;
   minGamesPlayed: number | null;
 };
 
@@ -336,10 +342,15 @@ export function serverVerdict(i: ServerVerdictInput): Verdict {
   if (i.bvLine === null) return "PASS";
   if (i.hrLine === null) return "WATCH";
   const gap = Math.round((i.hrLine - i.bvLine) * 100) / 100;
-  const bar = i.bar ?? BET_GAP_PTS;
   if (gap < WATCH_GAP_PTS) return "PASS";
-  if (!(gap >= bar && gap > 0) || i.hrCentred === false) return "WATCH";
-  if (i.qbOut) return "WATCH";
+  // B2b (2026-10-14): no bar from a scheduled card's slate means no BET. The
+  // empty-slate fallback (BET_GAP_PTS) never decides a ticket.
+  if (i.bar === null) return "WATCH";
+  if (!(gap >= i.bar && gap > 0) || i.hrCentred === false) return "WATCH";
+  // B3: a game a failed input touched on this build is held: paper only.
+  if (i.held) return "WATCH";
+  // B4: the build's own QB read; an unknown read is never a favourable one.
+  if (i.qbOut !== false) return "WATCH";
   if (i.hrUnderPrice === null || i.ev === null || i.ev < BET_MIN_EV)
     return "WATCH";
   if (i.minGamesPlayed !== null && i.minGamesPlayed < MIN_GAMES_FOR_REAL_MONEY)

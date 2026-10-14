@@ -46,11 +46,27 @@ export function kickoffPassed(
  *  (`gateLedger`). */
 export function gateGame(g: HomeGame, authed: boolean): HomeGame {
   if (authed) return g;
+  // The weekly cap is the owner's real-money rule (v1.4): its slot number,
+  // its "past the cap" chip and the "real money needs N games" clause reveal
+  // which games his stake will take, so a visitor never sees them (2026-10-14,
+  // programme step 2). The rating, rank, our number and the gap stay.
   const paper = {
     ...g,
-    edge: { ...g.edge, action: withBetOpening(g.edge.action, false) },
+    edge: {
+      ...g.edge,
+      action: withoutRealMoney(withBetOpening(g.edge.action, false)),
+    },
   };
-  return g.kickedOff ? paper : { ...paper, picked: false };
+  // After kickoff the ledger shows the ticket anyway, so the slot can show too.
+  return g.kickedOff
+    ? paper
+    : { ...paper, picked: false, capRank: null, overCap: false };
+}
+
+/** The early-season sentence names the real-money threshold; for a visitor it
+ *  names the rating's instead. Every other sentence passes through unchanged. */
+export function withoutRealMoney(action: string): string {
+  return action.replace(/; real money needs (\d+)\./, "; a rating needs $1.");
 }
 
 /** /records and its CSV: our number, the gap, its z and the rank stay blank

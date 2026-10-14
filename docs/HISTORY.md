@@ -9,6 +9,17 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (A VISITOR NEVER SEES THE OWNER'S CAP SLOT BEFORE KICKOFF).** Step 2 of the
+  2026-10-14 programme. `signalGate.gateGame` rewrote only the action sentence and the "bet logged"
+  chip; the "cap slot N" and "past the 5-bet cap · paper only" chips and the early-season clause
+  "real money needs 2" still reached visitors, naming which games the owner's stake would take
+  (v1.4/v1.7). Before kickoff a visitor now gets `capRank` null and `overCap` false, and the
+  early-season sentence reads "a rating needs 2"; after kickoff the ledger shows the ticket anyway,
+  so the slot shows too. The owner's view is unchanged; the rating, rank, our number, the gap and
+  the kill line stay public before kickoff exactly as all season. Unit tests in
+  `lib/signalGate.test.ts`; the visitor e2e on the board and the game page asserts none of the
+  three strings renders.
+
 - **2026-10-14 UTC (NO DOLLARS ARE PUBLIC: THE BANKROLL CURVE CARRIES UNITS ONLY).** Step 1 of the
   2026-10-14 programme. `/results` passed the bankroll curve into the client `BetLedger`, and every
   point carried a `usd` value (the starting bankroll compounded by the unit size), so each visitor's

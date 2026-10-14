@@ -235,6 +235,21 @@ test.describe("the board, signed out", () => {
     }
     await expect(page.getByText(/Bet one unit/)).toHaveCount(0);
     await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
+    // The owner's weekly cap is his real-money rule: no slot, no over-cap
+    // chip, no "real money needs" clause for a visitor (2026-10-14). The
+    // fixture's ticketed BET carries a cap slot for the owner (game.spec.ts).
+    await expect(
+      page.getByText(/cap slot \d|bet cap|real money needs/),
+    ).toHaveCount(0);
+    const ticketed = expected.picks.find(
+      (p) => p.game.kick.getTime() > Date.now(),
+    );
+    if (ticketed) {
+      await page.goto(`/game/${ticketed.game.id}`);
+      await expect(
+        page.getByText(/cap slot \d|bet cap|real money needs/),
+      ).toHaveCount(0);
+    }
   });
 });
 

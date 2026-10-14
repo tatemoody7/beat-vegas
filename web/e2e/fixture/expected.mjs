@@ -1217,6 +1217,88 @@ export function armPositionsFor(now) {
       llr: null,
       mean_ev: 0.021,
       next_read: d(monday),
+      payload_json: JSON.stringify({
+        verdict: { verdict: "insufficient" },
+        opportunities: [PRICING_OPPORTUNITY],
+      }),
     }),
   ];
 }
+
+/**
+ * The registered arms' FORWARD paper picks (programme step 13): graded rows in
+ * `challenger_picks` placed at or after the arms' clock start (2026-10-13
+ * 20:51:39Z), plus one development row placed before it that must never show.
+ * The fixture's played games kicked off relative to `now`, so each row is
+ * placed at the later of 30 h before kickoff and one second after the start.
+ */
+export const ARMS_START_MS = Date.parse("2026-10-13T20:51:39.533Z");
+
+export function armForwardPicksFor(week) {
+  const g = (id) => week.games.find((x) => x.id === id);
+  const at = (game) =>
+    new Date(
+      Math.max(game.kick.getTime() - 30 * 3_600_000, ARMS_START_MS + 1000),
+    );
+  const base = (id, game, over) => ({
+    id,
+    arm: "H-ARM-1HO",
+    game,
+    week: game.week,
+    side: "over",
+    market: "1H",
+    line: 24.5,
+    price: -110,
+    graded: true,
+    result: "over",
+    units: 0.91,
+    ev_cons: null,
+    cons_excluded: null,
+    placedAt: at(game),
+    ...over,
+  });
+  return [
+    base(9101, g(900012), { ev_cons: 0.031, cons_version: "cv1" }),
+    base(9102, g(900013), {
+      result: "under",
+      units: -1,
+      cons_excluded: "far_lines",
+      cons_version: "cv1",
+    }),
+    base(9103, g(900014), {
+      arm: "H-ARM-FGU",
+      side: "under",
+      market: "full",
+      line: 48.5,
+      result: "over",
+      units: -1,
+      ev_cons: -0.022,
+      cons_version: "cv1",
+    }),
+    // Development: placed before the clock started; never listed.
+    base(9104, g(900014), {
+      placedAt: new Date("2026-10-09T20:17:48Z"),
+      ev_cons: 0.5,
+    }),
+  ];
+}
+
+/** The one forward pricing opportunity the stored H-PRICE-HR row carries. */
+export const PRICING_OPPORTUNITY = {
+  market: "1H_total",
+  week: 5,
+  game: "Kestrel Point @ Westmark",
+  captured_at: "2026-10-14T11:58:00",
+  hrs_to_kick: 7.5,
+  hr_line: 28.5,
+  ref_line: 27.5,
+  side: "under",
+  price: -110,
+  ev_ref: 0.0478,
+  ev_ref_lower: 0.0292,
+  ev_close: 0.0478,
+  market_moved: "unchanged",
+  tier: 0,
+  fl_check: "none",
+  result: "loss",
+};

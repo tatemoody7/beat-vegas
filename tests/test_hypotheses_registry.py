@@ -202,7 +202,9 @@ def test_the_site_export_matches_the_registry():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    spec = importlib.util.spec_from_file_location("export_registry", root / "scripts" / "export_registry.py")
+    spec = importlib.util.spec_from_file_location(
+        "export_registry", root / "scripts" / "export_registry.py"
+    )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     out = root / "web" / "data" / "hypotheses.json"

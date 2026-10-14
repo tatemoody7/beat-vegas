@@ -301,7 +301,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         now = datetime.utcnow()
         with session_scope() as s:
-            upsert_position(s, pricing_position(v, fwd_by, now, args.run_id))
+            upsert_position(s, pricing_position(v, fwd_by, now, args.run_id, opps_fwd))
         print(f"[pricing] wrote the {P.ROW_ID} arm_positions row (run {args.run_id})")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     md = render(row, season, dev_by, fwd_by, v, opps_fwd, opps_dev, fl_counts, stamp)

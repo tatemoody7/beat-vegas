@@ -147,6 +147,37 @@ export function ledgerSummary(rows: LedgerRow[]): LedgerSummary {
   };
 }
 
+export type EvSummary = {
+  /** Graded rows the judge read, and those it could not (cons_excluded). */
+  judged: number;
+  excluded: number;
+  mean: number | null;
+  lo: number | null;
+  hi: number | null;
+};
+
+/**
+ * The judge's reading of a set of bets (2026-10-14, programme B6): the mean
+ * `ev_cons` -- value at the bet's exact line and price against the vig-free
+ * consensus close -- with a 95% normal interval from two readings. This, not
+ * the point move of the line, is what every strategy is judged by; the point
+ * move stays beside it as the secondary line.
+ */
+export function evSummary(rows: LedgerRow[]): EvSummary {
+  const graded = rows.filter((r) => r.graded);
+  const ev = graded.map((r) => r.evCons).filter((v): v is number => v !== null);
+  const excluded = graded.length - ev.length;
+  if (ev.length === 0)
+    return { judged: 0, excluded, mean: null, lo: null, hi: null };
+  const mean = ev.reduce((a, b) => a + b, 0) / ev.length;
+  if (ev.length < 2) return { judged: 1, excluded, mean, lo: null, hi: null };
+  const sd = Math.sqrt(
+    ev.reduce((a, v) => a + (v - mean) ** 2, 0) / (ev.length - 1),
+  );
+  const h = (1.96 * sd) / Math.sqrt(ev.length);
+  return { judged: ev.length, excluded, mean, lo: mean - h, hi: mean + h };
+}
+
 /** When the bet was made: the bet time when one was recorded, else the log time. */
 export function betTime(r: LedgerRow): string | null {
   return r.betAt ?? r.placedAt;

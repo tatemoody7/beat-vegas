@@ -40,3 +40,12 @@ def test_the_page_lists_every_registered_arm_and_the_pricing_study():
     for arm in P.ARMS:
         assert f'id: "{arm}"' in src, arm
     assert 'id: "H-PRICE-HR"' in src
+
+
+def test_the_arm_starts_on_the_site_are_the_protocols():
+    src = TS.read_text()
+    block = re.search(r"ARM_STARTS: Record<string, string> = \{(.*?)\};", src, re.S).group(1)
+    starts = dict(re.findall(r'"(H-ARM-[A-Z0-9]+)": "([0-9T:.\-]+)"', block))
+    assert set(starts) == set(P.ARMS)
+    for arm in P.ARMS:
+        assert starts[arm] == P.arm_start(arm), arm

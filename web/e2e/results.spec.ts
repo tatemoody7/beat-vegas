@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ARMS_START_MS, PRICING_OPPORTUNITY } from "./fixture/expected.mjs";
 import { fixture } from "./helpers/fixture";
 
 // /results (app/results/page.tsx): the scoreboard, the season summary table,
@@ -51,21 +52,31 @@ test.describe("results", () => {
     // The real ledger opens first: 1-1 over three bets, -0.09u.
     const tabs = strip.getByRole("tablist", { name: "Which bets to show" });
     await expect(
-      tabs.getByRole("tab", { name: `Our bets ${expected.ledger.realBets}` }),
+      tabs.getByRole("tab", {
+        name: `Personal stake ${expected.ledger.realBets}`,
+      }),
     ).toHaveAttribute("aria-selected", "true");
-    await expect(strip).toContainText("Our bets50.0%");
+    await expect(strip).toContainText("Personal stake50.0%");
+    // No ROI on the strip (no interval for it), and the stake is named as
+    // never evidence (Tate, 2026-10-14).
     await expect(strip).toContainText(
-      `${expected.ledger.real.record} · ${expected.ledger.realBets} bets · ${expected.ledger.real.units}u · ROI -4.5%`,
+      `${expected.ledger.real.record} · ${expected.ledger.realBets} bets · ${expected.ledger.real.units}u`,
     );
+    await expect(strip).not.toContainText("ROI");
+    await expect(strip).toContainText("Never evidence for any strategy");
     await expect(strip).toContainText(/could plausibly be \d+%–\d+%/);
     // The units curve sits under the strip: two graded weeks, dashed zero line.
     await expect(strip.locator(".recharts-wrapper")).toBeVisible();
     await expect(strip.locator(".recharts-reference-line line")).toHaveCount(1);
     // Stored clv -1.0 and +0.5 -> displayed +1.00 and -0.50, mean +0.25.
+    // The judge's value is the headline (B6); the fixture's tickets carry no
+    // ev_cons, so it reads "—"; the point move is the secondary line.
     await expect(strip).toContainText(
-      `Line value${expected.ledger.avgPointsGained}points the market came toward us`,
+      "Value vs the close—no bet has a usable close yet",
     );
-    await expect(strip).toContainText("50% of 2 lines moved our way");
+    await expect(strip).toContainText(
+      `Line move: ${expected.ledger.avgPointsGained} points toward us on average · 50% of 2 lines moved our way`,
+    );
     await expect(
       strip.getByRole("link", { name: "Download every bet (CSV)" }),
     ).toHaveAttribute("href", `/api/bets?season=${week.season}`);
@@ -219,10 +230,10 @@ test.describe("results", () => {
     expect(
       await rowText("Every game that cleared the bar, on paper"),
     ).toContain(`${L.paper.hit} ${L.paper.record} ${L.paper.units}`);
-    expect(await rowText("Our bets")).toContain(
+    expect(await rowText("Personal stake")).toContain(
       `50.0% ${L.real.record} ${L.real.units}`,
     );
-    expect(await rowText("Our bets")).toContain(L.avgPointsGained); // line value column
+    expect(await rowText("Personal stake")).toContain(L.avgPointsGained); // line value column
     await expect(table.locator("tr", { hasText: "Model" })).toHaveCount(0);
     expect(await rowText("Market — full game")).toContain(
       `${marketFullGame.hit} ${marketFullGame.record} ${marketFullGame.units}`,
@@ -235,7 +246,7 @@ test.describe("results", () => {
     await page.goto("/results?week=all");
     const tabs = page.getByRole("tablist", { name: "Which picks to show" });
     await expect(
-      tabs.getByRole("tab", { name: `Our bets ${L.realBets}` }),
+      tabs.getByRole("tab", { name: `Personal stake ${L.realBets}` }),
     ).toHaveAttribute("aria-selected", "true");
     await tabs
       .getByRole("tab", { name: `All ${expected.picks.length}` })
@@ -319,6 +330,70 @@ test.describe("results", () => {
     await expect(graded.getByRole("button", { name: "delete" })).toHaveCount(0);
   });
 
+  test("paper rows placed before the 1H-unders clock started are tagged development", async ({
+    page,
+  }) => {
+    await page.goto("/results?week=all");
+    const strip = page.locator(ledger());
+    await strip.getByRole("tab", { name: /^Paper / }).click();
+    const dev = expected.picks.filter(
+      (p) => p.isPaper && p.placedAt.getTime() < ARMS_START_MS,
+    ).length;
+    await expect(
+      strip.locator(".bv-badge", {
+        hasText: "development — before the clock started",
+      }),
+    ).toHaveCount(dev);
+  });
+
+  test("the forward picks of every arm, each with its value or the reason it has none; development never listed", async ({
+    page,
+  }) => {
+    await page.goto("/results?week=all");
+    const sec = page.locator(
+      'section[aria-label="Paper strategies, forward picks"]',
+    );
+    const over = sec.locator('[data-arm="H-ARM-1HO"]');
+    await expect(over.locator("h3")).toHaveText(
+      "First-half overs · 2 graded · 1 read · 1 excluded",
+    );
+    await expect(over).toContainText("+3.1%");
+    await expect(over).toContainText(
+      "excluded: the close sat too far from this line",
+    );
+    await expect(over).not.toContainText("+50.0%"); // the development row
+    const fg = sec.locator('[data-arm="H-ARM-FGU"]');
+    await expect(fg).toContainText("FG under 48.5");
+    await expect(fg).toContainText("-2.2%");
+    await expect(sec.locator('[data-arm="H-ARM-HT1H"] h3')).toHaveText(
+      "High totals, first-half unders · 0 graded · 0 read · 0 excluded",
+    );
+  });
+
+  test("the pricing study's forward opportunities come from the stored Monday row", async ({
+    page,
+  }) => {
+    await page.goto("/results?week=all");
+    const sec = page.locator(
+      'section[aria-label="Hard Rock pricing, forward opportunities"]',
+    );
+    const rows = sec.locator("tbody tr");
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(PRICING_OPPORTUNITY.game);
+    await expect(rows.first()).toContainText("+2.9%");
+    await expect(rows.first()).toContainText("one feed observation");
+  });
+
+  test("the season comparison carries the Wilson interval on every win rate", async ({
+    page,
+  }) => {
+    await page.goto("/results?week=all");
+    const table = page.locator('table[aria-label="Season summary"]');
+    await expect(
+      table.getByRole("columnheader", { name: "Plausibly" }),
+    ).toBeVisible();
+  });
+
   test.describe("signed out", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -334,7 +409,7 @@ test.describe("results", () => {
       expect(visible).toBeLessThan(expected.picks.length);
       await page.goto("/results?week=all");
       const strip = page.locator('section[aria-label="Every bet"]');
-      await expect(strip).toContainText("Our bets50.0%");
+      await expect(strip).toContainText("Personal stake50.0%");
       await strip.getByRole("tab", { name: `All ${visible}` }).click();
       await expect(strip.locator("tbody > tr.align-top")).toHaveCount(visible);
       await expect(strip.getByRole("button", { name: "details" })).toHaveCount(

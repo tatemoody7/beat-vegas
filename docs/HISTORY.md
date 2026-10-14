@@ -9,6 +9,23 @@ hold the rest.
 
 ## 2026-10-14
 
+- **2026-10-14 UTC (RESULTS RELABELLED: THE PERSONAL STAKE, THE JUDGE'S VALUE, THE ARMS' FORWARD PICKS).**
+  Step 13 of the 2026-10-14 programme (Tate's calls: the personal ledger shown as a record only,
+  labelled never evidence; no ROI without an interval; everything shown and labelled). The real-money
+  ledger is "Personal stake" everywhere (the strip, the tab, the season comparison, the owner's pick
+  list) with "never evidence for any strategy; units modelled from the ledger, not reconciled"; the
+  strip drops ROI; its second headline is now the judge's number -- "Value vs the close", the mean
+  `ev_cons` with a 95% interval from two readings, with the point move of the line as the secondary
+  line (B6); ROI elsewhere no longer counts a bonus bet's stake, which risked nothing (B7,
+  `lib/record.ts`); the season comparison carries the Wilson interval on every win rate (P7). Paper
+  rows placed before the 1H-unders clock started carry a "development" tag. Two new sections: every
+  registered arm's FORWARD graded picks with their value or the exclusion reason
+  (`lib/armPicks.ts`, the same selection `protocol_position.arm_rows` makes; graded rows only, so
+  nothing shows before kickoff; arm starts pinned to `protocol.py` by `test_research_parity.py`),
+  and the pricing study's forward opportunities, which the stored H-PRICE-HR row now carries
+  (`positions.pricing_position` payload, `compact_opportunity`), so the site recomputes nothing.
+  No rule, grading or ticket logic changes.
+
 - **2026-10-14 UTC (THE RESEARCH STATUS STRIP ABOVE THE BOARD).** Step 12 of the 2026-10-14
   programme (Tate: the Board stays first, with a thin status strip above it). One line -- how many
   strategies run on paper, the most readings any has toward 30, the next Monday read -- and a pill

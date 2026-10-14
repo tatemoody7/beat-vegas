@@ -33,6 +33,9 @@ export type Gradable = {
   clv: number | null;
   /** Units risked; null/0 for paper and for results-ledger rows (flat 1u). */
   stake?: number | null;
+  /** A bonus bet risks none of the bankroll: its units count, its stake does
+   *  not enter ROI's denominator (2026-10-14, programme B7). */
+  isBonus?: boolean;
 };
 
 /**
@@ -66,7 +69,7 @@ export function recordFrom(rows: Gradable[]): Record3 | null {
   const unitsSum = priced.reduce((a, r) => a + (r.units as number), 0);
   // Results-ledger rows carry no stake: they are flat 1-unit bets by construction.
   const staked = priced.reduce(
-    (a, r) => a + (r.stake === undefined ? 1 : (r.stake ?? 0)),
+    (a, r) => a + (r.isBonus ? 0 : r.stake === undefined ? 1 : (r.stake ?? 0)),
     0,
   );
   // Stored clv is closing - bet. Every bet is an UNDER, so a line that FELL

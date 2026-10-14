@@ -61,7 +61,7 @@ detail; `info=` carries facts that are never a miss (`early_season_held=N`,
 
 ## How the board shows it
 
-`web/lib/boardHealth.ts` reads the four keys (`HEALTH_GAUGE_PREFIX` +
+`web/lib/boardHealth.ts` reads the five keys (`HEALTH_GAUGE_PREFIX` +
 `HEALTH_JOB_IDS`, parity-tested against `ops.HEALTH_PREFIX` / `ops.HEALTH_JOBS`)
 into `Gauges.health[job] = { verdict, note, at }`. A `degraded` or `failed`
 verdict becomes an `OpsBanner` line (`health:<job>`, failed sorted first) naming
@@ -155,6 +155,18 @@ and the H-FG-U-R / H-FG-O-R retrospectives grade at a REAL close -- before this,
 2026 games had a full-game snapshot inside 3 h. The step is `continue-on-error` and carries no
 contract check (2026-10-14: the Saturday close-coverage gauge covers the 1H side; a full-game
 check is not planned while the judge's full-game reads are secondary).
+
+### When monday is degraded (or failed)
+
+1. `monday.positions_written` missed (FAILED, email) -> the Monday run did not leave one
+   `arm_positions` row per registered hypothesis (the six arms from `scripts/protocol_position.py
+   --write`, H-PRICE-HR from `scripts/pricing_check.py --write`). Read the run log for the step that
+   failed; re-run with `gh workflow run pricing_monday.yml --ref main` -- a second run on the same
+   Monday rewrites the same rows (unique on hypothesis + read date), nothing double-counts. Until it
+   lands, the Research page shows the previous read with its date and the board's health banner
+   names this check; past eight days the cards read "outdated".
+2. `monday.pricing_report_written` missed -> `pricing_check.py` wrote no report file; the positions
+   may still be fine. Same re-run.
 
 ### When lines_watch is degraded
 
@@ -274,6 +286,22 @@ Failure modes on record:
 - **2026-09-13** -- four Sunday ticks each re-ran the whole job for one capture (~1,150 Open-Meteo calls). The need_capture / need_score probes fixed the spend; the checks read the day's facts, not this run's, so a correctly skipped tick still passes. Caught by: `sunday.fg_snapshot_today`, `sunday.predictions_today`.
 - **2026-09-16** -- the CFBD reference cache saved an empty payload all season. Caught by: `sunday.reference_cache_populated`.
 - **2026-09-28** -- the refit left no record of itself: confirming the week-5 refit ran on the corrected 58 inputs meant reading the run log, while model_runs held only retrain.py's June rows. Caught by: `sunday.model_run_recorded`.
+
+### monday
+
+- Workflow: `.github/workflows/pricing_monday.yml`
+- Window: Monday: the Vercel `pricing-monday` tick at 12Z (15Z retry, 18Z catch-up; 6am-3pm ET) plus the 12:30Z GitHub backup cron; a second run on the same Monday rewrites the same arm_positions rows
+- Artifacts: `arm_positions rows (one per registered hypothesis, this read date)`, `pricing-report artifact + run Summary`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): 
+
+| Check | Severity | Positive fact |
+|---|---|---|
+| `monday.positions_written` | failed | one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR) with read_at >= RUN_STARTED_AT |
+| `monday.pricing_report_written` | degraded | a reports/pricing_check_<stamp>.md written since RUN_STARTED_AT |
+
+Failure modes on record:
+
+- **2026-10-14** -- Before the stored positions existed, the arms' Monday read lived only in a study.yml artifact and the site could not show it; a failed or missing Monday run was invisible. The site, the Monday read and the January review now read the same arm_positions row, and this contract is how a missing read surfaces. Caught by: `monday.positions_written`.
 
 ### lines_watch
 

@@ -395,6 +395,7 @@ describe("the health contracts (scripts/health_check.py -> last_health_<job>)", 
       "card",
       "grade",
       "sunday",
+      "monday",
       "lines_watch",
     ]);
     for (const id of HEALTH_JOB_IDS) {

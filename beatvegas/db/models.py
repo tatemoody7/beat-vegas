@@ -264,6 +264,42 @@ class WeatherObs(Base):
     )
 
 
+class ArmPosition(Base):
+    """Where each registered hypothesis stood at one Monday read (2026-10-14,
+    programme step 10): ONE row per hypothesis per read date, written only by the
+    Monday workflow (`scripts/protocol_position.py --write` for the six arms,
+    `scripts/pricing_check.py --write` for H-PRICE-HR) and read by the site, the
+    Monday read and the January review -- one source, so none of them can
+    disagree. A retry on the same day rewrites the row (unique on hypothesis +
+    read_date) with the newer run id; nothing here recomputes a position.
+    """
+
+    __tablename__ = "arm_positions"
+    __table_args__ = (
+        UniqueConstraint("hypothesis", "read_date", name="uq_arm_position_per_read_date"),
+    )
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hypothesis = Column(String, nullable=False, index=True)  # registry id
+    standard = Column(String, nullable=False)  # sprt (an arm) | pricing (H-PRICE-HR)
+    read_date = Column(String, nullable=False)  # YYYY-MM-DD, the UTC date of the read
+    read_at = Column(DateTime, nullable=False)  # naive UTC
+    run_id = Column(String)  # GITHUB_RUN_ID of the writer, '-' locally
+    state = Column(String)  # protocol state word or the pricing verdict word
+    label = Column(String)  # the human label the report prints
+    logged = Column(Integer)
+    readings = Column(Integer)
+    weeks = Column(Integer)
+    excluded = Column(Integer)
+    pending = Column(Integer)
+    needed = Column(Integer)  # readings before the first decision window (30) / opportunities (40)
+    llr = Column(Float)
+    mean_ev = Column(Float)
+    ev_lo = Column(Float)
+    ev_hi = Column(Float)
+    next_read = Column(String)  # YYYY-MM-DD
+    payload_json = Column(Text)  # the writer's full line, for the record
+
+
 class BuildForecast(Base):
     """The forecast a card build SAW: one row per game per build that fetched it.
 

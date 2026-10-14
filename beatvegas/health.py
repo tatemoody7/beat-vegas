@@ -508,6 +508,35 @@ def sunday_predictions_today(ctx: Ctx) -> Result:
     return Result(n > 0, f"{n} model predictions for {ctx.season} w{ctx.week} since ET midnight")
 
 
+def monday_positions_written(ctx: Ctx) -> Result:
+    """The Monday run left one arm_positions row per registered hypothesis,
+    written since the run started (2026-10-14, programme step 10)."""
+    from .db.models import ArmPosition
+    from .positions import HYPOTHESES
+
+    rows = (
+        ctx.session.query(ArmPosition.hypothesis)
+        .filter(ArmPosition.read_at >= ctx.run_started_at)
+        .all()
+    )
+    have = {h for (h,) in rows}
+    missing = [h for h in HYPOTHESES if h not in have]
+    return Result(
+        not missing,
+        f"{len(have)} of {len(HYPOTHESES)} arm_positions rows since the run started"
+        + (f"; missing {missing}" if missing else ""),
+    )
+
+
+def monday_pricing_report_written(ctx: Ctx) -> Result:
+    from pathlib import Path as _Path
+
+    root = _Path(ctx.env.get("BV_ROOT") or ".")
+    files = sorted(root.glob("reports/pricing_check_*.md"))
+    fresh = [f for f in files if datetime.utcfromtimestamp(f.stat().st_mtime) >= ctx.run_started_at]
+    return Result(bool(fresh), f"{len(fresh)} pricing report file(s) written since the run started")
+
+
 def sunday_fg_shadow_scored(ctx: Ctx) -> Result:
     """H-ARM-FGU selects on `bv_fg_v1` reads that only the Sunday shadow step
     writes (scripts/fg_shadow.py), and that step is continue-on-error so a
@@ -956,6 +985,41 @@ CONTRACTS: Dict[str, Contract] = {
             ),
         ),
         info=sunday_info,
+    ),
+    "monday": Contract(
+        job="monday",
+        workflow="pricing_monday.yml",
+        window=(
+            "Monday: the Vercel `pricing-monday` tick at 12Z (15Z retry, 18Z catch-up; 6am-3pm ET)"
+            " plus the 12:30Z GitHub backup cron; a second run on the same Monday rewrites the"
+            " same arm_positions rows"
+        ),
+        artifacts=(
+            "arm_positions rows (one per registered hypothesis, this read date)",
+            "pricing-report artifact + run Summary",
+        ),
+        inputs=(),
+        checks=(
+            Check(
+                "monday.positions_written",
+                "failed",
+                "one arm_positions row per registered hypothesis (protocol.ARMS + H-PRICE-HR) with read_at >= RUN_STARTED_AT",
+                monday_positions_written,
+            ),
+            Check(
+                "monday.pricing_report_written",
+                "degraded",
+                "a reports/pricing_check_<stamp>.md written since RUN_STARTED_AT",
+                monday_pricing_report_written,
+            ),
+        ),
+        failure_modes=(
+            FailureMode(
+                "2026-10-14",
+                "Before the stored positions existed, the arms' Monday read lived only in a study.yml artifact and the site could not show it; a failed or missing Monday run was invisible. The site, the Monday read and the January review now read the same arm_positions row, and this contract is how a missing read surfaces.",
+                ("monday.positions_written",),
+            ),
+        ),
     ),
     "lines_watch": Contract(
         job="lines_watch",

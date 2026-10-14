@@ -58,8 +58,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
 - **Real money stood 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
   placed 2026-10-06 before the pause (`manual_picks` 102, 103; they grade as normal). H-STOP-2
   closed inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73); H-NEGGAP-P, H-FG-P,
-  H-PCT-TIE, H-TIMING and H-CLOSE-W superseded; H-MARGIN closed (Pick'em dropped). The existing
-  collectors keep logging, as development data, until the arms re-register.
+  H-PCT-TIE, H-TIMING and H-CLOSE-W superseded; H-MARGIN closed (Pick'em dropped). The neggap and
+  H-FG-P collectors were retired 2026-10-08; the registered arms log from 2026-10-13.
 - **What the evidence says**: the market-blind 1H model is level with the market at best (2026
   average first-half miss 8.34 vs Hard Rock 8.22 over 213 games; H-HIST pooled 8.75 vs the close
   8.73, live on 2003+ training since 2026-10-07); the 2026 factor screen found no input, nor the
@@ -88,7 +88,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
   probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
-  Arscott/TV/Bennett all NOT MET 10-09 (final); `H-LIT-COX` registered 10-11; Coleman/Salaga parked; team
+  Arscott/TV/Bennett all NOT MET 10-09 and Cox NOT MET 10-11 (final); Coleman/Salaga parked; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
   1HO / FGU, clocks start at the 10-13 card (p1.1); 6-7 = weather unders,
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
@@ -106,7 +106,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   the 10-11 refit `model_runs` 10). First read 10-19. `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
 - **Reads (v2.1)**: light read 2026-10-12; first one-page Monday read 2026-10-19 (then weekly); mid-point
   2026-12-07 (with H6, no decisions); final 2027-01-25. After 10-19: one late GitHub cron per job,
-  post-mortem tables stop. Cox look running (`H-LIT-COX`); Coleman and Salaga parked.
+  post-mortem tables stop. All four literature looks closed NOT MET; Coleman and Salaga parked.
 - **Accounts (v2.1)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key, `docs/OPS_ACCOUNTS.md`);
   The Odds API stays on 20K; Actions cap to $20. Kalshi account only on the January H-VENUE-1 read.
 - **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
@@ -123,13 +123,14 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, 6 h look-ahead on Saturday ticks (`CLOSE_LOOKAHEAD_MIN_SAT=360`, since 2026-10-11; weeknights 120); GitHub's every-30-min crons stay |
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z; 23Z catch-up, v2.2) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
-| Mon 6am–noon ET (ticks 12Z, 15Z retry; 18Z catch-up) | `pricing-monday` → `pricing_monday.yml` | the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13); read-only, no health contract |
+| Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up) | `pricing-monday` → `pricing_monday.yml` | the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13); read-only, no health contract |
 | Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
 in `web/lib/cronJobs.ts` (mirrored by `web/vercel.json`, which **must live in `web/`**). A
 `manual` dispatch is always a preview and paper-logs nothing. The `cards`-row probe stops the
-two triggers double-building; `force=true` overrides. Every job ends with
+two triggers double-building; `force=true` overrides (and is the one override of a named slot's
+ET gate on a hand dispatch, 2026-10-14). Every scheduled Neon-writing job ends with
 `scripts/health_check.py --job <job>` (`always()`), which writes `last_health_<job>` for the
 board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `degraded`.
 
@@ -168,10 +169,10 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
 |---|---|---|
-| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks`, `challenger_picks` (`NEGGAP_COLLECT=1`, `FG_COLLECT=1`), preview |
-| `lines_watch.yml` | Vercel `lines-close` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
+| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
+| `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
-| `grade.yml` | Vercel + 2 crons; input hist | finals, graded picks/records, factor ledger, post-mortem, gauges |
+| `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up), dispatch | — (the Monday pricing report, read-only: run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
@@ -273,7 +274,7 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   not reconciled". Line value against the close is the one edge measure that needs no proxy; it
   is read at each wager's exact terms by `beatvegas/consensus.py` (`ev_cons` on every graded pick).
 - **What is measured, not gated**: the model's ~2-pt level deficit and its spread-bucket accuracy
-  vs Hard Rock (weekly review), the negative-gap "overs" band (H-NEGGAP, H-NEGGAP-P), the gap
+  vs Hard Rock (the post-mortem tables; not read weekly since 10-13), the negative-gap band (superseded 10-14), the gap
   ladder by band. No gate, model constant or registry row changes from an analysis; fixes land
   through their own registered row or PR.
 - **The proxy era is history.** Before the 2023-25 closes were bought (Sep 2026) every backtest

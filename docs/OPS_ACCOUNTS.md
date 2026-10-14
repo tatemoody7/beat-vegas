@@ -16,7 +16,8 @@ date; the board cannot see any of these until the change is made.
 1. **GitHub billing — RESOLVED 2026-10-04.** A card is on file, the repo is private again
    (made private 14:36Z; it had been public since 2026-09-22 with 0 forks and 0 stars), and the
    Actions budget is **$10/month, stop usage at the cap, alerts at 75/90/100%**
-   (github.com/settings/billing/budgets). The $0 budget with stop-usage on was what halted
+   (github.com/settings/billing/budgets). Roadmap v2.1 (2026-10-11) raised the cap to **$20**:
+   an account-side change only Tate can make; the page still reads $10 until he does. The $0 budget with stop-usage on was what halted
    every job on 2026-09-22; a private repo gets 2,000 free minutes against ~2,830 measured, so
    the overage (~$7) bills to the card inside the budget. Check the budget page in the last
    week of each month.
@@ -27,8 +28,8 @@ date; the board cannot see any of these until the change is made.
    all feature flags true). That key is now in local `config.yaml` and the `CFBD_API_KEY`
    repository secret (14:11Z); the FGCU Academic key (3,000/mo) is retired from the system.
    Everything the review found useful is Tier 1 data (`/wepa/team/season`, weather,
-   scoreboard); dropping to Tier 1 ($1) at the Nov 6 renewal is Tate's call
-   (`docs/CFBD_TIER3_REVIEW_2026-10-05.md`). Optional: link Discord in Patreon
+   scoreboard); dropping to Tier 1 ($1) at the Nov 6 renewal is DECIDED (roadmap v2.1, 2026-10-11;
+   `docs/CFBD_TIER3_REVIEW_2026-10-05.md`) and is Tate's click on Patreon. Optional: link Discord in Patreon
    (patreon.com/settings/apps) for the patron channel.
 
 3. **GitHub dispatch token — confirm its scope (added 2026-10-07).** `GITHUB_DISPATCH_TOKEN`

@@ -3,6 +3,7 @@ import { createPick, DuplicatePickError } from "@/lib/picks";
 import { parsePickBody } from "@/lib/pickRules";
 import { requireAuth } from "@/lib/session";
 import { evaluateRealTicket, evaluationMode } from "@/lib/ticketPolicy";
+import { verdictDisagreement } from "@/lib/pickRules";
 
 // POST /api/picks — log a REAL ticket on a current-slate game. Validation and
 // the betting policy (1H-only real money, flat 1 unit, 5-bet weekly cap, the
@@ -67,9 +68,18 @@ export async function POST(req: NextRequest) {
     }
     return dbError("createPick", e);
   }
+  // The server's verdict goes back with the Board's (B2a, 2026-10-14): a
+  // disagreement used to be stored silently as the server's.
+  const disagreement = verdictDisagreement(
+    pick.verdict ?? null,
+    judgedBy.verdict,
+  );
   return NextResponse.json(
     {
       ok: true,
+      verdict: judgedBy.verdict,
+      boardVerdict: pick.verdict ?? null,
+      ...(disagreement ? { disagreement } : {}),
       ...(tracked
         ? {}
         : {

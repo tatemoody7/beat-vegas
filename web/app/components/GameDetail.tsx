@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { bookLabel } from "@/lib/books";
-import { hrQuoteText } from "@/lib/labels";
+import { hrQuoteText, priceAgeText } from "@/lib/labels";
+import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
 import type { MarketMovement } from "@/lib/movement";
@@ -460,7 +461,15 @@ export default function GameDetail({
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Stat label="Hard Rock" value={hrQuoteText(check)} />
+          <Stat
+            label="Hard Rock"
+            value={hrQuoteText(check)}
+            note={
+              g.edge.tier === "BET" && !g.kickedOff
+                ? priceAgeText(check?.hrSeenAt, new Date(), HR_PRICE_MAX_AGE_H)
+                : null
+            }
+          />
           <Stat
             label="Market"
             value={row.curLine === null ? "—" : `u${fmt(row.curLine)}`}
@@ -516,13 +525,26 @@ export default function GameDetail({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  note = null,
+}: {
+  label: string;
+  value: string;
+  note?: string | null;
+}) {
   return (
     <div className="rounded-[var(--r-sm)] bg-[var(--bg-2)] px-3 py-2">
       <div className="text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
         {label}
       </div>
       <div className="font-mono text-lg text-[var(--text)]">{value}</div>
+      {note && (
+        <div data-testid="price-age" className="text-xs text-[var(--text-dim)]">
+          {note}
+        </div>
+      )}
     </div>
   );
 }

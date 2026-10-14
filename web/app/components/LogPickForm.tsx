@@ -64,6 +64,7 @@ export default function LogPickForm({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   // PRICE STALE (M2): the server saw no Hard Rock price in the last 6 h. The
   // owner can poll this one game now (POST /api/price-refresh, 1 Odds API
   // credit) and log again once it lands.
@@ -148,6 +149,13 @@ export default function LogPickForm({
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `failed (${res.status})`);
       setNote("");
+      // The server judged it differently from the Board (B2a): say so and
+      // keep the form open on the message instead of closing silently.
+      if (typeof j.disagreement === "string") {
+        setNotice(j.disagreement);
+        router.refresh();
+        return;
+      }
       onDone?.();
       router.refresh();
     } catch (e) {
@@ -244,6 +252,11 @@ export default function LogPickForm({
       {err && (
         <p role="alert" className="mt-2 text-sm text-[var(--bad)]">
           {err}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="mt-2 text-sm text-[var(--warn)]">
+          {notice}
         </p>
       )}
       {err?.startsWith("PRICE STALE") && (

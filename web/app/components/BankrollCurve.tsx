@@ -1,5 +1,6 @@
 "use client";
 
+import { curveTicks } from "@/lib/curveTicks";
 import {
   CartesianGrid,
   Line,
@@ -18,17 +19,20 @@ const AXIS = "#aab6cc"; // --text-muted
 const GRID = "#3a4a6b"; // --border
 const ACCENT = "#38bdf8"; // --accent
 
-const signedU = (v: number) => `${v > 0 ? "+" : ""}${v}u`;
+const signedU = (v: number) => (v === 0 ? "0" : `${v > 0 ? "+" : ""}${v}u`);
 
 // Where our bets actually went, week by week: cumulative settled units on real
 // first-half bets. In units, not dollars, since 2026-09-28 (the public site
 // shows no stake size). Cyan is the brand accent (green/red stay reserved for
 // under/over outcomes); the dashed line is zero, where the season started.
+// Straight segments between weeks (Q9): each dot is a real week-end number and
+// a smoothed curve drew paths between them that never happened.
 export default function BankrollCurve({ points }: { points: BankrollPoint[] }) {
   const units = points.map((p) => p.units);
   const lo = Math.min(0, ...units);
   const hi = Math.max(0, ...units);
   const pad = Math.max(0.5, (hi - lo) * 0.15);
+  const ticks = curveTicks(lo - pad, hi + pad);
 
   return (
     // No frame of its own: it sits inside the ledger card, and a box in a box
@@ -54,7 +58,9 @@ export default function BankrollCurve({ points }: { points: BankrollPoint[] }) {
             }}
           />
           <YAxis
-            domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]}
+            domain={[ticks[0], ticks[ticks.length - 1]]}
+            ticks={ticks}
+            interval={0}
             tick={{ fill: AXIS, fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: GRID }}
@@ -75,9 +81,15 @@ export default function BankrollCurve({ points }: { points: BankrollPoint[] }) {
             stroke={AXIS}
             strokeDasharray="4 4"
             ifOverflow="extendDomain"
+            label={{
+              value: "0 = break even",
+              position: "insideBottomRight",
+              fill: AXIS,
+              fontSize: 11,
+            }}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="units"
             stroke={ACCENT}
             strokeWidth={2}

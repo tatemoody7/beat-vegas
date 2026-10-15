@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { etDateLabel } from "@/lib/et";
 import type { HypothesisCard } from "@/lib/research";
 
 // The one slim line above the Board (Tate, 2026-10-15, Q1; it replaced the
@@ -22,7 +23,7 @@ export function stripLine(cards: HypothesisCard[]): string {
     most === 0
       ? `0 of ${needed} readings`
       : `up to ${most} of ${needed} readings`;
-  return `${head} · ${progress}${next ? ` · next read ${next}` : ""}`;
+  return `${head} · ${progress}${next ? ` · next read ${etDateLabel(next)}` : ""}`;
 }
 
 /** The slim line's fixed opening (Tate 2026-10-15, Q1). */

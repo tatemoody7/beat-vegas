@@ -43,11 +43,11 @@ describe("the research strip line", () => {
       ]),
     );
     expect(stripLine(cards)).toBe(
-      "6 strategies on paper · up to 12 of 30 readings · next read 2026-10-26",
+      "6 strategies on paper · up to 12 of 30 readings · next read Mon Oct 26",
     );
     const zero = cardsFor(new Map([pos("H-ARM-FGU", { readings: 0 })]));
     expect(stripLine(zero)).toBe(
-      "6 strategies on paper · 0 of 30 readings · next read 2026-10-26",
+      "6 strategies on paper · 0 of 30 readings · next read Mon Oct 26",
     );
   });
 });

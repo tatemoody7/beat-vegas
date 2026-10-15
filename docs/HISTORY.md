@@ -7,6 +7,36 @@ appends its episode here** (`tests/test_claude_md.py` caps the brief). PR bodies
 hold the rest.
 
 
+
+## 2026-10-15
+
+- **2026-10-15 UTC (THE WRITER AND THE GRADER NOW SHARE ONE 0-0 STANDARD).** The board read DEGRADED from
+  2026-10-11: App State-Old Dominion (2026-10-10, `games.id` 401869843) stored a 0-0 first half and its record
+  never graded. Cause: the writer (`etl.first_half.attach_first_half`) keeps a scoreless line-score half in a
+  game that scored only when the full box reconciles (4+ numeric quarters per side summing to the final),
+  while the grader (`grading.trusted_first_half_total`) refused every line-score 0. The box checks out on both
+  feeds, read 2026-10-15: App State 0-0-3-0 = 3, Old Dominion 0-0-2-8 = 10 (CFBD `/games?id=` and ESPN's
+  summary, identical). Tate chose to fix the cause (option 2). The writer now labels a proven scoreless
+  line-score half `linescores_verified`; the grader trusts a 0-0 half in a scoring game under
+  `linescores_verified` or `pbp` and no other label (`grading.ZERO_PROVEN_SOURCES`), so a plain `linescores` 0
+  -- every row written before the fix, including the placeholder corruption -- is still refused. The nightly
+  season load (`scripts/backfill.py --season 2026` in `grade.yml`) re-derives every finished 2026 game from
+  CFBD, so the labels change only where the writer re-proves the box; nothing is relabelled by hand.
+  `tests/test_zero_half_parity.py` runs one case matrix through the writer and then the grader: whatever the
+  writer stores, the grader grades.
+  **Impact, measured 2026-10-15 before the change** (all ten 2026 games with a stored 0-0 half and points;
+  every one passes the writer's check on both CFBD and ESPN):
+
+  | Game(s) | What changes | What does not |
+  |---|---|---|
+  | App State-Old Dominion (FBS, wk 6) | label → `linescores_verified`; its rating record grades (first half 0); `challenger_picks` 41 (H-ARM-1HO, placed 2026-10-09, development) grades; post-mortem `live_2026` reads its half (was NULL); 4 unflagged first-half states in the pricing CSV gain a result; `grade.records_graded` clears | no forward arm pick, no real ticket, no pricing opportunity on the game |
+  | San Diego State @ UCLA (FBS, wk 2) | label → `linescores_verified`; post-mortem and 4 unflagged pricing states read its half (were NULL) | its rating record (graded 2026-09-13, first half 0) and paper pick `manual_picks` 33 (graded under 2026-09-12, before any arm) are write-once and already agree |
+  | Eight Division II/III and FCS games | label only | no rating record, pick, snapshot or post-mortem row |
+  | 47 pre-2026 line-score zeros (2003-25) | nothing: the nightly load reloads 2026 only | the frozen studies, the hp1 table and every historical record |
+
+  The six arms, their selection rules, the judge, pv1, the protocol, the Board and the personal-ledger logic
+  are unchanged; development rows stay development.
+
 ## 2026-10-14
 
 - **2026-10-14 UTC (H-ARM-EVP COLLECTS, EXPLORATORY).** Tate chose option A for the value-at-price idea: collect in

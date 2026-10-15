@@ -64,7 +64,7 @@ class Game(Base):
     home_first_half_points = Column(Integer)
     away_first_half_points = Column(Integer)
     first_half_total = Column(Integer)
-    first_half_source = Column(String)  # 'pbp' | 'linescores'
+    first_half_source = Column(String)  # 'pbp' | 'linescores' | 'linescores_verified' (grading.py)
 
     # Full-game total: the Sunday/card-day opener capture (Odds API / DK) or
     # CFBD /lines (consensus/best available) when nothing live was captured.

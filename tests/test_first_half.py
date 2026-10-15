@@ -187,7 +187,8 @@ def test_reconciled_full_box_with_scoreless_half_is_trusted():
     assert line_scores_trustworthy(game, (0, 0)) is True
     out = attach_first_half(game)
     assert out["first_half_total"] == 0
-    assert out["first_half_source"] == "linescores"
+    # The proof is recorded in the label the grader trusts (2026-10-15).
+    assert out["first_half_source"] == "linescores_verified"
 
 
 def test_all_zero_placeholder_box_is_still_rejected():

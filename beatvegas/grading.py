@@ -48,6 +48,22 @@ def units_won(
     return -1.0
 
 
+# The writer's labels for a stored first half (`games.first_half_source`,
+# written by `etl.first_half.attach_first_half`). One vocabulary for the writer
+# and the grader (2026-10-15): a 0-0 half in a game that scored is graded only
+# when the writer recorded HOW it proved it.
+SOURCE_LINESCORES = "linescores"
+# Line scores where the half is 0-0 in a game that scored AND the writer proved
+# it from the full box: at least four numeric quarters per side, each side's
+# quarters summing exactly to its final (`etl.first_half.line_scores_trustworthy`).
+SOURCE_LINESCORES_VERIFIED = "linescores_verified"
+# Play-by-play; a 0-0 PBP half is persisted only when the feed's own running
+# score reaches the stored final (`etl.first_half._pbp_zero_corroborated`).
+SOURCE_PBP = "pbp"
+# The labels under which a scoreless half in a scoring game carries its proof.
+ZERO_PROVEN_SOURCES = frozenset({SOURCE_LINESCORES_VERIFIED, SOURCE_PBP})
+
+
 def trusted_first_half_total(
     first_half_total: Optional[float],
     home_points: Optional[float],
@@ -56,16 +72,19 @@ def trusted_first_half_total(
 ) -> Optional[float]:
     """The game's 1H total if it can be trusted for grading, else None.
 
-    A LINE-SCORE 0 with a non-zero final score is the known false-zero
-    corruption (placeholder all-zero quarters) — grading it would fabricate an
-    UNDER win. A play-by-play 0 grades normally: since 2026-09-20 the writer
-    (`etl.first_half.attach_first_half`) persists a scoreless PBP half only when
-    the feed's own running score reaches the stored final, and every legacy PBP
-    zero on file (15 games, 2023-26) was checked against ESPN's box score and is
-    a real scoreless half. 0-0 in a 0-0 final grades too."""
+    A 0-0 half in a game that scored is trusted only when the writer recorded
+    its proof (`ZERO_PROVEN_SOURCES`): `linescores_verified` (the full box
+    reconciles with the final, the writer's own standard) or `pbp` (the feed's
+    running score reaches the final). A plain `linescores` 0 -- every row written
+    before 2026-10-15, including the known false-zero corruption of placeholder
+    all-zero quarters -- stays untrusted: grading it could fabricate an UNDER
+    win. Until 2026-10-15 the grader rejected every line-score 0 while the writer
+    accepted a reconciled one, so a proven half (App State-Old Dominion,
+    2026-10-10) sat ungraded with no way out; the label closes that gap without
+    trusting any stored 0 on its value alone. 0-0 in a 0-0 final grades too."""
     if first_half_total is None:
         return None
-    if source == "pbp":
+    if source in ZERO_PROVEN_SOURCES:
         return first_half_total
     final_total = (home_points or 0) + (away_points or 0)
     if first_half_total == 0 and final_total > 0:

@@ -112,7 +112,9 @@ carries `HEALTH: <verdict> <note>`.
 3. `grade.records_graded` / `grade.picks_graded` missed -> played games with a
    first-half total whose record or pick is still ungraded. Usually the
    trust rule holding a 0-0 half without proof (`etl/first_half.py`): look at
-   the game's line scores before touching anything.
+   the game's line scores before touching anything. A proven 0-0 half is stored
+   as `linescores_verified` (or `pbp`) and grades; a plain `linescores` 0 in a
+   game that scored never does (`grading.ZERO_PROVEN_SOURCES`, 2026-10-15).
 4. `grade.postmortem_written` missed -> `post_mortem.py --write` did not write
    the live scope this run; it is `continue-on-error`, so the run is green.
    Re-run it by hand or re-dispatch `grade.yml`.
@@ -262,6 +264,7 @@ Failure modes on record:
 - **2026-09-16** -- the CFBD reference cache had saved an EMPTY payload all season (the first job of each ISO week made no CFBD calls), so every later run re-fetched ~22 reference calls against a 3,000-call month. Caught by: `grade.reference_cache_populated`.
 - **2026-09-22** -- the four-hour probe matched scope = 'live' while the rows are written as live_<season>, so it matched nothing and never skipped. The check compares the exact scope string. Caught by: `grade.postmortem_written`.
 - **2026-09-20** -- fifteen 0-0 first halves on file looked like the ESPN false zero and were all real (PR #176). Zero halves graded this run are counted as info (`zero_halves_graded=N`), never judged. Caught by: info only.
+- **2026-10-15** -- the writer stored App State-Old Dominion's proven 0-0 half (full box reconciled, 2026-10-10) and the grader refused every line-score 0, so the record sat ungraded for five days. The writer now labels a proven scoreless half `linescores_verified` and the grader trusts that label and `pbp` only (`grading.ZERO_PROVEN_SOURCES`; tests/test_zero_half_parity.py). Caught by: `grade.records_graded`.
 
 ### sunday
 

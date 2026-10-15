@@ -75,7 +75,9 @@ def main(argv=None) -> int:
         ap.error("--as-of is a dry-run replay; it never writes")
 
     now = S.parse_ts(args.as_of) if args.as_of else datetime.utcnow()
-    if not try_init_db():
+    # Only a write initialises the schema (it creates shortlist_entries the first time); a dry
+    # run, e.g. study.yml, reads and changes nothing.
+    if args.write and not try_init_db():
         return 1
     with session_scope() as s:
         card = _find_card(s, args)

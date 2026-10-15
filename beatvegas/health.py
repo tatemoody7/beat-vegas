@@ -894,6 +894,11 @@ CONTRACTS: Dict[str, Contract] = {
                 "fifteen 0-0 first halves on file looked like the ESPN false zero and were all real (PR #176). Zero halves graded this run are counted as info (`zero_halves_graded=N`), never judged.",
                 (),
             ),
+            FailureMode(
+                "2026-10-15",
+                "the writer stored App State-Old Dominion's proven 0-0 half (full box reconciled, 2026-10-10) and the grader refused every line-score 0, so the record sat ungraded for five days. The writer now labels a proven scoreless half `linescores_verified` and the grader trusts that label and `pbp` only (`grading.ZERO_PROVEN_SOURCES`; tests/test_zero_half_parity.py).",
+                ("grade.records_graded",),
+            ),
         ),
         info=grade_info,
     ),

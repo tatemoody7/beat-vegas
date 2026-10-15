@@ -51,6 +51,8 @@ def test_trusted_first_half_total_guards_false_zeros():
     assert trusted_first_half_total(0, 24, 17, source="linescores") is None
     # A play-by-play 0 is a genuinely scoreless first half -> grades normally.
     assert trusted_first_half_total(0, 10, 7, source="pbp") == 0
+    # A line-score 0 the writer proved from the full, reconciled box -> grades (2026-10-15).
+    assert trusted_first_half_total(0, 10, 3, source="linescores_verified") == 0
     # 0-0 final (or unknown final) keeps a 0 first half.
     assert trusted_first_half_total(0, 0, 0) == 0
     assert trusted_first_half_total(0, None, None) == 0

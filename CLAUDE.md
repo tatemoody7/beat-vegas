@@ -355,9 +355,9 @@ list and land through their own registered row or PR.
   its event ids ARE `games.id`; ESPN cannot replace CFBD for scoring (8 CFBD-only features).
 - **ESPN**: host `site.web.api.espn.com`, send NO custom headers (Akamai 403s a spoofed UA);
   ESPN has no college injuries — Rotowire does (`sources/rotowire.py`). Line scores populate
-  late: a 0-0 half is trusted only when 4+ numeric quarters sum to each side's final, or the PBP
-  running score reaches the stored final (`etl/first_half.py`). **All 15 scoreless halves on file
-  are real** — never "fill in" a missing half without one of those two proofs.
+  late: a 0-0 half is trusted only when 4+ numeric quarters sum to each side's final (stored as
+  `linescores_verified`) or the PBP running score reaches the final (`pbp`); the grader trusts those two
+  labels only (`grading.ZERO_PROVEN_SOURCES`). Never "fill in" a missing half without one of the two proofs.
 - **DraftKings' hidden API 403s GHA IPs and needs browser headers** (`draftkings.py::_HEADERS`);
   prod captures full-game lines with `--source oddsapi`. TeamRankings → CFBD mapping is
   exact-first (`teamrankings.map_to_cfbd`); new abbreviations go in `_ALIASES`.

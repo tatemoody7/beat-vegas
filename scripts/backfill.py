@@ -114,8 +114,8 @@ def backfill_season(
 
     # Play-by-play fallback. --use-pbp fetches every week; otherwise fetch ONLY
     # the weeks holding finished games whose line scores are missing or fail the
-    # trust guard (e.g. a genuine 0-0 first half, which line_scores_trustworthy
-    # must reject as a *linescore* but PBP can confirm as real). This keeps the
+    # trust guard (e.g. a 0-0 first half whose box is partial: line_scores_trustworthy
+    # rejects it, and PBP can confirm it as real). This keeps the
     # default run cheap while never leaving a resolvable game NULL.
     pbp_lookup: Dict[int, Any] = {}
     pbp_final: Dict[int, Any] = {}

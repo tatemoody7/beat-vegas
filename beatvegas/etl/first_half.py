@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..grading import SOURCE_LINESCORES, SOURCE_LINESCORES_VERIFIED, SOURCE_PBP
+
 
 def _get(d: Dict[str, Any], *names: str) -> Any:
     for n in names:
@@ -152,14 +154,20 @@ def attach_first_half(
     of the ledger. With no `pbp_final` to check against, the zero is not trusted."""
     gid = _get(game, "id")
     res = first_half_from_line_scores(game)
-    source = "linescores"
+    source = SOURCE_LINESCORES
     # Reject line scores that disagree with the final score: fall through to PBP,
     # else leave NULL — never persist a false 0.
     if res is not None and not line_scores_trustworthy(game, res):
         res = None
+    # A 0-0 half in a game that scored reached here only on the full, reconciled
+    # box (line_scores_trustworthy). Record that proof in the label: the grader
+    # trusts a scoreless line-score half under this label and no other
+    # (grading.ZERO_PROVEN_SOURCES, 2026-10-15).
+    if res is not None and _scoreless_in_scoring_game(game, res):
+        source = SOURCE_LINESCORES_VERIFIED
     if res is None and pbp_lookup and gid in pbp_lookup:
         res = pbp_lookup[gid]
-        source = "pbp"
+        source = SOURCE_PBP
         if res is not None and not _pbp_zero_corroborated(game, res, pbp_final):
             res = None
     if res is None:
@@ -176,6 +184,13 @@ def attach_first_half(
         "first_half_total": home_1h + away_1h,
         "first_half_source": source,
     }
+
+
+def _scoreless_in_scoring_game(game: Dict[str, Any], first_half: Tuple[int, int]) -> bool:
+    """A 0-0 first half in a game whose known final is not 0-0."""
+    home_pts = _get(game, "homePoints", "home_points")
+    away_pts = _get(game, "awayPoints", "away_points")
+    return (first_half[0] + first_half[1]) == 0 and ((home_pts or 0) + (away_pts or 0)) > 0
 
 
 def _pbp_zero_corroborated(

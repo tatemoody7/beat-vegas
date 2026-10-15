@@ -149,3 +149,30 @@ export function factorTint(f: BoardFactor): { bg: string; dot: string } {
       : 0.08 + 0.22 * f.intensity;
   return { bg: `rgba(${base},${alpha.toFixed(3)})`, dot: `rgb(${base})` };
 }
+
+/** The one line above the factor list (Tate 2026-10-15, Q5), with the count
+ *  from research/1h-factors-2026-10/report.md (H-1H-FACTORS, development
+ *  evidence): 64 factors screened, none passed either level. */
+export const FACTOR_NOTE =
+  "These explain the line. None has been shown to beat it: 64 factors tested against the closing line, none passed (H-1H-FACTORS).";
+
+/**
+ * A stored factor sentence in scoring words (Q5): "— helps the under" becomes
+ * "— points to less scoring", and so on. Rows scored before 2026-10-15 carry
+ * the old words in predictions.factors_json (board.py writes the new ones);
+ * this makes every week read the same. A hypothesis ("unproven for the under")
+ * loses its direction; its "unproven" chip says it.
+ */
+export function scoringWords(sentence: string): string {
+  return sentence
+    .replace(/\s+—\s+helps the under/g, " — points to less scoring")
+    .replace(
+      /\s+—\s+(hurts|works against) the under/g,
+      " — points to more scoring",
+    )
+    .replace(/\s+—\s+is neutral for the under/g, " — small effect, if any")
+    .replace(/\s+—\s+unproven for the under\.?/g, ".")
+    .replace(/,\s*works against the under/g, ", points to more scoring")
+    .replace(/\.\s*\(/g, " (")
+    .replace(/\.\./g, ".");
+}

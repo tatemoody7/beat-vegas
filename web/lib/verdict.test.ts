@@ -257,8 +257,8 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
       ],
     });
     expect(v.why).toHaveLength(4);
-    expect(v.why[2]).toBe("Wind 18 mph at kickoff — helps the under.");
-    expect(v.why[3]).toBe("Both offenses play fast — works against the under.");
+    expect(v.why[2]).toBe("Wind 18 mph at kickoff — points to less scoring.");
+    expect(v.why[3]).toBe("Both offenses play fast — points to more scoring.");
   });
 
   it("does not double the '— helps the under' tail the board already words", () => {
@@ -274,9 +274,11 @@ describe("verdictFor — model rows, gated on Hard Rock's number", () => {
         }),
       ],
     });
-    expect(v.why[2]).toBe("Combined PPA allowed 0.15 — helps the under.");
+    expect(v.why[2]).toBe(
+      "Combined PPA allowed 0.15 — points to less scoring.",
+    );
     expect(v.why[3]).toBe(
-      "Both 1H offenses average 30.8 pts — works against the under.",
+      "Both 1H offenses average 30.8 pts — points to more scoring.",
     );
   });
 

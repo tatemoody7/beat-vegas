@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
+import ShortlistAnalysis from "@/app/components/ShortlistAnalysis";
+import { getShortlist } from "@/lib/shortlist";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
 import { viewerIsAuthed } from "@/lib/session";
 import { gateGame } from "@/lib/signalGate";
@@ -39,12 +41,35 @@ export default async function GamePage({
 
   const { unitUsd } = bankrollEnv();
   const authed = await viewerIsAuthed();
+  // The Research top 10 (H-1H-SHORTLIST): a shortlisted game carries its full
+  // analysis at the top of the page (Q14), from the frozen publication.
+  const list =
+    found.board.week === null
+      ? null
+      : await getShortlist(found.board.season, found.board.week);
+  const entry = list?.entries.find((e) => e.game_id === gameId) ?? null;
+  const { check } = found.game;
   return (
     <GameDetail
       g={gateGame(found.game, authed)}
       authed={authed}
       unitUsd={unitUsd}
       backHref={`/#game-${gameId}`}
+      research={
+        list && entry ? (
+          <ShortlistAnalysis
+            e={entry}
+            publishedAt={list.publishedAt}
+            cardBuilt={list.cardBuilt}
+            boardRank={found.game.boardRank}
+            latest={{
+              line: check?.hrLine ?? null,
+              under: check?.hrUnderPrice ?? null,
+              seenAt: check?.hrSeenAt,
+            }}
+          />
+        ) : null
+      }
     />
   );
 }

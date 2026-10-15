@@ -2,7 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
 import { RESEARCH_BANNER } from "../lib/signalGate";
-import { BOARD_KEY, BOARD_KEY_OWNER, PASS_HEAD } from "../lib/boardKey";
+import {
+  BOARD_KEY,
+  BOARD_KEY_OWNER,
+  BOARD_KEY_SHORTLIST,
+  PASS_HEAD,
+} from "../lib/boardKey";
 import { SLIM_LEAD } from "../app/components/ResearchStrip";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
@@ -47,7 +52,7 @@ test.describe("the board", () => {
     await expect(page.locator('p[aria-label="What this is"]')).toHaveCount(0);
     await expect(
       page.locator('p[aria-label="How to read the Board"]'),
-    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_OWNER}`);
+    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_SHORTLIST} ${BOARD_KEY_OWNER}`);
     // The slim line sits above the week heading, never inside the board.
     const slimBox = await slim.boundingBox();
     const heading = await page.locator("h1.bv-page-title").boundingBox();
@@ -73,7 +78,8 @@ test.describe("the board", () => {
     const labels = await page.$$eval("section[aria-label]", (ss) =>
       ss.map((x) => x.getAttribute("aria-label")),
     );
-    expect(labels).toEqual(["Ranked", "Played"]);
+    // The Research top 10 (its own section, above the Board) is not a Board group.
+    expect(labels).toEqual(["Research top 10", "Ranked", "Played"]);
     await expect(
       page.locator('section[aria-label="Played"] > h2.bv-day-head'),
     ).toHaveText(`Played · ${expected.playedIds.length}`);
@@ -224,7 +230,9 @@ test.describe("the board", () => {
     const labels = await page.$$eval("section[aria-label]", (ss) =>
       ss.map((s) => s.getAttribute("aria-label")),
     );
-    expect(labels.filter((l) => l !== "Played")).toEqual(["Ranked"]);
+    expect(
+      labels.filter((l) => l !== "Played" && l !== "Research top 10"),
+    ).toEqual(["Ranked"]);
   });
 
   test("every banner is silent in the clean state", async ({ page }) => {
@@ -272,7 +280,7 @@ test.describe("the board, signed out", () => {
     ).toHaveText(RESEARCH_BANNER);
     await expect(
       page.locator('p[aria-label="How to read the Board"]'),
-    ).toHaveText(BOARD_KEY);
+    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_SHORTLIST}`);
     await expect(
       page.locator('div[aria-label="This week at a glance"]'),
     ).toHaveCount(0);

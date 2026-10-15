@@ -16,10 +16,17 @@ import { getLatestCard } from "@/lib/card";
 import { getArmPositions } from "@/lib/armPositions";
 import { cardsFor } from "@/lib/research";
 import ResearchStrip from "@/app/components/ResearchStrip";
+import ResearchTopTen from "@/app/components/ResearchTopTen";
+import { getShortlist } from "@/lib/shortlist";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
-import { BOARD_KEY, BOARD_KEY_OWNER, PASS_HEAD } from "@/lib/boardKey";
+import {
+  BOARD_KEY,
+  BOARD_KEY_OWNER,
+  BOARD_KEY_SHORTLIST,
+  PASS_HEAD,
+} from "@/lib/boardKey";
 import { viewerIsAuthed } from "@/lib/session";
 import { Fragment } from "react";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
@@ -82,6 +89,8 @@ export default async function BoardPage({
   // money is paused to everyone; only an unreadable switch needs its own
   // warning, and only the owner can act on it.
   const pause = await getRulePause();
+  const shortlist =
+    board.week === null ? null : await getShortlist(season, board.week);
 
   const filters = parseFilters(sp);
   const games = all.filter((g) => matchesFilters(g, filters));
@@ -108,6 +117,11 @@ export default async function BoardPage({
           research stands, then straight to the games. It reads the stored
           Monday row and never changes a rating. */}
       <ResearchStrip cards={cardsFor(await getArmPositions())} />
+
+      {/* The Research top 10 (Q13, 2026-10-15): the frozen research ranking,
+          labelled apart from the Board's rank; nothing renders without a
+          publication. */}
+      <ResearchTopTen list={shortlist} />
 
       <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
         <h1 className="bv-page-title">
@@ -139,6 +153,9 @@ export default async function BoardPage({
         className="mb-3 text-xs text-[var(--text-dim)]"
       >
         {BOARD_KEY}
+        {shortlist && shortlist.entries.length > 0
+          ? ` ${BOARD_KEY_SHORTLIST}`
+          : ""}
         {authed ? ` ${BOARD_KEY_OWNER}` : ""}
       </p>
 

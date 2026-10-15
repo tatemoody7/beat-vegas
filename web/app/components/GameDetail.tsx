@@ -397,8 +397,12 @@ export default function GameDetail({
   unitUsd,
   backHref,
   authed,
+  research = null,
 }: {
   g: HomeGame;
+  /** The Research top 10's full analysis for a shortlisted game (H-1H-SHORTLIST);
+   *  rendered right under the header, before the decision. */
+  research?: React.ReactNode;
   /** The flat stake, read server-side — a client component cannot read it. */
   unitUsd: number;
   backHref: string;
@@ -426,6 +430,14 @@ export default function GameDetail({
           ← Back to the board
         </Link>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {g.boardRank !== null && research !== null && (
+            <span
+              data-testid="board-rank-label"
+              className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]"
+            >
+              Board
+            </span>
+          )}
           {g.boardRank !== null && (
             <span
               className="rounded-[var(--r-sm)] px-2 py-0.5 font-mono text-lg font-semibold"
@@ -445,6 +457,8 @@ export default function GameDetail({
           </span>
         </div>
       </div>
+
+      {research}
 
       <section className="bv-card p-4">
         <h2 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">

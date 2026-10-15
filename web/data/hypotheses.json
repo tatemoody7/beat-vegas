@@ -448,6 +448,13 @@
     "doc": "`research/1h-factors-2026-10/` (gitignored local result; the report is summarized in `docs/HISTORY.md`)"
   },
   {
+    "id": "H-1H-SHORTLIST",
+    "question": "Which upcoming first-half unders does a price-first research ranking put on top each scheduled card, and, read later, does that rank track the result and the closing value? (Tate, 2026-10-15: the weekly research top 10 he reviews and decides on himself; website plan PR D. A display, never an arm, never a bet rule.)",
+    "status": "exploratory",
+    "family": "exploratory (no ledger slot, no alpha; never evidence for any arm; the personal ledger is untouched)",
+    "doc": "`beatvegas/shortlist.py`, `scripts/publish_shortlist.py`, `shortlist_entries`"
+  },
+  {
     "id": "H-MODEL-FIX",
     "question": "Is the champion with four fixes -- (1) bowl games out of the frame and season-to-date means ordered by date, (2) a 2015 training floor instead of 2003, (3) early-season averages seeded with last season's (`PRIOR_SEASON_WEIGHT` = 3), (4) early stopping off, stated explicitly -- at least as accurate on first halves as the live champion?",
     "status": "tested-null",

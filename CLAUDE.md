@@ -170,12 +170,13 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
 |---|---|---|
-| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
+| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, `shortlist_entries` (the frozen research top 10, scheduled slots), preview |
 | `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
+| `shortlist_publish.yml` | dispatch card_id | `shortlist_entries` for one card that missed (insert-only; refuses a card >24 h old) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
@@ -191,8 +192,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 
 ### Scripts (`scripts/`, grouped; every script is idempotent)
 - **Live jobs**: `weekly_update` (score; `--min-games 0`, serve-skew guard, refit `model_runs`),
-  `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`,
-  `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
+  `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`, `publish_shortlist`
+  (H-1H-SHORTLIST, after each scheduled card), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
@@ -202,14 +203,13 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 - **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
   `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
   `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
-  `neggap_level_study`, `frame_snapshot`, `margin_backtest`,
-  `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
+  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +
   `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `build_trophy_games` (rivalry list),
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
-  `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
+  `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml), `build_shortlist_reference` (freezes `data/shortlist_reference.json` from the H-1H-FACTORS screen).
 - **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (the offline backtest engine and
   its tools went 2026-10-11, roadmap v2.0).
 - **Pricing research (exploratory, read-only)**: `pricing_check` (H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).

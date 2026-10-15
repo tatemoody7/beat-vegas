@@ -257,6 +257,7 @@ def _card_payload(ctx: Ctx) -> Optional[dict]:
                 continue
             if ctx.slot is None or payload.get("slot") == ctx.slot:
                 payload["_built_at"] = row.built_at
+                payload["_id"] = row.id
                 found = payload
                 break
     ctx.cache["card"] = found
@@ -333,6 +334,33 @@ def card_paper_logged_iff_window(ctx: Ctx) -> Result:
     if missing:
         detail += " missing " + ",".join(str(g) for g in missing[:6])
     return Result(not missing, detail)
+
+
+def card_shortlist_published(ctx: Ctx) -> Result:
+    """A scheduled card publishes its frozen research shortlist (H-1H-SHORTLIST, website plan
+    adjustment 2): rows in `shortlist_entries` for the card this run built. The publish step is
+    continue-on-error, so it can never stop the Board; this check is what makes a miss visible
+    (degraded), and `shortlist_publish.yml` recovers it. A `manual` build publishes nothing; a card
+    with no Hard Rock-priced upcoming game has nothing to publish."""
+    from .db.models import ShortlistEntry
+    from .shortlist import pool
+
+    if ctx.slot is None:
+        return Result(False, "slot unknown")
+    if ctx.slot not in SCHEDULED_SLOTS:
+        return Result(True, f"{ctx.slot}: a preview publishes nothing")
+    p = _card_payload(ctx)
+    if p is None:
+        return Result(False, "no card row")
+    n_pool = len(pool(p.get("items") or [], p["_built_at"]))
+    if n_pool == 0:
+        return Result(True, "no Hard Rock-priced upcoming game: nothing to publish")
+    n = ctx.session.query(ShortlistEntry.id).filter(ShortlistEntry.card_id == p["_id"]).count()
+    step = ctx.outcomes.get("shortlist", "") or "?"
+    detail = f"{n} entries for card {p['_id']} (pool {n_pool}, publish step {step})"
+    if n == 0:
+        detail += f"; recover with shortlist_publish.yml card_id={p['_id']}"
+    return Result(n > 0, detail)
 
 
 def card_sweep_reached_slate(ctx: Ctx) -> Result:
@@ -747,9 +775,18 @@ CONTRACTS: Dict[str, Contract] = {
         artifacts=(
             "cards row",
             "manual_picks paper rows (scheduled slots)",
+            "shortlist_entries (scheduled slots, frozen)",
             "odds_snapshots 1H sweep",
         ),
-        inputs=("SLOT", "SEASON", "WEEK", "OUTCOME_SWEEP", "OUTCOME_PREVIEW", "OUTCOME_BUILD"),
+        inputs=(
+            "SLOT",
+            "SEASON",
+            "WEEK",
+            "OUTCOME_SWEEP",
+            "OUTCOME_PREVIEW",
+            "OUTCOME_BUILD",
+            "OUTCOME_SHORTLIST",
+        ),
         checks=(
             Check(
                 "card.row_this_run",
@@ -774,6 +811,12 @@ CONTRACTS: Dict[str, Contract] = {
                 "degraded",
                 "scheduled slot: every qualifying item inside the slot's paper window has a paper pick; manual: zero paper picks placed since RUN_STARTED_AT",
                 card_paper_logged_iff_window,
+            ),
+            Check(
+                "card.shortlist_published",
+                "degraded",
+                "scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no Hard Rock-priced game is upcoming); manual: nothing published",
+                card_shortlist_published,
             ),
             Check(
                 "card.sweep_reached_slate",

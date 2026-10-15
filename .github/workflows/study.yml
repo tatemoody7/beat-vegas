@@ -44,6 +44,7 @@ on:
           - model_fix_study
           - venue_check
           - pricing_check
+          - publish_shortlist
         default: blend_gate
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
@@ -87,7 +88,7 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem|margin_backtest|build_halfpoint_table|consensus_backfill|week_shock_study|protocol_position|literature_look|weather_history_look|judge_check|model_fix_study|venue_check|pricing_check) ;;
+            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem|margin_backtest|build_halfpoint_table|consensus_backfill|week_shock_study|protocol_position|literature_look|weather_history_look|judge_check|model_fix_study|venue_check|pricing_check|publish_shortlist) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"
@@ -99,6 +100,10 @@ jobs:
           # The consensus backfill writes only from grade.yml; here it is a report.
           if [ "$IN_SCRIPT" = consensus_backfill ]; then
             case " ${ARGS[*]} " in *" --write "*) echo "consensus_backfill --write is not a study"; exit 1 ;; esac
+          fi
+          # The shortlist publishes only from card.yml / shortlist_publish.yml; here a dry run.
+          if [ "$IN_SCRIPT" = publish_shortlist ]; then
+            case " ${ARGS[*]} " in *" --write "*) echo "publish_shortlist --write is not a study"; exit 1 ;; esac
           fi
           echo "running: scripts/$IN_SCRIPT.py ${ARGS[*]}"
           python "scripts/$IN_SCRIPT.py" "${ARGS[@]}"

@@ -10,6 +10,18 @@ hold the rest.
 
 ## 2026-10-15
 
+- **2026-10-15 UTC (THE FACTOR SCREEN'S RESULT, AND THE WEBSITE PLAN SHIPS IN FIVE PRS).** H-1H-FACTORS screened 64
+  factors over 2,040 FBS games (2023 616, 2024 630, 2025 637, 2026 157 before the 10-13 card; leak audit 400 games, 0
+  mismatches): none passed Level 1 and none passed Level 2 (`research/1h-factors-2026-10/report.md`). Tate's site audit
+  Q&A (Q1-Q14, four adjustments) then shipped as #405-#409: the Board opens with one slim research line, one list in
+  rank order, badges coloured by the verdict (green meets the week's rule; a key line says neither rank nor colour is a
+  proven edge), short Pass lines, the research-season sentence in the footer (#405); factors worded by scoring, never
+  the bet, under the screen's result (#406); Research dates in words and run ids owner-only, the Results week picker
+  filtering the bet table, an honest units chart, and the stale "1.75+ is the band we bet" replaced by the per-slate
+  rule (#407); H-1H-SHORTLIST, the frozen price-first research top 10 published after each scheduled card, insert-only
+  with a degraded health check and a recovery workflow, reproducing the approved prototype exactly on card 30 (#408);
+  the Research top 10 above the Board and each shortlisted game's full analysis, frozen beside the latest price (#409).
+  Ranks, arms, pv1 and the real-money rules unchanged; the ledger choice (v1.4 / shortlist picks / both) stays open.
 - **2026-10-15 UTC (H-1H-FACTORS REGISTERED BEFORE ANY NUMBER).** Tate's first-half-unders reassessment: a full,
   exploratory factor screen (~44 football and market factors) of where a first-half total lands against the consensus
   close, registered before any computation. Decision times, the outcome, the leakage rule for every factor family, the

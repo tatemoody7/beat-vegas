@@ -147,8 +147,8 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `prisma db pull`: it introspects every table in the shared Neon database (22 models the app
   reads by raw SQL on purpose, six `swfl_*` fishing tables) and strips the comments (2026-10-04).
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
-  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`, the
-  research strip above it), Results (`/results`: the personal stake, the arms' forward picks, the
+  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`, one
+  ranked list under a slim research line), Results (`/results`: the personal stake, the arms' forward picks, the
   pricing opportunities), Research (`/research`: a card per hypothesis from `arm_positions`, the closed
   hypotheses from `web/data/hypotheses.json`) — plus `/game/[id]` (the only place a pick is logged)
   and `/records`. Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. **Owner-only content renders behind

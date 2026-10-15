@@ -7,6 +7,7 @@ import {
   breakEvenPrice,
   contextScore,
   edgeScore,
+  passShort,
   roundHalfUp,
   withBetOpening,
   type EdgeInput,
@@ -808,5 +809,34 @@ describe("withBetOpening (roadmap v1.4)", () => {
       "Bet one unit:",
       "Paper signal:",
     ]);
+  });
+});
+
+// Website plan 2026-10-15, Q4: the Board says a Pass in a few words; the full
+// sentence stays on the game page.
+describe("passShort", () => {
+  it("is null for anything that is not a Pass", () => {
+    expect(passShort(edgeScore(base))).toBeNull(); // a BET
+    const amber = edgeScore({ ...base, bvLine: 23.6, gap: 0.9 });
+    expect(amber.tier).toBe("EDGE");
+    expect(passShort(amber)).toBeNull();
+  });
+
+  it("names the lean and its size when the line is below our number", () => {
+    const r = edgeScore({ ...base, bvLine: 26.6, gap: -2.1 });
+    expect(r.tier).toBe("PASS");
+    expect(passShort(r)).toBe("Pass · leans over 2.1");
+  });
+
+  it("names the line it needs when it is above our number but short of the bar", () => {
+    const r = edgeScore({ ...base, bvLine: 24.2, gap: 0.3 });
+    expect(r.tier).toBe("PASS");
+    expect(passShort(r)).toBe("Pass · short of the bar (needs 26.0)");
+  });
+
+  it("says when the line sits on our number, and when there is no model", () => {
+    const on = edgeScore({ ...base, bvLine: 24.5, gap: 0 });
+    expect(passShort(on)).toBe("Pass · on our number");
+    expect(passShort(edgeScore(noModel))).toBe("Pass · no model number yet");
   });
 });

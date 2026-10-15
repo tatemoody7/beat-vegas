@@ -8,7 +8,6 @@ import {
 } from "@/lib/boardHealth";
 import {
   getHomeBoard,
-  groupByDay,
   matchesFilters,
   parseFilters,
   tierCounts,
@@ -20,8 +19,9 @@ import ResearchStrip from "@/app/components/ResearchStrip";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
+import { BOARD_KEY, BOARD_KEY_OWNER, PASS_HEAD } from "@/lib/boardKey";
 import { viewerIsAuthed } from "@/lib/session";
-import Link from "next/link";
+import { Fragment } from "react";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import OpsBanner from "@/app/components/OpsBanner";
 import BoardFilters from "@/app/components/BoardFilters";
@@ -32,8 +32,8 @@ import WeekSelect from "@/app/components/WeekSelect";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
-// The board IS the home page: one rolling week, grouped by day, every game
-// ranked best to worst with one line saying what to do. Each row is a LINK to
+// The board IS the home page: one rolling week, every game ranked best to
+// worst in one list with one line saying what to do. Each row is a LINK to
 // /game/[id] — nothing expands in place any more, which is what took a week
 // from 11,600px down to a list you can scan.
 //
@@ -95,32 +95,18 @@ export default async function BoardPage({
   // Held (BETTING_POLICY, B3 2026-10-14): a failed input on the scheduled
   // build touched these; paper only until a clean build, in their own group.
   const held = upcoming.filter((g) => g.hold === "degraded");
-  const days = groupByDay(upcoming.filter((g) => g.hold !== "degraded"));
+  // One list in rank order (Tate 2026-10-15, Q2): `games` is already in the
+  // order assignBoardRanks numbered, so #1 comes first; each row keeps its day
+  // and kickoff. Pass rows sort last (their score is under the amber band) and
+  // get one heading instead of the same sentence on every row (Q4).
+  const ranked = upcoming.filter((g) => g.hold !== "degraded");
+  const firstPass = ranked.findIndex((g) => g.edge.tier === "PASS");
 
   return (
     <div className="mx-auto max-w-5xl">
-      {/* Two lines for a first-time visitor, always shown (Tate 2026-09-28):
-          what this is, what green means, where the record lives. */}
-      <p
-        className="mb-5 border-l-2 border-[var(--accent)] bg-[var(--accent-soft)] py-2.5 pl-3.5 pr-3 text-sm leading-snug text-[var(--text)]"
-        aria-label="What this is"
-      >
-        Beat Vegas rates college football first-half unders, priced at Hard Rock
-        Bet.
-        {authed
-          ? " Green means bet, inside this week’s cap; past it, a paper signal."
-          : ""}{" "}
-        Every result, losses included, is on Results.{" "}
-        <Link
-          href="/research"
-          className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
-        >
-          Research →
-        </Link>
-      </p>
-
-      {/* The research status, one line + a pill per hypothesis, from the stored
-          Monday read (Tate, 2026-10-14). It never touches a rating. */}
+      {/* One slim line (Tate 2026-10-15, Q1): what this is and where the
+          research stands, then straight to the games. It reads the stored
+          Monday row and never changes a rating. */}
       <ResearchStrip cards={cardsFor(await getArmPositions())} />
 
       <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
@@ -140,12 +126,21 @@ export default async function BoardPage({
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
       {board.slate.n > 0 && (
-        <p className="mb-3 text-xs text-[var(--text-dim)]">
+        <p className="mb-1 text-xs text-[var(--text-dim)]">
           {/* Shortened 2026-09-28 (Tate): the rows already say why a game is
               not a bet, so the gate clause and the clearing count went. */}
           {`Bar this week: ${board.slate.bar.toFixed(1)} pts (top ${Math.round(100 * board.slate.share)}% of ${board.slate.n} priced games).`}
         </p>
       )}
+      {/* Model, rule and price are three different things and the Board never
+          blends them (website plan adjustment 4, 2026-10-15). */}
+      <p
+        aria-label="How to read the Board"
+        className="mb-3 text-xs text-[var(--text-dim)]"
+      >
+        {BOARD_KEY}
+        {authed ? ` ${BOARD_KEY_OWNER}` : ""}
+      </p>
 
       <div className="mb-3">
         <BoardFilters current={filters} />
@@ -271,16 +266,25 @@ export default async function BoardPage({
                   </div>
                 </section>
               )}
-              {days.map((grp) => (
-                <section key={grp.label} aria-label={grp.label}>
-                  <h2 className="bv-day-head">{grp.label}</h2>
+              {ranked.length > 0 && (
+                <section aria-label="Ranked">
                   <div className="flex flex-col gap-3">
-                    {grp.games.map((g) => (
-                      <GameRow key={g.row.gameId} g={g} />
+                    {ranked.map((g, i) => (
+                      <Fragment key={g.row.gameId}>
+                        {i === firstPass && (
+                          <p
+                            aria-label="Pass games"
+                            className="bv-day-head mt-3"
+                          >
+                            {PASS_HEAD}
+                          </p>
+                        )}
+                        <GameRow g={g} />
+                      </Fragment>
                     ))}
                   </div>
                 </section>
-              ))}
+              )}
 
               {played.length > 0 && (
                 <section aria-label="Played">

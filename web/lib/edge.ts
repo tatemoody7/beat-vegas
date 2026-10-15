@@ -322,6 +322,23 @@ export function edgeScore(i: EdgeInput): EdgeResult {
 }
 
 /**
+ * The Board's short form of a Pass (website plan 2026-10-15, Q4): every Pass
+ * game stays on the Board with its rank, but says its reason in a few words;
+ * "we only rate unders" is said once above the Pass rows instead of on each.
+ * The full sentence (`action`) stays on the game page and in card.py. Null for
+ * anything that is not a Pass.
+ */
+export function passShort(r: EdgeResult): string | null {
+  if (r.tier !== "PASS") return null;
+  if (r.gap === null) return "Pass · no model number yet";
+  if (Math.abs(r.gap) < 0.05) return "Pass · on our number";
+  if (r.gap < 0) return `Pass · leans over ${fmt(Math.abs(r.gap))}`;
+  return r.kill.line !== null
+    ? `Pass · short of the bar (needs ${fmt(r.kill.line)})`
+    : "Pass · short of the bar";
+}
+
+/**
  * The two openings of a BET's action sentence (roadmap v1.4, Tate 2026-10-08):
  * a BET inside the week's real-money cap is a bet; past the cap, or in a
  * visitor's view, the same pick is a paper signal. Mirrored by beatvegas/card.py.

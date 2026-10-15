@@ -13,6 +13,7 @@ import {
   type TeamSplit,
 } from "@/lib/score";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import { tierColor } from "@/lib/grade";
 import LogPickButton from "@/app/components/LogPickButton";
 import TeamLogo from "@/app/components/TeamLogo";
 
@@ -378,9 +379,7 @@ function NewsSection({ g }: { g: HomeGame }) {
 /** Tier colour, the same language the board badge speaks. */
 function tierTone(g: HomeGame): string {
   if (g.settled !== null) return "var(--push)";
-  if (g.edge.tier === "BET") return "var(--good)";
-  if (g.edge.tier === "PASS") return "var(--bad)";
-  return "var(--warn)";
+  return `var(--${tierColor(g.edge.tier)})`;
 }
 
 export default function GameDetail({

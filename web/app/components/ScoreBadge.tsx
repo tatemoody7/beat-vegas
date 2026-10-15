@@ -1,17 +1,28 @@
 import type { ReactNode } from "react";
-import { gradeColor, gradeWord, type Settled } from "@/lib/grade";
+import {
+  gradeColor,
+  gradeWord,
+  tierColor,
+  TIER_WORD,
+  type Settled,
+  type VerdictTier,
+} from "@/lib/grade";
 
 // The card's headline block, in one of three states. Before kickoff it is the
-// game's place on the board (#1 = best game of the week) over the tier word,
-// coloured by the score band (70+ green, 55–69 amber, under 55 red). Once the
+// game's place on the board (#1 = best game of the week), coloured by the
+// verdict when one is passed (green meets this week's rule, amber not yet, red
+// pass -- Tate 2026-10-15, Q3), else by the score band (70+ green, 55–69 amber,
+// under 55 red). Once the
 // game starts there is no decision left, so it reads LIVE in grey — FINAL once
 // it must be over — and once it settles it reads the result in the result's
 // colour. Never cyan: cyan is
 // chrome. The 0–100 score itself lives inside the card, under "Our number".
 
 type Props = {
-  /** 0–100; sets the colour before kickoff. */
+  /** 0–100; sets the colour before kickoff when no `tier` is passed. */
   score: number | null;
+  /** The verdict; when set it colours the badge before kickoff (Q3). */
+  tier?: VerdictTier;
   /** Place on the board this week; null once the game has kicked off. */
   rank: number | null;
   /** The game has started. */
@@ -54,6 +65,7 @@ const WORD = "text-[0.6rem] font-bold uppercase tracking-wide";
 
 export default function ScoreBadge({
   score,
+  tier,
   rank,
   kickedOff,
   inPlay,
@@ -82,20 +94,20 @@ export default function ScoreBadge({
       </Box>
     );
   }
-  const tier = label === null ? null : (label ?? gradeWord(score, null));
+  const shown = label === null ? null : (label ?? gradeWord(score, null));
   // Screen readers still get the tier even when it is not drawn — the colour
   // carries it visually and nothing carries it otherwise.
-  const word = gradeWord(score, null);
+  const word = tier !== undefined ? TIER_WORD[tier] : gradeWord(score, null);
   return (
     <Box
-      color={gradeColor(score, null)}
+      color={tier !== undefined ? tierColor(tier) : gradeColor(score, null)}
       aria={rank === null ? `Unranked, ${word}` : `Rank ${rank}, ${word}`}
       className={className}
     >
       <span className="font-[family-name:var(--font-display)] text-2xl font-extrabold leading-none tabular-nums">
         {rank === null ? "—" : `#${rank}`}
       </span>
-      {tier !== null && <span className={`mt-0.5 ${WORD}`}>{tier}</span>}
+      {shown !== null && <span className={`mt-0.5 ${WORD}`}>{shown}</span>}
     </Box>
   );
 }

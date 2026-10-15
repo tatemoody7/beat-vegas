@@ -7,6 +7,7 @@ import {
   SCORE_WATCH_MIN,
   settledOf,
 } from "./grade";
+import { tierColor, TIER_WORD } from "./grade";
 
 describe("gradeOf", () => {
   it("bands 70+ bet, 55–69 watch, under 55 pass, with exact boundaries", () => {
@@ -54,5 +55,21 @@ describe("gradeColor / gradeWord", () => {
     expect(gradeColor(40, "won")).toBe("good");
     expect(gradeColor(74, "push")).toBe("push");
     expect(gradeWord(74, "lost")).toBe("lost");
+  });
+});
+
+// Q3, 2026-10-15: the badge is coloured by the verdict, and its words never
+// claim more than the rule (adjustment 4).
+describe("tierColor", () => {
+  it("is green for a game meeting the rule, amber for not yet, red for pass", () => {
+    expect(tierColor("BET")).toBe("good");
+    expect(tierColor("EDGE")).toBe("warn");
+    expect(tierColor("PASS")).toBe("bad");
+  });
+
+  it("never words green as an edge", () => {
+    expect(TIER_WORD.BET).toBe("meets this week's rule");
+    for (const w of Object.values(TIER_WORD))
+      expect(w).not.toMatch(/edge|value/);
   });
 });

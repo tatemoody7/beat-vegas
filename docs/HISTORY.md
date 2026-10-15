@@ -10,6 +10,12 @@ hold the rest.
 
 ## 2026-10-15
 
+- **2026-10-15 UTC (H-1H-FACTORS REGISTERED BEFORE ANY NUMBER).** Tate's first-half-unders reassessment: a full,
+  exploratory factor screen (~44 football and market factors) of where a first-half total lands against the consensus
+  close, registered before any computation. Decision times, the outcome, the leakage rule for every factor family, the
+  leak audit, the two levels (preliminary association; improves on the market out of sample) and their thresholds are
+  fixed in the row. It feeds a research shortlist prototype only; no arm, pv1, Board or money rule changes, and any
+  factor that passes needs its own forward test before it can carry weight.
 - **2026-10-15 UTC (THE OPENING WATCH MOVES TO VERCEL'S HOURLY TRIGGER).** GitHub fired 0 of ~4 scheduled watch ticks in
   its first 95 minutes (its other scheduled jobs had last fired at 07:35Z), so Tate chose Vercel's hourly entries as the
   trigger (`web/lib/cronJobs.ts` `opening-watch`: 24 daily entries, one per UTC hour, every tick dispatches; Vercel lands

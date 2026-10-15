@@ -183,6 +183,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
 | `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
+| `opening_watch.yml` | cron every 20 min, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every
 workflow installs `pip install --require-hashes -r requirements/lock.txt` (Python 3.11, 32 pins)
@@ -213,9 +214,8 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
   its tools went 2026-10-11, roadmap v2.0).
 - **Pricing research (exploratory, read-only)**: `pricing_check` (H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
 - **Probes**: `probe_hr_keys` (one-off, by hand: `hardrockbet` vs `hardrockbet_fl` with the feed's
-  raw keys and stamps kept; prints the credits it spent; writes nothing); `probe_alt_totals_h1` (programme 4.4, one run, Hard Rock + 9 books in one region, ≤24 credits).
-- **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` +
-  `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
+  raw keys and stamps kept; prints the credits it spent; writes nothing); `probe_alt_totals_h1` (programme 4.4, one run, Hard Rock + 9 books in one region, ≤24 credits); `opening_watch` (temporary, ≤5,500 credits).
+- **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)

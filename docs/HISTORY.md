@@ -10,6 +10,18 @@ hold the rest.
 
 ## 2026-10-15
 
+- **2026-10-15 UTC (THE MARKET-OPENING WATCH, TEMPORARY).** Tate asked when every book we can see opens next week's
+  first-half totals, team totals and full-game totals. History first (Odds API 5-minute archive, research run
+  `research/line-release-2026-10-15/`, 6,509 credits): Hard Rock's first-half totals for 20 of 20 sampled week-5
+  games appeared Monday 9-28 between ~8:20am and noon ET, and week 6 and 7 games mostly Monday morning (a few Monday
+  afternoon or Tuesday) -- 6 to 32 hours before our first Tuesday capture; Kalshi listed week 5's first-half totals
+  Monday 5:17pm ET. Live next: `.github/workflows/opening_watch.yml` runs `scripts/opening_watch.py` every 20 minutes
+  (every 10 on Monday 6am-1pm ET) from Friday 10-16 6pm to Tuesday 10-20 6pm ET. It asks each market only of books that
+  have not posted it (an empty answer is free, so credits are spent only at an opening), reads full-game totals every
+  other tick, snapshots opened first halves every 6 hours, keeps each first sighting's window (last miss -> first hit),
+  stops all paid calls at 5,500 credits, and writes nothing to the database (state in the actions cache, ticks as
+  artifacts). Two local test ticks: 92 calls, 5 credits, then 0. Kalshi is read afterwards from its public history
+  (creation to the microsecond, per-minute bid/ask), finer than polling. Removed by its own PR after Tuesday.
 - **2026-10-15 UTC (THE ALTERNATE-LINE PROBE COMPARES HARD ROCK WITH THE MARKET).** Tate approved adding up to nine
   other books to Saturday's one probe run. The same call now names the configured `bookmakers_1h` list (Hard Rock plus
   nine). The Odds API bills an event call as unique markets returned x regions, and up to 10 named books are one region

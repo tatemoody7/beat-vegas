@@ -15,6 +15,7 @@ tint can never fool the reader before the real-line ledger has spoken.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -53,11 +54,15 @@ BOARD_FACTOR_NAMES: List[str] = [
 _NEUTRAL_EPS = 0.15  # |lean| at/below this reads as neutral
 _INTENSITY_CAP = 2.0  # a lean of this many spreads = full tint
 
+# What a factor says about SCORING, never about the bet (Tate 2026-10-15, Q5):
+# the line already prices these, and H-1H-FACTORS found none that beats it (64
+# tested, none passed). Amber (a hypothesis) carries no direction; the board
+# shows its "unproven" chip instead.
 _DIR_WORD = {
-    "green": "helps",
-    "red": "hurts",
-    "neutral": "is neutral for",
-    "amber": "unproven for",
+    "green": "points to less scoring",
+    "red": "points to more scoring",
+    "neutral": "small effect, if any",
+    "amber": "",
     "unknown": "",
 }
 
@@ -78,9 +83,11 @@ def _fill(factor: Factor, value, color: str) -> str:
     if not factor.sentence:
         return ""
     try:
-        return factor.sentence.format(value=value, dir=_DIR_WORD.get(color, ""))
+        text = factor.sentence.format(value=value, dir=_DIR_WORD.get(color, ""))
     except (KeyError, ValueError, IndexError):
         return factor.sentence
+    # An empty direction leaves "<fact> — ." or "<fact> —  (note)."; drop the dash.
+    return re.sub(r"\s+—\s+(?=[.(])", " ", text).replace(" .", ".")
 
 
 def tint_factor(factor: Factor, value, median=None, spread=None) -> Tint:

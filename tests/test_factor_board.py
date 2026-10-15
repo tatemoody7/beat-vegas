@@ -137,7 +137,9 @@ def test_tint_fills_sentence_with_value_and_direction():
     wind = factor_by_name("wx_wind")
     t = tint_factor(wind, value=20.0, median=8.0, spread=6.0)
     assert "20" in t.sentence
-    assert "helps" in t.sentence  # green => "helps"
+    # green => fewer points; the sentence speaks of scoring, never the bet (Q5)
+    assert t.sentence.endswith("— points to less scoring (passing & kicking).")
+    assert "under" not in t.sentence
 
 
 # --- references + board emission ---------------------------------------------
@@ -241,3 +243,20 @@ def test_build_factor_board_passes_cooling_flag():
     board = build_factor_board(row, {"combined_sec_play": (28.0, 3.0)}, ledger=ledger)
     f = next(b for b in board if b["key"] == "combined_sec_play")
     assert f["live"]["cooling"] is True
+
+
+def test_no_factor_sentence_speaks_of_the_bet():
+    """Q5 (Tate 2026-10-15): factors explain the line; none has been shown to
+    beat it, so no template may say it helps or hurts the under."""
+    from beatvegas.factors.registry import default_registry
+
+    for f in default_registry():
+        assert "the under" not in (f.sentence or ""), f.name
+
+
+def test_an_amber_or_neutral_direction_reads_cleanly():
+    from beatvegas.factors.board import _fill
+
+    wind = factor_by_name("wx_wind")
+    assert _fill(wind, 12.0, "amber") == "Wind 12 mph (passing & kicking)."
+    assert _fill(wind, 12.0, "neutral") == "Wind 12 mph — small effect, if any (passing & kicking)."

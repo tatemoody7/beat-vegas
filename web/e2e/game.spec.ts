@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fixture } from "./helpers/fixture";
+import { FACTOR_NOTE } from "../lib/score";
 
 // /game/[id] (app/components/GameDetail.tsx): the decision block must show the
 // SAME numbers the board row carried (it rebuilds the whole week to get the
@@ -202,6 +203,30 @@ test.describe("the game page", () => {
         "Won · first half 27, line 30.5",
       );
     });
+  });
+
+  // Q5 (Tate 2026-10-15): the factors explain the line in scoring words; the
+  // seed stores the OLD wording, so this also proves stored rows are rewritten.
+  test("words every factor by scoring, never the bet, under the screen's note", async ({
+    page,
+  }) => {
+    let directed = 0;
+    for (const id of [BET_LOGGED, BET_OPEN, PRICE_BLOCKED, GAP_SHORT, HR_ALT]) {
+      await page.goto(`/game/${id}`);
+      const why = page.locator("section.bv-card", {
+        hasText: "What is behind it",
+      });
+      await expect(
+        why.locator('p[aria-label="What the factors can tell you"]'),
+      ).toHaveText(FACTOR_NOTE);
+      const texts = await why.locator(".bv-fac-text").allTextContents();
+      expect(texts.length, `${id}`).toBeGreaterThan(0);
+      for (const t of texts) expect(t, `${id}`).not.toMatch(/the under/);
+      directed += texts.filter((t) => t.includes("points to")).length;
+    }
+    // The seed words some factors "— helps the under." / "works against the
+    // under": they must arrive rewritten.
+    expect(directed).toBeGreaterThan(0);
   });
 
   test("lists every book's open and current line, Hard Rock's move included", async ({

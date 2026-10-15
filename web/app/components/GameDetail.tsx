@@ -7,6 +7,8 @@ import type { HomeGame } from "@/lib/homeBoard";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
+  FACTOR_NOTE,
+  scoringWords,
   type BoardFactor,
   type SplitLeg,
   type TeamForm,
@@ -162,7 +164,7 @@ function FactorRow({ f }: { f: BoardFactor }) {
   return (
     <div className="bv-fac-row" style={{ background: tint.bg }}>
       <span className="bv-fac-text">
-        {f.sentence || `${f.label} — ${f.value}`}
+        {f.sentence ? scoringWords(f.sentence) : `${f.label} — ${f.value}`}
       </span>
       {f.hypothesis && (
         <span className="bv-fac-badge bv-fac-badge-amber">unproven</span>
@@ -234,6 +236,14 @@ function WhySection({ g }: { g: HomeGame }) {
 
   return (
     <Section title="What is behind it">
+      {factors.length > 0 && (
+        <p
+          aria-label="What the factors can tell you"
+          className="mb-2 text-xs text-[var(--text-dim)]"
+        >
+          {FACTOR_NOTE}
+        </p>
+      )}
       {factors.length > 0 ? (
         <div className="mb-3">
           {factors.map((fac) => (

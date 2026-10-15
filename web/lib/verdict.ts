@@ -281,15 +281,18 @@ function driverSentences(board: BoardFactor[] | null | undefined): string[] {
   );
   usable.sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
   return usable.slice(0, 2).map((f) => {
+    // Scoring words, never the bet (Tate 2026-10-15, Q5).
     const tail =
-      f.color === "green" ? "helps the under." : "works against the under.";
-    // board.py already words most sentences "<fact> — helps the under."; strip
-    // that tail so we never render "— helps the under — helps the under."
+      f.color === "green"
+        ? "points to less scoring."
+        : "points to more scoring.";
+    // board.py words most sentences "<fact> — points to less scoring." (and
+    // older rows "— helps the under."); strip that tail so it is never doubled.
     const s = f.sentence
       .trim()
       .replace(/[.]+$/, "")
       .replace(
-        /\s+[—–-]+\s+(helps|hurts|works against|is neutral for)\b[^—–]*$/i,
+        /\s+[—–-]+\s+(helps|hurts|works against|is neutral for|points to|small effect)\b[^—–]*$/i,
         "",
       )
       .trim();

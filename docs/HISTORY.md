@@ -10,6 +10,12 @@ hold the rest.
 
 ## 2026-10-15
 
+- **2026-10-15 UTC (THE OPENING WATCH MOVES TO VERCEL'S HOURLY TRIGGER).** GitHub fired 0 of ~4 scheduled watch ticks in
+  its first 95 minutes (its other scheduled jobs had last fired at 07:35Z), so Tate chose Vercel's hourly entries as the
+  trigger (`web/lib/cronJobs.ts` `opening-watch`: 24 daily entries, one per UTC hour, every tick dispatches; Vercel lands
+  each within the hour) with GitHub's 20-minute cron kept as a backup. Live ticks find the hour each book opened; the
+  provider's 5-minute archive then narrows the key openings afterwards (~30 credits an opening). The script still
+  refuses to spend outside Fri 18:00 - Tue 18:00 ET. Removed with the watch after Tuesday.
 - **2026-10-15 UTC (THE MARKET-OPENING WATCH, TEMPORARY).** Tate asked when every book we can see opens next week's
   first-half totals, team totals and full-game totals. History first (Odds API 5-minute archive, research run
   `research/line-release-2026-10-15/`, 6,509 credits): Hard Rock's first-half totals for 20 of 20 sampled week-5

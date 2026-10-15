@@ -150,9 +150,14 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     expect(job.workflow).toBe("lines_watch.yml");
     expect(dispatchBody(job).inputs).toEqual({ market: "1h_close" });
     expect(job.everyTick).toBe(true);
-    // Only the close polls may skip the duplicate probe: a card build that ran
+    // Only the close polls (and the temporary opening watch, which pays only when a
+    // book opens a market) may skip the duplicate probe: a card build that ran
     // twice spends a whole sweep, a close poll that ran twice re-sees the same lines.
-    const closePolls = new Set(["lines-close", "close-weeknight"]);
+    const closePolls = new Set([
+      "lines-close",
+      "close-weeknight",
+      "opening-watch",
+    ]);
     for (const [id, j] of Object.entries(CRON_JOBS)) {
       if (!closePolls.has(id)) expect(j.everyTick ?? false).toBe(false);
     }
@@ -475,5 +480,22 @@ describe("vercel.json stays in lock-step with the table", () => {
         ).toBeGreaterThanOrEqual(1);
       }
     }
+  });
+});
+
+describe("opening-watch (temporary research, 2026-10-15)", () => {
+  const job = CRON_JOBS["opening-watch"];
+
+  it("dispatches the read-only watch on every hourly tick (the script holds the Fri-Tue window)", () => {
+    expect(job.workflow).toBe("opening_watch.yml");
+    expect(dispatchBody(job).inputs).toBeUndefined();
+    expect(job.everyTick).toBe(true);
+    expect(job.days).toBeNull();
+    expect(dispatchDecision(job, at("2026-10-18T07:05:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-10-19T13:05:00Z")).allowed).toBe(
+      true,
+    );
   });
 });

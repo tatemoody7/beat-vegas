@@ -183,7 +183,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
 | `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
-| `opening_watch.yml` | cron every 20 min, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
+| `opening_watch.yml` | Vercel `opening-watch` hourly + GitHub 20-min backup, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every
 workflow installs `pip install --require-hashes -r requirements/lock.txt` (Python 3.11, 32 pins)

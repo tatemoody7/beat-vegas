@@ -11,22 +11,22 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 ## Board
 
-- [board] The research status strip above the board: one line (strategies on paper, readings toward 30, next read), a pill per hypothesis with what it logged, the link to /research; public — board.spec.ts › "carries the research status strip above the board: one line, a pill per hypothesis, the link"
 - [board] Every row is a link to `/game/<id>` and the id set is exactly the fixture week's — board.spec.ts › "every row links to its game page and the ids are the fixture's week"
-- [board] Games group by ET day Thu, Fri, Sat, with played games in a `Played · N` section last — board.spec.ts › "groups the week Thu, Fri, Sat, then Played last"
+- [board] One ranked list (no day groups, Tate 2026-10-15 Q2) in a `Ranked` section, with played games in a `Played · N` section last — board.spec.ts › "lists the week as one ranked list, then Played last"
+- [board] A Pass row says its reason in a few words (`Pass · leans over 2.1` …) under one `Pass` heading placed right before the first Pass row; every badge is coloured by its verdict, green exactly on the BET rows (Q3, Q4) — board.spec.ts › "says a Pass in a few words under one heading, and colours each badge by its verdict"
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
 - [board] The `N bet(s) · N watch · N pass` counts line (signed in) matches the derived tiers — board.spec.ts › "states the tier counts"
 - [board] The H-PCT bar sentence (`Bar this week: <bar> pts (top <share>% of <n> priced games).`, one decimal, no gate clause since 2026-09-28) is exact — board.spec.ts › "states this week’s bar exactly"
-- [board] The two-line strip (what this is, signed in: green means bet inside this week's cap and a paper signal past it, every result is on Results) opens the page and links to How it works — board.spec.ts › "opens with the two-line strip that says what this is"
+- [board] The slim line (research season, first-half unders at Hard Rock, strategies on paper, readings, next read, the /research link; it replaced the intro note and the pill strip, Q1 2026-10-15) sits above the week heading, and the key line keeps model, rule and price apart (signed in: plus what green means for the cap) — board.spec.ts › "opens with the slim line and the key that keeps model, rule and price apart"
 - [board] A game with a real ticket carries the `bet logged` chip and no other row does — board.spec.ts › "marks the game with a logged ticket"
 - [board] The Hard Rock chip sets `?hr=1`, reads `aria-pressed`, hides games without a Hard Rock line and states the pre-filter count — board.spec.ts › "the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line"
 - [board] The Hard Rock chip is the only filter chip, signed in or out (the My teams chip went with roadmap v2.0) — board.spec.ts › "the Hard Rock filter is the only chip, signed in or out"
-- [board] Signed out (research season, roadmap v1.7): the banner reads exactly, the strip drops "green means", no answer bar and no tier counts render, and every pre-kickoff row carries its rank badge with the BET rows lit, in paper wording — no `Bet one unit`, no `bet logged` chip — board.spec.ts › "a visitor reads the research-season banner and the board with its ratings in paper wording"
+- [board] Signed out (research season, roadmap v1.7): the footer carries the research-season sentence exactly (moved from under the header, Q10), the key line drops the cap clause, no answer bar and no tier counts render, and every pre-kickoff row carries its rank badge with the BET rows lit, in paper wording — no `Bet one unit`, no `bet logged` chip — board.spec.ts › "a visitor reads the research-season banner and the board with its ratings in paper wording"
 - [board] `?days=sat` (parsed, no UI) keeps only Saturday's games and heading — board.spec.ts › "?days=sat keeps only Saturday’s games"
 - [board] On the clean fixture no banner renders: no `role=status`, no missed build, no stale results, no pause, no no-model, no no-HR-line — board.spec.ts › "every banner is silent in the clean state"
 - [board] `odds_credits_remaining` under the floor lights the OpsBanner (signed in only; a visitor sees none) with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
-- [board] `rule_paused=true` is reported by `/api/health.rulePaused`; the board shows the research-season banner and no separate pause box; restored afterwards — board.spec.ts › "the real-money switch is reported by /api/health; the season banner speaks for it on the board"
+- [board] `rule_paused=true` is reported by `/api/health.rulePaused`; the footer shows the research-season sentence and no separate pause box; restored afterwards — board.spec.ts › "the real-money switch is reported by /api/health; the season banner speaks for it on the board"
 - [board] Every lit BET row says how old its Hard Rock price is (B5); no other row does — board.spec.ts › "every lit BET row says how old its Hard Rock price is; no other row does"
 
 ## Game page

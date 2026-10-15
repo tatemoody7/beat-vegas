@@ -1,22 +1,11 @@
 import Link from "next/link";
 import type { HypothesisCard } from "@/lib/research";
-import { HYPOTHESES } from "@/lib/research";
 
-// The one-line research status above the Board (Tate, 2026-10-14: "the Board
-// with a status strip above it"): how far the paper strategies are from their
-// first decision, one pill per hypothesis with what it has logged, and the
-// link to the Research page. It reads the stored Monday row like the cards do
-// and never changes a rating; a visitor sees the same line.
-
-const SHORT: Record<string, string> = {
-  "H-ARM-1HU": "1H unders",
-  "H-ARM-1HO": "1H overs",
-  "H-ARM-FGU": "FG unders",
-  "H-ARM-WX1H": "Wind 1H",
-  "H-ARM-WXFG": "Wind FG",
-  "H-ARM-HT1H": "60+ totals",
-  "H-PRICE-HR": "Hard Rock pricing",
-};
+// The one slim line above the Board (Tate, 2026-10-15, Q1; it replaced the
+// intro note and the pill strip of 2026-10-14): what this is, how far the paper
+// strategies are from their first decision, and the link to Research. It reads
+// the stored Monday row like the cards do and never changes a rating; a visitor
+// sees the same line.
 
 export function stripLine(cards: HypothesisCard[]): string {
   const arms = cards.filter((c) => c.meta.standard === "sprt");
@@ -36,36 +25,24 @@ export function stripLine(cards: HypothesisCard[]): string {
   return `${head} · ${progress}${next ? ` · next read ${next}` : ""}`;
 }
 
+/** The slim line's fixed opening (Tate 2026-10-15, Q1). */
+export const SLIM_LEAD = "Research season · first-half unders at Hard Rock";
+
 export default function ResearchStrip({ cards }: { cards: HypothesisCard[] }) {
-  if (cards.length === 0) return null;
   return (
-    <div
+    <p
       aria-label="Research status"
-      className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-2)] px-3 py-2 text-xs"
+      className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]"
     >
-      <span className="font-semibold text-[var(--text)]">
-        {stripLine(cards)}
+      <span>
+        {cards.length > 0 ? `${SLIM_LEAD} · ${stripLine(cards)}` : SLIM_LEAD}
       </span>
-      {cards.map((c) => (
-        <span
-          key={c.meta.id}
-          className="bv-pill"
-          data-hypothesis={c.meta.id}
-          title={`${c.meta.name}: ${c.status}`}
-        >
-          {`${SHORT[c.meta.id] ?? HYPOTHESES.find((h) => h.id === c.meta.id)?.name ?? c.meta.id} ${
-            c.meta.standard === "pricing"
-              ? `${c.readings} / ${c.needed}`
-              : c.logged
-          }`}
-        </span>
-      ))}
       <Link
         href="/research"
-        className="ml-auto inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
+        className="inline-flex min-h-6 items-center whitespace-nowrap font-semibold text-[var(--accent)] hover:underline"
       >
         Research →
       </Link>
-    </div>
+    </p>
   );
 }

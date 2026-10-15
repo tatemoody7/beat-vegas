@@ -58,22 +58,15 @@ export default async function RootLayout({
             <HeaderChrome />
           </div>
         </header>
-        {/* The research season (docs/ROADMAP_2026.md): one full-width strip
-            under the header on every page, aligned with the header rather than
-            any one page's column. Outside <header>, so the header keeps its
-            height; not role=status — it is the season, not an alert. */}
-        <div className="border-b border-[var(--border)] bg-[var(--bg-2)]">
-          <p
-            className="mx-auto max-w-7xl px-4 py-2 text-sm leading-snug text-[var(--text)] sm:px-6"
-            aria-label="Research season"
-          >
-            {RESEARCH_BANNER}
-          </p>
-        </div>
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {children}
         </main>
         <footer className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-xs text-[var(--text-dim)]">
+          {/* The research season moved here from under the header (Tate
+              2026-10-15, Q10): said on every page, out of the way of it. */}
+          <p className="w-full" aria-label="Research season">
+            {RESEARCH_BANNER}
+          </p>
           <span>
             This site rates bets. It never places one. Not betting advice. 21+,
             Florida, Hard Rock Bet. Past results do not predict future results.

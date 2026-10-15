@@ -60,6 +60,30 @@ export function gradeColor(
   return g === null ? "push" : GRADE_COLOR[g];
 }
 
+/** The verdict tier as edgeScore names it (lib/edge.ts EdgeTier). */
+export type VerdictTier = "BET" | "EDGE" | "PASS";
+
+const TIER_COLOR: Record<VerdictTier, GradeColor> = {
+  BET: "good",
+  EDGE: "warn",
+  PASS: "bad",
+};
+
+/** Plain words for the verdict colour (website plan 2026-10-15, Q3 + adjustment
+ *  4): green is the week's RULE being met, never a proven edge. */
+export const TIER_WORD: Record<VerdictTier, string> = {
+  BET: "meets this week's rule",
+  EDGE: "not yet",
+  PASS: "pass",
+};
+
+/** The colour of a pre-kickoff badge: the verdict, not the score band (Q3,
+ *  2026-10-15). The board and the game page read this one helper, so a game
+ *  can no longer be green on the board and amber on its page. */
+export function tierColor(tier: VerdictTier): GradeColor {
+  return TIER_COLOR[tier];
+}
+
 /** The word beside the number: "won" / "lost" / "push" once settled, else the
  *  grade. Both enums already read as plain lower-case words, so the key is the word. */
 export function gradeWord(

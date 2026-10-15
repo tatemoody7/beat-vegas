@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
 import { RESEARCH_BANNER } from "../lib/signalGate";
+import { BOARD_KEY, BOARD_KEY_OWNER, PASS_HEAD } from "../lib/boardKey";
+import { SLIM_LEAD } from "../app/components/ResearchStrip";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
 // number asserted here is derived in e2e/fixture/expected.mjs from the same rows
@@ -18,6 +20,10 @@ async function rows(page: Page) {
       id: Number(el.id.replace("game-", "")),
       href: el.getAttribute("href"),
       badge: el.querySelector("span[aria-label]")?.textContent?.trim() ?? "",
+      badgeColor:
+        (el.querySelector("span[aria-label]") as HTMLElement | null)?.style
+          .background ?? "",
+      text: el.querySelector("p")?.textContent?.trim() ?? "",
       section: el.closest("section")?.getAttribute("aria-label") ?? "(none)",
       lit: el.classList.contains("bv-card--lit"),
       chips: [...el.querySelectorAll(".bv-badge")].map((c) =>
@@ -28,15 +34,24 @@ async function rows(page: Page) {
 }
 
 test.describe("the board", () => {
-  test("opens with the two-line strip that says what this is", async ({
+  test("opens with the slim line and the key that keeps model, rule and price apart", async ({
     page,
   }) => {
     await page.goto("/");
-    const strip = page.locator('p[aria-label="What this is"]');
-    await expect(strip).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Green means bet, inside this week’s cap; past it, a paper signal. Every result, losses included, is on Results. Research →",
+    const slim = page.locator('p[aria-label="Research status"]');
+    await expect(slim).toContainText(
+      `${SLIM_LEAD} · 6 strategies on paper · up to 12 of 30 readings · next read`,
     );
-    await expect(strip.getByRole("link")).toHaveAttribute("href", "/research");
+    await expect(slim.getByRole("link")).toHaveAttribute("href", "/research");
+    await expect(slim.locator(".bv-pill")).toHaveCount(0);
+    await expect(page.locator('p[aria-label="What this is"]')).toHaveCount(0);
+    await expect(
+      page.locator('p[aria-label="How to read the Board"]'),
+    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_OWNER}`);
+    // The slim line sits above the week heading, never inside the board.
+    const slimBox = await slim.boundingBox();
+    const heading = await page.locator("h1.bv-page-title").boundingBox();
+    expect(slimBox!.y).toBeLessThan(heading!.y);
   });
 
   test("every row links to its game page and the ids are the fixture's week", async ({
@@ -51,52 +66,59 @@ test.describe("the board", () => {
     for (const x of r) expect(x.href).toBe(`/game/${x.id}`);
   });
 
-  test("groups the week Thu, Fri, Sat, then Played last", async ({ page }) => {
-    await page.goto("/");
-    const labels = await page.$$eval(
-      "section[aria-label] > h2.bv-day-head",
-      (hs) =>
-        hs.map((h) => [
-          h.closest("section")?.getAttribute("aria-label"),
-          h.textContent?.trim(),
-        ]),
-    );
-    expect(labels.map((l) => l[0])).toEqual(["Thu", "Fri", "Sat", "Played"]);
-    expect(labels[3][1]).toBe(`Played · ${expected.playedIds.length}`);
-    const r = await rows(page);
-    for (const x of r) {
-      const g = byId.get(x.id)!;
-      const day = etParts(g.kick).weekday;
-      expect(x.section, `${x.id}`).toBe(
-        expected.playedIds.includes(x.id) ? "Played" : day,
-      );
-    }
-    // Played is the last section on the page.
-    expect(r[r.length - 1].section).toBe("Played");
-  });
-
-  test("carries the research status strip above the board: one line, a pill per hypothesis, the link", async ({
+  test("lists the week as one ranked list, then Played last", async ({
     page,
   }) => {
     await page.goto("/");
-    const strip = page.locator('div[aria-label="Research status"]');
-    await expect(strip).toContainText(
-      "6 strategies on paper · up to 12 of 30 readings · next read",
+    const labels = await page.$$eval("section[aria-label]", (ss) =>
+      ss.map((x) => x.getAttribute("aria-label")),
     );
-    await expect(strip.locator(".bv-pill")).toHaveCount(7);
-    await expect(strip.locator('[data-hypothesis="H-ARM-1HU"]')).toHaveText(
-      "1H unders 14",
-    );
-    await expect(strip.locator('[data-hypothesis="H-PRICE-HR"]')).toHaveText(
-      "Hard Rock pricing 3 / 40",
-    );
+    expect(labels).toEqual(["Ranked", "Played"]);
     await expect(
-      strip.getByRole("link", { name: "Research →" }),
-    ).toHaveAttribute("href", "/research");
-    // It sits above the week heading, never inside the board.
-    const stripBox = await strip.boundingBox();
-    const heading = await page.locator("h1.bv-page-title").boundingBox();
-    expect(stripBox!.y).toBeLessThan(heading!.y);
+      page.locator('section[aria-label="Played"] > h2.bv-day-head'),
+    ).toHaveText(`Played · ${expected.playedIds.length}`);
+    const r = await rows(page);
+    for (const x of r) {
+      expect(x.section, `${x.id}`).toBe(
+        expected.playedIds.includes(x.id) ? "Played" : "Ranked",
+      );
+    }
+    expect(r[r.length - 1].section).toBe("Played");
+  });
+
+  test("says a Pass in a few words under one heading, and colours each badge by its verdict", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const r = (await rows(page)).filter((x) => x.section === "Ranked");
+    const passes = r.filter((x) => x.text.startsWith("Pass"));
+    for (const x of passes) {
+      expect(x.text, `${x.id}`).toMatch(
+        /^Pass · (leans over \d+\.\d|short of the bar \(needs \d+\.\d\)|on our number|no model number yet)$/,
+      );
+      expect(x.badgeColor, `${x.id}`).toBe("var(--bad)");
+    }
+    const head = page.locator('p[aria-label="Pass games"]');
+    if (passes.length === 0) {
+      await expect(head).toHaveCount(0);
+    } else {
+      await expect(head).toHaveText(PASS_HEAD);
+      // The heading comes right before the first Pass row, and every row after
+      // it is a Pass: Pass rows score under the amber band, so they sort last.
+      const firstPassId = passes[0].id;
+      const next = await page.$eval(
+        'p[aria-label="Pass games"]',
+        (el) => el.nextElementSibling?.id ?? "",
+      );
+      expect(next).toBe(`game-${firstPassId}`);
+      const at = r.findIndex((x) => x.id === firstPassId);
+      expect(r.slice(at).every((x) => x.text.startsWith("Pass"))).toBe(true);
+    }
+    for (const x of r) {
+      expect(x.badgeColor === "var(--good)", `${x.id}`).toBe(
+        expected.betIds.includes(x.id),
+      );
+    }
   });
 
   test("numbers the week best to worst in the expected order", async ({
@@ -112,17 +134,12 @@ test.describe("the board", () => {
         expect(x.badge, `${x.id}`).toBe(`#${rank.get(x.id)}`);
       }
     }
-    // Within each day the rows run in rank order.
-    const bySection = new Map<string, number[]>();
-    for (const x of r) {
-      if (x.section === "Played") continue;
-      const list = bySection.get(x.section) ?? [];
-      list.push(rank.get(x.id)!);
-      bySection.set(x.section, list);
-    }
-    for (const [section, ranks] of bySection) {
-      expect(ranks, section).toEqual([...ranks].sort((a, b) => a - b));
-    }
+    // One list: the rows run #1, #2, #3 ... down the page (Q2, 2026-10-15).
+    const ranks = r
+      .filter((x) => x.section === "Ranked")
+      .map((x) => rank.get(x.id)!);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(ranks[0]).toBe(1);
   });
 
   test("lights exactly the two BET rows", async ({ page }) => {
@@ -207,7 +224,7 @@ test.describe("the board", () => {
     const labels = await page.$$eval("section[aria-label]", (ss) =>
       ss.map((s) => s.getAttribute("aria-label")),
     );
-    expect(labels.filter((l) => l !== "Played")).toEqual(["Sat"]);
+    expect(labels.filter((l) => l !== "Played")).toEqual(["Ranked"]);
   });
 
   test("every banner is silent in the clean state", async ({ page }) => {
@@ -249,12 +266,13 @@ test.describe("the board, signed out", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.locator('p[aria-label="Research season"]')).toHaveText(
-      RESEARCH_BANNER,
-    );
-    await expect(page.locator('p[aria-label="What this is"]')).toHaveText(
-      "Beat Vegas rates college football first-half unders, priced at Hard Rock Bet. Every result, losses included, is on Results. Research →",
-    );
+    // The season sentence lives in the footer now (Q10, 2026-10-15).
+    await expect(
+      page.locator('footer p[aria-label="Research season"]'),
+    ).toHaveText(RESEARCH_BANNER);
+    await expect(
+      page.locator('p[aria-label="How to read the Board"]'),
+    ).toHaveText(BOARD_KEY);
     await expect(
       page.locator('div[aria-label="This week at a glance"]'),
     ).toHaveCount(0);
@@ -270,10 +288,10 @@ test.describe("the board, signed out", () => {
     }
     await expect(page.getByText(/Bet one unit/)).toHaveCount(0);
     await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
-    // The research status strip is public too (2026-10-14).
-    await expect(
-      page.locator('div[aria-label="Research status"]'),
-    ).toContainText("6 strategies on paper");
+    // The slim research line is public too (2026-10-14, slimmed 2026-10-15).
+    await expect(page.locator('p[aria-label="Research status"]')).toContainText(
+      "6 strategies on paper",
+    );
     // The owner's weekly cap is his real-money rule: no slot, no over-cap
     // chip, no "real money needs" clause for a visitor (2026-10-14). The
     // fixture's ticketed BET carries a cap slot for the owner (game.spec.ts).
@@ -337,9 +355,9 @@ test.describe.serial("banners driven by app_settings", () => {
       await page.goto("/");
       // One message, not two (2026-10-07): the research-season banner says
       // money is paused; the old board box is gone.
-      await expect(page.locator('p[aria-label="Research season"]')).toHaveText(
-        RESEARCH_BANNER,
-      );
+      await expect(
+        page.locator('footer p[aria-label="Research season"]'),
+      ).toHaveText(RESEARCH_BANNER);
       await expect(page.getByText("Our bets are paused.")).toHaveCount(0);
       const health = await (await request.get("/api/health")).json();
       expect(health.rulePaused).toBe(true);

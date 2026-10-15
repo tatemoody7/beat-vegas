@@ -4,6 +4,7 @@ import type { HomeGame } from "@/lib/homeBoard";
 import { hrQuoteText, priceAgeText } from "@/lib/labels";
 import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import { passShort } from "@/lib/edge";
 import ScoreBadge from "@/app/components/ScoreBadge";
 import TeamLogo from "@/app/components/TeamLogo";
 
@@ -51,6 +52,7 @@ export default function GameRow({ g }: { g: HomeGame }) {
       <div className="flex items-start gap-3">
         <ScoreBadge
           score={edge.score}
+          tier={edge.tier}
           rank={g.boardRank}
           kickedOff={g.kickedOff}
           inPlay={g.inPlay}
@@ -100,7 +102,9 @@ export default function GameRow({ g }: { g: HomeGame }) {
                 : "text-[var(--text)]"
             }`}
           >
-            {resultLine ?? edge.action}
+            {resultLine ??
+              (g.kickedOff ? null : passShort(edge)) ??
+              edge.action}
           </p>
         </div>
 

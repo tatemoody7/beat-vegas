@@ -300,6 +300,34 @@ class ArmPosition(Base):
     payload_json = Column(Text)  # the writer's full line, for the record
 
 
+class ShortlistEntry(Base):
+    """One entry of a frozen research-shortlist publication (H-1H-SHORTLIST, website plan PR D,
+    Tate 2026-10-15): the top 10 first-half unders a scheduled card's price-first ranking put on
+    top. Written once per card by `scripts/publish_shortlist.py` (insert-only: a card that already
+    has rows is never re-ranked or rewritten) and read by the site. The publication-level columns
+    repeat on every row so the whole publication, and its sha256, can be rebuilt from the rows
+    (`shortlist.publication_from_rows`)."""
+
+    __tablename__ = "shortlist_entries"
+    __table_args__ = (
+        UniqueConstraint("card_id", "game_id", name="uq_shortlist_entry_per_card"),
+    )
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    card_id = Column(Integer, nullable=False, index=True)  # cards.id this ranking read
+    season = Column(Integer, nullable=False, index=True)
+    week = Column(Integer, nullable=False)
+    slot = Column(String, nullable=False)  # tue_pm | thu_pm | fri_pm | sat_am
+    published_at = Column(DateTime, nullable=False)  # naive UTC
+    card_built = Column(String)  # the card's built_at, ISO (the decision time of the analysis)
+    pool_size = Column(Integer)  # games the ranking considered
+    method = Column(String)
+    publication_sha256 = Column(String, nullable=False)
+    game_id = Column(Integer, nullable=False, index=True)
+    rank = Column(Integer, nullable=False)  # R1..R10, the research rank (never the Board's)
+    label = Column(String, nullable=False)
+    payload_json = Column(Text, nullable=False)  # the frozen entry: price, analysis, why_rank
+
+
 class BuildForecast(Base):
     """The forecast a card build SAW: one row per game per build that fetched it.
 

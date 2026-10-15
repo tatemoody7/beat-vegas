@@ -1,0 +1,72 @@
+name: Publish a missed research shortlist (recovery)
+
+# Re-runs scripts/publish_shortlist.py for ONE card whose scheduled build did not
+# publish its research shortlist (H-1H-SHORTLIST; the card health check
+# `card.shortlist_published` names the card id). Dispatch-only. The script is
+# insert-only: a card that already has rows is left untouched, so a duplicate run
+# can never overwrite a frozen ranking; and it refuses a card built more than 24 h
+# ago, so a late recovery never publishes stale ranks as if on time. Never the
+# money path: it writes `shortlist_entries` and nothing else.
+
+# Least privilege: these jobs read the repo and write to Neon via
+# secrets; none of them pushes to git. Without this block the job
+# inherits whatever the repository default happens to be, and that
+# default is a setting someone can change later without touching
+# any workflow.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      card_id:
+        description: "cards.id to publish (from the card health note)"
+        required: true
+
+# Shares the Neon writers' group so it never overlaps a card build.
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Install
+        # Hash-pinned: requirements/lock.txt names the exact release AND sha256 of
+        # every package (see its header), so a compromised upload of any of them
+        # cannot reach a runner that holds DATABASE_URL and the API keys. The
+        # editable install of this repo then runs without build isolation, so
+        # the build backend (setuptools, also in the lock) is never fetched
+        # unhashed. Local dev keeps plain `pip install -e .`.
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Restore CFBD reference data (weekly cache)
+        id: cfbd_cache
+        uses: ./.github/actions/cfbd-cache
+      - name: Publish the shortlist for the card
+        # Inputs go through env, never inlined into bash (script-injection hygiene).
+        env:
+          IN_CARD_ID: ${{ inputs.card_id }}
+        run: python scripts/publish_shortlist.py --card-id "$IN_CARD_ID" --write
+      - name: Upload the publication
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shortlist-publication
+          path: reports/shortlist_*.json
+          if-no-files-found: warn
+      - name: Save CFBD reference cache (only when this run populated it)
+        if: always() && steps.cfbd_cache.outputs.hit != 'true'
+        uses: ./.github/actions/cfbd-cache-save
+        with:
+          key: ${{ steps.cfbd_cache.outputs.key }}

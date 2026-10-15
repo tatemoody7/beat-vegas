@@ -1073,6 +1073,45 @@ CREATE SEQUENCE public.results_id_seq
 ALTER SEQUENCE public.results_id_seq OWNED BY public.results.id;
 
 --
+-- Name: shortlist_entries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.shortlist_entries (
+    id integer NOT NULL,
+    card_id integer NOT NULL,
+    season integer NOT NULL,
+    week integer NOT NULL,
+    slot character varying NOT NULL,
+    published_at timestamp without time zone NOT NULL,
+    card_built character varying,
+    pool_size integer,
+    method character varying,
+    publication_sha256 character varying NOT NULL,
+    game_id integer NOT NULL,
+    rank integer NOT NULL,
+    label character varying NOT NULL,
+    payload_json text NOT NULL
+);
+
+--
+-- Name: shortlist_entries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.shortlist_entries_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: shortlist_entries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.shortlist_entries_id_seq OWNED BY public.shortlist_entries.id;
+
+--
 -- Name: team_tempo; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1454,6 +1493,12 @@ ALTER TABLE ONLY public.predictions ALTER COLUMN id SET DEFAULT nextval('public.
 ALTER TABLE ONLY public.results ALTER COLUMN id SET DEFAULT nextval('public.results_id_seq'::regclass);
 
 --
+-- Name: shortlist_entries id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shortlist_entries ALTER COLUMN id SET DEFAULT nextval('public.shortlist_entries_id_seq'::regclass);
+
+--
 -- Name: team_tempo id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1651,6 +1696,13 @@ ALTER TABLE ONLY public.results
     ADD CONSTRAINT results_pkey PRIMARY KEY (id);
 
 --
+-- Name: shortlist_entries shortlist_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shortlist_entries
+    ADD CONSTRAINT shortlist_entries_pkey PRIMARY KEY (id);
+
+--
 -- Name: team_tempo team_tempo_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1698,6 +1750,13 @@ ALTER TABLE ONLY public.games
 
 ALTER TABLE ONLY public.odds_snapshots
     ADD CONSTRAINT uq_odds_snapshot UNIQUE (game_id, book, market, captured_at);
+
+--
+-- Name: shortlist_entries uq_shortlist_entry_per_card; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shortlist_entries
+    ADD CONSTRAINT uq_shortlist_entry_per_card UNIQUE (card_id, game_id);
 
 --
 -- Name: team_week_features uq_team_week; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2029,6 +2088,24 @@ CREATE INDEX ix_results_game_id ON public.results USING btree (game_id);
 --
 
 CREATE INDEX ix_results_model_version ON public.results USING btree (model_version);
+
+--
+-- Name: ix_shortlist_entries_card_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_shortlist_entries_card_id ON public.shortlist_entries USING btree (card_id);
+
+--
+-- Name: ix_shortlist_entries_game_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_shortlist_entries_game_id ON public.shortlist_entries USING btree (game_id);
+
+--
+-- Name: ix_shortlist_entries_season; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_shortlist_entries_season ON public.shortlist_entries USING btree (season);
 
 --
 -- Name: ix_team_tempo_season; Type: INDEX; Schema: public; Owner: -

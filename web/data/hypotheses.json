@@ -441,6 +441,13 @@
     "doc": "`docs/program/EVP_SPEC_2026-10.md`"
   },
   {
+    "id": "H-1H-FACTORS",
+    "question": "Which pre-kickoff football and market factors carry information about where a college-football FIRST-HALF total lands relative to the consensus close, and does any of them improve on the market's own probability out of sample? (Tate, 2026-10-15: the first-half-unders reassessment; the screen feeds a research shortlist, never an arm.)",
+    "status": "exploratory",
+    "family": "exploratory (no ledger slot, no alpha; registered before any number was computed; a factor that passes earns at most its own forward paper registration)",
+    "doc": "`research/1h-factors-2026-10/` (gitignored local result; the report is summarized in `docs/HISTORY.md`)"
+  },
+  {
     "id": "H-MODEL-FIX",
     "question": "Is the champion with four fixes -- (1) bowl games out of the frame and season-to-date means ordered by date, (2) a 2015 training floor instead of 2003, (3) early-season averages seeded with last season's (`PRIOR_SEASON_WEIGHT` = 3), (4) early stopping off, stated explicitly -- at least as accurate on first halves as the live champion?",
     "status": "tested-null",

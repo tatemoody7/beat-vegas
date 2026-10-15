@@ -10,6 +10,15 @@ hold the rest.
 
 ## 2026-10-15
 
+- **2026-10-15 UTC (THE ALTERNATE-LINE PROBE COMPARES HARD ROCK WITH THE MARKET).** Tate approved adding up to nine
+  other books to Saturday's one probe run. The same call now names the configured `bookmakers_1h` list (Hard Rock plus
+  nine). The Odds API bills an event call as unique markets returned x regions, and up to 10 named books are one region
+  (the provider's v4 guide, read 2026-10-15; the repo verified it live 2026-09-09), so the cost is unchanged: 2 credits
+  an event, 24 at the 12-event cap; the probe stops after the first event if the feed bills more. The report adds every
+  book's rows as fed (a missing side stays empty), Hard Rock against the other books at the identical line and side
+  only, each two-sided quote's hold and de-vigged fair share, Hard Rock's unders by price range (-150/-200/-250 named),
+  and data-quality lines (books absent, no ladder, one-sided quotes, a line priced two ways, stamp age). `--csv` keeps
+  the raw rows for the Florida-app comparison. It writes nothing; no collector, arm, pv1 or Board change.
 - **2026-10-15 UTC (THE WRITER AND THE GRADER NOW SHARE ONE 0-0 STANDARD).** The board read DEGRADED from
   2026-10-11: App State-Old Dominion (2026-10-10, `games.id` 401869843) stored a 0-0 first half and its record
   never graded. Cause: the writer (`etl.first_half.attach_first_half`) keeps a scoreless line-score half in a

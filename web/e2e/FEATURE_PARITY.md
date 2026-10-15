@@ -57,6 +57,14 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [game] `/game/abc`, an unknown id and a negative id are 404s with the styled not-found page — game.spec.ts › "a non-numeric id and an unknown id are 404s"
 - [game] `← Back to the board` returns to the row's anchor — game.spec.ts › "the played game links back to its row on the board"
 
+## Research top 10
+
+- [shortlist] The frozen publication sits above the Board heading: "Research top 10 — research ranking, not the Board's rank", R1..R3 in order, each linking to its game, estimated EV with its rough range or "no estimate (incomplete pricing)", the label, the no-potential-value line, the estimate caveat and the feed note; the Board key points to it — shortlist.spec.ts › "sits above the Board in research rank order, labelled apart from the Board's rank"
+- [shortlist] A shortlisted game opens with its analysis before the decision card: frozen block (line, price, estimate, label, books) beside the latest Hard Rock price, why R1, stats with percentile, scoring words and the screen verdict, travel and local kickoff, the Board's rank named as a different ranking, no "the under" — shortlist.spec.ts › "a shortlisted game opens with its full analysis: frozen beside the latest price"
+- [shortlist] An informational candidate shows no estimate and names the incomplete pricing — shortlist.spec.ts › "an informational candidate says why it has no estimate"
+- [shortlist] A game off the list has no research section — shortlist.spec.ts › "a game off the list has no research section"
+- [shortlist] Signed out, the list and the analysis show before kickoff with no bet language — shortlist.spec.ts › "a visitor sees the list and the analysis before kickoff, in research wording"
+
 ## Results
 
 - [results] Every bet: the strip opens on our bets with the record, ROI, "could plausibly be" interval, line value, the units curve with its zero line, and the CSV link; a `vs consensus` column (line value vs the consensus close, roadmap v1.4); one week heading per week newest first with its record; running units accumulate oldest to newest; the winner shows both first-half scores and the total — results.spec.ts › "every bet: the summary strip, the week groups and the running units"

@@ -23,6 +23,7 @@ import {
   lineUsedFor,
   round2,
   armPositionsFor,
+  shortlistFor,
   armForwardPicksFor,
 } from "./expected.mjs";
 
@@ -47,6 +48,7 @@ export const TABLES = [
   "bv_adjustments",
   "app_settings",
   "arm_positions",
+  "shortlist_entries",
   "games",
   "teams",
 ];
@@ -879,6 +881,12 @@ export function fixtureRows(week, expected) {
     cons_excluded: p.cons_excluded,
     cons_version: p.cons_version ?? null,
   }));
+
+  // The research shortlist (website plan PR E): one frozen publication of the
+  // fixture's card, three upcoming games.
+  rows.shortlist_entries = shortlistFor(week, expected.builtAt, now).map(
+    (r) => ({ ...r, published_at: ts(r.published_at) }),
+  );
 
   rows.arm_positions = armPositionsFor(now).map((r) => ({
     ...r,

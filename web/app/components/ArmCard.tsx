@@ -1,3 +1,4 @@
+import { etDateLabel } from "@/lib/et";
 import type { HypothesisCard } from "@/lib/research";
 import { PROTOCOL, pct } from "@/lib/research";
 
@@ -16,14 +17,14 @@ const STATUS_CLASS: Record<string, string> = {
   "timed out": "bv-badge--warn",
 };
 
-const fmtDate = (d: Date) =>
-  d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "America/New_York",
-  });
-
-export default function ArmCard({ card }: { card: HypothesisCard }) {
+export default function ArmCard({
+  card,
+  authed = false,
+}: {
+  card: HypothesisCard;
+  /** Signed in: the run id is the owner's detail (Q7). */
+  authed?: boolean;
+}) {
   const { meta } = card;
   const unit = meta.standard === "pricing" ? "opportunities" : "readings";
   const evLine =
@@ -82,6 +83,11 @@ export default function ArmCard({ card }: { card: HypothesisCard }) {
         {card.pending > 0 ? ` · ${card.pending} pending` : ""}
         {` · ${card.logged} logged`}
       </p>
+      <p className="text-xs text-[var(--text-dim)]" data-testid="standard">
+        {meta.standard === "pricing"
+          ? `Reads a direction after ${PROTOCOL.PRICING_NEEDED} forward opportunities.`
+          : `Promoted or stopped only after ${PROTOCOL.NEEDED_READINGS} readings over ${PROTOCOL.MIN_WEEKS} or more weeks.`}
+      </p>
       <p className="text-sm text-[var(--text)]">{evLine}</p>
       {card.llrPct !== null && card.llr !== null && (
         <div>
@@ -105,8 +111,8 @@ export default function ArmCard({ card }: { card: HypothesisCard }) {
       <p className="text-xs text-[var(--text-dim)]">
         {card.readAt === null
           ? "Not yet read."
-          : `Last read ${fmtDate(card.readAt)}${card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
-        {card.nextRead ? ` · Next read ${card.nextRead}` : ""}
+          : `Last read ${etDateLabel(card.readAt)}${authed && card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
+        {card.nextRead ? ` · Next read ${etDateLabel(card.nextRead)}` : ""}
       </p>
     </article>
   );

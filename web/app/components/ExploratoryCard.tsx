@@ -1,3 +1,4 @@
+import { etDateLabel } from "@/lib/et";
 import type { ExploratoryCard as Card } from "@/lib/research";
 import { PROTOCOL, pct } from "@/lib/research";
 
@@ -6,13 +7,6 @@ import { PROTOCOL, pct } from "@/lib/research";
 // toward a decision and no LLR, because there is no sequential test. It shows
 // the judge's readings with the same "enough data" rule as the arms and, over
 // exactly the same weeks, the gap rule's readings from the same stored row.
-
-const fmtDate = (d: Date) =>
-  d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "America/New_York",
-  });
 
 function evText(
   ev: { mean: number; lo: number | null; hi: number | null } | null,
@@ -27,7 +21,14 @@ function evText(
     : `${pct(ev.mean)} (${pct(ev.lo)} to ${pct(ev.hi)})`;
 }
 
-export default function ExploratoryCard({ card }: { card: Card }) {
+export default function ExploratoryCard({
+  card,
+  authed = false,
+}: {
+  card: Card;
+  /** Signed in: the run id is the owner's detail (Q7). */
+  authed?: boolean;
+}) {
   const { meta } = card;
   return (
     <article
@@ -73,8 +74,8 @@ export default function ExploratoryCard({ card }: { card: Card }) {
       <p className="text-xs text-[var(--text-dim)]">
         {card.readAt === null
           ? "Not yet read."
-          : `Last read ${fmtDate(card.readAt)}${card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
-        {card.nextRead ? ` · Next read ${card.nextRead}` : ""}
+          : `Last read ${etDateLabel(card.readAt)}${authed && card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
+        {card.nextRead ? ` · Next read ${etDateLabel(card.nextRead)}` : ""}
       </p>
     </article>
   );

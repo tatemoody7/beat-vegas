@@ -68,6 +68,20 @@ test.describe("results", () => {
     // The units curve sits under the strip: two graded weeks, dashed zero line.
     await expect(strip.locator(".recharts-wrapper")).toBeVisible();
     await expect(strip.locator(".recharts-reference-line line")).toHaveCount(1);
+    // Q9 (2026-10-15): the zero line is labelled and every Y label is a whole,
+    // evenly spaced unit with zero among them.
+    await expect(
+      strip.locator(".recharts-wrapper svg text", {
+        hasText: "0 = break even",
+      }),
+    ).toHaveCount(1);
+    const yTicks = (
+      await strip.locator(".recharts-yAxis-tick-labels text").allTextContents()
+    ).map((t) => (t === "0" ? 0 : Number(t.replace("u", ""))));
+    expect(yTicks).toContain(0);
+    for (const t of yTicks) expect(Number.isInteger(t)).toBe(true);
+    const steps = new Set(yTicks.slice(1).map((t, i) => t - yTicks[i]));
+    expect(steps.size).toBe(1);
     // Stored clv -1.0 and +0.5 -> displayed +1.00 and -0.50, mean +0.25.
     // The judge's value is the headline (B6); the fixture's tickets carry no
     // ev_cons, so it reads "—"; the point move is the secondary line.
@@ -432,11 +446,28 @@ test.describe("results", () => {
     });
   });
 
-  test("the default view is the latest week with a pick", async ({ page }) => {
+  test("the default view is every week; the picker filters the bet table, not the season numbers", async ({
+    page,
+  }) => {
     await page.goto("/results");
     await expect(page.locator(".bv-page-sub")).toHaveText(
-      `week ${week.week} · ${week.season}`,
+      `${week.season} season`,
     );
+    const strip = page.locator(ledger());
+    await expect(strip.locator("h3.bv-day-head")).toHaveCount(2);
+    // One week: the table shows only its group; the season strip is unchanged.
+    await page.goto(`/results?week=${week.prevWeek}`);
+    await expect(page.locator(".bv-page-sub")).toHaveText(
+      `${week.season} season · table shows week ${week.prevWeek}`,
+    );
+    await expect(strip.locator("h3.bv-day-head")).toHaveCount(1);
+    await expect(strip.locator("h3.bv-day-head")).toHaveText(
+      `Week ${week.prevWeek} · 2 bets · ${expected.ledger.real.record} · ${expected.ledger.real.units}u`,
+    );
+    await expect(strip).toContainText(
+      `${expected.ledger.real.record} · ${expected.ledger.realBets} bets · ${expected.ledger.real.units}u`,
+    );
+    await page.goto(`/results?week=${week.week}`);
     const thisWeekPicks = expected.picks.filter((p) => p.week === week.week);
     await page
       .getByRole("tablist", { name: "Which picks to show" })

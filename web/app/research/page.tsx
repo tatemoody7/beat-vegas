@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ArmCard from "@/app/components/ArmCard";
+import { viewerIsAuthed } from "@/lib/session";
 import ExploratoryCard from "@/app/components/ExploratoryCard";
 import Glossary from "@/app/components/Glossary";
 import { getArmPositions, getPositionPayload } from "@/lib/armPositions";
@@ -63,6 +64,7 @@ const docName = (doc: string) => {
 };
 
 export default async function ResearchPage() {
+  const authed = await viewerIsAuthed();
   const positions = await getArmPositions();
   const cards = cardsFor(positions);
   const exploratoryCards = await Promise.all(
@@ -81,37 +83,20 @@ export default async function ResearchPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="bv-page-title mb-2">Research</h1>
+      {/* One sentence (Tate 2026-10-15, Q7); each card carries its own
+          standard. */}
       <p className="bv-page-sub mb-6">
-        What is being tested, how each test is judged, and where it stands.
+        Every strategy runs on paper and is judged by its value against the
+        closing line.
       </p>
-
-      <section aria-label="What this is" className="mb-8 max-w-[68ch]">
-        <h2 className="mb-2 text-lg font-semibold text-[var(--text)]">
-          What this is
-        </h2>
-        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-          Beat Vegas is a college football research lab. Every strategy runs on
-          paper and is judged by one number: the value of each wager against the
-          books’ vig-free closing line, read at Hard Rock’s price. The Board
-          keeps showing the first-half under ratings for anyone who follows the
-          games; this page is the record of whether any of it holds up.
-        </p>
-      </section>
 
       <section aria-label="The strategies on paper" className="mb-8">
         <h2 className="mb-1 text-lg font-semibold text-[var(--text)]">
           The strategies on paper
         </h2>
-        <p className="mb-3 max-w-[68ch] text-sm leading-relaxed text-[var(--text-muted)]">
-          Each card shows its own standard. A paper strategy needs{" "}
-          {PROTOCOL.NEEDED_READINGS} readings over {PROTOCOL.MIN_WEEKS} or more
-          weeks before it can be promoted or stopped; the pricing study needs{" "}
-          {PROTOCOL.PRICING_NEEDED} forward opportunities before it reads a
-          direction. Nothing is ranked until then.
-        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {cards.map((c) => (
-            <ArmCard key={c.meta.id} card={c} />
+            <ArmCard key={c.meta.id} card={c} authed={authed} />
           ))}
         </div>
       </section>
@@ -127,7 +112,7 @@ export default async function ResearchPage() {
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {exploratoryCards.map((c) => (
-            <ExploratoryCard key={c.meta.id} card={c} />
+            <ExploratoryCard key={c.meta.id} card={c} authed={authed} />
           ))}
         </div>
       </section>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { glossaryTerms } from "./glossary";
+import { barRule } from "./glossary";
 import {
   BET_GAP_PTS,
   EV_FLOOR_PCT,
@@ -37,5 +38,16 @@ describe("glossary", () => {
 
   it("prints no dollar figure (no stake size is public since 2026-09-28)", () => {
     for (const t of terms) expect(t.body).not.toMatch(/\$\d/);
+  });
+});
+
+// Adjustment 1 (2026-10-15): the bar is per-slate; 1.75 is only the fallback.
+describe("barRule", () => {
+  it("names the week's bar when there is one, and no number otherwise", () => {
+    expect(barRule(1.6, 7)).toBe(
+      "The bar is set each week at the top 20% of gaps among games Hard Rock has priced (1.6 in week 7); 1.75 applies only to a week with no priced games.",
+    );
+    expect(barRule()).not.toMatch(/in week/);
+    expect(barRule()).not.toMatch(/band we bet/);
   });
 });

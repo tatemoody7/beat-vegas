@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { etDateLabel } from "../lib/et";
 import { armPositionsFor } from "./fixture/expected.mjs";
 import { seededNow } from "./helpers/fixture";
 
@@ -43,8 +44,15 @@ test.describe("research", () => {
       "12 of 30 readings · 2 weeks of 3 · 2 excluded · 14 logged",
     );
     await expect(one).toContainText("EV vs close -1.2% (-5.1% to +2.6%)");
+    // Signed in, the run id shows; dates read "Mon Oct 19" (Q7, 2026-10-15).
     await expect(one).toContainText("run 38590000009");
-    await expect(one).toContainText(`Next read ${rows[0].next_read}`);
+    await expect(one).toContainText(
+      `Next read ${etDateLabel(rows[0].next_read)}`,
+    );
+    await expect(one).not.toContainText(rows[0].next_read);
+    await expect(one.getByTestId("standard")).toHaveText(
+      "Promoted or stopped only after 30 readings over 3 or more weeks.",
+    );
     await expect(
       one.getByLabel("position between the stop and promote boundaries"),
     ).toBeVisible();
@@ -192,5 +200,13 @@ test.describe("research, signed out", () => {
       page.locator('section[aria-label="The strategies on paper"] article'),
     ).toHaveCount(7);
     expect(await page.locator("body").innerText()).not.toMatch(/\$\s?\d/);
+    // The run id is the owner's detail (Q7, 2026-10-15); the intro is one line.
+    await expect(page.getByText(/run \d{6,}/)).toHaveCount(0);
+    await expect(page.locator(".bv-page-sub")).toHaveText(
+      "Every strategy runs on paper and is judged by its value against the closing line.",
+    );
+    await expect(
+      page.locator('section[aria-label="What this is"]'),
+    ).toHaveCount(0);
   });
 });

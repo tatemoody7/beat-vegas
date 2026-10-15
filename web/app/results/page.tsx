@@ -50,7 +50,7 @@ export default async function ResultsPage({
       ? "all"
       : sp.week && Number.isFinite(Number(sp.week))
         ? Number(sp.week)
-        : undefined;
+        : "all"; // the default is every week (Tate 2026-10-15, Q8)
 
   const [ledger, review, allPicks, bets, armPicks, opportunities] =
     await Promise.all([
@@ -112,7 +112,13 @@ export default async function ResultsPage({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="bv-page-title">Results</h1>
-          <p className="bv-page-sub">{`${weekLabel} · ${season}`}</p>
+          {/* The headline numbers and the curve are the season's; the week
+              picker filters the bet table (Q8, 2026-10-15). */}
+          <p className="bv-page-sub">
+            {review.week === null
+              ? `${season} season`
+              : `${season} season · table shows week ${review.week}`}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {review.weeks.length > 0 && (
@@ -135,6 +141,7 @@ export default async function ResultsPage({
         rows={gateLedger(bets, authed, new Date())}
         season={season}
         curve={curve}
+        week={review.week}
       />
 
       <Section

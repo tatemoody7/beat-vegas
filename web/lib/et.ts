@@ -110,3 +110,23 @@ export function etStamp(d: Date): string {
   const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
   return `${p.weekday} ${p.month}/${p.day} ${hour12}:${pad2(p.minute)}${p.hour >= 12 ? "pm" : "am"}`;
 }
+
+/** A calendar date in plain words, "Mon Oct 19" (Tate 2026-10-15, Q7): every
+ *  research date reads this way. A bare "YYYY-MM-DD" (arm_positions.next_read)
+ *  is a calendar day, not an instant, so it is read at noon UTC and can never
+ *  slip to the day before in ET. */
+export function etDateLabel(d: Date | string): string {
+  const at =
+    typeof d === "string"
+      ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T12:00:00Z` : d)
+      : d;
+  if (Number.isNaN(at.getTime())) return String(d);
+  return at
+    .toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "America/New_York",
+    })
+    .replace(",", "");
+}

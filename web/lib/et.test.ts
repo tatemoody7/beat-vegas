@@ -11,6 +11,7 @@ import {
   pad2,
   etStamp,
 } from "./et";
+import { etDateLabel } from "./et";
 
 describe("etParts", () => {
   it("names the zone the whole site runs on", () => {
@@ -129,5 +130,16 @@ describe("etLocalToUtc / etLocalValue (the log form's Placed at field)", () => {
         etLocalValue(new Date("2026-09-26T14:31:00Z")),
       )?.toISOString(),
     ).toBe("2026-09-26T14:31:00.000Z");
+  });
+});
+
+// Q7, 2026-10-15: research dates read "Mon Oct 19" everywhere.
+describe("etDateLabel", () => {
+  it("reads a bare calendar day as that day, never the one before in ET", () => {
+    expect(etDateLabel("2026-10-19")).toBe("Mon Oct 19");
+  });
+  it("reads an instant in ET", () => {
+    // 2026-10-15 02:30Z is still Wed Oct 14 in Eastern time.
+    expect(etDateLabel(new Date("2026-10-15T02:30:00Z"))).toBe("Wed Oct 14");
   });
 });

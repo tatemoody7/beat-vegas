@@ -1,6 +1,7 @@
 import {
   BET_GAP_PTS,
   EV_FLOOR_PCT,
+  PCT_SHARE,
   STRONG_GAP_PTS,
   WEEKLY_BET_CAP,
 } from "@/lib/verdict";
@@ -25,7 +26,7 @@ export function glossaryTerms(): GlossaryTerm[] {
   return [
     {
       term: "Gap",
-      body: `The line minus our number, in points; positive leans under. ${BET_GAP_PTS}+ is the band we bet, ${STRONG_GAP_PTS}+ is as large as gaps get.`,
+      body: `The line minus our number, in points; positive leans under. ${barRule()} ${STRONG_GAP_PTS}+ is as large as gaps get.`,
     },
     {
       term: "Our number",
@@ -64,4 +65,20 @@ export function glossaryTerms(): GlossaryTerm[] {
       body: "The range the true win rate could sit in, given how few bets there are. It narrows as bets add up.",
     },
   ];
+}
+
+/**
+ * How the bar is set, in words (website plan adjustment 1, 2026-10-15): the
+ * old copy said "1.75+ is the band we bet", which stopped being true when the
+ * bar became per-slate (H-PCT, lib/verdict.ts slateBar). With a week's card
+ * bar, the sentence names it; without one, it names no number.
+ */
+export function barRule(
+  bar: number | null = null,
+  week: number | null = null,
+): string {
+  const pctTop = Math.round(100 * PCT_SHARE);
+  const named =
+    bar !== null && week !== null ? ` (${bar.toFixed(1)} in week ${week})` : "";
+  return `The bar is set each week at the top ${pctTop}% of gaps among games Hard Rock has priced${named}; ${BET_GAP_PTS} applies only to a week with no priced games.`;
 }

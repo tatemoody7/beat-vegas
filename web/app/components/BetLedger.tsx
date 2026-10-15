@@ -86,9 +86,14 @@ export default function BetLedger({
   rows,
   season,
   curve = [],
+  week = null,
 }: {
   rows: LedgerRow[];
   season: number;
+  /** The Results week picker (Q8, 2026-10-15): the table shows only this
+   *  week's group; the summary strip and the curve stay season-long, and
+   *  running units still count from the season's first bet. Null = every week. */
+  week?: number | null;
   /** Cumulative settled units on our bets, week by week; drawn under the
    *  strip when the real ledger is showing. */
   curve?: BankrollPoint[];
@@ -100,7 +105,9 @@ export default function BetLedger({
 
   const shown = rowsFor(rows, view);
   const summary = ledgerSummary(shown);
-  const groups = groupByWeek(withRunningUnits(shown));
+  const groups = groupByWeek(withRunningUnits(shown)).filter(
+    (g) => week === null || g.week === week,
+  );
   const rec = summary.record;
   const ev = evSummary(shown);
   const interval =
@@ -221,6 +228,10 @@ export default function BetLedger({
           {view === "real"
             ? "No real-money bets logged yet."
             : "No paper picks logged yet."}
+        </EmptyLine>
+      ) : groups.length === 0 ? (
+        <EmptyLine className="mt-3">
+          {`Nothing in week ${week} for this view. Pick “All weeks” for the season.`}
         </EmptyLine>
       ) : (
         groups.map((g) => (

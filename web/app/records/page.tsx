@@ -16,7 +16,8 @@ import {
 import { resolveSeason } from "@/lib/season";
 import { viewerIsAuthed } from "@/lib/session";
 import { gateRecords } from "@/lib/signalGate";
-import { BET_GAP_PTS } from "@/lib/verdict";
+import { barRule } from "@/lib/glossary";
+import { getLatestCard } from "@/lib/card";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import { EmptyLine } from "@/app/components/Section";
 
@@ -33,7 +34,7 @@ const LEGEND: [string, string][] = [
   ],
   [
     "Gap",
-    `the line minus our number. Positive means the line is above us, which leans under. ${BET_GAP_PTS}+ is the band we bet`,
+    "the line minus our number. Positive means the line is above us, which leans under",
   ],
   [
     "Scored after",
@@ -77,6 +78,9 @@ export default async function RecordsPage({
       ? reqWeek
       : (defaultWeek(all) ?? weeks[weeks.length - 1] ?? null);
   const rows = week === null ? all : all.filter((r) => r.week === week);
+  // The week's bar, from its newest card (the Board shows the same number).
+  const card = week === null ? null : await getLatestCard(season, week);
+  const barText = barRule(card?.slate?.bar ?? null, week);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -134,7 +138,9 @@ export default async function RecordsPage({
         {LEGEND.map(([k, v]) => (
           <div key={k} className="flex gap-2">
             <dt className="shrink-0 font-semibold text-[var(--text)]">{k}</dt>
-            <dd className="text-[var(--text-muted)]">{v}</dd>
+            <dd className="text-[var(--text-muted)]">
+              {k === "Gap" ? `${v}. ${barText}` : v}
+            </dd>
           </div>
         ))}
       </dl>

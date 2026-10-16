@@ -79,6 +79,8 @@ export function barRule(
 ): string {
   const pctTop = Math.round(100 * PCT_SHARE);
   const named =
-    bar !== null && week !== null ? ` (${bar.toFixed(1)} in week ${week})` : "";
+    bar !== null && week !== null
+      ? ` (${bar.toFixed(1)} on week ${week}'s latest card; the Board recomputes it over the games still to kick off)`
+      : "";
   return `The bar is set each week at the top ${pctTop}% of gaps among games Hard Rock has priced${named}; ${BET_GAP_PTS} applies only to a week with no priced games.`;
 }

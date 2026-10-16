@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
 import ShortlistAnalysis from "@/app/components/ShortlistAnalysis";
 import { getShortlist } from "@/lib/shortlist";
+import { getCardForecast } from "@/lib/forecast";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
 import { viewerIsAuthed } from "@/lib/session";
 import { gateGame } from "@/lib/signalGate";
@@ -55,6 +56,7 @@ export default async function GamePage({
       authed={authed}
       unitUsd={unitUsd}
       backHref={`/#game-${gameId}`}
+      forecast={await getCardForecast(gameId)}
       research={
         list && entry ? (
           <ShortlistAnalysis

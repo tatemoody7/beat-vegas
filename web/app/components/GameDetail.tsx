@@ -439,8 +439,8 @@ export default function GameDetail({
   g: HomeGame;
   /** The newest card-build forecast for the kickoff hour (lib/forecast.ts). */
   forecast?: CardForecast | null;
-  /** The Research top 10's full analysis for a shortlisted game (H-1H-SHORTLIST);
-   *  rendered right under the header, before the decision. */
+  /** The analysis of a Board #1-#10 game (H-1H-SHORTLIST); rendered right
+   *  under the header, before the decision. */
   research?: React.ReactNode;
   /** The flat stake, read server-side — a client component cannot read it. */
   unitUsd: number;
@@ -469,14 +469,6 @@ export default function GameDetail({
           ← Back to the board
         </Link>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {g.boardRank !== null && research !== null && (
-            <span
-              data-testid="board-rank-label"
-              className="text-xs font-semibold uppercase tracking-wide text-[var(--text-dim)]"
-            >
-              Board
-            </span>
-          )}
           {g.boardRank !== null && (
             <span
               className="rounded-[var(--r-sm)] px-2 py-0.5 font-mono text-lg font-semibold"

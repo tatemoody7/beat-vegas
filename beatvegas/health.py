@@ -337,11 +337,12 @@ def card_paper_logged_iff_window(ctx: Ctx) -> Result:
 
 
 def card_shortlist_published(ctx: Ctx) -> Result:
-    """A scheduled card publishes its frozen research shortlist (H-1H-SHORTLIST, website plan
-    adjustment 2): rows in `shortlist_entries` for the card this run built. The publish step is
+    """A scheduled card publishes its frozen analysis of every game it rates (H-1H-SHORTLIST,
+    website plan adjustment 2; the site shows it for the Board's #1-#10): rows in
+    `shortlist_entries` for the card this run built. The publish step is
     continue-on-error, so it can never stop the Board; this check is what makes a miss visible
     (degraded), and `shortlist_publish.yml` recovers it. A `manual` build publishes nothing; a card
-    with no Hard Rock-priced upcoming game has nothing to publish."""
+    with no upcoming game has nothing to publish."""
     from .db.models import ShortlistEntry
     from .shortlist import pool
 
@@ -354,12 +355,13 @@ def card_shortlist_published(ctx: Ctx) -> Result:
         return Result(False, "no card row")
     n_pool = len(pool(p.get("items") or [], p["_built_at"]))
     if n_pool == 0:
-        return Result(True, "no Hard Rock-priced upcoming game: nothing to publish")
+        return Result(True, "no upcoming game on the card: nothing to publish")
     n = ctx.session.query(ShortlistEntry.id).filter(ShortlistEntry.card_id == p["_id"]).count()
     step = ctx.outcomes.get("shortlist", "") or "?"
-    detail = f"{n} entries for card {p['_id']} (pool {n_pool}, publish step {step})"
+    # Short, and no ";": the note joins misses with ";" and keeps 90 characters of each.
+    detail = f"card {p['_id']}: {n} saved of {n_pool}, step {step}"
     if n == 0:
-        detail += f"; recover with shortlist_publish.yml card_id={p['_id']}"
+        detail += f", recover shortlist_publish.yml card_id={p['_id']}"
     return Result(n > 0, detail)
 
 
@@ -815,7 +817,7 @@ CONTRACTS: Dict[str, Contract] = {
             Check(
                 "card.shortlist_published",
                 "degraded",
-                "scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no Hard Rock-priced game is upcoming); manual: nothing published",
+                "scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no game on the card is upcoming); manual: nothing published",
                 card_shortlist_published,
             ),
             Check(

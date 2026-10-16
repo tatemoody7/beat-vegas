@@ -449,7 +449,7 @@
   },
   {
     "id": "H-1H-SHORTLIST",
-    "question": "Which upcoming first-half unders does a price-first research ranking put on top each scheduled card, and, read later, does that rank track the result and the closing value? (Tate, 2026-10-15: the weekly research top 10 he reviews and decides on himself; website plan PR D. A display, never an arm, never a bet rule.)",
+    "question": "What does the newest scheduled card know about each game it rates (price at Hard Rock against the same sweep's books, the matchup, rest, travel, QB, weather), shown as the analysis behind the Board's #1-#10, and read later against the result and the closing value? (Tate, 2026-10-15; reshaped 2026-10-16: no separate ranking — the Board's top 10 open this analysis. A display, never an arm, never a bet rule.)",
     "status": "exploratory",
     "family": "exploratory (no ledger slot, no alpha; never evidence for any arm; the personal ledger is untouched)",
     "doc": "`beatvegas/shortlist.py`, `scripts/publish_shortlist.py`, `shortlist_entries`"

@@ -8,6 +8,17 @@ hold the rest.
 
 
 
+## 2026-10-16
+
+- **2026-10-16 UTC (THE BOARD'S TOP 10 OPEN THE ANALYSIS; A BILLING HOLD; DATED WEATHER).** GitHub refused every job
+  from ~04:00Z (the $10 Actions cap); Tate made the repo public again (~20:15Z, history since 10-04 scanned clean) and
+  grading, the fri_pm card and the first publication ran. Tate then set the Board's #1-#10 green (#411), had the game
+  page show the newest card-build forecast with its source and time instead of the undated, ~6-day-old Sunday weather
+  (19 of 47 outdoor week-7 games were 5+ mph off; #412), and reshaped H-1H-SHORTLIST: no separate price-ranked list;
+  every scheduled card saves the analysis of every game it rates (alternate rungs and missing prices saved unpriced),
+  and the Board's #1-#10 open it ("Analysis — Board #N"). The bar line, the key line and the estimate fine print were
+  removed as clutter. Card 31's publication (the old top-10 shape) stays frozen; the next card is the first full one.
+
 ## 2026-10-15
 
 - **2026-10-15 UTC (THE FACTOR SCREEN'S RESULT, AND THE WEBSITE PLAN SHIPS IN FIVE PRS).** H-1H-FACTORS screened 64

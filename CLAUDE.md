@@ -170,7 +170,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
 |---|---|---|
-| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, `shortlist_entries` (the frozen research top 10, scheduled slots), preview |
+| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, `shortlist_entries` (the frozen analysis of every rated game; the site shows it for Board #1-#10), preview |
 | `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
@@ -193,7 +193,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 ### Scripts (`scripts/`, grouped; every script is idempotent)
 - **Live jobs**: `weekly_update` (score; `--min-games 0`, serve-skew guard, refit `model_runs`),
   `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`, `publish_shortlist`
-  (H-1H-SHORTLIST, after each scheduled card), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
+  (H-1H-SHORTLIST: the Board #1-#10 analysis, after each scheduled card), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`

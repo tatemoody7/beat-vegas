@@ -54,15 +54,29 @@ THREE_BOOKS = [
 
 
 # --- the pool ---------------------------------------------------------------------------------
-def test_the_pool_takes_only_hard_rocks_main_line_with_a_price_before_kickoff():
+def test_every_upcoming_game_gets_an_analysis_but_only_main_lines_are_priced():
+    """Tate 2026-10-16: the analysis is saved for every game the card rates (the site shows it for
+    the Board's #1-#10); an alternate rung or a missing price is never priced or filled in."""
     items = [
         item(1),
-        item(2, centred=False),  # an alternate rung never enters
-        item(3, price=None),  # a missing price is never filled in
+        item(2, centred=False),  # an alternate rung
+        item(3, price=None),  # no price
         item(4, line=None),
         item(5, kick="2026-10-15T19:00:00Z"),  # already kicked off
     ]
-    assert [it["game_id"] for it in S.pool(items, NOW)] == [1]
+    assert [it["game_id"] for it in S.pool(items, NOW)] == [1, 2, 3, 4]
+    assert [S.priceable(it) for it in items[:4]] == [True, False, False, False]
+    alt = S.price_read(item(2, centred=False), [snap("hardrockbet")] + THREE_BOOKS, MT, NOW)
+    assert alt["status"] == (
+        "insufficient pricing data (Hard Rock was showing an alternate line at the build)"
+    )
+    assert "ev_point" not in alt and S.label(alt) == S.LABEL_INSUFFICIENT
+    none = S.price_read(item(3, price=None), [], MT, NOW)
+    assert (
+        none["status"]
+        == "insufficient pricing data (no Hard Rock main line and price at the build)"
+    )
+    assert none["hr_under"] is None and none["breakeven"] is None
 
 
 # --- the price safeguards ---------------------------------------------------------------------
@@ -178,25 +192,6 @@ def test_an_informational_candidate_ranks_below_every_priced_game():
     assert sorted([info, priced], key=S.rank_key) == [priced, info]
 
 
-def test_why_rank_says_an_informational_candidate_ranks_below():
-    top = [
-        {
-            "price": {
-                "status": "priced",
-                "ev_point": 0.01,
-                "range_low": -0.01,
-                "range_high": 0.03,
-                "ref_books": ["a", "b", "c"],
-            }
-        },
-        {"price": {"status": "insufficient pricing data (2 reference books in the same sweep)"}},
-    ]
-    S.why_rank(top)
-    assert [e["rank"] for e in top] == [1, 2]
-    assert top[0]["why_rank"].startswith("R1: estimated EV +1.0%")
-    assert "ranks below every fully priced game" in top[1]["why_rank"]
-
-
 # --- the analysis speaks of scoring -----------------------------------------------------------
 def test_the_analysis_marks_scoring_by_percentile_and_never_the_bet():
     ref = {
@@ -222,7 +217,7 @@ def _pub(card_id=30):
         "card_built": "2026-10-15T20:17:15",
         "pool": 2,
         "method": S.METHOD,
-        "top10": [
+        "entries": [
             {"game_id": 1, "rank": 1, "label": S.LABEL_FAIR, "price": {"ev_point": 0.01}},
             {"game_id": 2, "rank": 2, "label": S.LABEL_INSUFFICIENT, "price": {"status": "x"}},
         ],
@@ -238,7 +233,7 @@ def test_a_card_publishes_once_and_a_second_run_writes_nothing():
         assert S.write_publication(s, pub) == 2
         s.commit()
     changed = _pub()
-    changed["top10"][0]["label"] = S.LABEL_POTENTIAL  # a later re-rank must not land
+    changed["entries"][0]["label"] = S.LABEL_POTENTIAL  # a later re-rank must not land
     with Session(eng) as s:
         assert S.write_publication(s, changed) == 0
         s.commit()
@@ -313,7 +308,7 @@ def test_health_flags_a_scheduled_card_with_no_publication_and_names_the_recover
     health, ctx = _card_ctx(eng)
     r = health.card_shortlist_published(ctx)
     assert not r.ok
-    assert "shortlist_publish.yml card_id=30" in r.detail
+    assert "recover shortlist_publish.yml card_id=30" in r.detail and ";" not in r.detail
     check = next(c for c in health.CONTRACTS["card"].checks if c.id == "card.shortlist_published")
     assert check.severity == "degraded"
 
@@ -328,5 +323,5 @@ def test_health_passes_once_published_and_for_a_manual_or_empty_card():
     health, ctx2 = _card_ctx(eng2, slot="manual")
     assert health.card_shortlist_published(ctx2).ok
     eng3, _ = _sqlite_scope()
-    health, ctx3 = _card_ctx(eng3, items=[item(centred=False)])
+    health, ctx3 = _card_ctx(eng3, items=[item(kick="2026-10-15T19:00:00Z")])
     assert health.card_shortlist_published(ctx3).ok

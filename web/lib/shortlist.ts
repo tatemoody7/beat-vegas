@@ -1,12 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { utcFrom } from "@/lib/armPositions";
 
-// The research shortlist (H-1H-SHORTLIST, website plan PR E, Tate 2026-10-15):
-// the frozen top 10 first-half unders a scheduled card's price-first ranking
-// put on top, written once per card by scripts/publish_shortlist.py into
-// `shortlist_entries`. The site only READS the frozen publication; nothing here
-// re-ranks, re-prices or relabels it. It is a research ranking, never the
-// Board's rank and never a bet: every number is an estimate, worded as one.
+// The Board's top-10 analysis (H-1H-SHORTLIST; Tate 2026-10-15, reshaped
+// 2026-10-16): the frozen read of every game a scheduled card rated, written
+// once per card by scripts/publish_shortlist.py into `shortlist_entries`. The
+// site shows an entry on the game page of the Board's #1-#10 and never
+// re-prices or relabels it. Every number is an estimate, worded as one.
 
 export const LABEL_POTENTIAL = "Potential positive market value";
 export const LABEL_FAIR = "Fair price";
@@ -200,11 +199,3 @@ export function verdictText(v: string | undefined): string {
   if (v === "candidate") return "a candidate, awaiting a forward test";
   return "not screened";
 }
-
-export const SHORTLIST_HEAD =
-  "Research top 10 — research ranking, not the Board's rank";
-export const NOTHING_POTENTIAL =
-  "No game in this publication reaches potential positive market value.";
-export const EV_CAVEAT =
-  "Estimated EV is an estimate, not proof of profit. The rough range reflects the spread across books, which copy each other, so it is narrower than the true uncertainty, and the line-conversion table's error.";
-export const FEED_NOTE = "Feed quote; Florida app availability unverified.";

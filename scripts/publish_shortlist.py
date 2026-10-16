@@ -1,4 +1,4 @@
-"""Publish the frozen research shortlist for one scheduled card (H-1H-SHORTLIST).
+"""Publish the frozen analysis of every game one scheduled card rates (H-1H-SHORTLIST).
 
 card.yml runs this after `build`, for the card the run just wrote:
 
@@ -18,7 +18,7 @@ Rules (website plan PR D, adjustment 2):
   `last_seen_at` is capped at it (a later re-confirmation cannot be undone, so the replay says how
   many games it touched).
 
-Writes `reports/shortlist_<card>_<UTC>.json` (the publication) and prints the top 10 and its sha256.
+Writes `reports/shortlist_<card>_<UTC>.json` (the publication) and prints each entry and its sha256.
 Exits 0 unless something is broken; card.yml's step is continue-on-error and the health check
 (`card.shortlist_published`) is what reports a missing publication.
 """
@@ -126,7 +126,7 @@ def main(argv=None) -> int:
             print(
                 f"replay as of {args.as_of}: {touched} snapshot rows were captured or re-confirmed later"
             )
-        for e in pub["top10"]:
+        for e in pub["entries"]:
             p = e["price"]
             ev = (
                 "—"
@@ -134,7 +134,7 @@ def main(argv=None) -> int:
                 else f"{100 * p['ev_point']:+.1f}% [{100 * p['range_low']:+.1f},{100 * p['range_high']:+.1f}]"
             )
             print(
-                f"R{e['rank']:<2d} {e['game_id']} {e['matchup']:40s} HR u{p['hr_line']} {p['hr_under']:+d}"
+                f"{e['game_id']} {e['matchup']:40s} HR u{p['hr_line']} {p['hr_under'] if p['hr_under'] is not None else '—'}"
                 f"  EV {ev}  {e['label']}  books {len(p.get('ref_books', []))}"
             )
         if not args.write:

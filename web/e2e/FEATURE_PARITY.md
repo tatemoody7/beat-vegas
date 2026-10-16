@@ -17,12 +17,11 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
 - [board] The `N bet(s) · N watch · N pass` counts line (signed in) matches the derived tiers — board.spec.ts › "states the tier counts"
-- [board] The H-PCT bar sentence (`Bar this week: <bar> pts (top <share>% of <n> priced games).`, one decimal, no gate clause since 2026-09-28) is exact — board.spec.ts › "states this week’s bar exactly"
-- [board] The slim line (research season, first-half unders at Hard Rock, strategies on paper, readings, next read, the /research link; it replaced the intro note and the pill strip, Q1 2026-10-15) sits above the week heading, and the key line keeps model, rule and price apart (signed in: plus what green means for the cap) — board.spec.ts › "opens with the slim line and the key that keeps model, rule and price apart"
+- [board] The slim line (research season, first-half unders at Hard Rock, strategies on paper, readings, next read, the /research link) sits above the week heading, with no bar line, no key line and no separate research list above the games (Tate 2026-10-16) — board.spec.ts › "opens with the slim line and nothing else above the games"
 - [board] A game with a real ticket carries the `bet logged` chip and no other row does — board.spec.ts › "marks the game with a logged ticket"
 - [board] The Hard Rock chip sets `?hr=1`, reads `aria-pressed`, hides games without a Hard Rock line and states the pre-filter count — board.spec.ts › "the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line"
 - [board] The Hard Rock chip is the only filter chip, signed in or out (the My teams chip went with roadmap v2.0) — board.spec.ts › "the Hard Rock filter is the only chip, signed in or out"
-- [board] Signed out (research season, roadmap v1.7): the footer carries the research-season sentence exactly (moved from under the header, Q10), the key line drops the cap clause, no answer bar and no tier counts render, and every pre-kickoff row carries its rank badge with the BET rows lit, in paper wording — no `Bet one unit`, no `bet logged` chip — board.spec.ts › "a visitor reads the research-season banner and the board with its ratings in paper wording"
+- [board] Signed out (research season, roadmap v1.7): the footer carries the research-season sentence exactly (moved from under the header, Q10), no answer bar and no tier counts render, and every pre-kickoff row carries its rank badge with the BET rows lit, in paper wording — no `Bet one unit`, no `bet logged` chip — board.spec.ts › "a visitor reads the research-season banner and the board with its ratings in paper wording"
 - [board] `?days=sat` (parsed, no UI) keeps only Saturday's games and heading — board.spec.ts › "?days=sat keeps only Saturday’s games"
 - [board] On the clean fixture no banner renders: no `role=status`, no missed build, no stale results, no pause, no no-model, no no-HR-line — board.spec.ts › "every banner is silent in the clean state"
 - [board] `odds_credits_remaining` under the floor lights the OpsBanner (signed in only; a visitor sees none) with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
@@ -58,13 +57,13 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [game] `/game/abc`, an unknown id and a negative id are 404s with the styled not-found page — game.spec.ts › "a non-numeric id and an unknown id are 404s"
 - [game] `← Back to the board` returns to the row's anchor — game.spec.ts › "the played game links back to its row on the board"
 
-## Research top 10
+## Board top-10 analysis
 
-- [shortlist] The frozen publication sits above the Board heading: "Research top 10 — research ranking, not the Board's rank", R1..R3 in order, each linking to its game, estimated EV with its rough range or "no estimate (incomplete pricing)", the label, the no-potential-value line, the estimate caveat and the feed note; the Board key points to it — shortlist.spec.ts › "sits above the Board in research rank order, labelled apart from the Board's rank"
-- [shortlist] A shortlisted game opens with its analysis before the decision card: frozen block (line, price, estimate, label, books) beside the latest Hard Rock price, why R1, stats with percentile, scoring words and the screen verdict, travel and local kickoff, the Board's rank named as a different ranking, no "the under" — shortlist.spec.ts › "a shortlisted game opens with its full analysis: frozen beside the latest price"
-- [shortlist] An informational candidate shows no estimate and names the incomplete pricing — shortlist.spec.ts › "an informational candidate says why it has no estimate"
-- [shortlist] A game off the list has no research section — shortlist.spec.ts › "a game off the list has no research section"
-- [shortlist] Signed out, the list and the analysis show before kickoff with no bet language — shortlist.spec.ts › "a visitor sees the list and the analysis before kickoff, in research wording"
+- [shortlist] The Board has no separate research list — shortlist.spec.ts › "the Board has no separate research list"
+- [shortlist] A Board #1-#10 game opens with "Analysis — Board #N" before the decision card: Hard Rock's price, estimated EV with its rough range and the label at the card, Hard Rock now, the matchup stats in scoring words, travel; no second ranking, no fine print — shortlist.spec.ts › "a top-10 game opens with its analysis, headed by its Board rank"
+- [shortlist] A game without a usable price shows no estimate and names why — shortlist.spec.ts › "a game without a price says so instead of an estimate"
+- [shortlist] A game past #10 shows no analysis, even when the card saved one — shortlist.spec.ts › "a game past #10 shows no analysis, even when the card saved one"
+- [shortlist] Signed out, the analysis shows before kickoff with no bet language — shortlist.spec.ts › "a visitor sees the analysis before kickoff, with no bet language"
 
 ## Results
 

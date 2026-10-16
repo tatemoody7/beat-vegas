@@ -2,12 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
 import { RESEARCH_BANNER } from "../lib/signalGate";
-import {
-  BOARD_KEY,
-  BOARD_KEY_OWNER,
-  BOARD_KEY_SHORTLIST,
-  PASS_HEAD,
-} from "../lib/boardKey";
+import { PASS_HEAD } from "../lib/boardKey";
 import { SLIM_LEAD } from "../app/components/ResearchStrip";
 
 // The board (app/page.tsx) against the fixture week, feature by feature. Every
@@ -39,7 +34,7 @@ async function rows(page: Page) {
 }
 
 test.describe("the board", () => {
-  test("opens with the slim line and the key that keeps model, rule and price apart", async ({
+  test("opens with the slim line and nothing else above the games", async ({
     page,
   }) => {
     await page.goto("/");
@@ -50,9 +45,14 @@ test.describe("the board", () => {
     await expect(slim.getByRole("link")).toHaveAttribute("href", "/research");
     await expect(slim.locator(".bv-pill")).toHaveCount(0);
     await expect(page.locator('p[aria-label="What this is"]')).toHaveCount(0);
+    // No bar line, no key line, no separate list (Tate 2026-10-16).
     await expect(
       page.locator('p[aria-label="How to read the Board"]'),
-    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_SHORTLIST} ${BOARD_KEY_OWNER}`);
+    ).toHaveCount(0);
+    await expect(page.getByText(/^Bar this week/)).toHaveCount(0);
+    await expect(
+      page.locator('section[aria-label="Research top 10"]'),
+    ).toHaveCount(0);
     // The slim line sits above the week heading, never inside the board.
     const slimBox = await slim.boundingBox();
     const heading = await page.locator("h1.bv-page-title").boundingBox();
@@ -78,8 +78,7 @@ test.describe("the board", () => {
     const labels = await page.$$eval("section[aria-label]", (ss) =>
       ss.map((x) => x.getAttribute("aria-label")),
     );
-    // The Research top 10 (its own section, above the Board) is not a Board group.
-    expect(labels).toEqual(["Research top 10", "Ranked", "Played"]);
+    expect(labels).toEqual(["Ranked", "Played"]);
     await expect(
       page.locator('section[aria-label="Played"] > h2.bv-day-head'),
     ).toHaveText(`Played · ${expected.playedIds.length}`);
@@ -190,13 +189,6 @@ test.describe("the board", () => {
     ).toBeVisible();
   });
 
-  test("states this week’s bar exactly", async ({ page }) => {
-    await page.goto("/");
-    await expect(
-      page.getByText(expected.barLine, { exact: true }),
-    ).toBeVisible();
-  });
-
   test("marks the game with a logged ticket", async ({ page }) => {
     await page.goto("/");
     const r = await rows(page);
@@ -235,9 +227,7 @@ test.describe("the board", () => {
     const labels = await page.$$eval("section[aria-label]", (ss) =>
       ss.map((s) => s.getAttribute("aria-label")),
     );
-    expect(
-      labels.filter((l) => l !== "Played" && l !== "Research top 10"),
-    ).toEqual(["Ranked"]);
+    expect(labels.filter((l) => l !== "Played")).toEqual(["Ranked"]);
   });
 
   test("every banner is silent in the clean state", async ({ page }) => {
@@ -283,9 +273,7 @@ test.describe("the board, signed out", () => {
     await expect(
       page.locator('footer p[aria-label="Research season"]'),
     ).toHaveText(RESEARCH_BANNER);
-    await expect(
-      page.locator('p[aria-label="How to read the Board"]'),
-    ).toHaveText(`${BOARD_KEY} ${BOARD_KEY_SHORTLIST}`);
+
     await expect(
       page.locator('div[aria-label="This week at a glance"]'),
     ).toHaveCount(0);

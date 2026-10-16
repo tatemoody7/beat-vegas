@@ -92,17 +92,21 @@ test.describe("the board", () => {
     expect(r[r.length - 1].section).toBe("Played");
   });
 
-  test("says a Pass in a few words under one heading, and colours each badge by its verdict", async ({
+  test("says a Pass in a few words under one heading; green is the top 10 or a lit row", async ({
     page,
   }) => {
     await page.goto("/");
     const r = (await rows(page)).filter((x) => x.section === "Ranked");
+    const rank = new Map(expected.rankOrder.map((id, i) => [id, i + 1]));
     const passes = r.filter((x) => x.text.startsWith("Pass"));
     for (const x of passes) {
       expect(x.text, `${x.id}`).toMatch(
         /^Pass · (leans over \d+\.\d|short of the bar \(needs \d+\.\d\)|on our number|no model number yet)$/,
       );
-      expect(x.badgeColor, `${x.id}`).toBe("var(--bad)");
+      // Red past #10; the Board's top 10 reads green (Tate 2026-10-16).
+      expect(x.badgeColor, `${x.id}`).toBe(
+        rank.get(x.id)! <= 10 ? "var(--good)" : "var(--bad)",
+      );
     }
     const head = page.locator('p[aria-label="Pass games"]');
     if (passes.length === 0) {
@@ -120,9 +124,10 @@ test.describe("the board", () => {
       const at = r.findIndex((x) => x.id === firstPassId);
       expect(r.slice(at).every((x) => x.text.startsWith("Pass"))).toBe(true);
     }
+    // Green = the Board's #1-#10 or a game meeting the rule (a lit row).
     for (const x of r) {
       expect(x.badgeColor === "var(--good)", `${x.id}`).toBe(
-        expected.betIds.includes(x.id),
+        rank.get(x.id)! <= 10 || expected.betIds.includes(x.id),
       );
     }
   });

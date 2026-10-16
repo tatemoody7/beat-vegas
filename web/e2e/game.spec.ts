@@ -229,6 +229,30 @@ test.describe("the game page", () => {
     expect(directed).toBeGreaterThan(0);
   });
 
+  // Tate 2026-10-16: the weather is the newest card-build forecast, dated and
+  // sourced; the undated Sunday rows (wx_wind, wx_temp, wx_precip) are gone.
+  test("shows the newest card forecast with its source and time, never the undated Sunday weather", async ({
+    page,
+  }) => {
+    await page.goto(`/game/${BET_LOGGED}`);
+    const wx = page.locator('div[aria-label="Weather"]');
+    await expect(wx).toContainText(
+      "Wind 11 mph, gusts 25 mph — points to less scoring.",
+    );
+    await expect(wx).toContainText("48°F, dry.");
+    await expect(wx).toContainText(
+      /ICON forecast, fetched \w{3} \d{1,2}:\d\d[ap]m, 44 h before kickoff/,
+    );
+    // The fixture's Sunday factor row ("... mph wind at kickoff") is not shown.
+    await expect(
+      page.locator(".bv-fac-text", { hasText: "wind at kickoff" }),
+    ).toHaveCount(0);
+    await page.goto(`/game/${BET_OPEN}`);
+    await expect(page.locator('div[aria-label="Weather"]')).toContainText(
+      "Weather: no forecast captured yet.",
+    );
+  });
+
   test("lists every book's open and current line, Hard Rock's move included", async ({
     page,
   }) => {

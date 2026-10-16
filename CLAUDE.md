@@ -109,9 +109,9 @@ disagree, **this file wins**; memory files hold lessons and point here.
   post-mortem tables stop. All four literature looks closed NOT MET; Coleman and Salaga parked.
 - **Accounts (v2.1)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key, `docs/OPS_ACCOUNTS.md`);
   The Odds API stays on 20K; Actions cap to $20. Kalshi account only on the January H-VENUE-1 read.
-- **The repo is PRIVATE again since 2026-10-04** (card on file; Actions budget $10/month,
-  stop-at-cap, alerts on — the $0 budget was the Sep 22 outage). 2,000 free minutes a month
-  against ~2,830 measured: watch the budget page in the last week of each month.
+- **The repo is PUBLIC again since 2026-10-16** (Tate): the $10/month Actions cap was hit mid-month
+  and GitHub refused every job from ~04:00Z (a refused job has 0 steps; its check-run annotation
+  names billing). Public removes the minute cap; nothing secret is tracked (scanned 2026-10-16).
 - **2026-12-07**: the one confirmatory look for `docs/WHEN_TO_BET.md` (H6); the script refuses
   `--confirmatory` before then.
 

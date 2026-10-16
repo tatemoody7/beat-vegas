@@ -32,6 +32,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 ## Game page
 
 - [game] "What is behind it" opens with the H-1H-FACTORS note and words every factor by scoring ("points to less scoring"), never the bet, including rows stored with the old words (Q5) — game.spec.ts › "words every factor by scoring, never the bet, under the screen's note"
+- [game] The weather is the newest card-build forecast with gusts, its model, fetch time and lead; a game without one says so; the undated Sunday weather rows are not shown (Tate 2026-10-16) — game.spec.ts › "shows the newest card forecast with its source and time, never the undated Sunday weather"
 - [game] For a logged BET, an open BET, a price-blocked Watch, a gap-short Watch and a played game: the Hard Rock / Market / Our number tiles, the rank badge and the sentence equal the board row's — game.spec.ts › "${id}: the three tiles, the rank and the sentence match the board row"
 - [game] The sentence names the kill line on a gap-short game and the kill price on a dear one — game.spec.ts › "names the kill number for a game short of the bar and the kill price for a dear one"
 - [game] When the feed's newest Hard Rock quote is an alternate line, the Hard Rock tile shows the last main line with `· as of <ET time>`, the sentence says so, and only a paper pick is offered — game.spec.ts › "a Hard Rock alternate line: the tile shows the last main line with its time, paper only"

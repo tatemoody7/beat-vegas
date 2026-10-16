@@ -49,6 +49,7 @@ export const TABLES = [
   "app_settings",
   "arm_positions",
   "shortlist_entries",
+  "build_forecasts",
   "games",
   "teams",
 ];
@@ -881,6 +882,27 @@ export function fixtureRows(week, expected) {
     cons_excluded: p.cons_excluded,
     cons_version: p.cons_version ?? null,
   }));
+
+  // The card-build forecast the game page shows (Tate 2026-10-16): one game
+  // has a dated forecast; the rest show "no forecast captured yet".
+  rows.build_forecasts = [
+    {
+      game_id: 900001,
+      fetched_at: ts(expected.builtAt),
+      kickoff: ts(week.games.find((g) => g.id === 900001).kick),
+      lead_hours: 44,
+      slot: "thu_pm",
+      temperature_f: 48.4,
+      wind_mph: 10.9,
+      wind_gust_mph: 25.1,
+      precipitation: 0,
+      dome: false,
+      latitude: 39.65,
+      longitude: -79.96,
+      source: "open_meteo_forecast",
+      weather_model: "icon_seamless",
+    },
+  ];
 
   // The research shortlist (website plan PR E): one frozen publication of the
   // fixture's card, three upcoming games.

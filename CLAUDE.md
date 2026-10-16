@@ -170,13 +170,12 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 ### Workflows (`.github/workflows/`)
 | File | Trigger | Writes |
 |---|---|---|
-| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, `shortlist_entries` (the frozen analysis of every rated game; the site shows it for Board #1-#10), preview |
+| `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
 | `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
-| `shortlist_publish.yml` | dispatch card_id | `shortlist_entries` for one card that missed (insert-only; refuses a card >24 h old) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
@@ -193,7 +192,7 @@ and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py`
 ### Scripts (`scripts/`, grouped; every script is idempotent)
 - **Live jobs**: `weekly_update` (score; `--min-games 0`, serve-skew guard, refit `model_runs`),
   `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`, `publish_shortlist`
-  (H-1H-SHORTLIST: the Board #1-#10 analysis, after each scheduled card), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
+  (H-1H-SHORTLIST, stopped 2026-10-16; dry runs only), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`

@@ -23,7 +23,6 @@ import {
   lineUsedFor,
   round2,
   armPositionsFor,
-  shortlistFor,
   armForwardPicksFor,
 } from "./expected.mjs";
 
@@ -903,15 +902,6 @@ export function fixtureRows(week, expected) {
       weather_model: "icon_seamless",
     },
   ];
-
-  // The research shortlist (website plan PR E): one frozen publication of the
-  // fixture's card, three upcoming games.
-  rows.shortlist_entries = shortlistFor(
-    week,
-    expected.builtAt,
-    now,
-    expected.rankOrder[10] ?? null,
-  ).map((r) => ({ ...r, published_at: ts(r.published_at) }));
 
   rows.arm_positions = armPositionsFor(now).map((r) => ({
     ...r,

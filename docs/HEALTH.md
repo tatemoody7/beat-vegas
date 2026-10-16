@@ -222,8 +222,8 @@ Parameters: `HR_PRICED_FLOOR = 10`, `STALE_AFTER_HOURS = 18`, `PACE_COVERAGE_MIN
 
 - Workflow: `.github/workflows/card.yml`
 - Window: tue_pm / thu_pm / fri_pm 3:45-5:15pm ET, sat_am 7:45-9:15am ET (beatvegas/ci.py)
-- Artifacts: `cards row`, `manual_picks paper rows (scheduled slots)`, `shortlist_entries (scheduled slots, frozen)`, `odds_snapshots 1H sweep`
-- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SLOT`, `SEASON`, `WEEK`, `OUTCOME_SWEEP`, `OUTCOME_PREVIEW`, `OUTCOME_BUILD`, `OUTCOME_SHORTLIST`
+- Artifacts: `cards row`, `manual_picks paper rows (scheduled slots)`, `odds_snapshots 1H sweep`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SLOT`, `SEASON`, `WEEK`, `OUTCOME_SWEEP`, `OUTCOME_PREVIEW`, `OUTCOME_BUILD`
 
 | Check | Severity | Positive fact |
 |---|---|---|
@@ -231,7 +231,6 @@ Parameters: `HR_PRICED_FLOOR = 10`, `STALE_AFTER_HOURS = 18`, `PACE_COVERAGE_MIN
 | `card.status_clean` | degraded | that row's payload.status is the slot's clean status (ci.CARD_STATUS_BY_SLOT) and payload.degraded is empty |
 | `card.hr_priced_floor` | degraded | items with a Hard Rock 1H line >= HR_PRICED_FLOOR [10] |
 | `card.paper_logged_iff_window` | degraded | scheduled slot: every qualifying item inside the slot's paper window has a paper pick; manual: zero paper picks placed since RUN_STARTED_AT |
-| `card.shortlist_published` | degraded | scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no game on the card is upcoming); manual: nothing published |
 | `card.sweep_reached_slate` | degraded | the sweep status file says complete and events_polled >= events_in_window (a missing file is a miss unless the sweep step was skipped) |
 
 Failure modes on record:

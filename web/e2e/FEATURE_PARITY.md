@@ -31,7 +31,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 ## Game page
 
 - [game] "What is behind it" opens with the H-1H-FACTORS note and words every factor by scoring ("points to less scoring"), never the bet, including rows stored with the old words (Q5) — game.spec.ts › "words every factor by scoring, never the bet, under the screen's note"
-- [game] The weather is the newest card-build forecast with gusts, its model, fetch time and lead; a game without one says so; the undated Sunday weather rows are not shown (Tate 2026-10-16) — game.spec.ts › "shows the newest card forecast with its source and time, never the undated Sunday weather"
+- [game] The wind is one row in the factors list: the steady wind from the newest card forecast, green at 10+ mph, plain below, no gusts; no weather box, no analysis box, the undated Sunday weather rows not shown (Tate 2026-10-16) — game.spec.ts › "shows the newest card forecast's steady wind as a coloured factor row"
 - [game] For a logged BET, an open BET, a price-blocked Watch, a gap-short Watch and a played game: the Hard Rock / Market / Our number tiles, the rank badge and the sentence equal the board row's — game.spec.ts › "${id}: the three tiles, the rank and the sentence match the board row"
 - [game] The sentence names the kill line on a gap-short game and the kill price on a dear one — game.spec.ts › "names the kill number for a game short of the bar and the kill price for a dear one"
 - [game] When the feed's newest Hard Rock quote is an alternate line, the Hard Rock tile shows the last main line with `· as of <ET time>`, the sentence says so, and only a paper pick is offered — game.spec.ts › "a Hard Rock alternate line: the tile shows the last main line with its time, paper only"
@@ -56,14 +56,6 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [game] With no first-half line anywhere the Lines section says so and shows our reference line — game.spec.ts › "says when no book has posted a first half yet"
 - [game] `/game/abc`, an unknown id and a negative id are 404s with the styled not-found page — game.spec.ts › "a non-numeric id and an unknown id are 404s"
 - [game] `← Back to the board` returns to the row's anchor — game.spec.ts › "the played game links back to its row on the board"
-
-## Board top-10 analysis
-
-- [shortlist] The Board has no separate research list — shortlist.spec.ts › "the Board has no separate research list"
-- [shortlist] A Board #1-#10 game opens with "Analysis — Board #N" before the decision card: Hard Rock's price, estimated EV with its rough range and the label at the card, Hard Rock now, the matchup stats in scoring words, travel; no second ranking, no fine print — shortlist.spec.ts › "a top-10 game opens with its analysis, headed by its Board rank"
-- [shortlist] A game without a usable price shows no estimate and names why — shortlist.spec.ts › "a game without a price says so instead of an estimate"
-- [shortlist] A game past #10 shows no analysis, even when the card saved one — shortlist.spec.ts › "a game past #10 shows no analysis, even when the card saved one"
-- [shortlist] Signed out, the analysis shows before kickoff with no bet language — shortlist.spec.ts › "a visitor sees the analysis before kickoff, with no bet language"
 
 ## Results
 

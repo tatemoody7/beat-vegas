@@ -229,28 +229,25 @@ test.describe("the game page", () => {
     expect(directed).toBeGreaterThan(0);
   });
 
-  // Tate 2026-10-16: the weather is the newest card-build forecast, dated and
-  // sourced; the undated Sunday rows (wx_wind, wx_temp, wx_precip) are gone.
-  test("shows the newest card forecast with its source and time, never the undated Sunday weather", async ({
+  // Tate 2026-10-16: the wind is one row in the factors list, the steady wind
+  // from the newest card forecast, green at 10+ mph; no gusts, no weather box.
+  test("shows the newest card forecast's steady wind as a coloured factor row", async ({
     page,
   }) => {
     await page.goto(`/game/${BET_LOGGED}`);
-    const wx = page.locator('div[aria-label="Weather"]');
-    await expect(wx).toContainText(
-      "Wind 11 mph, gusts 25 mph — points to less scoring.",
-    );
-    await expect(wx).toContainText("48°F, dry.");
-    await expect(wx).toContainText(
-      /ICON forecast, fetched \w{3} \d{1,2}:\d\d[ap]m, 44 h before kickoff/,
-    );
-    // The fixture's Sunday factor row ("... mph wind at kickoff") is not shown.
+    const row = page.locator(".bv-fac-row", { hasText: "Wind 11 mph" });
+    await expect(row).toHaveText("Wind 11 mph — points to less scoring.");
+    expect(
+      await row.evaluate((el) => (el as HTMLElement).style.background),
+    ).toMatch(/rgba\(22, ?163, ?74/);
+    await expect(page.getByText(/gust/i)).toHaveCount(0);
+    await expect(page.locator('div[aria-label="Weather"]')).toHaveCount(0);
+    // The fixture's undated Sunday row ("... mph wind at kickoff") is not shown.
     await expect(
       page.locator(".bv-fac-text", { hasText: "wind at kickoff" }),
     ).toHaveCount(0);
-    await page.goto(`/game/${BET_OPEN}`);
-    await expect(page.locator('div[aria-label="Weather"]')).toContainText(
-      "Weather: no forecast captured yet.",
-    );
+    // No analysis box on any game page (removed 2026-10-16).
+    await expect(page.locator('section[aria-label="Analysis"]')).toHaveCount(0);
   });
 
   test("lists every book's open and current line, Hard Rock's move included", async ({

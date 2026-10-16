@@ -18,8 +18,7 @@ import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import { badgeColor } from "@/lib/grade";
 import {
   STALE_WEATHER_KEYS,
-  forecastLines,
-  forecastSource,
+  windFactor,
   type CardForecast,
 } from "@/lib/forecast";
 import LogPickButton from "@/app/components/LogPickButton";
@@ -215,9 +214,19 @@ function WhySection({
   const f = g.row.factors;
   // The Sunday `weather` table's three rows carry no fetch time and were days
   // old (Tate 2026-10-16): the dated card-build forecast below replaces them.
-  const factors: BoardFactor[] = (f.factor_board ?? []).filter(
+  const board: BoardFactor[] = (f.factor_board ?? []).filter(
     (x) => x && x.key && !STALE_WEATHER_KEYS.has(x.key),
   );
+  // The wind row comes from the newest card forecast, placed where the old
+  // Sunday wind row sat (after plays), else at the end (Tate 2026-10-16).
+  const wind = windFactor(forecast);
+  const at = board.findIndex((x) => x.key === "combined_plays");
+  const factors: BoardFactor[] =
+    wind === null
+      ? board
+      : at >= 0
+        ? [...board.slice(0, at + 1), wind, ...board.slice(at + 1)]
+        : [...board, wind];
   const bits: string[] = [];
   if (f.home_rest_days != null || f.away_rest_days != null) {
     bits.push(
@@ -269,28 +278,6 @@ function WhySection({
           Nothing here yet. It fills in when the week is scored.
         </p>
       )}
-      <div
-        aria-label="Weather"
-        className="mb-3 rounded-[var(--r-sm)] border border-[var(--border)] px-3 py-2 text-sm"
-      >
-        {forecast === null ? (
-          <p className="text-[var(--text-muted)]">
-            Weather: no forecast captured yet. A card build fetches one for
-            every game it reads.
-          </p>
-        ) : (
-          <>
-            {forecastLines(forecast).map((line) => (
-              <p key={line} className="text-[var(--text)]">
-                {line}
-              </p>
-            ))}
-            <p className="mt-0.5 text-xs text-[var(--text-dim)]">
-              {forecastSource(forecast)}
-            </p>
-          </>
-        )}
-      </div>
       <div className="space-y-1">
         <Row
           label={`Last 3 first halves · ${g.row.away}`}
@@ -433,15 +420,11 @@ export default function GameDetail({
   unitUsd,
   backHref,
   authed,
-  research = null,
   forecast = null,
 }: {
   g: HomeGame;
   /** The newest card-build forecast for the kickoff hour (lib/forecast.ts). */
   forecast?: CardForecast | null;
-  /** The analysis of a Board #1-#10 game (H-1H-SHORTLIST); rendered right
-   *  under the header, before the decision. */
-  research?: React.ReactNode;
   /** The flat stake, read server-side — a client component cannot read it. */
   unitUsd: number;
   backHref: string;
@@ -488,8 +471,6 @@ export default function GameDetail({
           </span>
         </div>
       </div>
-
-      {research}
 
       <section className="bv-card p-4">
         <h2 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">

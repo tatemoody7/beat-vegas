@@ -336,35 +336,6 @@ def card_paper_logged_iff_window(ctx: Ctx) -> Result:
     return Result(not missing, detail)
 
 
-def card_shortlist_published(ctx: Ctx) -> Result:
-    """A scheduled card publishes its frozen analysis of every game it rates (H-1H-SHORTLIST,
-    website plan adjustment 2; the site shows it for the Board's #1-#10): rows in
-    `shortlist_entries` for the card this run built. The publish step is
-    continue-on-error, so it can never stop the Board; this check is what makes a miss visible
-    (degraded), and `shortlist_publish.yml` recovers it. A `manual` build publishes nothing; a card
-    with no upcoming game has nothing to publish."""
-    from .db.models import ShortlistEntry
-    from .shortlist import pool
-
-    if ctx.slot is None:
-        return Result(False, "slot unknown")
-    if ctx.slot not in SCHEDULED_SLOTS:
-        return Result(True, f"{ctx.slot}: a preview publishes nothing")
-    p = _card_payload(ctx)
-    if p is None:
-        return Result(False, "no card row")
-    n_pool = len(pool(p.get("items") or [], p["_built_at"]))
-    if n_pool == 0:
-        return Result(True, "no upcoming game on the card: nothing to publish")
-    n = ctx.session.query(ShortlistEntry.id).filter(ShortlistEntry.card_id == p["_id"]).count()
-    step = ctx.outcomes.get("shortlist", "") or "?"
-    # Short, and no ";": the note joins misses with ";" and keeps 90 characters of each.
-    detail = f"card {p['_id']}: {n} saved of {n_pool}, step {step}"
-    if n == 0:
-        detail += f", recover shortlist_publish.yml card_id={p['_id']}"
-    return Result(n > 0, detail)
-
-
 def card_sweep_reached_slate(ctx: Ctx) -> Result:
     st = ctx.status_files.get("sweep")
     outcome = ctx.outcomes.get("sweep", "")
@@ -777,7 +748,6 @@ CONTRACTS: Dict[str, Contract] = {
         artifacts=(
             "cards row",
             "manual_picks paper rows (scheduled slots)",
-            "shortlist_entries (scheduled slots, frozen)",
             "odds_snapshots 1H sweep",
         ),
         inputs=(
@@ -787,7 +757,6 @@ CONTRACTS: Dict[str, Contract] = {
             "OUTCOME_SWEEP",
             "OUTCOME_PREVIEW",
             "OUTCOME_BUILD",
-            "OUTCOME_SHORTLIST",
         ),
         checks=(
             Check(
@@ -813,12 +782,6 @@ CONTRACTS: Dict[str, Contract] = {
                 "degraded",
                 "scheduled slot: every qualifying item inside the slot's paper window has a paper pick; manual: zero paper picks placed since RUN_STARTED_AT",
                 card_paper_logged_iff_window,
-            ),
-            Check(
-                "card.shortlist_published",
-                "degraded",
-                "scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no game on the card is upcoming); manual: nothing published",
-                card_shortlist_published,
             ),
             Check(
                 "card.sweep_reached_slate",

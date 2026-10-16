@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   forecastFrom,
-  forecastLines,
-  forecastSource,
   modelName,
   STALE_WEATHER_KEYS,
+  windFactor,
 } from "./forecast";
 
-// The game page's weather (Tate 2026-10-16): the newest card-build forecast,
-// dated and sourced, in scoring words; the Sunday table's rows are dropped.
+// The wind row in the factors list (Tate 2026-10-16): the steady wind from the
+// newest card forecast, one number, green at 10+ mph, plain below.
 
 const row = {
   fetched_at: "2026-10-15 20:17:15.232935",
@@ -21,32 +20,24 @@ const row = {
   weather_model: "icon_seamless",
 };
 
-describe("the card forecast on the game page", () => {
-  it("states wind, gusts, temperature and rain in scoring words", () => {
-    expect(forecastLines(forecastFrom(row))).toEqual([
-      "Wind 11 mph, gusts 25 mph — points to less scoring.",
-      "48°F, dry.",
-    ]);
-    expect(
-      forecastLines(forecastFrom({ ...row, wind_mph: 6, precipitation: 0.04 })),
-    ).toEqual([
-      "Wind 6 mph, gusts 25 mph — small effect, if any.",
-      "48°F, 0.04 in of rain in the kickoff hour.",
-    ]);
+describe("the wind row", () => {
+  it("is green at 10 mph or more and names the steady wind only", () => {
+    const w = windFactor(forecastFrom(row))!;
+    expect(w.sentence).toBe("Wind 11 mph — points to less scoring.");
+    expect(w.color).toBe("green");
+    expect(w.sentence).not.toMatch(/gust/);
   });
 
-  it("says where and when the forecast came from", () => {
-    // 20:17Z on a Thursday in October is 4:17pm ET.
-    expect(forecastSource(forecastFrom(row))).toBe(
-      "ICON forecast, fetched Thu 4:17pm, 44 h before kickoff",
-    );
-    expect(modelName("gfs_seamless")).toBe("GFS");
+  it("is plain below 10 mph", () => {
+    const w = windFactor(forecastFrom({ ...row, wind_mph: 4.2 }))!;
+    expect(w.sentence).toBe("Wind 4 mph — small effect, if any.");
+    expect(w.color).toBe("neutral");
   });
 
-  it("an indoor game has no weather, and the stale rows are named", () => {
-    expect(forecastLines(forecastFrom({ ...row, dome: true }))).toEqual([
-      "Indoors: no weather.",
-    ]);
+  it("is absent indoors or without a forecast", () => {
+    expect(windFactor(forecastFrom({ ...row, dome: true }))).toBeNull();
+    expect(windFactor(null)).toBeNull();
+    expect(modelName("icon_seamless")).toBe("ICON");
     expect([...STALE_WEATHER_KEYS].sort()).toEqual([
       "wx_precip",
       "wx_temp",

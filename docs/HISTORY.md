@@ -10,6 +10,12 @@ hold the rest.
 
 ## 2026-10-16
 
+- **2026-10-16 UTC (THE ANALYSIS IS REMOVED; WIND BACK IN THE FACTORS LIST).** Tate did not want the analysis box:
+  it is off every game page, and no card saves it any more (the card.yml step, the `card.shortlist_published` check and
+  `shortlist_publish.yml` are gone; H-1H-SHORTLIST rejected; card 31's rows stay as the record). The wind is back as a
+  row in "What is behind it": the steady wind at kickoff from the newest card forecast, green at 10+ mph, plain below,
+  no gusts; the weather box (and its temperature and rain lines) is gone.
+
 - **2026-10-16 UTC (THE BOARD'S TOP 10 OPEN THE ANALYSIS; A BILLING HOLD; DATED WEATHER).** GitHub refused every job
   from ~04:00Z (the $10 Actions cap); Tate made the repo public again (~20:15Z, history since 10-04 scanned clean) and
   grading, the fri_pm card and the first publication ran. Tate then set the Board's #1-#10 green (#411), had the game

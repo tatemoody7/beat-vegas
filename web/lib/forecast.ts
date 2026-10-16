@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { utcFrom } from "@/lib/armPositions";
 import { etClock12 } from "@/lib/et";
+import type { BoardFactor } from "@/lib/score";
 
-// The game page's weather (Tate 2026-10-16): the forecast the newest card
-// build fetched for the kickoff hour (`build_forecasts`, written by
+// The game page's wind (Tate 2026-10-16): the steady wind at kickoff from the
+// forecast the newest card build fetched (`build_forecasts`, written by
 // beatvegas/wx_paper.capture -- the same row the wind strategies read), shown
-// with its gusts, the weather model, when it was fetched and how far before
-// kickoff. It replaced the bare numbers of the Sunday `weather` table, which
+// as one row in the factors list. It replaced the bare numbers of the Sunday `weather` table, which
 // carried no fetch time: on 2026-10-16 they were ~6 days old and 19 of 47
 // outdoor week-7 games read 5+ mph off the current forecast. Display only:
 // the model does not read kickoff weather (LEAKY_WEATHER_COLS).
@@ -88,28 +88,31 @@ export const STALE_WEATHER_KEYS = new Set(["wx_temp", "wx_wind", "wx_precip"]);
 /** Wind at or above this points to less scoring (the wind strategies' line). */
 export const WIND_LESS_SCORING_MPH = 10;
 
-/** The lines the page shows, in scoring words (Q5), never the bet. */
-export function forecastLines(f: CardForecast): string[] {
-  if (f.dome) return ["Indoors: no weather."];
-  const r = (x: number | null) => (x === null ? "—" : String(Math.round(x)));
-  const wind =
-    f.windMph === null
-      ? "No wind forecast"
-      : `Wind ${r(f.windMph)} mph${f.gustMph !== null ? `, gusts ${r(f.gustMph)} mph` : ""} — ${f.windMph >= WIND_LESS_SCORING_MPH ? "points to less scoring" : "small effect, if any"}`;
-  const precip =
-    f.precipitationIn === null
-      ? ""
-      : f.precipitationIn < 0.005
-        ? ", dry"
-        : `, ${f.precipitationIn.toFixed(2)} in of rain in the kickoff hour`;
-  const temp =
-    f.temperatureF === null ? "Temperature —" : `${r(f.temperatureF)}°F`;
-  return [`${wind}.`, `${temp}${precip}.`];
-}
-
-/** "ICON forecast, fetched Thu 4:17pm, 44 h before kickoff". */
-export function forecastSource(f: CardForecast): string {
-  const lead =
-    f.leadHours === null ? "" : `, ${Math.round(f.leadHours)} h before kickoff`;
-  return `${modelName(f.model)} forecast, fetched ${etClock12(f.fetchedAt)}${lead}`;
+/**
+ * The wind as a row in the factors list (Tate 2026-10-16): the steady wind at
+ * kickoff from the newest card forecast, one number, no gusts; green ("points
+ * to less scoring") at WIND_LESS_SCORING_MPH or more, plain below. Null indoors
+ * or without a forecast.
+ */
+export function windFactor(f: CardForecast | null): BoardFactor | null {
+  if (f === null || f.dome || f.windMph === null) return null;
+  const mph = Math.round(f.windMph);
+  const strong = f.windMph >= WIND_LESS_SCORING_MPH;
+  return {
+    key: "card_wind",
+    label: "Wind",
+    family: "weather",
+    tier: 2,
+    direction: strong ? 1 : 0,
+    hypothesis: false,
+    binary: false,
+    value: f.windMph,
+    color: strong ? "green" : "neutral",
+    intensity: strong
+      ? Math.min(1, 0.5 + (f.windMph - WIND_LESS_SCORING_MPH) / 20)
+      : 0,
+    lean: 0,
+    sentence: `Wind ${mph} mph — ${strong ? "points to less scoring" : "small effect, if any"}.`,
+    live: null,
+  };
 }

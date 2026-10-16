@@ -1,8 +1,5 @@
 import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
-import ShortlistAnalysis from "@/app/components/ShortlistAnalysis";
-import { getShortlist } from "@/lib/shortlist";
-import { GREEN_TOP_RANKS } from "@/lib/grade";
 import { getCardForecast } from "@/lib/forecast";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
 import { viewerIsAuthed } from "@/lib/session";
@@ -43,15 +40,6 @@ export default async function GamePage({
 
   const { unitUsd } = bankrollEnv();
   const authed = await viewerIsAuthed();
-  // The Board's #1-#10 open with their analysis (Tate 2026-10-16): the frozen
-  // read of the newest scheduled card, saved for every game it rated.
-  const rank = found.game.boardRank;
-  const list =
-    rank !== null && rank <= GREEN_TOP_RANKS && found.board.week !== null
-      ? await getShortlist(found.board.season, found.board.week)
-      : null;
-  const entry = list?.entries.find((e) => e.game_id === gameId) ?? null;
-  const { check } = found.game;
   return (
     <GameDetail
       g={gateGame(found.game, authed)}
@@ -59,21 +47,6 @@ export default async function GamePage({
       unitUsd={unitUsd}
       backHref={`/#game-${gameId}`}
       forecast={await getCardForecast(gameId)}
-      research={
-        list && entry && rank !== null ? (
-          <ShortlistAnalysis
-            e={entry}
-            publishedAt={list.publishedAt}
-            cardBuilt={list.cardBuilt}
-            boardRank={rank}
-            latest={{
-              line: check?.hrLine ?? null,
-              under: check?.hrUnderPrice ?? null,
-              seenAt: check?.hrSeenAt,
-            }}
-          />
-        ) : null
-      }
     />
   );
 }

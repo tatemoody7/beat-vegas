@@ -364,24 +364,6 @@ jobs:
             --slot "$SLOT" \
             --sweep-status "$SWEEP_STATUS" \
             --preview-status "$PREVIEW_STATUS"
-      - name: Publish the frozen research shortlist (H-1H-SHORTLIST; never the money path)
-        id: shortlist
-        # The research top 10 for the card the build step just wrote (website plan PR D).
-        # Scheduled slots only (a manual build is a preview and publishes nothing);
-        # continue-on-error so a failure here can never turn the run red or touch the
-        # card or the Board: card.shortlist_published (health, degraded) reports a miss
-        # and shortlist_publish.yml recovers it. Insert-only: a card publishes once.
-        if: always() && steps.build.outcome == 'success' && steps.slot.outputs.no_paper != 'true'
-        continue-on-error: true
-        env:
-          SEASON: ${{ steps.active.outputs.season }}
-          WEEK: ${{ steps.active.outputs.week }}
-          SLOT: ${{ steps.slot.outputs.slot }}
-          RUN_STARTED_AT: ${{ steps.gate.outputs.started }}
-        run: |
-          if [ -z "$WEEK" ]; then echo "no active week: nothing to publish"; exit 0; fi
-          python scripts/publish_shortlist.py --season "$SEASON" --week "$WEEK" \
-            --slot "$SLOT" --since "$RUN_STARTED_AT" --write
       - name: Save CFBD reference cache (only when this run populated it)
         if: always() && steps.gate.outputs.slot != 'skip' && steps.cfbd_cache.outputs.hit != 'true'
         uses: ./.github/actions/cfbd-cache-save
@@ -418,5 +400,4 @@ jobs:
           OUTCOME_SWEEP: ${{ steps.sweep.outcome }}
           OUTCOME_PREVIEW: ${{ steps.preview.outcome }}
           OUTCOME_BUILD: ${{ steps.build.outcome }}
-          OUTCOME_SHORTLIST: ${{ steps.shortlist.outcome }}
         run: python scripts/health_check.py --job card --sweep-status "$RUNNER_TEMP/sweep_status.json"

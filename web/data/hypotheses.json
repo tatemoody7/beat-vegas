@@ -449,8 +449,8 @@
   },
   {
     "id": "H-1H-SHORTLIST",
-    "question": "What does the newest scheduled card know about each game it rates (price at Hard Rock against the same sweep's books, the matchup, rest, travel, QB, weather), shown as the analysis behind the Board's #1-#10, and read later against the result and the closing value? (Tate, 2026-10-15; reshaped 2026-10-16: no separate ranking — the Board's top 10 open this analysis. A display, never an arm, never a bet rule.)",
-    "status": "exploratory",
+    "question": "STOPPED 2026-10-16 (Tate): no card saves it and no page shows it; card 31's rows stay as the record. What does the newest scheduled card know about each game it rates (price at Hard Rock against the same sweep's books, the matchup, rest, travel, QB, weather), shown as the analysis behind the Board's top ten, and read later against the result and the closing value? (Tate, 2026-10-15; reshaped 2026-10-16: no separate ranking — the Board's top 10 open this analysis. A display, never an arm, never a bet rule.)",
+    "status": "rejected",
     "family": "exploratory (no ledger slot, no alpha; never evidence for any arm; the personal ledger is untouched)",
     "doc": "`beatvegas/shortlist.py`, `scripts/publish_shortlist.py`, `shortlist_entries`"
   },

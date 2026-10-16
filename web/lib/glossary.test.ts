@@ -45,7 +45,7 @@ describe("glossary", () => {
 describe("barRule", () => {
   it("names the week's bar when there is one, and no number otherwise", () => {
     expect(barRule(1.6, 7)).toBe(
-      "The bar is set each week at the top 20% of gaps among games Hard Rock has priced (1.6 in week 7); 1.75 applies only to a week with no priced games.",
+      "The bar is set each week at the top 20% of gaps among games Hard Rock has priced (1.6 on week 7's latest card; the Board recomputes it over the games still to kick off); 1.75 applies only to a week with no priced games.",
     );
     expect(barRule()).not.toMatch(/in week/);
     expect(barRule()).not.toMatch(/band we bet/);

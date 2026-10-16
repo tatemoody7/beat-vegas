@@ -1,26 +1,26 @@
-"""The research shortlist (H-1H-SHORTLIST; website plan PR D, Tate 2026-10-15).
+"""The Board's top-10 analysis (H-1H-SHORTLIST; website plan PR D, Tate 2026-10-15; reshaped
+2026-10-16).
 
-Each scheduled card publishes one frozen, ranked top 10 of first-half unders for Tate to judge
-himself. Ported from the approved prototype (`research/1h-factors-2026-10/proto.py`, frozen record
-`shortlist_20261015T201834Z.json`) with every pricing safeguard kept exactly:
+Each scheduled card saves one frozen analysis for EVERY game it rates; the site shows it on the game
+page of the Board's #1-#10 (the green badges), so clicking a top-10 card opens the deeper read Tate
+decides from. There is no second ranking: the Board's rank is the only one. Ported from the approved
+prototype (`research/1h-factors-2026-10/proto.py`) with every pricing safeguard kept exactly:
 
-- pool: card items with Hard Rock's MAIN 1H line (`hr_centred`), a non-null line and price, kicking
-  off after the decision time. An alternate rung never enters.
+- only Hard Rock's MAIN 1H line with a price (`hr_centred`) is ever priced; an alternate rung or a
+  missing price is saved as "insufficient pricing data" with its reason, never filled in.
 - price: estimated EV at Hard Rock's exact line and price against the consensus fair share, from
   reference books confirmed in the SAME sweep as Hard Rock's last confirmation
   (`pricing.reference_quotes`, grace 0), within 1.5 pts, converted through hp1; Hard Rock, Fliff and
   the feed's consensus row excluded; at least `consensus.MIN_BOOKS` (3) books.
 - a Hard Rock price last confirmed more than `STALE_H` (6) hours ago, too few books, a line outside
-  the conversion table or no matching Hard Rock snapshot makes an informational candidate
-  ("Insufficient pricing data"), ranked below every priced game. A missing price is never filled in.
+  the conversion table or no matching Hard Rock snapshot is "insufficient pricing data".
 - the rough range is a bootstrap over the books joined with hp1's conservative low; it is an
   ESTIMATE, not proof of profit, and narrower than the true uncertainty (books copy each other).
-- no factor carries ranking weight (H-1H-FACTORS: 64 screened, none passed). The analysis is
-  descriptive and worded by scoring, never by the bet (Q5).
+- no factor carries weight (H-1H-FACTORS: 64 screened, none passed). The analysis is descriptive
+  and worded by scoring, never by the bet (Q5).
 
-The core is pure (plain dicts in, a publication dict out) so it can be checked against the
-prototype's frozen output on the same rows; `load_inputs` is the only database reader and
-`write_publication` the only writer (insert-only: a card publishes once, never re-ranked).
+The core is pure (plain dicts in, a publication dict out); `load_inputs` is the only database
+reader and `write_publication` the only writer (insert-only: a card publishes once).
 """
 
 from __future__ import annotations
@@ -43,12 +43,13 @@ from .devig import devig_two_way
 
 ROW_ID = "H-1H-SHORTLIST"
 STALE_H = 6.0  # a Hard Rock price last confirmed longer ago than this is not priced
-TOP_N = 10
 BOOT_DRAWS = 500
 POTENTIAL_MIN_EV = 0.01  # the point estimate a "Potential positive market value" label needs
 GAME_LEN = timedelta(hours=4)  # a game counts as finished 4 h after kickoff (build_frame.py)
 HR_BOOK = "hardrockbet"
-METHOD = "price-first; no factor weight (H-1H-FACTORS: 0 of 64 passed); EV is an estimate"
+METHOD = (
+    "every game the card rates; EV is an estimate; no factor weight (H-1H-FACTORS: 0 of 64 passed)"
+)
 
 LABEL_POTENTIAL = "Potential positive market value"
 LABEL_FAIR = "Fair price"
@@ -129,6 +130,21 @@ def price_read(
     now: datetime,
 ) -> Dict[str, Any]:
     """Hard Rock's under at the card's exact line and price, against the same sweep's books."""
+    if not priceable(item):
+        reason = (
+            "Hard Rock was showing an alternate line at the build"
+            if item.get("hr_line") is not None and not item.get("hr_centred")
+            else "no Hard Rock main line and price at the build"
+        )
+        return {
+            "hr_line": item.get("hr_line"),
+            "hr_under": item.get("hr_price"),
+            "hr_over": item.get("hr_over_price"),
+            "hr_quote_at": item.get("hr_as_of"),
+            "breakeven": None,
+            "hr_hold": None,
+            "status": f"insufficient pricing data ({reason})",
+        }
     hr_price = int(item["hr_price"])
     over = item.get("hr_over_price")
     out: Dict[str, Any] = {
@@ -241,29 +257,6 @@ def rank_key(e: Mapping[str, Any]) -> tuple:
         return (0, -p["range_low"], -p["ev_point"], -len(p.get("ref_books", [])))
     ev = p.get("ev_point")
     return (1, -(ev if ev is not None else -9.0), 0, -len(p.get("ref_books", [])))
-
-
-def why_rank(top: List[Dict[str, Any]]) -> None:
-    for i, e in enumerate(top, 1):
-        e["rank"] = i
-        p = e["price"]
-        if p.get("status") != "priced":
-            e["why_rank"] = (
-                f"R{i}: informational candidate. {p.get('status', '').capitalize()}, "
-                "so it ranks below every fully priced game."
-            )
-            continue
-        nxt = top[i] if i < len(top) and top[i]["price"].get("status") == "priced" else None
-        e["why_rank"] = (
-            f"R{i}: estimated EV {100 * p['ev_point']:+.1f}% (rough range {100 * p['range_low']:+.1f}% "
-            f"to {100 * p['range_high']:+.1f}%) against {len(p['ref_books'])} reference books in the "
-            "same sweep"
-            + (
-                f"; its low end is above R{i + 1}'s ({100 * nxt['price']['range_low']:+.1f}%)."
-                if nxt
-                else "."
-            )
-        )
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -532,19 +525,23 @@ def analysis(
 # The publication
 # --------------------------------------------------------------------------------------------- #
 def pool(items: Sequence[Mapping[str, Any]], t: datetime) -> List[Mapping[str, Any]]:
-    """Card items the shortlist may rank: Hard Rock's main line and price, kicking off after `t`."""
+    """Every card item kicking off after `t`: the analysis is saved for each game the card rates
+    (Tate 2026-10-16), and the site shows it for the Board's #1-#10."""
     out = []
     for it in items:
         kick = parse_ts(it.get("kick"))
-        if (
-            it.get("hr_centred")
-            and it.get("hr_price") is not None
-            and it.get("hr_line") is not None
-            and kick is not None
-            and kick > t
-        ):
+        if kick is not None and kick > t:
             out.append(it)
     return out
+
+
+def priceable(it: Mapping[str, Any]) -> bool:
+    """Only Hard Rock's MAIN line with a price is ever priced; an alternate rung never is."""
+    return (
+        bool(it.get("hr_centred"))
+        and it.get("hr_price") is not None
+        and it.get("hr_line") is not None
+    )
 
 
 def build_publication(
@@ -557,7 +554,8 @@ def build_publication(
     mass_table: PR.MassTable,
     now: datetime,
 ) -> Dict[str, Any]:
-    """The frozen top 10 for one card. `card`: id, season, week, slot, built_at, items."""
+    """The frozen analysis of every game one card rates. `card`: id, season, week, slot, built_at,
+    items."""
     built = parse_ts(card["built_at"])
     entries = []
     for it in pool(card["items"], now):
@@ -583,9 +581,11 @@ def build_publication(
                 "analysis": analysis(f, reference, forecasts.get(gid), previews.get(gid)),
             }
         )
+    # Stored in price order for a stable record; the site shows each entry on its own game page
+    # for the Board's #1-#10 and never shows this order as a ranking.
     entries.sort(key=rank_key)
-    top = entries[:TOP_N]
-    why_rank(top)
+    for i, e in enumerate(entries, 1):
+        e["rank"] = i
     return {
         "published_at": now.isoformat() + "Z",
         "card_id": int(card["id"]),
@@ -595,7 +595,7 @@ def build_publication(
         "card_built": built.isoformat() if built else None,
         "pool": len(entries),
         "method": METHOD,
-        "top10": top,
+        "entries": entries,
     }
 
 
@@ -754,7 +754,7 @@ def write_publication(session, pub: Mapping[str, Any]) -> int:
         return 0
     sha = publication_sha(pub)
     published = parse_ts(pub["published_at"])
-    for e in pub["top10"]:
+    for e in pub["entries"]:
         session.add(
             ShortlistEntry(
                 card_id=int(pub["card_id"]),
@@ -773,7 +773,7 @@ def write_publication(session, pub: Mapping[str, Any]) -> int:
             )
         )
     session.flush()
-    return len(pub["top10"])
+    return len(pub["entries"])
 
 
 def publication_from_rows(rows: Sequence[Any]) -> Dict[str, Any]:
@@ -789,5 +789,5 @@ def publication_from_rows(rows: Sequence[Any]) -> Dict[str, Any]:
         "card_built": r0.card_built,
         "pool": r0.pool_size,
         "method": r0.method,
-        "top10": [json.loads(r.payload_json) for r in rows],
+        "entries": [json.loads(r.payload_json) for r in rows],
     }

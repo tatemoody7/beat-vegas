@@ -1,92 +1,52 @@
 import { expect, test } from "@playwright/test";
-import { BOARD_KEY, BOARD_KEY_SHORTLIST } from "../lib/boardKey";
-import {
-  EV_CAVEAT,
-  FEED_NOTE,
-  NOTHING_POTENTIAL,
-  SHORTLIST_HEAD,
-} from "../lib/shortlist";
 import { SHORTLIST_IDS } from "./fixture/expected.mjs";
 import { fixture } from "./helpers/fixture";
 
-// The Research top 10 (H-1H-SHORTLIST, website plan PR E): the frozen
-// publication above the Board, labelled apart from the Board's rank, and each
-// shortlisted game's full analysis at the top of its page, frozen beside the
-// latest Hard Rock price. Research wording only, signed in or out.
+// The Board's top-10 analysis (H-1H-SHORTLIST; Tate 2026-10-16): no separate
+// list on the Board; each of the Board's #1-#10 opens its game page with the
+// analysis the newest scheduled card saved, beside Hard Rock's price now. A
+// game past #10 shows none, even when the card saved one for it.
 
-const { byId } = fixture();
-const [R1, , R3] = SHORTLIST_IDS;
+const { expected } = fixture();
+const rank = new Map(expected.rankOrder.map((id, i) => [id, i + 1]));
+const [FIRST, , THIRD] = SHORTLIST_IDS;
+const ELEVENTH = expected.rankOrder[10];
 
-test.describe("the research top 10", () => {
-  test("sits above the Board in research rank order, labelled apart from the Board's rank", async ({
-    page,
-  }) => {
+test.describe("the Board's top-10 analysis", () => {
+  test("the Board has no separate research list", async ({ page }) => {
     await page.goto("/");
-    const list = page.locator('section[aria-label="Research top 10"]');
-    await expect(list.locator("h2")).toHaveText(SHORTLIST_HEAD);
-    const links = list.locator("a[data-research-rank]");
-    await expect(links).toHaveCount(3);
-    for (const [i, id] of SHORTLIST_IDS.entries()) {
-      const a = links.nth(i);
-      await expect(a).toHaveAttribute("href", `/game/${id}`);
-      await expect(a).toContainText(`R${i + 1}`);
-      const g = byId.get(id)!;
-      await expect(a).toContainText(`${g.away} @ ${g.home}`);
-    }
-    await expect(links.nth(0)).toContainText(
-      "estimated EV +1.8% (rough range 0.0% to +3.9%)",
-    );
-    await expect(links.nth(0)).toContainText("Fair price");
-    await expect(links.nth(2)).toContainText(
-      "no estimate (incomplete pricing)",
-    );
-    await expect(links.nth(2)).toContainText("Insufficient pricing data");
-    // No entry reaches potential value, and the page says so.
-    await expect(list).toContainText(NOTHING_POTENTIAL);
-    await expect(list).toContainText(`${EV_CAVEAT} ${FEED_NOTE}`);
-    await expect(list).toContainText("frozen, never re-ranked");
-    // It sits above the Board heading; the key points to it.
-    const listBox = await list.boundingBox();
-    const heading = await page.locator("h1.bv-page-title").boundingBox();
-    expect(listBox!.y).toBeLessThan(heading!.y);
     await expect(
-      page.locator('p[aria-label="How to read the Board"]'),
-    ).toContainText(`${BOARD_KEY} ${BOARD_KEY_SHORTLIST}`);
+      page.locator('section[aria-label="Research top 10"]'),
+    ).toHaveCount(0);
+    await expect(page.getByText(/Research top 10|R1\b/)).toHaveCount(0);
   });
 
-  test("a shortlisted game opens with its full analysis: frozen beside the latest price", async ({
+  test("a top-10 game opens with its analysis, headed by its Board rank", async ({
     page,
   }) => {
-    await page.goto(`/game/${R1}`);
-    const sec = page.locator('section[aria-label="Research shortlist"]');
+    expect(rank.get(FIRST)!).toBeLessThanOrEqual(10);
+    await page.goto(`/game/${FIRST}`);
+    const sec = page.locator('section[aria-label="Analysis"]');
     await expect(sec.locator("h2")).toHaveText(
-      "Research shortlist R1 — research ranking, not the Board's rank",
+      `Analysis — Board #${rank.get(FIRST)}`,
     );
-    const frozen = sec.getByTestId("frozen");
-    await expect(frozen).toContainText("(frozen)");
-    await expect(frozen).toContainText("u44.5 +100");
-    await expect(frozen).toContainText(
+    const atCard = sec.getByTestId("frozen");
+    await expect(atCard).toContainText(/At the \w{3} \d{1,2}:\d\d[ap]m card/);
+    await expect(atCard).toContainText("u44.5 +100");
+    await expect(atCard).toContainText(
       "estimated EV +1.8% (rough range 0.0% to +3.9%)",
     );
-    await expect(frozen).toContainText("Fair price");
-    await expect(frozen).toContainText("5 reference books in the same sweep");
-    await expect(sec.getByTestId("latest")).toContainText(
-      "Latest Hard Rock price",
-    );
-    await expect(sec.getByTestId("why")).toHaveText(
-      /^R1: estimated EV \+1\.8%/,
-    );
-    // The matchup speaks of scoring, with each stat's percentile and verdict.
+    await expect(atCard).toContainText("Fair price");
+    await expect(sec.getByTestId("latest")).toContainText("Hard Rock now");
     const stats = sec.locator('ul[aria-label="Matchup stats"]');
     await expect(stats).toContainText("21st percentile");
     await expect(stats).toContainText("points to less scoring");
-    await expect(stats).toContainText("not shown to beat the line");
     await expect(sec).toContainText("visitors travel ~435 miles");
-    await expect(sec).toContainText("~19:30 local");
     await expect(sec).not.toContainText("the under");
-    // The Board's own rank is named as a different ranking.
-    await expect(sec).toContainText("On the Board this game is #");
-    await expect(page.getByTestId("board-rank-label")).toHaveText("Board");
+    // No second ranking and no fine print.
+    await expect(sec).not.toContainText(
+      /research ranking|R\d|not proof of profit|Feed quote/,
+    );
     // The analysis comes before the decision card.
     const secBox = await sec.boundingBox();
     const decision = await page
@@ -95,42 +55,39 @@ test.describe("the research top 10", () => {
     expect(secBox!.y).toBeLessThan(decision!.y);
   });
 
-  test("an informational candidate says why it has no estimate", async ({
+  test("a game without a price says so instead of an estimate", async ({
     page,
   }) => {
-    await page.goto(`/game/${R3}`);
-    const frozen = page
-      .locator('section[aria-label="Research shortlist"]')
+    await page.goto(`/game/${THIRD}`);
+    const atCard = page
+      .locator('section[aria-label="Analysis"]')
       .getByTestId("frozen");
-    await expect(frozen).toContainText("no estimate (incomplete pricing)");
-    await expect(frozen).toContainText(
+    await expect(atCard).toContainText("no estimate (incomplete pricing)");
+    await expect(atCard).toContainText(
       "Incomplete pricing: insufficient pricing data (2 reference books in the same sweep).",
     );
   });
 
-  test("a game off the list has no research section", async ({ page }) => {
-    const off = [...byId.values()].find(
-      (g) => !SHORTLIST_IDS.includes(g.id) && g.kick.getTime() > Date.now(),
-    )!;
-    await page.goto(`/game/${off.id}`);
-    await expect(
-      page.locator('section[aria-label="Research shortlist"]'),
-    ).toHaveCount(0);
+  test("a game past #10 shows no analysis, even when the card saved one", async ({
+    page,
+  }) => {
+    test.skip(
+      ELEVENTH === undefined,
+      "the fixture week has fewer than 11 ranked games",
+    );
+    await page.goto(`/game/${ELEVENTH}`);
+    await expect(page.locator('section[aria-label="Analysis"]')).toHaveCount(0);
   });
 });
 
-test.describe("the research top 10, signed out", () => {
+test.describe("the Board's top-10 analysis, signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("a visitor sees the list and the analysis before kickoff, in research wording", async ({
+  test("a visitor sees the analysis before kickoff, with no bet language", async ({
     page,
   }) => {
-    await page.goto("/");
-    const list = page.locator('section[aria-label="Research top 10"]');
-    await expect(list.locator("a[data-research-rank]")).toHaveCount(3);
-    await expect(list).not.toContainText(/\bbet\b/i);
-    await page.goto(`/game/${R1}`);
-    const sec = page.locator('section[aria-label="Research shortlist"]');
+    await page.goto(`/game/${FIRST}`);
+    const sec = page.locator('section[aria-label="Analysis"]');
     await expect(sec).toBeVisible();
     await expect(sec).not.toContainText(/\bbet\b|bet one unit|proven/i);
   });

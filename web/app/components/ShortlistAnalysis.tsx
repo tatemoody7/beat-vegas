@@ -2,8 +2,6 @@ import { utcFrom } from "@/lib/armPositions";
 import { etClock12 } from "@/lib/et";
 import { american, fmt } from "@/lib/format";
 import {
-  EV_CAVEAT,
-  FEED_NOTE,
   evText,
   ordinal,
   scoringText,
@@ -11,14 +9,11 @@ import {
   type ShortlistEntry,
 } from "@/lib/shortlist";
 
-// The full analysis of a game on the Research top 10 (Tate 2026-10-15, Q14 +
-// adjustments 3 and 4), at the top of its game page. Two blocks side by side:
-// the FROZEN publication (rank, line, price, estimated EV, label, analysis,
-// with its time) and the LATEST Hard Rock price with its own capture time;
-// newer data never changes the frozen rank. Research wording only: estimates
-// are called estimates, factors speak of scoring, and the Board's rank is
-// named as a different ranking. Not a .bv-card: the page's first card is the
-// decision, and stays so.
+// The analysis at the top of a Board #1-#10 game page (Tate 2026-10-16): what
+// the newest scheduled card saw (Hard Rock's price, the estimated EV with its
+// rough range and label, the matchup, rest, travel, QB, weather), beside Hard
+// Rock's price now. No second ranking and no fine print (Tate 2026-10-16).
+// Not a .bv-card: the page's first card stays the decision.
 
 const prob = (x: number | null | undefined) =>
   x === null || x === undefined ? "—" : `${(100 * x).toFixed(1)}%`;
@@ -55,7 +50,7 @@ export default function ShortlistAnalysis({
   e: ShortlistEntry;
   publishedAt: Date;
   cardBuilt: Date | null;
-  boardRank: number | null;
+  boardRank: number;
   latest: {
     line: number | null;
     under: number | null;
@@ -77,17 +72,12 @@ export default function ShortlistAnalysis({
 
   return (
     <section
-      aria-label="Research shortlist"
+      aria-label="Analysis"
       className="rounded-lg border border-[var(--accent)]/40 bg-[var(--bg-2)] p-4"
     >
       <h2 className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">
-        {`Research shortlist R${e.rank} — research ranking, not the Board's rank`}
+        {`Analysis — Board #${boardRank}`}
       </h2>
-      <p className="mt-1 text-xs text-[var(--text-dim)]">
-        {boardRank !== null
-          ? `On the Board this game is #${boardRank}, by our model against the line; R${e.rank} ranks it by price.`
-          : `R${e.rank} ranks it by price, not by our model.`}
-      </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div
@@ -95,7 +85,7 @@ export default function ShortlistAnalysis({
           className="rounded-[var(--r-sm)] border border-[var(--border)] p-3"
         >
           <p className="text-xs font-semibold text-[var(--text)]">
-            {`Published ${etClock12(publishedAt)} (frozen)`}
+            {`At the ${etClock12(cardBuilt ?? publishedAt)} card`}
           </p>
           <p className="mt-1 font-mono text-sm text-[var(--text)]">
             {`u${fmt(p.hr_line)} ${american(p.hr_under)}`}
@@ -115,20 +105,13 @@ export default function ShortlistAnalysis({
           className="rounded-[var(--r-sm)] border border-[var(--border)] p-3"
         >
           <p className="text-xs font-semibold text-[var(--text)]">
-            Latest Hard Rock price
+            Hard Rock now
           </p>
           <p className="mt-1 font-mono text-sm text-[var(--text)]">
             {latestText}
           </p>
-          <p className="mt-1 text-xs text-[var(--text-dim)]">
-            The frozen rank and estimate never change with it.
-          </p>
         </div>
       </div>
-
-      <p className="mt-3 text-sm text-[var(--text)]" data-testid="why">
-        {e.why_rank}
-      </p>
 
       <dl className="mt-3 flex flex-col gap-1">
         <Row k="Break-even" v={prob(p.breakeven)} />
@@ -218,15 +201,6 @@ export default function ShortlistAnalysis({
           }
         />
       </dl>
-
-      <p className="mt-3 text-xs text-[var(--text-dim)]">
-        {`${EV_CAVEAT} Ranking key: the low end of the rough range, then the estimate, then the number of books; no factor carries weight (H-1H-FACTORS: none of 64 passed). ${FEED_NOTE}`}
-      </p>
-      {cardBuilt && (
-        <p className="mt-1 text-xs text-[var(--text-dim)]">
-          {`Matchup stats as known at the ${etClock12(cardBuilt)} build.`}
-        </p>
-      )}
     </section>
   );
 }

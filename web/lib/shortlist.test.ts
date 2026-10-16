@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  EV_CAVEAT,
-  FEED_NOTE,
-  NOTHING_POTENTIAL,
-  SHORTLIST_HEAD,
   evText,
   ordinal,
   scoringText,
@@ -96,12 +92,5 @@ describe("the words", () => {
     expect(scoringText("less")).toBe("points to less scoring");
     expect(scoringText(null)).toBe("middle third");
     expect(verdictText("null")).toBe("not shown to beat the line");
-  });
-
-  it("uses research wording: no bet language, no proven edge", () => {
-    for (const s of [SHORTLIST_HEAD, NOTHING_POTENTIAL, EV_CAVEAT, FEED_NOTE]) {
-      expect(s).not.toMatch(/\bbet\b|bet one|proven edge|guarantee/i);
-    }
-    expect(EV_CAVEAT).toContain("an estimate, not proof of profit");
   });
 });

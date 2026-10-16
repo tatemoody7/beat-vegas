@@ -16,17 +16,10 @@ import { getLatestCard } from "@/lib/card";
 import { getArmPositions } from "@/lib/armPositions";
 import { cardsFor } from "@/lib/research";
 import ResearchStrip from "@/app/components/ResearchStrip";
-import ResearchTopTen from "@/app/components/ResearchTopTen";
-import { getShortlist } from "@/lib/shortlist";
 import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
 import { gateGame } from "@/lib/signalGate";
-import {
-  BOARD_KEY,
-  BOARD_KEY_OWNER,
-  BOARD_KEY_SHORTLIST,
-  PASS_HEAD,
-} from "@/lib/boardKey";
+import { PASS_HEAD } from "@/lib/boardKey";
 import { viewerIsAuthed } from "@/lib/session";
 import { Fragment } from "react";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
@@ -89,8 +82,6 @@ export default async function BoardPage({
   // money is paused to everyone; only an unreadable switch needs its own
   // warning, and only the owner can act on it.
   const pause = await getRulePause();
-  const shortlist =
-    board.week === null ? null : await getShortlist(season, board.week);
 
   const filters = parseFilters(sp);
   const games = all.filter((g) => matchesFilters(g, filters));
@@ -118,11 +109,6 @@ export default async function BoardPage({
           Monday row and never changes a rating. */}
       <ResearchStrip cards={cardsFor(await getArmPositions())} />
 
-      {/* The Research top 10 (Q13, 2026-10-15): the frozen research ranking,
-          labelled apart from the Board's rank; nothing renders without a
-          publication. */}
-      <ResearchTopTen list={shortlist} />
-
       <div className="mb-1 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
         <h1 className="bv-page-title">
           {board.week !== null ? `Board · Week ${board.week}` : "Board"}
@@ -139,26 +125,8 @@ export default async function BoardPage({
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
 
-      {board.slate.n > 0 && (
-        <p className="mb-1 text-xs text-[var(--text-dim)]">
-          {/* Shortened 2026-09-28 (Tate): the rows already say why a game is
-              not a bet, so the gate clause and the clearing count went. */}
-          {`Bar this week: ${board.slate.bar.toFixed(1)} pts (top ${Math.round(100 * board.slate.share)}% of ${board.slate.n} priced games).`}
-        </p>
-      )}
-      {/* Model, rule and price are three different things and the Board never
-          blends them (website plan adjustment 4, 2026-10-15). */}
-      <p
-        aria-label="How to read the Board"
-        className="mb-3 text-xs text-[var(--text-dim)]"
-      >
-        {BOARD_KEY}
-        {shortlist && shortlist.entries.length > 0
-          ? ` ${BOARD_KEY_SHORTLIST}`
-          : ""}
-        {authed ? ` ${BOARD_KEY_OWNER}` : ""}
-      </p>
-
+      {/* The bar line and the key line went 2026-10-16 (Tate): the badges
+          and each row's sentence say it; the page reads cleaner without. */}
       <div className="mb-3">
         <BoardFilters current={filters} />
       </div>

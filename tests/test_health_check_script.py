@@ -11,7 +11,7 @@ from conftest import _load_script
 from sqlalchemy.orm import Session
 
 from beatvegas import ops
-from beatvegas.db.models import AppSetting, Card, ManualPick
+from beatvegas.db.models import AppSetting, Card, ManualPick, ShortlistEntry
 from tests.conftest import _sqlite_scope
 
 SEASON, WEEK = 2026, 4
@@ -65,12 +65,27 @@ def _card(eng, n_hr=12):
         "items": items,
     }
     with Session(eng) as s:
+        card = Card(
+            season=SEASON,
+            week=WEEK,
+            built_at=STARTED + timedelta(minutes=9),
+            payload=json.dumps(payload),
+        )
+        s.add(card)
+        s.flush()
+        # A clean scheduled card also saved its analysis (H-1H-SHORTLIST).
         s.add(
-            Card(
+            ShortlistEntry(
+                card_id=card.id,
                 season=SEASON,
                 week=WEEK,
-                built_at=STARTED + timedelta(minutes=9),
-                payload=json.dumps(payload),
+                slot="fri_pm",
+                published_at=card.built_at,
+                publication_sha256="x",
+                game_id=1,
+                rank=1,
+                label="Fair price",
+                payload_json="{}",
             )
         )
         s.add(

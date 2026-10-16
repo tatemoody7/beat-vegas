@@ -231,7 +231,7 @@ Parameters: `HR_PRICED_FLOOR = 10`, `STALE_AFTER_HOURS = 18`, `PACE_COVERAGE_MIN
 | `card.status_clean` | degraded | that row's payload.status is the slot's clean status (ci.CARD_STATUS_BY_SLOT) and payload.degraded is empty |
 | `card.hr_priced_floor` | degraded | items with a Hard Rock 1H line >= HR_PRICED_FLOOR [10] |
 | `card.paper_logged_iff_window` | degraded | scheduled slot: every qualifying item inside the slot's paper window has a paper pick; manual: zero paper picks placed since RUN_STARTED_AT |
-| `card.shortlist_published` | degraded | scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no Hard Rock-priced game is upcoming); manual: nothing published |
+| `card.shortlist_published` | degraded | scheduled slot: `shortlist_entries` rows exist for the card this run built (H-1H-SHORTLIST; none needed when no game on the card is upcoming); manual: nothing published |
 | `card.sweep_reached_slate` | degraded | the sweep status file says complete and events_polled >= events_in_window (a missing file is a miss unless the sweep step was skipped) |
 
 Failure modes on record:

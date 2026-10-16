@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
 import ShortlistAnalysis from "@/app/components/ShortlistAnalysis";
 import { getShortlist } from "@/lib/shortlist";
+import { GREEN_TOP_RANKS } from "@/lib/grade";
 import { getCardForecast } from "@/lib/forecast";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
 import { viewerIsAuthed } from "@/lib/session";
@@ -42,12 +43,13 @@ export default async function GamePage({
 
   const { unitUsd } = bankrollEnv();
   const authed = await viewerIsAuthed();
-  // The Research top 10 (H-1H-SHORTLIST): a shortlisted game carries its full
-  // analysis at the top of the page (Q14), from the frozen publication.
+  // The Board's #1-#10 open with their analysis (Tate 2026-10-16): the frozen
+  // read of the newest scheduled card, saved for every game it rated.
+  const rank = found.game.boardRank;
   const list =
-    found.board.week === null
-      ? null
-      : await getShortlist(found.board.season, found.board.week);
+    rank !== null && rank <= GREEN_TOP_RANKS && found.board.week !== null
+      ? await getShortlist(found.board.season, found.board.week)
+      : null;
   const entry = list?.entries.find((e) => e.game_id === gameId) ?? null;
   const { check } = found.game;
   return (
@@ -58,12 +60,12 @@ export default async function GamePage({
       backHref={`/#game-${gameId}`}
       forecast={await getCardForecast(gameId)}
       research={
-        list && entry ? (
+        list && entry && rank !== null ? (
           <ShortlistAnalysis
             e={entry}
             publishedAt={list.publishedAt}
             cardBuilt={list.cardBuilt}
-            boardRank={found.game.boardRank}
+            boardRank={rank}
             latest={{
               line: check?.hrLine ?? null,
               under: check?.hrUnderPrice ?? null,

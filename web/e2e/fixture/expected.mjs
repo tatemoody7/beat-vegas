@@ -1348,7 +1348,7 @@ export const PRICING_OPPORTUNITY = {
  * from the week's own games so their kickoffs stay upcoming.
  */
 export const SHORTLIST_IDS = [900003, 900005, 900002];
-export function shortlistFor(week, builtAt, now) {
+export function shortlistFor(week, builtAt, now, extraId = null) {
   const byId = new Map(week.games.map((g) => [g.id, g]));
   const stat = (key, words, value, pct, scoring) => ({
     key,
@@ -1399,28 +1399,29 @@ export function shortlistFor(week, builtAt, now) {
     },
   ];
   const labels = ["Fair price", "Expensive", "Insufficient pricing data"];
-  const entries = SHORTLIST_IDS.map((id, i) => {
+  const ids = extraId === null ? SHORTLIST_IDS : [...SHORTLIST_IDS, extraId];
+  const entries = ids.map((id, i) => {
     const g = byId.get(id);
     return {
       game_id: id,
       matchup: `${g.away} @ ${g.home}`,
       kick: g.kick.toISOString(),
       rank: i + 1,
-      label: labels[i],
+      label: labels[i % 3],
       why_rank:
-        i === 2
+        i % 3 === 2
           ? "R3: informational candidate. Insufficient pricing data (2 reference books in the same sweep), so it ranks below every fully priced game."
-          : `R${i + 1}: estimated EV ${100 * prices[i].ev_point >= 0 ? "+" : ""}${(100 * prices[i].ev_point).toFixed(1)}% against 5 reference books in the same sweep.`,
-      price: prices[i],
-      model: { bv_line: 42.0, market_line: prices[i].hr_line, gap: 1.0 },
+          : `R${i + 1}: estimated EV ${100 * prices[i % 3].ev_point >= 0 ? "+" : ""}${(100 * prices[i % 3].ev_point).toFixed(1)}% against 5 reference books in the same sweep.`,
+      price: prices[i % 3],
+      model: { bv_line: 42.0, market_line: prices[i % 3].hr_line, gap: 1.0 },
       first_hr: {
-        line: prices[i].hr_line,
-        under: prices[i].hr_under,
+        line: prices[i % 3].hr_line,
+        under: prices[i % 3].hr_under,
         at: builtAt.toISOString().slice(0, 19),
       },
       latest_hr: {
-        line: prices[i].hr_line,
-        under: prices[i].hr_under,
+        line: prices[i % 3].hr_line,
+        under: prices[i % 3].hr_under,
         at: builtAt.toISOString().slice(0, 19),
       },
       analysis: {

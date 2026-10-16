@@ -20,6 +20,7 @@ from beatvegas.db.models import (
     OddsSnapshot,
     PostMortemRun,
     Prediction,
+    ShortlistEntry,
     TeamTempo,
     Weather,
 )
@@ -811,8 +812,25 @@ def test_a_check_that_raises_is_a_miss_not_a_crash(db):
 def test_the_note_names_the_run_the_trigger_the_slot_and_every_miss(db):
     eng, scope = db
     with Session(eng) as s:
-        s.add(_card("thu_pm", items=[_item(1)]))  # 1 HR-priced item: under the floor
+        card = _card("thu_pm", items=[_item(1)])  # 1 HR-priced item: under the floor
+        s.add(card)
         s.add(_paper(1))
+        s.flush()
+        # The card's analysis was saved (H-1H-SHORTLIST), so the floor is the one miss.
+        s.add(
+            ShortlistEntry(
+                card_id=card.id,
+                season=card.season,
+                week=card.week,
+                slot="thu_pm",
+                published_at=card.built_at,
+                publication_sha256="x",
+                game_id=1,
+                rank=1,
+                label="Fair price",
+                payload_json="{}",
+            )
+        )
         s.commit()
     good = {"complete": True, "events_in_window": 80, "events_polled": 80, "credits_spent": 80}
     with scope() as s:

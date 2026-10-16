@@ -2,16 +2,17 @@ import type { ReactNode } from "react";
 import {
   gradeColor,
   gradeWord,
-  tierColor,
-  TIER_WORD,
+  badgeColor,
+  badgeWord,
   type Settled,
   type VerdictTier,
 } from "@/lib/grade";
 
 // The card's headline block, in one of three states. Before kickoff it is the
-// game's place on the board (#1 = best game of the week), coloured by the
-// verdict when one is passed (green meets this week's rule, amber not yet, red
-// pass -- Tate 2026-10-15, Q3), else by the score band (70+ green, 55–69 amber,
+// game's place on the board (#1 = best game of the week), coloured when a
+// verdict is passed by lib/grade.ts badgeColor (green for the Board's #1-#10
+// and any game meeting this week's rule, past #10 amber not yet / red pass --
+// Tate 2026-10-16), else by the score band (70+ green, 55–69 amber,
 // under 55 red). Once the
 // game starts there is no decision left, so it reads LIVE in grey — FINAL once
 // it must be over — and once it settles it reads the result in the result's
@@ -97,10 +98,13 @@ export default function ScoreBadge({
   const shown = label === null ? null : (label ?? gradeWord(score, null));
   // Screen readers still get the tier even when it is not drawn — the colour
   // carries it visually and nothing carries it otherwise.
-  const word = tier !== undefined ? TIER_WORD[tier] : gradeWord(score, null);
+  const word =
+    tier !== undefined ? badgeWord(tier, rank) : gradeWord(score, null);
   return (
     <Box
-      color={tier !== undefined ? tierColor(tier) : gradeColor(score, null)}
+      color={
+        tier !== undefined ? badgeColor(tier, rank) : gradeColor(score, null)
+      }
       aria={rank === null ? `Unranked, ${word}` : `Rank ${rank}, ${word}`}
       className={className}
     >

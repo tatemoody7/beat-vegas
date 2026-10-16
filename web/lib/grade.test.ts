@@ -7,7 +7,7 @@ import {
   SCORE_WATCH_MIN,
   settledOf,
 } from "./grade";
-import { tierColor, TIER_WORD } from "./grade";
+import { badgeColor, badgeWord, tierColor, TIER_WORD } from "./grade";
 
 describe("gradeOf", () => {
   it("bands 70+ bet, 55–69 watch, under 55 pass, with exact boundaries", () => {
@@ -71,5 +71,27 @@ describe("tierColor", () => {
     expect(TIER_WORD.BET).toBe("meets this week's rule");
     for (const w of Object.values(TIER_WORD))
       expect(w).not.toMatch(/edge|value/);
+  });
+});
+
+// Tate 2026-10-16: the Board's #1-#10 read green; past #10 the verdict colours
+// the badge; a game meeting the rule (a lit row) is green wherever it ranks.
+describe("badgeColor", () => {
+  it("is green for ranks 1-10 whatever the verdict", () => {
+    expect(badgeColor("PASS", 1)).toBe("good");
+    expect(badgeColor("EDGE", 10)).toBe("good");
+  });
+  it("past #10 is amber for not yet and red for a pass", () => {
+    expect(badgeColor("EDGE", 11)).toBe("warn");
+    expect(badgeColor("PASS", 41)).toBe("bad");
+    expect(badgeColor("EDGE", null)).toBe("warn");
+  });
+  it("keeps a game meeting the rule green wherever it ranks", () => {
+    expect(badgeColor("BET", 14)).toBe("good");
+  });
+  it("tells a screen reader why a top-10 badge is green", () => {
+    expect(badgeWord("EDGE", 3)).toBe("Board top 10, not yet");
+    expect(badgeWord("EDGE", 12)).toBe("not yet");
+    expect(badgeWord("BET", 2)).toBe("meets this week's rule");
   });
 });

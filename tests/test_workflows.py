@@ -520,6 +520,24 @@ def test_ci_runs_on_pull_requests_only_and_caches_pip():
     assert setups and all(s["with"].get("cache") == "pip" for s in setups)
 
 
+RUNNER_IMAGE = "ubuntu-24.04"
+
+
+def test_every_job_runs_on_the_pinned_runner_image():
+    """Pinned 2026-10-17: GitHub moves `ubuntu-latest` to Ubuntu 26 from
+    2026-10-19, and no job here has been tested on it. A floating label lets
+    the platform change the OS under a scheduled job overnight; moving off
+    24.04 is a deliberate PR that edits RUNNER_IMAGE and every workflow."""
+    checked = 0
+    for p in _workflows():
+        for jname, job in (_load(p).get("jobs") or {}).items():
+            assert job.get("runs-on") == RUNNER_IMAGE, (
+                f"{p.name}:{jname}: runs-on must be {RUNNER_IMAGE}, got {job.get('runs-on')!r}"
+            )
+            checked += 1
+    assert checked >= 20
+
+
 def test_every_scheduled_python_workflow_caches_pip():
     """A scheduled job runs dozens of times a month; the ~40 s reinstall is a
     billed minute each time."""

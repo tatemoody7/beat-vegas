@@ -110,7 +110,7 @@ concurrency:
 
 jobs:
   card:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 30, not 15: the first build of a new week (nothing cached, 57 fresh
     # previews) ran 15m22s on 2026-09-21 and GitHub reported the timeout as
     # `cancelled`, so no card shipped and nothing looked broken. Normal builds

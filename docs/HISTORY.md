@@ -8,6 +8,14 @@ hold the rest.
 
 
 
+## 2026-10-17
+
+- **2026-10-17 UTC (EVERY WORKFLOW PINNED TO UBUNTU 24.04).** GitHub's run annotations announced that `ubuntu-latest`
+  moves to Ubuntu 26 from 2026-10-19, the first scheduled Monday read, and no job here had run on it. All 20 jobs in
+  the 16 workflows now name `runs-on: ubuntu-24.04` (the image they were already on); the `postgres:16` service in
+  ci.yml's e2e lane was already pinned. `test_every_job_runs_on_the_pinned_runner_image` fails on any other label, so
+  moving to 26 is its own PR, tested first.
+
 ## 2026-10-16
 
 - **2026-10-16 UTC (THE ANALYSIS IS REMOVED; WIND BACK IN THE FACTORS LIST).** Tate did not want the analysis box:

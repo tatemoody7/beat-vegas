@@ -10,6 +10,17 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 UTC (A SATURDAY BOARD REPORT, TEXTED: THE ONE EXCEPTION TO "NO SCHEDULED TEXTS").** Tate liked a
+  hand-built analysis of the Board's top 10 (each game's offense, defense, first halves, injuries, weather, coaching and
+  market, with reasons for and against the under) and asked for one every week, texted. His calls: Saturday after the
+  8am card (9:30am ET); a Mac scheduled task (`bv-saturday-board-report`, skill `~/.claude/skills/bv-board-report`)
+  that publishes a new private page and texts the link only; a run that starts after 3:30pm ET is skipped with a
+  one-line text, one after 10am covers only games not yet started. This reverses the 2026-09-13 "no scheduled texts"
+  call knowingly: it runs only when the Mac is awake, it is research only, and nothing in the engine depends on it.
+  It reads Neon read-only and writes nothing to Beat Vegas. The same day Tate asked why the site's wind (ICON, e.g. 9
+  mph at Southern Miss) reads below the National Weather Service (13-15 mph, gusts agreeing); he chose to measure
+  which is right before changing anything (the registered weather arms are frozen on ICON).
+
 - **2026-10-17 UTC (THE KICKOFF CLOCK READS THE VENUE'S TIME ZONE; A DATA-BUG REPAIR TO FOUR MODEL INPUTS).**
   `etl/situational.py` built `kickoff_local_hour` as `(UTC hour + longitude / 15) % 24`: solar time, no minutes, no
   DST. Penn State @ Michigan (19:30Z = 3:30pm EDT) read "~13:00 local kickoff" and was flagged `early_kickoff`; the

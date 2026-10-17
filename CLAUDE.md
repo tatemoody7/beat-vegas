@@ -137,7 +137,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 
 ## Architecture
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade, run by GitHub Actions.
-  Nothing runs on the Mac on a schedule and nothing texts Tate; the board is the failure surface.
+  The engine never runs on the Mac or messages Tate (one research exception: `bv-saturday-board-report`); the board is the failure surface.
   Data: CFBD (games, PBP, SP+, talent, returning production), The Odds API (`totals_h1` per
   event; full-game bulk totals + spreads + moneylines), TeamRankings tempo, Open-Meteo weather,
   Rotowire injuries, ESPN scores.

@@ -341,6 +341,9 @@ def test_nothing_but_the_backfill_reads_weather_actuals():
     allowed = {
         "beatvegas/db/models.py",
         "scripts/backfill_weather_actuals.py",
+        # H-WX-ICON-BIAS (2026-10-17): a read-only report comparing the ICON
+        # forecast to observed wind; it feeds nothing.
+        "scripts/wind_forecast_check.py",
     }
     hits = []
     for base in ("beatvegas", "scripts", "web/lib", "web/app"):

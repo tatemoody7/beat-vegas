@@ -203,7 +203,7 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
 - **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
   `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
   `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
-  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
+  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1), `wind_forecast_check` (H-WX-ICON-BIAS, ICON wind vs observed).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +

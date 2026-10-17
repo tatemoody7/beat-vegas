@@ -354,3 +354,4 @@ refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch th
 `docs/STOPPING_RULE.md` says what threw it first (a pre-registered failure boundary, now closed).
 It was on from 2026-10-07 (roadmap v1, real money paused) and turned off on 2026-10-08 for the
 personal ledger (v1.4); the ledger has no stop rule, so nothing throws it automatically.
+It was on again 2026-10-17 13:27 → 17:10 UTC (the audit; Tate lifted it the same day).

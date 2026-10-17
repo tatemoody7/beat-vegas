@@ -10,6 +10,11 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 17:10 UTC (REAL MONEY BACK ON).** Tate asked to turn real money back on so he could log first-half
+  unders from the day's board; `rule_paused` was set to false through Neon's HTTPS endpoint (mirroring
+  `scripts/rule_pause.py off`; `app_settings_log` 546). This lifts the audit pause of 13:27 UTC (row 520) the same day,
+  by his call; the measured figure that prompted it (−3.6% per bet against the consensus close, 14 of 26) is unchanged.
+
 - **2026-10-17 UTC (A SATURDAY BOARD REPORT, TEXTED: THE ONE EXCEPTION TO "NO SCHEDULED TEXTS").** Tate liked a
   hand-built analysis of the Board's top 10 (each game's offense, defense, first halves, injuries, weather, coaching and
   market, with reasons for and against the under) and asked for one every week, texted. His calls: Saturday after the

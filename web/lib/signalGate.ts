@@ -83,7 +83,7 @@ export function gateRecords(
   const tagged = rows.map((r, i) => {
     const open = !kickoffPassed(r.kickoffMs, now);
     const row = open
-      ? { ...r, bvLine: null, bvGap: null, bvGapZ: null, rank: null }
+      ? { ...r, bvLine: null, hrGap: null, consGap: null, rank: null }
       : r;
     return { row, i, open };
   });

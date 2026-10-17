@@ -26,6 +26,7 @@ import {
 } from "@/lib/picks";
 import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
 import { isPriceVerified } from "@/lib/personalStake";
+import { hardRockAtLastCard, type HrQuote } from "@/lib/records";
 import type { Record3 } from "@/lib/record";
 import type { BoardFactor, Factors } from "@/lib/score";
 import {
@@ -603,7 +604,7 @@ export async function getHomeBoard(
     requestedWeek !== undefined && weeks.includes(requestedWeek)
       ? requestedWeek
       : defaultWeek(universe, now);
-  const [board, checks, { picks, record, paperRecord }, card] =
+  const [board, checks, { picks, record, paperRecord }, card, hrAtCard] =
     await Promise.all([
       week === null
         ? Promise.resolve([] as BoardRow[])
@@ -615,6 +616,11 @@ export async function getHomeBoard(
       // Board alignment (2026-10-14): the newest SCHEDULED build of the week
       // decides the QB read and the hold, as it does for the server.
       week === null ? Promise.resolve(null) : getScheduledCard(season, week),
+      // A played game settles on Hard Rock's line at the last scheduled card
+      // before its kickoff, as /records does (fact-check audit 2026-10-17).
+      week === null
+        ? Promise.resolve(new Map<number, HrQuote>())
+        : hardRockAtLastCard(season, week),
     ]);
   const itemById = new Map<number, CardItem>(
     (card?.items ?? []).map((i) => [i.gameId, i]),
@@ -693,13 +699,13 @@ export async function getHomeBoard(
     // that line is the same lookup, in the same order. `edge.lineBasis` is set
     // whenever any line exists — settling needs no model — while the board's
     // own `gapBasis` is null without one (no gap without our number).
-    const basisLine = check?.hrLine ?? row.curLine ?? fallbackLine;
+    // Settles ONLY on Hard Rock's line at the last scheduled card before
+    // kickoff (fact-check audit 2026-10-17, Tate): no market or reference
+    // fallback; without that line the game reads "No verified Hard Rock line".
+    const atCard = hrAtCard.get(row.gameId) ?? null;
     const start = asDate(row.startDate);
-    const settled = settledAgainst(
-      edge.lineBasis,
-      row.firstHalfTotal,
-      basisLine,
-    );
+    const settled =
+      atCard === null ? null : settledOf(row.firstHalfTrusted, atCard.line);
     return {
       row,
       check,
@@ -717,7 +723,7 @@ export async function getHomeBoard(
       basisBooks: basisBooksFrom(check),
       earlySeason: earlySeasonFrom(row.factors),
       settled,
-      settledLine: settled === null ? null : basisLine,
+      settledLine: settled === null ? null : (atCard?.line ?? null),
       priceLine: priceSentence(input),
       boardRank: null,
       capRank: null,

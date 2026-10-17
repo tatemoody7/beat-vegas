@@ -46,6 +46,7 @@ function row(over: Partial<LedgerRow> = {}): LedgerRow {
     closingCapturedAt: "2026-09-19T18:30:00.000Z",
     priceProvenance: "logged",
     auditFlag: null,
+    excludedReason: null,
     clv: 0,
     verdictAtPick: "BET",
     reason: "model_gap",
@@ -261,5 +262,30 @@ describe("evSummary (the judge's reading, programme B6)", () => {
     expect(
       evSummary([row({ id: 1, graded: true, evCons: null })]).mean,
     ).toBeNull();
+  });
+});
+
+// Fact-check audit 2026-10-17 (Tate): a pick logged on a Hard Rock alternate
+// line stays listed but out of every record, units and running total.
+describe("excluded picks", () => {
+  const rows = [
+    row({ id: 1, isPaper: true, result: "under", units: 0.91, week: 2 }),
+    row({
+      id: 2,
+      isPaper: true,
+      result: "under",
+      units: 1.4,
+      week: 2,
+      excludedReason: "alt_line",
+    }),
+  ];
+  it("leaves them out of the summary and the week's record", () => {
+    expect(ledgerSummary(rows).record?.record).toBe("1-0");
+    expect(groupByWeek(withRunningUnits(rows))[0].record?.units).toBe("+0.91");
+  });
+  it("never adds them to the running units", () => {
+    const run = withRunningUnits(rows);
+    expect(run.find((r) => r.id === 2)!.runningUnits).toBeNull();
+    expect(run.find((r) => r.id === 1)!.runningUnits).toBe(0.91);
   });
 });

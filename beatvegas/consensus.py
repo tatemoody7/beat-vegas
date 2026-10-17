@@ -211,6 +211,39 @@ def book_closes(snaps: Sequence, kickoff, excluded=EXCLUDED_BOOKS) -> Dict[str, 
     }
 
 
+@dataclass
+class MarketClose:
+    """The consensus close of the first-half market as a research benchmark."""
+
+    line: float
+    close_at: object  # the newest counted confirmation before kickoff
+    books: int
+
+
+def market_close(
+    snaps: Sequence, kickoff, excluded=EXCLUDED_BOOKS
+) -> Optional[MarketClose]:
+    """The judge's close for a GAME, not a wager (fact-check audit 2026-10-17):
+    each book's newest centred quote confirmed inside CLOSE_WINDOW_H before
+    kickoff, Hard Rock, Fliff and the feed's consensus row excluded, at least
+    MIN_BOOKS books, and the median of their lines. It is the Market Research
+    benchmark on Results and /records -- never a price anyone could bet -- so
+    it carries no price. None when the window holds too few books."""
+    if kickoff is None:
+        return None
+    start = kickoff - timedelta(hours=CLOSE_WINDOW_H)
+    closes = [
+        c for c in book_closes(snaps, kickoff, excluded).values() if c.seen_at >= start
+    ]
+    if len(closes) < MIN_BOOKS:
+        return None
+    return MarketClose(
+        line=float(statistics.median(c.line for c in closes)),
+        close_at=max(c.seen_at for c in closes),
+        books=len(closes),
+    )
+
+
 def fair_under_decided(close: BookClose) -> float:
     _, fair_under, _ = devig_two_way(close.over_price, close.under_price, DEVIG_METHOD)
     return fair_under

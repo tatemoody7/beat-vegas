@@ -408,6 +408,11 @@ function LedgerRowView({
           {p.auditFlag && (
             <span className="bv-badge bv-badge--warn ml-1">flagged</span>
           )}
+          {p.excludedReason === "alt_line" && (
+            <span className="bv-badge ml-1">
+              left out: Hard Rock alternate line
+            </span>
+          )}
         </td>
         <td className="bv-num whitespace-nowrap text-[var(--text-muted)]">
           {p.line !== null ? `under ${p.line}` : "—"}

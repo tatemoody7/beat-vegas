@@ -598,6 +598,8 @@ class ManualPick(Base):
     price_provenance = Column(String)
     # What an audit could not verify about a real ticket (2026-10-17).
     audit_flag = Column(Text)
+    # Why the pick is left out of every record ('alt_line'; 2026-10-17).
+    excluded_reason = Column(Text)
     clv = Column(Float)  # points CLV (closing_line - bet_line)
     clv_prob = Column(Float)  # no-vig PRICE CLV, in prob points (juice only)
 

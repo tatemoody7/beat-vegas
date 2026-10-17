@@ -5,8 +5,32 @@ import { fixture } from "./helpers/fixture";
 // the latest week with a graded game; the gap to one decimal with its sign;
 // the CSV link that hands over the whole season.
 
-const { week, thisWeek } = fixture();
+const { week, thisWeek, expected } = fixture();
 const fmt1 = (n: number) => n.toFixed(1);
+
+// Hard Rock Records (fact-check audit 2026-10-17): each game graded on Hard
+// Rock's line and price as the last scheduled card before kickoff froze them.
+// The fresh card carries the upcoming games; the seed's earlier card carries
+// each played game's last quote captured two hours before the week's first
+// played kickoff.
+const cardItems = expected.card.items as unknown as {
+  game_id: number;
+  hr_line: number | null;
+  hr_price: number | null;
+}[];
+function hrAtCard(g: (typeof thisWeek)[number]) {
+  if (g.played) {
+    const played = week.games.filter((x) => x.played && x.week === g.week);
+    const built = Math.min(...played.map((x) => x.kick.getTime())) - 7_200_000;
+    const q = (g.hr ?? []).filter((h) => h.capturedAt.getTime() <= built).pop();
+    return q ? { line: q.line, price: q.under } : null;
+  }
+  const it = cardItems.find((i) => i.game_id === g.id);
+  return it && it.hr_line !== null && it.hr_price !== null
+    ? { line: it.hr_line, price: it.hr_price }
+    : null;
+}
+const american = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 
 test.describe("every game we have rated", () => {
   test("opens on the latest graded week and shows only its rows", async ({
@@ -23,8 +47,12 @@ test.describe("every game we have rated", () => {
     await expect(active).toHaveCount(1);
     await expect(active).toHaveAttribute(
       "href",
-      `/records?season=${week.season}&week=${week.week}`,
+      `/records?season=${week.season}&week=${week.week}&view=hr`,
     );
+    // Hard Rock Records opens first when the season has Hard Rock lines.
+    await expect(
+      page.getByRole("tab", { name: "Hard Rock Records" }),
+    ).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByText(`${thisWeek.length} of ${week.games.length} games`),
     ).toBeVisible();
@@ -42,7 +70,7 @@ test.describe("every game we have rated", () => {
     await expect(pills.filter({ hasText: "2005" })).toHaveCount(0);
   });
 
-  test("shows each game's line, our number and the gap to one decimal, signed", async ({
+  test("grades each game on Hard Rock's line and price at the last scheduled card", async ({
     page,
   }) => {
     await page.goto(`/records?season=${week.season}&week=${week.week}`);
@@ -55,35 +83,68 @@ test.describe("every game we have rated", () => {
       ),
     );
     for (const c of cells) {
-      // Week, Matchup, Full game, Line, Our number, Gap, Actual first half, Result.
-      expect(c).toHaveLength(8);
-      expect(c[5]).toMatch(/^([+-]\d+\.\d|0\.0)$/);
+      // Week, Matchup, Full game, Our number, Hard Rock, Price, Gap, Actual, Result.
+      expect(c).toHaveLength(9);
     }
     for (const g of thisWeek) {
       const row = rows
         .filter({ hasText: `${g.away}` })
         .filter({ hasText: g.home });
-      const lineUsed = g.hr ? g.hr[0].line : null;
-      const gap =
-        lineUsed === null ? null : Math.round((lineUsed - g.bv) * 100) / 100;
       const tds = row.locator("td");
       await expect(tds.nth(2)).toHaveText(fmt1(g.fg.total));
-      await expect(tds.nth(4)).toHaveText(fmt1(g.bv));
-      if (gap !== null) {
-        await expect(tds.nth(3)).toHaveText(fmt1(lineUsed!));
-        await expect(tds.nth(5)).toHaveText(
-          `${gap > 0 ? "+" : ""}${fmt1(gap)}`,
-        );
+      await expect(tds.nth(3)).toHaveText(fmt1(g.bv));
+      const q = hrAtCard(g);
+      if (q !== null) {
+        const gap = Math.round((q.line - g.bv) * 100) / 100;
+        await expect(tds.nth(4)).toHaveText(fmt1(q.line));
+        await expect(tds.nth(5)).toHaveText(american(q.price));
+        await expect(tds.nth(6)).toHaveText(`${gap > 0 ? "+" : ""}${fmt1(gap)}`);
+      } else {
+        await expect(tds.nth(4)).toHaveText("—");
       }
       if (g.played) {
         const fh = g.played.homeFh + g.played.awayFh;
-        await expect(tds.nth(6)).toHaveText(String(fh));
-        await expect(tds.nth(7)).toHaveText(fh < lineUsed! ? "Under" : "Over");
+        await expect(tds.nth(7)).toHaveText(String(fh));
+        await expect(tds.nth(8)).toHaveText(
+          q === null
+            ? "No verified Hard Rock line"
+            : fh < q.line
+              ? "Under"
+              : "Over",
+        );
       } else {
-        await expect(tds.nth(6)).toHaveText("—");
-        await expect(tds.nth(7)).toHaveText("Pending");
+        await expect(tds.nth(7)).toHaveText("—");
+        await expect(tds.nth(8)).toHaveText("Pending");
       }
     }
+    await expect(page.getByTestId("records-totals")).toContainText(
+      "at Hard Rock's line on the last scheduled card",
+    );
+  });
+
+  test("Market Research grades on the consensus close, as a record with no units", async ({
+    page,
+  }) => {
+    await page.goto(
+      `/records?season=${week.season}&week=${week.prevWeek}&view=market`,
+    );
+    await expect(
+      page.getByRole("tab", { name: "Market Research" }),
+    ).toHaveAttribute("aria-selected", "true");
+    const totals = page.getByTestId("records-totals");
+    await expect(totals).toContainText("a research benchmark, not a bet");
+    await expect(totals).not.toContainText("units");
+    await expect(page.locator("table.bv-table thead th")).toHaveText([
+      "Week",
+      "Matchup",
+      "Full game",
+      "Our number",
+      "Close",
+      "Gap",
+      "Actual first half",
+      "Result",
+    ]);
+    await expect(page.locator("dl dt", { hasText: "Close" })).toBeVisible();
   });
 
   test("the previous week is one click away and holds its two graded games", async ({
@@ -94,7 +155,7 @@ test.describe("every game we have rated", () => {
       .getByRole("link", { name: String(week.prevWeek), exact: true })
       .click();
     await page.waitForURL(
-      `**/records?season=${week.season}&week=${week.prevWeek}`,
+      `**/records?season=${week.season}&week=${week.prevWeek}&view=hr`,
     );
     const rows = page.locator("table.bv-table tbody tr");
     const prev = week.games.filter((g) => g.week === week.prevWeek);
@@ -129,8 +190,8 @@ test.describe("every game we have rated", () => {
     await page.goto("/records");
     for (const term of [
       "Full game",
-      "Line",
       "Our number",
+      "Hard Rock",
       "Gap",
       "Scored after",
     ]) {

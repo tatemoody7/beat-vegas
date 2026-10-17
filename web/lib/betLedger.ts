@@ -47,6 +47,8 @@ export type LedgerRow = {
   /** What an audit could not verify about this ticket, in plain words
    *  (2026-10-17); null when nothing is flagged. */
   auditFlag: string | null;
+  /** Why the row is left out of every record ('alt_line'); null when it counts. */
+  excludedReason: string | null;
   /** Stored `closing - bet`: NEGATIVE is the good direction for an under. */
   clv: number | null;
   /** EV at the wager's exact terms against the vig-free consensus close
@@ -95,7 +97,8 @@ export function withRunningUnits(rows: LedgerRow[]): RunningRow[] {
   const oldestFirst = sortNewestFirst(rows).reverse();
   let total = 0;
   const stamped = oldestFirst.map((r) => {
-    if (!r.graded || r.units === null) return { ...r, runningUnits: null };
+    if (!r.graded || r.units === null || r.excludedReason !== null)
+      return { ...r, runningUnits: null };
     total = Math.round((total + r.units) * 100) / 100;
     return { ...r, runningUnits: total };
   });
@@ -123,7 +126,9 @@ export function groupByWeek(rows: RunningRow[]): WeekGroup[] {
     .map(([week, list]) => ({
       week,
       rows: list,
-      record: recordFrom(list.filter((r) => r.graded)),
+      record: recordFrom(
+        list.filter((r) => r.graded && r.excludedReason === null),
+      ),
       pending: list.filter((r) => !r.graded).length,
     }));
 }
@@ -139,7 +144,7 @@ export type LedgerSummary = {
 
 /** The strip above the list: the same recordFrom the scoreboard uses. */
 export function ledgerSummary(rows: LedgerRow[]): LedgerSummary {
-  const graded = rows.filter((r) => r.graded);
+  const graded = rows.filter((r) => r.graded && r.excludedReason === null);
   const withClose = graded.filter((r) => r.clv !== null);
   return {
     record: recordFrom(graded),
@@ -167,7 +172,7 @@ export type EvSummary = {
  * move stays beside it as the secondary line.
  */
 export function evSummary(rows: LedgerRow[]): EvSummary {
-  const graded = rows.filter((r) => r.graded);
+  const graded = rows.filter((r) => r.graded && r.excludedReason === null);
   const ev = graded.map((r) => r.evCons).filter((v): v is number => v !== null);
   const excluded = graded.length - ev.length;
   if (ev.length === 0)

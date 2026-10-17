@@ -248,3 +248,15 @@ def test_the_off_market_gate_is_retired_on_both_sides():
     card = (Path(__file__).resolve().parent.parent / "beatvegas" / "card.py").read_text()
     assert "HR_OFF_MARKET_PTS" not in card
     assert '"off_market"' not in card
+
+
+def test_zero_proven_sources_match_the_grader():
+    """The Board and /records settle on the grader's zero-half rule
+    (web/lib/grade.ts::trustedFirstHalf, fact-check audit 2026-10-17)."""
+    from beatvegas.grading import ZERO_PROVEN_SOURCES
+
+    src = (Path(__file__).resolve().parents[1] / "web/lib/grade.ts").read_text()
+    m = re.search(r"export const ZERO_PROVEN_SOURCES = \[([^\]]*)\]", src)
+    assert m, "ZERO_PROVEN_SOURCES not found in web/lib/grade.ts"
+    ts = set(re.findall(r'"([^"]+)"', m.group(1)))
+    assert ts == set(ZERO_PROVEN_SOURCES)

@@ -4,6 +4,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Factors, parseFactors } from "@/lib/score";
 import { median } from "@/lib/format";
+import { trustedFirstHalf } from "@/lib/grade";
 import {
   CHAMPION_READ_VERSIONS,
   DERIVED_LINES_MODEL_VERSION,
@@ -29,8 +30,10 @@ export type BoardRow = {
   bvLine: number | null;
   bvLo: number | null;
   bvHi: number | null;
-  /** Actual first-half points once the game is played (grading input); null before. */
+  /** Actual first-half points once the game is played (display); null before. */
   firstHalfTotal: number | null;
+  /** The same total only when the grader trusts it (a 0-0 half needs its proof); the grading input. */
+  firstHalfTrusted: number | null;
   // gap vs the live consensus (curLine − bvLine), under direction: positive =
   // Vegas above our number. Falls back to the gap stored at scoring time.
   liveGap: number | null;
@@ -47,6 +50,9 @@ type PredRow = {
   rank: number | bigint | null;
   factors_json: string | null;
   first_half_total: number | bigint | null;
+  first_half_source?: string | null;
+  home_points?: number | bigint | null;
+  away_points?: number | bigint | null;
   bv_line: number | null;
   bv_gap: number | null;
   bv_lo: number | null;
@@ -215,6 +221,7 @@ export async function boardGames(
     SELECT p.game_id, p.rank, p.factors_json,
            p.bv_line, p.bv_gap, p.bv_lo, p.bv_hi,
            g.week, g.start_date, g.away_team, g.home_team, g.first_half_total,
+           g.first_half_source, g.home_points, g.away_points,
            g.away_team_id, g.home_team_id
     FROM predictions p JOIN games g ON g.id = p.game_id
     ${universeWhere(season, week)}
@@ -313,6 +320,12 @@ export const getBoard = cache(async function getBoard(
       curLine,
       bvLine,
       firstHalfTotal: num(p.first_half_total),
+      firstHalfTrusted: trustedFirstHalf(
+        num(p.first_half_total),
+        num(p.home_points ?? null),
+        num(p.away_points ?? null),
+        p.first_half_source ?? null,
+      ),
       bvLo:
         adj && num(p.bv_lo) !== null ? num(p.bv_lo)! + adj.delta : num(p.bv_lo),
       bvHi:

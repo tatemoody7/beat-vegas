@@ -28,6 +28,7 @@ const pick = (o: Partial<PickFull>): PickFull => ({
   hrLineAtPick: 24.5,
   blocker: null,
   priceProvenance: "logged",
+  excludedReason: null,
   ...o,
 });
 
@@ -108,6 +109,7 @@ const paperPick = (o: Partial<PickFull>): PickFull => ({
   hrLineAtPick: 24.5,
   blocker: "none",
   priceProvenance: "logged",
+  excludedReason: null,
   ...o,
 });
 

@@ -115,3 +115,24 @@ export function gradeWord(
   if (settled !== null) return settled;
   return gradeOf(score) ?? "no score";
 }
+
+/** Mirrors beatvegas/grading.py ZERO_PROVEN_SOURCES (tests/test_gate_parity.py). */
+export const ZERO_PROVEN_SOURCES = ["linescores_verified", "pbp"] as const;
+
+/** grading.trusted_first_half_total's rule (fact-check audit 2026-10-17: the
+ *  Board and /records grade on it too). A 0-0 half
+ *  in a game that scored counts only with its proof; anything else stands. */
+export function trustedFirstHalf(
+  fh: number | null,
+  homePoints: number | null,
+  awayPoints: number | null,
+  source: string | null,
+): number | null {
+  if (fh === null) return null;
+  if (source !== null && (ZERO_PROVEN_SOURCES as readonly string[]).includes(source))
+    return fh;
+  const final = (homePoints ?? 0) + (awayPoints ?? 0);
+  if (fh === 0 && final > 0) return null;
+  return fh;
+}
+

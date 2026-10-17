@@ -613,6 +613,7 @@ CREATE TABLE public.manual_picks (
     closing_price integer,
     price_provenance character varying,
     audit_flag text,
+    excluded_reason text,
     clv double precision,
     clv_prob double precision,
     factors_json_at_pick character varying,

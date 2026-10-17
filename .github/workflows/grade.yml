@@ -183,6 +183,20 @@ jobs:
         env:
           SEASON: ${{ steps.season.outputs.season }}
         run: python scripts/grade.py --season "$SEASON"
+      - name: Market Research history (2023-25 consensus closes; hist=true only)
+        if: steps.probe.outputs.need_grade == 'true'
+        env:
+          IN_HIST: ${{ inputs.hist }}
+        # The Market Research benchmark on /records reads `results` market rows,
+        # graded on the judge's close (fact-check audit 2026-10-17). The bought
+        # 2023-25 closes never change, so they are graded only on a manual
+        # history pass, never nightly.
+        run: |
+          if [ "$IN_HIST" = "true" ]; then
+            for s in 2023 2024 2025; do python scripts/grade.py --season "$s"; done
+          else
+            echo "history pass not requested (hist=false)"
+          fi
       - name: Grade my picks
         if: steps.probe.outputs.need_grade == 'true'
         env:

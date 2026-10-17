@@ -390,6 +390,31 @@ export function fixtureRows(week, expected) {
       payload: JSON.stringify(expected.card),
     },
   ];
+  // An earlier scheduled build per week, two hours before its first played
+  // game kicked off (fact-check audit 2026-10-17): the Board's Played list and
+  // /records grade a played game on Hard Rock's line and price as the last
+  // scheduled card before kickoff froze them. No season/week in the payload,
+  // so lib/card.ts never reads it as the week's card.
+  const playedWeeks = [
+    ...new Set(week.games.filter((g) => g.played).map((g) => g.week)),
+  ];
+  for (const wk of playedWeeks) {
+    const played = week.games.filter((g) => g.played && g.week === wk);
+    const firstKick = Math.min(...played.map((g) => g.kick.getTime()));
+    const builtAt = new Date(firstKick - 2 * 3_600_000);
+    const items = played.flatMap((g) => {
+      const q = g.hr
+        .filter((h) => h.capturedAt.getTime() <= builtAt.getTime())
+        .pop();
+      return q ? [{ game_id: g.id, hr_line: q.line, hr_price: q.under }] : [];
+    });
+    rows.cards.push({
+      season,
+      week: wk,
+      built_at: ts(builtAt),
+      payload: JSON.stringify({ slot: "fri_pm", items }),
+    });
+  }
 
   rows.manual_picks = expected.picks.map((p) => ({
     game_id: p.game.id,

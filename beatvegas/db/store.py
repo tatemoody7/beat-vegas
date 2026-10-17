@@ -122,6 +122,9 @@ _MIGRATIONS = {
         # What an audit could not verify about a real ticket, in plain words
         # (fact-check audit 2026-10-17); shown as a flag on Results.
         "audit_flag": "TEXT",
+        # Why a pick is left out of every record, when it is (2026-10-17: the
+        # paper picks logged on a Hard Rock alternate line before the filter).
+        "excluded_reason": "TEXT",
     },
     "venues": {
         "elevation": "FLOAT",
@@ -273,6 +276,83 @@ _DATA_MIGRATIONS = [
         "UPDATE manual_picks SET audit_flag = 'Logged at 28.5; Hard Rock''s feed showed 29.5 when it was logged.' "
         "WHERE id = 105 AND season = 2026 AND line = 28.5 AND price = -110 "
         "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
+    ),
+    # The 12 paper picks of weeks 2-4 logged on a Hard Rock ALTERNATE line
+    # (2+ points off the other books' median, most at -140 or worse), before
+    # devig.is_hr_rung existed (2026-09-25). Tate's call (fact-check audit
+    # 2026-10-17): left out of the paper record with a note. Each guard pins
+    # the pick's id, line and price; IS NULL makes a re-run a no-op.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 16 AND season = 2026 AND line = 33.5 AND price = -145 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 18 AND season = 2026 AND line = 31.5 AND price = -200 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 20 AND season = 2026 AND line = 27.5 AND price = 130 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 21 AND season = 2026 AND line = 30.5 AND price = -175 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 25 AND season = 2026 AND line = 30.5 AND price = -180 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 27 AND season = 2026 AND line = 25.5 AND price = -180 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 31 AND season = 2026 AND line = 30.5 AND price = -160 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 35 AND season = 2026 AND line = 25.5 AND price = 140 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 39 AND season = 2026 AND line = 29.5 AND price = -180 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 62 AND season = 2026 AND line = 26.5 AND price = 140 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 70 AND season = 2026 AND line = 29.5 AND price = -185 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET excluded_reason = 'alt_line' "
+        "WHERE id = 77 AND season = 2026 AND line = 30.5 AND price = -160 "
+        "AND is_paper = TRUE AND excluded_reason IS NULL",
     ),
 ]
 

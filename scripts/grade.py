@@ -16,6 +16,7 @@ import argparse
 import statistics
 from typing import Optional
 
+from beatvegas.consensus import market_close
 from beatvegas.db.models import Game, OddsSnapshot, Result
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.grading import (
@@ -58,9 +59,12 @@ def _closings(session, season: int):
             .filter(OddsSnapshot.game_id == g.id, OddsSnapshot.market == "1H_total")
             .all()
         )
-        opening, closing, closing_at = closing_before_kickoff(
-            snaps, g.start_date, exclude=CLOSE_EXCLUDED_BOOKS
-        )
+        opening, _, _ = closing_before_kickoff(snaps, g.start_date, exclude=CLOSE_EXCLUDED_BOOKS)
+        # The close is the judge's (fact-check audit 2026-10-17): books confirmed
+        # inside two hours of kickoff, three or more, median line -- the Market
+        # Research benchmark. No such close, no row.
+        mc = market_close(snaps, g.start_date)
+        closing, closing_at = (mc.line, mc.close_at) if mc else (None, None)
         fair = fair_under_before_kickoff(snaps, g.start_date)
         out[g.id] = (g, (opening, closing), closing_at, fair)
     return out
@@ -147,15 +151,17 @@ def grade_market_fg(session, closings_fg) -> int:
 def grade_market(session, closings) -> int:
     n = 0
     for gid, (g, (opening, closing), closing_at, (fair_open, fair_close)) in closings.items():
-        if closing is None:
-            continue
-        # Delete BEFORE the trust check so a previously-graded false zero is
-        # cleaned up (not just skipped) when grading is re-run.
+        # Delete BEFORE every skip, as grade_market_fg does: a game whose close
+        # no longer qualifies (or a previously-graded false zero) must lose its
+        # stale row on re-grade, not keep it forever (2026-10-17: two rows graded
+        # on a Fliff-only close outlived the Fliff exclusion this way).
         (
             session.query(Result)
             .filter(Result.game_id == gid, Result.model_version == MODEL_MARKET)
             .delete()
         )
+        if closing is None:
+            continue
         actual = trusted_first_half_total(
             g.first_half_total, g.home_points, g.away_points, g.first_half_source
         )

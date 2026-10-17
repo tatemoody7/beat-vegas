@@ -152,7 +152,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   ranked list under a slim research line), Results (`/results`: the personal stake, the arms' forward picks, the
   pricing opportunities), Research (`/research`: a card per hypothesis from `arm_positions`, the closed
   hypotheses from `web/data/hypotheses.json`) — plus `/game/[id]` (the only place a pick is logged)
-  and `/records`. Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. **Owner-only content renders behind
+  and `/records` (Hard Rock Records at the last scheduled card's line + price; Market Research at the consensus close, no units). Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. **Owner-only content renders behind
   the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
   control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
   `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
@@ -174,7 +174,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
 | `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
-| `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges |
+| `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |

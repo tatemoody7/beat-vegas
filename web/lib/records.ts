@@ -1,11 +1,16 @@
 import { unstable_cache } from "next/cache";
 import { csvCell } from "@/lib/format";
-import { MODEL_VERSION, SITE_MIN_SEASON } from "@/lib/model";
+import { MARKET_LEDGER_1H, MODEL_VERSION, SITE_MIN_SEASON } from "@/lib/model";
+import { trustedFirstHalf } from "@/lib/grade";
+import { recordFrom, type Record3 } from "@/lib/record";
+
+export { trustedFirstHalf };
 import { prisma } from "@/lib/prisma";
 
 // Our own season records (plan Phase 1): one row per game, model-aligned —
-// game meta + market line + our number (bv_line/gap) + the real 1H result and
-// under/over outcome. Surfaced as an in-app grid + CSV export in Research. The
+// game meta + our number + the real 1H result, graded two ways and never mixed
+// (fact-check audit 2026-10-17): Hard Rock Records on Hard Rock's own line and
+// price at the last scheduled card, and Market Research on the consensus close. Surfaced as an in-app grid + CSV export in Research. The
 // full feature-frame export + immutable snapshots arrive with Phase 0's
 // GameRecord; this is the decision-level record buildable from existing tables.
 
@@ -14,15 +19,31 @@ export type RecordRow = {
   week: number;
   away: string;
   home: string;
+  /** Games.id; the join key, not a CSV column. */
+  gameId: number;
   fullGameTotal: number | null;
   spread: number | null;
-  line: number | null; // the 1H line used at scoring
   bvLine: number | null; // our market-blind number
-  bvGap: number | null; // line - bvLine (under direction)
-  bvGapZ: number | null; // gap in residual sigmas
   rank: number | null;
-  firstHalfTotal: number | null; // real 1H result
-  outcome: "under" | "over" | "push" | null;
+  /** The real first half, only when the grader would trust it (a 0-0 half
+   *  needs its proof, `ZERO_PROVEN_SOURCES`); null otherwise. */
+  firstHalfTotal: number | null;
+  // --- Hard Rock Records (fact-check audit 2026-10-17, Tate: decision time =
+  // the last SCHEDULED card built before kickoff). Hard Rock's MAIN first-half
+  // line and under price as that card froze them. Null = no verified Hard Rock
+  // line: the game is out of every Hard Rock figure, never given a substitute.
+  hrLine: number | null;
+  hrPrice: number | null;
+  /** hrLine minus our number; positive leans under. */
+  hrGap: number | null;
+  hrOutcome: "under" | "over" | "push" | null;
+  /** One unit on the under at hrPrice: +win, -1 loss, 0 push. */
+  hrUnits: number | null;
+  // --- Market Research: the judge's consensus close (results market row,
+  // beatvegas.consensus.market_close). A benchmark, never a bet: no price.
+  consLine: number | null;
+  consGap: number | null;
+  consOutcome: "under" | "over" | "push" | null;
   /** Our number was produced AFTER kickoff (a retro re-score, e.g. 2026 week 1):
    *  accuracy only, never a decision the board could have acted on. Null when
    *  either timestamp is missing. */
@@ -32,6 +53,19 @@ export type RecordRow = {
   kickoffMs: number | null;
 };
 
+/** Exported for its test: one unit on the under at an American price. */
+export function underUnits(
+  result: RecordRow["hrOutcome"],
+  price: number | null,
+): number | null {
+  if (result === null || price === null || price === 0) return null;
+  if (result === "push") return 0;
+  if (result === "over") return -1;
+  return price > 0 ? price / 100 : 100 / Math.abs(price);
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
 const num = (v: number | bigint | null | undefined): number | null =>
   v === null || v === undefined ? null : Number(v);
 
@@ -39,7 +73,7 @@ const num = (v: number | bigint | null | undefined): number | null =>
 export function outcome(
   fh: number | null,
   line: number | null,
-): RecordRow["outcome"] {
+): RecordRow["hrOutcome"] {
   if (fh === null || line === null) return null;
   if (fh < line) return "under";
   if (fh > line) return "over";
@@ -78,11 +112,12 @@ export function kickoffMs(
  *  2026-09-16). Null when nothing has been graded; the page then falls back to
  *  the last week. */
 export function defaultWeek(
-  rows: Pick<RecordRow, "week" | "outcome">[],
+  rows: Pick<RecordRow, "week" | "firstHalfTotal">[],
 ): number | null {
   let best: number | null = null;
   for (const r of rows) {
-    if (r.outcome !== null && (best === null || r.week > best)) best = r.week;
+    if (r.firstHalfTotal !== null && (best === null || r.week > best))
+      best = r.week;
   }
   return best;
 }
@@ -103,60 +138,141 @@ export async function getRecordSeasons(): Promise<number[]> {
   return rows.map((r) => Number(r.season));
 }
 
-async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
+export type HrQuote = { line: number; price: number };
+
+/** Hard Rock's main line and under price as the last SCHEDULED card built
+ *  before each game's kickoff froze them (card.py `hr_line` / `hr_price` are
+ *  the main line, never an alternate rung). Only cards carry Hard Rock, so a
+ *  season before the first card has none. */
+export async function hardRockAtLastCard(
+  season: number,
+  week?: number,
+): Promise<Map<number, HrQuote>> {
   const rows = await prisma.$queryRaw<
-    {
-      season: number | bigint;
-      week: number | bigint;
-      away_team: string;
-      home_team: string;
-      full_game_total: number | null;
-      spread: number | null;
-      first_half_total: number | bigint | null;
-      line_used: number | null;
-      bv_line: number | null;
-      bv_gap: number | null;
-      bv_sigma: number | null;
-      rank: number | bigint | null;
-      created_at: Date | string | null;
-      start_date: Date | string | null;
-    }[]
+    { gid: number | bigint; hr_line: number | null; hr_price: number | null }[]
   >`
-    SELECT g.season, g.week, g.away_team, g.home_team, g.full_game_total, g.spread,
-           g.first_half_total, p.line_used, p.bv_line, p.bv_gap, p.bv_sigma,
-           p.rank, p.created_at, g.start_date
-    FROM games g
-    LEFT JOIN predictions p
-      ON p.game_id = g.id AND p.model_version = ${MODEL_VERSION}
-    WHERE g.season = ${season}
-    ORDER BY g.week, p.rank NULLS LAST, g.id
+    SELECT DISTINCT ON ((i->>'game_id')::int)
+           (i->>'game_id')::int AS gid,
+           (i->>'hr_line')::float AS hr_line,
+           (i->>'hr_price')::int AS hr_price
+    FROM cards c
+    CROSS JOIN LATERAL jsonb_array_elements(c.payload::jsonb -> 'items') i
+    JOIN games g ON g.id = (i->>'game_id')::int
+    WHERE c.season = ${season}
+      AND (${week ?? null}::int IS NULL OR c.week = ${week ?? null}::int)
+      AND COALESCE(c.payload::jsonb ->> 'slot', '') <> 'manual'
+      AND c.built_at < g.start_date
+      AND i->>'hr_line' IS NOT NULL AND i->>'hr_price' IS NOT NULL
+    ORDER BY (i->>'game_id')::int, c.built_at DESC
   `;
+  const out = new Map<number, HrQuote>();
+  for (const r of rows) {
+    if (r.hr_line === null || r.hr_price === null) continue;
+    out.set(Number(r.gid), { line: Number(r.hr_line), price: Number(r.hr_price) });
+  }
+  return out;
+}
+
+async function getSeasonRecordsUncached(season: number): Promise<RecordRow[]> {
+  const [rows, hr] = await Promise.all([
+    prisma.$queryRaw<
+      {
+        id: number | bigint;
+        season: number | bigint;
+        week: number | bigint;
+        away_team: string;
+        home_team: string;
+        full_game_total: number | null;
+        spread: number | null;
+        first_half_total: number | bigint | null;
+        first_half_source: string | null;
+        home_points: number | bigint | null;
+        away_points: number | bigint | null;
+        bv_line: number | null;
+        rank: number | bigint | null;
+        created_at: Date | string | null;
+        start_date: Date | string | null;
+        cons_line: number | null;
+      }[]
+    >`
+      SELECT g.id, g.season, g.week, g.away_team, g.home_team, g.full_game_total,
+             g.spread, g.first_half_total, g.first_half_source, g.home_points,
+             g.away_points, p.bv_line, p.rank, p.created_at, g.start_date,
+             r.closing_line AS cons_line
+      FROM games g
+      LEFT JOIN predictions p
+        ON p.game_id = g.id AND p.model_version = ${MODEL_VERSION}
+      LEFT JOIN results r
+        ON r.game_id = g.id AND r.model_version = ${MARKET_LEDGER_1H}
+      WHERE g.season = ${season}
+      ORDER BY g.week, p.rank NULLS LAST, g.id
+    `,
+    hardRockAtLastCard(season),
+  ]);
   return rows.map((r) => {
-    const line = num(r.line_used);
-    const fh = num(r.first_half_total);
-    const bvGap = num(r.bv_gap);
-    const bvSigma = num(r.bv_sigma);
+    const gameId = Number(r.id);
+    const fh = trustedFirstHalf(
+      num(r.first_half_total),
+      num(r.home_points),
+      num(r.away_points),
+      r.first_half_source,
+    );
+    const bvLine = num(r.bv_line);
+    const q = hr.get(gameId) ?? null;
+    const hrOutcome = outcome(fh, q?.line ?? null);
+    const consLine = num(r.cons_line);
+    const gap = (line: number | null) =>
+      line !== null && bvLine !== null ? round2(line - bvLine) : null;
     return {
       season: Number(r.season),
       week: Number(r.week),
       away: r.away_team,
       home: r.home_team,
+      gameId,
       fullGameTotal: num(r.full_game_total),
       spread: num(r.spread),
-      line,
-      bvLine: num(r.bv_line),
-      bvGap,
-      bvGapZ:
-        bvGap !== null && bvSigma
-          ? Math.round((bvGap / bvSigma) * 100) / 100
-          : null,
+      bvLine,
       rank: num(r.rank),
       firstHalfTotal: fh,
-      outcome: outcome(fh, line),
+      hrLine: q?.line ?? null,
+      hrPrice: q?.price ?? null,
+      hrGap: gap(q?.line ?? null),
+      hrOutcome,
+      hrUnits: underUnits(hrOutcome, q?.price ?? null),
+      consLine,
+      consGap: gap(consLine),
+      consOutcome: outcome(fh, consLine),
       scoredAfterKickoff: scoredAfter(r.created_at, r.start_date),
       kickoffMs: kickoffMs(r.start_date),
     };
   });
+}
+
+export type ViewTotals = {
+  /** Played, rated games with the view's line, and those without one. */
+  graded: number;
+  missing: number;
+  record: Record3 | null;
+};
+
+/** The season line above each view. Hard Rock: units at Hard Rock's price.
+ *  Market Research: the record only -- no one can bet the consensus. */
+export function viewTotals(rows: RecordRow[], view: "hr" | "market"): ViewTotals {
+  const played = rows.filter((r) => r.firstHalfTotal !== null && r.bvLine !== null);
+  const outcomeOf = (r: RecordRow) => (view === "hr" ? r.hrOutcome : r.consOutcome);
+  const graded = played.filter((r) => outcomeOf(r) !== null);
+  return {
+    graded: graded.length,
+    missing: played.length - graded.length,
+    record: recordFrom(
+      graded.map((r) => ({
+        result: outcomeOf(r),
+        units: view === "hr" ? r.hrUnits : null,
+        clv: null,
+        stake: view === "hr" ? 1 : 0,
+      })),
+    ),
+  };
 }
 
 // History view — slow-changing (updates at most weekly), so cache the DB scan.
@@ -173,14 +289,20 @@ const CSV_COLUMNS: { key: keyof RecordRow; header: string }[] = [
   { key: "home", header: "home" },
   { key: "fullGameTotal", header: "full_game_total" },
   { key: "spread", header: "spread" },
-  { key: "line", header: "line_1h" },
   { key: "bvLine", header: "bv_line" },
-  { key: "bvGap", header: "bv_gap" },
-  { key: "bvGapZ", header: "bv_gap_z" },
-  // under_score left the CSV on 2026-10-04 with the classifier (docs/CLASSIFIER_RETIREMENT.md).
+  // under_score left the CSV on 2026-10-04 with the classifier (docs/CLASSIFIER_RETIREMENT.md);
+  // the scoring-time line (line_1h, bv_gap, outcome) left it on 2026-10-17: it
+  // was a derived or proxy number no book posted (fact-check audit).
   { key: "rank", header: "rank" },
+  { key: "hrLine", header: "hr_line_last_card" },
+  { key: "hrPrice", header: "hr_price_last_card" },
+  { key: "hrGap", header: "hr_gap" },
+  { key: "hrOutcome", header: "hr_result" },
+  { key: "hrUnits", header: "hr_units" },
+  { key: "consLine", header: "consensus_close" },
+  { key: "consGap", header: "consensus_gap" },
+  { key: "consOutcome", header: "consensus_result" },
   { key: "firstHalfTotal", header: "first_half_total_actual" },
-  { key: "outcome", header: "outcome" },
   { key: "scoredAfterKickoff", header: "scored_after_kickoff" },
 ];
 

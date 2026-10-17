@@ -5,6 +5,9 @@ import {
   outcome,
   recordsToCsv,
   scoredAfter,
+  trustedFirstHalf,
+  underUnits,
+  viewTotals,
   type RecordRow,
 } from "./records";
 
@@ -13,20 +16,27 @@ const row = (o: Partial<RecordRow> = {}): RecordRow => ({
   week: 3,
   away: "Kansas",
   home: "Missouri",
+  gameId: 1,
   fullGameTotal: 52.5,
   spread: -7,
-  line: 27.5,
   bvLine: 25.1,
-  bvGap: 2.4,
-  bvGapZ: 0.2,
   rank: 3,
   firstHalfTotal: 24,
-  outcome: "under",
-
+  hrLine: 27.5,
+  hrPrice: -110,
+  hrGap: 2.4,
+  hrOutcome: "under",
+  hrUnits: 0.91,
+  consLine: 27,
+  consGap: 1.9,
+  consOutcome: "under",
   scoredAfterKickoff: null,
   kickoffMs: null,
   ...o,
 });
+
+const HEADER =
+  "season,week,away,home,full_game_total,spread,bv_line,rank,hr_line_last_card,hr_price_last_card,hr_gap,hr_result,hr_units,consensus_close,consensus_gap,consensus_result,first_half_total_actual,scored_after_kickoff";
 
 describe("outcome", () => {
   it("grades the under against the line, with a push on the number", () => {
@@ -45,21 +55,31 @@ describe("recordsToCsv", () => {
   it("writes the header, one line per row, and a trailing newline", () => {
     const csv = recordsToCsv([row(), row({ week: 4 })]);
     const lines = csv.split("\n");
-    expect(lines[0]).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,rank,first_half_total_actual,outcome,scored_after_kickoff",
-    );
+    expect(lines[0]).toBe(HEADER);
     expect(lines).toHaveLength(4); // header + 2 rows + trailing ""
     expect(lines[3]).toBe("");
-    expect(lines[1].split(",")).toHaveLength(14);
+    expect(lines[1].split(",")).toHaveLength(18);
+  });
+
+  it("never carries the scoring-time line again (audit 2026-10-17)", () => {
+    expect(HEADER).not.toMatch(/line_1h|bv_gap|,outcome,/);
   });
 
   it("leaves a missing value as an empty cell, never a literal null", () => {
     const csv = recordsToCsv([
-      row({ line: null, bvLine: null, firstHalfTotal: null, outcome: null }),
+      row({
+        hrLine: null,
+        hrPrice: null,
+        hrGap: null,
+        hrOutcome: null,
+        hrUnits: null,
+        bvLine: null,
+        firstHalfTotal: null,
+      }),
     ]);
     expect(csv).not.toContain("null");
     expect(csv.split("\n")[1]).toBe(
-      "2025,3,Kansas,Missouri,52.5,-7,,,2.4,0.2,3,,,",
+      "2025,3,Kansas,Missouri,52.5,-7,,3,,,,,,27,1.9,under,,",
     );
   });
 
@@ -67,17 +87,57 @@ describe("recordsToCsv", () => {
     const csv = recordsToCsv([row({ home: "Texas A&M, College Station" })]);
     const body = csv.split("\n")[1];
     expect(body).toContain('"Texas A&M, College Station"');
-    // Still 14 fields once the quoted comma is respected.
     expect(body.match(/"/g)).toHaveLength(2);
   });
 
   it("is the header plus a blank line when there are no rows", () => {
-    // The join of zero rows is "", so an empty season downloads a header and
-    // one empty line. Harmless in every spreadsheet we have opened it in;
-    // pinned so it is a known shape rather than a surprise.
-    expect(recordsToCsv([])).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,rank,first_half_total_actual,outcome,scored_after_kickoff\n\n",
-    );
+    expect(recordsToCsv([])).toBe(`${HEADER}\n\n`);
+  });
+});
+
+describe("trustedFirstHalf", () => {
+  it("trusts a 0-0 half only with its proof, as the grader does", () => {
+    expect(trustedFirstHalf(0, 21, 14, "linescores")).toBeNull();
+    expect(trustedFirstHalf(0, 21, 14, "linescores_verified")).toBe(0);
+    expect(trustedFirstHalf(0, 21, 14, "pbp")).toBe(0);
+    expect(trustedFirstHalf(0, 0, 0, "linescores")).toBe(0);
+    expect(trustedFirstHalf(17, 21, 14, null)).toBe(17);
+    expect(trustedFirstHalf(null, 21, 14, null)).toBeNull();
+  });
+});
+
+describe("underUnits", () => {
+  it("pays one unit at the American price, -1 on a loss, 0 on a push", () => {
+    expect(underUnits("under", -110)).toBeCloseTo(0.9091, 4);
+    expect(underUnits("under", 120)).toBe(1.2);
+    expect(underUnits("over", -110)).toBe(-1);
+    expect(underUnits("push", -110)).toBe(0);
+    expect(underUnits(null, -110)).toBeNull();
+    expect(underUnits("under", null)).toBeNull();
+  });
+});
+
+describe("viewTotals", () => {
+  const rows = [
+    row({}),
+    row({ hrOutcome: "over", hrUnits: -1, consOutcome: "over" }),
+    row({ hrLine: null, hrPrice: null, hrOutcome: null, hrUnits: null }), // no verified HR line
+    row({ consLine: null, consOutcome: null }), // no consensus close
+    row({ firstHalfTotal: null, hrOutcome: null, consOutcome: null }), // unplayed
+  ];
+  it("grades Hard Rock Records at Hard Rock's price and counts the games without a line", () => {
+    const t = viewTotals(rows, "hr");
+    expect(t.graded).toBe(3);
+    expect(t.missing).toBe(1);
+    expect(t.record?.record).toBe("2-1");
+    expect(t.record?.units).toBe("+0.82");
+  });
+  it("reads Market Research as a record only, never units", () => {
+    const t = viewTotals(rows, "market");
+    expect(t.graded).toBe(3);
+    expect(t.missing).toBe(1);
+    expect(t.record?.record).toBe("2-1");
+    expect(t.record?.roi).toBe("—");
   });
 });
 
@@ -97,16 +157,16 @@ describe("scoredAfter", () => {
 describe("defaultWeek", () => {
   it("opens on the latest week with a graded game, not the last week scheduled", () => {
     const rows = [
-      { week: 1, outcome: "under" as const },
-      { week: 2, outcome: "over" as const },
-      { week: 3, outcome: null },
-      { week: 15, outcome: null }, // Navy @ Army, on the schedule from day one
+      { week: 1, firstHalfTotal: 21 },
+      { week: 2, firstHalfTotal: 30 },
+      { week: 3, firstHalfTotal: null },
+      { week: 15, firstHalfTotal: null }, // Navy @ Army, on the schedule from day one
     ];
     expect(defaultWeek(rows)).toBe(2);
   });
 
   it("is null when nothing has been graded yet", () => {
-    expect(defaultWeek([{ week: 1, outcome: null }])).toBeNull();
+    expect(defaultWeek([{ week: 1, firstHalfTotal: null }])).toBeNull();
     expect(defaultWeek([])).toBeNull();
   });
 });
@@ -125,7 +185,8 @@ describe("kickoffMs", () => {
   });
   it("is not a CSV column", () => {
     const head = recordsToCsv([row({ kickoffMs: 1 })]).split("\n")[0];
-    expect(head.split(",")).toHaveLength(14);
+    expect(head.split(",")).toHaveLength(18);
     expect(head.split(",").at(-1)).toBe("scored_after_kickoff");
+    expect(head).not.toContain("game_id");
   });
 });

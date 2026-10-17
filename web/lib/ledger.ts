@@ -24,6 +24,8 @@ export type Ledger = {
   market: Record3 | null;
   marketFull: Record3 | null;
   you: Record3 | null; // real-money 1H picks only
+  /** Graded paper picks left out of `paper` (excluded_reason set). */
+  paperExcluded: number;
   paper: Record3 | null; // paper 1H picks — never merged into "you"
   picks: PickFull[];
 };
@@ -89,7 +91,14 @@ export async function getLedger(season: number): Promise<Ledger> {
     ),
     // Cash record; units, ROI and line value price-verified only (audit 2026-10-17).
     you: stakeRecord(personalStake(picks.filter(isRealFirstHalf))),
-    paper: recordFrom(graded.filter(isPaperFirstHalf)),
+    // The 12 weeks 2-4 picks logged on a Hard Rock alternate line stay out
+    // (fact-check audit 2026-10-17, Tate); Results says how many.
+    paper: recordFrom(
+      graded.filter((p) => isPaperFirstHalf(p) && p.excludedReason === null),
+    ),
+    paperExcluded: graded.filter(
+      (p) => isPaperFirstHalf(p) && p.excludedReason !== null,
+    ).length,
     picks,
   };
 }

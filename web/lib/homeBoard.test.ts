@@ -43,6 +43,7 @@ const row = (o: Partial<BoardRow> = {}): BoardRow => ({
   bvLo: 16,
   bvHi: 28,
   firstHalfTotal: null,
+  firstHalfTrusted: null,
   liveGap: 2.5,
   bvAdjust: null,
   bvAdjustReason: null,
@@ -55,6 +56,7 @@ const edge = (score: number, tier: EdgeTier): EdgeResult =>
     tier,
     blocker: null,
     priceProvenance: "logged",
+    excludedReason: null,
     action: "",
     kill: { line: null, price: null, text: "" },
   }) as unknown as EdgeResult;
@@ -109,6 +111,7 @@ const pick = (o: Partial<PickFull>): PickFull =>
     hrLineAtPick: null,
     blocker: null,
     priceProvenance: "logged",
+    excludedReason: null,
     ...o,
   }) as PickFull;
 
@@ -615,6 +618,7 @@ describe("Board alignment (2026-10-14)", () => {
       gameId: 1,
       blocker: null,
       priceProvenance: "logged",
+      excludedReason: null,
       paperBlocker: null,
       action:
         "Paper only — the injury report could not be read on this build. Check Hard Rock’s number and the injury list yourself before betting.",

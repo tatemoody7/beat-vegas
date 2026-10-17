@@ -10,6 +10,23 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 ~23:00 UTC (RECORDS SPLIT: HARD ROCK RECORDS AND MARKET RESEARCH, NEVER MIXED).** From the fact-check
+  audit's plan (P1.1/P1.2, Tate's calls). `/records` graded every game against `predictions.line_used`: in 2026 a derived
+  or median line (only 64 of 334 equal to Hard Rock's), and for 2023-25 the proxy line written 2026-06-03 from a share
+  fitted on those seasons' own first halves (0 pushes in 1,667 whole-number lines; mechanism not found). Now two tabs:
+  **Hard Rock Records** grade each game on Hard Rock's MAIN line and under price as the last scheduled card built before
+  kickoff froze them (`card.py` `hr_line`/`hr_price`; 293 of 337 played 2026 games, 150-143, -10.55u at Hard Rock's
+  price), and a game without one reads "No verified Hard Rock line" and stays out; **Market Research** grades on the
+  judge's consensus close (`consensus.market_close`: 3+ other books confirmed inside 2 h of kickoff, median line), a
+  record with no units. 2023-25 have no Hard Rock quote at all, so they open on Market Research. `grade_market` now
+  writes that close (and deletes a stale row before every skip: two Fliff-only rows had survived); `grade.yml hist=true`
+  also grades 2023-25. Results: the market row is "Market research ... consensus close", record only (its stored -110
+  units are never shown); the paper row leaves out the 12 weeks 2-4 picks logged on a Hard Rock alternate line
+  (`manual_picks.excluded_reason = 'alt_line'`, a data migration pinned to each pick's line and price) and says so. The
+  Board's Played list settles on the same last-card Hard Rock line, with no market fallback, and every settle uses the
+  grader's zero-half trust rule (`grade.ts::trustedFirstHalf`). The records CSV drops `line_1h`/`bv_gap`/`outcome` for the
+  Hard Rock and consensus columns (18 columns).
+
 - **2026-10-17 ~22:00 UTC (THE PERSONAL STAKE READS ONLY WHAT CAN BE VERIFIED).** From the fact-check audit's plan
   (P1.3, Tate's calls). The ticket check found settlement and payout right on all 26 graded tickets, but 10 carry no
   logged price (6 `unknown`, 4 NULL), id 7's price was changed after kickoff, id 105 was logged at 28.5 while Hard

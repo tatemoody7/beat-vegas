@@ -166,8 +166,11 @@ async function withCardBuilt30hAgo(fn: () => Promise<void>): Promise<void> {
   const cards = await query<{ id: number; built_at: string }>(
     "SELECT id, built_at::text AS built_at FROM cards",
   );
+  // Only the week's card moves: the seed's earlier builds (the Played list's
+  // and /records' Hard Rock source, 2026-10-17) stay where they were.
   await query(
-    "UPDATE cards SET built_at = (now() AT TIME ZONE 'utc') - interval '30 hours'",
+    "UPDATE cards SET built_at = (now() AT TIME ZONE 'utc') - interval '30 hours' " +
+      "WHERE id = (SELECT id FROM cards ORDER BY built_at DESC LIMIT 1)",
   );
   try {
     await fn();

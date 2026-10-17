@@ -38,6 +38,7 @@ type Raw = {
   closing_captured_at?: string | null;
   price_provenance?: string | null;
   audit_flag?: string | null;
+  excluded_reason?: string | null;
   clv: number | null;
   ev_cons?: number | null;
   cons_excluded?: string | null;
@@ -88,7 +89,8 @@ async function selectRows(season: number): Promise<Raw[]> {
              mp.closing_captured_at::text AS closing_captured_at,
              mp.price_provenance, mp.clv,
              mp.verdict_at_pick, mp.reason, mp.gap_at_pick, mp.hr_line_at_pick, mp.blocker,
-             mp.ev_cons, mp.cons_excluded, mp.audit_flag
+             mp.ev_cons, mp.cons_excluded, mp.audit_flag,
+             mp.excluded_reason
       FROM manual_picks mp
       LEFT JOIN games g ON g.id = mp.game_id
       WHERE mp.season = ${season}
@@ -145,6 +147,7 @@ async function getBetLedgerUncached(season: number): Promise<LedgerRow[]> {
       closingCapturedAt: isoFromNaive(r.closing_captured_at),
       priceProvenance: r.price_provenance ?? null,
       auditFlag: r.audit_flag ?? null,
+      excludedReason: r.excluded_reason ?? null,
       clv: r.clv,
       evCons: r.ev_cons ?? null,
       consExcluded: r.cons_excluded ?? null,

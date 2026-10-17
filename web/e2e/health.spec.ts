@@ -159,7 +159,7 @@ test.describe("GET /api/records", () => {
     const csv = await res.text();
     const lines = csv.trim().split("\n");
     expect(lines[0]).toBe(
-      "season,week,away,home,full_game_total,spread,line_1h,bv_line,bv_gap,bv_gap_z,rank,first_half_total_actual,outcome,scored_after_kickoff",
+      "season,week,away,home,full_game_total,spread,bv_line,rank,hr_line_last_card,hr_price_last_card,hr_gap,hr_result,hr_units,consensus_close,consensus_gap,consensus_result,first_half_total_actual,scored_after_kickoff",
     );
     // One row per fixture game, every one scored before kickoff.
     expect(lines.length - 1).toBe(games.length);

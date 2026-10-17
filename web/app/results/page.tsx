@@ -74,15 +74,24 @@ export default async function ResultsPage({
   const comparison: RecordTableRow[] = [
     {
       key: "market",
-      label: "Every first-half under at the close",
-      note: "the baseline to beat",
-      rec: ledger.market,
+      label: "Market research: every first-half under at the consensus close",
+      note: "a benchmark, not a bet: no one can bet the consensus, so no units",
+      // Record only (fact-check audit 2026-10-17, Tate): the stored rows
+      // carry an assumed -110 that no one was offered.
+      rec:
+        ledger.market === null
+          ? null
+          : { ...ledger.market, units: "—", roi: "—" },
       empty: "nothing graded yet",
     },
     {
       key: "paper",
       label: "Every game that cleared the bar, on paper",
-      note: "no 5-a-week cap · development before 2026-10-13",
+      note: `no 5-a-week cap · development before 2026-10-13${
+        ledger.paperExcluded > 0
+          ? ` · ${ledger.paperExcluded} picks logged on a Hard Rock alternate line (weeks 2-4) left out`
+          : ""
+      }`,
       rec: ledger.paper,
       empty: "no paper picks graded yet",
     },

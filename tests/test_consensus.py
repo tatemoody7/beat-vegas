@@ -235,3 +235,51 @@ def test_the_frozen_table_is_the_one_the_version_names():
     # 24 is a key first-half number: far more often landed on than 25.
     m = t.mass("1H_total", 24.5)
     assert m[24] > 5 * m[25]
+
+
+# --- market_close: the Market Research benchmark (fact-check audit 2026-10-17) ---
+
+
+def test_market_close_is_the_median_of_three_or_more_books_inside_two_hours():
+    snaps = [
+        snap("draftkings", 27.5, -110, -110),
+        snap("fanduel", 28.5, -110, -110),
+        snap("betmgm", 27.5, -110, -110),
+        snap("bovada", 28.0, -110, -110),
+    ]
+    mc = C.market_close(snaps, KICK)
+    assert mc is not None
+    assert mc.line == 27.75 and mc.books == 4
+
+
+def test_market_close_ignores_hard_rock_fliff_and_stale_books():
+    snaps = [
+        snap("draftkings", 27.5, -110, -110),
+        snap("fanduel", 27.5, -110, -110),
+        snap("hardrockbet", 30.5, -110, -110),
+        snap("fliff", 30.5, -110, -110),
+        # Last confirmed three hours out: outside the judge's window.
+        snap("betmgm", 26.5, -110, -110, minutes_before=180),
+    ]
+    assert C.market_close(snaps, KICK) is None  # two books left, fewer than three
+
+
+def test_market_close_counts_a_late_confirmation_of_an_old_quote():
+    snaps = [
+        snap("draftkings", 27.5, -110, -110, minutes_before=600, seen_minutes_before=20),
+        snap("fanduel", 27.5, -110, -110),
+        snap("betmgm", 28.5, -110, -110),
+    ]
+    mc = C.market_close(snaps, KICK)
+    assert mc is not None and mc.line == 27.5 and mc.books == 3
+
+
+def test_market_close_skips_off_centre_rungs():
+    snaps = [
+        snap("draftkings", 27.5, -110, -110),
+        snap("fanduel", 27.5, -110, -110),
+        snap("betmgm", 23.5, -295, 210),  # a rung, not a main line
+        snap("bovada", 28.5, -110, -110),
+    ]
+    mc = C.market_close(snaps, KICK)
+    assert mc is not None and mc.books == 3 and mc.line == 27.5

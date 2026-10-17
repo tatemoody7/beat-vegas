@@ -120,23 +120,23 @@ describe("gateRecords", () => {
   const rec = (kickoffMs: number | null) =>
     ({
       bvLine: 24,
-      bvGap: 3,
-      bvGapZ: 0.4,
+      hrGap: 3,
+      consGap: 2.5,
       rank: 2,
-      line: 27,
+      hrLine: 27,
       kickoffMs,
     }) as unknown as RecordRow;
-  it("blanks our number, gap, z and rank before kickoff for a visitor", () => {
+  it("blanks our number, both gaps and rank before kickoff for a visitor", () => {
     const out = gateRecords([rec(AFTER), rec(null), rec(BEFORE)], false, NOW);
     expect(out).toHaveLength(3);
     for (const r of out.filter((x) => x.kickoffMs !== BEFORE)) {
-      expect([r.bvLine, r.bvGap, r.bvGapZ, r.rank]).toEqual([
+      expect([r.bvLine, r.hrGap, r.consGap, r.rank]).toEqual([
         null,
         null,
         null,
         null,
       ]);
-      expect(r.line).toBe(27);
+      expect(r.hrLine).toBe(27);
     }
     expect(out.find((x) => x.kickoffMs === BEFORE)!.bvLine).toBe(24);
   });

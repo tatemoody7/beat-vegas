@@ -232,7 +232,7 @@ test.describe("results", () => {
     expect((await request.get("/api/bets?season=abc")).status()).toBe(400);
   });
 
-  test("the season comparison: every under, the paper rule, our bets, and signed in the full game", async ({
+  test("the season comparison: market research, the paper rule, our bets, and signed in the full game", async ({
     page,
   }) => {
     await page.goto("/results?week=all");
@@ -245,9 +245,13 @@ test.describe("results", () => {
       (
         await table.locator("tr", { hasText: label }).first().innerText()
       ).replace(/\s+/g, " ");
-    expect(await rowText("Every first-half under at the close")).toContain(
-      `${marketFirstHalf.hit} ${marketFirstHalf.record} ${marketFirstHalf.units}`,
+    // Market Research (fact-check audit 2026-10-17): a record with no units or
+    // ROI -- no one can bet the consensus.
+    const market = await rowText(
+      "Market research: every first-half under at the consensus close",
     );
+    expect(market).toContain(`${marketFirstHalf.hit} ${marketFirstHalf.record} —`);
+    expect(market).not.toContain(marketFirstHalf.units);
     expect(
       await rowText("Every game that cleared the bar, on paper"),
     ).toContain(`${L.paper.hit} ${L.paper.record} ${L.paper.units}`);

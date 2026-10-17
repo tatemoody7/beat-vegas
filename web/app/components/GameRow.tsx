@@ -37,7 +37,7 @@ export default function GameRow({ g }: { g: HomeGame }) {
     played && g.settled !== null
       ? `${capitalize(g.settled)} · first half ${fmt(row.firstHalfTotal, 0)}, line ${fmt(g.settledLine)}`
       : played
-        ? `Final · first half ${fmt(row.firstHalfTotal, 0)}. No first-half line was posted, so nothing to grade.`
+        ? `Final · first half ${fmt(row.firstHalfTotal, 0)}. No verified Hard Rock line, so nothing to grade.`
         : null;
   const lit = edge.tier === "BET" && !g.kickedOff;
 

@@ -137,7 +137,9 @@
   afternoon card Thu/Fri (~4pm ET), daily grading, Tue/Fri research preview. GitHub emails
   failed runs. **There are no scheduled Claude routines and no scheduled texts**
   (retired 2026-09-13 — they were local sessions that only fired when the laptop
-  was awake). The board is the failure signal: `web/lib/boardHealth.ts`.
+  was awake). The board is the failure signal: `web/lib/boardHealth.ts`. One research
+  exception since 2026-10-17: the Mac task `bv-saturday-board-report` sends the link to
+  a Saturday page analysing the Board's top 10 (best-effort; nothing depends on it).
 - Repo (private): https://github.com/tatemoody7/beat-vegas
 - The real test of the edge = **real first-half lines collected this season**,
   graded vs the model and my own picks.

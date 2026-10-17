@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { bookLabel } from "@/lib/books";
-import { hrQuoteText, priceAgeText } from "@/lib/labels";
+import { hrQuoteText, priceAgeText, QB_UNKNOWN_TEXT } from "@/lib/labels";
 import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
@@ -547,6 +547,14 @@ export default function GameDetail({
         >
           {resultLine ?? edge.action}
         </p>
+        {g.edge.tier === "BET" && !g.kickedOff && (
+          <p
+            data-testid="qb-unknown"
+            className="mt-1 text-sm text-[var(--warn)]"
+          >
+            {QB_UNKNOWN_TEXT}
+          </p>
+        )}
         {/* Said once on the page a visitor acts from (site review 2026-09-28):
             the number is a Florida book's. */}
         {!played && (

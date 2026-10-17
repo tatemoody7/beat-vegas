@@ -240,6 +240,8 @@ def backfill_venues(client: CFBDClient) -> int:
                 "latitude": _get(v, "latitude") or _get(loc, "x"),
                 "longitude": _get(v, "longitude") or _get(loc, "y"),
                 "dome": _get(v, "dome"),
+                # IANA zone; None for ~half of CFBD's venues (upsert keeps a stored one)
+                "timezone": _get(v, "timezone"),
             }
         )
     rows = [r for r in rows if r["id"] is not None]

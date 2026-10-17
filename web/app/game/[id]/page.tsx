@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import GameDetail from "@/app/components/GameDetail";
 import { getCardForecast } from "@/lib/forecast";
 import { bankrollEnv, getHomeGame } from "@/lib/homeBoard";
+import { getKickZones } from "@/lib/kickoffClockDb";
 import { viewerIsAuthed } from "@/lib/session";
 import { gateGame } from "@/lib/signalGate";
 
@@ -47,6 +48,7 @@ export default async function GamePage({
       unitUsd={unitUsd}
       backHref={`/#game-${gameId}`}
       forecast={await getCardForecast(gameId)}
+      zones={await getKickZones(gameId)}
     />
   );
 }

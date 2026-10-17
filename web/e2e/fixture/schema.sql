@@ -1231,7 +1231,8 @@ CREATE TABLE public.venues (
     dome boolean,
     elevation double precision,
     grass boolean,
-    capacity integer
+    capacity integer,
+    timezone character varying
 );
 
 --

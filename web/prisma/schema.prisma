@@ -233,6 +233,8 @@ model venues {
   latitude  Float?
   longitude Float?
   dome      Boolean?
+  /// IANA zone from CFBD /venues (2026-10-17); null when CFBD has none
+  timezone  String?  @db.VarChar
   games     games[]
 }
 

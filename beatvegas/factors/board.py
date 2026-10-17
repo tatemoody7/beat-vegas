@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
+from ..etl.situational import clock_text
 from .ledger import tier_from_evidence
 from .registry import Factor, factor_by_name
 
@@ -83,7 +84,10 @@ def _fill(factor: Factor, value, color: str) -> str:
     if not factor.sentence:
         return ""
     try:
-        text = factor.sentence.format(value=value, dir=_DIR_WORD.get(color, ""))
+        # {clock}: a local hour as a wall-clock time (15.5 -> "3:30pm")
+        text = factor.sentence.format(
+            value=value, clock=clock_text(value), dir=_DIR_WORD.get(color, "")
+        )
     except (KeyError, ValueError, IndexError):
         return factor.sentence
     # An empty direction leaves "<fact> — ." or "<fact> —  (note)."; drop the dash.

@@ -30,7 +30,7 @@ import pandas as pd
 
 from ..db.models import Game, TeamTempo, Weather
 from .features import quality_prior_frame
-from .situational import situational_frame
+from .situational import clock_text, situational_frame
 
 # Week from which a team's own season-to-date 1H record replaces the prior season.
 SEASON_TO_DATE_FROM_WEEK = 3
@@ -238,9 +238,9 @@ def _spot_str(d: Dict) -> Optional[str]:
     trav = d.get("away_travel_dist")
     if trav is not None:
         parts.append(f"trav {int(trav)}mi")
-    hour = d.get("kickoff_local_hour")
-    if hour is not None:
-        parts.append(f"~{int(round(hour)):02d}:00 kick")
+    clock = clock_text(d.get("kickoff_local_hour"))
+    if clock is not None:
+        parts.append(f"{clock} kick")
     return " · ".join(parts) if parts else None
 
 

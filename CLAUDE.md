@@ -69,7 +69,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,
   judged on the years after the paper's own sample (Arscott, national TV, Bennett: NOT MET 10-09).
 - **The model and bar as built** (they feed the paper arms): market-blind HGB, 55 inputs (B-SERVE
-  dropped 57 NaN at serving, the leak fix 3 kickoff-weather; rivalry = trophy games; `weekly_update.py`
+  dropped 57 NaN at serving, the leak fix 3 kickoff-weather; rivalry = trophy games; kickoff clock and
+  time-zone change = the venue's IANA zone, `venues.timezone`, since 2026-10-17; `weekly_update.py`
   fails a run >90% NaN on a column training has <10% NaN). The per-slate bar (H-PCT) is the k-th largest gap
   over the slate's Hard-Rock-priced games, k = max(1, round(0.2 × N)) — `model/score.py::slate_bar`
   mirrored by `verdict.ts::slateBar`, golden vectors in `tests/fixtures/slate_bar_vectors.json`;

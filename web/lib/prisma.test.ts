@@ -55,6 +55,7 @@ const DB_BACKED = [
   "ledger",
   "weeklyReview",
   "betLedgerDb",
+  "kickoffClockDb",
 ];
 
 function tsxFiles(dir: string): string[] {

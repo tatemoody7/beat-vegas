@@ -179,9 +179,15 @@ def main() -> None:
             news = {"home": news_for(g.home_team), "away": news_for(g.away_team)}
             home_rows = inj_by_school.get(g.home_team, [])
             away_rows = inj_by_school.get(g.away_team, [])
+            # `covered`: the pull named at least one of this game's teams. The
+            # public feed is capped at about five players from that day's games
+            # (measured 2026-10-06..10-17), so an uncovered game has NO injury
+            # read -- the page says "not available", never "nothing reported".
+            covered = bool(home_rows or away_rows)
             injuries = {
                 "home": [rotowire.format_entry(r) for r in home_rows],
                 "away": [rotowire.format_entry(r) for r in away_rows],
+                "covered": covered,
             }
             details = []
             for side, rows in (("home", home_rows), ("away", away_rows)):
@@ -201,7 +207,11 @@ def main() -> None:
                 s.add(row)
             row.season = g.season
             row.week = g.week
-            row.qb_out = bool(details)
+            # True when a starting QB is listed out; otherwise NULL = unknown.
+            # A five-row feed can show a QB is out but can never show one is
+            # playing, so "clear" is not a fact this source can give. Every
+            # Python reader bool()s it, so the card's gate is unchanged.
+            row.qb_out = True if details else None
             row.qb_out_detail = " · ".join(details)
             row.news_json = json.dumps(news)
             row.injuries_json = json.dumps(injuries)

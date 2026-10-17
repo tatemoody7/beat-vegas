@@ -27,6 +27,7 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 - [board] `odds_credits_remaining` under the floor lights the OpsBanner (signed in only; a visitor sees none) with the credits text and `/api/health` carries the same warning; restored afterwards — board.spec.ts › "a low Odds API budget lights the ops banner and /api/health warns"
 - [board] `rule_paused=true` is reported by `/api/health.rulePaused`; the footer shows the research-season sentence and no separate pause box; restored afterwards — board.spec.ts › "the real-money switch is reported by /api/health; the season banner speaks for it on the board"
 - [board] Every lit BET row says how old its Hard Rock price is (B5); no other row does — board.spec.ts › "every lit BET row says how old its Hard Rock price is; no other row does"
+- [board] Every lit BET row says the starting QB is unconfirmed (audit 2026-10-17); no other row does — board.spec.ts › "every lit BET row says the starting QB is unconfirmed; no other row does"
 
 ## Game page
 

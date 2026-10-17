@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { american, capitalize, fmt } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
-import { hrQuoteText, priceAgeText } from "@/lib/labels";
+import { hrQuoteText, priceAgeText, QB_UNKNOWN_TEXT } from "@/lib/labels";
 import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import { passShort } from "@/lib/edge";
@@ -106,6 +106,14 @@ export default function GameRow({ g }: { g: HomeGame }) {
               (g.kickedOff ? null : passShort(edge)) ??
               edge.action}
           </p>
+          {lit && (
+            <p
+              data-testid="qb-unknown"
+              className="mt-1 text-xs text-[var(--warn)]"
+            >
+              {QB_UNKNOWN_TEXT}
+            </p>
+          )}
         </div>
 
         <span

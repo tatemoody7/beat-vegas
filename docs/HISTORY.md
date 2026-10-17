@@ -10,6 +10,16 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 ~19:30 UTC (A REAL-MONEY SIGNAL SAYS THE STARTING QB IS UNCONFIRMED).** A second independent audit
+  (read-only, chat report) found the QB gate reads unknown as clear: every week-7 `game_previews` row was written at
+  12:02Z (before #418) with `qb_out = false`, card 32 rated Louisville @ Syracuse BET with Syracuse's starter unsettled
+  (Odom out, Nelson questionable, Angeli doubtful), and after #418 `bool(None)` is still False in `card.py`. Tate's call:
+  allow the BET, warn on it. Every lit BET row, the game page's decision block and the log form now read "QB status
+  unknown — check before logging" (`labels.ts::QB_UNKNOWN_TEXT`); no gate, card or money rule changed. The same audit
+  found `venues.timezone` empty on all 852 venues (the 14:09Z grade run skipped its CFBD refresh under the minutes
+  guard, so #417's repair had not landed); a hand `grade.yml` dispatch at 17:57Z (run 39055975940, Tate's call) loaded
+  them: 364 of 852 venues carry a zone, all 385 rated 2026 games among them, before the 10-18 refit.
+
 - **2026-10-17 17:10 UTC (REAL MONEY BACK ON).** Tate asked to turn real money back on so he could log first-half
   unders from the day's board; `rule_paused` was set to false through Neon's HTTPS endpoint (mirroring
   `scripts/rule_pause.py off`; `app_settings_log` 546). This lifts the audit pause of 13:27 UTC (row 520) the same day,

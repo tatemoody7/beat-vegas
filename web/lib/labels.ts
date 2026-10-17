@@ -343,6 +343,13 @@ export function priceAgeText(
     : ago;
 }
 
+/** No source here confirms a starting QB: Rotowire's public feed is capped at a
+ *  few players from that day's games, and `game_previews.qb_out` is True or
+ *  unknown, never "playing" (2026-10-17). A QB known to be out already blocks
+ *  the BET, so every real-money signal that remains carries this line (audit
+ *  2026-10-17, Tate: allow the BET, warn on the row and the log form). */
+export const QB_UNKNOWN_TEXT = "QB status unknown — check before logging";
+
 export function hrQuoteText(q: HrQuote | null | undefined): string {
   if (q == null || q.hrLine == null) return "no line yet";
   const price = q.hrUnderPrice == null ? "" : ` ${american(q.hrUnderPrice)}`;

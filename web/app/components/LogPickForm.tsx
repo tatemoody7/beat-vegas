@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { etLocalToUtc } from "@/lib/et";
 import { usd } from "@/lib/format";
-import { labelOf, REASON_TEXT, VERDICT_TEXT } from "@/lib/labels";
+import {
+  labelOf,
+  QB_UNKNOWN_TEXT,
+  REASON_TEXT,
+  VERDICT_TEXT,
+} from "@/lib/labels";
 import type { PickReason, Verdict } from "@/lib/verdict";
 
 // Everything the board knows at the moment you decide, frozen onto the pick
@@ -217,6 +222,12 @@ export default function LogPickForm({
             A loss books nothing and it uses no weekly slot.
           </span>
         </div>
+        <p
+          data-testid="qb-unknown"
+          className="text-xs text-[var(--warn)] sm:col-span-3"
+        >
+          {QB_UNKNOWN_TEXT}
+        </p>
         {prefill.verdict && prefill.verdict !== "BET" && (
           <p className="text-xs text-[var(--warn)] sm:col-span-3">
             {`This site rates the game ${verdictWord}, not Bet. Logging it as real money is fine — Results will show it separately so you can see how your own calls do.`}

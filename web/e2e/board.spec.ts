@@ -176,6 +176,21 @@ test.describe("the board", () => {
     await expect(page.getByTestId("price-age")).toHaveCount(n);
   });
 
+  test("every lit BET row says the starting QB is unconfirmed; no other row does", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const lit = page.locator("a.bv-card--lit");
+    const n = await lit.count();
+    expect(n).toBeGreaterThan(0);
+    for (let i = 0; i < n; i++) {
+      await expect(lit.nth(i).getByTestId("qb-unknown")).toHaveText(
+        "QB status unknown — check before logging",
+      );
+    }
+    await expect(page.getByTestId("qb-unknown")).toHaveCount(n);
+  });
+
   test("states the tier counts", async ({ page }) => {
     await page.goto("/");
     const c = expected.counts;

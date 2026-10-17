@@ -240,6 +240,13 @@ after a minute, so they fired only when the laptop happened to be awake —
 `web/lib/boardHealth.ts` surfaces a stale-results banner and a missed-build
 banner, and GitHub emails failed runs.
 
+One research exception since 2026-10-17 (Tate's call): the Mac scheduled task
+`bv-saturday-board-report` (skill `~/.claude/skills/bv-board-report`) reads the
+Saturday 8am card and the live Board after it builds, publishes a private page
+analysing the Board's top 10, and sends Tate its link by iMessage. It is research
+only, best-effort (it runs only when the Mac is awake), and nothing in the engine
+or the money path depends on it.
+
 Odds API: ~3,300 credits a month expected since the 2026-10-07 side-market
 capture (`lines_watch.yml` header: ~567 a week for the first half and the
 full-game totals, plus ~200 a week for spreads, moneylines and the exchanges),
@@ -347,3 +354,4 @@ refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch th
 `docs/STOPPING_RULE.md` says what threw it first (a pre-registered failure boundary, now closed).
 It was on from 2026-10-07 (roadmap v1, real money paused) and turned off on 2026-10-08 for the
 personal ledger (v1.4); the ledger has no stop rule, so nothing throws it automatically.
+It was on again 2026-10-17 13:27 → 17:10 UTC (the audit; Tate lifted it the same day).

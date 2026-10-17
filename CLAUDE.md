@@ -53,7 +53,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   starts after the Statistical Protocol is registered; all earlier rows are development evidence.
 - **Real money: Tate's personal first-half-unders ledger since 2026-10-08 (v1.4)** — the old rule
   (BET at the per-slate bar, top 5 a week by gap, every money-path check), $10 flat, no stop rule,
-  never an observation for any arm; paused 2026-10-07 → 10-08 and again since 2026-10-17 (audit). Signed in, a BET inside the cap
+  never an observation for any arm; paused 2026-10-07 → 10-08 and 2026-10-17 13:27 → 17:10 UTC (audit). Signed in, a BET inside the cap
   reads "Bet one unit", past it "Paper signal"; visitors never see bet wording.
 - **Real money stood 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
   placed 2026-10-06 before the pause (`manual_picks` 102, 103; they grade as normal). H-STOP-2
@@ -95,8 +95,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
-- **The pause switch (`rule_paused`) is ON since 2026-10-17 13:27 UTC, so the personal ledger is PAUSED** (audit round 1, Tate's call, until he
-  lifts it after the plan's data-trust phases; written through Neon's HTTPS endpoint like `scripts/rule_pause.py`; earlier on 10-07 → 10-08).
+- **The pause switch (`rule_paused`) is OFF since 2026-10-17 17:10 UTC, so the personal ledger is ON** (Tate lifted the audit pause of 13:27 UTC
+  the same day; written through Neon's HTTPS endpoint like `scripts/rule_pause.py`, logged as `app_settings_log` 546; earlier on 10-07 → 10-08).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
   candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
@@ -137,7 +137,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 
 ## Architecture
 - **Engine** (`beatvegas/` + `scripts/`): capture → enrich → score → grade, run by GitHub Actions.
-  Nothing runs on the Mac on a schedule and nothing texts Tate; the board is the failure surface.
+  The engine never runs on the Mac or messages Tate (one research exception: `bv-saturday-board-report`); the board is the failure surface.
   Data: CFBD (games, PBP, SP+, talent, returning production), The Odds API (`totals_h1` per
   event; full-game bulk totals + spreads + moneylines), TeamRankings tempo, Open-Meteo weather,
   Rotowire injuries, ESPN scores.

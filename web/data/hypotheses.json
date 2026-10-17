@@ -460,5 +460,12 @@
     "status": "tested-null",
     "family": "model-fix",
     "doc": "`docs/MODEL_FIX.md` (run 38070611660, 2026-10-10): NOT MET -- Δ\\|err\\| +0.163 [+0.025, +0.294] against the +0.10 margin, worse in both seasons; the live model stays (Tate)."
+  },
+  {
+    "id": "H-WX-ICON-BIAS",
+    "question": "Does ICON's (`icon_seamless`) sustained 10 m wind forecast at the kickoff hour run low against observed wind at that hour?",
+    "status": "exploratory",
+    "family": "weather-measurement (no confirmatory alpha)",
+    "doc": "`docs/WIND_FORECAST_CHECK.md` (PR to come)"
   }
 ]

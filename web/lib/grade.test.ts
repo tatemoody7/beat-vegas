@@ -74,24 +74,19 @@ describe("tierColor", () => {
   });
 });
 
-// Tate 2026-10-16: the Board's #1-#10 read green; past #10 the verdict colours
-// the badge; a game meeting the rule (a lit row) is green wherever it ranks.
+// Audit 2026-10-17 (Tate): green only for a paper signal; the rank never
+// colours the badge (reverses 2026-10-16's green #1-#10).
 describe("badgeColor", () => {
-  it("is green for ranks 1-10 whatever the verdict", () => {
-    expect(badgeColor("PASS", 1)).toBe("good");
-    expect(badgeColor("EDGE", 10)).toBe("good");
-  });
-  it("past #10 is amber for not yet and red for a pass", () => {
-    expect(badgeColor("EDGE", 11)).toBe("warn");
-    expect(badgeColor("PASS", 41)).toBe("bad");
+  it("colours by the verdict whatever the rank", () => {
+    expect(badgeColor("PASS", 1)).toBe("bad");
+    expect(badgeColor("EDGE", 1)).toBe("warn");
+    expect(badgeColor("EDGE", 10)).toBe("warn");
+    expect(badgeColor("BET", 14)).toBe("good");
     expect(badgeColor("EDGE", null)).toBe("warn");
   });
-  it("keeps a game meeting the rule green wherever it ranks", () => {
-    expect(badgeColor("BET", 14)).toBe("good");
-  });
-  it("tells a screen reader why a top-10 badge is green", () => {
-    expect(badgeWord("EDGE", 3)).toBe("Board top 10, not yet");
-    expect(badgeWord("EDGE", 12)).toBe("not yet");
+  it("tells a screen reader the verdict, never a top-10 reason", () => {
+    expect(badgeWord("EDGE", 3)).toBe("not yet");
+    expect(badgeWord("PASS", 10)).toBe("pass");
     expect(badgeWord("BET", 2)).toBe("meets this week's rule");
   });
 });

@@ -30,7 +30,7 @@ export function glossaryTerms(): GlossaryTerm[] {
     },
     {
       term: "Our number",
-      body: "Our own first-half estimate from pace, efficiency, weather and era. It never sees the sportsbook line.",
+      body: "Our own first-half estimate from pace, efficiency and era. It never sees the sportsbook line, and it does not use the weather forecast.",
     },
     {
       term: "Hard Rock line",
@@ -38,7 +38,7 @@ export function glossaryTerms(): GlossaryTerm[] {
     },
     {
       term: "Market line",
-      body: "The middle of the other books’ first-half totals, used to judge whether Hard Rock’s line and price are reasonable.",
+      body: "The middle of the books’ first-half totals, Hard Rock’s included, used to judge whether Hard Rock’s line and price are reasonable.",
     },
     {
       term: "Price and fair price",

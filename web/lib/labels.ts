@@ -350,6 +350,11 @@ export function priceAgeText(
  *  2026-10-17, Tate: allow the BET, warn on the row and the log form). */
 export const QB_UNKNOWN_TEXT = "QB status unknown — check before logging";
 
+/** The Board's one honest line (audit 2026-10-17, Tate): ranks are the
+ *  model's view, green is a paper signal, and a gap is not an edge. */
+export const BOARD_HONESTY_TEXT =
+  "Ranked by how far Hard Rock's line sits above our number. Green marks a paper signal, not a proven bet: this season our number has missed first halves by more than Hard Rock's line has, so a large gap is not a betting advantage.";
+
 export function hrQuoteText(q: HrQuote | null | undefined): string {
   if (q == null || q.hrLine == null) return "no line yet";
   const price = q.hrUnderPrice == null ? "" : ` ${american(q.hrUnderPrice)}`;

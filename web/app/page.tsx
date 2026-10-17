@@ -29,6 +29,7 @@ import GameRow from "@/app/components/GameRow";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
 import SeasonSelect from "@/app/components/SeasonSelect";
 import WeekSelect from "@/app/components/WeekSelect";
+import { BOARD_HONESTY_TEXT } from "@/lib/labels";
 
 export const dynamic = "force-dynamic"; // always read live DB
 
@@ -124,6 +125,17 @@ export default async function BoardPage({
       </div>
 
       <SeasonFallbackNotice fallbackFrom={fallbackFrom} season={season} />
+
+      {/* Audit 2026-10-17 (Tate): the rank is the model's view, green is only a
+          paper signal, and the model has trailed Hard Rock's line this season
+          (280 graded games, 8.9 vs 8.4 points a game; the query is in
+          CLAUDE.md). Re-check this sentence at each Monday read. */}
+      <p
+        data-testid="board-honesty"
+        className="mb-3 max-w-3xl text-xs leading-relaxed text-[var(--text-dim)]"
+      >
+        {BOARD_HONESTY_TEXT}
+      </p>
 
       {/* The bar line and the key line went 2026-10-16 (Tate): the badges
           and each row's sentence say it; the page reads cleaner without. */}

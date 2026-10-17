@@ -13,7 +13,8 @@ Format: `- [area] what — <spec file> › "<test title as written in the source
 
 - [board] Every row is a link to `/game/<id>` and the id set is exactly the fixture week's — board.spec.ts › "every row links to its game page and the ids are the fixture's week"
 - [board] One ranked list (no day groups, Tate 2026-10-15 Q2) in a `Ranked` section, with played games in a `Played · N` section last — board.spec.ts › "lists the week as one ranked list, then Played last"
-- [board] A Pass row says its reason in a few words (`Pass · leans over 2.1` …) under one `Pass` heading placed right before the first Pass row; a badge is green for the Board's #1-#10 or a lit row (meets the rule), and past #10 amber or red by its verdict (Q4; Tate 2026-10-16) — board.spec.ts › "says a Pass in a few words under one heading; green is the top 10 or a lit row"
+- [board] A Pass reads in a few words under one heading, and its badge is red at every rank (audit 2026-10-17) — board.spec.ts › "says a Pass in a few words under one heading; a Pass is red at every rank"
+- [board] Green marks only a paper signal (a lit row), whatever the rank, and the Board says a gap is not an edge (audit 2026-10-17) — board.spec.ts › "green marks only a paper signal, and the Board says a gap is not an edge"
 - [board] Rank badges run #1..#N in the expected order over the whole week; a played game shows its result instead — board.spec.ts › "numbers the week best to worst in the expected order"
 - [board] Exactly the live BET rows carry `.bv-card--lit` — board.spec.ts › "lights exactly the two BET rows"
 - [board] The `N bet(s) · N watch · N pass` counts line (signed in) matches the derived tiers — board.spec.ts › "states the tier counts"

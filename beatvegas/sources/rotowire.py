@@ -9,7 +9,12 @@ network we run on and `sports.core.api.espn.com` returns 0 injuries for every FB
 team (it works for the NFL). Rotowire aggregates the conference availability
 reports (SEC / ACC / Big Ten) plus beat reporting, and its table is current.
 
-One call returns the whole current report (~7 rows on a Tuesday, more by Friday):
+One call returns a CAPPED teaser, not the whole report: every pull from 2026-10-06
+to 10-17 held 5-7 rows, all for games kicking off that day (a live fetch on Fri
+10-16 returned exactly 5: Tulane and Washington). A Saturday game is never in a
+Tue/Thu/Fri pull, so research_preview.py marks a game `covered` only when the
+pull names one of its teams, and the QB flag is True or unknown, never "clear".
+Row shape:
     {"player","team","RotoSchoolName","IR","position","injury_type","ReturnDate",
      "game_datetime",...}   with IR in {"Out","Doubtful","Questionable","Probable",...}
 """

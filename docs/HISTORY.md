@@ -10,6 +10,15 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 ~20:30 UTC (GREEN MEANS A PAPER SIGNAL; THE BOARD SAYS A GAP IS NOT AN EDGE).** From the fact-check
+  audit's plan (P1.4, Tate's call): a rank badge is coloured by its verdict only, green for a game meeting the week's
+  rule, amber not yet, red pass, at every rank; this reverses 2026-10-16's green #1-#10 (#411), which had eight "Not
+  yet" rows and a Pass reading green while the Research key said green is a paper signal. The ranking is unchanged.
+  The Board carries one line under its heading (`labels.ts::BOARD_HONESTY_TEXT`): ranked by the gap, green a paper
+  signal and not a proven bet, our number has missed by more than Hard Rock's line this season. The glossary's "Our
+  number" no longer claims weather (excluded since 10-09, `LEAKY_WEATHER_COLS`) and "Market line" says Hard Rock is in
+  it. The brief's accuracy sentence now carries the re-runnable query (n 280, +0.57 a game; champion n 65, +1.10).
+
 - **2026-10-17 ~19:30 UTC (A REAL-MONEY SIGNAL SAYS THE STARTING QB IS UNCONFIRMED).** A second independent audit
   (read-only, chat report) found the QB gate reads unknown as clear: every week-7 `game_previews` row was written at
   12:02Z (before #418) with `qb_out = false`, card 32 rated Louisville @ Syracuse BET with Syracuse's starter unsettled

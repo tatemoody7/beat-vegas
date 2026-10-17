@@ -60,10 +60,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   closed inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73); H-NEGGAP-P, H-FG-P,
   H-PCT-TIE, H-TIMING and H-CLOSE-W superseded; H-MARGIN closed (Pick'em dropped). The neggap and
   H-FG-P collectors were retired 2026-10-08; the registered arms log from 2026-10-13.
-- **What the evidence says**: the market-blind 1H model is level with the market at best (2026
-  average first-half miss 8.34 vs Hard Rock 8.22 over 213 games; H-HIST pooled 8.75 vs the close
-  8.73, live on 2003+ training since 2026-10-07); the 2026 factor screen found no input, nor the
-  gap, predicting the residual against the close (87 comparisons, best p 0.117); in weeks 4-5 the
+- **What the evidence says**: the 1H model is LESS accurate than Hard Rock (newest `gbm_v1` row at or
+  before kickoff vs Hard Rock's last main 1H line, 2026: 8.92 vs 8.35, n 280; champion since 10-07 +1.10,
+  n 65); H-HIST's 8.75 vs 8.73 did not hold forward; the factor screen found no input nor the gap
+  predicting the close residual (87 comparisons, best p 0.117; ad hoc, rules out large effects only); in weeks 4-5 the
   gap did not sort unders from overs. Closed null: 1H censoring, weather × style, two-sided overs,
   Hard Rock lag at a day grain, WEPA-F, ELO-F, the margin model, the four-fix model (H-MODEL-FIX).
   2023-25 (1,902 real closes) is spent for rules we derive; a literature hypothesis gets one look,

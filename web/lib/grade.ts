@@ -84,34 +84,26 @@ export function tierColor(tier: VerdictTier): GradeColor {
   return TIER_COLOR[tier];
 }
 
-/** The Board ranks that read green whatever their verdict (Tate 2026-10-16):
- *  the top of the Board is what he looks at first. */
-export const GREEN_TOP_RANKS = 10;
-
 /**
- * The colour of a pre-kickoff rank badge (Tate 2026-10-16, replacing Q3's
- * verdict-only rule): green for the Board's #1-#10 and for any game meeting
- * this week's rule (the lit rows, wherever they rank); past #10, amber for
- * "not yet" and red for a pass. The Board and the game page read this one
- * helper. A colour is never a proven edge (the Board's key line says so).
+ * The colour of a pre-kickoff rank badge: the verdict only (audit 2026-10-17,
+ * Tate, reversing 2026-10-16's green #1-#10). Green is a paper signal — a game
+ * meeting this week's rule — never a proven bet; amber is "not yet", red a
+ * pass. The rank stays on the badge. The Board and the game page read this one
+ * helper.
  */
 export function badgeColor(
   tier: VerdictTier,
-  boardRank: number | null,
+  _boardRank: number | null = null,
 ): GradeColor {
-  if (tier === "BET") return "good";
-  if (boardRank !== null && boardRank <= GREEN_TOP_RANKS) return "good";
   return tierColor(tier);
 }
 
-/** The badge's words for a screen reader: the verdict, and the top-10 reason
- *  when that is what made it green. */
-export function badgeWord(tier: VerdictTier, boardRank: number | null): string {
-  const top =
-    tier !== "BET" && boardRank !== null && boardRank <= GREEN_TOP_RANKS;
-  return top
-    ? `Board top ${GREEN_TOP_RANKS}, ${TIER_WORD[tier]}`
-    : TIER_WORD[tier];
+/** The badge's words for a screen reader: the verdict. */
+export function badgeWord(
+  tier: VerdictTier,
+  _boardRank: number | null = null,
+): string {
+  return TIER_WORD[tier];
 }
 
 /** The word beside the number: "won" / "lost" / "push" once settled, else the

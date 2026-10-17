@@ -10,9 +10,9 @@ import {
 
 // The card's headline block, in one of three states. Before kickoff it is the
 // game's place on the board (#1 = best game of the week), coloured when a
-// verdict is passed by lib/grade.ts badgeColor (green for the Board's #1-#10
-// and any game meeting this week's rule, past #10 amber not yet / red pass --
-// Tate 2026-10-16), else by the score band (70+ green, 55–69 amber,
+// verdict is passed by lib/grade.ts badgeColor (green only for a paper signal,
+// amber not yet, red pass -- audit 2026-10-17), else by the score band (70+
+// green, 55–69 amber,
 // under 55 red). Once the
 // game starts there is no decision left, so it reads LIVE in grey — FINAL once
 // it must be over — and once it settles it reads the result in the result's

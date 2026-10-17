@@ -91,21 +91,18 @@ test.describe("the board", () => {
     expect(r[r.length - 1].section).toBe("Played");
   });
 
-  test("says a Pass in a few words under one heading; green is the top 10 or a lit row", async ({
+  test("says a Pass in a few words under one heading; a Pass is red at every rank", async ({
     page,
   }) => {
     await page.goto("/");
     const r = (await rows(page)).filter((x) => x.section === "Ranked");
-    const rank = new Map(expected.rankOrder.map((id, i) => [id, i + 1]));
     const passes = r.filter((x) => x.text.startsWith("Pass"));
     for (const x of passes) {
       expect(x.text, `${x.id}`).toMatch(
         /^Pass · (leans over \d+\.\d|short of the bar \(needs \d+\.\d\)|on our number|no model number yet)$/,
       );
-      // Red past #10; the Board's top 10 reads green (Tate 2026-10-16).
-      expect(x.badgeColor, `${x.id}`).toBe(
-        rank.get(x.id)! <= 10 ? "var(--good)" : "var(--bad)",
-      );
+      // A Pass is red at every rank (audit 2026-10-17: green only for a paper signal).
+      expect(x.badgeColor, `${x.id}`).toBe("var(--bad)");
     }
     const head = page.locator('p[aria-label="Pass games"]');
     if (passes.length === 0) {
@@ -122,12 +119,6 @@ test.describe("the board", () => {
       expect(next).toBe(`game-${firstPassId}`);
       const at = r.findIndex((x) => x.id === firstPassId);
       expect(r.slice(at).every((x) => x.text.startsWith("Pass"))).toBe(true);
-    }
-    // Green = the Board's #1-#10 or a game meeting the rule (a lit row).
-    for (const x of r) {
-      expect(x.badgeColor === "var(--good)", `${x.id}`).toBe(
-        rank.get(x.id)! <= 10 || expected.betIds.includes(x.id),
-      );
     }
   });
 
@@ -150,6 +141,21 @@ test.describe("the board", () => {
       .map((x) => rank.get(x.id)!);
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
     expect(ranks[0]).toBe(1);
+  });
+
+  test("green marks only a paper signal, and the Board says a gap is not an edge", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const r = (await rows(page)).filter((x) => x.section === "Ranked");
+    for (const x of r) {
+      expect(x.badgeColor === "var(--good)", `${x.id}`).toBe(
+        expected.betIds.includes(x.id),
+      );
+    }
+    await expect(page.getByTestId("board-honesty")).toContainText(
+      "Green marks a paper signal, not a proven bet",
+    );
   });
 
   test("lights exactly the two BET rows", async ({ page }) => {

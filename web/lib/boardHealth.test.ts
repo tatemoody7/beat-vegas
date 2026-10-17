@@ -315,7 +315,7 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
       row("card-tue-pm", "2026-09-15T20:10:00"), // last Tue, in window
       row("card-thu-pm", "2026-09-17T20:05:00"),
       row("card-fri-pm", "2026-09-18T20:11:00"),
-      row("card-sat-am", "2026-09-19T11:05:00"), // Sat 7:05am ET
+      row("card-sat-am", "2026-09-19T12:05:00"), // Sat 8:05am ET
       row("sunday", "2026-09-20T18:30:00"),
       row("grade", "2026-09-22T10:20:00"), // this morning
     ]);
@@ -324,7 +324,7 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
 
   it("warns for the job whose window closed without a tick, naming the day", () => {
     const g = gaugesFrom([
-      row("card-sat-am", "2026-09-12T11:05:00"), // the Saturday BEFORE last
+      row("card-sat-am", "2026-09-12T12:05:00"), // the Saturday BEFORE last
       row("card-fri-pm", "2026-09-18T20:11:00"),
     ]);
     const w = opsWarnings(g, tue2pm);

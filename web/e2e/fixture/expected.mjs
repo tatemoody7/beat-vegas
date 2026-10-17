@@ -558,8 +558,8 @@ export const CRON_JOBS = {
   "card-fri-pm": { days: ["Fri"], ...PM, slot: "fri_pm" },
   "card-sat-am": {
     days: ["Sat"],
-    openMin: 7 * 60,
-    closeMin: 8 * 60 + 15,
+    openMin: 7 * 60 + 45,
+    closeMin: 9 * 60,
     slot: "sat_am",
   },
   sunday: { days: ["Sun"], openMin: 13 * 60, closeMin: 17 * 60 },

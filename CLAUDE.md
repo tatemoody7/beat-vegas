@@ -156,7 +156,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
   control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
   `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
-  `/api/picks`, `/api/picks/[id]`, `/api/bets` (30-column CSV), `/api/records`, `/api/health`,
+  `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
   `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
   `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
   `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on

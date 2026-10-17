@@ -7,6 +7,7 @@ import {
   loadPicks,
   type PickFull,
 } from "@/lib/picks";
+import { personalStake, stakeRecord } from "@/lib/personalStake";
 import { recordFrom, type Record3 } from "@/lib/record";
 
 export type { Record3 } from "@/lib/record";
@@ -86,7 +87,8 @@ export async function getLedger(season: number): Promise<Ledger> {
     marketFull: recordFromResults(
       res.filter((r) => r.model_version === MARKET_LEDGER_FG),
     ),
-    you: recordFrom(graded.filter(isRealFirstHalf)),
+    // Cash record; units, ROI and line value price-verified only (audit 2026-10-17).
+    you: stakeRecord(personalStake(picks.filter(isRealFirstHalf))),
     paper: recordFrom(graded.filter(isPaperFirstHalf)),
     picks,
   };

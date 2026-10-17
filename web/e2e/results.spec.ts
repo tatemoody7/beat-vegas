@@ -57,12 +57,19 @@ test.describe("results", () => {
       }),
     ).toHaveAttribute("aria-selected", "true");
     await expect(strip).toContainText("Personal stake50.0%");
-    // No ROI on the strip (no interval for it), and the stake is named as
-    // never evidence (Tate, 2026-10-14).
+    // Audit 2026-10-17 (Tate): the record over every graded cash ticket; units
+    // and ROI over price-verified cash tickets only, saying how many were left
+    // out; the stake is named as never evidence.
     await expect(strip).toContainText(
-      `${expected.ledger.real.record} · ${expected.ledger.realBets} bets · ${expected.ledger.real.units}u`,
+      `${expected.ledger.real.record} · 2 cash bets`,
     );
-    await expect(strip).not.toContainText("ROI");
+    await expect(strip.getByTestId("stake-split")).toContainText(
+      `Units, price-verified only: ${expected.ledger.real.units}u · ROI`,
+    );
+    await expect(strip.getByTestId("stake-split")).toContainText(
+      "0 without a verified price not counted",
+    );
+    await expect(strip).toContainText("Value vs the close (price-verified)");
     await expect(strip).toContainText("Never evidence for any strategy");
     await expect(strip).toContainText(/could plausibly be \d+%–\d+%/);
     // The units curve sits under the strip: two graded weeks, dashed zero line.
@@ -86,7 +93,7 @@ test.describe("results", () => {
     // The judge's value is the headline (B6); the fixture's tickets carry no
     // ev_cons, so it reads "—"; the point move is the secondary line.
     await expect(strip).toContainText(
-      "Value vs the close—no bet has a usable close yet",
+      "Value vs the close (price-verified)—no bet has a usable close yet",
     );
     await expect(strip).toContainText(
       `Line move: ${expected.ledger.avgPointsGained} points toward us on average · 50% of 2 lines moved our way`,
@@ -211,7 +218,7 @@ test.describe("results", () => {
     );
     const lines = (await res.text()).trim().split("\n");
     expect(lines[0]).toBe(
-      "season,week,placed_at_utc,bet_at_utc,kickoff_utc,ledger,away,home,market,bet,line,price,stake,bonus,book,price_provenance,verdict_at_pick,reason,gap_at_pick,model_line_at_pick,away_1h,home_1h,first_half_total,result,units,closing_line,closing_price,clv_points_stored,line_value_displayed,note",
+      "season,week,placed_at_utc,bet_at_utc,kickoff_utc,ledger,away,home,market,bet,line,price,stake,bonus,book,price_provenance,audit_flag,verdict_at_pick,reason,gap_at_pick,model_line_at_pick,away_1h,home_1h,first_half_total,result,units,closing_line,closing_price,clv_points_stored,line_value_displayed,note",
     );
     expect(lines.length - 1).toBe(expected.picks.length);
     expect(lines.filter((l) => l.includes(",real,"))).toHaveLength(
@@ -465,7 +472,7 @@ test.describe("results", () => {
       `Week ${week.prevWeek} · 2 bets · ${expected.ledger.real.record} · ${expected.ledger.real.units}u`,
     );
     await expect(strip).toContainText(
-      `${expected.ledger.real.record} · ${expected.ledger.realBets} bets · ${expected.ledger.real.units}u`,
+      `${expected.ledger.real.record} · 2 cash bets`,
     );
     await page.goto(`/results?week=${week.week}`);
     const thisWeekPicks = expected.picks.filter((p) => p.week === week.week);

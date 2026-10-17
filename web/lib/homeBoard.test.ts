@@ -54,6 +54,7 @@ const edge = (score: number, tier: EdgeTier): EdgeResult =>
     score,
     tier,
     blocker: null,
+    priceProvenance: "logged",
     action: "",
     kill: { line: null, price: null, text: "" },
   }) as unknown as EdgeResult;
@@ -107,6 +108,7 @@ const pick = (o: Partial<PickFull>): PickFull =>
     evAtPick: null,
     hrLineAtPick: null,
     blocker: null,
+    priceProvenance: "logged",
     ...o,
   }) as PickFull;
 
@@ -612,6 +614,7 @@ describe("Board alignment (2026-10-14)", () => {
     ({
       gameId: 1,
       blocker: null,
+      priceProvenance: "logged",
       paperBlocker: null,
       action:
         "Paper only — the injury report could not be read on this build. Check Hard Rock’s number and the injury list yourself before betting.",

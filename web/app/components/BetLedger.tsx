@@ -31,6 +31,7 @@ import { isOffPolicy } from "@/lib/pickRules";
 import { EmptyLine } from "@/app/components/Section";
 import BankrollCurve from "@/app/components/BankrollCurve";
 import { isForward } from "@/lib/research";
+import { isPriceVerified, personalStake } from "@/lib/personalStake";
 import type { BankrollPoint } from "@/lib/homeBoard";
 
 // Every bet we have placed, at the top of Results (Track record until
@@ -108,8 +109,19 @@ export default function BetLedger({
   const groups = groupByWeek(withRunningUnits(shown)).filter(
     (g) => week === null || g.week === week,
   );
-  const rec = summary.record;
-  const ev = evSummary(shown);
+  // The personal stake reads honestly (audit 2026-10-17, Tate): the record
+  // over every graded cash ticket; units, ROI, line move and value vs the
+  // close over price-verified cash tickets only; bonus bets and the Board-rule
+  // tickets on their own lines. Paper reads as before.
+  const stake = view === "real" ? personalStake(shown) : null;
+  const verifiedCash = shown.filter(
+    (r) => !r.isPaper && !r.isBonus && isPriceVerified(r),
+  );
+  const moneyRows = stake ? verifiedCash : shown;
+  const moneySummary = stake ? ledgerSummary(moneyRows) : summary;
+  const rec = stake ? stake.cash : summary.record;
+  const moneyRec = stake ? stake.money : summary.record;
+  const ev = evSummary(moneyRows);
   const interval =
     rec && rec.hitLo !== null && rec.hitHi !== null
       ? `could plausibly be ${pct(rec.hitLo)}–${pct(rec.hitHi)}`
@@ -138,20 +150,53 @@ export default function BetLedger({
                 <p className="mt-2 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-none tabular-nums text-[var(--text)]">
                   {rec.hit}
                 </p>
-                <p className="mt-2.5 font-mono text-sm text-[var(--text-muted)]">
-                  {`${rec.record} · ${summary.bets} ${summary.bets === 1 ? "bet" : "bets"} · `}
-                  <span style={{ color: unitColor(rec.units) }}>
-                    {`${rec.units}u`}
-                  </span>
-                </p>
+                {stake ? (
+                  <p className="mt-2.5 font-mono text-sm text-[var(--text-muted)]">
+                    {`${rec.record} · ${rec.n} cash ${rec.n === 1 ? "bet" : "bets"}`}
+                  </p>
+                ) : (
+                  <p className="mt-2.5 font-mono text-sm text-[var(--text-muted)]">
+                    {`${rec.record} · ${summary.bets} ${summary.bets === 1 ? "bet" : "bets"} · `}
+                    <span style={{ color: unitColor(rec.units) }}>
+                      {`${rec.units}u`}
+                    </span>
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-[var(--text-dim)]">
                   {interval}
                 </p>
-                {view === "real" && (
-                  <p className="mt-1 text-xs text-[var(--text-dim)]">
-                    Never evidence for any strategy; units modelled from the
-                    ledger, not reconciled.
-                  </p>
+                {stake && (
+                  <div
+                    data-testid="stake-split"
+                    className="mt-3 space-y-1 text-xs text-[var(--text-muted)]"
+                  >
+                    <p>
+                      {"Units, price-verified only: "}
+                      {moneyRec === null ? (
+                        "none yet"
+                      ) : (
+                        <>
+                          <span style={{ color: unitColor(moneyRec.units) }}>
+                            {`${moneyRec.units}u`}
+                          </span>
+                          {` · ROI ${moneyRec.roi}`}
+                        </>
+                      )}
+                      {` (${moneyRec?.n ?? 0} ${moneyRec?.n === 1 ? "ticket" : "tickets"}; ${stake.unverified} without a verified price not counted)`}
+                    </p>
+                    {stake.bonus.n > 0 && (
+                      <p>
+                        {`Bonus bets: ${stake.bonus.n} · paid ${signed(stake.bonus.units)}u (a loss costs nothing)`}
+                      </p>
+                    )}
+                    {stake.boardRule && (
+                      <p>{`Board-rule bets only: ${stake.boardRule.record}`}</p>
+                    )}
+                    <p className="text-[var(--text-dim)]">
+                      Never evidence for any strategy; not reconciled with
+                      Hard Rock’s own bet history.
+                    </p>
+                  </div>
                 )}
               </>
             )}
@@ -160,7 +205,9 @@ export default function BetLedger({
             {/* The judge's number (2026-10-14, programme B6): value at the
                 bet's exact line and price against the vig-free consensus
                 close. The point move of the line is the secondary line. */}
-            <span className="bv-stat-label">Value vs the close</span>
+            <span className="bv-stat-label">
+              {stake ? "Value vs the close (price-verified)" : "Value vs the close"}
+            </span>
             <p className="mt-2 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-none tabular-nums text-[var(--text)]">
               {ev.mean === null ? "—" : evPct(ev.mean)}
             </p>
@@ -175,16 +222,18 @@ export default function BetLedger({
                 : ""}
             </p>
             <p className="mt-1 text-xs text-[var(--text-dim)]">
-              {summary.closes === 0
+              {moneySummary.closes === 0
                 ? "Line move: no closes captured yet"
-                : `Line move: ${rec?.clv ?? "—"} points toward us on average · ${pct(summary.movedOurWay / summary.closes)} of ${summary.closes} lines moved our way`}
+                : `Line move: ${moneyRec?.clv ?? "—"} points toward us on average · ${pct(moneySummary.movedOurWay / moneySummary.closes)} of ${moneySummary.closes} lines moved our way`}
             </p>
           </div>
           <div>
             <span className="bv-stat-label">Every bet, as logged</span>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Every row was logged before kickoff at Hard Rock’s line and price.
-              Open one for our number at the time and the closing line.
+              Every row was logged before kickoff. A price marked “not
+              verified” was not recorded when the bet was made, and a flagged
+              row says what could not be checked. Open one for our number at
+              the time and the closing line.
             </p>
             <a
               href={`/api/bets?season=${season}`}
@@ -350,8 +399,14 @@ function LedgerRowView({
           )}
           {isOffPolicy(p) && (
             <span className="bv-badge bv-badge--warn ml-1">
-              against the verdict
+              {`off-rule: ${p.verdictAtPick === "PASS" ? "Pass" : "Watch"}`}
             </span>
+          )}
+          {!p.isPaper && !isPriceVerified(p) && (
+            <span className="bv-badge ml-1">price not verified</span>
+          )}
+          {p.auditFlag && (
+            <span className="bv-badge bv-badge--warn ml-1">flagged</span>
           )}
         </td>
         <td className="bv-num whitespace-nowrap text-[var(--text-muted)]">
@@ -471,10 +526,16 @@ function LedgerRowView({
               <dt className="text-[var(--text-dim)]">Price</dt>
               <dd className="text-[var(--text-muted)]">
                 {p.book === null ? "no book recorded" : p.book}
-                {p.priceProvenance
-                  ? ` · ${labelOf(PROVENANCE_TEXT, p.priceProvenance, "price not verified")}`
+                {p.priceProvenance || !p.isPaper
+                  ? ` · ${labelOf(PROVENANCE_TEXT, p.priceProvenance ?? "unknown", "price not verified")}`
                   : ""}
               </dd>
+              {p.auditFlag && (
+                <>
+                  <dt className="text-[var(--text-dim)]">Audit flag</dt>
+                  <dd className="text-[var(--warn)]">{p.auditFlag}</dd>
+                </>
+              )}
               <dt className="text-[var(--text-dim)]">Closing line</dt>
               <dd className="font-mono text-[var(--text-muted)]">
                 {p.closingLine === null

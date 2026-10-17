@@ -8,6 +8,22 @@ hold the rest.
 
 
 
+## 2026-10-17
+
+- **2026-10-17 UTC (THE KICKOFF CLOCK READS THE VENUE'S TIME ZONE; A DATA-BUG REPAIR TO FOUR MODEL INPUTS).**
+  `etl/situational.py` built `kickoff_local_hour` as `(UTC hour + longitude / 15) % 24`: solar time, no minutes, no
+  DST. Penn State @ Michigan (19:30Z = 3:30pm EDT) read "~13:00 local kickoff" and was flagged `early_kickoff`; the
+  same longitude math gave `away_tz_shift` 0.39 hours. All four (`kickoff_local_hour`, `early_kickoff`, `night_game`,
+  `away_tz_shift`) are in `BV_FEATURE_COLS`. Tate fixed it as a data bug, not a gate (independent-audit plan, Phase
+  1d): `venues.timezone` (CFBD /venues `timezone`, refreshed by `scripts/backfill.py` in grade.yml) now gives the real
+  wall clock (hour + minutes/60) and the whole-hour UTC-offset difference between the visitor's home venue and the
+  game venue at kickoff; a venue without a zone gives NaN for all four, never a guess (CFBD has none for 488 of its
+  852 venues, mostly lower-division; on FBS-vs-FBS games 2003-26 that is 33 games at 9 venues, none in 2026). The
+  2026-10-18 Sunday refit is the first trained and scored on the repaired inputs; earlier `predictions.factors_json`
+  rows keep the old numbers, so the game page now reads the clock and the time change from the venue tables directly.
+  The factor sentence reads "3:30pm local kickoff"; the `spot` chip "3:30pm kick". `docs/HYPOTHESES.md` notes the
+  affected rows.
+
 ## 2026-10-16
 
 - **2026-10-16 UTC (THE ANALYSIS IS REMOVED; WIND BACK IN THE FACTORS LIST).** Tate did not want the analysis box:

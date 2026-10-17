@@ -39,6 +39,10 @@ class Venue(Base):
     elevation = Column(Float)  # meters (CFBD /venues)
     grass = Column(Boolean)  # natural grass surface (vs turf)
     capacity = Column(Integer)
+    # IANA zone (CFBD /venues `timezone`, 2026-10-17): the venue's real wall clock
+    # for kickoff_local_hour / away_tz_shift. NULL when CFBD has none -- those
+    # features go NaN, never a longitude guess (etl/situational.py).
+    timezone = Column(String)
 
 
 class Game(Base):

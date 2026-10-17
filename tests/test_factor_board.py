@@ -260,3 +260,11 @@ def test_an_amber_or_neutral_direction_reads_cleanly():
     wind = factor_by_name("wx_wind")
     assert _fill(wind, 12.0, "amber") == "Wind 12 mph (passing & kicking)."
     assert _fill(wind, 12.0, "neutral") == "Wind 12 mph — small effect, if any (passing & kicking)."
+
+
+def test_kickoff_sentence_reads_the_wall_clock():
+    # 2026-10-17: the sentence states the real local time, not "~16:00".
+    from beatvegas.factors.board import _fill
+
+    k = factor_by_name("kickoff_local_hour")
+    assert _fill(k, 15.5, "amber") == "3:30pm local kickoff."

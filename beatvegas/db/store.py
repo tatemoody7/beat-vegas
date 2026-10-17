@@ -120,7 +120,12 @@ _MIGRATIONS = {
         "ev_hr": "FLOAT",
         "cons_excluded": "VARCHAR(32)",
     },
-    "venues": {"elevation": "FLOAT", "grass": "BOOLEAN", "capacity": "INTEGER"},
+    "venues": {
+        "elevation": "FLOAT",
+        "grass": "BOOLEAN",
+        "capacity": "INTEGER",
+        "timezone": "VARCHAR",
+    },
     "fh_team_game": {"redzone_td": "FLOAT", "fourth_go": "FLOAT"},
     "games": {
         "spread": "FLOAT",

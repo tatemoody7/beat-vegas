@@ -36,9 +36,11 @@ def _engine():
 def _seed(s: Session) -> None:
     s.add_all(
         [
-            Venue(id=10, latitude=39.19, longitude=-96.58),  # Manhattan, KS
-            Venue(id=20, latitude=38.96, longitude=-95.25),  # Lawrence, KS
-            Venue(id=30, latitude=29.65, longitude=-82.35),  # Gainesville, FL
+            Venue(id=10, latitude=39.19, longitude=-96.58, timezone="America/Chicago"),  # Manhattan
+            Venue(id=20, latitude=38.96, longitude=-95.25, timezone="America/Chicago"),  # Lawrence
+            Venue(
+                id=30, latitude=29.65, longitude=-82.35, timezone="America/New_York"
+            ),  # Gainesville
         ]
     )
     # Prior season (2025): played games with 1H points.
@@ -95,7 +97,7 @@ def _seed(s: Session) -> None:
                 id=100,
                 season=SEASON,
                 week=WEEK,
-                start_date=datetime(2026, 8, 29, 23),  # 23:00 UTC -> ~16:35 local at -96.58
+                start_date=datetime(2026, 8, 29, 23),  # 23:00 UTC = 6:00pm CDT
                 home_team="Kansas State",
                 away_team="Kansas",
                 venue_id=10,
@@ -182,13 +184,13 @@ def test_situational_numbers_are_explicit(session):
     assert g["home_rest_days"] is None and g["away_rest_days"] is None
     # Kansas (home base Lawrence) -> Manhattan is a short hop.
     assert 50 < g["away_travel_dist"] < 90
-    assert abs(g["away_tz_shift"]) < 0.2
-    assert 15 < g["kickoff_local_hour"] < 18
-    assert isinstance(g["spot"], str) and "trav" in g["spot"]
+    assert g["away_tz_shift"] == 0.0  # same zone: no clock change
+    assert g["kickoff_local_hour"] == 18.0  # 23:00 UTC = 6:00pm CDT, the real clock
+    assert isinstance(g["spot"], str) and "trav" in g["spot"] and "6:00pm kick" in g["spot"]
     # FCS visitor with no home base in our tables -> travel unknown, kickoff known.
     f = out[101]
     assert f["away_travel_dist"] is None
-    assert f["kickoff_local_hour"] is not None
+    assert f["kickoff_local_hour"] == 12.0  # 16:00 UTC = noon EDT in Gainesville
 
 
 def test_prior_season_fh_priors_before_week_3(session):

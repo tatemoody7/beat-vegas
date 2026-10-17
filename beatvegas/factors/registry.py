@@ -133,7 +133,7 @@ _FACTORS: List[Factor] = [
         "situational",
         "Away time-zone shift (hours)",
         hypothesis=True,
-        sentence="Visitors cross {value:+.1f} time zones — {dir}.",
+        sentence="Visitors cross {value:+.0f} time zones — {dir}.",
     ),
     Factor(
         "kickoff_local_hour",
@@ -141,7 +141,7 @@ _FACTORS: List[Factor] = [
         "Local kickoff hour",
         direction=-1,
         hypothesis=True,
-        sentence="~{value:.0f}:00 local kickoff — {dir}.",
+        sentence="{clock} local kickoff — {dir}.",
     ),
     Factor("early_kickoff", "situational", "Early kickoff (<=1pm local)"),
     Factor("week", "situational", "Week of season"),

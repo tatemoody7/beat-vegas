@@ -4,12 +4,23 @@ All are knowable before kickoff and computable for every historical game from th
 `games` + `venues` tables (no new data source), so they're real model inputs. Fits
 the slow-start thesis: early kickoffs + long westward travel tend to dampen first
 halves. The backtest decides whether they actually matter.
+
+Kickoff clock (data-bug repair, 2026-10-17): `kickoff_local_hour` is the venue's
+real wall-clock time (hour + minutes/60) in its IANA zone (`venues.timezone`,
+from CFBD /venues), DST-aware; `away_tz_shift` is the difference between the
+game venue's and the visitor's home venue's UTC offsets AT KICKOFF (positive =
+the visitor travelled east). Both used longitude / 15 before, which is solar
+time: no minutes, no DST (Penn State @ Michigan, 19:30Z = 3:30pm EDT, read
+"~13:00" and 0.39 hours of time change). A venue without a zone gives NaN for
+these and for `early_kickoff` / `night_game`, never a guess.
 """
 
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -57,6 +68,62 @@ def haversine(lat1, lon1, lat2, lon2) -> Optional[float]:
     return r * 2 * math.asin(math.sqrt(a))
 
 
+def _zone(name) -> Optional[ZoneInfo]:
+    """The IANA zone, or None when the venue has none (or an unknown name)."""
+    if name is None or (isinstance(name, float) and math.isnan(name)) or not str(name).strip():
+        return None
+    try:
+        return ZoneInfo(str(name).strip())
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def _utc(kick) -> Optional[datetime]:
+    """A tz-aware UTC datetime from a naive-UTC stored kickoff (or None)."""
+    if kick is None or (not isinstance(kick, str) and pd.isna(kick)):
+        return None
+    t = pd.Timestamp(kick)
+    if pd.isna(t):
+        return None
+    t = t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+    return t.to_pydatetime().astimezone(timezone.utc)
+
+
+def kickoff_local_hour(kick_utc, tz_name) -> Optional[float]:
+    """The venue's wall-clock kickoff, hour + minutes/60 (19:30Z at Michigan in
+    October = 15.5), DST-aware. None without a kickoff or a zone."""
+    z, t = _zone(tz_name), _utc(kick_utc)
+    if z is None or t is None:
+        return None
+    loc = t.astimezone(z)
+    return loc.hour + loc.minute / 60.0
+
+
+def utc_offset_hours(kick_utc, tz_name) -> Optional[float]:
+    """The zone's UTC offset in hours at that instant (EDT = -4, MST = -7)."""
+    z, t = _zone(tz_name), _utc(kick_utc)
+    if z is None or t is None:
+        return None
+    off = t.astimezone(z).utcoffset()
+    return None if off is None else off.total_seconds() / 3600.0
+
+
+def tz_shift_hours(kick_utc, home_tz, game_tz) -> Optional[float]:
+    """Hours the visitor's clock moves, game zone minus home zone at kickoff
+    (positive = travelled east). None when either zone is unknown."""
+    g, h = utc_offset_hours(kick_utc, game_tz), utc_offset_hours(kick_utc, home_tz)
+    return None if g is None or h is None else g - h
+
+
+def clock_text(hour) -> Optional[str]:
+    """15.5 -> "3:30pm", 12.0 -> "12:00pm", 0.25 -> "12:15am"; None when unknown."""
+    if hour is None or (isinstance(hour, float) and math.isnan(hour)):
+        return None
+    total = int(round(float(hour) * 60)) % (24 * 60)
+    h, m = divmod(total, 60)
+    return f"{(h % 12) or 12}:{m:02d}{'am' if h < 12 else 'pm'}"
+
+
 def _load(session=None, season: Optional[int] = None, min_season: Optional[int] = None) -> tuple:
     """games/venues frames. `session` reuses a caller's session (else opens
     one); `season` restricts the games to one season (enough for rest/travel/
@@ -100,8 +167,8 @@ def _load(session=None, season: Optional[int] = None, min_season: Optional[int] 
         ],
     )
     venues = pd.DataFrame(
-        s.query(Venue.id, Venue.latitude, Venue.longitude).all(),
-        columns=["venue_id", "lat", "lon"],
+        s.query(Venue.id, Venue.latitude, Venue.longitude, Venue.timezone).all(),
+        columns=["venue_id", "lat", "lon", "tz"],
     )
     return games, venues
 
@@ -221,26 +288,24 @@ def situational_frame(
         a_rest, on=["id", "away_team"], how="left"
     )
 
-    def _coords(vid):
-        if vid is None or vid not in vcoord.index:
-            return (None, None)
+    def _venue(vid):
+        if vid is None or pd.isna(vid) or vid not in vcoord.index:
+            return (None, None, None)
         row = vcoord.loc[vid]
-        return (row["lat"], row["lon"])
+        return (row["lat"], row["lon"], row["tz"])
 
+    nan = float("nan")
     rows = []
+    no_zone = set()
     for r in df.itertuples(index=False):
-        glat, glon = _coords(r.venue_id)
+        glat, glon, gtz = _venue(r.venue_id)
         ahome = home_base.get((r.season, r.away_team))
-        alat, alon = _coords(ahome)
+        alat, alon, atz = _venue(ahome)
         travel = haversine(alat, alon, glat, glon)
-        tz = (
-            (glon - alon) / 15.0
-            if (glon is not None and alon is not None and not pd.isna(glon) and not pd.isna(alon))
-            else None
-        )
-        local_hour = None
-        if pd.notna(r.start_date) and glon is not None and not pd.isna(glon):
-            local_hour = (r.start_date.hour + glon / 15.0) % 24
+        if r.venue_id is not None and not pd.isna(r.venue_id) and _zone(gtz) is None:
+            no_zone.add(int(r.venue_id))
+        tz = tz_shift_hours(r.start_date, atz, gtz)
+        local_hour = kickoff_local_hour(r.start_date, gtz)
         rows.append(
             {
                 "id": r.id,
@@ -251,13 +316,20 @@ def situational_frame(
                 "home_off_bye": _flag(r.home_rest_days, lambda x: x > 9),
                 "away_off_bye": _flag(r.away_rest_days, lambda x: x > 9),
                 "away_travel_dist": travel,
-                "away_tz_shift": tz,
-                "kickoff_local_hour": local_hour,
-                "early_kickoff": 1 if (local_hour is not None and local_hour <= 13) else 0,
-                "night_game": 1 if (local_hour is not None and local_hour >= 18) else 0,
+                "away_tz_shift": nan if tz is None else tz,
+                "kickoff_local_hour": nan if local_hour is None else local_hour,
+                # NaN without a zone, never 0: an unknown clock is not a late kickoff
+                "early_kickoff": nan if local_hour is None else float(local_hour <= 13),
+                "night_game": nan if local_hour is None else float(local_hour >= 18),
                 # that season's conferences, from the game row (CFBD per season)
                 "conference_game": same_conference(r.home_conference, r.away_conference),
             }
+        )
+    if no_zone:
+        # Loud, not fatal: these games' kickoff clock and time-zone change are NaN.
+        print(
+            f"[situational] {len(no_zone)} venue(s) have no time zone; their kickoff "
+            f"hour is NaN: {sorted(no_zone)[:20]}{' ...' if len(no_zone) > 20 else ''}"
         )
     df_base = pd.DataFrame(rows)
     df_base = df_base.merge(_revenge_and_rivalry(games), on="id", how="left").merge(

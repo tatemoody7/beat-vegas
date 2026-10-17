@@ -31,6 +31,7 @@ from ..etl.features import FRAME_MIN_SEASON, build_feature_frame, training_frame
 from ..etl.form import form_for_games
 from ..etl.game_records import snapshot_slate
 from ..etl.proxy_line import proxy_total
+from ..etl.situational import clock_text
 from ..factors.board import build_factor_board, factor_references
 from ..factors.ledger import load_ledger
 from .bv_line import bias_corrections, bv_line_for_slate, residual_band
@@ -204,9 +205,9 @@ def _spot_str(row: pd.Series) -> Optional[str]:
     trav = row.get("away_travel_dist")
     if trav is not None and not pd.isna(trav):
         parts.append(f"trav {int(trav)}mi")
-    hour = row.get("kickoff_local_hour")
-    if hour is not None and not pd.isna(hour):
-        parts.append(f"~{int(round(hour)):02d}:00 kick")
+    clock = clock_text(row.get("kickoff_local_hour"))
+    if clock is not None:
+        parts.append(f"{clock} kick")
     return " · ".join(parts) if parts else None
 
 

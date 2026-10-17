@@ -40,6 +40,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from . import consensus as C
 from . import pricing as PR
 from .devig import devig_two_way
+from .etl.situational import kickoff_local_hour
 
 ROW_ID = "H-1H-SHORTLIST"
 STALE_H = 6.0  # a Hard Rock price last confirmed longer ago than this is not priced
@@ -429,11 +430,8 @@ class FactorContext:
             )
         else:
             f["away_travel_km"] = None
-        f["kick_local_hour"] = (
-            None
-            if not v or v.get("longitude") is None
-            else (g["kick_dt"].hour + g["kick_dt"].minute / 60 + v["longitude"] / 15.0) % 24
-        )
+        # the venue's real wall clock (IANA zone, DST-aware); None without a zone (2026-10-17)
+        f["kick_local_hour"] = kickoff_local_hour(g["kick_dt"], v.get("timezone")) if v else None
         # Estimated first-half possessions (descriptive): combined first-half offensive plays per
         # game this season over last season's plays per drive of the two offenses.
         ppd = []
@@ -715,7 +713,12 @@ def load_inputs(session, card: Mapping[str, Any], now: datetime):
         for r in session.query(TeamTempo).filter(TeamTempo.season == season)
     ]
     venues = {
-        int(v.id): {"latitude": v.latitude, "longitude": v.longitude, "dome": v.dome}
+        int(v.id): {
+            "latitude": v.latitude,
+            "longitude": v.longitude,
+            "dome": v.dome,
+            "timezone": v.timezone,
+        }
         for v in session.query(Venue)
     }
 

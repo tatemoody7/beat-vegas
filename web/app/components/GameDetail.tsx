@@ -21,6 +21,12 @@ import {
   windFactor,
   type CardForecast,
 } from "@/lib/forecast";
+import {
+  clockText,
+  localKickoffHour,
+  tzShiftHours,
+  type KickZones,
+} from "@/lib/kickoffClock";
 import LogPickButton from "@/app/components/LogPickButton";
 import TeamLogo from "@/app/components/TeamLogo";
 
@@ -207,16 +213,42 @@ function splitText(s: TeamSplit | null | undefined): string {
 function WhySection({
   g,
   forecast,
+  zones,
 }: {
   g: HomeGame;
   forecast: CardForecast | null;
+  zones: KickZones | null;
 }) {
   const f = g.row.factors;
+  // The kickoff clock and the visitor's time change come from the venue's time
+  // zone (lib/kickoffClock.ts, 2026-10-17), never the stored numbers: rows
+  // scored before then hold longitude/15 solar time ("~13:00" for a 3:30pm
+  // kickoff). No zone, no clock: nothing is shown rather than a guess.
+  const kickClock = clockText(
+    zones ? localKickoffHour(zones.kickoff, zones.venueTz) : null,
+  );
+  const tzShift = zones ? tzShiftHours(zones) : null;
   // The Sunday `weather` table's three rows carry no fetch time and were days
   // old (Tate 2026-10-16): the dated card-build forecast below replaces them.
-  const board: BoardFactor[] = (f.factor_board ?? []).filter(
-    (x) => x && x.key && !STALE_WEATHER_KEYS.has(x.key),
-  );
+  const board: BoardFactor[] = (f.factor_board ?? [])
+    .filter((x) => x && x.key && !STALE_WEATHER_KEYS.has(x.key))
+    .flatMap((x) =>
+      x.key !== "kickoff_local_hour"
+        ? [x]
+        : kickClock === null
+          ? []
+          : [
+              {
+                ...x,
+                sentence: x.sentence
+                  ? x.sentence.replace(
+                      /^~?\d{1,2}:\d{2}(am|pm)? local kickoff/,
+                      `${kickClock} local kickoff`,
+                    )
+                  : x.sentence,
+              },
+            ],
+    );
   // The wind row comes from the newest card forecast, placed where the old
   // Sunday wind row sat (after plays), else at the end (Tate 2026-10-16).
   const wind = windFactor(forecast);
@@ -238,22 +270,12 @@ function WhySection({
       `${g.row.away} travelled ${Math.round(f.away_travel_dist)} miles`,
     );
   }
-  if (f.away_tz_shift != null && f.away_tz_shift !== 0) {
-    bits.push(
-      `${Math.abs(f.away_tz_shift)} hour${Math.abs(f.away_tz_shift) === 1 ? "" : "s"} of time change`,
-    );
+  if (tzShift !== null && tzShift !== 0) {
+    const n = Math.abs(tzShift);
+    bits.push(`${n} hour${n === 1 ? "" : "s"} of time change`);
   }
-  if (f.kickoff_local_hour != null) {
-    const h = Math.round(f.kickoff_local_hour);
-    const local =
-      h === 12
-        ? "noon"
-        : h === 0
-          ? "midnight"
-          : h > 12
-            ? `${h - 12}pm`
-            : `${h}am`;
-    bits.push(`${local} local kickoff`);
+  if (kickClock !== null) {
+    bits.push(`${kickClock} local kickoff`);
   }
   const restTravel = bits.length > 0 ? bits.join(" · ") : "—";
 
@@ -421,8 +443,11 @@ export default function GameDetail({
   backHref,
   authed,
   forecast = null,
+  zones = null,
 }: {
   g: HomeGame;
+  /** The kickoff and its venue / visitor-home time zones (lib/kickoffClockDb.ts). */
+  zones?: KickZones | null;
   /** The newest card-build forecast for the kickoff hour (lib/forecast.ts). */
   forecast?: CardForecast | null;
   /** The flat stake, read server-side — a client component cannot read it. */
@@ -554,7 +579,7 @@ export default function GameDetail({
       </section>
 
       <LinesSection g={g} />
-      <WhySection g={g} forecast={forecast} />
+      <WhySection g={g} forecast={forecast} zones={zones} />
       <NewsSection g={g} />
     </div>
   );

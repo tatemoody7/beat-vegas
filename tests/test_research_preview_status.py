@@ -170,3 +170,37 @@ def test_no_status_file_flag_writes_nothing(env, monkeypatch, tmp_path):
     mod, _ = env
     _run(mod, monkeypatch)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_an_uncovered_game_is_marked_not_covered_and_its_qb_unknown(env, monkeypatch):
+    """2026-10-17 audit: Rotowire's public feed is a ~5-row teaser of that day's
+    games, so a game the pull does not name has NO injury read. It is stored
+    covered=False with qb_out NULL (unknown), never as an empty "all clear"."""
+    mod, eng = env  # by_school is stubbed to match nothing
+    _run(mod, monkeypatch)
+    with Session(eng) as s:
+        p = s.query(GamePreview).one()
+        assert json.loads(p.injuries_json) == {"home": [], "away": [], "covered": False}
+        assert p.qb_out is None
+
+
+def test_a_covered_game_keeps_its_rows_and_a_listed_qb_is_out(env, monkeypatch):
+    mod, eng = env
+    qb = {
+        "player": "QB Someone",
+        "position": "QB",
+        "IR": "Out",
+        "injury_type": "Knee",
+        "team": "Missouri",
+        "RotoSchoolName": "Missouri",
+    }
+    monkeypatch.setattr(mod.rotowire, "by_school", lambda report, schools: {"Missouri": [qb]})
+    monkeypatch.setattr(
+        mod.rotowire, "qb_out_detail", lambda rows: "QB Someone — Out" if rows else ""
+    )
+    _run(mod, monkeypatch)
+    with Session(eng) as s:
+        p = s.query(GamePreview).one()
+        inj = json.loads(p.injuries_json)
+        assert inj["covered"] is True and len(inj["home"]) == 1 and inj["away"] == []
+        assert p.qb_out is True and "QB Someone" in p.qb_out_detail

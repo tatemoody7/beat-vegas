@@ -284,7 +284,9 @@ class ArmPosition(Base):
     )
     id = Column(Integer, primary_key=True, autoincrement=True)
     hypothesis = Column(String, nullable=False, index=True)  # registry id
-    standard = Column(String, nullable=False)  # sprt (an arm) | pricing (H-PRICE-HR) | exploratory (H-ARM-EVP)
+    standard = Column(
+        String, nullable=False
+    )  # sprt (an arm) | pricing (H-PRICE-HR) | exploratory (H-ARM-EVP)
     read_date = Column(String, nullable=False)  # YYYY-MM-DD, the UTC date of the read
     read_at = Column(DateTime, nullable=False)  # naive UTC
     run_id = Column(String)  # GITHUB_RUN_ID of the writer, '-' locally
@@ -313,9 +315,7 @@ class ShortlistEntry(Base):
     (`shortlist.publication_from_rows`)."""
 
     __tablename__ = "shortlist_entries"
-    __table_args__ = (
-        UniqueConstraint("card_id", "game_id", name="uq_shortlist_entry_per_card"),
-    )
+    __table_args__ = (UniqueConstraint("card_id", "game_id", name="uq_shortlist_entry_per_card"),)
     id = Column(Integer, primary_key=True, autoincrement=True)
     card_id = Column(Integer, nullable=False, index=True)  # cards.id this ranking read
     season = Column(Integer, nullable=False, index=True)
@@ -883,10 +883,13 @@ class GamePreview(Base):
     game_id = Column(Integer, ForeignKey("games.id"), index=True, unique=True)
     season = Column(Integer, index=True)
     week = Column(Integer)
-    qb_out = Column(Boolean, default=False)
+    # True = a starting QB listed out; NULL = unknown (2026-10-17: the injury
+    # feed is a five-row teaser, so it can never show a QB is playing). No
+    # default: a False here would claim "clear" for every unread game.
+    qb_out = Column(Boolean)
     qb_out_detail = Column(String)
     news_json = Column(String)  # {"home": [...], "away": [...]}
-    injuries_json = Column(String)  # {"home": [...], "away": [...]}
+    injuries_json = Column(String)  # {"home": [...], "away": [...], "covered": bool}
     updated_at = Column(DateTime)
 
 

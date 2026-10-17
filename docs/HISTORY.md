@@ -24,6 +24,15 @@ hold the rest.
   The factor sentence reads "3:30pm local kickoff"; the `spot` chip "3:30pm kick". `docs/HYPOTHESES.md` notes the
   affected rows.
 
+- **2026-10-17 UTC (INJURIES SAY "NOT AVAILABLE"; QB STATUS UNKNOWN, NEVER CLEAR).** The audit found Rotowire's public
+  injury table is a capped teaser: every `injury_snapshots` row 2026-10-06..10-17 held 5-7 rows, all for that day's
+  games, so a Saturday game was never in a Tue/Thu/Fri pull, yet its page showed "Injuries and news" with national
+  articles and `qb_out` read false. `injuries_json` now carries `covered` (the pull named one of the game's teams),
+  `qb_out` is True or NULL (unknown), and the game page says "Injury report not available for this game ... Starting
+  QB status unknown" when uncovered, "Partial list" when covered, reading the newest pull rather than Sunday's flag.
+  The card's QB gate is unchanged (every Python reader bool()s the flag); whether "unknown" should block a BET is
+  Tate's call before real money resumes. A Saturday-capable source is the plan's next injuries step.
+
 - **2026-10-17 UTC (INDEPENDENT AUDIT; REAL MONEY PAUSED; SATURDAY WINDOW INSIDE ITS GATE).** Tate commissioned an
   outside-critic audit (findings, his 16 decisions and the improvement plan: `~/.claude/plans/pasted-content-id-29b8-i-want-recursive-rabbit.md`,
   to be filed as `docs/program/AUDIT_2026-10-16.md`). Two actions shipped first. (1) `rule_paused` = true at 13:27Z

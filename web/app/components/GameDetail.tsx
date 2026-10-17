@@ -4,6 +4,7 @@ import { hrQuoteText, priceAgeText } from "@/lib/labels";
 import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
+import { injuryNote } from "@/lib/previewRow";
 import type { MarketMovement } from "@/lib/movement";
 import {
   factorTint,
@@ -390,14 +391,14 @@ function pulledAt(s: string | null): string | null {
 
 function NewsSection({ g }: { g: HomeGame }) {
   const p = g.preview;
-  const f = g.row.factors;
-  const qbOut = Boolean(f.qb_out_home || f.qb_out_away);
+  // The newest injury pull (the card build's own read), not Sunday's flag.
+  const qbOut = p?.qbOut === true;
   const at = pulledAt(p?.updatedAt ?? null);
   return (
     <Section title="Injuries and news">
       {qbOut && (
         <p className="mb-2 rounded-[var(--r-sm)] border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2 py-1 text-xs text-[var(--warn)]">
-          {`Starting QB out: ${f.qb_out_detail ?? "a starting quarterback is listed out"}. Our number does not know about it.`}
+          {`Starting QB out: ${p?.qbOutDetail || "a starting quarterback is listed out"}. Our number does not know about it.`}
         </p>
       )}
       {p === null ? (
@@ -418,8 +419,9 @@ function NewsSection({ g }: { g: HomeGame }) {
               injuries={p.homeInjuries}
             />
           </div>
+          <p className="mt-2 text-xs text-[var(--text-dim)]">{injuryNote(p)}</p>
           {at && (
-            <p className="mt-2 text-xs text-[var(--text-dim)]">
+            <p className="mt-1 text-xs text-[var(--text-dim)]">
               {`Rotowire and ESPN, pulled ${at} ET`}
             </p>
           )}

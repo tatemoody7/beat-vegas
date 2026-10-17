@@ -1,39 +1,22 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import {
+  toPreviewGame,
+  type PreviewGame,
+  type PreviewRow,
+} from "@/lib/previewRow";
+
+export type { PreviewGame } from "@/lib/previewRow";
 
 // Week research preview: this week's games + injuries/QB-out (Rotowire's college
 // injury report) and team news (ESPN), pulled by scripts/research_preview.py
 // into game_previews. DISPLAY ONLY — both sources are unofficial.
-
-export type PreviewGame = {
-  gameId: number;
-  week: number;
-  away: string | null;
-  home: string | null;
-  qbOut: boolean;
-  qbOutDetail: string | null;
-  homeNews: string[];
-  awayNews: string[];
-  homeInjuries: string[];
-  awayInjuries: string[];
-  updatedAt: string | null;
-};
 
 export type Preview = {
   week: number | null;
   weeks: number[];
   games: PreviewGame[];
 };
-
-function arr(jsonStr: string | null, key: "home" | "away"): string[] {
-  if (!jsonStr) return [];
-  try {
-    const o = JSON.parse(jsonStr);
-    return Array.isArray(o?.[key]) ? o[key] : [];
-  } catch {
-    return [];
-  }
-}
 
 const EMPTY: Preview = { week: null, weeks: [], games: [] };
 
@@ -82,19 +65,7 @@ async function getPreviewUnsafe(
     week && weeks.includes(week) ? week : (weeks[weeks.length - 1] ?? null);
   if (wk === null) return { week: null, weeks, games: [] };
 
-  const rows = await prisma.$queryRaw<
-    {
-      game_id: number | bigint;
-      week: number | bigint;
-      qb_out: boolean | number | null;
-      qb_out_detail: string | null;
-      news_json: string | null;
-      injuries_json: string | null;
-      updated_at: string | null;
-      home_team: string | null;
-      away_team: string | null;
-    }[]
-  >`
+  const rows = await prisma.$queryRaw<PreviewRow[]>`
     SELECT p.game_id, p.week, p.qb_out, p.qb_out_detail, p.news_json,
            p.injuries_json, CAST(p.updated_at AS TEXT) AS updated_at,
            g.home_team, g.away_team
@@ -103,19 +74,7 @@ async function getPreviewUnsafe(
     ORDER BY g.start_date
   `;
 
-  const games: PreviewGame[] = rows.map((r) => ({
-    gameId: Number(r.game_id),
-    week: Number(r.week),
-    away: r.away_team,
-    home: r.home_team,
-    qbOut: r.qb_out === true || Number(r.qb_out) === 1,
-    qbOutDetail: r.qb_out_detail,
-    homeNews: arr(r.news_json, "home"),
-    awayNews: arr(r.news_json, "away"),
-    homeInjuries: arr(r.injuries_json, "home"),
-    awayInjuries: arr(r.injuries_json, "away"),
-    updatedAt: r.updated_at,
-  }));
+  const games: PreviewGame[] = rows.map(toPreviewGame);
 
   return { week: wk, weeks, games };
 }

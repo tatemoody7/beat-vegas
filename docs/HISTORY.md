@@ -10,6 +10,18 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 ~22:00 UTC (THE PERSONAL STAKE READS ONLY WHAT CAN BE VERIFIED).** From the fact-check audit's plan
+  (P1.3, Tate's calls). The ticket check found settlement and payout right on all 26 graded tickets, but 10 carry no
+  logged price (6 `unknown`, 4 NULL), id 7's price was changed after kickoff, id 105 was logged at 28.5 while Hard
+  Rock's feed showed 29.5, ids 85/86 were bet Friday and logged Saturday, and id 9's boost is not modelled. Results now
+  reads the record over every graded cash ticket; units, ROI, line move and value vs the close over price-verified
+  (`logged`) cash tickets only, naming how many were left out; bonus bets on their own line with what they paid; the
+  Board-rule (BET at the log) tickets as a sub-line (`lib/personalStake.ts`). The comparison table's Personal stake row
+  and the units curve follow the same rule. Rows carry "price not verified", "off-rule: Watch/Pass" and "flagged";
+  `manual_picks.audit_flag` (new, TEXT) holds the plain reason for ids 7, 9, 85, 86 and 105 (a `_DATA_MIGRATIONS` fill,
+  guarded on each ticket's line and price) and joins the bets CSV (31 columns). Nothing is regraded and no price is
+  substituted; Hard Rock's own bet history, when Tate supplies it, is the only reconciliation.
+
 - **2026-10-17 ~20:30 UTC (GREEN MEANS A PAPER SIGNAL; THE BOARD SAYS A GAP IS NOT AN EDGE).** From the fact-check
   audit's plan (P1.4, Tate's call): a rank badge is coloured by its verdict only, green for a game meeting the week's
   rule, amber not yet, red pass, at every rank; this reverses 2026-10-16's green #1-#10 (#411), which had eight "Not

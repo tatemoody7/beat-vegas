@@ -25,6 +25,7 @@ import {
   type WeekPick,
 } from "@/lib/picks";
 import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
+import { isPriceVerified } from "@/lib/personalStake";
 import type { Record3 } from "@/lib/record";
 import type { BoardFactor, Factors } from "@/lib/score";
 import {
@@ -83,8 +84,15 @@ export type BankrollPoint = { week: number; units: number };
  * not won or lost anything yet.
  */
 export function bankrollCurve(picks: PickFull[]): BankrollPoint[] {
+  // Cash tickets with a verified price only, the same money rule as the
+  // Personal stake strip (audit 2026-10-17): no bonus payout, no unlogged price.
   const settled = picks.filter(
-    (p) => isRealFirstHalf(p) && p.graded && p.week !== null,
+    (p) =>
+      isRealFirstHalf(p) &&
+      !p.isBonus &&
+      isPriceVerified(p) &&
+      p.graded &&
+      p.week !== null,
   );
   const weeks = [...new Set(settled.map((p) => p.week as number))].sort(
     (a, b) => a - b,

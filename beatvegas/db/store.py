@@ -119,6 +119,9 @@ _MIGRATIONS = {
         "ev_cons": "FLOAT",
         "ev_hr": "FLOAT",
         "cons_excluded": "VARCHAR(32)",
+        # What an audit could not verify about a real ticket, in plain words
+        # (fact-check audit 2026-10-17); shown as a flag on Results.
+        "audit_flag": "TEXT",
     },
     "venues": {
         "elevation": "FLOAT",
@@ -237,6 +240,39 @@ _DATA_MIGRATIONS = [
         "ELSE note || ' | bet Fri 2026-09-25 at the fri_pm card numbers; logged Sat' END "
         "WHERE id IN (85, 86) AND season = 2026 AND week = 4 "
         "AND verdict_at_pick = 'WATCH' AND COALESCE(is_paper, FALSE) = FALSE",
+    ),
+    # Fact-check audit 2026-10-17 (Tate's call: a new column, filled for the
+    # tickets whose record the audit could not verify). Each guard pins the
+    # ticket's own line and price, and IS NULL makes a re-run a no-op.
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET audit_flag = 'Price changed after kickoff (-105 to -130 on 2026-09-13); the price at the bet is not verified.' "
+        "WHERE id = 7 AND season = 2026 AND line = 31.5 AND price = -130 "
+        "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET audit_flag = 'A 10% Hard Rock profit boost applied; the boost is not modelled, so units grade at -110.' "
+        "WHERE id = 9 AND season = 2026 AND line = 28.5 AND price = -110 "
+        "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET audit_flag = 'Bet Fri 2026-09-25 at the fri_pm card numbers and logged Sat; the bet time is not recorded.' "
+        "WHERE id = 85 AND season = 2026 AND line = 26.5 AND price = 100 "
+        "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET audit_flag = 'Bet Fri 2026-09-25 at the fri_pm card numbers and logged Sat; the bet time is not recorded.' "
+        "WHERE id = 86 AND season = 2026 AND line = 29.5 AND price = -105 "
+        "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
+    ),
+    (
+        "manual_picks",
+        "UPDATE manual_picks SET audit_flag = 'Logged at 28.5; Hard Rock''s feed showed 29.5 when it was logged.' "
+        "WHERE id = 105 AND season = 2026 AND line = 28.5 AND price = -110 "
+        "AND COALESCE(is_paper, FALSE) = FALSE AND audit_flag IS NULL",
     ),
 ]
 

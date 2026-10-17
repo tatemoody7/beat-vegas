@@ -89,7 +89,7 @@ export default async function ResultsPage({
     {
       key: "you",
       label: "Personal stake",
-      note: "never evidence for any strategy",
+      note: "cash bets · units, ROI and line value from price-verified bets only · never evidence for any strategy",
       rec: ledger.you,
       empty: "no real bets graded yet",
     },

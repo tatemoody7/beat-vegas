@@ -230,7 +230,7 @@ export default function LogPickForm({
         </p>
         {prefill.verdict && prefill.verdict !== "BET" && (
           <p className="text-xs text-[var(--warn)] sm:col-span-3">
-            {`This site rates the game ${verdictWord}, not Bet. Logging it as real money is fine — Results will show it separately so you can see how your own calls do.`}
+            {`This site rates the game ${verdictWord}, not Bet. Logging it as real money is fine — Results tags it off-rule and shows the Board-rule bets on their own line.`}
           </p>
         )}
 

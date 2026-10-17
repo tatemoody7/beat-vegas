@@ -61,6 +61,8 @@ export type PickFull = {
   hrLineAtPick: number | null;
   /** Paper ledger: the gate that blocked a real bet (none | price | off_market | qb_out | cap); null on real picks. */
   blocker: string | null;
+  /** 'logged' when the price was recorded at the bet (audit 2026-10-17). */
+  priceProvenance: string | null;
 };
 
 /** A real-money 1H pick on the week, as the bet slip needs it. */
@@ -130,6 +132,7 @@ type RawPick = {
   ev_at_pick?: number | null;
   hr_line_at_pick?: number | null;
   blocker?: string | null;
+  price_provenance?: string | null;
 };
 
 const isMissingColumn = (e: unknown): boolean =>
@@ -167,7 +170,7 @@ async function selectPicks(season: number): Promise<RawPick[]> {
       SELECT id, game_id, week, away_team, home_team, market, line, stake, price,
              note, model_line_at_pick, result, units, clv,
              graded, is_paper, is_bonus, verdict_at_pick, reason, gap_at_pick,
-             ev_at_pick, hr_line_at_pick, blocker
+             ev_at_pick, hr_line_at_pick, blocker, price_provenance
       FROM manual_picks WHERE season = ${season}
     `;
   } catch (e) {
@@ -227,6 +230,7 @@ async function loadPicksUncached(season: number): Promise<PickFull[]> {
     evAtPick: r.ev_at_pick ?? null,
     hrLineAtPick: r.hr_line_at_pick ?? null,
     blocker: r.blocker ?? null,
+    priceProvenance: r.price_provenance ?? null,
   }));
   picks.sort((a, b) => Number(a.graded) - Number(b.graded) || b.id - a.id);
   return picks;

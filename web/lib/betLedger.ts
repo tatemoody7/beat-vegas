@@ -44,6 +44,9 @@ export type LedgerRow = {
   closingPrice: number | null;
   closingCapturedAt: string | null;
   priceProvenance: string | null;
+  /** What an audit could not verify about this ticket, in plain words
+   *  (2026-10-17); null when nothing is flagged. */
+  auditFlag: string | null;
   /** Stored `closing - bet`: NEGATIVE is the good direction for an under. */
   clv: number | null;
   /** EV at the wager's exact terms against the vig-free consensus close
@@ -212,6 +215,7 @@ export const BETS_CSV_HEADER = [
   "bonus",
   "book",
   "price_provenance",
+  "audit_flag",
   "verdict_at_pick",
   "reason",
   "gap_at_pick",
@@ -249,6 +253,7 @@ export function betsToCsv(season: number, rows: LedgerRow[]): string {
       r.isBonus,
       r.book,
       r.priceProvenance,
+      r.auditFlag,
       r.verdictAtPick,
       r.reason,
       r.gapAtPick,

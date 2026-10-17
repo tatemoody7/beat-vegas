@@ -466,6 +466,6 @@
     "question": "Does ICON's (`icon_seamless`) sustained 10 m wind forecast at the kickoff hour run low against observed wind at that hour?",
     "status": "exploratory",
     "family": "weather-measurement (no confirmatory alpha)",
-    "doc": "`docs/WIND_FORECAST_CHECK.md` (PR to come)"
+    "doc": "`docs/WIND_FORECAST_CHECK.md` (study.yml run 39053121873, 2026-10-17, at a243715): 2024-25, 24 h forecast: bias against ERA5 −0.32 mph (−0.47 to −0.19; n 1,467), ICON 10+ on 14.8% of games against ERA5's 15.5%; against CFBD −1.28 (−1.51 to −0.99; n 1,447), 14.8% against CFBD's 25.5%; 72 h the same bias, noisier; night kickoffs about 1 mph low against both (−0.98, n 260; −1.16, n 259). READ: slightly low against the reanalysis, low by about 1.3 mph against the station-like readings; the two truths disagree by about 1 mph, so which is right is not settled; the build-time forecasts await observations. Exploratory; nothing adopted."
   }
 ]

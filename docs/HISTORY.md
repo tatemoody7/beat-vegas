@@ -10,6 +10,14 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 UTC (IS THE ARMS' WIND FORECAST LOW? H-WX-ICON-BIAS, EXPLORATORY).** Arkansas State @ Southern Miss
+  read 8.6 mph on the game page (ICON, `build_forecasts`) where NWS read 13-15 sustained; Tate asked to measure before
+  changing anything. `scripts/wind_forecast_check.py` (study.yml run 39053121873) joined ICON's kickoff-hour wind
+  (`weather_obs` leads 24/72) to `weather_actuals` hour_offset 0. 2024-25, 24 h: −0.32 mph against ERA5 (n 1,467), −1.28
+  against CFBD (n 1,447); ICON calls 10+ on 14.8% of games, ERA5 sees 15.5%, CFBD 25.5%; night kickoffs about 1 mph low
+  against both. The build-time rows (from 10-13) have no observation yet (`weather_actuals` ends at 10-07 games).
+  Nothing changed; `docs/WIND_FORECAST_CHECK.md`.
+
 - **2026-10-17 UTC (THE KICKOFF CLOCK READS THE VENUE'S TIME ZONE; A DATA-BUG REPAIR TO FOUR MODEL INPUTS).**
   `etl/situational.py` built `kickoff_local_hour` as `(UTC hour + longitude / 15) % 24`: solar time, no minutes, no
   DST. Penn State @ Michigan (19:30Z = 3:30pm EDT) read "~13:00 local kickoff" and was flagged `early_kickoff`; the

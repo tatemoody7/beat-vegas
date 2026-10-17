@@ -21,13 +21,15 @@ import { etMinutesOfDay, etParts } from "@/lib/et";
  *  2. One UTC hour cannot serve both regimes, so each job carries several and
  *     the window here decides which of them is allowed to act.
  *
- * The Saturday window opens at 7:00 and closes at 8:15. That was originally so
- * the card landed before an 8:50am Mac routine texted it; that routine was
- * retired 2026-09-13 (every scheduled text was), so the window could now widen
- * to ci.py's 9:15 gate and let more entries act. Left as-is deliberately: it
- * works, and a wider window is a behaviour change worth making on purpose
- * rather than as a side effect. The cost is that Saturday's card may build as
- * early as 7:00am; minute-accurate timing needs Vercel's paid tier.
+ * EVERY DISPATCH WINDOW SITS INSIDE ITS BUILD GATE (2026-10-17). Since #379
+ * (2026-10-14) a named slot dispatched outside beatvegas/ci.py's ET gate skips,
+ * and the skipped run still concludes "success" -- which suppressedBy counts as
+ * the window's build, standing every later tick down. Saturday's window used to
+ * open at 7:00 against a 7:45 gate, so the first Hobby tick (anywhere in its
+ * hour) skipped about three times in four and took the card with it. The
+ * window is now 7:45-9:00: the 12Z entry (EDT) and the 13Z entry (EST) land
+ * wholly inside it, and 9:00 leaves 15 minutes for the neon-writers queue
+ * before the 9:15 gate closes. cronJobs.test.ts pins both properties.
  */
 
 export type CronJob = {
@@ -86,12 +88,12 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     workflow: "card.yml",
     inputs: { slot: "sat_am" },
     days: ["Sat"],
-    // 7:00–8:15am: wide enough that the EDT entry always lands inside it, and
-    // closed before the 9:15 ET gate so a late Hobby tick cannot dispatch a
-    // build the gate would then refuse. (It once also had to beat an 8:50am
-    // text; that routine was retired 2026-09-13 and the window kept.)
-    dispatchOpenMin: 7 * 60,
-    dispatchCloseMin: 8 * 60 + 15,
+    // 7:45–9:00am, inside ci.py's 7:45–9:15 gate (see the header): an early
+    // tick would gate-skip, conclude "success" and suppress the real build.
+    // One UTC entry per regime lands wholly inside (12Z EDT, 13Z EST); the
+    // 15 minutes before the gate closes are for the neon-writers queue.
+    dispatchOpenMin: 7 * 60 + 45,
+    dispatchCloseMin: 9 * 60,
     gateOpenMin: 7 * 60 + 45,
     gateCloseMin: 9 * 60 + 15,
   },

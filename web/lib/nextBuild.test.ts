@@ -36,7 +36,7 @@ describe("nextBuild", () => {
   it("labels the Saturday morning window with a single am suffix", () => {
     // Fri 18:00 ET, past Friday's close → Saturday morning.
     expect(nextBuild(et("2026-09-11T22:00:00Z"))?.label).toBe(
-      "Sat 7:00–8:15am ET",
+      "Sat 7:45–9:00am ET",
     );
   });
 

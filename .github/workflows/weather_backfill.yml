@@ -44,7 +44,7 @@ concurrency:
 
 jobs:
   weather:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}

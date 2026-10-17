@@ -185,9 +185,9 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
 | `opening_watch.yml` | Vercel `opening-watch` hourly + GitHub 20-min backup, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
 
-Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every
-workflow installs `pip install --require-hashes -r requirements/lock.txt` (Python 3.11, 32 pins)
-and dispatch inputs cross into `run:` only via `env:` (`tests/test_workflows.py` enforces both).
+Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every job runs on
+`ubuntu-24.04` (pinned 2026-10-17, never `ubuntu-latest`), installs `pip install --require-hashes -r
+requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `run:` only via `env:` (`tests/test_workflows.py`).
 
 ### Scripts (`scripts/`, grouped; every script is idempotent)
 - **Live jobs**: `weekly_update` (score; `--min-games 0`, serve-skew guard, refit `model_runs`),

@@ -10,6 +10,14 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 UTC (IS THE ARMS' WIND FORECAST LOW? H-WX-ICON-BIAS, EXPLORATORY).** Arkansas State @ Southern Miss
+  read 8.6 mph on the game page (ICON, `build_forecasts`) where NWS read 13-15 sustained; Tate asked to measure before
+  changing anything. `scripts/wind_forecast_check.py` (study.yml run 39053121873) joined ICON's kickoff-hour wind
+  (`weather_obs` leads 24/72) to `weather_actuals` hour_offset 0. 2024-25, 24 h: −0.32 mph against ERA5 (n 1,467), −1.28
+  against CFBD (n 1,447); ICON calls 10+ on 14.8% of games, ERA5 sees 15.5%, CFBD 25.5%; night kickoffs about 1 mph low
+  against both. The build-time rows (from 10-13) have no observation yet (`weather_actuals` ends at 10-07 games).
+  Nothing changed; `docs/WIND_FORECAST_CHECK.md`.
+
 - **2026-10-17 17:10 UTC (REAL MONEY BACK ON).** Tate asked to turn real money back on so he could log first-half
   unders from the day's board; `rule_paused` was set to false through Neon's HTTPS endpoint (mirroring
   `scripts/rule_pause.py off`; `app_settings_log` 546). This lifts the audit pause of 13:27 UTC (row 520) the same day,

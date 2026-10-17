@@ -37,7 +37,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `FG_MARKET`, `KNOWLEDGE` (the Discord/community knowledge base), `CFBD_BUSINESS_TEARDOWN`,
   `LEGAL_MEMO_2026-10` (payment rails gate a paid tier; not legal advice), `HISTORY_DEPTH`,
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
-  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10), `PRICING_RESEARCH` (Hard Rock against the market, exploratory) (all in `docs/`).
+  behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10), `PRICING_RESEARCH` (Hard Rock against the market, exploratory), `WIND_FORECAST_CHECK` (ICON wind vs observed, exploratory) (all in `docs/`).
 - `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11);
   `docs/program/JANUARY_2027_REVIEW.md` — the two reads (12-07, 2027-01-25) and the 2027 default (v2.1);
   `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-monday-read` (the one-page Monday read; replaced bv-weekly-review 2026-10-13), `bv-card-check`, `bv-ship`, `bv-site-check`.
@@ -203,7 +203,7 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
 - **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
   `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
   `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
-  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
+  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1), `wind_forecast_check` (H-WX-ICON-BIAS, ICON wind vs observed).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +

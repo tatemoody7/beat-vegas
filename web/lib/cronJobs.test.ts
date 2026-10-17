@@ -67,28 +67,32 @@ describe("dispatchDecision", () => {
     expect(d.reason).toContain("wrong_day");
   });
 
-  it("closes the Saturday window at 8:15 so the build beats the 8:50 text", () => {
+  it("keeps the Saturday window inside the 7:45 gate (2026-10-17)", () => {
     const job = CRON_JOBS["card-sat-am"];
+    // 7:20am EDT would gate-skip, conclude "success" and suppress the build.
     expect(dispatchDecision(job, at("2026-09-12T11:20:00Z")).allowed).toBe(
+      false,
+    );
+    expect(dispatchDecision(job, at("2026-09-12T11:50:00Z")).allowed).toBe(
       true,
-    ); // 7:20am
-    expect(dispatchDecision(job, at("2026-09-12T12:05:00Z")).allowed).toBe(
+    ); // 7:50am
+    expect(dispatchDecision(job, at("2026-09-12T12:59:00Z")).allowed).toBe(
       true,
-    ); // 8:05am
-    // 8:20am would leave the build racing the routine that texts the card.
-    expect(dispatchDecision(job, at("2026-09-12T12:20:00Z")).allowed).toBe(
+    ); // 8:59am
+    // 9:05am leaves too little of the gate for a queued run.
+    expect(dispatchDecision(job, at("2026-09-12T13:05:00Z")).allowed).toBe(
       false,
     );
   });
 
   it("carries the Saturday window into EST on a different UTC hour", () => {
     const job = CRON_JOBS["card-sat-am"];
-    expect(dispatchDecision(job, at("2026-11-14T11:20:00Z")).allowed).toBe(
-      false,
-    ); // 6:20am EST
     expect(dispatchDecision(job, at("2026-11-14T12:20:00Z")).allowed).toBe(
-      true,
+      false,
     ); // 7:20am EST
+    expect(dispatchDecision(job, at("2026-11-14T13:20:00Z")).allowed).toBe(
+      true,
+    ); // 8:20am EST
   });
 
   it("admits the Sunday capture across both DST regimes", () => {
@@ -247,24 +251,24 @@ describe("close-weeknight (Tue-Fri evening close polls, 2026-10-06)", () => {
 describe("windowOpenInstant", () => {
   it("is the same ET wall clock in both DST regimes", () => {
     const job = CRON_JOBS["card-sat-am"];
-    // 7:40am EDT and 7:40am EST are an hour apart in UTC; both windows opened
-    // at 7:00am ET.
+    // 8:40am EDT and 8:40am EST are an hour apart in UTC; both windows opened
+    // at 7:45am ET.
     expect(
-      windowOpenInstant(job, at("2026-09-12T11:40:00Z")).toISOString(),
-    ).toBe("2026-09-12T11:00:00.000Z");
+      windowOpenInstant(job, at("2026-09-12T12:40:00Z")).toISOString(),
+    ).toBe("2026-09-12T11:45:00.000Z");
     expect(
-      windowOpenInstant(job, at("2026-11-14T12:40:00Z")).toISOString(),
-    ).toBe("2026-11-14T12:00:00.000Z");
+      windowOpenInstant(job, at("2026-11-14T13:40:00Z")).toISOString(),
+    ).toBe("2026-11-14T12:45:00.000Z");
   });
 });
 
 describe("suppressedBy", () => {
   const job = CRON_JOBS["card-sat-am"];
-  const now = at("2026-11-14T12:40:00Z"); // Sat 7:40am EST, window opened 7:00
+  const now = at("2026-11-14T13:40:00Z"); // Sat 8:40am EST, window opened 7:45
   const run = (over: Partial<RunSummary>): RunSummary => ({
     id: 1,
     event: "schedule",
-    created_at: "2026-11-14T12:10:00Z",
+    created_at: "2026-11-14T13:10:00Z",
     conclusion: "success",
     ...over,
   });
@@ -279,7 +283,7 @@ describe("suppressedBy", () => {
         [
           run({
             event: "workflow_dispatch",
-            created_at: "2026-11-14T12:20:00Z",
+            created_at: "2026-11-14T13:20:00Z",
           }),
         ],
         job,
@@ -289,11 +293,15 @@ describe("suppressedBy", () => {
   });
 
   it("ignores a SCHEDULED run that fired outside the build gate", () => {
-    // 12:10Z is 7:10am EST — inside our dispatch window, outside ci.py's
+    // 14:20Z is 9:20am EST — after the window opened, outside ci.py's
     // 7:45–9:15 gate, so that run resolved to slot=skip and built NOTHING.
-    // Counting it would silently kill the Saturday card all winter.
+    // Counting it would silently kill a Saturday card.
     expect(
-      suppressedBy([run({ created_at: "2026-11-14T12:10:00Z" })], job, now),
+      suppressedBy(
+        [run({ created_at: "2026-11-14T14:20:00Z" })],
+        job,
+        at("2026-11-14T14:30:00Z"),
+      ),
     ).toBeNull();
   });
 
@@ -327,7 +335,7 @@ describe("suppressedBy", () => {
           [
             run({
               event: "workflow_dispatch",
-              created_at: "2026-11-14T12:20:00Z",
+              created_at: "2026-11-14T13:20:00Z",
               conclusion,
             }),
           ],
@@ -407,7 +415,7 @@ describe("catch-up ticks for the no-deadline jobs (2026-10-13, roadmap v2.2)", (
   }
 
   it("leaves the card, close-poll and weeknight windows where they were", () => {
-    expect(CRON_JOBS["card-sat-am"].dispatchCloseMin).toBe(8 * 60 + 15);
+    expect(CRON_JOBS["card-sat-am"].dispatchCloseMin).toBe(9 * 60);
     expect(CRON_JOBS["lines-close"].dispatchCloseMin).toBe(24 * 60 - 1);
     expect(CRON_JOBS["close-weeknight"].dispatchCloseMin).toBe(24 * 60 - 1);
   });
@@ -497,5 +505,35 @@ describe("opening-watch (temporary research, 2026-10-15)", () => {
     expect(dispatchDecision(job, at("2026-10-19T13:05:00Z")).allowed).toBe(
       true,
     );
+  });
+});
+
+describe("every dispatch window sits inside its build gate (2026-10-17)", () => {
+  // A named slot dispatched outside beatvegas/ci.py's ET gate skips, the
+  // skipped run concludes "success", and suppressedBy then counts it as the
+  // window's build. Saturday's 7:00 open against a 7:45 gate did exactly that.
+  const gated = Object.entries(CRON_JOBS).filter(
+    ([, j]) => j.gateOpenMin !== null && j.gateCloseMin !== null,
+  );
+
+  it("covers every card slot", () => {
+    expect(gated.map(([id]) => id).sort()).toEqual([
+      "card-fri-pm",
+      "card-sat-am",
+      "card-thu-pm",
+      "card-tue-pm",
+    ]);
+  });
+
+  for (const [id, job] of gated) {
+    it(`${id}: opens no earlier and closes no later than the gate`, () => {
+      expect(job.dispatchOpenMin).toBeGreaterThanOrEqual(job.gateOpenMin!);
+      expect(job.dispatchCloseMin).toBeLessThanOrEqual(job.gateCloseMin!);
+    });
+  }
+
+  it("leaves Saturday 15 minutes of gate for a queued run", () => {
+    const job = CRON_JOBS["card-sat-am"];
+    expect(job.gateCloseMin! - job.dispatchCloseMin).toBeGreaterThanOrEqual(15);
   });
 });

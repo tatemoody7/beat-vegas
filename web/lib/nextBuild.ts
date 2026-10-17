@@ -30,7 +30,7 @@ function clock12(min: number): { h: number; m: number; pm: boolean } {
   return { h: h24 % 12 === 0 ? 12 : h24 % 12, m: min % 60, pm: h24 >= 12 };
 }
 
-/** "3:45–5:15pm", or "7:00–8:15am" — one suffix when both sides share it. */
+/** "3:45–5:15pm", or "7:45–9:00am" — one suffix when both sides share it. */
 function windowLabel(openMin: number, closeMin: number): string {
   const a = clock12(openMin);
   const b = clock12(closeMin);

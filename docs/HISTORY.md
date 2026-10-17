@@ -10,6 +10,16 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-17 UTC (INDEPENDENT AUDIT; REAL MONEY PAUSED; SATURDAY WINDOW INSIDE ITS GATE).** Tate commissioned an
+  outside-critic audit (findings, his 16 decisions and the improvement plan: `~/.claude/plans/pasted-content-id-29b8-i-want-recursive-rabbit.md`,
+  to be filed as `docs/program/AUDIT_2026-10-16.md`). Two actions shipped first. (1) `rule_paused` = true at 13:27Z
+  (`app_settings_log` 520), written through Neon's HTTPS endpoint like `scripts/rule_pause.py on`: the personal stake
+  read -3.6% per bet against the consensus close (14 read of 26, interval -6.2% to -1.1%), and it stays paused until
+  Tate lifts it after the plan's data-trust phases. (2) `card-sat-am`'s Vercel window moved from 7:00-8:15 to 7:45-9:00
+  ET: since #379 a named slot dispatched before the 7:45 gate skips, the skipped run concludes "success", and
+  `suppressedBy` counted it as the build, so the first Hobby tick stood the morning down about three times in four.
+  Today's tick happened to land at 7:50 and card 32 built at 8:06. A new test pins every card window inside its gate.
+
 - **2026-10-17 UTC (EVERY WORKFLOW PINNED TO UBUNTU 24.04).** GitHub's run annotations announced that `ubuntu-latest`
   moves to Ubuntu 26 from 2026-10-19, the first scheduled Monday read, and no job here had run on it. All 20 jobs in
   the 16 workflows now name `runs-on: ubuntu-24.04` (the image they were already on); the `postgres:16` service in

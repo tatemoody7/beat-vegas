@@ -257,7 +257,7 @@ jobs:
         continue-on-error: true
         env:
           BV_ODDS_JOB: card
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --days-ahead 6
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --days-ahead 6 --research-regions eu --research-markets totals,h2h
       - name: 1H sweep (forced on every scheduled build; else only when today's is missing)
         id: sweep
         if: steps.inputs.outputs.need_sweep == 'true'

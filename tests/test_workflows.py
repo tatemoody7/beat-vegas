@@ -918,7 +918,11 @@ def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
     (`spreads` fills Game.spread there); the close ticks may narrow to
     `totals,h2h` (final-2026 PR-C2: nothing reads the close spread rows) but
     must keep `h2h`, which the pricing study pv1 reads. A pull that dropped
-    `us_ex` or the moneyline would quietly thin what the judge reads."""
+    `us_ex` or the moneyline would quietly thin what the judge reads.
+
+    PR-C4a: each pull also asks for the sharp reference, a SEPARATE `eu` call
+    stored in research_snapshots. `eu` never joins `--regions` (that call feeds
+    odds_snapshots, which the judge reads)."""
     pulls = {
         "sunday.yml": "Capture full-game openers",
         "card.yml": "Full-game refresh",
@@ -931,6 +935,9 @@ def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
         run = step["run"]
         assert "poll_full_game.py --source oddsapi" in run, wf
         assert "--regions us,us2,us_ex" in run, wf
+        assert "--research-regions eu" in run, wf
+        assert "eu" not in run.split("--regions ")[1].split()[0].split(","), wf
+        assert "--research-markets totals" in run, wf
         if "--markets" in run:
             wanted = (
                 "--markets totals,h2h"

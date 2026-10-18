@@ -172,7 +172,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | File | Trigger | Writes |
 |---|---|---|
 | `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
-| `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
+| `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, moneylines) + `research_snapshots` (eu) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |

@@ -849,3 +849,194 @@ def test_without_the_gate_the_same_slate_is_still_pulled(monkeypatch, tmp_path):
     args = [a for a in GATE_ARGS if a != "--hr-only-gate"]
     mod.main([*args, "--status-file", str(tmp_path / "fg.json")])
     assert len(client.paid_calls) == 1
+
+
+# --- --research-regions (final-2026 PR-C4a): the sharp reference beside the live pull ------------
+
+
+def _book_event(eid, home, away, kick, books):
+    """A bulk /odds event: `books` is {book key: (total point, home ML, away ML)}."""
+    bms = []
+    for key, (pt, h, a) in books.items():
+        markets = [
+            {
+                "key": "totals",
+                "outcomes": [
+                    {"name": "Over", "price": -108, "point": pt},
+                    {"name": "Under", "price": -112, "point": pt},
+                ],
+            }
+        ]
+        if h is not None:
+            markets.append(
+                {
+                    "key": "h2h",
+                    "outcomes": [{"name": home, "price": h}, {"name": away, "price": a}],
+                }
+            )
+        bms.append({"key": key, "markets": markets})
+    return {**_ev(eid, home, away, kick), "bookmakers": bms}
+
+
+class _ResearchClient(_GateClient):
+    """Answers the live call (regions us,us2) and the research call (eu) differently,
+    and carries what the real client does after a paid response."""
+
+    def __init__(self, events, live, sharp, remaining=10_000):
+        super().__init__(events, live)
+        from beatvegas.sources.odds import Credits
+
+        self.sharp = sharp
+        self.purpose = "ledger-default"
+        self.last_spend_id = None
+        self.last_credits = Credits(remaining=remaining, used=0, last_cost=2)
+        self.purposes_at_call = []
+
+    def list_full_game_odds(self, regions=None, markets="totals,spreads,h2h"):
+        self.purposes_at_call.append(self.purpose)
+        self.last_spend_id = 40 + len(self.paid_calls)
+        out = self.sharp if regions == "eu" else self.paid
+        self.paid_calls.append({"regions": regions, "markets": markets})
+        return out
+
+
+RESEARCH_ARGS = [
+    *[a for a in GATE_ARGS if a != "--hr-only-gate"],
+    "--research-regions",
+    "eu",
+    "--research-markets",
+    "totals,h2h",
+]
+
+
+def _research_world(monkeypatch, remaining=10_000, hr_games=(1,)):
+    kick = GATE_NOW + timedelta(minutes=90)
+    mod, eng = _gate_env(monkeypatch, GATE_NOW, hr_games=hr_games)
+    live = [_book_event("e1", "LSU", "Clemson", kick, {"hardrockbet": (50.5, None, None)})]
+    sharp = [
+        _book_event("e1", "LSU", "Clemson", kick, {"pinnacle": (51.0, -150, 130)}),
+        _book_event(
+            "e9", "Kent St", "Ohio", kick, {"pinnacle": (44.5, -110, -110)}
+        ),  # no CFBD game
+    ]
+    client = _ResearchClient([live[0]], live, sharp, remaining=remaining)
+    monkeypatch.setattr(mod, "OddsAPIClient", lambda: client)
+    return mod, eng, client
+
+
+def test_research_call_is_a_second_bulk_call_that_names_no_book(monkeypatch, capsys):
+    from beatvegas.db.models import ResearchSnapshot
+
+    mod, eng, client = _research_world(monkeypatch)
+    mod.main(RESEARCH_ARGS)
+    # the live pull is untouched; the research call follows it on regions only
+    assert client.paid_calls == [
+        {"regions": "us,us2", "markets": "totals,h2h"},
+        {"regions": "eu", "markets": "totals,h2h"},
+    ]
+    # the ledger saw the purpose during the research call only, then got its own back
+    assert client.purposes_at_call == ["ledger-default", "sharp_eu"]
+    assert client.purpose == "ledger-default"
+    with Session(eng) as s:
+        rows = s.query(ResearchSnapshot).order_by(ResearchSnapshot.event_id).all()
+        got = {(r.event_id, r.market, r.book) for r in rows}
+        assert got == {
+            ("e1", "full_game_total", "pinnacle"),
+            ("e1", "full_game_ml", "pinnacle"),
+            ("e9", "full_game_total", "pinnacle"),
+            ("e9", "full_game_ml", "pinnacle"),
+        }
+        assert {(r.purpose, r.region, r.request_id, r.source) for r in rows} == {
+            ("sharp_eu", "eu", 41, "live")
+        }
+        by_event = {r.event_id: r.game_id for r in rows}
+        assert by_event == {"e1": 1, "e9": None}  # matched game id set; FCS pairing stays NULL
+    out = capsys.readouterr().out
+    assert "research eu: 4 written, 0 reseen, 2 credits" in out
+
+
+def test_research_rows_never_reach_odds_snapshots(monkeypatch):
+    """The judge reads odds_snapshots: it must see the live pull and nothing else."""
+    mod, eng, _client = _research_world(monkeypatch)
+    mod.main(RESEARCH_ARGS)
+    with Session(eng) as s:
+        books = {b for (b,) in s.query(OddsSnapshot.book).distinct()}
+        assert books == {"hardrockbet"}
+        live_rows = s.query(OddsSnapshot).count()
+
+    # the same slate with no research flags writes exactly the same odds_snapshots
+    mod2, eng2, client2 = _research_world(monkeypatch)
+    mod2.main(GATE_ARGS[:0] + [a for a in RESEARCH_ARGS[: len(GATE_ARGS) - 1]])
+    assert [c["regions"] for c in client2.paid_calls] == ["us,us2"]
+    with Session(eng2) as s:
+        assert s.query(OddsSnapshot).count() == live_rows
+
+
+def test_a_second_run_re_sees_an_unchanged_sharp_quote(monkeypatch, capsys):
+    from beatvegas.db.models import ResearchSnapshot
+
+    mod, eng, _client = _research_world(monkeypatch)
+    mod.main(RESEARCH_ARGS)
+    capsys.readouterr()
+    mod.main(RESEARCH_ARGS)
+    assert "research eu: 0 written, 4 reseen" in capsys.readouterr().out
+    with Session(eng) as s:
+        assert s.query(ResearchSnapshot).count() == 4
+
+
+def test_research_is_skipped_when_the_allowance_is_short(monkeypatch, capsys):
+    from beatvegas.db.models import ResearchSnapshot
+
+    mod, eng, client = _research_world(monkeypatch, remaining=1_700)  # floor 1,500 + recurring
+    mod.main(RESEARCH_ARGS)
+    assert [c["regions"] for c in client.paid_calls] == ["us,us2"]  # no second call
+    out = capsys.readouterr().out
+    assert "research eu: skipped (allowance" in out
+    with Session(eng) as s:
+        assert s.query(ResearchSnapshot).count() == 0
+        assert s.query(OddsSnapshot).filter(OddsSnapshot.market == "full_game_total").count() >= 1
+
+
+def test_research_is_skipped_when_the_balance_is_unknown(monkeypatch, capsys):
+    mod, _eng, client = _research_world(monkeypatch)
+    client.last_credits = None
+    mod.main(RESEARCH_ARGS)
+    assert [c["regions"] for c in client.paid_calls] == ["us,us2"]
+    assert "research eu: skipped (balance unknown)" in capsys.readouterr().out
+
+
+def test_no_live_pull_means_no_research_pull(monkeypatch, tmp_path):
+    """The Hard-Rock gate (PR-C2) stops the live pull; the research call follows it."""
+    from beatvegas.db.models import ResearchSnapshot
+
+    mod, eng, client = _research_world(monkeypatch, hr_games=(2,))  # LSU/Clemson not HR-priced
+    mod.main([*RESEARCH_ARGS, "--hr-only-gate", "--status-file", str(tmp_path / "s.json")])
+    assert client.paid_calls == []
+    with Session(eng) as s:
+        assert s.query(ResearchSnapshot).count() == 0
+
+
+def test_no_live_pull_at_the_credit_floor_means_no_research_pull(monkeypatch):
+    mod, _eng, client = _research_world(monkeypatch)
+    client.credits_low = lambda floor: True
+    mod.main(RESEARCH_ARGS)
+    assert client.paid_calls == []
+
+
+def test_a_research_failure_never_touches_the_live_pull_or_the_exit(monkeypatch, capsys):
+    mod, eng, client = _research_world(monkeypatch)
+    real = client.list_full_game_odds
+
+    def boom(regions=None, markets="totals,spreads,h2h"):
+        if regions == "eu":
+            raise RuntimeError("provider 500")
+        return real(regions=regions, markets=markets)
+
+    client.list_full_game_odds = boom
+    mod.main(RESEARCH_ARGS)  # returns, no SystemExit
+    assert "::warning::research eu: not captured (RuntimeError: provider 500)" in (
+        capsys.readouterr().out
+    )
+    assert client.purpose == "ledger-default"
+    with Session(eng) as s:
+        assert s.query(OddsSnapshot).filter(OddsSnapshot.book == "hardrockbet").count() >= 1

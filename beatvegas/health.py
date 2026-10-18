@@ -437,23 +437,6 @@ def grade_picks_graded(ctx: Ctx) -> Result:
     return Result(n == 0, f"{n} picks on a played game still ungraded")
 
 
-def grade_postmortem_written(ctx: Ctx) -> Result:
-    from .db.models import PostMortemRun
-
-    scope = f"live_{ctx.season}"
-    row = (
-        ctx.session.query(PostMortemRun)
-        .filter(PostMortemRun.scope == scope, PostMortemRun.computed_at >= ctx.run_started_at)
-        .order_by(PostMortemRun.computed_at.desc())
-        .first()
-    )
-    if row is None:
-        return Result(
-            False, f"no postmortem_runs row scope={scope} since {_iso(ctx.run_started_at)}"
-        )
-    return Result(True, f"scope={scope} computed_at={_iso(row.computed_at)} n_games={row.n_games}")
-
-
 def grade_info(ctx: Ctx) -> Dict[str, str]:
     from .db.models import GameRecord
 
@@ -463,7 +446,7 @@ def grade_info(ctx: Ctx) -> Dict[str, str]:
         .count()
     )
     out = {"zero_halves_graded": str(zero)}
-    for step in ("backfill", "espn", "pbp", "ledger", "pm"):
+    for step in ("backfill", "espn"):
         if step in ctx.outcomes:
             out[step] = ctx.outcomes[step]
     return out
@@ -879,16 +862,12 @@ CONTRACTS: Dict[str, Contract] = {
             "games finals",
             "results / manual_picks graded",
             "game_records graded",
-            "postmortem_runs live_<season>",
             "last_grade_completed_at gauge",
         ),
         inputs=(
             "SEASON",
             "OUTCOME_BACKFILL",
             "OUTCOME_ESPN",
-            "OUTCOME_PBP",
-            "OUTCOME_LEDGER",
-            "OUTCOME_PM",
         ),
         checks=(
             Check(
@@ -915,18 +894,6 @@ CONTRACTS: Dict[str, Contract] = {
                 "zero manual_picks in SEASON with graded false/NULL whose game has a first_half_total",
                 grade_picks_graded,
             ),
-            Check(
-                "grade.postmortem_written",
-                "degraded",
-                "a postmortem_runs row with scope == live_<SEASON> and computed_at >= RUN_STARTED_AT",
-                grade_postmortem_written,
-            ),
-            Check(
-                "grade.reference_cache_populated",
-                "degraded",
-                "the five CFBD reference files (sp/talent/roster/returning/adv) for SEASON-1 exist in data/cache/ at > REFERENCE_CACHE_MIN_BYTES [1024] bytes",
-                _reference_cache_populated,
-            ),
         ),
         failure_modes=(
             FailureMode(
@@ -936,13 +903,13 @@ CONTRACTS: Dict[str, Contract] = {
             ),
             FailureMode(
                 "2026-09-16",
-                "the CFBD reference cache had saved an EMPTY payload all season (the first job of each ISO week made no CFBD calls), so every later run re-fetched ~22 reference calls against a 3,000-call month.",
-                ("grade.reference_cache_populated",),
+                "the CFBD reference cache had saved an EMPTY payload all season (the first job of each ISO week made no CFBD calls), so every later run re-fetched ~22 reference calls against a 3,000-call month. (grade.yml stopped restoring the cache 2026-10-18, final-2026 PR-09; `sunday.reference_cache_populated` keeps the check.)",
+                (),
             ),
             FailureMode(
                 "2026-09-22",
-                "the four-hour probe matched scope = 'live' while the rows are written as live_<season>, so it matched nothing and never skipped. The check compares the exact scope string.",
-                ("grade.postmortem_written",),
+                "the four-hour probe matched scope = 'live' while the rows are written as live_<season>, so it matched nothing and never skipped. The check compared the exact scope string. (The post-mortem step and its check were retired 2026-10-18, final-2026 PR-09; the probe reads the completed-grade gauge.)",
+                (),
             ),
             FailureMode(
                 "2026-09-20",

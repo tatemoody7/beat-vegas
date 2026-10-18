@@ -50,7 +50,7 @@ def test_every_neon_writer_shares_the_concurrency_group():
     """Every JOB that can reach Neon (it, or its workflow, holds DATABASE_URL) is
     in neon-writers -- through the workflow-level group or its own. Job-level
     lets a long job that never touches Neon sit outside the queue
-    (weather_actuals.yml's fetch, 2026-10-08) while its writing jobs stay in it."""
+    (the retired weather_actuals.yml's fetch, 2026-10-08) while its writing jobs stay in it."""
     writers = [p for p in _workflows() if _writes_neon(_load(p))]
     assert writers, "expected at least one Neon-writing workflow"
     checked = 0
@@ -70,25 +70,6 @@ def test_every_neon_writer_shares_the_concurrency_group():
             )
             checked += 1
     assert checked >= len(writers)
-
-
-def test_weather_actuals_fetches_outside_the_queue_and_writes_inside_it():
-    """The hours of ERA5 fetching hold no DATABASE_URL and no queue slot; the
-    plan and promote jobs, which reach Neon, hold both. Promote runs after a
-    fetch cut off at its limit, but never without a plan."""
-    data = _load(WF_DIR / "weather_actuals.yml")
-    assert "concurrency" not in data  # job-level only, or the fetch would hold it
-    jobs = data["jobs"]
-    fetch = yaml.safe_dump(jobs["fetch"])
-    assert "DATABASE_URL" not in fetch and "concurrency" not in jobs["fetch"]
-    assert "--plan data/cache/weather_actuals_plan.json" in fetch
-    for name in ("plan", "promote"):
-        assert jobs[name]["concurrency"] == {"group": NEON_GROUP, "cancel-in-progress": False}
-        assert "secrets.DATABASE_URL" in yaml.safe_dump(jobs[name]["env"])
-    assert jobs["fetch"]["needs"] == "plan"
-    assert jobs["promote"]["needs"] == ["plan", "fetch"]
-    cond = jobs["promote"]["if"]
-    assert "always()" in cond and "needs.plan.result == 'success'" in cond
 
 
 def test_ci_keeps_its_own_group():
@@ -270,47 +251,53 @@ def test_card_yml_gates_on_the_eastern_clock_before_installing_anything():
     assert (steps[resolve].get("env") or {}).get("INPUT_FORCE")
 
 
-def test_grade_yml_backfills_pbp_only_missing_and_scopes_post_mortem():
-    """grade.yml fires three times a day (Vercel dispatch + two GitHub crons),
-    so each run must be cheap even when the probe below lets it through:
-    the PBP step fetches only the weeks still missing rows, and the post-mortem
-    regrades only the live season except on Monday ET or a dispatch that asks
-    for it (hist=true). NOT every dispatch: the Vercel cron that is this
-    workflow's primary trigger is a dispatch, and keying on the event ran the
-    2023-25 regrade (7 MB read, 3.5 MB rewrite) every single day."""
+def test_grade_yml_runs_no_enrichment_or_post_mortem_step():
+    """final-2026 plan PR-09 (decision D5, 2026-10-18): CFBD drops to the free
+    tier (1,000 calls a month) on 2026-11-05 and no reader remains for the 1H
+    play-by-play aggregates, the SP+ factor chips or the post-mortem tables, so
+    the daily job stopped collecting them -- and with them the CFBD reference
+    cache they restored. The scripts stay (PR-19 archives them); backfill.py's
+    own /plays call, the grader's 0-0 half proof, is a step this job keeps."""
     data = _load(WF_DIR / "grade.yml")
     steps = data["jobs"]["grade"]["steps"]
     runs = [s["run"] for s in steps if isinstance(s.get("run"), str)]
-    pbp = next(r for r in runs if "scripts/backfill_pbp.py" in r)
-    assert "--only-missing" in pbp
+    text = "\n".join(runs)
+    for gone in ("backfill_pbp", "grade_factor_ledger", "post_mortem"):
+        assert f"scripts/{gone}.py" not in text, f"grade.yml must not run {gone}.py"
+    uses = {str(s.get("uses", "")) for s in steps}
+    assert CACHE_RESTORE not in uses and CACHE_SAVE not in uses
+    assert "scripts/backfill.py" in text, "the /plays 0-0 proof rides backfill.py"
+    health = next(s for s in steps if s.get("id") == "health")
+    assert {k for k in health["env"] if k.startswith("OUTCOME_")} == {
+        "OUTCOME_BACKFILL",
+        "OUTCOME_ESPN",
+    }
+    assert "et_dow" not in (WF_DIR / "grade.yml").read_text()
     espn = next(r for r in runs if "scripts/backfill_scores_espn.py" in r)
     assert "--days-back 4" in espn, "twice a day, four days back covers every late final"
-    resolve = next(s for s in steps if s.get("id") == "season")
-    assert "et_dow=$(TZ=America/New_York date +%u)" in resolve["run"]
-    pm = next(s for s in steps if "scripts/post_mortem.py" in (s.get("run") or ""))
-    assert pm["env"]["ET_DOW"] == "${{ steps.season.outputs.et_dow }}"
-    assert "scope=live" in pm["run"]
-    assert '"$ET_DOW" = "1"' in pm["run"]
-    assert pm["env"]["IN_HIST"] == "${{ inputs.hist }}"
-    assert '"$IN_HIST" = "true"' in pm["run"]
-    assert 'GITHUB_EVENT_NAME" = "workflow_dispatch' not in pm["run"]
-    assert '--scope "$scope"' in pm["run"]
     hist = _on(data)["workflow_dispatch"]["inputs"]["hist"]
     assert hist["type"] == "boolean" and hist["default"] is False
+    assert "regrade" in _on(data)["workflow_dispatch"]["inputs"]
     # Both crons stay; no case-block gate.
     assert len(_cron_strings(data)) == 2
     assert not any('case "$SCHEDULE"' in r for r in runs)
+
+
+def test_weather_actuals_workflow_is_retired():
+    """Retired 2026-10-18 (final-2026 plan PR-09, D5): the study-only observed
+    weather backfill (~46% done) stops. The script and its table stay."""
+    assert not (WF_DIR / "weather_actuals.yml").exists()
 
 
 def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     """Three triggers a day (the Vercel dispatch at ~10:52Z and GitHub's 10:30Z
     and 16:00Z crons, which fire 2-4 h late) each ran every step: ~18
     runner-minutes a day for one useful pass, measured 2026-09-20/21. The
-    probe reads a POSITIVE fact -- a postmortem_runs row with scope=live inside
-    the last four hours; the post-mortem is the job's last step, so the row
-    proves a whole run completed -- and gates every work step on it. Four
+    probe reads a POSITIVE fact -- the last_grade_completed_at gauge written
+    inside the last four hours, after the job's fatal steps -- and gates every
+    work step on it. Four
     hours, not "today": the noon-ET second pass for late finals is deliberate
-    and stays. hist=true forces. The cache save stays on always()."""
+    and stays. hist=true forces."""
     data = _load(WF_DIR / "grade.yml")
     steps = data["jobs"]["grade"]["steps"]
     probe = next(s for s in steps if s.get("id") == "probe")
@@ -325,9 +312,6 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     )
     names = [s.get("name", "") for s in steps]
     assert names.index(marker["name"]) > names.index("Grade frozen game records")
-    assert names.index(marker["name"]) < names.index(
-        "Post-mortem (rated games vs outcomes -> postmortem_* tables)"
-    )
     assert "timedelta(hours=4)" in probe["run"]
     assert probe["env"]["IN_HIST"] == "${{ inputs.hist }}"
     assert 'os.environ.get("IN_HIST") == "true"' in probe["run"]
@@ -336,9 +320,6 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     assert steps[idx - 1].get("id") == "season", "the probe runs right after the season resolves"
     gate = "steps.probe.outputs.need_grade == 'true'"
     for s in steps[idx + 1 :]:
-        if s.get("uses") == CACHE_SAVE:
-            assert (s.get("if") or "").startswith("always()")
-            continue
         if s.get("id") == "health":
             # The health contract runs on always() (a red run still gets a
             # verdict) and reads the probe's answer as SKIPPED: a run the
@@ -347,7 +328,7 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
             assert "need_grade" in s["env"]["SKIPPED"]
             continue
         assert s.get("if") == gate, f"{s.get('name')} is not gated on the probe"
-    assert any("scripts/post_mortem.py" in (s.get("run") or "") for s in steps[idx + 1 :])
+    assert any("record_gauge.py" in (s.get("run") or "") for s in steps[idx + 1 :])
 
 
 def test_grade_yml_judge_step_is_fatal_and_follows_the_pick_grade_step():
@@ -555,7 +536,7 @@ def test_every_job_runs_on_the_pinned_runner_image():
                 f"{p.name}:{jname}: runs-on must be {RUNNER_IMAGE}, got {job.get('runs-on')!r}"
             )
             checked += 1
-    assert checked >= 20
+    assert checked >= 15
 
 
 def test_every_scheduled_python_workflow_caches_pip():
@@ -621,8 +602,8 @@ def test_cfbd_cache_is_restored_where_features_build_and_saved_only_when_populat
         )
         assert saves[0] > last_feature > restores[0] or saves[0] > restores[0], p.name
         checked += 1
-    assert checked >= 6, (
-        f"expected the card, grade, sunday, rescore, study and gate workflows; got {checked}"
+    assert checked >= 5, (
+        f"expected the card, sunday, rescore, study and gate workflows; got {checked}"
     )
 
 

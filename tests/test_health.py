@@ -18,7 +18,6 @@ from beatvegas.db.models import (
     GameRecord,
     ManualPick,
     OddsSnapshot,
-    PostMortemRun,
     Prediction,
     ShortlistEntry,
     TeamTempo,
@@ -366,54 +365,6 @@ class TestGrade:
         with scope() as s:
             assert fn(_ctx(s, "grade")).ok
 
-    def test_postmortem_written_matches_the_exact_live_scope(self, db):
-        eng, scope = db
-        fn = _check("grade", "grade.postmortem_written").fn
-        with Session(eng) as s:
-            # The bug of 2026-09-22 in reverse: a row with scope 'live' is NOT the season's.
-            s.add(PostMortemRun(run_id="a", computed_at=NOW, scope="live", n_games=5))
-            s.add(PostMortemRun(run_id="b", computed_at=NOW, scope="hist_2023_25", n_games=5))
-            s.add(
-                PostMortemRun(
-                    run_id="c",
-                    computed_at=STARTED - timedelta(hours=5),
-                    scope=f"live_{SEASON}",
-                    n_games=5,
-                )
-            )
-            s.commit()
-        with scope() as s:
-            r = fn(_ctx(s, "grade"))
-            assert not r.ok and f"scope=live_{SEASON}" in r.detail
-        with Session(eng) as s:
-            s.add(PostMortemRun(run_id="d", computed_at=NOW, scope=f"live_{SEASON}", n_games=9))
-            s.commit()
-        with scope() as s:
-            r = fn(_ctx(s, "grade"))
-            assert r.ok and "n_games=9" in r.detail
-
-    def test_reference_cache_populated_reads_the_prior_seasons_five_files(
-        self, db, tmp_path, monkeypatch
-    ):
-        from beatvegas.sources import season_stats
-
-        monkeypatch.setattr(season_stats, "CACHE", tmp_path)
-        eng, scope = db
-        fn = _check("grade", "grade.reference_cache_populated").fn
-        with scope() as s:
-            r = fn(_ctx(s, "grade"))
-            assert not r.ok and "0/5" in r.detail and f"sp_{SEASON - 1}.json" in r.detail
-            for kind in health.REFERENCE_CACHE_KINDS:
-                (tmp_path / f"{kind}_{SEASON - 1}.json").write_text("x" * 2000)
-            # The current season's file is reported, never required (an empty
-            # payload is exactly the 2-byte bug the size floor exists for).
-            (tmp_path / f"sp_{SEASON}.json").write_text("[]")
-            r = fn(_ctx(s, "grade"))
-            assert r.ok and f"{SEASON - 1}: 5/5" in r.detail and f"{SEASON}: 0/5" in r.detail
-            # An empty payload for the prior season is a miss again.
-            (tmp_path / f"adv_{SEASON - 1}.json").write_text("[]")
-            assert not fn(_ctx(s, "grade")).ok
-
     def test_info_counts_zero_halves_graded_this_run(self, db):
         eng, scope = db
         with Session(eng) as s:
@@ -435,8 +386,11 @@ class TestGrade:
             )
             s.commit()
         with scope() as s:
-            info = health.CONTRACTS["grade"].info(_ctx(s, "grade", outcomes={"pm": "success"}))
-        assert info == {"zero_halves_graded": "1", "pm": "success"}
+            info = health.CONTRACTS["grade"].info(
+                _ctx(s, "grade", outcomes={"espn": "success", "pm": "success"})
+            )
+        # Only the steps grade.yml still has; a stale `pm` outcome is not carried (PR-09).
+        assert info == {"zero_halves_graded": "1", "espn": "success"}
 
 
 # --------------------------------------------------------------------------- #

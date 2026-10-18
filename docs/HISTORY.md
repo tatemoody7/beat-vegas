@@ -10,6 +10,22 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 (THE DAILY GRADE JOB STOPS PLAY-BY-PLAY, POST-MORTEM AND FACTOR-CHIP COLLECTION).** Final-2026 plan PR-09,
+  decision D5. `grade.yml` lost four steps: the 1H play-by-play refresh (`backfill_pbp.py --only-missing` into
+  `fh_team_game`), the SP+ factor credibility ledger (`grade_factor_ledger.py`), the post-mortem (`post_mortem.py` into
+  `postmortem_*`) and the CFBD reference-cache restore/save pair that existed only for the ledger's feature frame; its
+  `OUTCOME_PBP` / `OUTCOME_LEDGER` / `OUTCOME_PM` health inputs and the Eastern-weekday output went with them.
+  `weather_actuals.yml` is deleted (the study-only observed-weather backfill, about 46% done). The `grade` health
+  contract dropped `grade.postmortem_written` and `grade.reference_cache_populated` (the sunday contract keeps its own
+  cache check); the two 2026-09 failure modes stay as history with no live check. **Why:** CFBD drops to the free tier
+  (1,000 calls a month) on 2026-11-05 and no page or job reads those rows. **CFBD calls saved (an estimate from the
+  step design, not a measured count):** at most one `/plays` call per run for the weeks still missing rows (usually
+  none), plus the reference fetch (~22 calls) on every run where the weekly cache missed, plus the factor ledger's
+  `/ratings/sp`. **Kept:** `backfill.py`'s own `/plays` call (the grader's 0-0 half proof), `close_coverage`, the `hist`
+  and `regrade` inputs, moneylines. `fh_team_game`, `weather_actuals` and `postmortem_*` keep their rows; nothing reads
+  them live (the model has not used the PBP table since the B-SERVE fix). The three scripts stay in place until PR-19
+  archives them. First run proving it: Monday 2026-10-19 10Z (the four-hour guard makes a same-day hand dispatch skip).
+
 - **2026-10-18 ~21:00 UTC (THE ODDS API PROGRAMME, STEP 6: THE ARCHIVE QUEUE'S WORKFLOW AND ITS PROBE).** Final-2026
   plan PR-C6. Credits do not roll over, so Tate's decisions C-D5 / C-D9 / C-D13 / C-D17 turn the unspent balance of
   each cycle into permanent datasets in the last four days before the reset: `scripts/archive_buy.py` holds the queue

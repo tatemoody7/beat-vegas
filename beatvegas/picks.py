@@ -12,11 +12,13 @@ unpriced-ticket rules live in exactly one place too.
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
 from .consensus import fields_for_pick
-from .db.models import AppSetting, ManualPick, OddsSnapshot
+from .db.models import AppSetting, JudgeReadingAudit, ManualPick, OddsSnapshot
 from .grading import (
     clv_under,
     price_clv_under,
@@ -296,7 +298,86 @@ def graded_pick_fields(
     }
 
 
-def grade_pick(session, pick, game) -> bool:
+# The judge's columns (beatvegas/consensus.py::pick_fields), in the order the
+# audit JSON lists them. Write-once: see apply_judge_reading.
+JUDGE_FIELDS = (
+    "cons_version",
+    "cons_books",
+    "cons_line",
+    "cons_close_at",
+    "cons_p_win",
+    "cons_p_push",
+    "ev_cons",
+    "ev_hr",
+    "cons_excluded",
+)
+JUDGE_REASONS = ("grade", "regrade", "backfill")
+_FLOAT_TOL = 1e-9
+
+
+def _judge_value(v):
+    if isinstance(v, datetime):
+        return v.isoformat()
+    return v
+
+
+def _same_judge_value(a, b) -> bool:
+    if isinstance(a, float) or isinstance(b, float):
+        if a is None or b is None:
+            return a is b
+        return abs(float(a) - float(b)) <= _FLOAT_TOL
+    return a == b
+
+
+def apply_judge_reading(session, pick, fields: dict, *, reason: str, run_id=None) -> str:
+    """Write the judge's columns ONCE; later recomputations are audited, not written.
+
+    The 2026 programme's evidence is each pick's `ev_cons` as first read. A
+    pick's reading could be recomputed three ways -- `grade_pick` at grading
+    time (after `consensus_backfill` has usually read it an hour past kickoff),
+    `pick.py grade --regrade`, and `consensus_backfill --write` without
+    `--missing-only` -- and until 2026-10-18 each of them overwrote the columns
+    in place, so a changed past reading left no trace. Now:
+
+    - `cons_version` NULL (never read): every field in `fields` is written.
+      Returns "written".
+    - already read and `fields` agree with the stored values (floats within
+      1e-9, datetimes equal): nothing happens. Returns "same".
+    - already read and something differs: the pick is left exactly as it was
+      and one `judge_reading_audit` row records the stored and the computed
+      values, which fields differ, the reason and the run id. Returns "audited".
+
+    `reason` is one of JUDGE_REASONS; `run_id` defaults to GITHUB_RUN_ID or '-'.
+    """
+    if reason not in JUDGE_REASONS:
+        raise ValueError(f"unknown judge reason {reason!r}; expected one of {JUDGE_REASONS}")
+    if getattr(pick, "cons_version", None) is None:
+        for k in JUDGE_FIELDS:
+            setattr(pick, k, fields.get(k))
+        return "written"
+    stored = {k: getattr(pick, k, None) for k in JUDGE_FIELDS}
+    computed = {k: fields.get(k) for k in JUDGE_FIELDS}
+    changed = [k for k in JUDGE_FIELDS if not _same_judge_value(stored[k], computed[k])]
+    if not changed:
+        return "same"
+    session.add(
+        JudgeReadingAudit(
+            ledger="manual" if isinstance(pick, ManualPick) else "challenger",
+            pick_id=pick.id,
+            computed_at=datetime.utcnow(),
+            run_id=str(run_id or os.environ.get("GITHUB_RUN_ID") or "-"),
+            reason=reason,
+            changed=",".join(changed),
+            stored_json=json.dumps({k: _judge_value(v) for k, v in stored.items()}, default=str),
+            computed_json=json.dumps(
+                {k: _judge_value(v) for k, v in computed.items()}, default=str
+            ),
+        )
+    )
+    return "audited"
+
+
+def grade_pick(session, pick, game, judge_reason: str = "grade") -> bool:
     """Grade one ungraded pick against its (finished) game in place. Returns
     True when the pick was graded, False when the game isn't gradeable yet (not
     finished, or a known-false 1H zero — never grade that).
@@ -394,9 +475,13 @@ def grade_pick(session, pick, game) -> bool:
     pick.closing_captured_at = closing_at
     # Line value at the wager's exact terms (beatvegas/consensus.py): the 2026
     # research program's judge, read from the same pre-kick snapshots. It never
-    # blocks a grade -- a missing reading records why in `cons_excluded`.
-    for k, v in fields_for_pick(snaps, game.start_date, pick).items():
-        setattr(pick, k, v)
+    # blocks a grade -- a missing reading records why in `cons_excluded` -- and
+    # it is WRITE-ONCE: consensus_backfill usually read the pick an hour after
+    # kickoff, and a grade (or regrade) that computes something else is audited,
+    # never written (apply_judge_reading).
+    apply_judge_reading(
+        session, pick, fields_for_pick(snaps, game.start_date, pick), reason=judge_reason
+    )
     pick.graded = True
     return True
 

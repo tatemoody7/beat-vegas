@@ -80,17 +80,20 @@ def cmd_grade(args) -> None:
         # the job nightly must not churn it. --regrade is for the case where the
         # GRADING RULE itself changed -- 2026-09-13, when CLV stopped being
         # measured against Hard Rock's pre-kickoff rung. grade_pick recomputes
-        # every field from the game and the snapshots, so it is idempotent.
+        # the result, units and CLV fields from the game and the snapshots; the
+        # judge's columns (ev_cons and friends) are write-once, so a regrade
+        # that would change them is audited (judge_reading_audit), not written.
         if not regrade:
             q = q.filter(ManualPick.graded == False)  # noqa: E712
         picks = q.all()
+        reason = "regrade" if regrade else "grade"
         for p in picks:
             g = s.query(Game).filter(Game.id == p.game_id).one_or_none()
             if g is None:
                 continue
             # per-pick rules (trusted 1H, pre-kick close, Hard Rock's own close,
             # NULL-price fill) live in beatvegas.picks.grade_pick
-            if grade_pick(s, p, g):
+            if grade_pick(s, p, g, judge_reason=reason):
                 graded += 1
     print(f"graded {graded} pick(s) for {season}")
     # H-INSEASON-P's arms settle by the same rules, in their own table. A failure

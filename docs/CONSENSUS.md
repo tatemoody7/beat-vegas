@@ -63,11 +63,19 @@ is that run's artifact.
 
 ## Where it runs
 
-- `picks.grade_pick` writes the columns on every new grade (manual_picks and challenger_picks:
-  `cons_version`, `cons_books`, `cons_line`, `cons_close_at`, `cons_p_win`, `cons_p_push`,
-  `ev_cons`, `ev_hr`, `cons_excluded`). A missing reading never blocks a grade.
-- `grade.yml` runs `scripts/consensus_backfill.py --write --missing-only` after "Grade my picks"
-  (continue-on-error), so rows graded before the engine get their reading once.
+- `grade.yml` runs `scripts/consensus_backfill.py --write --missing-only` every day: a pick is
+  read an hour after kickoff (p1.2 R3′), graded or not, and the columns land on its row
+  (manual_picks and challenger_picks: `cons_version`, `cons_books`, `cons_line`, `cons_close_at`,
+  `cons_p_win`, `cons_p_push`, `ev_cons`, `ev_hr`, `cons_excluded`).
+- `picks.grade_pick` computes the same reading when the pick is graded; a row the backfill has not
+  reached gets it there. A missing reading never blocks a grade.
+- **The columns are write-once (2026-10-18, final-2026 plan PR-01;
+  `picks.apply_judge_reading`).** The first reading is the evidence. A grade after the backfill, a
+  `pick.py grade --regrade`, or a `--write` without `--missing-only` that computes something
+  different writes nothing to the pick: one `judge_reading_audit` row records the stored values,
+  the computed values, which fields differ, the reason (grade / regrade / backfill) and the run id.
+  An identical recomputation writes nothing at all. The Monday read and the final report list the
+  audit; no gate or position reads it.
 - `study.yml` runs the same script as a report (refuses `--write`).
 - `ev_hr` is the secondary reading against Hard Rock's own closing main quote (its rungs dropped,
   `lines.hr_main_snaps`).

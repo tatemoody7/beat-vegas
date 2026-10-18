@@ -10,6 +10,20 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 (THE JUDGE'S COLUMNS ARE WRITE-ONCE; A DIFFERING RECOMPUTATION IS AUDITED).** Final-2026 plan
+  PR-01. The audit found three paths that overwrote a pick's reading in place: `picks.grade_pick` at grading
+  time (after `consensus_backfill` had usually read the pick an hour past kickoff, p1.2 R3′), `pick.py grade
+  --regrade`, and `consensus_backfill --write` without `--missing-only`; a changed past reading left no trace,
+  and the Monday read recomputes every SPRT path from the stored `ev_cons`. Now every writer goes through
+  `picks.apply_judge_reading`: a row with no reading (`cons_version` NULL) gets this one; a row already read
+  keeps it, and a recomputation that differs (floats beyond 1e-9) writes one `judge_reading_audit` row (ledger,
+  pick id, stored and computed values, the fields that differ, reason grade / regrade / backfill, run id) and
+  nothing to the pick; an identical recomputation writes nothing. `challenger_picks` and `manual_picks` share
+  the function. The backfill's summary counts written / kept / audited. New table via `init_db`
+  (`migrate.yml` before the next grade run; the write path would otherwise fail on the insert).
+  `docs/CONSENSUS.md` "Where it runs" rewritten; `tests/test_judge_write_once.py` works each path on SQLite
+  with the real judge and grader. Standing rule until this is on Neon: no `grade.yml regrade=true` dispatch.
+
 - **2026-10-18 ~15:00 UTC (REAL MONEY ENDED; THE MONEY DOCS DESCRIBE A FROZEN LEDGER).** Tate's decision D2 in the
   final-2026 plan (PR-11, docs only): the personal first-half-unders ledger (v1.4) ends. Its 30 graded real tickets
   stay as a frozen historical ledger, never edited; the `rule_paused` switch is set on today and stays on; the owner
@@ -18,9 +32,27 @@ hold the rest.
   reads paper picks only, and `CLAUDE.md` is reworded in its four places that said real money was on. No row, rule,
   constant, test or code changed; every sentence `tests/test_docs_parity.py` pins is untouched.
 
-## 2026-10-17
+- **2026-10-18 ~15:00 UTC (THE FINAL-2026 PLAN; REAL MONEY ENDED; THE SATURDAY REPORT STOPPED).** Tate asked
+  for an independent audit of the whole system and a plan to run the rest of 2026 as an automated testing
+  machine, then stop paying (`~/.claude/plans/beat-vegas-final-fluffy-hollerith.md`: the assessment, his
+  fourteen decisions, a 25-PR roadmap). The decisions: paid operation ends after Sat 11-28 (week 13; no
+  championship or Army-Navy capture; the Odds API's ~12-05 renewal is cancelled); **real money ended today**
+  (`rule_paused` = true at 14:59Z through Neon's HTTPS endpoint, `app_settings_log` 674; the 30 graded tickets
+  are a frozen ledger, the owner log path leaves the site in later PRs); the Sunday refit stays as registered
+  and model code is frozen to the final read; the final read moves to **Mon 11-30** (roadmap amendment v2.6
+  to follow; the 12-07 mid-point is dropped; H6, H-JUDGE and H-VENUE-1 read the same day); play-by-play,
+  weather-actuals, post-mortem and factor-chip collection stop (moneylines stay: pv1 compares them); the
+  Board will rank by arm membership; the Mac Saturday board report is deleted (scheduled task
+  `bv-saturday-board-report` removed 2026-10-18; its skill folder stays on disk); alerts are GitHub email
+  only from one daily digest with age checks; FGU / WXFG apply `is_hr_rung` forward (p1.3 to follow); after
+  11-30 a full export goes to the public repo and Neon drops to the free tier; a weekly evidence snapshot
+  (`data/evidence/2026-wNN/`) is committed by the Monday workflow; the final report is
+  `docs/program/SEASON_2026_FINAL.md` plus a Final read section on `/research`, with the pre-arm paper and
+  the retired neggap picks reported in full as development evidence. Live state at the audit: 30 real
+  tickets −1.83u (mean `ev_cons` −4.1%, n 18 read); every registered arm's first picks read −3% to −6%
+  `ev_cons` at n 3-23; 11,356 Odds credits left (the 10-15 line-release study spent 6,509 in a day).
 
-- **2026-10-19 ~15:10 UTC (THE RESIDUAL-GATE SHIM HAS NO IMPORTERS LEFT).** Final-2026 plan PR-18 (mechanical, S). Fifteen
+- **2026-10-18 ~15:10 UTC (THE RESIDUAL-GATE SHIM HAS NO IMPORTERS LEFT).** Final-2026 plan PR-18 (mechanical, S). Fifteen
   scripts imported `report_paths` / `append_step_summary` through `scripts/residual_gate.py`, a re-export shim: `protocol_position`
   (the live Monday job), `stopping_rule_position`, `neggap_position`, `neggap_level_study`, `fg_position`, `challenger_position`,
   `when_to_bet_study`, `gates_study`, `sharp_book_probe`, `blend_gate` (bare `from residual_gate import`) and `inseason_gate`,
@@ -31,6 +63,9 @@ hold the rest.
   `scripts/residual_gate.py` stays untouched for PR-19; only its own file and the tests that test it still name it
   (`test_residual_gate_script.py`, `test_reporting.py`, `test_harness_consumers.py`, `test_gate_scripts_run_without_pythonpath.py`).
   Checked: `ruff check` / `ruff format --check` clean; full suite 1,848 passed (exit 0); every repointed script's `--help` exits 0 with PYTHONPATH unset.
+
+## 2026-10-17
+
 
 - **2026-10-17 ~23:00 UTC (RECORDS SPLIT: HARD ROCK RECORDS AND MARKET RESEARCH, NEVER MIXED).** From the fact-check
   audit's plan (P1.1/P1.2, Tate's calls). `/records` graded every game against `predictions.line_used`: in 2026 a derived

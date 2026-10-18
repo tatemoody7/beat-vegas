@@ -23,6 +23,12 @@ Writes reports/consensus_backfill_<UTC>.{md,json}. study.yml runs it as a
 report and refuses --write; grade.yml runs it with --write --missing-only so a
 row graded before this engine existed, or by a run that lacked the table, gets
 its reading once.
+
+The judge's columns are WRITE-ONCE (2026-10-18, beatvegas/picks.py::apply_judge_reading):
+--write fills a row that has no reading and never overwrites one that has. A
+recomputation that disagrees with the stored reading lands in judge_reading_audit
+(stored values, computed values, which fields differ, run id) and the row keeps
+its first reading; the summary line counts written / kept / audited.
 """
 
 from __future__ import annotations
@@ -42,6 +48,7 @@ from sqlalchemy.orm import load_only
 from beatvegas.consensus import CONSENSUS_VERSION, SNAP_MARKET, HalfPointTable, fields_for_pick
 from beatvegas.db.models import ChallengerPick, Game, ManualPick, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
+from beatvegas.picks import apply_judge_reading
 
 ROOT = Path(__file__).resolve().parent.parent
 CHUNK = 500
@@ -90,6 +97,7 @@ def main(argv=None) -> int:
     table = HalfPointTable.load()
     groups: Dict[tuple, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
     written = 0
+    outcomes: Counter = Counter()  # written / same / audited (--write only)
     with session_scope() as s:
         picks: list = []
         cutoff = datetime.utcnow() - timedelta(hours=READ_AFTER_KICKOFF_H)
@@ -150,10 +158,14 @@ def main(argv=None) -> int:
             if fields["cons_p_win"] is not None:
                 g["p_win"].append(fields["cons_p_win"])
             if args.write:
-                for k, v in fields.items():
-                    setattr(p, k, v)
-                written += 1
-                if written % CHUNK == 0:
+                # Write-once (beatvegas/picks.py::apply_judge_reading): a row with
+                # no reading gets this one; a row already read keeps it, and a
+                # recomputation that differs is audited, never written.
+                outcome = apply_judge_reading(s, p, fields, reason="backfill")
+                outcomes[outcome] += 1
+                if outcome == "written":
+                    written += 1
+                if (written + outcomes["audited"]) % CHUNK == 0:
                     s.commit()
         if args.write:
             s.commit()
@@ -167,6 +179,8 @@ def main(argv=None) -> int:
         "missing_only": args.missing_only,
         "rows": sum(len(g["rows"]) for g in groups.values()),
         "written": written,
+        "kept": outcomes["same"],  # already read, recomputation agreed
+        "audited": outcomes["audited"],  # already read, recomputation differed: audit row, no write
         "groups": {},
     }
     md = [
@@ -205,7 +219,10 @@ def main(argv=None) -> int:
     (outdir / f"consensus_backfill_{stamp}.json").write_text(json.dumps(out, indent=1, default=str))
     (outdir / f"consensus_backfill_{stamp}.md").write_text("\n".join(md) + "\n")
     print("\n".join(md))
-    print(f"rows {out['rows']}, written {written}")
+    print(
+        f"rows {out['rows']}, written {written}, kept {out['kept']}, audited {out['audited']}"
+        + (" (write-once: an audited row kept its first reading)" if out["audited"] else "")
+    )
     return 0
 
 

@@ -943,6 +943,30 @@ class AppSettingLog(Base):
     written_at = Column(DateTime, index=True)  # naive UTC
 
 
+class JudgeReadingAudit(Base):
+    """What a later recomputation of the judge WOULD have written (2026-10-18,
+    final-2026 plan PR-01). The judge's columns on `manual_picks` and
+    `challenger_picks` (`cons_*`, `ev_cons`, `ev_hr`, `cons_excluded`) are
+    write-once: the first reading of a pick is the evidence, and nothing
+    overwrites it -- not a regrade, not a backfill, not grading a pick the
+    backfill already read. When a recomputation differs from what is stored, the
+    difference lands here instead, so a reading that would have changed is a
+    visible event with a run id, never a silent rewrite. Identical recomputations
+    write nothing. Readers: the Monday read's appendix and the final report; no
+    gate, position or page reads it."""
+
+    __tablename__ = "judge_reading_audit"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ledger = Column(String(16), nullable=False, index=True)  # manual | challenger
+    pick_id = Column(Integer, nullable=False, index=True)
+    computed_at = Column(DateTime, nullable=False)  # naive UTC
+    run_id = Column(String(32))  # GITHUB_RUN_ID of the writer, '-' by hand
+    reason = Column(String(16), nullable=False)  # grade | regrade | backfill
+    changed = Column(Text, nullable=False)  # comma-separated field names that differ
+    stored_json = Column(Text, nullable=False)  # the columns as they stand (kept)
+    computed_json = Column(Text, nullable=False)  # what this run computed (not written)
+
+
 class InjurySnapshot(Base):
     """The whole Rotowire injury report, one row per research_preview run
     (2026-10-04). game_previews keeps only the per-game extract and is

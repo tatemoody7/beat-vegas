@@ -234,12 +234,12 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   refuses future, >7 d and post-kickoff times; the log form's "Placed at" is blank by default.
 - Real tickets freeze at kickoff; until then PATCH edits price/stake/note (a new price is re-judged,
   never null; bonus is set at log only). `uq_manual_pick_per_ledger` stops duplicates.
-- Grading is side-aware in one place each: `grading.units_won(side)`,
-  `picks.graded_pick_fields(side)`, `lines.book_closing_price_before_kickoff(side)`. Stored
-  `clv = closing − bet` (the close never counts Hard Rock, Fliff or the feed's consensus row:
-  `lines.CLOSE_EXCLUDED_BOOKS`), so **negative is the good direction for an under**; the site shows
-  `−clv` (`lib/clvDirection.test.ts` pins it). `price_provenance` ∈ logged / backfilled_close / unknown;
-  only `logged` feeds price CLV.
+- Grading is side-aware in one place each: `grading.units_won(side)`, `picks.graded_pick_fields(side)`,
+  `lines.book_closing_price_before_kickoff(side)`. Stored `clv = closing − bet` (the close never counts
+  Hard Rock, Fliff or the feed's consensus row: `lines.CLOSE_EXCLUDED_BOOKS`), so **negative is the good
+  direction for an under**; the site shows `−clv` (`lib/clvDirection.test.ts` pins it). `price_provenance`
+  ∈ logged / backfilled_close / unknown; only `logged` feeds price CLV. **The judge's columns (`ev_cons`,
+  `cons_*`) are write-once** (`picks.apply_judge_reading`): a differing recomputation is audited in `judge_reading_audit`, never written.
 - Real: `manual_picks` (`is_paper=false`). Paper: `manual_picks` (`is_paper=true`, 1 unit, build
   only). Challengers: `challenger_picks` only — one missed filter contaminates the champion's clock.
 

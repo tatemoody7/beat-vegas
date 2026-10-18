@@ -78,7 +78,7 @@ def test_the_season_ends_at_the_final_read_by_the_clock():
     season is over from 12:00 UTC that day, deterministically; the last kickoff is before it."""
     from datetime import datetime
 
-    assert P.PROTOCOL_VERSION == "p1.3"
+    assert P.PROTOCOL_VERSION == "p1.4"
     assert P.SEASON_LAST_KICKOFF == "2026-11-29T04:00:00" and P.FINAL_READ_DATE == "2026-11-30"
     assert P.SEASON_LAST_KICKOFF < P.FINAL_READ_AT == "2026-11-30T12:00:00"
     assert not P.season_over(datetime(2026, 11, 29, 4, 0))  # the last kickoff itself

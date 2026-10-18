@@ -8,7 +8,17 @@ import os
 import sys
 from pathlib import Path
 
-import pytest
+# One BLAS / OpenMP thread for the whole test session, set before numpy loads.
+# sklearn's HistGradientBoosting bins in OpenMP threads, and on this Mac
+# (Python 3.9 venv, numpy 2) a threaded fit raised "RuntimeError: Identity cache
+# already includes the item" from inside numpy whenever the whole suite was
+# collected -- deterministically, and only then (2026-10-18, final-2026 PR-03;
+# the pre-push hook runs exactly that). One thread makes the fit deterministic,
+# costs nothing measurable here, and changes no result on CI.
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
+import pytest  # noqa: E402
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "scripts"))

@@ -592,3 +592,38 @@ def test_the_arms_account_for_every_priced_game_fresh_carried_dome_or_unknown():
         stats["unknown"],
     ) == (4, 1, 1, 1, 1)
     assert stats["unknown_game_ids"] == [4] and stats["oldest_carried_h"] == 72.0
+
+
+def test_p14_full_game_arm_ignores_a_hard_rock_rung_and_logs_the_last_main_line():
+    """p1.4 (2026-10-18): the newest Hard Rock full-game row is a -150 rung; the
+    arm logs at the main 44.5 posted earlier and counts the rung ignored."""
+    eng, scope = _sqlite_scope()
+    _seed(eng, [(1, 1, KICK)])
+    with Session(eng) as s:
+        for line, over, under, at in [
+            (44.5, -110, -110, NOW - timedelta(hours=2)),
+            (47.5, 125, -150, NOW - timedelta(minutes=10)),
+        ]:
+            s.add(
+                OddsSnapshot(
+                    game_id=1,
+                    book="hardrockbet",
+                    market="full_game_total",
+                    line=line,
+                    over_price=over,
+                    under_price=under,
+                    captured_at=at,
+                )
+            )
+        s.commit()
+    fcs = {1: BuildForecast(game_id=1, wind_mph=14.0, dome=False, fetched_at=NOW)}
+    with scope() as s:
+        out = W.log_full_game(s, 2026, 8, NOW, fcs, slot="tue_pm")
+    assert (out["windy"], out["added"], out["hr_alt_ignored"]) == (1, 1, 1)
+    with Session(eng) as s:
+        (r,) = s.query(ChallengerPick).all()
+        assert (r.line, r.price) == (44.5, -110)
+    line = [
+        ln for ln in W.summary_lines({"capture": {}, "1h": {}, "full": out}) if "full game" in ln
+    ][0]
+    assert "1 Hard Rock alternate rung ignored (p1.4)" in line

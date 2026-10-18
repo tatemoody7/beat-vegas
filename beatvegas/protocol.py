@@ -55,7 +55,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-PROTOCOL_VERSION = "p1.3"
+PROTOCOL_VERSION = "p1.4"
 K_TESTS = 10
 FAMILY_ALPHA = 0.05
 ALPHA = FAMILY_ALPHA / K_TESTS  # 0.005 per confirmatory test

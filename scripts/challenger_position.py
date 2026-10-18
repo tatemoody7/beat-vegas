@@ -25,10 +25,10 @@ from typing import Any, Dict, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from residual_gate import append_step_summary, report_paths  # noqa: E402
 from sqlalchemy import func  # noqa: E402
 
 from beatvegas.backtest import stopping as S  # noqa: E402
+from beatvegas.backtest.reporting import append_step_summary, report_paths  # noqa: E402
 from beatvegas.db.models import ChallengerPick  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 

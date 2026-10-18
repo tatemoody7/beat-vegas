@@ -27,9 +27,8 @@ from sqlalchemy import text
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from residual_gate import append_step_summary, report_paths  # noqa: E402
-
 from beatvegas.backtest import neggap_level as N  # noqa: E402
+from beatvegas.backtest.reporting import append_step_summary, report_paths  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 
 

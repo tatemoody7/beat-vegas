@@ -20,6 +20,18 @@ hold the rest.
 
 ## 2026-10-17
 
+- **2026-10-19 ~15:10 UTC (THE RESIDUAL-GATE SHIM HAS NO IMPORTERS LEFT).** Final-2026 plan PR-18 (mechanical, S). Fifteen
+  scripts imported `report_paths` / `append_step_summary` through `scripts/residual_gate.py`, a re-export shim: `protocol_position`
+  (the live Monday job), `stopping_rule_position`, `neggap_position`, `neggap_level_study`, `fg_position`, `challenger_position`,
+  `when_to_bet_study`, `gates_study`, `sharp_book_probe`, `blend_gate` (bare `from residual_gate import`) and `inseason_gate`,
+  `weather_gate`, `level_anchor_gate`, `intercept_gate`, `censoring_study` (`from scripts.residual_gate import`). All now import
+  from `beatvegas.backtest.reporting`, where the two functions are defined; import order re-sorted by ruff, nothing else touched.
+  `blend_gate` also took `load_closes` and `load_played_frame`, which the shim defines itself rather than re-exports; it now
+  carries its own two-line copies (same calls: `snapshots.consensus_closes` over `kickoffs_for`; `training_frame(build_feature_frame(min_games=2))`).
+  `scripts/residual_gate.py` stays untouched for PR-19; only its own file and the tests that test it still name it
+  (`test_residual_gate_script.py`, `test_reporting.py`, `test_harness_consumers.py`, `test_gate_scripts_run_without_pythonpath.py`).
+  Checked: `ruff check` / `ruff format --check` clean; full suite 1,848 passed (exit 0); every repointed script's `--help` exits 0 with PYTHONPATH unset.
+
 - **2026-10-17 ~23:00 UTC (RECORDS SPLIT: HARD ROCK RECORDS AND MARKET RESEARCH, NEVER MIXED).** From the fact-check
   audit's plan (P1.1/P1.2, Tate's calls). `/records` graded every game against `predictions.line_used`: in 2026 a derived
   or median line (only 64 of 334 equal to Hard Rock's), and for 2023-25 the proxy line written 2026-06-03 from a share

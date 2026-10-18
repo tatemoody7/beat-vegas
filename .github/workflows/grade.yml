@@ -9,16 +9,17 @@ name: Daily grading (results + ledger)
 # Each run is kept CHEAP (and since 2026-09-22 a run that finds a completed
 # grading run inside the last four hours skips the work -- see the probe): the
 # finals refresh only writes games CFBD marks completed (a noon-ET Saturday run
-# never freezes a live score), the PBP step fetches only the weeks still missing
-# fh_team_game rows, and the post-mortem regrades only the live season except on
-# Monday (ET) -- or a dispatch with hist=true -- when it also redoes the 2023-25
-# history. (Until 2026-09-16 EVERY dispatch did the history pass, and the Vercel
-# cron that is this workflow's primary trigger IS a dispatch, so the 7 MB read +
-# 3.5 MB rewrite ran daily instead of weekly.)
-# Post-game refresh + grading: finals, 1H play-by-play aggregates, then the
-# ledgers. Pre-game enrichment (pace/weather) + scoring run Sundays
-# (sunday.yml). A red run here means "the ledger or PBP factors are stale";
-# GitHub emails it and the Monday coaching routine re-kicks the workflow.
+# never freezes a live score).
+# Post-game refresh + grading: finals, then the ledgers. Pre-game enrichment
+# (pace/weather) + scoring run Sundays (sunday.yml). A red run here means "the
+# ledger is stale"; GitHub emails it and the Monday coaching routine re-kicks
+# the workflow.
+# Stopped 2026-10-18 (final-2026 plan PR-09, decision D5): the 1H play-by-play
+# refresh (fh_team_game), the factor credibility ledger and the post-mortem
+# tables, and with them the CFBD reference cache this job restored for the
+# ledger's feature frame. CFBD drops to the free tier (1,000 calls a month) on
+# 2026-11-05 and no reader remains: the scripts stay, the rows stay, nothing
+# collects them. backfill.py's own /plays call (the 0-0 half proof) stays.
 # No ODDS_API_KEY: grading reads snapshots already in Neon.
 
 # Least privilege: these jobs read the repo and write to Neon via
@@ -44,7 +45,7 @@ on:
   workflow_dispatch:
     inputs:
       hist:
-        description: 'also regrade the 2023-25 history (post-mortem scope both); default is Monday ET only'
+        description: 'also regrade the 2023-25 Market Research closes (grade.py per season)'
         type: boolean
         required: false
         default: false
@@ -82,18 +83,10 @@ jobs:
         run: |
           pip install --require-hashes -r requirements/lock.txt
           pip install --no-deps --no-build-isolation -e .
-      - name: Restore CFBD reference data (weekly cache)
-        # grade_factor_ledger.py builds the feature frame, which fetches the
-        # SP+/talent/roster/returning references (~22 CFBD calls) -- twice a
-        # day here. This job was the one heavy caller NOT sharing the cache.
-        id: cfbd_cache
-        uses: ./.github/actions/cfbd-cache
       - name: Resolve season
         id: season
         run: |
           echo "season=$(python -c 'from beatvegas.season import current_season; print(current_season())')" >> "$GITHUB_OUTPUT"
-          # ISO weekday in Eastern time (1 = Monday): the weekly full pass.
-          echo "et_dow=$(TZ=America/New_York date +%u)" >> "$GITHUB_OUTPUT"
           # The run's clock for the health contract (last step): every fact it
           # checks must have been written after this instant.
           echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
@@ -164,20 +157,6 @@ jobs:
         # ever landed in.
         continue-on-error: true
         run: python scripts/backfill_scores_espn.py --days-back 4
-      - name: Refresh 1H play-by-play aggregates (CFBD /plays, finished games)
-        id: pbp
-        if: steps.probe.outputs.need_grade == 'true'
-        # fh_team_game feeds the season-to-date FH factors the Sunday scorer
-        # reads; without this the current season never accrues PBP rows.
-        # --only-missing: one CFBD call per week that still has a finished FBS
-        # game without rows (usually one, often none) instead of all 20 weeks
-        # twice a day; upsert by (game_id, off_team), fail-silent per season.
-        # Enrichment, not grading: PBP aggregates feed next week's SCORING, so a
-        # flaky CFBD call here must never stop this week's grades from landing.
-        continue-on-error: true
-        env:
-          SEASON: ${{ steps.season.outputs.season }}
-        run: python scripts/backfill_pbp.py --season "$SEASON" --only-missing
       - name: Grade market vs model ledger
         if: steps.probe.outputs.need_grade == 'true'
         env:
@@ -228,32 +207,6 @@ jobs:
         # Reached only when the fatal grading steps above succeeded; the
         # continue-on-error enrichment below cannot fake it.
         run: python scripts/record_gauge.py --key last_grade_completed_at --now
-      - name: Grade factor credibility ledger (real lines only)
-        id: ledger
-        if: steps.probe.outputs.need_grade == 'true'
-        # Display chips only -- nothing downstream reads this to decide a bet,
-        # and it calls CFBD /ratings/sp, which 429'd and skipped the post-mortem
-        # on 2026-09-13 after this guard was reverted by mistake.
-        continue-on-error: true
-        run: python scripts/grade_factor_ledger.py
-      - name: Post-mortem (rated games vs outcomes -> postmortem_* tables)
-        id: pm
-        if: steps.probe.outputs.need_grade == 'true'
-        # Regrades the season's cards at Hard Rock's numbers (scope live) every
-        # run; the stored 2023-25 ratings under the flat and fair proxies (scope
-        # hist, the expensive half) only on Monday ET or when dispatched with
-        # hist=true. NOT on every dispatch: the Vercel cron dispatches this
-        # workflow daily, so keying on the event ran the history pass every day.
-        # Delete-then-rewrite per scope, no API calls. Feeds the Results page
-        # panel and docs/POST_MORTEM.md.
-        env:
-          ET_DOW: ${{ steps.season.outputs.et_dow }}
-          IN_HIST: ${{ inputs.hist }}
-        run: |
-          scope=live
-          if [ "$ET_DOW" = "1" ] || [ "$IN_HIST" = "true" ]; then scope=both; fi
-          echo "post-mortem scope=$scope (et_dow=$ET_DOW hist=$IN_HIST event=$GITHUB_EVENT_NAME)"
-          python scripts/post_mortem.py --write --md "" --scope "$scope"
       - name: Close-window coverage gauge (last Saturday; docs/HEALTH.md)
         # How many of last Saturday's Hard-Rock-priced games the close polls
         # reached (beatvegas/coverage.py -> close_coverage_pct, board banner).
@@ -262,17 +215,12 @@ jobs:
         if: steps.probe.outputs.need_grade == 'true'
         continue-on-error: true
         run: python scripts/close_coverage.py
-      - name: Save CFBD reference cache (only when this run populated it)
-        if: always() && steps.cfbd_cache.outputs.hit != 'true'
-        uses: ./.github/actions/cfbd-cache-save
-        with:
-          key: ${{ steps.cfbd_cache.outputs.key }}
       - name: Health contract (docs/HEALTH.md; writes last_health_grade)
         id: health
         # Did this run leave behind what it was for? beatvegas/health.py checks
         # the positive facts (the completed-grade gauge moved after `started`,
         # no rated game >18h old without a final, records and picks on played
-        # games graded, the live post-mortem row, the CFBD reference cache) and
+        # games graded) and
         # writes the verdict + note to `last_health_grade` for the board banner
         # and /api/health. `failed` exits 1 (email); `degraded` is board-only.
         # always() so a red run still gets a verdict; a run the four-hour probe
@@ -284,7 +232,4 @@ jobs:
           SEASON: ${{ steps.season.outputs.season }}
           OUTCOME_BACKFILL: ${{ steps.backfill.outcome }}
           OUTCOME_ESPN: ${{ steps.espn.outcome }}
-          OUTCOME_PBP: ${{ steps.pbp.outcome }}
-          OUTCOME_LEDGER: ${{ steps.ledger.outcome }}
-          OUTCOME_PM: ${{ steps.pm.outcome }}
         run: python scripts/health_check.py --job grade

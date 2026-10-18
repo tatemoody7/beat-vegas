@@ -101,7 +101,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
 - **Arms 1-3 clocks started at the 2026-10-13 tue_pm card** (`cards.id` 29, 20:51:39Z; `protocol.ARMS_START`;
-  the 10-11 refit `model_runs` 10). `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
+  the 10-11 refit `model_runs` 10).
 - **Reads (v2.6, 2026-10-18)**: the one-page Monday read runs weekly from 2026-10-19 (`pricing_monday.yml`). Paid capture
   ends after Sat **11-28** (week 13; `protocol.SEASON_LAST_KICKOFF`); the **final read is Mon 11-30** (`protocol.FINAL_READ_DATE`;
   p1.3: a running arm times out there, `protocol_position.py --season-over` is implied from 12Z and the workflow's `season_over` input
@@ -121,7 +121,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z; 23Z catch-up, v2.2) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
 | Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up; GitHub 12:30Z backup) | `pricing-monday` → `pricing_monday.yml` | the Monday read: the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13) and every arm's position, one `arm_positions` row per hypothesis per read date (the site, the Monday read and the 11-30 final read read that row); from 11-30 12Z every running arm times out (p1.3, `--season-over` implied; dispatch input `season_over`); health contract `monday` |
-| Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
+| Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → coverage gauge (no PBP, post-mortem or factor chips since 10-18, D5) |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
 in `web/lib/cronJobs.ts` (mirrored by `web/vercel.json`, which **must live in `web/`**). A
@@ -174,7 +174,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `card.yml` | Vercel dispatch + 16 backup crons; inputs slot/force/season/week/max_credits | `cards`, paper `manual_picks` (H-ARM-1HU), `challenger_picks` (H-ARM-1HO/FGU/WX1H/WXFG/HT1H), `build_forecasts`, preview |
 | `lines_watch.yml` | Vercel `lines-close` / `close-weeknight` + 4 crons; input market | `odds_snapshots` (1H; full-game totals, spreads, moneylines) |
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
-| `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges; `hist=true` also grades the 2023-25 Market Research rows |
+| `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
@@ -184,7 +184,6 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
-| `weather_actuals.yml` | dispatch start/end/sources/promote | `weather_actuals` (study-only observed weather, ERA5 + CFBD) |
 | `opening_watch.yml` | Vercel `opening-watch` hourly + GitHub 20-min backup, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every job runs on
@@ -273,7 +272,7 @@ cd web && npm install && npm run dev     # web/.env DATABASE_URL: the sandbox by
   not reconciled". Line value against the close is the one edge measure that needs no proxy; it
   is read at each wager's exact terms by `beatvegas/consensus.py` (`ev_cons` on every graded pick).
 - **What is measured, not gated**: the model's ~2-pt level deficit and its spread-bucket accuracy
-  vs Hard Rock (the post-mortem tables; not read weekly since 10-13), the negative-gap band (superseded 10-14), the gap
+  vs Hard Rock (the post-mortem tables, collection stopped 10-18, D5), the negative-gap band (superseded 10-14), the gap
   ladder by band. No gate, model constant or registry row changes from an analysis; fixes land
   through their own registered row or PR.
 - **The proxy era is history.** Before the 2023-25 closes were bought (Sep 2026) every backtest

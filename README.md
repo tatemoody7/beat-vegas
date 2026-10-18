@@ -129,8 +129,7 @@ itself before it builds.
 Manual-only workflows: `migrate.yml` (additive Neon schema), `backfill_1h.yml` (paid historical 1H lines),
 `history_load.yml` (2003-22 games + Elo, study-only), `backfill_intercept.yml`,
 `enrich_tempo.yml` (re-backfill pace), `weather_backfill.yml` (Open-Meteo into
-`weather_obs`), `weather_actuals.yml` (observed weather into the study-only
-`weather_actuals`), `rescore.yml` (re-score a played week without freezing records), `study.yml`
+`weather_obs`), `rescore.yml` (re-score a played week without freezing records), `study.yml`
 (every registered study; the report artifact is the deliverable). Dispatch any workflow from the Mac with
 `gh workflow run <file> --ref main` (add `-f market=1h|1h_close` for
 `lines_watch.yml`).
@@ -212,8 +211,8 @@ which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the write g
   python scripts/backfill_weather.py --promote          # staging file -> weather_obs
   ```
   (Slow — ~90 min for the full range; safe to re-run, resumes from the staging file.)
-- **Observed weather for the history looks** (`scripts/backfill_weather_actuals.py`,
-  `weather_actuals.yml`): ERA5 hourly around each kickoff plus CFBD's one reading per
+- **Observed weather for the history looks** (`scripts/backfill_weather_actuals.py`;
+  its workflow was retired 2026-10-18, final-2026 D5): ERA5 hourly around each kickoff plus CFBD's one reading per
   game, 2013-2026, into the study-only `weather_actuals` table (`docs/WEATHER.md` §7).
   Never decision-safe, never a model input.
 

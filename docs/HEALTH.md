@@ -119,13 +119,15 @@ carries `HEALTH: <verdict> <note>`.
    the game's line scores before touching anything. A proven 0-0 half is stored
    as `linescores_verified` (or `pbp`) and grades; a plain `linescores` 0 in a
    game that scored never does (`grading.ZERO_PROVEN_SOURCES`, 2026-10-15).
-4. `grade.postmortem_written` missed -> `post_mortem.py --write` did not write
-   the live scope this run; it is `continue-on-error`, so the run is green.
-   Re-run it by hand or re-dispatch `grade.yml`.
-5. `grade.reference_cache_populated` missed -> the CFBD reference files for the
-   prior season are absent or empty in `data/cache/`. The feature build
-   fetched nothing (quota, 429) or the weekly cache key is holding an empty
-   payload; `docs/OPS_ACCOUNTS.md` for the CFBD tier.
+
+Stopped 2026-10-18 (final-2026 plan PR-09, decision D5): the daily run no longer
+collects 1H play-by-play (`fh_team_game`), the SP+ factor chips or the
+post-mortem tables, and no longer restores the CFBD reference cache that fed
+them. CFBD drops to the free tier (1,000 calls a month) on 2026-11-05 and no
+page or job reads those rows; the scripts stay, and so does `backfill.py`'s own
+`/plays` call, the source of the 0-0 half proof. The checks
+`grade.postmortem_written` and `grade.reference_cache_populated` went with
+them; the 2026-09 failure modes below are kept as history.
 
 ### When sunday is degraded or failed
 
@@ -255,8 +257,8 @@ Failure modes on record:
 
 - Workflow: `.github/workflows/grade.yml`
 - Window: daily, 10:30Z cron plus the Vercel dispatch, and a 16:00Z cron Sun-Fri; skipped when a run completed in the last 4 h
-- Artifacts: `games finals`, `results / manual_picks graded`, `game_records graded`, `postmortem_runs live_<season>`, `last_grade_completed_at gauge`
-- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SEASON`, `OUTCOME_BACKFILL`, `OUTCOME_ESPN`, `OUTCOME_PBP`, `OUTCOME_LEDGER`, `OUTCOME_PM`
+- Artifacts: `games finals`, `results / manual_picks graded`, `game_records graded`, `last_grade_completed_at gauge`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `SEASON`, `OUTCOME_BACKFILL`, `OUTCOME_ESPN`
 
 | Check | Severity | Positive fact |
 |---|---|---|
@@ -264,14 +266,12 @@ Failure modes on record:
 | `grade.finals_landed` | degraded | zero rated games (a game_records row) in SEASON with home_points NULL that kicked off more than STALE_AFTER_HOURS [18] hours ago -- the board's stale-results predicate |
 | `grade.records_graded` | degraded | zero game_records in SEASON with graded_at NULL whose game has a first_half_total |
 | `grade.picks_graded` | degraded | zero manual_picks in SEASON with graded false/NULL whose game has a first_half_total |
-| `grade.postmortem_written` | degraded | a postmortem_runs row with scope == live_<SEASON> and computed_at >= RUN_STARTED_AT |
-| `grade.reference_cache_populated` | degraded | the five CFBD reference files (sp/talent/roster/returning/adv) for SEASON-1 exist in data/cache/ at > REFERENCE_CACHE_MIN_BYTES [1024] bytes |
 
 Failure modes on record:
 
 - **2026-09-12** -- CFBD returned 429 on the first, unguarded call and grade.yml failed four runs straight; week 2 sat with finals for 14 of 303 games and 0 of 31 picks graded for two days. Caught by: `grade.completed_this_run`, `grade.finals_landed`, `grade.picks_graded`.
-- **2026-09-16** -- the CFBD reference cache had saved an EMPTY payload all season (the first job of each ISO week made no CFBD calls), so every later run re-fetched ~22 reference calls against a 3,000-call month. Caught by: `grade.reference_cache_populated`.
-- **2026-09-22** -- the four-hour probe matched scope = 'live' while the rows are written as live_<season>, so it matched nothing and never skipped. The check compares the exact scope string. Caught by: `grade.postmortem_written`.
+- **2026-09-16** -- the CFBD reference cache had saved an EMPTY payload all season (the first job of each ISO week made no CFBD calls), so every later run re-fetched ~22 reference calls against a 3,000-call month. (grade.yml stopped restoring the cache 2026-10-18, final-2026 PR-09; `sunday.reference_cache_populated` keeps the check.) Caught by: info only.
+- **2026-09-22** -- the four-hour probe matched scope = 'live' while the rows are written as live_<season>, so it matched nothing and never skipped. The check compared the exact scope string. (The post-mortem step and its check were retired 2026-10-18, final-2026 PR-09; the probe reads the completed-grade gauge.) Caught by: info only.
 - **2026-09-20** -- fifteen 0-0 first halves on file looked like the ESPN false zero and were all real (PR #176). Zero halves graded this run are counted as info (`zero_halves_graded=N`), never judged. Caught by: info only.
 - **2026-10-15** -- the writer stored App State-Old Dominion's proven 0-0 half (full box reconciled, 2026-10-10) and the grader refused every line-score 0, so the record sat ungraded for five days. The writer now labels a proven scoreless half `linescores_verified` and the grader trusts that label and `pbp` only (`grading.ZERO_PROVEN_SOURCES`; tests/test_zero_half_parity.py). Caught by: `grade.records_graded`.
 

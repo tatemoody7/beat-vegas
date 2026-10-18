@@ -223,7 +223,7 @@ cross-check, every played FBS-vs-FBS game 2013-2026, in a table of its own.
 - **CFBD.** One reading per game, as reported (provider unnamed, whole-number
   wind), at `hour_offset` 0, two calls a season. Probed 2026-10-08: 60 of 60 rows
   (2016 week 10) and 54 of 54 (2019 week 12), with every numeric present.
-- **Running it.** `weather_actuals.yml` (dispatch) has three jobs, so the hours of
+- **Running it.** `weather_actuals.yml` (dispatch; retired 2026-10-18, final-2026 plan D5, about 46% done) had three jobs, so the hours of
   fetching never hold the Neon-writer queue:
   - **plan** (in `neon-writers`, seconds): reads games and venues and writes a plan file.
   - **fetch** (no `DATABASE_URL`, outside the queue): ERA5 and CFBD into a staging file.

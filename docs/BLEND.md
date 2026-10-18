@@ -4,7 +4,7 @@
 Measurement only — nothing reads the result file. **Since 2026-10-14 the exploratory collector
 H-ARM-EVP uses its weight, w = 0.80, as a frozen constant** (`beatvegas/evp_paper.py`, pinned to
 this fit by `tests/test_evp_paper.py`; no ledger slot, nothing adopted from it). Run 2026-09-15 with
-`scripts/blend_gate.py --freeze` (GitHub Actions `study.yml`, the campus network filters
+`scripts/archive/blend_gate.py --freeze` (GitHub Actions `study.yml`, the campus network filters
 Neon's port 5432); arithmetic and both rules in `beatvegas/backtest/blend.py`, pinned by
 `tests/test_blend.py`. Registry rows **H3A** and **H3B** in `docs/HYPOTHESES.md`.
 
@@ -136,8 +136,8 @@ spans zero twice), changing `BET_GAP_PTS`, or a spread-bucket weight (H3B is
 
 ```
 gh workflow run study.yml -f script=blend_gate -f args="--freeze --out reports/blend"
-PYTHONPATH=. python scripts/blend_gate.py --freeze --out reports/blend            # off campus
-PYTHONPATH=. python scripts/blend_gate.py --source refit --out reports/blend       # arms check
+PYTHONPATH=. python scripts/archive/blend_gate.py --freeze --out reports/blend            # off campus
+PYTHONPATH=. python scripts/archive/blend_gate.py --source refit --out reports/blend       # arms check
 ```
 
 Reads Neon; writes `reports/blend_<UTC>.{md,json,csv}` (gitignored) and, with `--freeze`

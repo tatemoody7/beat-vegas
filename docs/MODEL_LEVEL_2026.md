@@ -94,7 +94,7 @@ weeks 1-2, and rejected it. Its own closing paragraph says the rest:
 > demoted to context.
 
 That is exactly the hypothesis the numbers above make urgent, the 2025 set is still
-untouched, and `scripts/level_anchor_gate.py` already reports both quantities. **H-LEVEL**
+untouched, and `scripts/archive/level_anchor_gate.py` already reports both quantities. **H-LEVEL**
 is that pre-registration; its criterion was committed before the gate was run.
 
 **A pass licenses a registered parallel paper arm and nothing more.** H-STOP is running on
@@ -103,7 +103,7 @@ inform it.
 
 ## Results — H-LEVEL FAILS. `PRIOR_SEASON_WEIGHT` stays 0.
 
-Run 2026-09-20, `scripts/level_anchor_gate.py --train-seasons 2023 2024 --test-season
+Run 2026-09-20, `scripts/archive/level_anchor_gate.py --train-seasons 2023 2024 --test-season
 2025`, 744 test rows (622 with a real 1H close). Judged on the criterion committed
 before the run: bias, the share clearing the bar, and monotonicity in `k`. MAE is
 context.
@@ -224,14 +224,14 @@ Two details of how the rule is read, also fixed before the run:
 - **`comparisons run` counts challenger-versus-incumbent tests**, so the grid is 4
   comparisons per season, not 5 — λ=1 is not compared against itself.
 
-The gate is `scripts/intercept_gate.py` (`beatvegas/backtest/intercept.py` holds the
+The gate is `scripts/archive/intercept_gate.py` (`beatvegas/backtest/intercept.py` holds the
 arithmetic and `_verdict` applies the registered rule verbatim). It is a report, not a CI
 gate, and changing the intercept would mean editing `model/bv_line.py` in a PR that cites
 the report.
 
 ## H-INTERCEPT — result. NO ARM ADOPTED. The intercept stays as it is.
 
-Run 2026-09-20, `scripts/intercept_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
+Run 2026-09-20, `scripts/archive/intercept_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
 2,000 bootstrap draws. Judged on the criterion committed before the run, applied verbatim
 and **not edited**. `ADOPT: none`.
 
@@ -321,7 +321,7 @@ for this estimator**, so the pass does **not** establish prospective betting val
 nothing below should be quoted as evidence that an in-season intercept improves the betting
 system. The only thing it licenses is properly registered prospective paper collection.
 
-Run 2026-09-20, `scripts/inseason_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
+Run 2026-09-20, `scripts/archive/inseason_gate.py` against Neon, `min_games=0`, FBS-vs-FBS,
 2,000 draws, α 0.05. Judged on the criterion frozen before the script existed.
 `ADOPT: ['k25', 'k50', 'k100', 'k200']`. Reproduced identically from the previous
 session's cached frame.

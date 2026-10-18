@@ -188,7 +188,7 @@ def test_the_card_logs_challengers_only_where_it_logs_paper():
 
 def test_the_position_reader_cannot_pause_real_money():
     """H-STOP pauses the bankroll; this reader may not even import the switch."""
-    src = (ROOT / "scripts/challenger_position.py").read_text()
+    src = (ROOT / "scripts/archive/challenger_position.py").read_text()
     assert "rule_pause" not in src and "ManualPick" not in src
 
 

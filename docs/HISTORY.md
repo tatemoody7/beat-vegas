@@ -10,6 +10,27 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~22:00 UTC (THE CLOSED STUDIES MOVE TO `scripts/archive/`).** Final-2026 plan PR-19. Twenty-seven
+  scripts whose question is closed (or whose collector was retired) left `scripts/` by `git mv`, so the brief, the
+  study menu and the test suite carry only what still runs: the gates and blends (`blend_gate`, `gates_study`,
+  `residual_gate` (the shim), `level_anchor_gate`, `intercept_gate`, `inseason_gate`, `weather_gate`,
+  `censoring_study`, `sharp_book_probe`), the position scripts of the retired collectors (`neggap_position`,
+  `neggap_level_study`, `fg_position`, `challenger_position`, `stopping_rule_position`), the one-look studies
+  (`margin_backtest`, `model_fix_study`, `literature_look`, `weather_history_look`, `wepa_weekly_extract`), the
+  generic `harness_report`, the shortlist pair (`publish_shortlist`, `build_shortlist_reference`) and the retired
+  tools and probes (`bv_adjust`, `line_study`, `model_artifacts`, `probe_hr_keys`, `probe_alt_totals_h1`). Each
+  result stays where it was written: `scripts/archive/README.md` has one line per script with its registry row,
+  verdict and result doc. **No registry row, gate, model constant or live path changed.** What did change: the six
+  scripts that found the repo root by `parents[1]` / `.parent.parent` now use `parents[2]`; `inseason_gate` and
+  `intercept_gate` import `load_closes` from `scripts.archive.level_anchor_gate`; `study.yml` lost 12 options
+  (default now `when_to_bet_study`) and the `publish_shortlist` write guard; `tests/conftest.py::_load_script`
+  falls back to `scripts/archive/`, and the tests of the closed studies stay in `tests/` (they also cover the
+  `beatvegas/` code each study called, which is live), pointed at the new paths; the empty-PYTHONPATH test keeps
+  only `health_check`; `neggap_position` is asserted archived, not a study option. New
+  `tests/test_archive_scripts.py` keeps every archived file compiling, the README complete, and nothing live
+  importing from the archive. To run one: `PYTHONPATH=. python scripts/archive/<name>.py --help`; to dispatch one
+  again, a PR re-adds it to `study.yml` (docs/HARNESS.md says so for `harness_report`).
+
 - **2026-10-18 ~22:00 UTC (THE ODDS API PROGRAMME, STEP 4a: A SHARP REFERENCE BESIDE EVERY FULL-GAME PULL).** Final-2026
   plan PR-C4a. `scripts/poll_full_game.py` takes `--research-regions`, `--research-markets` (default `totals`) and
   `--research-purpose` (default `sharp_eu`). With `--research-regions eu` it makes a SECOND bulk `/odds` call after the

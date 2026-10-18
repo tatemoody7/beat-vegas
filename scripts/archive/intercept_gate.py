@@ -10,7 +10,7 @@ Each arm scales the intercept by lambda, so lambda=1 reproduces the live number
 exactly and lambda=0 drops it. See beatvegas/backtest/intercept.py for the
 adoption rule, quoted from the registry row and applied verbatim.
 
-    python scripts/intercept_gate.py --out reports/intercept \
+    python scripts/archive/intercept_gate.py --out reports/intercept \
         [--test-seasons 2024 2025 2026] [--grid 0 0.25 0.5 0.75 1] [--no-closes]
 
 Writes <out>_<UTC>.md, .json and .csv (the per-game frame, so the tables can be
@@ -47,12 +47,12 @@ from beatvegas.registry import HarnessRefusal
 # and not the repo root, so `from scripts.x import` fails with
 # ModuleNotFoundError -- which is how intercept_gate.yml died on the runner on
 # 2026-09-22 without anyone noticing the study had only ever run on a laptop.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # The sibling gates' plumbing, not a second copy of it: same stamped triple, same
 # step-summary behaviour, same real-close lookup, so the reports stay comparable.
 from beatvegas.backtest.reporting import append_step_summary, report_paths
-from scripts.level_anchor_gate import load_closes
+from scripts.archive.level_anchor_gate import load_closes
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

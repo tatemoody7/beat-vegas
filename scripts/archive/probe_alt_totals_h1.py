@@ -11,7 +11,7 @@ taken at the same minute (`data/fl_app_checks.csv`). The answer decides between 
 the alternate market (a design note, then a PR), accepting the drift, or reporting it to
 The Odds API.
 
-    python scripts/probe_alt_totals_h1.py --within-min 120 --max-events 10 --out <file>
+    python scripts/archive/probe_alt_totals_h1.py --within-min 120 --max-events 10 --out <file>
 
 Since 2026-10-15 (Tate's approval) the same call also names up to nine other books -- the
 configured `odds_api.bookmakers_1h` list, Hard Rock plus nine -- so Hard Rock's alternate
@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from beatvegas.devig import devig_two_way, is_hr_rung  # noqa: E402

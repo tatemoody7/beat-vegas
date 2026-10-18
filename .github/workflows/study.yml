@@ -1,17 +1,15 @@
 name: Study (manual, read-only report)
 
-# Runs one of the registered study scripts (docs/HYPOTHESES.md) against Neon and
+# Runs one of the live study scripts (docs/HYPOTHESES.md) against Neon and
 # uploads its reports/<name>_<UTC>.{md,json,csv} as an artifact. Exists because the
 # campus network filters Neon's port 5432, so a feature-frame study cannot run on
 # the Mac. Every script here is a REPORT: exits 0 whatever the numbers say, writes
-# no table, spends no Odds API credits. The blend's --freeze writes data/blend.json
-# into the RUNNER's checkout only; the committed copy comes from the artifact.
-# harness_report is the shared measurement harness (docs/HARNESS.md): it refuses any
-# --row that is not a runnable registry row (exit 2) and runs ONCE per row.
+# no table, spends no Odds API credits. The closed studies (blend, gates, the
+# harness, the literature looks, the position scripts, ...) left this menu on
+# 2026-10-18 (final-2026 PR-19): their scripts live in scripts/archive/, runnable
+# by hand with PYTHONPATH=. but not from this form.
 # post_mortem runs ONLY with --dry-run (compute + markdown, no postmortem_* write):
 # the committed docs/POST_MORTEM.md is regenerated from its artifact (2026-10-07).
-# literature_look runs ONE registered literature look per dispatch on CFBD data only
-# (no database read); it refuses a row that is not runnable (exit 2).
 
 permissions:
   contents: read
@@ -23,29 +21,17 @@ on:
         description: 'which study'
         type: choice
         options:
-          - blend_gate
           - when_to_bet_study
-          - gates_study
-          - stopping_rule_position
-          - neggap_level_study
           - frame_snapshot
-          - harness_report
-          - neggap_position
-          - fg_position
           - post_mortem
-          - margin_backtest
           - build_halfpoint_table
           - consensus_backfill
           - week_shock_study
           - protocol_position
-          - literature_look
-          - weather_history_look
           - judge_check
-          - model_fix_study
           - venue_check
           - pricing_check
-          - publish_shortlist
-        default: blend_gate
+        default: when_to_bet_study
       args:
         description: 'extra arguments (space-separated, no shell syntax)'
         default: ''
@@ -88,7 +74,7 @@ jobs:
           IN_ARGS: ${{ inputs.args }}
         run: |
           case "$IN_SCRIPT" in
-            blend_gate|when_to_bet_study|gates_study|stopping_rule_position|neggap_level_study|frame_snapshot|harness_report|neggap_position|fg_position|post_mortem|margin_backtest|build_halfpoint_table|consensus_backfill|week_shock_study|protocol_position|literature_look|weather_history_look|judge_check|model_fix_study|venue_check|pricing_check|publish_shortlist) ;;
+            when_to_bet_study|frame_snapshot|post_mortem|build_halfpoint_table|consensus_backfill|week_shock_study|protocol_position|judge_check|venue_check|pricing_check) ;;
             *) echo "unknown script: $IN_SCRIPT"; exit 1 ;;
           esac
           read -ra ARGS <<< "$IN_ARGS"
@@ -100,10 +86,6 @@ jobs:
           # The consensus backfill writes only from grade.yml; here it is a report.
           if [ "$IN_SCRIPT" = consensus_backfill ]; then
             case " ${ARGS[*]} " in *" --write "*) echo "consensus_backfill --write is not a study"; exit 1 ;; esac
-          fi
-          # The shortlist publishes only from card.yml / shortlist_publish.yml; here a dry run.
-          if [ "$IN_SCRIPT" = publish_shortlist ]; then
-            case " ${ARGS[*]} " in *" --write "*) echo "publish_shortlist --write is not a study"; exit 1 ;; esac
           fi
           echo "running: scripts/$IN_SCRIPT.py ${ARGS[*]}"
           python "scripts/$IN_SCRIPT.py" "${ARGS[@]}"

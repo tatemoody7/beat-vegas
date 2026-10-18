@@ -157,7 +157,7 @@ first-half unders; a pass is a finding, nothing more.
 - **Grading**: `picks.grade_pick` via `grade_challenger_picks` (daily `grade.yml`). It grades
   against the final total, with the consensus full-game close and its last pre-kick confirmation
   time.
-- **Position**: `scripts/fg_position.py` (also `study.yml` → `fg_position`). Constants are in
+- **Position**: `scripts/archive/fg_position.py` (also `study.yml` → `fg_position`). Constants are in
   `stopping.FG`.
   - The profit clock (σ 0.913) runs from the first graded row.
   - The line-value clock reports **not started** until its σ is frozen. It counts only closes

@@ -13,7 +13,7 @@ Idempotent: the same inputs give the same two files. The two mid-week "(Update)"
 re-posts and the postseason files are skipped on purpose (the row says weeks
 5-15, 561 games, the ids in `_2025_ids.txt`).
 
-    PYTHONPATH=. python scripts/wepa_weekly_extract.py [--src DIR] [--out data/wepa_2025_weekly_z.csv]
+    PYTHONPATH=. python scripts/archive/wepa_weekly_extract.py [--src DIR] [--out data/wepa_2025_weekly_z.csv]
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Sequence
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 _GALLERY = Path("research/swarm/2026-10-05-cfbd-tier3/downloads/posts/gallery")
 
 

@@ -2,7 +2,7 @@
 the same model with four fixes, once, on the runner (`study.yml`). NOT MET on
 2026-10-10 (run 38070611660, docs/MODEL_FIX.md); a rerun is a second look.
 
-    python scripts/model_fix_study.py [--test-seasons 2025 2026] [--out reports/model_fix]
+    python scripts/archive/model_fix_study.py [--test-seasons 2025 2026] [--out reports/model_fix]
 
 Each arm on its own frame (beatvegas/backtest/model_fix.py): the candidate's
 frame is the harness's shared frame, so its score pool holds no bowl game; the

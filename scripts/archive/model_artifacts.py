@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Read-only look at the persisted model fits (model_artifacts).
 
-    python scripts/model_artifacts.py list --engine residual [--limit 10]
+    python scripts/archive/model_artifacts.py list --engine residual [--limit 10]
 
 One line per refit, newest first: when it was fitted, the slate it scored,
 how many rows it trained on, the last game date it saw, the feature hash and

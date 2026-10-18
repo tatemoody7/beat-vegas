@@ -8,10 +8,10 @@ Nothing here writes, and no verdict it prints changes real money.
 
 SIGN: stored clv is closing - bet; for an OVER a RISING line is favourable, so
 favourable line value is +clv here -- the reverse of the champion's ledger and
-of scripts/challenger_position.py. The line-value clock takes only closes
+of scripts/archive/challenger_position.py. The line-value clock takes only closes
 confirmed inside lines.REAL_1H_CLOSE_WINDOW_H of kickoff and counts the rest.
 
-    PYTHONPATH=. python scripts/neggap_position.py --out reports/neggap
+    PYTHONPATH=. python scripts/archive/neggap_position.py --out reports/neggap
 """
 
 from __future__ import annotations

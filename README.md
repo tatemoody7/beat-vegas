@@ -85,7 +85,7 @@ python scripts/pick.py summary                 # your hit rate, units, CLV
 lines where captured, else proxy). Research-only since roadmap v2.0 (the site's research
 section was removed 2026-10-11); the CLI is the full version:
 ```bash
-python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
+python scripts/archive/line_study.py --season 2025 --min-games 40 --highlight 24.5
 ```
 
 **Credit budget (Odds API 20K plan, $30/month, since 2026-10-05; 100K Sep 6 - Oct 5 for the history purchase):** `totals_h1` is

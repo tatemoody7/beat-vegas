@@ -1,4 +1,4 @@
-"""scripts/residual_gate.py imports without a database and its parser accepts
+"""scripts/archive/residual_gate.py imports without a database and its parser accepts
 the documented flags (the workflow builds exactly these)."""
 
 import json

@@ -497,8 +497,6 @@ FEATURE_FRAME_SCRIPTS = (
     "scripts/weekly_update.py",
     "scripts/grade_factor_ledger.py",
     "scripts/post_derived_lines.py",
-    "scripts/residual_gate.py",
-    "scripts/level_anchor_gate.py",
     "scripts/backfill_bv_intercept.py",
 )
 CACHE_RESTORE = "./.github/actions/cfbd-cache"
@@ -975,7 +973,7 @@ def test_every_study_choice_is_in_the_case_line():
     after the install and the CFBD cache restore have already been paid for."""
     data = _load(WF_DIR / "study.yml")
     options = _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
-    assert "harness_report" in options
+    assert "when_to_bet_study" in options
     runs = [r for r in _run_blocks(data) if 'case "$IN_SCRIPT" in' in r]
     assert len(runs) == 1, "expected exactly one case dispatch over $IN_SCRIPT"
     pattern_line = next(
@@ -1015,8 +1013,13 @@ def test_the_development_collectors_are_retired_everywhere():
         text = p.read_text()
         for switch in ("NEGGAP_COLLECT:", "FG_COLLECT:"):
             assert switch not in text, (p.name, switch)
+    # The position script that read them was archived 2026-10-18 (final-2026
+    # PR-19): it is no longer a study option, and it lives under scripts/archive/.
     data = _load(WF_DIR / "study.yml")
-    assert "neggap_position" in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
+    assert "neggap_position" not in _on(data)["workflow_dispatch"]["inputs"]["script"]["options"]
+    root = Path(__file__).resolve().parent.parent
+    assert (root / "scripts" / "archive" / "neggap_position.py").exists()
+    assert not (root / "scripts" / "neggap_position.py").exists()
 
 
 def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():

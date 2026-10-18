@@ -1,10 +1,11 @@
-"""scripts/probe_alt_totals_h1.py: pure parsing only (the network call is never made here)."""
+"""scripts/archive/probe_alt_totals_h1.py: pure parsing only (the network call is never made here)."""
 
 import importlib.util
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
-    "probe_alt", Path(__file__).resolve().parents[1] / "scripts" / "probe_alt_totals_h1.py"
+    "probe_alt",
+    Path(__file__).resolve().parents[1] / "scripts" / "archive" / "probe_alt_totals_h1.py",
 )
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)

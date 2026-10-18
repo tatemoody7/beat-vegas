@@ -2,7 +2,7 @@
 
 **Status: EXPLORATORY. No gate verdict.** Counts, records, units and intervals only; no
 COSTLY / PROTECTIVE call and no adoption decision may come from this sample (Tate,
-2026-09-15). Run 2026-09-15 with `scripts/gates_study.py --season 2026` (GitHub Actions
+2026-09-15). Run 2026-09-15 with `scripts/archive/gates_study.py --season 2026` (GitHub Actions
 `study.yml`); arithmetic in `beatvegas/backtest/gates.py`, rows from
 `beatvegas/snapshots.py`, pinned by `tests/test_gates.py`. Registry rows **H4G, H4P, H4C**
 in `docs/HYPOTHESES.md`, all `exploratory`.
@@ -153,7 +153,7 @@ does not.
 
 ```
 gh workflow run study.yml -f script=gates_study -f args="--season 2026 --out reports/gates"
-PYTHONPATH=. python scripts/gates_study.py --season 2026 --out reports/gates     # off campus
+PYTHONPATH=. python scripts/archive/gates_study.py --season 2026 --out reports/gates     # off campus
 ```
 
 Reads Neon (`cards`, `games`, `odds_snapshots`, `postmortem_games`); writes

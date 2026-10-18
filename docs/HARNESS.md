@@ -1,7 +1,7 @@
 # The measurement harness
 
-`beatvegas/backtest/harness.py`, driven by `scripts/harness_report.py`, dispatched through
-`study.yml`. One shape of question, answered the same way every time, for every future
+`beatvegas/backtest/harness.py`, driven by `scripts/archive/harness_report.py` (archived 2026-10-18, final-2026 PR-19; it left
+`study.yml`'s menu with the other closed studies). One shape of question, answered the same way every time, for every future
 model gate: given the champion's scorer and zero or more candidates with the SAME contract
 (`(train_played, target) -> bv_line per target row`, the contract of
 `model.bv_line.bv_line_for_slate`), how do they do on each held-out season?
@@ -121,12 +121,14 @@ Registry row first, script second, ONE dispatch per row (docs/HYPOTHESES.md, "Ho
 row"). Locally (needs the database; refusals need only the registry file):
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/harness_report.py --row NOPE          # exit 2, no DB
-PYTHONPATH=. .venv/bin/python scripts/harness_report.py --row H-NEGGAP-L    # live-tracking: exit 2
+PYTHONPATH=. .venv/bin/python scripts/archive/harness_report.py --row NOPE          # exit 2, no DB
+PYTHONPATH=. .venv/bin/python scripts/archive/harness_report.py --row H-NEGGAP-L    # live-tracking: exit 2
 ```
 
 On the runner, which is where any number about the live model must come from
-(CLAUDE.md, 2026-09-22; the campus network filters Neon's 5432 anyway):
+(CLAUDE.md, 2026-09-22; the campus network filters Neon's 5432 anyway). Since 2026-10-18
+`harness_report` is no longer a `study.yml` option, so a new row's PR adds it back to the
+`script` menu, the `case` line and the script path (`scripts/archive/`) with the row:
 
 ```bash
 gh workflow run study.yml --ref <branch> -f script=harness_report \
@@ -173,10 +175,10 @@ be re-cut on exactly the runner's inputs.
 
 ## Consumers
 
-- `scripts/harness_report.py` — the generic runner above.
-- `scripts/intercept_gate.py`, `scripts/inseason_gate.py` — load their frame through
+- `scripts/archive/harness_report.py` — the generic runner above.
+- `scripts/archive/intercept_gate.py`, `scripts/archive/inseason_gate.py` — load their frame through
   `harness.load_frame` (gaining `--frame`); their evaluation code is unchanged.
-- `scripts/level_anchor_gate.py::load_closes`, `scripts/residual_gate.py::load_closes` —
+- `scripts/archive/level_anchor_gate.py::load_closes`, `scripts/archive/residual_gate.py::load_closes` —
   one-line wrappers over `snapshots.kickoffs_for` + `snapshots.consensus_closes`.
 - `beatvegas/backtest/neggap_level.py` imports `stats.wilson`, the repo's one Wilson, but is
   **not a harness consumer**: it measures stored card rows (H-NEGGAP-L), not walk-forward

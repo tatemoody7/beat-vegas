@@ -18,7 +18,7 @@ external test from here.
   favored), effectively the close for a played game; implied home margin = −spread. Never an input.
 - **Tests** 2025 (trained 2003-24) and 2026 games played before the run (trained 2003-25), games with a
   closing spread. One fit per test season, as the champion trains.
-- **Run** `study.yml` run 37670166376 (`scripts/margin_backtest.py`), frame fingerprint
+- **Run** `study.yml` run 37670166376 (`scripts/archive/margin_backtest.py`), frame fingerprint
   `23cb43a0a69c29aa`, computed 2026-10-07T18:57Z on the runner.
 
 ## Results

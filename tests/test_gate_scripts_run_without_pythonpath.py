@@ -14,12 +14,9 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 # health_check is not a gate but runs the same way: `python scripts/health_check.py`
 # as the last step of every scheduled workflow, with scripts/ on sys.path.
+# The gate and harness scripts that used to be listed here moved to scripts/archive/
+# on 2026-10-18 (final-2026 PR-19); tests/test_archive_scripts.py keeps them compiling.
 GATES = [
-    "harness_report",
-    "intercept_gate",
-    "inseason_gate",
-    "level_anchor_gate",
-    "residual_gate",
     "health_check",
 ]
 

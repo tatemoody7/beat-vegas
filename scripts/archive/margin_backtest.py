@@ -9,7 +9,7 @@ with both final scores and a closing spread. Reports MAE, MSE, straight-up and
 ATS with intervals beside Vegas, and the paired MAE difference. Entering the
 Pick'em does not depend on any of it (Tate, 2026-10-07).
 
-    PYTHONPATH=. python scripts/margin_backtest.py            # on the runner: study.yml
+    PYTHONPATH=. python scripts/archive/margin_backtest.py            # on the runner: study.yml
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from beatvegas.model.margin_line import (
 from beatvegas.model.score import CHAMPION_TRAIN_MIN_SEASON
 
 ROW_ID = "H-MARGIN"
-REGISTRY = Path(__file__).resolve().parent.parent / "docs" / "HYPOTHESES.md"
+REGISTRY = Path(__file__).resolve().parents[2] / "docs" / "HYPOTHESES.md"
 TEST_SEASONS = (2025, 2026)
 
 

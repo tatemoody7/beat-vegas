@@ -6,7 +6,7 @@ or a trust-adjusted cap have picked differently?
 Counts and intervals only; no gate verdict comes from this script (see
 beatvegas/backtest/gates.py and docs/HYPOTHESES.md rows H4G / H4P / H4C).
 
-    PYTHONPATH=. python scripts/gates_study.py --season 2026 --out reports/gates
+    PYTHONPATH=. python scripts/archive/gates_study.py --season 2026 --out reports/gates
 
 Reads Neon (cards, games, odds_snapshots, postmortem_games); writes <out>_<UTC>.{md,json,csv};
 appends the markdown to $GITHUB_STEP_SUMMARY when set; exits 0 whatever the numbers say.

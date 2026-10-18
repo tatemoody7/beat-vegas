@@ -20,7 +20,7 @@ FBS = {2019: {"A", "B", "C", "D", "E", "F"}, 2020: {"A", "B", "C", "D", "E", "F"
 
 
 def _script():
-    path = ROOT / "scripts" / "literature_look.py"
+    path = ROOT / "scripts" / "archive" / "literature_look.py"
     spec = importlib.util.spec_from_file_location("literature_look", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

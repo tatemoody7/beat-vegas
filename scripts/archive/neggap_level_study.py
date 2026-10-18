@@ -11,7 +11,7 @@ Inputs are stored rows only: each `cards` payload item's `gap` and `hr_line`
 `c_season`, `in_season_n`), and `games.first_half_total`. The arithmetic is in
 beatvegas/backtest/neggap_level.py.
 
-    PYTHONPATH=. python scripts/neggap_level_study.py --season 2026 --out reports/neggap_level
+    PYTHONPATH=. python scripts/archive/neggap_level_study.py --season 2026 --out reports/neggap_level
 """
 
 from __future__ import annotations

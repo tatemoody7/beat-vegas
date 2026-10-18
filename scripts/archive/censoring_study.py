@@ -6,7 +6,7 @@ engine is worth multiple days, and it is allowed to say no. See
 beatvegas/backtest/censoring.py for what each test can and cannot support, and
 docs/CENSORING_STUDY.md for the first run.
 
-    python scripts/censoring_study.py --out reports/censoring
+    python scripts/archive/censoring_study.py --out reports/censoring
 
 Writes <out>_<UTC>.md and .json, appends the markdown to $GITHUB_STEP_SUMMARY
 when set, and exits 0 whatever the numbers say. Reads Neon; writes nothing.

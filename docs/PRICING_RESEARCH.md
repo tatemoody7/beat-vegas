@@ -38,7 +38,7 @@ run unchanged to the final read (2026-11-30, roadmap v2.6; it was the January re
 | 3 | a ticket at that price | bet in Florida |
 
 Tiers 2 and 3 come only from Tate's records (the paired screenshots and the personal ledger). The
-Odds API serves no Florida-specific Hard Rock key (probe 2026-10-11, `scripts/probe_hr_keys.py`):
+Odds API serves no Florida-specific Hard Rock key (probe 2026-10-11, `scripts/archive/probe_hr_keys.py`):
 `hardrockbet` is the only key, which the provider's table calls the Indiana book "currently same
 odds as several other states". Until the paired checks exist, every flag is a feed observation.
 

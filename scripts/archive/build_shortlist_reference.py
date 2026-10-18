@@ -6,7 +6,7 @@ Reads the H-1H-FACTORS screen's local outputs (`research/1h-factors-2026-10/fram
 screen verdict ("null" unless a factor passed Level 1). Run by hand when the screen is re-run;
 `beatvegas/shortlist.py` only reads the committed file.
 
-    python scripts/build_shortlist_reference.py [--research research/1h-factors-2026-10]
+    python scripts/archive/build_shortlist_reference.py [--research research/1h-factors-2026-10]
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from beatvegas.shortlist import CONTEXT, REFERENCE_PATH
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> int:

@@ -10,6 +10,18 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~15:30 UTC (CHALLENGER GRADING AND THE JUDGE STEP FAIL LOUDLY).** Final-2026 plan PR-02 (evidence
+  integrity, Tate's approval of 2026-10-18). Five of the six registered paper arms live in `challenger_picks` and are
+  graded by `grade_challenger_picks`, which `scripts/pick.py::cmd_grade` wrapped in a try/except that only printed a
+  warning, and the judge's backfill step in `grade.yml` ("Line value at each pick's exact terms") was
+  `continue-on-error: true`: either could fail and leave the run green with the arms silently ungraded or unread.
+  Now `cmd_grade` lets the exception propagate (the champion ledger still commits first, in its own session) and the
+  judge step is fatal. Both sit before "Mark grading complete", so a failure leaves `grade.completed_this_run`
+  missed and the `grade` contract `failed` (the health step already runs on `always()`; `beatvegas/health.py`
+  unchanged). Tests: `test_workflows.py` pins no `continue-on-error` on the judge step and its order after
+  `pick.py grade`; `test_challenger_end_to_end.py` pins that a raising `grade_challenger_picks` escapes `cmd_grade`.
+  `docs/HEALTH.md` names the two fail paths.
+
 - **2026-10-18 (THE JUDGE'S COLUMNS ARE WRITE-ONCE; A DIFFERING RECOMPUTATION IS AUDITED).** Final-2026 plan
   PR-01. The audit found three paths that overwrote a pick's reading in place: `picks.grade_pick` at grading
   time (after `consensus_backfill` had usually read the pick an hour past kickoff, p1.2 R3′), `pick.py grade

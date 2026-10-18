@@ -217,8 +217,8 @@ jobs:
         # this fills any row that lacks them: graded rows, and (protocol p1.2
         # R3', 2026-10-14) every pick whose game kicked off an hour ago, graded
         # or not -- the reading uses only pre-kickoff quotes, never the score.
-        # The judge never blocks grading.
-        continue-on-error: true
+        # Fatal (final-2026 plan PR-02): the arms are judged by these columns, so
+        # a failed backfill must fail the run before "Mark grading complete".
         run: python scripts/consensus_backfill.py --write --missing-only
       - name: Grade frozen game records
         if: steps.probe.outputs.need_grade == 'true'

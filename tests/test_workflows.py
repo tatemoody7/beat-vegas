@@ -350,6 +350,26 @@ def test_grade_yml_skips_when_a_run_completed_in_the_last_four_hours():
     assert any("scripts/post_mortem.py" in (s.get("run") or "") for s in steps[idx + 1 :])
 
 
+def test_grade_yml_judge_step_is_fatal_and_follows_the_pick_grade_step():
+    """final-2026 plan PR-02: the arms are judged by ev_cons, so the consensus
+    backfill must fail the run when it fails (it used to be continue-on-error,
+    leaving a green run and silently unread arms). It sits after `pick.py grade`
+    (whose challenger half is also fatal now) and before the completed-grade
+    gauge, so a failure leaves grade.completed_this_run missed and the contract
+    `failed`; the health step still runs on always()."""
+    steps = _load(WF_DIR / "grade.yml")["jobs"]["grade"]["steps"]
+    judge = next(s for s in steps if "scripts/consensus_backfill.py" in (s.get("run") or ""))
+    assert "continue-on-error" not in judge
+    pick_grade = next(s for s in steps if "scripts/pick.py grade" in (s.get("run") or ""))
+    assert "continue-on-error" not in pick_grade
+    marker = next(
+        s for s in steps if "record_gauge.py --key last_grade_completed_at" in (s.get("run") or "")
+    )
+    assert steps.index(pick_grade) < steps.index(judge) < steps.index(marker)
+    health = next(s for s in steps if s.get("id") == "health")
+    assert "always()" in health["if"]
+
+
 def test_rescore_yml_is_dispatch_only_and_writes_through_env():
     """rescore.yml: re-score one past week (2026 week 1 was never scored).
     Dispatch-only with required season/week inputs that reach bash only via

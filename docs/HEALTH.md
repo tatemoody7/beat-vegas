@@ -102,8 +102,12 @@ carries `HEALTH: <verdict> <note>`.
 ### When grade is degraded or failed
 
 1. `grade.completed_this_run` missed -> one of the fatal grading steps
-   (`grade.py`, `pick.py grade`, `grade_records.py`) failed. The run is red;
-   read that step's traceback. On CFBD 429/quota the scores fallback (ESPN)
+   (`grade.py`, `pick.py grade`, the consensus backfill "Line value at each
+   pick's exact terms", `grade_records.py`) failed. Two of those used to be
+   swallowed and now fail the run (final-2026 plan PR-02, 2026-10-19):
+   challenger-arm grading inside `pick.py grade` (the champion ledger commits
+   first, then an arm-grading exception propagates) and the judge's backfill
+   step. The run is red; read that step's traceback. On CFBD 429/quota the scores fallback (ESPN)
    should still have landed finals -- check `grade.finals_landed`.
 2. `grade.finals_landed` missed -> rated games kicked off > 18 h ago with no
    final. Both score sources failed or the games are genuinely late. The

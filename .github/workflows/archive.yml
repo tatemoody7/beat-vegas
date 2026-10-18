@@ -1,0 +1,93 @@
+name: Archive queue (Odds API credits -> research_snapshots)
+
+# The archive queue (final-2026 plan C11-C12): in the last four days of a billing
+# cycle the unspent Odds API credits buy historical captures, in Tate's order,
+# into research_snapshots -- never odds_snapshots, so no registered reader sees
+# them. Dispatch-only in this PR (C6): `probe` asks the archive whether it carries
+# Hard Rock's alternate first-half ladder and team totals (<= 40 credits);
+# `status` prints the queue; `auto` is the end-of-cycle runner, which spends
+# nothing until PR-C10 builds the items. The daily schedule arrives with PR-C10.
+#
+# Every call is logged in odds_spend by the client (job `archive`), and the
+# controller's allowance (balance - floor - the cycle's recurring need) is
+# checked before each paid call.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      item:
+        description: 'what to run'
+        type: choice
+        options: [status, probe, auto]
+        default: status
+      max_credits:
+        description: 'hard cap for this run (probe)'
+        default: '40'
+      game_id:
+        description: 'probe: the past Hard Rock game to ask the archive about (default: week-5 Notre Dame @ North Carolina)'
+        default: ''
+      live:
+        description: 'probe: also ask the next Hard Rock game live (<= 3 credits)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'auto: report, spend nothing'
+        type: boolean
+        default: false
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      BV_ODDS_JOB: archive
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/lock.txt
+      - name: Install
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Run the archive command
+        env:
+          IN_ITEM: ${{ inputs.item }}
+          IN_MAX: ${{ inputs.max_credits }}
+          IN_GAME: ${{ inputs.game_id }}
+          IN_LIVE: ${{ inputs.live }}
+          IN_DRY: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          case "$IN_ITEM" in
+            status) python scripts/archive_buy.py status ;;
+            probe)
+              extra=""
+              if [ -n "$IN_GAME" ]; then extra="$extra --game-id $IN_GAME"; fi
+              if [ "$IN_LIVE" = "true" ]; then extra="$extra --live"; fi
+              python scripts/archive_buy.py probe --max-credits "$IN_MAX" $extra ;;
+            auto)
+              extra=""
+              if [ "$IN_DRY" = "true" ]; then extra="--dry-run"; fi
+              python scripts/archive_buy.py auto $extra ;;
+            *) echo "unknown item $IN_ITEM"; exit 1 ;;
+          esac
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-${{ github.run_id }}
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 90

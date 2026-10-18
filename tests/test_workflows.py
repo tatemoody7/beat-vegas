@@ -1080,3 +1080,25 @@ def test_pricing_monday_season_over_input_crosses_via_env():
     for s in steps:
         if isinstance(s.get("run"), str):
             assert "inputs." not in s["run"], "an input is inlined into a run: block"
+
+
+def test_archive_yml_is_dispatch_only_and_writes_through_env():
+    """archive.yml (final-2026 plan PR-C6): the archive queue's workflow. Dispatch
+    only until PR-C10 adds the end-of-cycle schedule; every input reaches bash
+    through env:, the job carries BV_ODDS_JOB=archive so the ledger names it, and
+    it shares the neon-writers group like every other Neon writer."""
+    data = _load(WF_DIR / "archive.yml")
+    on = _on(data)
+    assert set(on) == {"workflow_dispatch"}
+    inputs = on["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"item", "max_credits", "game_id", "live", "dry_run"}
+    assert inputs["item"]["options"] == ["status", "probe", "auto"]
+    assert (data.get("concurrency") or {}).get("group") == NEON_GROUP
+    job = data["jobs"]["archive"]
+    assert job["env"]["BV_ODDS_JOB"] == "archive"
+    run_steps = [s for s in job["steps"] if isinstance(s.get("run"), str)]
+    for s in run_steps:
+        assert "inputs." not in s["run"], "an input is inlined into a run: block"
+    cmd = next(s for s in run_steps if "scripts/archive_buy.py" in s["run"])
+    assert set(cmd["env"]) == {"IN_ITEM", "IN_MAX", "IN_GAME", "IN_LIVE", "IN_DRY"}
+    assert '--max-credits "$IN_MAX"' in cmd["run"]

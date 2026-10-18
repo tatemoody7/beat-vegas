@@ -10,6 +10,23 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~21:00 UTC (THE ODDS API PROGRAMME, STEP 6: THE ARCHIVE QUEUE'S WORKFLOW AND ITS PROBE).** Final-2026
+  plan PR-C6. Credits do not roll over, so Tate's decisions C-D5 / C-D9 / C-D13 / C-D17 turn the unspent balance of
+  each cycle into permanent datasets in the last four days before the reset: `scripts/archive_buy.py` holds the queue
+  in his order with his caps (Pinnacle 2026 closes 1,500 → Hard Rock 1H ladder at close 2026 3,900 → full-game paths
+  2026 on `us` 3,000 → Hard Rock 1H release times wks 1-4 6,000 → Pinnacle 2025 closes 2,100 → Hard Rock ladder 2025
+  4,500 → full-game paths on `us2` 2,500 → Pinnacle 2024 closes 2,600), reads each item's `spent` from the `odds_spend`
+  ledger, and asks the budget controller (`beatvegas/credit_plan.py`: balance − floor 1,500 − the cycle's recurring
+  need) before every paid call; `auto` runs nothing until the reset date is set and the window is open, and the items
+  themselves land in PR-C10. `.github/workflows/archive.yml` is dispatch-only for now (`status`, `probe`, `auto`;
+  inputs via env; job `archive` in the ledger). **The probe** (≤40 credits, Tate's approval in the plan) asks the
+  archive, as of kickoff −30 min, whether it carries `alternate_totals_h1`, `team_totals` and `team_totals_h1` for a
+  week-5 Hard Rock game (default Notre Dame @ North Carolina, 2026-10-03 16:00Z): one historical events list (1
+  credit) to find the event id, one historical event-odds call for Hard Rock alone (10 per market returned, 0 if
+  empty); `--live` adds one live four-book call for the next Hard Rock game (≤3). Its finding sizes the Hard Rock
+  ladder archive item (keep / drop) before the Nov 1-4 window and tells PR-C9 whether team totals are archivable;
+  the report is an artifact and this log. `OddsAPIClient.historical_event_odds` is the one new client method.
+
 - **2026-10-18 (THE CLOSE TICKS SPEND ONLY ON WHAT THE JUDGE READS).** Final-2026 plan PR-C2 (programme C, E1; decisions
   C-D11 and C-D19). Four changes, measured against the week Tue 10-13 → Sun 10-18 (831 credits itemised = 831 gauge delta):
   (1) **Look-ahead**: the Saturday resolve step now gives a tick a 360-minute look-ahead only when its UTC hour is divisible

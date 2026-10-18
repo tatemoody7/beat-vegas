@@ -83,9 +83,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Open items (the only place pending work lives; date each)
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
-  spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
-  `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
-  probe (`H-MKT-PROBE`, Saturday 10-10, then Tate decides capture) → literature looks (papers
+  spreads + moneylines (shipped 2026-10-07, ~+860 credits/month) and one team-total probe
+  (`H-MKT-PROBE`, parked; team totals now ride the Odds API programme, plan C11) → literature looks (papers
   verified 2026-10-08, `docs/LITERATURE.md`, v1.3: six looks, Holm 5% outside the ledger;
   Arscott/TV/Bennett all NOT MET 10-09 and Cox NOT MET 10-11 (final); Coleman/Salaga parked; team
   totals and full-game weather tracked as candidates) → arms: 1-3 registered 2026-10-08 (H-ARM-1HU /
@@ -181,6 +180,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
+| `archive.yml` | dispatch item/max_credits/game_id/live/dry_run | the archive queue (plan C12, Tate's order): `status`, `probe` (≤40 credits), `auto` (items land in PR-C10); ledger job `archive` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
@@ -212,7 +212,7 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml), `build_shortlist_reference` (freezes `data/shortlist_reference.json` from the H-1H-FACTORS screen).
 - **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (offline backtest engine retired 2026-10-11, v2.0); `pricing_check` (exploratory, read-only: H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
-- **Probes** (write nothing): `probe_hr_keys` (`hardrockbet` vs `hardrockbet_fl`, raw keys kept), `probe_alt_totals_h1` (≤24 credits, one run), `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20).
+- **Probes** (write nothing): `probe_hr_keys` (`hardrockbet` vs `hardrockbet_fl`, raw keys kept), `probe_alt_totals_h1` (≤24 credits, one run), `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20); `archive_buy` (the archive queue + its probe; writes `research_snapshots` only).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 

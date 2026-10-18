@@ -456,6 +456,30 @@ class OddsAPIClient:
         _raise_for_status(resp)
         return _unwrap_historical(resp.json()) or {}
 
+    def historical_event_odds(
+        self, event_id: str, date_iso: str, markets: str, bookmakers: List[str]
+    ) -> Dict[str, Any]:
+        """One event's odds for EXPLICIT markets and books as of a past timestamp
+        (the archive queue, final-2026 plan C11). Billed 10 x [markets RETURNED]
+        x 1 (the book list is one region); an empty answer costs 0. Keys left as
+        the feed spells them. Returns {} on 404 or an empty envelope."""
+        if len(bookmakers) > MAX_BOOKMAKERS_ONE_REGION:
+            raise ValueError("more than one region's worth of bookmaker keys")
+        url = f"{self.base_url}/historical/sports/{self.sport}/events/{event_id}/odds"
+        params = {
+            "apiKey": self.api_key,
+            "markets": markets,
+            "oddsFormat": self.odds_format,
+            "dateFormat": "iso",
+            "date": date_iso,
+            "bookmakers": ",".join(bookmakers),
+        }
+        resp = self._get(url, params)
+        if resp.status_code == 404:
+            return {}
+        _raise_for_status(resp)
+        return _unwrap_historical(resp.json()) or {}
+
 
 def _unwrap_historical(payload: Dict[str, Any]):
     """Pull `data` out of a historical snapshot envelope (list of events, or a

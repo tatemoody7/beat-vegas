@@ -241,3 +241,32 @@ def test_the_arms_grade_with_the_champions_grader(slate):
             # Stored clv is closing - bet; the line FELL, which for an under is
             # the favourable direction, so the stored value is negative.
             assert r.clv is not None and r.clv < 0
+
+
+def test_a_failing_challenger_grade_propagates_after_the_champion_ledger_commits(
+    load_script, monkeypatch
+):
+    """final-2026 plan PR-02: `pick.py grade` used to catch a challenger-grading
+    exception and print a warning, so the run stayed green and the registered
+    arms went ungraded unread. The exception must now escape cmd_grade (the
+    champion ledger keeps its own, earlier session)."""
+    import argparse
+
+    from conftest import _sqlite_scope
+
+    eng, scope = _sqlite_scope()
+    pick = load_script("pick")
+    monkeypatch.setattr(pick, "session_scope", scope)
+
+    calls = []
+
+    def boom(s, season, regrade=False):
+        calls.append((season, regrade))
+        raise RuntimeError("challenger grading blew up")
+
+    monkeypatch.setattr(pick, "grade_challenger_picks", boom)
+    monkeypatch.setattr(pick, "cmd_summary", lambda args: pytest.fail("ran past the failure"))
+    args = argparse.Namespace(season=2026, regrade=False)
+    with pytest.raises(RuntimeError, match="challenger grading blew up"):
+        pick.cmd_grade(args)
+    assert calls == [(2026, False)], "the challenger grader was reached exactly once"

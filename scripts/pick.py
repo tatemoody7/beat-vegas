@@ -96,14 +96,14 @@ def cmd_grade(args) -> None:
             if grade_pick(s, p, g, judge_reason=reason):
                 graded += 1
     print(f"graded {graded} pick(s) for {season}")
-    # H-INSEASON-P's arms settle by the same rules, in their own table. A failure
-    # here is a measurement outage, never a reason to fail the real grading run.
-    try:
-        with session_scope() as s:
-            n = grade_challenger_picks(s, season, regrade=regrade)
-        print(f"graded {n} challenger observation(s) for {season}")
-    except Exception as e:  # noqa: BLE001 - the champion's ledger comes first
-        print(f"[grade] WARNING: challenger ledger not graded: {e}")
+    # The registered paper arms settle by the same rules, in their own table. This
+    # is its own session so the champion ledger's grades above are already
+    # committed when it runs; it is NOT wrapped in a try/except. An exception
+    # propagates and fails the step (final-2026 plan PR-02): a swallowed warning
+    # left the run green and the arms silently ungraded and unread.
+    with session_scope() as s:
+        n = grade_challenger_picks(s, season, regrade=regrade)
+    print(f"graded {n} challenger observation(s) for {season}")
     cmd_summary(args)
 
 

@@ -1,60 +1,58 @@
-# Account-side checklist (things only Tate can click)
+# Account-side checklist and shutdown runbook (things only Tate can click)
 
-Written 2026-09-22 from the system review. Each item names the exact plan and the
-date; the board cannot see any of these until the change is made.
+Rewritten 2026-10-18 for the final-2026 plan (`~/.claude/plans/beat-vegas-final-fluffy-hollerith.md`,
+B1 decisions D1-D14, B8 the shutdown table, C1/C12 the Odds API cycle and archive queue; final-2026
+PR-22). Paid operation ends after **Sat 2026-11-28** (week 13; last kickoff 2026-11-29 04:00 UTC,
+`protocol.SEASON_LAST_KICKOFF`); the final read is **Mon 2026-11-30**. The board cannot see any
+account-side change until it is made, so each row says who acts and what has to be true first.
 
-## Status 2026-09-22 evening
+## What stop, cancel and retain mean here
 
-- **The repository was made PUBLIC at ~18:20Z** (Tate), which removes the Actions minute cap
-  and unblocked every job. The billing fix below is still worth finishing so the repo can go
-  private again if wanted: GitHub's Payment information form timed out on every save (unicorn
-  page), so no card could be added; a **Billing support ticket** is filed from help.github.com
-  (replies to boomtatermac@gmail.com; "View tickets" on help.github.com).
+- **Stop** a job: the workflow or cron is switched off. It spends nothing further but keeps the
+  subscription behind it; nothing is refunded.
+- **Cancel a renewal**: the provider is told not to bill again. Access continues until the paid period
+  ends (The Odds API says so in its cancellation guide, with no refund of the unused part; re-read the
+  wording on the billing page before clicking). Cancelling early therefore saves nothing and can only
+  cut access short if the provider's wording turns out different.
+- **Retain** paid access: we keep paying because a job still needs it. Every retained plan has a date
+  on which it stops being retained.
+- **Downgrade**: move to the provider's free tier; only after what the paid tier held is exported.
+- **Claude never cancels, downgrades or buys anything. Only Tate does, on the provider's own page.**
 
-## Do now
+## The runbook (all dates 2026; times UTC unless marked)
 
-1. **GitHub billing — RESOLVED 2026-10-04.** A card is on file, the repo is private again
-   (made private 14:36Z; it had been public since 2026-09-22 with 0 forks and 0 stars), and the
-   Actions budget is **$10/month, stop usage at the cap, alerts at 75/90/100%**
-   (github.com/settings/billing/budgets). Roadmap v2.1 (2026-10-11) raised the cap to **$20**:
-   an account-side change only Tate can make; the page still reads $10 until he does. The $0 budget with stop-usage on was what halted
-   every job on 2026-09-22; a private repo gets 2,000 free minutes against ~2,830 measured, so
-   the overage (~$7) bills to the card inside the budget. Check the budget page in the last
-   week of each month.
+| Date | Action | Kind | Precondition | Who |
+|---|---|---|---|---|
+| Sun 10-18 | Real money ended: `rule_paused` on (14:59Z, `app_settings_log` 674); the 30 graded tickets are a frozen ledger. The Mac task `bv-saturday-board-report` deleted (D7); no scheduled text remains | stop | Tate's decision D2/D7 | Tate decided; Claude executed |
+| Sun 10-18 | **CFBD Patreon membership cancelled** (Tate, on Patreon). Tier 3 (75,000 calls) stays until **Nov 5**, then the key drops to the free tier: **1,000 calls a month**. This replaces the earlier plan to move to Tier 1 ($1) on Nov 6 | cancel renewal | None | Tate |
+| Nov 1-4 | Archive queue, first window: items 1-3 of the final queue (reference plan C12), run automatically in the last 4 days of the cycle, never taking the balance under the **1,500** floor | retain | Balance above the floor | automatic |
+| Nov 5 onward | CFBD free tier: measured use is ~600-900 calls a month and a hand season reload costs ~500. The daily digest warns under 500 remaining (`cfbd_calls_remaining`, PR-06). **No hand season reload (`backfill.py`, `history_load.yml`, `backfill_1h.yml`) may run after Nov 5 without reading the balance first** | retain (free) | `/info` on the key shows the remaining calls | Claude checks before any run |
+| ~Nov 5 (±1) | The Odds API 20K plan ($30) resets for the **last** cycle (credits do not roll over). Retained so Nov 5 → Dec 5 can run the last cards and the archive queue | retain paid access | Tate confirms the reset date on the dashboard. If it differs from ~Nov 5, the controller setting `odds_cycle_reset_at` (reference plan C11) is updated to match | Tate confirms; Claude sets the setting |
+| Sat 11-28 | Last capture. The Saturday close ticks end at 04:00 UTC Nov 29 | stop | Week 13 priced | automatic |
+| Sun 11-29 | Last grade. The last Sunday job is skipped (no week 14 capture); `sunday.yml` crons are disabled by PR | stop | All week-13 finals in | automatic; Claude disables the crons |
+| Mon 11-30 | Final read (`season_over=true`, implied from 12Z), late reads (H6, H-JUDGE, H-VENUE-1, H-ARM-EVP), the final-report generation, and the export | stop | **Gate for every row below:** the week-13 judge readings are present on the graded picks; `data/evidence/2026-w13` is committed; the export (PR-23) is verified by a **restore into the local sandbox** (`scripts/pg_sim.py`) with row counts matching Neon | automatic + Claude |
+| Nov 30 - Dec 4 | Archive queue, final window (items 4-8, ~15,000 credits available; whatever is unbought is listed in the final report). The Vercel cron entries are removed by PR-24 only after this window drains, `grade` last | retain | Floor 1,500 held; export verified | automatic; Claude removes the crons |
+| Nov 30 - Dec 4 (before the renewal, ~Dec 5) | **Tate cancels The Odds API subscription** ("Manage subscription" on the plan). Access runs to the end of the paid period; no refund | cancel renewal | The archive queue has drained (credits left unspent are lost at the reset) **and the Vercel crons are already removed (PR-24)**: a dead key would turn `lines_watch` and `card` red every day | Tate |
+| After the export is verified (Dec 1-5) | **Tate moves Neon Launch to the free plan** | downgrade | The export restores cleanly (see Mon 11-30). Size and restore window checked first (below). The database is shared with six `swfl_*` fishing tables, which the downgrade also affects | Tate |
+| Ongoing | Vercel Hobby ($0) and the public GitHub repository ($0) stay; the site is read-only and stays up as the public record | retain | None | none |
 
-2. **CFBD — Patreon Tier 3 ($10/month, 75,000 calls) since 2026-10-05.** Tate bought Tier
-   3 (Patreon account boomtatermac@gmail.com); CFBD applies the tier by email match, so the key
-   issued to that address on 2026-06-02 became Tier 3 automatically (`/info`: patronLevel 3,
-   all feature flags true). That key is now in local `config.yaml` and the `CFBD_API_KEY`
-   repository secret (14:11Z); the FGCU Academic key (3,000/mo) is retired from the system.
-   Everything the review found useful is Tier 1 data (`/wepa/team/season`, weather,
-   scoreboard); dropping to Tier 1 ($1) at the Nov 6 renewal is DECIDED (roadmap v2.1, 2026-10-11;
-   `docs/CFBD_TIER3_REVIEW_2026-10-05.md`) and is Tate's click on Patreon. Optional: link Discord in Patreon
-   (patreon.com/settings/apps) for the patron channel.
+**CFBD note.** B8 of the plan still reads "Tier 1 on Nov 6, cancel before Dec 6"; the 10-18
+cancellation replaced both rows. The CFBD key has no Tier 3-only data in use (only `/games/weather`
+is tier-gated and nothing live uses it), so the drop costs the live system nothing; it only removes
+headroom for hand reloads.
 
-3. **GitHub dispatch token — confirm its scope (added 2026-10-07).** `GITHUB_DISPATCH_TOKEN`
-   (Vercel env) now also backs the game page's **Refresh price** (`POST /api/price-refresh` →
-   `lines_watch.yml` `market=1h_game`, 1 Odds API credit). It should be a **fine-grained** token
-   with **Actions: read and write** on **tatemoody7/beat-vegas only**, nothing else
-   (github.com/settings/personal-access-tokens). If it is a classic token or covers more repos,
-   replace it with one of that shape and paste it into Vercel → Settings → Environment
-   Variables → Production, then redeploy.
+**Neon check before the downgrade** (read 2026-10-18 from Neon's changelog and plans pages; re-read
+on the billing page before clicking, the pages disagreed with each other): the free plan allows
+**1 GB per project** since the 2026-10-02 changelog (older pages still say 0.5 GB); the database is
+**131 MB** (PostgreSQL 16.15), so either cap fits. The free plan's point-in-time restore window is
+**about 6 hours** against up to 7 days on Launch, so after the downgrade the committed export is the
+only long-lived copy of the season. Do not downgrade until the restore test has passed.
 
-## Done 2026-10-05
-
-3. **The Odds API — on the 20K plan ($30/month) since 2026-10-05.** Tate cancelled the 100K
-   ($59) subscription and created the 20K one; each subscription has its own key, so the
-   `ODDS_API_KEY` repository secret was re-set (13:35Z) and local `config.yaml` updated the
-   same hour. Verified: the free `/v4/sports` call on the new key reads 20,000 remaining, 0
-   used; a zero-credit `lines_watch.yml` `market=1h_close` dispatch (run 37318117401) proved
-   the runner's copy. Live use is well under 2,000 credits a month (326 for Oct 1-4, which
-   covered three card builds and the 14 Saturday close ticks), so the plan carries ~10x.
-   There is **no tier between the free 500 and 20K** (re-read 2026-10-05: Starter 500 free,
-   20K $30, 100K $59, 5M $119, 15M $249, hard cap, no overage). The 100K plan existed for the
-   one-time 2023-25 history purchase (~44.9K credits, Sep 6-8). Full stack review:
-   `docs/DATA_STACK_REVIEW_2026-10-05.md`. **Since 2026-10-07** (roadmap step 4, Tate's
-   approved credit math) every full-game pull also carries spreads, moneylines and the
-   exchanges: ~+860 credits a month, ~3,300 a month in all, still on the 20K plan.
+**Other standing accounts.** `GITHUB_DISPATCH_TOKEN` (Vercel env, fine-grained, Actions read and
+write on `tatemoody7/beat-vegas` only) triggers every Vercel-dispatched job; it stops mattering when
+PR-24 empties the crons, after which Tate may revoke it. The GitHub Actions budget is moot while the
+repository is public (public since 2026-10-16: no minute cap). Open-Meteo, TeamRankings, Rotowire and
+ESPN are free and unmetered. A Kalshi account is opened only for the Mon 11-30 H-VENUE-1 read, if that read needs one.
 
 ## What the board now shows about these
 
@@ -73,3 +71,6 @@ per UTC hour 15Z–04Z, 14 entries, every tick dispatching): GitHub's own 30-min
 Saturday slots in week 4, and only about a third of Hard-Rock-priced games had any 1H snapshot
 inside the registered 2-hour close window. `last_dispatch_lines-close` should advance hourly on
 a Saturday.
+
+From 2026-11-05 `cfbd_calls_remaining` counts down from the free tier's 1,000 calls a month, not Tier 3's 75,000,
+so the board's warning under 200 is the last line of defence; the daily digest (PR-06) warns under 500.

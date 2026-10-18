@@ -108,9 +108,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   p1.3: a running arm times out there, `protocol_position.py --season-over` is implied from 12Z and the workflow's `season_over` input
   forces it) with H6 (`docs/WHEN_TO_BET.md`, `CONFIRMATORY_DATE`), H-JUDGE, H-VENUE-1 and H-ARM-EVP read the same day; the 12-07
   mid-point and the 2027-01-25 read are gone. Final report `docs/program/SEASON_2026_FINAL` (PR-17), then the export and Neon free.
-- **Accounts (v2.6; `docs/OPS_ACCOUNTS.md`)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key); The Odds API
-  renews once more ~Nov 5 and is cancelled before Dec 5, CFBD before Dec 6, Neon to free after the export (Tate clicks;
-  nothing is cancelled by Claude). Kalshi account only on the 11-30 H-VENUE-1 read.
+- **Accounts and shutdown (v2.6)**: `docs/OPS_ACCOUNTS.md` is the dated runbook; Tate clicks every cancellation, Claude none.
 - **The repo is PUBLIC again since 2026-10-16** (Tate): the $10/month Actions cap was hit mid-month
   and GitHub refused every job from ~04:00Z (a refused job has 0 steps; its check-run annotation
   names billing). Public removes the minute cap; nothing secret is tracked (scanned 2026-10-16).

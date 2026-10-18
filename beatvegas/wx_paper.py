@@ -27,13 +27,13 @@ import json
 import sys
 import time
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from .card import parse_kick
 from .challenger_picks import add_challenger_pick
 from .db.models import BuildForecast, ChallengerPick, Game, Venue
 from .devig import is_centred_quote
-from .fg_paper import _hr_quotes
+from .fg_paper import hr_main_quotes
 from .hardrock import HR_BOOK_KEY
 from .protocol import ARM_WX_1H, ARM_WX_FG
 from .sources.weather import (
@@ -303,14 +303,21 @@ def _priced_first_half(it: Dict) -> bool:
 
 def _priced_full_game(session, season: int, week: int, now: datetime) -> List[tuple]:
     """(game, quote) for the week's games not yet kicked off whose newest Hard Rock
-    full-game total is centred with a line and an under price: the full-game
-    arm's universe (H-ARM-FGU's quote rule)."""
+    MAIN full-game total (p1.4: alternate rungs ignored, `fg_paper.hr_main_quotes`)
+    is centred with a line and an under price: the full-game arm's universe
+    (H-ARM-FGU's quote rule)."""
+    return _priced_full_game_with_stats(session, season, week, now)[0]
+
+
+def _priced_full_game_with_stats(
+    session, season: int, week: int, now: datetime
+) -> Tuple[List[tuple], Dict[str, int]]:
     games = (
         session.query(Game)
         .filter(Game.season == int(season), Game.week == int(week), Game.start_date > now)
         .all()
     )
-    quotes = _hr_quotes(session, [int(g.id) for g in games], now)
+    quotes, displaced = hr_main_quotes(session, [int(g.id) for g in games], now)
     out = []
     for g in games:
         q = quotes.get(int(g.id))
@@ -319,7 +326,7 @@ def _priced_full_game(session, season: int, week: int, now: datetime) -> List[tu
         if not is_centred_quote(q.over_price, q.under_price):
             continue
         out.append((g, q))
-    return out
+    return out, {"hr_alt_ignored": len(displaced)}
 
 
 def arm_game_ids(session, card: Dict, season: int, week: int, now: datetime) -> List[int]:
@@ -437,7 +444,8 @@ def log_full_game(
     logged = _logged(session, ARM_WX_FG)
     added = windy = 0
     acct = _Accounting()
-    for g, q in _priced_full_game(session, season, week, now):
+    priced, pstats = _priced_full_game_with_stats(session, season, week, now)
+    for g, q in priced:
         gid = int(g.id)
         fc = forecasts.get(gid)
         acct.see(gid, fc, now)
@@ -465,7 +473,7 @@ def log_full_game(
         )
         logged.add(gid)
         added += 1
-    return {"windy": windy, "added": added, **acct.counts()}
+    return {"windy": windy, "added": added, **acct.counts(), **pstats}
 
 
 def summary_lines(stats: Optional[Dict[str, Any]]) -> List[str]:
@@ -491,10 +499,16 @@ def summary_lines(stats: Optional[Dict[str, Any]]) -> List[str]:
         unknown = a.get("unknown", 0)
         ids = a.get("unknown_game_ids") or []
         named = f" {ids[:8]}{'...' if len(ids) > 8 else ''}" if ids else ""
+        alt = a.get("hr_alt_ignored") or 0
+        alt_txt = (
+            f"; {alt} Hard Rock alternate rung{'s' if alt != 1 else ''} ignored (p1.4)"
+            if alt
+            else ""
+        )
         return (
             f"    {name}: priced {a.get('priced', 0)}; forecast this build {a.get('forecast_fresh', 0)}, "
             f"from an earlier build {carried}{age}, domes {a.get('domes', 0)}; windy {a.get('windy', 0)}, "
-            f"+{a.get('added', 0)} logged; UNKNOWN (no forecast) {unknown}{named}"
+            f"+{a.get('added', 0)} logged; UNKNOWN (no forecast) {unknown}{named}{alt_txt}"
         )
 
     lines.append(arm_line("first half", h))

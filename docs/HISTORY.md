@@ -10,6 +10,26 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~21:30 UTC (P1.4: THE FULL-GAME ARMS IGNORE HARD ROCK'S ALTERNATE RUNGS; THE REPLAY FOUND NONE).**
+  Final-2026 plan PR-03 (decision D9). The audit found H-ARM-FGU and H-ARM-WXFG took Hard Rock's newest full-game
+  total on the −160 "centred" test alone, while the 1H arms also apply `devig.is_hr_rung` (−140 or worse, or 2+
+  points off the median of 3+ other centred books as of the same capture). Now both full-game arms read
+  `fg_paper.hr_main_quotes` (the card's `lines.hr_rung_flags` over every book's full-game rows at the build): the
+  newest MAIN Hard Rock line, the last main line when the newest row is a rung, nothing when every row is a rung;
+  the build summary counts `hr_alt_ignored`. **Replay before the change (Neon, read-only, 2026-10-18 ~20:50Z):** for
+  each of the 39 FGU / WXFG picks, Hard Rock's newest `full_game_total` row at or before `placed_at` and the other
+  non-exchange books' newest centred rows at that moment (`DISTINCT ON (book)`, prices > −160, Hard Rock / Fliff /
+  consensus / Kalshi / Novig / ProphetX / Polymarket / BetOpenly excluded): price rung (min price ≤ −140) 0 of 39;
+  distance rung (3+ books and |line − median| ≥ 2) 0 of 39 (16-17 reference books on 37 picks, 9-10 on two).
+  So no pick is retagged, no reading changes and the planned `challenger_picks.audit_flag` column is not needed.
+  `PROTOCOL_VERSION` → `p1.4` (`docs/PROTOCOL_2026.md` p1.4; roadmap v2.7; the two registry rows carry the
+  amendment); `tests/test_fg_paper.py` and `tests/test_wx_paper.py` pin that a rung newest row yields the last main
+  line and a rung-only game leaves the universe. Applies from the first card built after the merge (Tue 10-20 or
+  Thu 10-22). Same PR: `tests/conftest.py` pins one OpenMP / BLAS thread for the test session,
+  because on this Mac the whole-suite run (the pre-push hook's exact command) raised numpy's "Identity cache already
+  includes the item" inside sklearn's threaded binning in `tests/test_artifacts.py` -- main passed, this tree failed
+  5 of 5, `OMP_NUM_THREADS=1` passed the full suite; the test itself is untouched and CI results are unchanged.
+
 - **2026-10-18 ~17:00 UTC (THE SHUTDOWN RUNBOOK, DATED; CFBD PATREON CANCELLED).** Final-2026 plan PR-22 (docs only).
   `docs/OPS_ACCOUNTS.md` drops its stale "Do now" and "Done 2026-10-05" sections for one dated table (date, action, kind,
   precondition, who) with a paragraph on what stop, cancel a renewal, retain and downgrade mean here and the rule that only

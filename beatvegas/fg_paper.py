@@ -22,15 +22,14 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-
-from sqlalchemy import func
+from typing import Any, Dict, List, Optional, Tuple
 
 from .backtest.stopping import FG
 from .challenger_picks import add_challenger_pick
 from .db.models import ChallengerPick, Game, OddsSnapshot, Prediction
 from .devig import is_centred_quote
 from .hardrock import HR_BOOK_KEY
+from .lines import hr_rung_flags
 from .model.score import MODEL_VERSION, WEEKLY_BET_CAP, slate_bar
 from .picks import freeze_factors
 
@@ -45,23 +44,54 @@ def collection_enabled() -> bool:
     return os.environ.get("FG_COLLECT") == "1"
 
 
-def _hr_quotes(session, game_ids: List[int], now: datetime) -> Dict[int, Any]:
-    """Each game's NEWEST Hard Rock full-game total captured at or before `now`."""
+def hr_main_quotes(
+    session, game_ids: List[int], now: datetime
+) -> Tuple[Dict[int, Any], Dict[int, Any]]:
+    """(main, displaced): each game's newest Hard Rock MAIN full-game total
+    captured at or before `now`, and -- for the games whose NEWEST Hard Rock row
+    is an alternate rung -- that rung.
+
+    Protocol p1.4 (Tate, 2026-10-18): the full-game arms apply the first-half
+    arms' rule. A Hard Rock row is a rung when its price is -140 or worse or its
+    line sits 2+ points off the median of 3+ other centred books as of its own
+    capture (`devig.is_hr_rung` through `lines.hr_rung_flags`, the card's own
+    `_hr_main_quote`); the arms log at the last MAIN line, never at a rung, and
+    a game whose Hard Rock quotes are all rungs is out of the universe. Before
+    p1.4 only the -160 rule applied here; the replay of every FGU / WXFG pick
+    logged before it (39 rows) found none on a rung, so nothing was retagged."""
+    if not game_ids:
+        return {}, {}
     rows = (
         session.query(OddsSnapshot)
         .filter(
             OddsSnapshot.game_id.in_(game_ids),
             OddsSnapshot.market == FG_SNAPSHOT_MARKET,
-            func.lower(OddsSnapshot.book) == HR_BOOK_KEY,
             OddsSnapshot.captured_at <= now,
         )
         .order_by(OddsSnapshot.captured_at.asc(), OddsSnapshot.id.asc())
         .all()
     )
-    out: Dict[int, Any] = {}
-    for s in rows:  # ascending, so the newest wins
-        out[int(s.game_id)] = s
-    return out
+    by_game: Dict[int, list] = {}
+    for s in rows:
+        by_game.setdefault(int(s.game_id), []).append(s)
+    main: Dict[int, Any] = {}
+    displaced: Dict[int, Any] = {}
+    for gid, snaps in by_game.items():
+        flags = hr_rung_flags(snaps)  # Hard Rock's rows in input (ascending) order
+        if not flags:
+            continue
+        newest, newest_rung = flags[-1]
+        mains = [s for s, rung in flags if not rung]
+        if mains:
+            main[gid] = mains[-1]
+        if newest_rung:
+            displaced[gid] = newest
+    return main, displaced
+
+
+def _hr_quotes(session, game_ids: List[int], now: datetime) -> Dict[int, Any]:
+    """Each game's newest Hard Rock MAIN full-game total at or before `now` (p1.4)."""
+    return hr_main_quotes(session, game_ids, now)[0]
 
 
 def _predictions(session, game_ids: List[int], version: str) -> Dict[int, Prediction]:
@@ -93,8 +123,17 @@ def _logged_this_week(session, season: int, week: int, arm: str = ARM) -> List[i
 
 def universe(session, season: int, week: int, now: datetime) -> List[Dict[str, Any]]:
     """H-FG-P's universe at this build: the week's games not yet kicked off whose
-    newest Hard Rock full-game quote is centred and carries a line and an UNDER
-    price, with a `bv_fg_v1` read. One dict per game with its gap."""
+    newest Hard Rock MAIN full-game quote (p1.4) is centred and carries a line
+    and an UNDER price, with a `bv_fg_v1` read. One dict per game with its gap."""
+    return universe_with_stats(session, season, week, now)[0]
+
+
+def universe_with_stats(
+    session, season: int, week: int, now: datetime
+) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+    """`universe` plus the build's accounting: `hr_alt_ignored` = games whose
+    newest Hard Rock quote was an alternate rung (the last main line, if any,
+    was used instead)."""
     games = (
         session.query(Game)
         .filter(Game.season == int(season), Game.week == int(week), Game.start_date > now)
@@ -102,8 +141,8 @@ def universe(session, season: int, week: int, now: datetime) -> List[Dict[str, A
     )
     ids = [int(g.id) for g in games]
     if not ids:
-        return []
-    quotes = _hr_quotes(session, ids, now)
+        return [], {"hr_alt_ignored": 0}
+    quotes, displaced = hr_main_quotes(session, ids, now)
     fg = _predictions(session, ids, FG_MODEL_VERSION)
     champ = _predictions(session, ids, MODEL_VERSION)
     out = []
@@ -134,7 +173,7 @@ def universe(session, season: int, week: int, now: datetime) -> List[Dict[str, A
                 else float(champ[gid].bv_line),
             }
         )
-    return out
+    return out, {"hr_alt_ignored": len(displaced)}
 
 
 def select(
@@ -218,7 +257,7 @@ def log_fg_picks(
     `manual_picks`. H-ARM-FGU (2026-10-08) calls it with its own `arm`,
     `cap=None` and `require_positive=True`."""
     season, week = int(card["season"]), int(card["week"])
-    items = universe(session, season, week, now)
+    items, ustats = universe_with_stats(session, season, week, now)
     logged = _logged_this_week(session, season, week, arm)
     sel = select(items, logged, cap=cap, require_positive=require_positive)
     added = 0
@@ -260,6 +299,7 @@ def log_fg_picks(
         "bar": sel["bar"],
         "qualifying": sel["qualifying"],
         "held": sel["held"],
+        "hr_alt_ignored": ustats["hr_alt_ignored"],
     }
 
 
@@ -289,7 +329,11 @@ def arm_summary_line(stats: Optional[Dict[str, Any]]) -> str:
     if not stats["universe"]:
         return f"{tag}: no game with a Hard Rock full-game price and a bv_fg_v1 read"
     bar = "—" if stats["bar"] is None else f"{stats['bar']:.2f}"
+    alt = stats.get("hr_alt_ignored") or 0
+    alt_txt = (
+        f"; {alt} Hard Rock alternate rung{'s' if alt != 1 else ''} ignored (p1.4)" if alt else ""
+    )
     return (
         f"{tag}: universe {stats['universe']}, bar {bar}, "
-        f"{stats['qualifying']} qualify, +{stats['added']} logged"
+        f"{stats['qualifying']} qualify, +{stats['added']} logged{alt_txt}"
     )

@@ -1,9 +1,9 @@
-# The 2026 Statistical Protocol — `p1.3`
+# The 2026 Statistical Protocol — `p1.4`
 
 **Status: frozen on Tate's approval of the simulated numbers below (2026-10-07); amended `p1.1`
 on 2026-10-09 (roadmap v1.5: the three arms' clocks paused before any completed week, and the
 restart rule below); amended `p1.2` on 2026-10-14 (roadmap v2.4: the reading unit and when a week is
-complete, below); amended `p1.3` on 2026-10-18 (roadmap v2.6: the season's end, below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
+complete, below); amended `p1.3` on 2026-10-18 (roadmap v2.6: the season's end, below); amended `p1.4` on 2026-10-18 (roadmap v2.6 decision D9: the full-game arms ignore Hard Rock's alternate rungs, below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
 is one test under this protocol, registered as its own row before it logs anything; every
 confirmatory clock starts at the first eligible build after that row exists. Everything logged
 before is development evidence. Code: `beatvegas/protocol.py` (the test),
@@ -80,6 +80,25 @@ time on **Monday 2026-11-30** (`protocol.FINAL_READ_DATE`, replacing the 2027-01
   (`protocol.season_over`, the same Monday-noon clock as R2), `--season-over` and the Monday
   workflow's `season_over` dispatch input only make it explicit. Nothing about an arm's selection
   rule, its start, the judge, alpha or the boundaries changes; the week-13 reading enters under R1-R3′ as usual.
+
+## p1.4 — the full-game arms ignore Hard Rock's alternate rungs (Tate, 2026-10-18; roadmap v2.6 D9)
+
+The first-half arms have always taken Hard Rock's last MAIN line and refused a rung
+(`devig.is_hr_rung`: a price of −140 or worse, or a line 2+ points off the median of 3+ other
+centred books as of the same capture; `RANKING_AND_TRUST` §9b). The full-game arms H-ARM-FGU and
+H-ARM-WXFG applied only the −160 "centred quote" test, so a Hard Rock full-game alternate priced
+between −140 and −160, or a main-priced rung 2+ points off the field, could be logged as the arm's
+line. From the first card built after this amendment merges:
+
+- **Both full-game arms read Hard Rock's newest MAIN full-game total** (`fg_paper.hr_main_quotes`,
+  the same `lines.hr_rung_flags` the card uses); a game whose newest Hard Rock quote is a rung logs
+  at its last main line, and a game with no main line is out of the universe. The build's summary
+  counts the rungs ignored (`hr_alt_ignored`).
+- **Nothing before it changes.** The replay of every FGU / WXFG pick logged before the amendment
+  (39 rows, ids 44-77 and 90-114; the Neon query is in `docs/HISTORY.md` 2026-10-18) found none on
+  a rung by either rule, so no pick is retagged and both arms' readings are exactly as they were.
+  The arms' starts, the judge, alpha and the boundaries are unchanged; this is a selection-input
+  correction disclosed before any week it affects is read.
 
 ## WEEK-SHOCK — how much of line value a week shares
 

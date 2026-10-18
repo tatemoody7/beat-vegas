@@ -54,7 +54,7 @@ def test_the_arms_are_registered_with_their_slots():
     # p1.1 (roadmap v1.5, 2026-10-09): paused before any completed week, until the
     # first card built on the leak-fixed model -- the 2026-10-13 tue_pm card
     # (Tate's approval 2026-10-13). The 2026-10-09 rows sit before it.
-    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.3"
+    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.4"
     assert P.ARMS_START > P.ARMS_TAGGED_FROM
     for arm in (P.ARM_1H_UNDER, P.ARM_1H_OVER, P.ARM_FG_UNDER):
         assert P.arm_start(arm) == P.ARMS_START

@@ -316,7 +316,7 @@ list and land through their own registered row or PR.
 - **Hard Rock's ALTERNATE lines arrive alone as the 1H total** (Texas @ Tennessee 30.5 at −160 vs
   27.5 in the app). `devig.is_hr_rung` (−140 or worse, or 2+ pts off the field's median with 3+
   books; `devig.ts::isHrRung`, golden vectors) flags them; the card shows the last MAIN line
-  (`hr_alt_line`) and they can never be bet, never set the bar, never paper-log. `RANKING_AND_TRUST` §9b.
+  (`hr_alt_line`) and they never bet, set the bar or paper-log — the full-game arms too since p1.4 (`fg_paper.hr_main_quotes`). `RANKING_AND_TRUST` §9b.
 - **BetMGM's `totals_h1` is an off-centre rung**, not a main line (61 of 63 games 2+ pts off);
   `fairPriceWindow` admits only books within 0.5 pts of Hard Rock. `RANKING_AND_TRUST` §9.
 - **`centred_snaps` falls back to the rungs it rejects** (`return ok or list(snaps)`): pass

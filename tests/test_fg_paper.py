@@ -368,3 +368,101 @@ def test_fg_shadow_scores_the_full_game_and_stores_a_shadow_row_with_its_own_ref
         assert p.refit_id == refit and p.rank is None and p.fingerprint == "abc"
         feats = json.loads(p.factors_json)["features"]
         assert all(v is None or math.isfinite(v) for v in feats.values())
+
+
+# --- p1.4 (Tate, 2026-10-18, final-2026 plan D9): Hard Rock's alternate rungs ------------
+
+
+def _other_books(s, gid, line, at, books=("draftkings", "fanduel", "betmgm")):
+    for b in books:
+        s.add(
+            OddsSnapshot(
+                game_id=gid,
+                book=b,
+                market="full_game_total",
+                line=line,
+                over_price=-110,
+                under_price=-110,
+                captured_at=at,
+            )
+        )
+
+
+def test_p14_a_rung_as_the_newest_hard_rock_quote_yields_the_last_main_line():
+    """The newest Hard Rock row is priced -160/+130 (a rung by price); the arm
+    reads the main 50.5 posted an hour earlier and counts the rung ignored."""
+    eng, _ = _sqlite_scope()
+    with Session(eng) as s:
+        _seed(s, 1)  # main 50.5 at NOW-1h
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="hardrockbet",
+                market="full_game_total",
+                line=53.5,
+                over_price=-160,
+                under_price=130,
+                captured_at=NOW - timedelta(minutes=10),
+            )
+        )
+        s.commit()
+        items, stats = F.universe_with_stats(s, 2026, 6, NOW)
+    assert [it["hr_line"] for it in items] == [50.5]
+    assert stats == {"hr_alt_ignored": 1}
+
+
+def test_p14_a_main_priced_line_two_points_off_three_books_is_a_rung():
+    """The distance rule: Hard Rock at 54.5 / -110 with three books at 50.5 is a
+    rung even at a main price; with the earlier 50.5 main line it is used instead."""
+    eng, _ = _sqlite_scope()
+    with Session(eng) as s:
+        _seed(s, 1)
+        _other_books(s, 1, 50.5, NOW - timedelta(hours=2))
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="hardrockbet",
+                market="full_game_total",
+                line=54.5,
+                over_price=-110,
+                under_price=-110,
+                captured_at=NOW - timedelta(minutes=10),
+            )
+        )
+        s.commit()
+        items, stats = F.universe_with_stats(s, 2026, 6, NOW)
+    assert [it["hr_line"] for it in items] == [50.5] and stats["hr_alt_ignored"] == 1
+
+
+def test_p14_a_game_whose_hard_rock_quotes_are_all_rungs_leaves_the_universe():
+    eng, _ = _sqlite_scope()
+    with Session(eng) as s:
+        _seed(s, 1, under=-150)  # -150 passes the -160 centred test, fails is_hr_rung
+        s.commit()
+        items, stats = F.universe_with_stats(s, 2026, 6, NOW)
+    assert items == [] and stats == {"hr_alt_ignored": 1}
+
+
+def test_p14_the_logged_pick_and_the_summary_carry_the_main_line_and_the_count():
+    eng, scope = _sqlite_scope()
+    with Session(eng) as s:
+        _seed(s, 1, gap_of=lambda i: 3.0)
+        s.add(
+            OddsSnapshot(
+                game_id=1,
+                book="hardrockbet",
+                market="full_game_total",
+                line=48.5,
+                over_price=120,
+                under_price=-150,
+                captured_at=NOW - timedelta(minutes=5),
+            )
+        )
+        s.commit()
+    with scope() as s:
+        out = F.log_fg_picks(s, CARD, NOW, arm="H-ARM-FGU", cap=None, require_positive=True)
+    assert out["added"] == 1 and out["hr_alt_ignored"] == 1
+    assert "1 Hard Rock alternate rung ignored (p1.4)" in F.arm_summary_line(out)
+    with Session(eng) as s:
+        (r,) = s.query(ChallengerPick).all()
+        assert (r.line, r.price) == (50.5, -110)

@@ -12,7 +12,7 @@ directly beside the champion's. The error budget is not: 5% total, split /4
 across the arms (Bonferroni) and /2 across the clocks, so each arm-clock runs at
 0.625%.
 
-    PYTHONPATH=. python scripts/challenger_position.py --out reports/challenger
+    PYTHONPATH=. python scripts/archive/challenger_position.py --out reports/challenger
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def _this_family():
     """The H-INSEASON arms only. `challenger_picks` also holds the H-NEGGAP-P
     paper OVERS (side='over', arms neggap_*, 2026-09-28), whose favourable line
     value has the opposite sign; they have their own budget and their own
-    script (scripts/neggap_position.py) and must never enter this one."""
+    script (scripts/archive/neggap_position.py) and must never enter this one."""
     return ChallengerPick.arm.in_(list(S.CHALLENGER["arms"])) & (ChallengerPick.side == "under")
 
 

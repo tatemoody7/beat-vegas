@@ -82,7 +82,7 @@ Two SPRT clocks per arm, the H-STOP-2 shape (`docs/STOPPING_RULE.md`, Clock 2):
   under record on the same games.
 
 Constants: `beatvegas/backtest/stopping.py::NEGGAP`; position:
-`scripts/neggap_position.py` (lands with the collection code); `tests/test_stopping.py`
+`scripts/archive/neggap_position.py` (lands with the collection code); `tests/test_stopping.py`
 pins the numbers to this document.
 
 ## Touches nothing live
@@ -93,7 +93,7 @@ price gate or H-STOP-2. The collection is switched on by `NEGGAP_COLLECT=1` in `
 off by unsetting it. Code: `beatvegas/neggap.py` (arms, universe, the writer),
 `beatvegas/grading.py` / `beatvegas/picks.py` graded side-aware (`result` stays the
 outcome; units pay the over; the no-vig price CLV flips sign), `lines.book_closing_price_
-before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (also
+before_kickoff(side="over")` for the close price, `scripts/archive/neggap_position.py` (also
 `study.yml` → `neggap_position`). `challenger_picks.closing_captured_at` is new: run
 `migrate.yml` before the first grade of an over row.
 
@@ -136,7 +136,7 @@ before_kickoff(side="over")` for the close price, `scripts/neggap_position.py` (
 - Weekly: per arm, n logged, n graded, hit rate, units at price, favourable line value,
   excluded-no-close share, both LLRs against A/B.
 
-## Weekly positions (`scripts/neggap_position.py`)
+## Weekly positions (`scripts/archive/neggap_position.py`)
 
 ### 2026-10-04 — week 5 graded (30 rows: 27 from card 24, 3 from card 25 `sat_am`)
 

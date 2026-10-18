@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Rank how often the 1H under cashed last season, by opening-line value.
 
-    python scripts/line_study.py --season 2025
-    python scripts/line_study.py --season 2025 --min-games 40 --highlight 24.5
+    python scripts/archive/line_study.py --season 2025
+    python scripts/archive/line_study.py --season 2025 --min-games 40 --highlight 24.5
 
 Uses real consensus opening lines where captured, else the proxy (0.52*full),
 labeled per row. Breakeven vs -110 = 52.4%.

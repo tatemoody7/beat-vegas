@@ -73,7 +73,7 @@ either clock is a stop.
 Under this design there is **no confidence band to look at**. `running_position`
 computes the LLR path and the Wald bounds and nothing else; the module contains no
 bootstrap and refuses any design name but the registered two. Weekly runs of
-`scripts/stopping_rule_position.py` are legitimate looks because the boundaries are
+`scripts/archive/stopping_rule_position.py` are legitimate looks because the boundaries are
 sequential by construction — that is the point of choosing SPRT over a fixed n.
 
 ## The candidate table Tate chose from (frozen inputs, 2026-09-15)
@@ -101,7 +101,7 @@ sequential by construction — that is the point of choosing SPRT over a fixed n
 
 ```
 PYTHONPATH=. python scripts/stopping_rule_candidates.py --breakeven 0.5475 --sd-units 0.924 --sd-clv 1.714 --sigma-outcome 11.26
-PYTHONPATH=. python scripts/stopping_rule_position.py --out reports/stopping      # weekly; GHA study.yml when on campus
+PYTHONPATH=. python scripts/archive/stopping_rule_position.py --out reports/stopping      # weekly; GHA study.yml when on campus
 ```
 
 ## Clock 1 closed — 2026-09-22, n = 30, no boundary crossed. Superseded.
@@ -145,7 +145,7 @@ this reduces to the Clock-1 formula.
 (`scripts/rule_pause.py on`); success on either is a finding for Tate and changes no stake.
 
 Constants: `beatvegas/backtest/stopping.py::REGISTERED_2`; the weekly position is
-`scripts/stopping_rule_position.py --clock 2`. Registry row **H-STOP-2**.
+`scripts/archive/stopping_rule_position.py --clock 2`. Registry row **H-STOP-2**.
 
 ## The model switch inside Clock 2 — 2026-10-07 (Tate's call: keep the clock running)
 

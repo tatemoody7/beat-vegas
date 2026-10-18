@@ -131,7 +131,7 @@ def test_the_slate_fit_records_its_trees_and_early_stopping():
     assert bv_line.LAST_FIT["train_rows"] == len(train)
 
 
-# --- the study (scripts/model_fix_study.py, beatvegas/backtest/model_fix.py) ---
+# --- the study (scripts/archive/model_fix_study.py, beatvegas/backtest/model_fix.py) ---
 
 
 def _report(hi):
@@ -191,7 +191,8 @@ def test_the_extras_render_the_readings():
     from pathlib import Path
 
     spec = importlib.util.spec_from_file_location(
-        "model_fix_study", Path(__file__).resolve().parents[1] / "scripts" / "model_fix_study.py"
+        "model_fix_study",
+        Path(__file__).resolve().parents[1] / "scripts" / "archive" / "model_fix_study.py",
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

@@ -2,7 +2,7 @@
 
 **Finding (descriptive, no criterion): a sharp book does post CFB first-half totals
 through the Odds API, but on 2-3 of 75 events.** Probe only — no bookmaker key changed,
-no swap. Run **Tuesday 2026-09-15, 21:13 UTC** with `scripts/sharp_book_probe.py --live`
+no swap. Run **Tuesday 2026-09-15, 21:13 UTC** with `scripts/archive/sharp_book_probe.py --live`
 (64 credits, 55,037 → 54,973); pure pieces pinned by `tests/test_sharp_book_probe.py`.
 Registry row **H5** in `docs/HYPOTHESES.md`.
 
@@ -73,8 +73,8 @@ first-half coverage widen toward kickoff) remains an open option, not a schedule
 ## Reproduce
 
 ```
-PYTHONPATH=. python scripts/sharp_book_probe.py                       # dry run, free
-PYTHONPATH=. python scripts/sharp_book_probe.py --live --max-credits 120
+PYTHONPATH=. python scripts/archive/sharp_book_probe.py                       # dry run, free
+PYTHONPATH=. python scripts/archive/sharp_book_probe.py --live --max-credits 120
 ```
 
 Writes `reports/sharp_books_<UTC>.{md,json}` (gitignored); exits 0. Reads nothing from

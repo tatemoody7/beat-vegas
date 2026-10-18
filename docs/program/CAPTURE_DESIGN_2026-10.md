@@ -137,7 +137,7 @@ honest version of "denser".
 
 ## Implemented 2026-10-11 (Step 1 of the pricing-inefficiency programme)
 
-Shipped as one PR with the corrections above, plus `scripts/probe_hr_keys.py`: a by-hand probe
+Shipped as one PR with the corrections above, plus `scripts/archive/probe_hr_keys.py`: a by-hand probe
 that asks the feed for `hardrockbet` and `hardrockbet_fl` together with the keys left as spelled
 (the capture folds every state key into `hardrockbet`; the Odds API's bookmaker table calls that
 key the Indiana book, "currently same odds as several other states"). One matching slate proves

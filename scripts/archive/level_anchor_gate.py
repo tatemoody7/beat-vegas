@@ -15,7 +15,7 @@ experiment rather than a separate code path. Every comparison is PAIRED on the
 same games. See beatvegas/backtest/level_anchor.py for the adoption rule, which
 was fixed before the first run, and for what that run found.
 
-    python scripts/level_anchor_gate.py --train-seasons 2023 --test-season 2024 \
+    python scripts/archive/level_anchor_gate.py --train-seasons 2023 --test-season 2024 \
         --out reports/level_anchor [--grid 0 0.5 1 2 3] [--no-closes]
 
 Writes <out>_<UTC>.md, .json and .csv (the per-game frame, so the tables can be
@@ -48,7 +48,7 @@ from beatvegas.snapshots import consensus_closes, kickoffs_for
 # and not the repo root, so `from scripts.x import` fails with
 # ModuleNotFoundError -- which is how intercept_gate.yml died on the runner on
 # 2026-09-22 without anyone noticing the study had only ever run on a laptop.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Reuse the residual gate's output plumbing rather than restating it -- same
 # stamped triple, same step-summary behaviour, so the two reports are siblings.

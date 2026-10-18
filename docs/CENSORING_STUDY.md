@@ -1,7 +1,7 @@
 # Does censoring leave information the price has not absorbed?
 
 **Run 2026-09-14. Verdict: DO NOT BUILD.** Re-run with
-`python scripts/censoring_study.py`.
+`python scripts/archive/censoring_study.py`.
 
 The two-team probabilistic engine was going to be a multi-day build. This is the
 half-day measurement that decided whether it was worth starting. It was not.

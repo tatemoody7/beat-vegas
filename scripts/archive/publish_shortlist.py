@@ -2,11 +2,11 @@
 
 card.yml runs this after `build`, for the card the run just wrote:
 
-    python scripts/publish_shortlist.py --season S --week W --slot SLOT --since RUN_STARTED_AT --write
+    python scripts/archive/publish_shortlist.py --season S --week W --slot SLOT --since RUN_STARTED_AT --write
 
 and `shortlist_publish.yml` re-runs it by hand for a card that missed (recoverable):
 
-    python scripts/publish_shortlist.py --card-id N --write
+    python scripts/archive/publish_shortlist.py --card-id N --write
 
 Rules (website plan PR D, adjustment 2):
 - a `manual` card publishes nothing (it is a preview);
@@ -37,7 +37,7 @@ from beatvegas.ci import SCHEDULED_SLOTS
 from beatvegas.db.models import Card
 from beatvegas.db.store import session_scope, try_init_db
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _find_card(s, args):

@@ -9,7 +9,7 @@ both on the held-out test season at that same close — plus the incumbent's
 predictions already stored under its model_version tag, which ties the report
 back to the published post-mortem headline. See beatvegas/backtest/residual_gate.py.
 
-    python scripts/residual_gate.py --train-seasons 2023 2024 --test-season 2025 \
+    python scripts/archive/residual_gate.py --train-seasons 2023 2024 --test-season 2025 \
         --out reports/residual_gate [--write-model-run] [--bv-train-seasons all|match]
 
 Writes <out>_<UTC>.md, .json and .csv (the per-game frame: picks, outcomes and

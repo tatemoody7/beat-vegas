@@ -483,7 +483,7 @@ def test_if_engine_match_proceeds(monkeypatch, mem, capsys):
     assert "scored 2 games" in capsys.readouterr().out
 
 
-# --- scripts/model_artifacts.py list ------------------------------------------------------
+# --- scripts/archive/model_artifacts.py list ------------------------------------------------------
 
 
 def test_model_artifacts_list_prints_the_newest_first(monkeypatch, mem, capsys):

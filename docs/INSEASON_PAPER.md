@@ -13,7 +13,7 @@ result this follows from.
 > reconciled the same day — same frame and same library reproduce to six decimals on both
 > machines, and only the reference-data snapshot differs (`docs/MODEL_LEVEL_2026.md`,
 > Reconciliation). Tate's disposition: the criterion is judged on the data the system uses.
-> The table, the arm code and `scripts/challenger_position.py` remain for a future family
+> The table, the arm code and `scripts/archive/challenger_position.py` remain for a future family
 > that earns its own registry row; `scripts/build_card.py` writes no challenger row unless
 > `CHALLENGER_COLLECT=1`, which no workflow sets. The `bv_intercept` backfill stands (it is a
 > correct value on every row, −1.2360, and the H-NEGGAP-L arithmetic still reads it).

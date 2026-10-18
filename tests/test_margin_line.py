@@ -102,7 +102,7 @@ def test_walk_forward_learns_a_margin_from_prior_seasons_only():
 
 def _load_backtest():
     spec = importlib.util.spec_from_file_location(
-        "margin_backtest", _ROOT / "scripts" / "margin_backtest.py"
+        "margin_backtest", _ROOT / "scripts" / "archive" / "margin_backtest.py"
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

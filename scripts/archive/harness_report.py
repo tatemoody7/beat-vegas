@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Run the shared measurement harness for ONE registry row and write its report.
 
-    python scripts/harness_report.py --row H-X --test-seasons 2024 2025 2026 \
+    python scripts/archive/harness_report.py --row H-X --test-seasons 2024 2025 2026 \
         [--frame reports/frame_snapshot_<UTC>.pkl] \
         [--min-games-train 0] [--min-games-score 0] \
         [--candidate beatvegas.some.module:fn --candidate-name plus1]... \

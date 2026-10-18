@@ -7,9 +7,9 @@ states". Nothing we hold proves the Florida app shows those numbers. This probe 
 for BOTH keys, keeps them as spelled, and prints them side by side with the provider's
 `last_update` stamp, plus the credits the run cost (x-requests-last / x-requests-used).
 
-    python scripts/probe_hr_keys.py --bulk                 # 1 credit: us2 full-game totals, every key seen
-    python scripts/probe_hr_keys.py --per-event 20         # 1 credit per event: totals_h1 for both keys
-    python scripts/probe_hr_keys.py --per-event 20 --markets totals_h1,totals   # 2 credits per event
+    python scripts/archive/probe_hr_keys.py --bulk                 # 1 credit: us2 full-game totals, every key seen
+    python scripts/archive/probe_hr_keys.py --per-event 20         # 1 credit per event: totals_h1 for both keys
+    python scripts/archive/probe_hr_keys.py --per-event 20 --markets totals_h1,totals   # 2 credits per event
 
 READ-ONLY: no table is written; the output is a markdown table on stdout (and --out FILE).
 One matching slate proves nothing about other weeks; the registry row that cites this
@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from beatvegas.sources.odds import OddsAPIClient, _raise_for_status  # noqa: E402

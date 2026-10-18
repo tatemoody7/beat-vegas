@@ -12,7 +12,7 @@ intercept with the season's OWN realized bias,
 closes strictly before the game being scored. See
 beatvegas/backtest/inseason.py for the rule, frozen before the script existed.
 
-    python scripts/inseason_gate.py --out reports/inseason \
+    python scripts/archive/inseason_gate.py --out reports/inseason \
         [--test-seasons 2024 2025 2026] [--grid 25 50 100 200] [--no-closes]
 
 Writes <out>_<UTC>.md, .json and .csv (the per-game frame, so the tables can be
@@ -43,12 +43,12 @@ from beatvegas.registry import HarnessRefusal
 # and not the repo root, so `from scripts.x import` fails with
 # ModuleNotFoundError -- which is how intercept_gate.yml died on the runner on
 # 2026-09-22 without anyone noticing the study had only ever run on a laptop.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # The sibling gates' plumbing, not a second copy of it: same stamped triple, same
 # step-summary behaviour, same real-close lookup, so the reports stay comparable.
 from beatvegas.backtest.reporting import append_step_summary, report_paths
-from scripts.level_anchor_gate import load_closes
+from scripts.archive.level_anchor_gate import load_closes
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

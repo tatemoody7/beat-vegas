@@ -25,7 +25,7 @@ promote anything.**
   - They are final because a raw p above 5% cannot pass at any Holm step, whatever Coleman and
     Salaga would show.
   - The rows are `H-LIT-ARSCOTT`, `H-LIT-TV` and `H-LIT-BENNETT` in `docs/HYPOTHESES.md`, run by
-    `scripts/literature_look.py`; `H-LIT-COX` ran 2026-10-11. Coleman and Salaga are parked (roadmap v2.1).
+    `scripts/archive/literature_look.py`; `H-LIT-COX` ran 2026-10-11. Coleman and Salaga are parked (roadmap v2.1).
 
 Provenance: a six-lane research run on 2026-10-08 (`research/swarm/2026-10-08-literature-step5/`,
 gitignored: every claim with its URL, retrieval time and confidence). Citations checked against

@@ -5,7 +5,7 @@
 Re-run it with:
 
 ```
-python scripts/level_anchor_gate.py --train-seasons 2023 --test-season 2024
+python scripts/archive/level_anchor_gate.py --train-seasons 2023 --test-season 2024
 ```
 
 ## The change

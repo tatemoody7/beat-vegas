@@ -13,7 +13,7 @@ rest; until its sigma is frozen (the first two Saturdays) it reports "not
 started" and this script prints the (close - build line) spread it will be
 frozen from.
 
-    PYTHONPATH=. python scripts/fg_position.py --out reports/fg
+    PYTHONPATH=. python scripts/archive/fg_position.py --out reports/fg
 """
 
 from __future__ import annotations

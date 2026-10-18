@@ -18,7 +18,7 @@
     "question": "Does a residual engine (market-conditioned) beat the incumbent and the close?",
     "status": "tested-null",
     "family": "exploratory",
-    "doc": "`scripts/residual_gate.py` (report gitignored; close 8.73 / residual 9.01 / incumbent 9.23 / stored 8.96 recorded in the 2026-09-08 session handoff, outside the repo)"
+    "doc": "`scripts/archive/residual_gate.py` (report gitignored; close 8.73 / residual 9.01 / incumbent 9.23 / stored 8.96 recorded in the 2026-09-08 session handoff, outside the repo)"
   },
   {
     "id": "R04",
@@ -452,7 +452,7 @@
     "question": "STOPPED 2026-10-16 (Tate): no card saves it and no page shows it; card 31's rows stay as the record. What does the newest scheduled card know about each game it rates (price at Hard Rock against the same sweep's books, the matchup, rest, travel, QB, weather), shown as the analysis behind the Board's top ten, and read later against the result and the closing value? (Tate, 2026-10-15; reshaped 2026-10-16: no separate ranking — the Board's top 10 open this analysis. A display, never an arm, never a bet rule.)",
     "status": "rejected",
     "family": "exploratory (no ledger slot, no alpha; never evidence for any arm; the personal ledger is untouched)",
-    "doc": "`beatvegas/shortlist.py`, `scripts/publish_shortlist.py`, `shortlist_entries`"
+    "doc": "`beatvegas/shortlist.py`, `scripts/archive/publish_shortlist.py`, `shortlist_entries`"
   },
   {
     "id": "H-MODEL-FIX",

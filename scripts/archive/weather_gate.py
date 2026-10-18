@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Blast radius of the repaired weather, for the ACTIVATION decision.
 
-    PYTHONPATH=. python scripts/weather_gate.py --train-seasons 2023 2024 \
+    PYTHONPATH=. python scripts/archive/weather_gate.py --train-seasons 2023 2024 \
         --test-season 2025 --out reports/weather_gate [--arms legacy 0 24 72]
 
 The weather values in the legacy table are wrong -- keyed with a UTC hour against

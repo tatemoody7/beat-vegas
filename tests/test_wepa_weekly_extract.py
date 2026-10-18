@@ -1,4 +1,4 @@
-"""scripts/wepa_weekly_extract.py: the derived H-WEPA-F z-table carries only
+"""scripts/archive/wepa_weekly_extract.py: the derived H-WEPA-F z-table carries only
 within-file z-scores of the 48 adjusted columns, keyed by game id, and refuses
 an id set that does not match the registered list."""
 
@@ -13,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts import wepa_weekly_extract as X  # noqa: E402
+from scripts.archive import wepa_weekly_extract as X  # noqa: E402
 
 
 def _file(tmp_path, post, week, ids, values, name=None, season=2025):

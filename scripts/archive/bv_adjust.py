@@ -5,9 +5,9 @@ Use when you know something the model can't see (a confirmed QB-out, late
 weather). The nudge shifts the BV line + gap shown on the card, clearly labeled —
 it never touches the model or the Under Score. Latest entry per game wins.
 
-    python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"
-    python scripts/bv_adjust.py list
-    python scripts/bv_adjust.py clear --game 401752875
+    python scripts/archive/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"
+    python scripts/archive/bv_adjust.py list
+    python scripts/archive/bv_adjust.py clear --game 401752875
 """
 
 from __future__ import annotations

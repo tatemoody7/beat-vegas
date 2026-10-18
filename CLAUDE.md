@@ -192,26 +192,22 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
 
 ### Scripts (`scripts/`, grouped; every script is idempotent)
 - **Live jobs**: `weekly_update` (score; `--min-games 0`, serve-skew guard, refit `model_runs`),
-  `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`, `publish_shortlist`
-  (H-1H-SHORTLIST, stopped 2026-10-16; dry runs only), `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
+  `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`,
+  `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
   `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`, `credit_plan`,
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
-- **Positions / rule**: `protocol_position` (the registered arms; `--write` stores `arm_positions`, Monday workflow only), `stopping_rule_position`,
-  `neggap_position`, `fg_position`, `challenger_position`, `rule_pause`, `pick` (no `add`).
-- **Studies (registry-gated)**: `harness_report --row <id>`, `residual_gate`, `level_anchor_gate`,
-  `intercept_gate`, `inseason_gate` (closed gates; the position scripts import them), `weather_gate`,
-  `blend_gate`, `gates_study`, `when_to_bet_study`, `sharp_book_probe`, `censoring_study`,
-  `neggap_level_study`, `frame_snapshot`, `margin_backtest`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `literature_look`, `weather_history_look`, `judge_check`, `model_fix_study` (H-MODEL-FIX), `venue_check` (H-VENUE-1).
+- **Positions / rule**: `protocol_position` (the registered arms; `--write` stores `arm_positions`, Monday workflow only), `rule_pause`, `pick` (no `add`).
+- **Studies (registry-gated)**: `when_to_bet_study`, `frame_snapshot`, `week_shock_study` and `protocol_sim` (size the 2026 Statistical Protocol), `judge_check`, `venue_check` (H-VENUE-1).
 - **Backfills / one-offs**: `backfill_1h_history`, `backfill_fg_history`,
   `backfill_bv_intercept`, `backfill_game_records`, `backfill_spread`, `backfill_spread_open`,
   `backfill_pbp`, `backfill_enrichment` (pace), `backfill_weather` +
   `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `build_trophy_games` (rivalry list),
-  `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
-  `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml), `build_shortlist_reference` (freezes `data/shortlist_reference.json` from the H-1H-FACTORS screen).
-- **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (offline backtest engine retired 2026-10-11, v2.0); `pricing_check` (exploratory, read-only: H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
-- **Probes** (write nothing): `probe_hr_keys` (`hardrockbet` vs `hardrockbet_fl`, raw keys kept), `probe_alt_totals_h1` (≤24 credits, one run), `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20); `archive_buy` (the archive queue + its probe; writes `research_snapshots` only).
+  `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
+- **Model / research**: `pricing_check` (exploratory, read-only: H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
+- **Probes** (write nothing): `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20); `archive_buy` (the archive queue + its probe; writes `research_snapshots` only).
+- **Archive** (`scripts/archive/`, 27 closed studies, probes and retired tools moved 2026-10-18, PR-19): not in `study.yml`, nothing live imports them; `scripts/archive/README.md` has each one's registry row, verdict and result doc; `tests/test_archive_scripts.py` keeps them compiling.
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 

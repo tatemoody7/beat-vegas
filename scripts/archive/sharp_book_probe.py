@@ -14,8 +14,8 @@ out, with a credit budget, in three steps:
      bookmakers= list (1 credit per event), across the slate: posted or not, line,
      prices, last_update, and Hard Rock's line in the same response.
 
-    PYTHONPATH=. python scripts/sharp_book_probe.py                 # dry run: step 1 only, prints the plan
-    PYTHONPATH=. python scripts/sharp_book_probe.py --live          # spends credits, capped by --max-credits
+    PYTHONPATH=. python scripts/archive/sharp_book_probe.py                 # dry run: step 1 only, prints the plan
+    PYTHONPATH=. python scripts/archive/sharp_book_probe.py --live          # spends credits, capped by --max-credits
 
 Writes reports/sharp_books_<UTC>.{md,json}; exits 0.
 """

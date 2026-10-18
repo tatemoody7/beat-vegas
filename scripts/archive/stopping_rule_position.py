@@ -7,7 +7,7 @@ beatvegas/backtest/stopping.py::REGISTERED, and prints the position. A FAILURE v
 means real money pauses: run `scripts/rule_pause.py on --note "..."` and review.
 Nothing here writes.
 
-    PYTHONPATH=. python scripts/stopping_rule_position.py --out reports/stopping
+    PYTHONPATH=. python scripts/archive/stopping_rule_position.py --out reports/stopping
 """
 
 from __future__ import annotations

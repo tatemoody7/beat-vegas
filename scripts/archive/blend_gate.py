@@ -8,7 +8,7 @@ all of 2023-25 and writes data/blend.json -- a file nothing reads. Bucket weight
 reported as their own pre-registered family. See beatvegas/backtest/blend.py and
 docs/HYPOTHESES.md rows H3A / H3B.
 
-    PYTHONPATH=. python scripts/blend_gate.py --out reports/blend --freeze
+    PYTHONPATH=. python scripts/archive/blend_gate.py --out reports/blend --freeze
 
 Reads Neon (feature frame + odds_snapshots + cards); writes <out>_<UTC>.{md,json,csv};
 appends the markdown to $GITHUB_STEP_SUMMARY when set; exits 0 whatever the numbers say.
@@ -33,12 +33,12 @@ from beatvegas.etl.features import build_feature_frame, training_frame  # noqa: 
 
 
 def load_played_frame(fbs_only: bool = True):
-    """Played games only (same as scripts/residual_gate.py::load_played_frame)."""
+    """Played games only (same as scripts/archive/residual_gate.py::load_played_frame)."""
     return training_frame(build_feature_frame(min_games=2, fbs_only=fbs_only))
 
 
 def load_closes(session, game_ids):
-    """game_id -> real pre-kick 1H close (same as scripts/residual_gate.py::load_closes)."""
+    """game_id -> real pre-kick 1H close (same as scripts/archive/residual_gate.py::load_closes)."""
     ids = [int(g) for g in game_ids]
     return snapshots.consensus_closes(session, ids, snapshots.kickoffs_for(session, ids))
 

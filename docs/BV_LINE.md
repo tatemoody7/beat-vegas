@@ -104,7 +104,7 @@ python scripts/retrain.py --notes "..."
 # 10:30am + 6pm ET with retry slots) — no local poller.
 
 # Manual BV nudge for a game the model can't see (display-only, clearly labeled):
-python scripts/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"
+python scripts/archive/bv_adjust.py set --game 401752875 --delta -3 --reason "starter QB out"
 ```
 **Deploying to the live site (Neon + Vercel):**
 1. New columns/tables auto-add to Neon on the next `init_db()` (via

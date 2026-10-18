@@ -10,6 +10,24 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~17:00 UTC (THE SHUTDOWN RUNBOOK, DATED; CFBD PATREON CANCELLED).** Final-2026 plan PR-22 (docs only).
+  `docs/OPS_ACCOUNTS.md` drops its stale "Do now" and "Done 2026-10-05" sections for one dated table (date, action, kind,
+  precondition, who) with a paragraph on what stop, cancel a renewal, retain and downgrade mean here and the rule that only
+  Tate cancels anything. The rows: real money ended and the Saturday report task deleted (10-18); **Tate cancelled the CFBD
+  Patreon membership on 10-18** (Tier 3 runs to Nov 5, then the key is the free tier, 1,000 calls a month; measured use is
+  ~600-900 and a hand season reload ~500, so no reload runs after Nov 5 without reading the balance); The Odds API resets for
+  its last cycle ~Nov 5 (Tate confirms the date on the dashboard); the archive queue drains Nov 1-4 and Nov 30-Dec 4 (floor
+  1,500); last capture Sat 11-28, last grade Sun 11-29; the Mon 11-30 final read, with the gate for everything after it (the
+  week-13 judge readings present, `data/evidence/2026-w13` committed, the export verified by a restore into the local
+  sandbox); Tate cancels The Odds API between Nov 30 and Dec 4, after the archive run and after PR-24 removes the Vercel crons
+  (a dead key would redden `lines_watch` and `card` daily); Tate moves Neon to the free plan after the export is verified.
+  This supersedes plan B8's "CFBD Tier 1 on Nov 6, cancel before Dec 6". Read 2026-10-18 and to be re-read on the billing pages
+  before clicking: The Odds API's cancellation guide says access continues to the end of the paid period with no refund;
+  Neon's free plan is 1 GB a project since its 2026-10-02 changelog (older pages say 0.5 GB; the database is 131 MB) with a
+  restore window of about 6 hours against 7 days on Launch. `CLAUDE.md`: the Accounts item is one line pointing at the runbook.
+  The `odds_cycle_reset_at` controller setting named in the runbook is from the Odds API programme (reference plan C11) and does
+  not exist in the code yet. No code, workflow or test changed.
+
 - **2026-10-18 ~22:00 UTC (THE ODDS API PROGRAMME, STEP 3: THE CREDIT BUDGET CONTROLLER).** Final-2026 plan PR-C3.
   The guardrail in one sentence (Tate): every optional pull and archive buy must leave the balance at or above the
   floor (1,500) plus the measured recurring need for the cycle's remaining weeks (to min(reset, Nov 29 04Z

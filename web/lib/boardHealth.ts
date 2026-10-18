@@ -195,6 +195,7 @@ export const BASE_GAUGE_KEYS = [
   "last_close_capture_events",
   "last_grade_completed_at",
   "close_coverage_pct",
+  "odds_projected_end",
 ] as const;
 
 // One more per cron job, written by app/api/cron/[job]/route.ts rather than by

@@ -32,6 +32,10 @@ LAST_GRADE_COMPLETED_AT = "last_grade_completed_at"
 # those sweeps actually reached (wk2 25/72, wk3 27/72, wk4 18/57 -- 2026-09-28).
 # Value = the share as a decimal string; note = `sat=<date> games=<n> covered=<k>`.
 CLOSE_COVERAGE_PCT = "close_coverage_pct"
+# The balance projected at the cycle's end after the recurring jobs have spent
+# (balance - measured recurring need to min(reset, season end)); written by
+# scripts/credit_plan.py report, read by the digest (final-2026 PR-C3).
+ODDS_PROJECTED_END_BALANCE = "odds_projected_end"
 
 GAUGE_KEYS = (
     CFBD_CALLS_REMAINING,
@@ -40,6 +44,7 @@ GAUGE_KEYS = (
     LAST_CLOSE_CAPTURE_EVENTS,
     LAST_GRADE_COMPLETED_AT,
     CLOSE_COVERAGE_PCT,
+    ODDS_PROJECTED_END_BALANCE,
 )
 
 # One more per Vercel cron job, written by web/app/api/cron/[job]/route.ts (not

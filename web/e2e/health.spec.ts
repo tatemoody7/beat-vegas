@@ -9,8 +9,6 @@ import { CRON_JOBS, HEALTH_JOBS } from "./fixture/expected.mjs";
 
 const HEALTH_KEYS = [
   "ok",
-  "rulePaused",
-  "rulePauseReadable",
   "lastFullGameCapture",
   "resultsStale",
   "buildMissed",
@@ -46,8 +44,6 @@ test.describe("GET /api/health", () => {
   test("reports the clean fixture as healthy", async ({ request }) => {
     const body = await (await request.get("/api/health")).json();
     expect(body.ok).toBe(true);
-    expect(body.rulePaused).toBe(false);
-    expect(body.rulePauseReadable).toBe(true);
     expect(body.resultsStale).toBe(false);
     expect(body.buildMissed).toBe(false);
     expect(body.resultsBehindHours).toBe(0);
@@ -97,37 +93,23 @@ test.describe("GET /api/health", () => {
     }
   });
 
-  test.describe("signed out", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
-    // The owner's operational detail rides only on the cookie (2026-10-14):
-    // a visitor never reads the real-money pause switch, the API budgets or a
-    // job's run note, and the keys are absent, not null.
-    test("a visitor reads the flags, coverage, dispatch times and verdicts, nothing more", async ({
-      request,
-    }) => {
-      const body = await (await request.get("/api/health")).json();
-      expect(Object.keys(body).sort()).toEqual(
-        HEALTH_KEYS.filter(
-          (k) => !["rulePaused", "rulePauseReadable"].includes(k),
-        ),
-      );
-      expect(Object.keys(body.gauges).sort()).toEqual(
-        GAUGE_KEYS.filter(
-          (k) => !["cfbdCallsRemaining", "oddsCreditsRemaining"].includes(k),
-        ),
-      );
-      expect(body.ok).toBe(true);
-      expect(body.resultsStale).toBe(false);
-      expect(body.buildMissed).toBe(false);
-      expect(body.gauges.closeCoveragePct).toBe(0.93);
-      for (const h of Object.values(body.gauges.health) as Record<
-        string,
-        unknown
-      >[]) {
-        expect(Object.keys(h).sort()).toEqual(["at", "verdict"]);
-      }
-      expect(JSON.stringify(body)).not.toMatch(/run=\d+|Run: https/);
-    });
+  // One body for everyone since 2026-10-18 (D17): the API budgets and each
+  // job's run note are public, and the real-money pause switch is not in it
+  // (nothing on the site reads `rule_paused` any more).
+  test("carries one body for everyone: the budgets and run notes, and no pause switch", async ({
+    request,
+  }) => {
+    const body = await (await request.get("/api/health")).json();
+    expect(body).not.toHaveProperty("rulePaused");
+    expect(body).not.toHaveProperty("rulePauseReadable");
+    expect(body.gauges.cfbdCallsRemaining).toBe(2500);
+    expect(body.gauges.oddsCreditsRemaining).toBe(15000);
+    for (const h of Object.values(body.gauges.health) as Record<
+      string,
+      unknown
+    >[]) {
+      expect(Object.keys(h).sort()).toEqual(["at", "note", "verdict"]);
+    }
   });
 
   test("sends the security headers next.config.ts declares", async ({

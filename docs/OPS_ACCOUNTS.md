@@ -50,7 +50,10 @@ only long-lived copy of the season. Do not downgrade until the restore test has 
 
 **Other standing accounts.** `GITHUB_DISPATCH_TOKEN` (Vercel env, fine-grained, Actions read and
 write on `tatemoody7/beat-vegas` only) triggers every Vercel-dispatched job; it stops mattering when
-PR-24 empties the crons, after which Tate may revoke it. The GitHub Actions budget is moot while the
+PR-24 empties the crons, after which Tate may revoke it. It no longer backs anything on the site: the
+owner's Refresh price poll left with the log path (PR-12+13, 2026-10-18). `APP_PASSWORD` (Vercel env) is
+read by nothing since the same PR — the login, the cookie and every write route are gone — so Tate can
+delete it from Vercel once that deploy is live; `CRON_SECRET` is the one app secret that stays. The GitHub Actions budget is moot while the
 repository is public (public since 2026-10-16: no minute cap). Open-Meteo, TeamRankings, Rotowire and
 ESPN are free and unmetered. A Kalshi account is opened only for the Mon 11-30 H-VENUE-1 read, if that read needs one.
 

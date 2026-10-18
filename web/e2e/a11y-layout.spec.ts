@@ -9,21 +9,19 @@ import { collectSilence, layoutMetrics } from "./helpers/metrics";
 // true of production today (measured 2026-09-23 on beat-vegas.vercel.app):
 //
 //  * (Retired 2026-09-28.) Signed out at phone width the header's Unlock link
-//    used to render 14x68 and push the header to 87px; Unlock now lives in the
-//    footer, so the signed-out header is measured like every other.
-//  * A handful of text links and buttons are under 24px tall: the answer bar's
-//    matchup links (20px), PicksList's "details" / "edit" / "delete" (16px),
-//    the game page's "Back to the board" (16px) and, on a phone, the wordmark
-//    (20px). They are listed by name so a NEW small target anywhere else still
-//    fails.
+//    used to render 14x68 and push the header to 87px; the login, the lock and
+//    the cookie left the site altogether on 2026-10-18 (D17).
+//  * A handful of text links are under 24px tall: the game page's "Back to the
+//    board" (16px) and, on a phone, the wordmark (20px). They are listed by
+//    name so a NEW small target anywhere else still fails. (The PicksList
+//    "details" / "edit" / "delete" buttons left with the ledger, 2026-10-18.)
 
 const PAGES: [string, string][] = [
   ["board", "/"],
-  ["results", "/results?week=all"],
+  ["record", "/results"],
   ["research", "/research"],
   ["records", "/records"],
   ["game", "/game/900001"],
-  ["login", "/login"],
 ];
 
 /** globals.css --header-h is 4.25rem (68px) plus the 1px bottom border. */
@@ -31,8 +29,6 @@ const HEADER_PX = 69;
 
 /** The sub-24px targets production already has (see the file comment). */
 const KNOWN_SMALL_TARGETS: RegExp[] = [
-  /^button\S* "details" \d+x16$/, // PicksList row expander
-  /^button\S* "(edit|delete)" \d+x16$/, // PicksList controls (signed in)
   /^a\S* "← Back to the board" \d+x16$/, // game page
   /^a\.shrink-0\S* "BEAT VEGAS/, // the wordmark at phone width
 ];
@@ -66,32 +62,19 @@ for (const [name, path] of PAGES) {
       expect(unexpected).toEqual([]);
     });
 
-    if (name !== "login") {
-      // /login hides the nav and the Lock control (HeaderChrome), so its header
-      // is the wordmark alone and shorter by design.
-      test(`keeps the header at ${HEADER_PX}px`, async ({ page }) => {
-        await page.goto(path, { waitUntil: "networkidle" });
-        const m = await layoutMetrics(page);
-        expect(m.headerHeight).toBe(HEADER_PX);
-      });
-    }
+    test(`keeps the header at ${HEADER_PX}px`, async ({ page }) => {
+      await page.goto(path, { waitUntil: "networkidle" });
+      const m = await layoutMetrics(page);
+      expect(m.headerHeight).toBe(HEADER_PX);
+    });
+
+    // No Lock or Unlock anywhere since 2026-10-18 (D17): the site has no login.
+    test(`offers no Lock, Unlock or login link`, async ({ page }) => {
+      await page.goto(path, { waitUntil: "networkidle" });
+      await expect(page.getByRole("link", { name: "Unlock" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Lock" })).toHaveCount(0);
+      await expect(page.locator('a[href="/login"]')).toHaveCount(0);
+      await expect(page.getByText("Signed in")).toHaveCount(0);
+    });
   });
 }
-
-test.describe("signed out", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test(`keeps the header at ${HEADER_PX}px with Unlock in the footer`, async ({
-    page,
-  }) => {
-    // Unlock left the header for the footer on 2026-09-28, which is also what
-    // ended the 87px phone header the old test marked as a known failure.
-    await page.goto("/", { waitUntil: "networkidle" });
-    await expect(
-      page.locator("footer").getByRole("link", { name: "Unlock" }),
-    ).toBeVisible();
-    await expect(page.locator("header")).not.toContainText("Unlock");
-    const m = await layoutMetrics(page);
-    expect(m.headerHeight).toBe(HEADER_PX);
-  });
-});

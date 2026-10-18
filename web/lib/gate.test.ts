@@ -1,121 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { gateDecision, safeNext } from "./gate";
+import { cronGate, safeEqual } from "./gate";
 
-// Public read-only (2026-09-16): GETs pass everywhere, writes need the cookie.
-const base = { gateEnabled: true, misconfigured: false };
+// The one lock left (2026-10-18, D17): the cron route's bearer secret.
+describe("cronGate", () => {
+  const secret = "s3cret-value";
 
-describe("gateDecision", () => {
-  it("lets every safe method through without a cookie", () => {
-    for (const method of ["GET", "HEAD", "OPTIONS", "get"]) {
-      for (const pathname of [
-        "/",
-        "/results",
-        "/game/401856688",
-        "/api/records",
-        "/logos/61.png",
-      ]) {
-        expect(gateDecision({ ...base, method, pathname, authed: false })).toBe(
-          "next",
-        );
-      }
-    }
-  });
-
-  it("refuses an unsigned write: 401 under /api, redirect elsewhere", () => {
+  it("fails closed when CRON_SECRET is not configured, whatever the header", async () => {
     expect(
-      gateDecision({
-        ...base,
-        method: "POST",
-        pathname: "/api/picks",
-        authed: false,
-      }),
-    ).toBe("unauthorized");
-    expect(
-      gateDecision({
-        ...base,
-        method: "PATCH",
-        pathname: "/api/picks/12",
-        authed: false,
-      }),
-    ).toBe("unauthorized");
-    expect(
-      gateDecision({
-        ...base,
-        method: "DELETE",
-        pathname: "/api/picks/12",
-        authed: false,
-      }),
-    ).toBe("unauthorized");
-    expect(
-      gateDecision({
-        ...base,
-        method: "POST",
-        pathname: "/api/logout",
-        authed: false,
-      }),
-    ).toBe("unauthorized");
-    expect(
-      gateDecision({
-        ...base,
-        method: "POST",
-        pathname: "/game/1",
-        authed: false,
-      }),
-    ).toBe("redirect");
-  });
-
-  it("lets a signed write through", () => {
-    expect(
-      gateDecision({
-        ...base,
-        method: "POST",
-        pathname: "/api/picks",
-        authed: true,
-      }),
-    ).toBe("next");
-    expect(
-      gateDecision({
-        ...base,
-        method: "DELETE",
-        pathname: "/api/picks/3",
-        authed: true,
-      }),
-    ).toBe("next");
-  });
-
-  it("fails CLOSED on everything when deployed without APP_PASSWORD", () => {
-    const o = { gateEnabled: false, misconfigured: true, authed: false };
-    expect(gateDecision({ ...o, method: "GET", pathname: "/" })).toBe(
-      "misconfigured",
-    );
-    expect(gateDecision({ ...o, method: "POST", pathname: "/api/picks" })).toBe(
+      await cronGate({ authorization: `Bearer ${secret}`, secret: undefined }),
+    ).toBe("misconfigured");
+    expect(await cronGate({ authorization: null, secret: "" })).toBe(
       "misconfigured",
     );
   });
 
-  it("is fully open when the gate is off (local dev)", () => {
-    const o = { gateEnabled: false, misconfigured: false, authed: false };
-    expect(gateDecision({ ...o, method: "POST", pathname: "/api/picks" })).toBe(
+  it("refuses a missing, malformed or wrong bearer token", async () => {
+    expect(await cronGate({ authorization: null, secret })).toBe(
+      "unauthorized",
+    );
+    expect(await cronGate({ authorization: secret, secret })).toBe(
+      "unauthorized",
+    );
+    expect(await cronGate({ authorization: "Bearer nope", secret })).toBe(
+      "unauthorized",
+    );
+    expect(await cronGate({ authorization: "Basic abc", secret })).toBe(
+      "unauthorized",
+    );
+  });
+
+  it("lets the configured secret through", async () => {
+    expect(await cronGate({ authorization: `Bearer ${secret}`, secret })).toBe(
       "next",
     );
   });
 });
 
-describe("safeNext", () => {
-  it("accepts a same-origin path and nothing else", () => {
-    expect(safeNext("/game/401856688")).toBe("/game/401856688");
-    expect(safeNext("/results?week=3")).toBe("/results?week=3");
-    for (const bad of [
-      null,
-      undefined,
-      "",
-      "https://evil.example",
-      "//evil.example",
-      "/\\evil",
-      "game/1",
-      "/a\nb",
-    ]) {
-      expect(safeNext(bad)).toBe("/");
-    }
+describe("safeEqual", () => {
+  it("compares whole strings, lengths included", async () => {
+    expect(await safeEqual("abc", "abc")).toBe(true);
+    expect(await safeEqual("abc", "abd")).toBe(false);
+    expect(await safeEqual("abc", "abcd")).toBe(false);
+    expect(await safeEqual("", "")).toBe(true);
   });
 });

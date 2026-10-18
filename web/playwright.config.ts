@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { AUTH_FILE, databaseUrl, E2E_PASSWORD } from "./e2e/helpers/env";
+import { databaseUrl } from "./e2e/helpers/env";
 
 // The e2e lane: the real Next.js app, rendered by a real browser, against a
 // real Postgres holding the SYNTHETIC fixture week (e2e/fixture/). Nothing here
@@ -19,10 +19,9 @@ import { AUTH_FILE, databaseUrl, E2E_PASSWORD } from "./e2e/helpers/env";
 // actually ships. E2E_BASE_URL points the suite at a server you started
 // yourself (a worktree on 31xx) and skips the webServer entirely.
 //
-// The password gate is ON (APP_PASSWORD set) so the signed-out / signed-in
-// split is exercised: the `setup` project logs in ONCE and every browser
-// project reuses that storageState. /api/login throttles at 10 attempts per
-// 15 minutes per IP, so the specs are written to spend at most three.
+// There is no password and no cookie (2026-10-18, D17): the site is a
+// read-only record, the `setup` project only seeds, and every browser project
+// reads the pages as anyone would.
 
 const CI = !!process.env.CI;
 const PORT = 3400;
@@ -32,16 +31,9 @@ const PROD = CI || !!process.env.E2E_PROD;
 const serverEnv: Record<string, string> = {
   ...(process.env as Record<string, string>),
   DATABASE_URL: databaseUrl(),
-  APP_PASSWORD: E2E_PASSWORD,
   // Never the Neon HTTP lane: the sandbox is plain Postgres over TCP.
   NEON_HTTP: "",
-  // A placeholder so /api/price-refresh reaches its cooldown check; every
-  // refresh spec is refused before the dispatch, so GitHub is never called.
-  GITHUB_DISPATCH_TOKEN: "e2e-placeholder-never-sent",
   NEXT_TELEMETRY_DISABLED: "1",
-  // The bankroll numbers the ledger specs assert are the defaults.
-  BANKROLL_USD: "100",
-  UNIT_USD: "10",
 };
 
 // The downloaded Chromium in CI (installed by the workflow); the machine's own
@@ -75,7 +67,7 @@ export default defineConfig({
     ? undefined
     : {
         command: PROD ? `npx next start -p ${PORT}` : `npx next dev -p ${PORT}`,
-        url: `${BASE_URL}/login`,
+        url: `${BASE_URL}/api/health`,
         reuseExistingServer: !CI,
         timeout: 180_000,
         env: serverEnv,
@@ -98,7 +90,6 @@ export default defineConfig({
         channel,
         viewport: { width: 1440, height: 900 },
         deviceScaleFactor: 1,
-        storageState: AUTH_FILE,
       },
     },
     {
@@ -111,7 +102,6 @@ export default defineConfig({
         browserName: "chromium",
         channel,
         deviceScaleFactor: 1,
-        storageState: AUTH_FILE,
       },
     },
     // Screenshot comparisons, opt-in and local-only: no baseline is committed
@@ -129,7 +119,6 @@ export default defineConfig({
               channel,
               viewport: { width: 1440, height: 900 },
               deviceScaleFactor: 1,
-              storageState: AUTH_FILE,
             },
           },
         ]

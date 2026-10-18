@@ -148,19 +148,19 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   `sources/odds.py` writes per priced response; `BV_ODDS_JOB` / `BV_ODDS_PURPOSE` name the caller).
   Every optional pull asks `scripts/credit_plan.py allow` first (balance − 1,500 floor − recurring need).
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
-  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`, one
-  ranked list under a slim research line), Results (`/results`: the personal stake, the arms' forward picks, the
-  pricing opportunities), Research (`/research`: a card per hypothesis from `arm_positions`, the closed
-  hypotheses from `web/data/hypotheses.json`) — plus `/game/[id]` (the only place a pick is logged)
-  and `/records` (Hard Rock Records at the last scheduled card's line + price; Market Research at the consensus close, no units). Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. **Owner-only content renders behind
-  the cookie** (`viewerIsAuthed()`): ops and build warnings, the owner's pick list with its edit/delete controls on Results, the log
-  control (roadmap v2.0 removed the My-teams chip, the answer bar, the Monday review and the research section). **A visitor sees the board and game page as the owner does, ratings before kickoff included, in paper wording** (roadmap v1.7, `lib/signalGate.ts`);
-  `/records`, the ledger and both CSVs still withhold a game until kickoff. No dollars are public. API:
-  `/api/picks`, `/api/picks/[id]`, `/api/bets` (31-column CSV), `/api/records`, `/api/health`,
-  `/api/login`, `/api/logout`, `/api/cron/[job]`, `/api/price-refresh` (owner; one-game poll). Reads are public; writes need the
-  `APP_PASSWORD` cookie (`lib/gate.ts::gateDecision` in `middleware.ts` AND
-  `lib/session.ts::requireAuth` inside every pick route). `/api/cron` authenticates on
-  `CRON_SECRET` and dispatches with `GITHUB_DISPATCH_TOKEN`.
+  `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. **A read-only research record
+  since 2026-10-18** (final-2026 plan D2/D16/D17): no login, no cookie, no write route; everyone reads the
+  same pages, ops and build warnings and run ids included, every rating in paper wording (`PAPER_ACTION`),
+  nothing withheld before kickoff. Three tabs — Board (`/`, one ranked list under a slim research line),
+  Record (`/results`, path kept: the arms' forward picks with their EV readings, the pricing opportunities,
+  the season comparison without a personal row), Research (`/research`: a card per hypothesis from
+  `arm_positions`, the closed hypotheses from `web/data/hypotheses.json`) — plus `/game/[id]` and `/records`
+  (Hard Rock Records at the last scheduled card's line + price; Market Research at the consensus close, no
+  units). Fourteen legacy routes (incl. `/proof`, `/how-it-works`) are 308s in `next.config.ts`. One sentence
+  on every page (`labels.ts::RESEARCH_BANNER`). No dollars are public. API: `/api/records` (CSV),
+  `/api/health`, `/api/cron/[job]`. The one lock is `CRON_SECRET` on `/api/cron` (`lib/gate.ts::cronGate`
+  in `middleware.ts` and inside the route); it dispatches with `GITHUB_DISPATCH_TOKEN`. `APP_PASSWORD`
+  is read by nothing (Tate removes it from Vercel after the deploy).
 - **Model**: market-blind HGB regressor on `BV_FEATURE_COLS` (`model/bv_line.py`, = `FEATURE_COLS`
   − `MARKET_COLS` − `SERVE_UNAVAILABLE_COLS` − `LEAKY_WEATHER_COLS`), FBS-vs-FBS training (`etl/fbs.py`,
   `data/fbs_teams.json`), trained on 2003+ (`score.CHAMPION_TRAIN_MIN_SEASON`; other frames
@@ -211,29 +211,19 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
-## Money path (server-side; the site never trusts the browser)
-- **Historical since 2026-10-18** (D2; `docs/BETTING_POLICY.md`): the rules below record how the 30
-  tickets were placed, not a live path; a promoted strategy's live validation would be its own track.
-- POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
-  Hard Rock's own MAIN line, a **live** verifiable price seen ≤6 h ago (`lib/lineCheck.ts`; none →
-  `PRICE UNAVAILABLE`, old → `PRICE STALE` + the form's Refresh price), a price at or better than the kill
-  price recomputed now, both teams with ≥2 current-season FBS games (`MIN_GAMES_FOR_REAL_MONEY`),
-  and a free cap slot (5 a week; bonus bets use none and book no loss). Nothing defaults a price
-  to −110; a missing price is NULL and refused (`PRICE MISSING`). **Paper is build-only** (2026-10-07):
-  POST refuses `isPaper`, `pick.py add` is gone, and paper rows cannot be PATCHed or DELETEd.
-- `manual_picks.bet_at` is when the ticket was WRITTEN (`placed_at` is the log time). A log more
-  than `BACKDATE_MIN_MINUTES` (30) after the bet is judged **as of bet time**: that card must rate it
-  BET, HR's price seen ≤6 h before (`lineCheck.HR_PRICE_MAX_AGE_H`, `getLineCheck(..., asOf)`); `betAtCheck`
-  refuses future, >7 d and post-kickoff times; the log form's "Placed at" is blank by default.
-- Real tickets freeze at kickoff; until then PATCH edits price/stake/note (a new price is re-judged,
-  never null; bonus is set at log only). `uq_manual_pick_per_ledger` stops duplicates.
+## Money path (ended 2026-10-18; the grading rules below still settle the frozen tickets)
+- **Real money ended 2026-10-18** (D2; `docs/BETTING_POLICY.md` records how the 30 tickets were placed:
+  Hard Rock's MAIN line, a live price seen ≤6 h, the kill price, ≥2 FBS games, 5 a week). The site's log path
+  (the pick routes, the ticket policy and pick-rule modules, the log form, Refresh price, the ledger and
+  the bet CSV) left in PR-12+13; the 30 rows stay in `manual_picks`, never edited, and appear only in the final report.
+  **Paper is build-only**: `beatvegas/picks.py::add_pick` is the ledger's one writer (`test_pick_columns_parity`).
 - Grading is side-aware in one place each: `grading.units_won(side)`, `picks.graded_pick_fields(side)`,
   `lines.book_closing_price_before_kickoff(side)`. Stored `clv = closing − bet` (the close never counts
   Hard Rock, Fliff or the feed's consensus row: `lines.CLOSE_EXCLUDED_BOOKS`), so **negative is the good
-  direction for an under**; the site shows `−clv` (`lib/clvDirection.test.ts` pins it). `price_provenance`
-  ∈ logged / backfilled_close / unknown; only `logged` feeds price CLV. **The judge's columns (`ev_cons`,
-  `cons_*`) are write-once** (`picks.apply_judge_reading`): a differing recomputation is audited in `judge_reading_audit`, never written.
-- Real: `manual_picks` (`is_paper=false`). Paper: `manual_picks` (`is_paper=true`, 1 unit, build
+  direction for an under**; a report shows `−clv`. `price_provenance` ∈ logged / backfilled_close / unknown;
+  only `logged` feeds price CLV. **The judge's columns (`ev_cons`, `cons_*`) are write-once**
+  (`picks.apply_judge_reading`): a differing recomputation is audited in `judge_reading_audit`, never written.
+- Real: `manual_picks` (`is_paper=false`, frozen). Paper: `manual_picks` (`is_paper=true`, 1 unit, build
   only). Challengers: `challenger_picks` only — one missed filter contaminates the champion's clock.
 
 ## Setup + dev
@@ -319,8 +309,6 @@ list and land through their own registered row or PR.
 - **`ev` is price-shopping, not wager EV** (`ev_under(market fair, HR price)`); gating on `ev ≥ 0`
   bets nothing. The live bar is `BET_MIN_EV` (−0.05); `BREAK_EVEN_EV` is wired to nothing until a
   calibrated P(under) exists. `RANKING_AND_TRUST` §8b.
-- **`checkPolicy` compares a LIVE price to a kill price recomputed now.** The "green board, refused
-  log" band was stale card data, not two rules. A cached price may be displayed, never authorize money.
 - **`build_feature_frame()` defaults to `min_games=2`; the live path scores at 0** (`weekly_update`
   → `score_slate` derives training from the frame it is handed). A diagnostic at the default reads
   4 rows for a season and calls it noise. Cache the frame (~8 min) before comparing anything.
@@ -370,7 +358,7 @@ list and land through their own registered row or PR.
   --workflow <file> --event workflow_dispatch`: a hand run from another session counts.
 - **`web/lib` exports with no TypeScript caller can be load-bearing**: `tests/test_gate_parity.py`
   reads constants out of `verdict.ts`, `grade.ts`, `edge.ts`, `lineCheck.ts`, `books.ts`,
-  `card.ts` by regex; `test_pick_columns_parity.py` reads both INSERT column lists;
+  `card.ts` by regex; `test_pick_columns_parity.py` refuses any `INSERT INTO manual_picks` under `web/`;
   `test_docs_parity.py` reads `BETTING_POLICY.md` and `HEALTH.md`. Grep `tests/` before deleting
   any `export const` or editing a doc sentence that names a number.
 - **A "use client" file must never import a VALUE from a database-backed module** — with Prisma 7

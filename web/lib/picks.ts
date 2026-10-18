@@ -1,36 +1,15 @@
 import { cache } from "react";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { boardGames } from "@/lib/board";
-import { parseFactors } from "@/lib/score";
-import { minGamesPlayedFrom } from "@/lib/homeBoard";
 import { recordFrom, type Record3 } from "@/lib/record";
-import { defaultWeek } from "@/lib/week";
 import type { PickReason, Verdict } from "@/lib/verdict";
-import { DEFAULT_STAKE, type PickEdit } from "@/lib/pickRules";
-import {
-  CHAMPION_READ_VERSIONS,
-  DERIVED_LINES_MODEL_VERSION,
-} from "@/lib/model";
-import { HR_BOOK_KEY } from "@/lib/books";
 
-// My Picks data layer: the current slate (for API validation), the user's
-// logged picks with the model + verdict snapshot frozen at log time, and the
-// running records. ONE picks query (loadPicks) feeds the ledger, the weekly
-// review and the bankroll strip so they can never disagree.
-
-export type SlateOption = {
-  gameId: number;
-  week: number;
-  away: string;
-  home: string;
-  /**
-   * Fewest current-season games played by either team, or null when unknown.
-   * Carried so POST /api/picks can enforce MIN_GAMES_FOR_REAL_MONEY without a
-   * second query -- boardGames already parsed the factors.
-   */
-  minGamesPlayed: number | null;
-};
+// The manual_picks READ layer: every logged pick with the model + verdict
+// snapshot frozen at log time, and the running records. ONE picks query
+// (loadPicks) feeds the season comparison and the arms' forward picks so they
+// can never disagree. The write half (createPick, updatePick, deletePick, the
+// slate check and the duplicate backstop) left on 2026-10-18 (final-2026 plan,
+// D2): the site writes nothing; `beatvegas/picks.py::add_pick` is the one
+// writer left, and tests/test_pick_columns_parity.py refuses any INSERT here.
 
 export type PickFull = {
   id: number;
@@ -66,45 +45,6 @@ export type PickFull = {
   /** Why the pick is left out of every record ('alt_line'); null when it counts. */
   excludedReason: string | null;
 };
-
-/** A real-money 1H pick on the week, as the bet slip needs it. */
-export type WeekPick = {
-  gameId: number | null;
-  away: string | null;
-  home: string | null;
-  line: number | null;
-  price: number | null;
-  /** A bonus bet still marks the game as logged, but does not use a cap slot. */
-  isBonus: boolean;
-};
-
-// Games on the current week (the week you are about to bet — see lib/week.ts).
-export async function getSlate(season: number): Promise<SlateOption[]> {
-  // boardGames, not getBoard: the slate needs the universe and the weeks, not
-  // the line medians. getBoard also runs consensusLines(), a full-season scan
-  // of odds_snapshots across every book — the most expensive query in the app —
-  // and POST /api/picks was paying for it on every single logged pick just to
-  // answer "is this game on the board".
-  const rows = await boardGames(season);
-  const games = rows.map((r) => ({
-    gameId: Number(r.game_id),
-    week: Number(r.week),
-    startDate: r.start_date ?? null,
-    away: r.away_team ?? "?",
-    home: r.home_team ?? "?",
-    minGamesPlayed: minGamesPlayedFrom(parseFactors(r.factors_json)),
-  }));
-  const week = defaultWeek(games);
-  return games
-    .filter((g) => g.week === week)
-    .map(({ gameId, week, away, home, minGamesPlayed }) => ({
-      gameId,
-      week,
-      away,
-      home,
-      minGamesPlayed,
-    }));
-}
 
 const truthy = (v: unknown) => v === true || Number(v) === 1;
 const num = (v: number | bigint | null | undefined): number | null =>
@@ -142,27 +82,6 @@ const isMissingColumn = (e: unknown): boolean =>
   /column .* does not exist|no such column/i.test(
     String((e as Error)?.message ?? e),
   );
-
-/**
- * The `uq_manual_pick_per_ledger` backstop fired: one pick per (game, market)
- * per ledger. The route already checks for a duplicate before inserting, so
- * this only ever fires on the RACE the check cannot close — a double-click, or
- * a retry of a request that actually succeeded. It is a 409, not a 500.
- * Matches Postgres ("duplicate key value violates unique constraint") and the
- * SQLite dev/test path ("UNIQUE constraint failed") alike.
- */
-export const isDuplicatePick = (e: unknown): boolean =>
-  /uq_manual_pick_per_ledger|duplicate key value|unique constraint/i.test(
-    String((e as Error)?.message ?? e),
-  );
-
-/** Thrown by createPick when the constraint refused a same-instant duplicate. */
-export class DuplicatePickError extends Error {
-  constructor() {
-    super("a pick on this game and market is already logged in this ledger");
-    this.name = "DuplicatePickError";
-  }
-}
 
 // The tracking columns arrive with the Python lane's migration; until it has
 // run on a database, fall back to the legacy column list (snapshot fields null)
@@ -240,25 +159,11 @@ async function loadPicksUncached(season: number): Promise<PickFull[]> {
   return picks;
 }
 
-/** Real-money picks that count: first-half only (the only market we bet). */
+/** The frozen real-money tickets (first half, the only market that was bet). */
 export const isRealFirstHalf = (p: PickFull): boolean =>
   !p.isPaper && p.market === "1H";
-/**
- * Uses one of the week's cap slots.
- *
- * A bonus bet risks none of the bankroll, so POST /api/picks and
- * build_card.py::real_bets_this_week both leave it out of the count. The
- * display has to agree, or the site tells you fewer slots are left than the
- * server will actually accept.
- */
-export const countsAgainstCap = (p: PickFull): boolean =>
-  isRealFirstHalf(p) && !p.isBonus;
 export const isPaperFirstHalf = (p: PickFull): boolean =>
   p.isPaper && p.market === "1H";
-/** Real money placed where the site graded WATCH/PASS. Defined in lib/pickRules
- *  (a module free of prisma) because a client component calls it; re-exported
- *  here so server callers keep one import. */
-export { isOffPolicy } from "@/lib/pickRules";
 
 export type PickRecords = {
   picks: PickFull[];
@@ -272,10 +177,9 @@ export type PickRecords = {
  * The season's picks, ONCE per request.
  *
  * picks.ts already said "ONE picks query feeds the ledger, the weekly review
- * and the board" — but /results had drifted to four independent callers
- * (getLedger, getWeeklyReview, getPicks via getHomeBoard, and the page itself),
- * each running the full manual_picks season scan, on a force-dynamic page with
- * no caching. React's cache() dedupes within a single render pass, so the
+ * and the board" — but /results had drifted to four independent callers, each
+ * running the full manual_picks season scan, on a force-dynamic page with no
+ * caching. React's cache() dedupes within a single render pass, so the
  * comment becomes true again without any caller having to know about the others
  * or thread a value through.
  *
@@ -292,271 +196,4 @@ export async function getPicks(season: number): Promise<PickRecords> {
     record: recordFrom(graded.filter(isRealFirstHalf)),
     paperRecord: recordFrom(graded.filter(isPaperFirstHalf)),
   };
-}
-
-export type CreatePickInput = {
-  gameId: number;
-  market?: "1H" | "full"; // default 1H
-  line: number;
-  stake?: number;
-  /** American odds on the ticket; null/absent = none given (stored NULL, provenance 'unknown'). */
-  price?: number | null;
-  note?: string;
-  /** Always false from the web: paper is written by the card build only
-   *  (2026-10-07). Kept so the type matches PickRequest; true throws. */
-  isPaper?: boolean;
-  /** A bonus (free) bet, set once at log time; stored as is_bonus. */
-  isBonus?: boolean;
-  /** When the ticket was written (UTC ISO), when that is not now; stored as bet_at. */
-  betAt?: string | null;
-  verdict?: Verdict;
-  reason?: PickReason;
-  gap?: number | null;
-  ev?: number | null;
-  hrLine?: number | null;
-};
-
-export type CreatePickResult = {
-  /** False when the tracking columns are missing and the pick was stored without its snapshot. */
-  tracked: boolean;
-};
-
-// Insert a ManualPick, freezing the model's current score+line and the This
-// Week verdict onto it.
-export async function createPick(
-  input: CreatePickInput,
-): Promise<CreatePickResult> {
-  const game = await prisma.games.findUnique({
-    where: { id: input.gameId },
-    select: { season: true, week: true, home_team: true, away_team: true },
-  });
-  if (!game) throw new Error("game not found");
-  // Paper is build-only (2026-10-07): POST /api/picks refuses it, and this
-  // writer refuses it too so no future caller can open a hand path into the
-  // stopping rule's observation stream.
-  if (input.isPaper === true) {
-    throw new Error("paper picks are written by the card build only");
-  }
-
-  const market = input.market === "full" ? "full" : "1H";
-
-  // The model (predictions) is 1H-only — only freeze its read onto a 1H pick.
-  // Prefer the MODEL row over the display-only derived_lines row (the same
-  // rule as board.ts: post_derived_lines writes seconds after scoring, so
-  // "newest" alone picked the reference row). model_line_at_pick is OUR
-  // NUMBER (bv_line) — the value Results compares your line against — with
-  // the scoring line as a fallback for legacy rows that have no bv_line.
-  // model_score_at_pick is no longer written (classifier retired 2026-10-04,
-  // docs/CLASSIFIER_RETIREMENT.md); the column stays, NULL on new rows.
-  const pred =
-    market === "1H"
-      ? await prisma.$queryRaw<
-          {
-            bv_line: number | null;
-            line_used: number | null;
-            factors_json: string | null;
-            refit_id: number | bigint | null;
-          }[]
-        >`
-    SELECT bv_line, line_used, factors_json, refit_id FROM predictions
-    WHERE game_id = ${input.gameId}
-      AND model_version IN (${Prisma.join([...CHAMPION_READ_VERSIONS])})
-    ORDER BY (model_version = ${DERIVED_LINES_MODEL_VERSION}) ASC, created_at DESC
-    LIMIT 1
-  `
-      : [];
-  const modelLine = pred[0]?.bv_line ?? pred[0]?.line_used ?? null;
-  const factorsAtPick = pred[0]?.factors_json ?? null;
-  // Which weekly refit the number came from (predictions.refit_id, 2026-10-04;
-  // mirrors beatvegas/picks.py model_refit_id). NULL before the column lands.
-  const refitId = pred[0]?.refit_id == null ? null : Number(pred[0].refit_id);
-
-  const isPaper = false;
-  const isBonus = input.isBonus === true;
-  // Flat 1 unit; the client's stake is never trusted.
-  const stake = DEFAULT_STAKE;
-  // Never invent a price. NULL + 'unknown' is an honest row; -110 + nothing
-  // (the behaviour until 2026-09-20) read as a verified ticket price and left
-  // every real 2026 ticket without a closing price, because grade_pick only
-  // computes one when `book` is set — which this writer never did either.
-  // Mirrors beatvegas/picks.py add_pick (price_provenance, book=HR_BOOK_KEY).
-  const price = input.price ?? null;
-  const priceProvenance = price === null ? "unknown" : "logged";
-  const book = HR_BOOK_KEY;
-  const note = input.note ?? null;
-  const placedAt = new Date().toISOString();
-  // When the ticket was written, if the caller said it was not now (the
-  // ManualPick.bet_at column comment). Naive UTC like placed_at.
-  const betAt = input.betAt ?? null;
-  const verdict = input.verdict ?? null;
-  const reason = input.reason ?? null;
-  const gap = input.gap ?? null;
-  const ev = input.ev ?? null;
-  const hrLine = input.hrLine ?? null;
-
-  // Postgres is strict: cast the ISO string to a timestamp and use real
-  // booleans (SQLite tolerated a text date + integer 0; Neon/PG won't).
-  try {
-    await prisma.$executeRaw`
-      INSERT INTO manual_picks
-        (game_id, season, week, home_team, away_team, side, market, line, price,
-         book, price_provenance,
-         stake, is_paper, is_bonus, placed_at, bet_at, note, model_line_at_pick,
-         factors_json_at_pick, graded, verdict_at_pick, reason, gap_at_pick,
-         ev_at_pick, hr_line_at_pick, refit_id)
-      VALUES
-        (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-         ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
-         ${book}, ${priceProvenance}, ${stake},
-         ${isPaper}, ${isBonus}, ${placedAt}::timestamp, ${betAt}::timestamp, ${note}, ${modelLine},
-         ${factorsAtPick}, false, ${verdict}, ${reason}, ${gap}, ${ev}, ${hrLine}, ${refitId})
-    `;
-    return { tracked: true };
-  } catch (e) {
-    if (isDuplicatePick(e)) throw new DuplicatePickError();
-    if (!isMissingColumn(e)) throw e;
-    // The legacy insert has no is_bonus: storing a bonus ticket as a funded
-    // one would book its loss and spend a cap slot. Refuse instead.
-    if (isBonus) throw e;
-    console.warn(
-      "manual_picks tracking columns missing — pick stored without snapshot",
-    );
-    try {
-      await prisma.$executeRaw`
-      INSERT INTO manual_picks
-        (game_id, season, week, home_team, away_team, side, market, line, price,
-         book, stake, is_paper, placed_at, note,
-         model_line_at_pick, factors_json_at_pick, graded)
-      VALUES
-        (${input.gameId}, ${game.season}, ${game.week}, ${game.home_team},
-         ${game.away_team}, 'under', ${market}, ${input.line}, ${price},
-         ${book}, ${stake},
-         ${isPaper}, ${placedAt}::timestamp, ${note}, ${modelLine},
-         ${factorsAtPick}, false)
-    `;
-      return { tracked: false };
-    } catch (e2) {
-      if (isDuplicatePick(e2)) throw new DuplicatePickError();
-      throw e2;
-    }
-  }
-}
-
-/** The stored facts an edit is judged against (PATCH /api/picks/<id>). */
-export type EditablePick = {
-  id: number;
-  gameId: number | null;
-  market: "1H" | "full";
-  line: number;
-  price: number | null;
-  isPaper: boolean;
-  isBonus: boolean;
-  graded: boolean;
-  verdictAtPick: Verdict | null;
-  /** When the ticket was written: bet_at, else placed_at (UTC ISO). */
-  writtenAt: string | null;
-};
-
-// "2026-10-07 18:00:00.123" (naive UTC, as text) -> "2026-10-07T18:00:00.123Z".
-const asIso = (v: string | null): string | null => {
-  if (v === null) return null;
-  const t = new Date(`${v.trim().replace(" ", "T")}Z`);
-  return Number.isNaN(t.getTime()) ? null : t.toISOString();
-};
-
-export async function getEditablePick(
-  id: number,
-): Promise<EditablePick | null> {
-  // Timestamps read as text: they are naive UTC, and a bare timestamp column
-  // comes back shifted by the server's zone (lib/et.ts).
-  const rows = await prisma.$queryRaw<
-    {
-      id: number;
-      game_id: number | null;
-      market: string | null;
-      line: number;
-      price: number | null;
-      is_paper: boolean | null;
-      is_bonus: boolean | null;
-      graded: boolean | null;
-      verdict_at_pick: string | null;
-      bet_at: string | null;
-      placed_at: string | null;
-    }[]
-  >`
-    SELECT id, game_id, market, line, price, is_paper, is_bonus, graded,
-           verdict_at_pick, bet_at::text AS bet_at, placed_at::text AS placed_at
-    FROM manual_picks WHERE id = ${id}
-  `;
-  const r = rows[0];
-  if (!r) return null;
-  return {
-    id: r.id,
-    gameId: r.game_id,
-    market: r.market === "full" ? "full" : "1H",
-    line: Number(r.line),
-    price: r.price === null ? null : Number(r.price),
-    isPaper: r.is_paper === true,
-    isBonus: r.is_bonus === true,
-    graded: r.graded === true,
-    verdictAtPick: asVerdict(r.verdict_at_pick),
-    writtenAt: asIso(r.bet_at ?? r.placed_at),
-  };
-}
-
-/**
- * Apply an edit to a PENDING pick whose game has NOT kicked off. Returns false
- * when the pick is missing, already graded, or its game has started — a ledger
- * you can rewrite once the result is known (or being decided) is not evidence
- * of anything.
- *
- * Only the fields present in `edit` are written. `note` replaces rather than
- * appends; the caller composes the text it wants kept.
- */
-export async function updatePick(id: number, edit: PickEdit): Promise<boolean> {
-  const sets: Prisma.Sql[] = [];
-  if (edit.price !== undefined) sets.push(Prisma.sql`price = ${edit.price}`);
-  if (edit.stake !== undefined) sets.push(Prisma.sql`stake = ${edit.stake}`);
-  if (edit.note !== undefined) sets.push(Prisma.sql`note = ${edit.note}`);
-  if (sets.length === 0) return false;
-
-  // ONE statement, with the immutability rule in its WHERE clause. It used to
-  // be a SELECT graded followed by up to four separate UPDATEs: the daily
-  // grading job landing in that window would have let an edit through onto a
-  // row that had just been graded — precisely what the rule exists to stop.
-  // The rowcount is the answer: 0 means missing or already graded.
-  // ...and FROZEN FROM KICKOFF, not from grading. Grading runs the next
-  // morning, so "ungraded" left a 4-7 hour window after a Saturday final in
-  // which a losing real ticket could be deleted, flipped to bonus (its loss
-  // books 0) or restaked to the whole roll. A price typo is correctable before
-  // the whistle; nothing is correctable after it (2026-09-22). start_date is
-  // naive UTC, so the clock is compared in UTC.
-  // ...and NEVER on paper (2026-10-07): the build's paper pick is the
-  // stopping rule's observation, so its price and stake are what the build
-  // saw. The route refuses first with its own message; this is the backstop.
-  const changed = await prisma.$executeRaw`
-    UPDATE manual_picks SET ${Prisma.join(sets, ", ")}
-    WHERE id = ${id} AND COALESCE(graded, false) = false
-      AND COALESCE(is_paper, false) = false
-      AND (game_id IS NULL OR game_id IN (
-        SELECT id FROM games
-        WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')
-      ))
-  `;
-  return changed > 0;
-}
-
-// Returns false if the pick is already graded (immutable), paper (the build's,
-// frozen), or missing. Same single-statement reasoning as updatePick.
-export async function deletePick(id: number): Promise<boolean> {
-  const changed = await prisma.$executeRaw`
-    DELETE FROM manual_picks
-    WHERE id = ${id} AND COALESCE(graded, false) = false
-      AND COALESCE(is_paper, false) = false
-      AND (game_id IS NULL OR game_id IN (
-        SELECT id FROM games
-        WHERE start_date IS NULL OR start_date > (now() AT TIME ZONE 'utc')
-      ))
-  `;
-  return changed > 0;
 }

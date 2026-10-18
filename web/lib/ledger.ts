@@ -1,21 +1,17 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { MARKET_LEDGER_1H, MARKET_LEDGER_FG } from "@/lib/model";
-import {
-  isPaperFirstHalf,
-  isRealFirstHalf,
-  loadPicks,
-  type PickFull,
-} from "@/lib/picks";
-import { personalStake, stakeRecord } from "@/lib/personalStake";
+import { isPaperFirstHalf, loadPicks, type PickFull } from "@/lib/picks";
 import { recordFrom, type Record3 } from "@/lib/record";
 
 export type { Record3 } from "@/lib/record";
 
-// The Ledger (market vs you), season-scoped.
+// The season comparison, season-scoped.
 //   Market 1H   = results.model_version='market'    (under vs the real closing 1H line)
 //   Market full = results.model_version='market_fg'
-//   You         = graded manual_picks: real-money first-half only; paper apart.
+//   Paper       = graded paper manual_picks, first half.
+// The personal real-money row left the site on 2026-10-18 (final-2026 plan,
+// D16): the 30 tickets stay in manual_picks and appear in the final report.
 // The "Model 1H" ledger (results.model_version='gbm_v1') was retired with the
 // classifier on 2026-10-04 (docs/CLASSIFIER_RETIREMENT.md); its rows stay in
 // `results` as history and nothing reads them.
@@ -23,7 +19,6 @@ export type { Record3 } from "@/lib/record";
 export type Ledger = {
   market: Record3 | null;
   marketFull: Record3 | null;
-  you: Record3 | null; // real-money 1H picks only
   /** Graded paper picks left out of `paper` (excluded_reason set). */
   paperExcluded: number;
   paper: Record3 | null; // paper 1H picks — never merged into "you"
@@ -89,8 +84,6 @@ export async function getLedger(season: number): Promise<Ledger> {
     marketFull: recordFromResults(
       res.filter((r) => r.model_version === MARKET_LEDGER_FG),
     ),
-    // Cash record; units, ROI and line value price-verified only (audit 2026-10-17).
-    you: stakeRecord(personalStake(picks.filter(isRealFirstHalf))),
     // The 12 weeks 2-4 picks logged on a Hard Rock alternate line stay out
     // (fact-check audit 2026-10-17, Tate); Results says how many.
     paper: recordFrom(

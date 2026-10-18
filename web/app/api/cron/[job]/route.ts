@@ -10,7 +10,7 @@ import {
   type CronJob,
   type RunSummary,
 } from "@/lib/cronJobs";
-import { safeEqual } from "@/lib/auth";
+import { safeEqual } from "@/lib/gate";
 import { etClock12 } from "@/lib/et";
 import { prisma } from "@/lib/prisma";
 
@@ -20,12 +20,12 @@ export const maxDuration = 30;
 // GET /api/cron/[job] — Vercel's scheduler calls this; it dispatches the
 // GitHub workflow. See lib/cronJobs.ts for why the trigger moved here.
 //
-// EXEMPT FROM THE PASSWORD GATE (middleware.ts): Vercel's cron carries no
-// session cookie, so without that exemption every invocation would come back
-// 401, Vercel would record it as completed, and nothing would ever build while
-// the dashboard looked healthy. CRON_SECRET is therefore the ONLY lock on this
-// route — an unset or leaked value makes it a public button that spends Odds
-// API credits, which is why a missing secret fails closed with a 500.
+// CRON_SECRET is the ONLY lock on this route, and since 2026-10-18 (the site
+// became a read-only record, D17) the only lock on the site: middleware.ts runs
+// lib/gate.ts::cronGate on this path first, and the route checks the same
+// secret again so a matcher edit can never open it. An unset or leaked value
+// makes it a public button that spends Odds API credits, which is why a
+// missing secret fails closed with a 500.
 
 const GITHUB_API = "https://api.github.com";
 const TIMEOUT_MS = 8_000;
@@ -151,7 +151,7 @@ export async function GET(
     );
   }
   const header = req.headers.get("authorization") ?? "";
-  // lib/auth.ts::safeEqual, not a second hand-rolled compare. The local one
+  // lib/gate.ts::safeEqual, not a second hand-rolled compare. The local one
   // returned early on a length mismatch, which leaked the secret's length;
   // safeEqual hashes both sides to a fixed width first, so it does not.
   if (

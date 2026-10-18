@@ -334,8 +334,8 @@ PID="$(cat "$PID_FILE")"
 echo "$PORT" >"$PORT_FILE"
 echo "starting next dev on port $PORT (pid $PID, log $LOG_FILE) ..."
 
-# /login is a client component with no database read, so it answers as soon as
-# the server is up and compiled -- it proves the server, not the data.
+# /api/health is the readiness probe (since 2026-10-18 there is no /login): it
+# answers 200 once the server is up, compiled and can reach its database.
 ready=0
 for _ in $(seq 1 90); do
   if ! alive "$PID"; then
@@ -344,14 +344,14 @@ for _ in $(seq 1 90); do
     rm -f "$PID_FILE" "$PORT_FILE"
     exit 2
   fi
-  if curl -sf -o /dev/null "http://localhost:$PORT/login"; then
+  if curl -sf -o /dev/null "http://localhost:$PORT/api/health"; then
     ready=1
     break
   fi
   sleep 1
 done
 if [ "$ready" != 1 ]; then
-  echo "dev server did not answer http://localhost:$PORT/login within 90 s; last lines of $LOG_FILE:" >&2
+  echo "dev server did not answer http://localhost:$PORT/api/health within 90 s; last lines of $LOG_FILE:" >&2
   tail -n 30 "$LOG_FILE" >&2
   echo "it is still running (pid $PID); '$0 stop' to kill it" >&2
   exit 2

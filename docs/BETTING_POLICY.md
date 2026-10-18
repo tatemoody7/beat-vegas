@@ -25,8 +25,10 @@ arms run exactly as planned. The personal ledger:
 - **No stop rule.** It was to run to the season's end; Tate ended it 2026-10-18 (D2).
 - **A promotion is separate.** A promoted arm's $10 flat live validation (roadmap) is a fresh track
   of its own; the personal ledger stays apart before and after.
-- **Shown on Results** (until the owner log path is removed), with line value against the consensus close (`ev_cons`,
-  `docs/CONSENSUS.md`) beside each ticket. No dollars are public; a visitor never sees bet wording.
+- **Was shown on Results** with line value against the consensus close (`ev_cons`, `docs/CONSENSUS.md`)
+  beside each ticket, until 2026-10-18. **The site no longer has a log path, a ledger or a login**
+  (final-2026 plan PR-12+13, D2/D16/D17): the 30 tickets stay in `manual_picks`, never edited, and appear
+  only in the final report. No dollars are public; every rating reads in paper wording.
 
 Real money was paused from 2026-10-07 21:40 UTC to 2026-10-08 20:00 UTC (roadmap v1), and ended
 for good 2026-10-18. The two

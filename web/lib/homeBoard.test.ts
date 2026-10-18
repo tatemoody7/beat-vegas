@@ -6,8 +6,6 @@ import {
   qbOutFrom,
   upcomingSlateGaps,
   assignBoardRanks,
-  assignCapRanks,
-  bankrollCurve,
   dayKey,
   edgeContext,
   inPlayAt,
@@ -22,7 +20,6 @@ import {
   tierCounts,
   type HomeGame,
 } from "./homeBoard";
-import type { PickFull } from "./picks";
 import type { BoardFactor } from "./score";
 
 // --- fixtures ---------------------------------------------------------------
@@ -68,7 +65,6 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     edge: edge(70, "EDGE"),
     movement: null,
     preview: null,
-    picked: false,
     kickedOff: false,
     kickoff: "Sat 7:30p",
     day: "sat",
@@ -81,39 +77,9 @@ const game = (o: Partial<HomeGame> = {}): HomeGame =>
     priceLine: "",
     inPlay: false,
     boardRank: null,
-    capRank: null,
-    overCap: false,
+    hold: null,
     ...o,
   }) as HomeGame;
-
-const pick = (o: Partial<PickFull>): PickFull =>
-  ({
-    id: 1,
-    gameId: 1,
-    week: 3,
-    away: "A",
-    home: "B",
-    market: "1H",
-    line: 24,
-    stake: 1,
-    price: -110,
-    note: null,
-    modelLine: null,
-    result: "under",
-    units: 0.91,
-    clv: null,
-    graded: true,
-    isPaper: false,
-    verdictAtPick: null,
-    reason: null,
-    gapAtPick: null,
-    evAtPick: null,
-    hrLineAtPick: null,
-    blocker: null,
-    priceProvenance: "logged",
-    excludedReason: null,
-    ...o,
-  }) as PickFull;
 
 // --- kickoff ----------------------------------------------------------------
 
@@ -365,126 +331,6 @@ describe("parseFilters", () => {
     expect(parseFilters({ days: "SAT, sat ,mon,nope" }).days).toEqual(["sat"]);
     expect(parseFilters({})).toEqual(NO_FILTERS);
     expect(parseFilters({ mine: "0", hr: "yes" })).toEqual(NO_FILTERS);
-  });
-});
-
-// --- bankroll curve ---------------------------------------------------------
-
-describe("bankrollCurve", () => {
-  it("starts at zero and compounds settled units by week (units only: it is a client prop)", () => {
-    const curve = bankrollCurve([
-      pick({ id: 1, week: 2, units: 0.91 }),
-      pick({ id: 2, week: 2, units: -1 }),
-      pick({ id: 3, week: 3, units: 0.91 }),
-    ]);
-    expect(curve).toEqual([
-      { week: 1, units: 0 },
-      { week: 2, units: -0.09 },
-      { week: 3, units: 0.82 },
-    ]);
-  });
-
-  it("ignores pending, paper and full-game picks", () => {
-    const curve = bankrollCurve([
-      pick({ id: 1, week: 2, units: 5, graded: false }),
-      pick({ id: 2, week: 2, units: 5, isPaper: true }),
-      pick({ id: 3, week: 2, units: 5, market: "full" }),
-      pick({ id: 4, week: 2, units: 1 }),
-    ]);
-    expect(curve[curve.length - 1]).toEqual({ week: 2, units: 1 });
-  });
-
-  it("is just the starting point with nothing settled", () => {
-    expect(bankrollCurve([])).toEqual([{ week: 0, units: 0 }]);
-  });
-});
-
-// --- the weekly cap on the board (2026-09-07) ------------------------------------
-
-describe("assignCapRanks", () => {
-  const bet = (gameId: number, gap: number, o: Partial<HomeGame> = {}) =>
-    game({
-      row: row({ gameId, away: `A${gameId}`, home: `H${gameId}` }),
-      edge: edge(70 + gap, "BET"),
-      gap,
-      ...o,
-    });
-
-  it("ranks BETs by gap, marks the 6th+ over the cap, leaves non-BETs null", () => {
-    const games = [
-      bet(1, 2.0),
-      bet(2, 3.1),
-      bet(3, 2.5),
-      bet(4, 1.9),
-      bet(5, 2.2),
-      bet(6, 2.1),
-      game({ row: row({ gameId: 7 }), edge: edge(64, "EDGE"), gap: 1.4 }),
-    ];
-    const out = assignCapRanks(games, new Set(), 5);
-    const ranks = Object.fromEntries(out.map((g) => [g.row.gameId, g.capRank]));
-    expect(ranks).toEqual({ 1: 5, 2: 1, 3: 2, 4: 6, 5: 3, 6: 4, 7: null });
-    expect(out.filter((g) => g.overCap).map((g) => g.row.gameId)).toEqual([4]);
-    expect(out.map((g) => g.row.gameId)).toEqual([1, 2, 3, 4, 5, 6, 7]); // order kept
-  });
-
-  it("a game already bet keeps its slot ahead of a bigger new gap", () => {
-    const games = [
-      bet(1, 3.0),
-      bet(2, 2.9),
-      bet(3, 2.8),
-      bet(4, 2.7),
-      bet(5, 2.6),
-      bet(6, 1.8),
-    ];
-    const out = assignCapRanks(games, new Set([6]), 5);
-    const by = Object.fromEntries(out.map((g) => [g.row.gameId, g]));
-    expect(by[6].capRank).toBe(1);
-    expect(by[6].overCap).toBe(false);
-    expect(by[5].capRank).toBe(6);
-    expect(by[5].overCap).toBe(true);
-  });
-
-  it("a real ticket on a game no longer ranked still holds a slot (card.py prior_bet_game_ids)", () => {
-    // Two tickets this week on games that kicked off (or slipped from BET): the
-    // three open slots go to the top three remaining BETs by gap.
-    const games = [
-      bet(1, 3.0),
-      bet(2, 2.9),
-      bet(3, 2.8),
-      bet(4, 2.7),
-      bet(9, 4.0, { kickedOff: true }),
-    ];
-    const out = assignCapRanks(games, new Set([9]), 5, new Set([9, 10]));
-    const by = Object.fromEntries(out.map((g) => [g.row.gameId, g]));
-    expect([1, 2, 3, 4].map((id) => by[id].capRank)).toEqual([3, 4, 5, 6]);
-    expect(by[4].overCap).toBe(true);
-    expect(by[9].capRank).toBe(null);
-  });
-
-  it("inside the cap a BET reads 'Bet one unit'; past it, 'Paper signal' (roadmap v1.4)", () => {
-    const say = (id: number, gap: number) =>
-      bet(id, gap, {
-        edge: {
-          ...edge(70 + gap, "BET"),
-          action: "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
-        } as EdgeResult,
-      });
-    const out = assignCapRanks([say(1, 3.0), say(2, 2.0)], new Set(), 1);
-    expect(out[0].edge.action).toBe(
-      "Bet one unit: first-half under 24.5 at -110 on Hard Rock.",
-    );
-    expect(out[1].edge.action).toBe(
-      "Paper signal: first-half under 24.5 at -110 on Hard Rock.",
-    );
-  });
-
-  it("kicked-off games are out of the ranking", () => {
-    const out = assignCapRanks(
-      [bet(1, 3.0, { kickedOff: true }), bet(2, 2.0)],
-      new Set(),
-      5,
-    );
-    expect(out.map((g) => g.capRank)).toEqual([null, 1]);
   });
 });
 

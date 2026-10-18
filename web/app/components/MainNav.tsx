@@ -7,10 +7,11 @@ import { usePathname } from "next/navigation";
 // The retired routes (/board, /preview, /line-check, /line-study, /movement,
 // /ledger, /weekly-review, /picks, /how-it-works, /proof, /glossary) redirect
 // into these. /records (every game rated) lights no tab; it is reached from
-// Research and Results.
+// Research and Record. Results became Record on 2026-10-18 (final-2026 plan,
+// D16); the path stays /results so every link and redirect keeps working.
 const LINKS = [
   { href: "/", label: "Board" },
-  { href: "/results", label: "Results" },
+  { href: "/results", label: "Record" },
   { href: "/research", label: "Research" },
 ];
 

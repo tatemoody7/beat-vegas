@@ -17,14 +17,7 @@ const STATUS_CLASS: Record<string, string> = {
   "timed out": "bv-badge--warn",
 };
 
-export default function ArmCard({
-  card,
-  authed = false,
-}: {
-  card: HypothesisCard;
-  /** Signed in: the run id is the owner's detail (Q7). */
-  authed?: boolean;
-}) {
+export default function ArmCard({ card }: { card: HypothesisCard }) {
   const { meta } = card;
   const unit = meta.standard === "pricing" ? "opportunities" : "readings";
   const evLine =
@@ -111,7 +104,7 @@ export default function ArmCard({
       <p className="text-xs text-[var(--text-dim)]">
         {card.readAt === null
           ? "Not yet read."
-          : `Last read ${etDateLabel(card.readAt)}${authed && card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
+          : `Last read ${etDateLabel(card.readAt)}${card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
         {card.nextRead ? ` · Next read ${etDateLabel(card.nextRead)}` : ""}
       </p>
     </article>

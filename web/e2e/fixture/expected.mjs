@@ -507,14 +507,6 @@ export function sortGames(rows) {
   );
 }
 
-// lib/edge.ts::withBetOpening (roadmap v1.4)
-export function withBetOpening(action, bet) {
-  const [from, to] = bet
-    ? ["Paper signal:", "Bet one unit:"]
-    : ["Bet one unit:", "Paper signal:"];
-  return action.startsWith(from) ? to + action.slice(from.length) : action;
-}
-
 export function assignCapRanks(
   rows,
   held,
@@ -536,15 +528,13 @@ export function assignCapRanks(
   );
   const rank = new Map(ranked.map((r, i) => [r.game.id, used + i + 1]));
   return rows.map((r) => {
+    // The cap rank and over-cap flag feed the CARD payload (beatvegas/card.py
+    // still writes cap_rank / over_cap); the BET sentence stays "Paper signal:"
+    // for every row since the site dropped the "Bet one unit" swap
+    // (2026-10-18, D2).
     const cr = rank.get(r.game.id) ?? null;
     const overCap = cr !== null && cr > cap;
-    if (cr === null) return { ...r, capRank: cr, overCap };
-    return {
-      ...r,
-      capRank: cr,
-      overCap,
-      edge: { ...r.edge, action: withBetOpening(r.edge.action, !overCap) },
-    };
+    return { ...r, capRank: cr, overCap };
   });
 }
 

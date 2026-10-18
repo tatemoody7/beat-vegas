@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { restoreSetting, setSetting } from "./helpers/db";
 import { etParts, fixture } from "./helpers/fixture";
-import { RESEARCH_BANNER } from "../lib/signalGate";
+import { RESEARCH_BANNER } from "../lib/labels";
 import { PASS_HEAD } from "../lib/boardKey";
 import { SLIM_LEAD } from "../app/components/ResearchStrip";
 
@@ -168,57 +168,18 @@ test.describe("the board", () => {
     expect(ids).toEqual([...expected.betIds].sort());
   });
 
-  test("every lit BET row says how old its Hard Rock price is; no other row does", async ({
+  // The log path left the site (2026-10-18, D2): no tier-count line, no
+  // "bet logged" chip, no price age and no QB warning on any row.
+  test("carries no tier-count line, no chip, no price age and no QB warning on any row", async ({
     page,
   }) => {
     await page.goto("/");
-    const lit = page.locator("a.bv-card--lit");
-    const n = await lit.count();
-    for (let i = 0; i < n; i++) {
-      await expect(lit.nth(i).getByTestId("price-age")).toHaveText(
-        /^price seen (under an hour|\d+ h) ago/,
-      );
-    }
-    await expect(page.getByTestId("price-age")).toHaveCount(n);
-  });
-
-  test("every lit BET row says the starting QB is unconfirmed; no other row does", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    const lit = page.locator("a.bv-card--lit");
-    const n = await lit.count();
-    expect(n).toBeGreaterThan(0);
-    for (let i = 0; i < n; i++) {
-      await expect(lit.nth(i).getByTestId("qb-unknown")).toHaveText(
-        "QB status unknown — check before logging",
-      );
-    }
-    await expect(page.getByTestId("qb-unknown")).toHaveCount(n);
-  });
-
-  test("states the tier counts", async ({ page }) => {
-    await page.goto("/");
-    const c = expected.counts;
-    await expect(
-      page.getByText(
-        `${c.bet} ${c.bet === 1 ? "bet" : "bets"} · ${c.edge} watch · ${c.pass} pass`,
-        {
-          exact: true,
-        },
-      ),
-    ).toBeVisible();
-  });
-
-  test("marks the game with a logged ticket", async ({ page }) => {
-    await page.goto("/");
+    await expect(page.getByText(/ watch · \d+ pass/)).toHaveCount(0);
+    await expect(page.getByTestId("price-age")).toHaveCount(0);
+    await expect(page.getByTestId("qb-unknown")).toHaveCount(0);
     const r = await rows(page);
-    for (const x of r) {
-      const chips = x.chips.filter((c) => c === "bet logged");
-      expect(chips.length, `${x.id}`).toBe(
-        expected.pickedIds.has(x.id) ? 1 : 0,
-      );
-    }
+    expect(r.length).toBeGreaterThan(0);
+    for (const x of r) expect(x.chips, `${x.id}`).toEqual([]);
   });
 
   test("the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line", async ({
@@ -268,12 +229,8 @@ test.describe("the board", () => {
   });
 });
 
-test.describe("the board, signed out", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test("the Hard Rock filter is the only chip, signed in or out", async ({
-    page,
-  }) => {
+test.describe("the board, read by anyone", () => {
+  test("the Hard Rock filter is the only chip", async ({ page }) => {
     await page.goto("/");
     await expect(
       page.getByRole("button", { name: "Hard Rock line posted" }),
@@ -282,15 +239,14 @@ test.describe("the board, signed out", () => {
     await expect(page.getByRole("button", { name: "My teams" })).toHaveCount(0);
   });
 
-  // The research season, roadmap v1.7 (Tate 2026-10-10; lib/signalGate): a
-  // visitor sees the owner's board before kickoff -- the ranks, the lit BET
-  // rows, the order -- in paper wording, never bet wording, and never the
-  // owner's "bet logged" chip before kickoff.
-  test("a visitor reads the research-season banner and the board with its ratings in paper wording", async ({
+  // The read-only record (2026-10-18, D2/D15/D17): everyone reads the same
+  // board -- the ranks, the lit BET rows, the order -- in paper wording, never
+  // bet wording, with the one sentence in the footer.
+  test("the footer carries the one sentence and every rating reads in paper wording", async ({
     page,
   }) => {
     await page.goto("/");
-    // The season sentence lives in the footer now (Q10, 2026-10-15).
+    // The one sentence lives in the footer (Q10, 2026-10-15; reworded D15).
     await expect(
       page.locator('footer p[aria-label="Research season"]'),
     ).toHaveText(RESEARCH_BANNER);
@@ -314,9 +270,9 @@ test.describe("the board, signed out", () => {
     await expect(page.locator('p[aria-label="Research status"]')).toContainText(
       "6 strategies on paper",
     );
-    // The owner's weekly cap is his real-money rule: no slot, no over-cap
-    // chip, no "real money needs" clause for a visitor (2026-10-14). The
-    // fixture's ticketed BET carries a cap slot for the owner (game.spec.ts).
+    // The weekly cap was the real-money rule: no slot, no over-cap chip, no
+    // "real money needs" clause anywhere (2026-10-18). The fixture's ticketed
+    // BET reads like any other row.
     await expect(
       page.getByText(/cap slot \d|bet cap|real money needs/),
     ).toHaveCount(0);
@@ -326,7 +282,7 @@ test.describe("the board, signed out", () => {
     if (ticketed) {
       await page.goto(`/game/${ticketed.game.id}`);
       await expect(
-        page.getByText(/cap slot \d|bet cap|real money needs/),
+        page.getByText(/cap slot \d|bet cap|real money needs|bet logged/),
       ).toHaveCount(0);
     }
   });
@@ -336,14 +292,15 @@ test.describe("the board, signed out", () => {
 // state that raises them and putting them back. Serial, and the only place the
 // suite writes to the database after the seed.
 test.describe.serial("banners driven by app_settings", () => {
-  test("a low Odds API budget lights the ops banner and /api/health warns", async ({
+  test("a low Odds API budget lights the ops banner for everyone and /api/health warns", async ({
     page,
     request,
-    browser,
   }) => {
     const before = await setSetting("odds_credits_remaining", "100");
     try {
       await page.goto("/");
+      // The ops warning renders for everyone since 2026-10-18 (D17): a
+      // research record shows its own state.
       const banner = page.locator("div[role=status]");
       await expect(banner).toHaveCount(1);
       await expect(banner).toContainText("One thing needs attention.");
@@ -353,14 +310,6 @@ test.describe.serial("banners driven by app_settings", () => {
       const health = await (await request.get("/api/health")).json();
       expect(health.warnings).toHaveLength(1);
       expect(health.warnings[0]).toContain("Odds API credits low: 100");
-      // The ops warning is the owner's: a visitor never sees it (2026-09-28).
-      const visitor = await browser.newContext({
-        storageState: { cookies: [], origins: [] },
-      });
-      const vp = await visitor.newPage();
-      await vp.goto("/");
-      await expect(vp.locator("div[role=status]")).toHaveCount(0);
-      await visitor.close();
     } finally {
       await restoreSetting("odds_credits_remaining", before);
     }
@@ -368,22 +317,25 @@ test.describe.serial("banners driven by app_settings", () => {
     await expect(page.locator("div[role=status]")).toHaveCount(0);
   });
 
-  test("the real-money switch is reported by /api/health; the season banner speaks for it on the board", async ({
+  test("the real-money switch is nothing the site reads: the board and /api/health ignore it", async ({
     page,
     request,
   }) => {
     const before = await setSetting("rule_paused", "true");
     try {
       await page.goto("/");
-      // One message, not two (2026-10-07): the research-season banner says
-      // money is paused; the old board box is gone.
+      // Real money ended 2026-10-18 (D2): the switch stays on in the database
+      // and nothing on the site reads it; the footer sentence says what this is.
       await expect(
         page.locator('footer p[aria-label="Research season"]'),
       ).toHaveText(RESEARCH_BANNER);
       await expect(page.getByText("Our bets are paused.")).toHaveCount(0);
+      await expect(
+        page.getByText("Real money is off until the pause switch can be read."),
+      ).toHaveCount(0);
       const health = await (await request.get("/api/health")).json();
-      expect(health.rulePaused).toBe(true);
-      expect(health.rulePauseReadable).toBe(true);
+      expect(health).not.toHaveProperty("rulePaused");
+      expect(health).not.toHaveProperty("rulePauseReadable");
     } finally {
       await restoreSetting("rule_paused", before);
     }

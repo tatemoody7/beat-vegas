@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import Link from "next/link";
-import { gateEnabled } from "@/lib/auth";
-import { viewerIsAuthed } from "@/lib/session";
-import { RESEARCH_BANNER } from "@/lib/signalGate";
-import FooterChrome from "@/app/components/FooterChrome";
-import HeaderChrome from "@/app/components/HeaderChrome";
+import { RESEARCH_BANNER } from "@/lib/labels";
+import MainNav from "@/app/components/MainNav";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -20,7 +17,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "Beat Vegas — College Football Betting System",
+  title: "Beat Vegas — College Football Betting Research",
   description:
     "College football betting research. Every rating and every result is public, losses included.",
   // Readable without a password since 2026-09-16, but not for search engines:
@@ -28,12 +25,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function RootLayout({
+// A READ-ONLY RESEARCH RECORD since 2026-10-18 (final-2026 plan, D2/D16/D17):
+// no login, no cookie, no Lock or Unlock in the footer. Everyone reads the
+// same pages; the one sentence in the footer says what this is.
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Lock (signed in) or Unlock (reading publicly) in the FOOTER; the gate is
-  // write-only, so this is about what the visitor can DO, not see.
-  const authed = await viewerIsAuthed();
   return (
     <html
       lang="en"
@@ -43,8 +40,7 @@ export default async function RootLayout({
         <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl flex-nowrap items-center gap-x-2 px-4 py-3 sm:gap-x-6 sm:px-6">
             {/* ONE row at every width: wordmark and three tabs. Below `sm`
-                the wordmark drops a size so 360px fits. The nav comes from
-                HeaderChrome, which renders nothing on /login. */}
+                the wordmark drops a size so 360px fits. */}
             <Link
               href="/"
               className="shrink-0 font-[family-name:var(--font-display)] text-sm font-extrabold tracking-tight sm:text-base"
@@ -52,18 +48,18 @@ export default async function RootLayout({
               <span className="text-[var(--accent)]">BEAT</span>
               <span className="text-[var(--text)]"> VEGAS</span>
               <span className="ml-2 hidden align-middle text-xs font-medium uppercase tracking-widest text-[var(--text-dim)] sm:inline">
-                College Football Betting System
+                College Football Betting Research
               </span>
             </Link>
-            <HeaderChrome />
+            <MainNav />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {children}
         </main>
         <footer className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-xs text-[var(--text-dim)]">
-          {/* The research season moved here from under the header (Tate
-              2026-10-15, Q10): said on every page, out of the way of it. */}
+          {/* The one sentence, said on every page (Tate 2026-10-15, Q10;
+              reworded 2026-10-18, D15). */}
           <p className="w-full" aria-label="Research season">
             {RESEARCH_BANNER}
           </p>
@@ -72,7 +68,6 @@ export default async function RootLayout({
             Florida, Hard Rock Bet. Past results do not predict future results.
             Gambling problem? 1-833-PLAYWISE.
           </span>
-          <FooterChrome gateEnabled={gateEnabled()} authed={authed} />
         </footer>
       </body>
     </html>

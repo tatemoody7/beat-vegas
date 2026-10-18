@@ -9,7 +9,7 @@
 // Compare two labels with `node scripts/shots.mjs --diff before after` (the
 // numbers) or `--pixdiff before after` (the pixels, via odiff; diff PNGs land in
 // shots/<after>/diff_<page>_<width>.png only where something changed).
-// The local dev server has no password gate (APP_PASSWORD unset), so no cookie.
+// The site has no password and no cookie (read-only since 2026-10-18).
 
 import { chromium, devices } from "playwright";
 import { compare } from "odiff-bin";
@@ -43,10 +43,9 @@ const EXTRA = String(args.extra ?? "")
   .map(([k, ...v]) => [k, v.join("=")]);
 const PAGES = [
   ["board", "/"],
-  ["results", "/results?week=all"],
+  ["record", "/results"],
   ["research", "/research"],
   ["records", "/records"],
-  ["login", "/login"],
   ...GAMES.map((id, i) => [`game_${i}_${id}`, `/game/${id}`]),
   ...EXTRA,
 ];

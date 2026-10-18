@@ -240,8 +240,9 @@ def test_the_off_market_gate_is_retired_on_both_sides():
     """Tate retired the off-market blocker on 2026-10-07 (docs/ASSUMPTIONS.md
     row 8). The constant survives in score.py only as a post-mortem band edge;
     no gate on either side reads it, and the web no longer exports it."""
+    # pickRules.ts and ticketPolicy.ts left with the site's write path (2026-10-18, D2).
     web = Path(__file__).resolve().parent.parent / "web" / "lib"
-    for f in ("verdict.ts", "edge.ts", "pickRules.ts", "ticketPolicy.ts"):
+    for f in ("verdict.ts", "edge.ts"):
         code = [ln for ln in (web / f).read_text().splitlines() if not ln.strip().startswith("//")]
         assert not any("HR_OFF_MARKET_PTS" in ln for ln in code), f
         assert not any('"off_market"' in ln and "blocker =" in ln for ln in code), f

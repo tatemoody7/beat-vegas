@@ -260,9 +260,8 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   }
 
   // --- Action ---------------------------------------------------------------
-  // A BET's sentence opens with PAPER_ACTION here; homeBoard.assignCapRanks
-  // swaps in BET_ACTION for the BETs inside the week's real-money cap (roadmap
-  // v1.4), and signalGate swaps it back for a visitor.
+  // A BET's sentence opens with PAPER_ACTION, for everyone: the "Bet one unit"
+  // opening of roadmap v1.4 left with real money on 2026-10-18 (D2).
   // One plain sentence saying what to do, and for anything that is not a bet
   // yet, the number or price that would make it one (spec §13). "Wait" became
   // "Not yet" so the sentence names a condition rather than an instruction.
@@ -339,17 +338,9 @@ export function passShort(r: EdgeResult): string | null {
 }
 
 /**
- * The two openings of a BET's action sentence (roadmap v1.4, Tate 2026-10-08):
- * a BET inside the week's real-money cap is a bet; past the cap, or in a
- * visitor's view, the same pick is a paper signal. Mirrored by beatvegas/card.py.
+ * The opening of a BET's action sentence. Since 2026-10-18 (final-2026 plan,
+ * D2) there is only the paper one: "Bet one unit:" and the swap that applied it
+ * inside the real-money cap (roadmap v1.4) left with real money. Mirrored by
+ * beatvegas/card.py (PAPER_ACTION).
  */
-export const BET_ACTION = "Bet one unit:";
 export const PAPER_ACTION = "Paper signal:";
-
-/** Pure: the same sentence with the opening that fits (`bet` = inside the cap). */
-export function withBetOpening(action: string, bet: boolean): string {
-  const [from, to] = bet
-    ? [PAPER_ACTION, BET_ACTION]
-    : [BET_ACTION, PAPER_ACTION];
-  return action.startsWith(from) ? to + action.slice(from.length) : action;
-}

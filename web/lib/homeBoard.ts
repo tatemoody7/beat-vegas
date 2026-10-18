@@ -6,7 +6,6 @@ import { boardUniverse, getBoard, type BoardRow } from "@/lib/board";
 import { cache } from "react";
 import {
   edgeScore,
-  withBetOpening,
   type EdgeContext,
   type EdgeInput,
   type EdgeResult,
@@ -17,97 +16,17 @@ import { MIN_GAMES_FOR_REAL_MONEY } from "@/lib/verdict";
 import { getLineCheck, type LineCheckRow } from "@/lib/lineCheck";
 import { getScheduledCard, isHeld, type CardItem } from "@/lib/card";
 import { getMovements, type Movement } from "@/lib/movement";
-import {
-  getPicks,
-  countsAgainstCap,
-  isRealFirstHalf,
-  type PickFull,
-  type WeekPick,
-} from "@/lib/picks";
 import { getPreviewByGame, type PreviewGame } from "@/lib/preview";
-import { isPriceVerified } from "@/lib/personalStake";
 import { hardRockAtLastCard, type HrQuote } from "@/lib/records";
-import type { Record3 } from "@/lib/record";
 import type { BoardFactor, Factors } from "@/lib/score";
-import {
-  BET_GAP_PTS,
-  PCT_SHARE,
-  priceSentence,
-  slateBar,
-  WEEKLY_BET_CAP,
-} from "@/lib/verdict";
+import { BET_GAP_PTS, PCT_SHARE, priceSentence, slateBar } from "@/lib/verdict";
 import { defaultWeek, weeksOf } from "@/lib/week";
 
 // The home board data layer: one ranked list of every game on the week, each
-// with an edge score 0-100, a tier (BET / EDGE / PASS), the line history, the
-// injury/news preview and the pick ledger behind it. Replaces lib/thisWeek.ts
-// (its bankroll logic lives here now). Reads only.
-
-// --- bankroll ---------------------------------------------------------------
-
-export type Bankroll = {
-  startUsd: number;
-  unitUsd: number;
-  /** Signed units from graded real-money 1H picks this season. */
-  realUnits: number;
-  currentUsd: number;
-  /** Real-money 1H picks logged for the displayed week (pending or graded). */
-  weekBets: number;
-  cap: number;
-  real: Record3 | null;
-  paper: Record3 | null;
-};
-
-// Bankroll policy (docs/BETTING_POLICY.md): fixed dollar unit, flat staking.
-// Env-driven so a top-up is a Vercel setting, not a deploy.
-function envNum(name: string, fallback: number): number {
-  const v = Number(process.env[name]);
-  return Number.isFinite(v) && v > 0 ? v : fallback;
-}
-
-/** Starting bankroll + unit size from the environment (BANKROLL_USD/UNIT_USD). */
-export function bankrollEnv(): { startUsd: number; unitUsd: number } {
-  return {
-    startUsd: envNum("BANKROLL_USD", 100),
-    unitUsd: envNum("UNIT_USD", 10),
-  };
-}
-
-// Units only (2026-10-14): the curve is a client-component prop, so anything on
-// a point reaches every visitor's page payload. The dollar series it used to
-// carry was never drawn (the chart has been in units since 2026-09-28) and
-// broke "no dollars are public".
-export type BankrollPoint = { week: number; units: number };
-
-/**
- * Pure: cumulative real-money first-half units by week, oldest first, with a
- * week-0 starting point at zero. Only GRADED picks move it — a pending bet has
- * not won or lost anything yet.
- */
-export function bankrollCurve(picks: PickFull[]): BankrollPoint[] {
-  // Cash tickets with a verified price only, the same money rule as the
-  // Personal stake strip (audit 2026-10-17): no bonus payout, no unlogged price.
-  const settled = picks.filter(
-    (p) =>
-      isRealFirstHalf(p) &&
-      !p.isBonus &&
-      isPriceVerified(p) &&
-      p.graded &&
-      p.week !== null,
-  );
-  const weeks = [...new Set(settled.map((p) => p.week as number))].sort(
-    (a, b) => a - b,
-  );
-  const out: BankrollPoint[] = [
-    { week: weeks.length > 0 ? weeks[0] - 1 : 0, units: 0 },
-  ];
-  let cum = 0;
-  for (const w of weeks) {
-    for (const p of settled.filter((p) => p.week === w)) cum += p.units ?? 0;
-    out.push({ week: w, units: round2(cum) });
-  }
-  return out;
-}
+// with an edge score 0-100, a tier (BET / EDGE / PASS), the line history and
+// the injury/news preview behind it. Reads only. The bankroll, the weekly cap
+// ranks and the "bet logged" state left on 2026-10-18 (final-2026 plan, D2):
+// the board reads no pick and every BET sentence opens as a paper signal.
 
 // --- kickoff ----------------------------------------------------------------
 
@@ -268,9 +187,8 @@ export function settledAgainst(
 /**
  * Fewest current-season games played by either team, or null when unknown.
  *
- * One definition, used by the display tag below AND by the real-money gate in
- * pickRules.checkPolicy, so the chip on the board and the rule that refuses the
- * bet can never disagree about what "early season" means.
+ * One definition for the display tag below and the edge gate, so the chip on
+ * the board and the rule can never disagree about what "early season" means.
  */
 export function minGamesPlayedFrom(f: Factors): number | null {
   const gp = [f.h_games_played, f.a_games_played].filter(
@@ -329,9 +247,7 @@ export type HomeGame = {
   movement: Movement | null;
   /** Injuries + news for the game (unofficial), when the preview job has run. */
   preview: PreviewGame | null;
-  /** A real-money 1H pick already logged on this game this season. */
-  picked: boolean;
-  /** Kickoff has passed (no more bets). */
+  /** Kickoff has passed: no longer a decision. */
   kickedOff: boolean;
   /** "Sat 7:30p" ET, or null when the kickoff time is unknown. */
   kickoff: string | null;
@@ -357,10 +273,6 @@ export type HomeGame = {
   /** Place on the board this week (1 = best), over every game, before filters.
    *  null once the game has kicked off: it is no longer a decision. */
   boardRank: number | null;
-  /** Rank among the week's BETs by gap (1 = biggest gap); null on non-BETs. */
-  capRank: number | null;
-  /** BET beyond the weekly cap: every gate passed, paper only (docs/BETTING_POLICY.md). */
-  overCap: boolean;
 };
 
 export type SlateBar = {
@@ -383,9 +295,6 @@ export type HomeBoard = {
   counts: { bet: number; edge: number; pass: number };
   /** H-PCT: this week's bar, how many games set it, and whether it fell back to the constant. */
   slate: SlateBar;
-  bankroll: Bankroll;
-  /** Real-money 1H picks logged on this week (the bet slip's "logged" state). */
-  weekPicks: WeekPick[];
 };
 
 /** Hours after kickoff a game could still be in progress. Past it, a game with
@@ -435,55 +344,6 @@ export function assignBoardRanks(games: HomeGame[]): HomeGame[] {
   );
 }
 
-/**
- * Pure: rank this week's BETs for the real-money cap, by gap (the cap-5 rule
- * the real-close backtest measured — beatvegas/card.py apply_weekly_cap).
- * Games already bet (`held`) keep their slot ahead of new arrivals; the rest
- * follow by gap desc, then Hard Rock's price, then kickoff. Rank > cap marks
- * overCap: every gate passed, paper only. Non-BETs get capRank null.
- *
- * `weekBetIds`: the games this week's cap-counting real tickets sit on. One on
- * a game that is NOT ranked here (kicked off, or no longer a BET) still holds a
- * slot, so ranks start after them -- card.py's prior_bet_game_ids. A BET inside
- * the cap reads "Bet one unit: …"; past it, "Paper signal: …" (roadmap v1.4).
- */
-export function assignCapRanks(
-  games: HomeGame[],
-  held: Set<number>,
-  cap: number = WEEKLY_BET_CAP,
-  weekBetIds: Set<number> = new Set(),
-): HomeGame[] {
-  const bets = games.filter((g) => g.edge.tier === "BET" && !g.kickedOff);
-  const rankedIds = new Set(bets.map((g) => g.row.gameId));
-  const used = [...weekBetIds].filter((id) => !rankedIds.has(id)).length;
-  const ms = (g: HomeGame): number => {
-    const t = asDate(g.row.startDate);
-    return t === null ? Number.POSITIVE_INFINITY : t.getTime();
-  };
-  const ranked = [...bets].sort(
-    (a, b) =>
-      Number(!held.has(a.row.gameId)) - Number(!held.has(b.row.gameId)) ||
-      (b.gap ?? Number.NEGATIVE_INFINITY) -
-        (a.gap ?? Number.NEGATIVE_INFINITY) ||
-      (b.check?.ev ?? Number.NEGATIVE_INFINITY) -
-        (a.check?.ev ?? Number.NEGATIVE_INFINITY) ||
-      ms(a) - ms(b) ||
-      a.row.away.localeCompare(b.row.away),
-  );
-  const rank = new Map(ranked.map((g, i) => [g.row.gameId, used + i + 1]));
-  return games.map((g) => {
-    const r = rank.get(g.row.gameId) ?? null;
-    const overCap = r !== null && r > cap;
-    if (r === null) return { ...g, capRank: r, overCap };
-    return {
-      ...g,
-      capRank: r,
-      overCap,
-      edge: { ...g.edge, action: withBetOpening(g.edge.action, !overCap) },
-    };
-  });
-}
-
 /** Pure: how many games sit in each tier. */
 export function tierCounts(games: HomeGame[]): {
   bet: number;
@@ -511,9 +371,9 @@ export const gameSeasonWeek = cache(async function gameSeasonWeek(
 
 /**
  * One game, with the whole week's context behind it. It loads the full board on
- * purpose: rank, cap slot and the tier counts are all assigned across every
- * game, so a game page that queried its own row alone would show a different
- * rank from the board that linked to it.
+ * purpose: the rank and the slate bar are assigned across every game, so a game
+ * page that queried its own row alone would show a different rank from the
+ * board that linked to it.
  */
 export async function getHomeGame(
   gameId: number,
@@ -604,24 +464,20 @@ export async function getHomeBoard(
     requestedWeek !== undefined && weeks.includes(requestedWeek)
       ? requestedWeek
       : defaultWeek(universe, now);
-  const [board, checks, { picks, record, paperRecord }, card, hrAtCard] =
-    await Promise.all([
-      week === null
-        ? Promise.resolve([] as BoardRow[])
-        : getBoard(season, week),
-      week === null
-        ? Promise.resolve([] as LineCheckRow[])
-        : getLineCheck(season, "1h", week),
-      getPicks(season),
-      // Board alignment (2026-10-14): the newest SCHEDULED build of the week
-      // decides the QB read and the hold, as it does for the server.
-      week === null ? Promise.resolve(null) : getScheduledCard(season, week),
-      // A played game settles on Hard Rock's line at the last scheduled card
-      // before its kickoff, as /records does (fact-check audit 2026-10-17).
-      week === null
-        ? Promise.resolve(new Map<number, HrQuote>())
-        : hardRockAtLastCard(season, week),
-    ]);
+  const [board, checks, card, hrAtCard] = await Promise.all([
+    week === null ? Promise.resolve([] as BoardRow[]) : getBoard(season, week),
+    week === null
+      ? Promise.resolve([] as LineCheckRow[])
+      : getLineCheck(season, "1h", week),
+    // Board alignment (2026-10-14): the newest SCHEDULED build of the week
+    // decides the QB read and the hold, as it does for the server.
+    week === null ? Promise.resolve(null) : getScheduledCard(season, week),
+    // A played game settles on Hard Rock's line at the last scheduled card
+    // before its kickoff, as /records does (fact-check audit 2026-10-17).
+    week === null
+      ? Promise.resolve(new Map<number, HrQuote>())
+      : hardRockAtLastCard(season, week),
+  ]);
   const itemById = new Map<number, CardItem>(
     (card?.items ?? []).map((i) => [i.gameId, i]),
   );
@@ -648,12 +504,6 @@ export async function getHomeBoard(
     basis: barValue === null ? "fallback" : "slate",
   };
   const noModel = rows.length > 0 && rows.every((r) => !lineState(r).hasModel);
-
-  // Only real-money FIRST-HALF picks count toward the record, the bankroll and
-  // the weekly cap (full game is context, paper is tracked apart).
-  const real1H = picks.filter(isRealFirstHalf);
-  const pickedGames = new Set(real1H.map((p) => p.gameId));
-  const pickedKey = new Set(real1H.map((p) => `${p.away}@${p.home}`));
 
   const games: HomeGame[] = rows.map((row) => {
     const check = checkById.get(row.gameId) ?? null;
@@ -712,8 +562,6 @@ export async function getHomeBoard(
       edge,
       movement: movements.get(row.gameId) ?? null,
       preview: previews.get(row.gameId) ?? null,
-      picked:
-        pickedGames.has(row.gameId) || pickedKey.has(`${row.away}@${row.home}`),
       kickedOff: start !== null && start.getTime() <= now.getTime(),
       inPlay: inPlayAt(start, now),
       kickoff: kickoffET(row.startDate),
@@ -726,38 +574,11 @@ export async function getHomeBoard(
       settledLine: settled === null ? null : (atCard?.line ?? null),
       priceLine: priceSentence(input),
       boardRank: null,
-      capRank: null,
-      overCap: false,
       hold,
     };
   });
 
-  const heldIds = new Set(
-    [...pickedGames].filter((g): g is number => g !== null),
-  );
-  const weekBetIds = new Set(
-    picks
-      .filter((p) => countsAgainstCap(p) && p.week === week)
-      .map((p) => p.gameId)
-      .filter((g): g is number => g !== null),
-  );
-  const sorted = assignBoardRanks(
-    assignCapRanks(sortGames(games), heldIds, WEEKLY_BET_CAP, weekBetIds),
-  );
-  const weekPicks: WeekPick[] = real1H
-    .filter((p) => p.week === week)
-    .map((p) => ({
-      gameId: p.gameId,
-      away: p.away,
-      home: p.home,
-      line: p.line,
-      price: p.price,
-      isBonus: p.isBonus,
-    }));
-  const { startUsd, unitUsd } = bankrollEnv();
-  const realUnits = round2(
-    real1H.filter((p) => p.graded).reduce((a, p) => a + (p.units ?? 0), 0),
-  );
+  const sorted = assignBoardRanks(sortGames(games));
 
   return {
     season,
@@ -768,20 +589,5 @@ export async function getHomeBoard(
     games: sorted,
     counts: tierCounts(sorted),
     slate,
-    bankroll: {
-      startUsd,
-      unitUsd,
-      realUnits,
-      currentUsd: Math.round((startUsd + realUnits * unitUsd) * 100) / 100,
-      // Bonus bets are excluded: they risk none of the roll, so POST
-      // /api/picks does not count them either. Displaying them here told you
-      // a slot was gone when the server would still take the bet.
-      weekBets: picks.filter((p) => countsAgainstCap(p) && p.week === week)
-        .length,
-      cap: WEEKLY_BET_CAP,
-      real: record,
-      paper: paperRecord,
-    },
-    weekPicks,
   };
 }

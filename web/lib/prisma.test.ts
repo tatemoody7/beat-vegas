@@ -33,9 +33,9 @@ describe("the driver adapter lane follows NEON_HTTP", () => {
 
 // Prisma 7's adapter pulls `pg` (dns/net/tls) into whatever bundle imports the
 // client. A "use client" component that imports a VALUE from a prisma-backed
-// module therefore breaks the browser build outright -- app/components/PicksList
-// did exactly that through lib/picks::isOffPolicy, and every page that renders it
-// 500'd. Type-only imports are erased and stay fine.
+// module therefore breaks the browser build outright -- the old PicksList did
+// exactly that through lib/picks, and every page that rendered it 500'd.
+// Type-only imports are erased and stay fine.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -49,12 +49,9 @@ const DB_BACKED = [
   "postmortem",
   "preview",
   "lineStudy",
-  "rulePause",
   "homeBoard",
   "prisma",
   "ledger",
-  "weeklyReview",
-  "betLedgerDb",
   "kickoffClockDb",
 ];
 

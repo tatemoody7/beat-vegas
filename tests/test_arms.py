@@ -54,7 +54,7 @@ def test_the_arms_are_registered_with_their_slots():
     # p1.1 (roadmap v1.5, 2026-10-09): paused before any completed week, until the
     # first card built on the leak-fixed model -- the 2026-10-13 tue_pm card
     # (Tate's approval 2026-10-13). The 2026-10-09 rows sit before it.
-    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.2"
+    assert P.ARMS_START == "2026-10-13T20:51:39.533351" and P.PROTOCOL_VERSION == "p1.3"
     assert P.ARMS_START > P.ARMS_TAGGED_FROM
     for arm in (P.ARM_1H_UNDER, P.ARM_1H_OVER, P.ARM_FG_UNDER):
         assert P.arm_start(arm) == P.ARMS_START
@@ -377,3 +377,19 @@ def test_the_exploratory_row_has_no_llr_and_no_readings_target():
     assert row["llr"] is None and row["needed"] is None
     assert row["read_date"] == "2026-10-19" and row["next_read"] == "2026-10-26"
     assert "H-ARM-EVP" in X.EXPLORATORY_IDS and "H-ARM-EVP" not in P.ARMS
+
+
+def test_season_over_is_the_flag_the_env_or_the_protocols_clock(load_script):
+    """p1.3 (roadmap v2.6): the final read needs no hand input -- the clock ends the
+    season at 2026-11-30 12:00 UTC -- and the `season_over` dispatch input (SEASON_OVER
+    via env:) or `--season-over` only make it explicit. A scheduled run passes the input
+    through as an empty string, which must not count."""
+    pos = load_script("protocol_position")
+    before, at = _dt(2026, 11, 23, 12, 0), _dt(2026, 11, 30, 12, 0)
+    assert not pos.resolve_season_over(False, before, env={})
+    assert not pos.resolve_season_over(False, before, env={"SEASON_OVER": ""})
+    assert not pos.resolve_season_over(False, before, env={"SEASON_OVER": "false"})
+    assert pos.resolve_season_over(False, before, env={"SEASON_OVER": "true"})
+    assert pos.resolve_season_over(True, before, env={})
+    assert pos.resolve_season_over(False, at, env={})
+    assert pos.resolve_season_over(False, _dt(2026, 11, 30, 11, 59), env={}) is False

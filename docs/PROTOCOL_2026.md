@@ -1,9 +1,9 @@
-# The 2026 Statistical Protocol — `p1.2`
+# The 2026 Statistical Protocol — `p1.3`
 
 **Status: frozen on Tate's approval of the simulated numbers below (2026-10-07); amended `p1.1`
 on 2026-10-09 (roadmap v1.5: the three arms' clocks paused before any completed week, and the
 restart rule below); amended `p1.2` on 2026-10-14 (roadmap v2.4: the reading unit and when a week is
-complete, below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
+complete, below); amended `p1.3` on 2026-10-18 (roadmap v2.6: the season's end, below). Registry row `H-PROGRAM-2026`.** Every confirmatory arm of the 2026 research program (`docs/ROADMAP_2026.md`)
 is one test under this protocol, registered as its own row before it logs anything; every
 confirmatory clock starts at the first eligible build after that row exists. Everything logged
 before is development evidence. Code: `beatvegas/protocol.py` (the test),
@@ -22,7 +22,7 @@ to any rule here is a new protocol version and a roadmap amendment, never an edi
 | Guard | no decision before **30 readings over 3+ weeks** | no single slate decides an arm |
 | PROMOTE | LLR ≥ ln(0.8/0.005) = 5.075 → **$10 live validation** at the arm's own weekly volume | roadmap |
 | STOP | LLR ≤ ln(0.2/0.995) = −1.604 → **NEEDS MORE EVIDENCE** (stopped: no +3% edge) | Tate: the sequential lower bound; a thin real edge can stop here and is not called negative |
-| TIMEOUT | 200 readings or the season's end → **NEEDS MORE EVIDENCE** (timed out) | roadmap; may restart in 2027 as a new test with new alpha |
+| TIMEOUT | 200 readings or the season's end (**p1.3**: the 2026-11-30 final read, below) → **NEEDS MORE EVIDENCE** (timed out) | roadmap; may restart in 2027 as a new test with new alpha |
 | Exclusions | a pick with no reading (`cons_excluded`) is not an observation; every exclusion is counted and reported beside the arm | `docs/CONSENSUS.md` |
 | Reading cadence | the Monday program review reads each arm over completed weeks (**p1.2**: R1 and R2 below) | roadmap |
 
@@ -65,6 +65,21 @@ draft's seven-day permanent exclusion was not adopted: nothing is discarded for 
 
 Impact on 2026-10-14 (measured): no reading changes. H-ARM-1HO's one week-7 pick, graded on 10-14,
 now reads `pending` until the read of Monday 2026-10-19 12:00 UTC instead of entering mid-week.
+
+## p1.3 — the season's end (Tate, 2026-10-18; roadmap v2.6)
+
+The final-2026 plan ends paid capture after the Saturday **2026-11-28** slate (week 13; the last
+kickoff is 2026-11-29 04:00 UTC, `protocol.SEASON_LAST_KICKOFF`) and reads every arm for the last
+time on **Monday 2026-11-30** (`protocol.FINAL_READ_DATE`, replacing the 2027-01-25 read; the
+2026-12-07 mid-point is dropped). The one rule this amendment adds:
+
+- **Every running arm times out at the 2026-11-30 read.** An arm still RUNNING there ends as
+  TIMEOUT (NEEDS MORE EVIDENCE, timed out), spending its 0.5% like every ending; no pick placed
+  after `SEASON_LAST_KICKOFF` is an observation for any arm. The read is deterministic:
+  `scripts/protocol_position.py` treats the season as over from 2026-11-30 12:00 UTC on
+  (`protocol.season_over`, the same Monday-noon clock as R2), `--season-over` and the Monday
+  workflow's `season_over` dispatch input only make it explicit. Nothing about an arm's selection
+  rule, its start, the judge, alpha or the boundaries changes; the week-13 reading enters under R1-R3′ as usual.
 
 ## WEEK-SHOCK — how much of line value a week shares
 

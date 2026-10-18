@@ -3,7 +3,7 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.2) governs 2026**: every
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.6) governs 2026**: every
 strategy runs on paper, judged by line value against the de-vigged consensus close; real money ended
 2026-10-18 (D2; 30 graded tickets frozen, never evidence). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.2): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.6): what is tested, how an edge is judged,
   what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -39,7 +39,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `ELO_F`, `MARGIN`, `CFBD_PACK` (the Starter Pack walkthrough), `LITERATURE` (the verified papers
   behind the six history looks), `MODEL_FIX` (the four-fix model, NOT MET 10-10), `PRICING_RESEARCH` (Hard Rock against the market, exploratory) (all in `docs/`).
 - `docs/program/REVIEW_2026-10.md` — the October review (Tate's 16 decisions, 2026-10-11);
-  `docs/program/JANUARY_2027_REVIEW.md` — the two reads (12-07, 2027-01-25) and the 2027 default (v2.1);
+  `docs/program/JANUARY_2027_REVIEW.md` — the final read (2026-11-30, v2.6) and the 2027 default it decides;
   `docs/external/` — outside reports, dated. Plans: `~/.claude/plans/`. Private skills: `~/.claude/skills/bv-monday-read` (the one-page Monday read; replaced bv-weekly-review 2026-10-13), `bv-card-check`, `bv-ship`, `bv-site-check`.
 - `README.md` is the public setup + run guide; it must not contradict this file.
 ## Where we are (as of 2026-10-11)
@@ -82,8 +82,6 @@ disagree, **this file wins**; memory files hold lessons and point here.
   were mostly Hard Rock ALTERNATE lines (`docs/NEGGAP_PAPER.md`).
 
 ## Open items (the only place pending work lives; date each)
-- **This week (2026-10-14)**: alternate-line probe Sat 10-17 ~3pm ET with app screenshots (`probe_alt_totals_h1`);
-  first scheduled Monday read 10-19; H-ARM-EVP collects exploratory (`beatvegas/evp_paper.py`, no slot), decided in January.
 - **Roadmap build queue (2026-10-07; each its own PR, `docs/ROADMAP_2026.md`)**: multi-book
   spreads + moneylines (capture shipped 2026-10-07: `full_game_spread` / `full_game_ml` rows with
   `home_price` / `away_price`, `us_ex` on every pull, ~+860 credits/month) and one team-total
@@ -104,17 +102,18 @@ disagree, **this file wins**; memory files hold lessons and point here.
   `lines-close` backup ran its first Saturday on 2026-10-03: 14 hourly dispatches,
   `close_coverage_pct` 1.000 = 53 of 53, so coverage itself is no longer the casualty.)
 - **Arms 1-3 clocks started at the 2026-10-13 tue_pm card** (`cards.id` 29, 20:51:39Z; `protocol.ARMS_START`;
-  the 10-11 refit `model_runs` 10). First read 10-19. `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
-- **Reads (v2.1)**: light read 2026-10-12; first one-page Monday read 2026-10-19 (then weekly); mid-point
-  2026-12-07 (with H6, no decisions); final 2027-01-25. After 10-19: one late GitHub cron per job,
-  post-mortem tables stop. All four literature looks closed NOT MET; Coleman and Salaga parked.
-- **Accounts (v2.1)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key, `docs/OPS_ACCOUNTS.md`);
-  The Odds API stays on 20K; Actions cap to $20. Kalshi account only on the January H-VENUE-1 read.
+  the 10-11 refit `model_runs` 10). `weather_actuals` fetch ~46% (2013-mid 2019), resumed on Mon-Wed only (v2.1).
+- **Reads (v2.6, 2026-10-18)**: the one-page Monday read runs weekly from 2026-10-19 (`pricing_monday.yml`). Paid capture
+  ends after Sat **11-28** (week 13; `protocol.SEASON_LAST_KICKOFF`); the **final read is Mon 11-30** (`protocol.FINAL_READ_DATE`;
+  p1.3: a running arm times out there, `protocol_position.py --season-over` is implied from 12Z and the workflow's `season_over` input
+  forces it) with H6 (`docs/WHEN_TO_BET.md`, `CONFIRMATORY_DATE`), H-JUDGE, H-VENUE-1 and H-ARM-EVP read the same day; the 12-07
+  mid-point and the 2027-01-25 read are gone. Final report `docs/program/SEASON_2026_FINAL` (PR-17), then the export and Neon free.
+- **Accounts (v2.6; `docs/OPS_ACCOUNTS.md`)**: CFBD to Tier 1 at the **Nov 6** renewal (boomtatermac key); The Odds API
+  renews once more ~Nov 5 and is cancelled before Dec 5, CFBD before Dec 6, Neon to free after the export (Tate clicks;
+  nothing is cancelled by Claude). Kalshi account only on the 11-30 H-VENUE-1 read.
 - **The repo is PUBLIC again since 2026-10-16** (Tate): the $10/month Actions cap was hit mid-month
   and GitHub refused every job from ~04:00Z (a refused job has 0 steps; its check-run annotation
   names billing). Public removes the minute cap; nothing secret is tracked (scanned 2026-10-16).
-- **2026-12-07**: the one confirmatory look for `docs/WHEN_TO_BET.md` (H6); the script refuses
-  `--confirmatory` before then.
 
 ## Decision calendar (all times ET; GitHub crons are the backup, Vercel is the trigger)
 | When | Job | What |
@@ -124,7 +123,7 @@ disagree, **this file wins**; memory files hold lessons and point here.
 | Sat 10:00am–11:59pm, one tick per UTC hour (15 entries, 14Z–04Z) | `lines-close` → `lines_watch.yml market=1h_close` | per-game Hard Rock closes, 6 h look-ahead on Saturday ticks (`CLOSE_LOOKAHEAD_MIN_SAT=360`, since 2026-10-11; weeknights 120); GitHub's every-30-min crons stay |
 | Tue–Fri 6–11:59pm ET, hourly (24 entries, 22Z–03Z) | `close-weeknight` → same close poll | weeknight closes (1H + full game); GitHub's 22Z–03Z crons stay as backup |
 | Sun 1–5pm (ticks 18/19/20Z; 23Z catch-up, v2.2) | `sunday.yml` | full-game opener capture → pace + weather → weekly refit + score → derived 1H lines; `need_capture` / `need_score` probes |
-| Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up; GitHub 12:30Z backup) | `pricing-monday` → `pricing_monday.yml` | the Monday read: the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13) and every arm's position, one `arm_positions` row per hypothesis per read date (the site, the Monday read and January read that row); health contract `monday` |
+| Mon 6am–3pm ET (ticks 12Z, 15Z retry; 18Z catch-up; GitHub 12:30Z backup) | `pricing-monday` → `pricing_monday.yml` | the Monday read: the pricing report (H-PRICE-HR, `pv1`, forward since 2026-10-13) and every arm's position, one `arm_positions` row per hypothesis per read date (the site, the Monday read and the 11-30 final read read that row); from 11-30 12Z every running arm times out (p1.3, `--season-over` implied; dispatch input `season_over`); health contract `monday` |
 | Daily 10Z + 20Z catch-up (GitHub 10:30Z; 16:00Z Sun–Fri) | `grade.yml` | finals (CFBD, ESPN fallback) → grade picks, records, ledger → post-mortem (Monday or `hist=true`) → coverage gauge |
 
 Slot windows live in `beatvegas/ci.py` (`resolve_slot`, `PAPER_WINDOW_HOURS`), the Vercel table
@@ -176,7 +175,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `sunday.yml` | Vercel + 3 crons; input force | full-game snapshots, `team_tempo`, `weather`, `predictions`, `model_runs`, `derived_lines` |
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, factor ledger, post-mortem, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
-| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
+| `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |

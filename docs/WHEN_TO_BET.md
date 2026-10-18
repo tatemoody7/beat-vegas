@@ -1,8 +1,9 @@
 # When to bet — what did each build's list do at the close?
 
 **Verdict (pre-registered rule): NOT YET EVALUABLE.** Descriptive only. The one
-confirmatory look is dated **2026-12-07** (the Monday after the regular season) and the
-script refuses `--confirmatory` before then. Nothing here changes a build, a gate or the
+confirmatory look is dated **2026-11-30** (the season's final read; registered as 2026-12-07
+and moved by roadmap v2.6 on 2026-10-18, before any confirmatory number was read, because
+paid capture ends after the 2026-11-28 slate) and the script refuses `--confirmatory` before then. Nothing here changes a build, a gate or the
 Friday guidance. Run 2026-09-15 with `scripts/when_to_bet_study.py --season 2026`;
 arithmetic and the rule in `beatvegas/backtest/when_to_bet.py`, rows from
 `beatvegas/snapshots.py`, pinned by `tests/test_when_to_bet.py` and `tests/test_snapshots.py`.
@@ -26,7 +27,7 @@ and favourable line value against Hard Rock's own strict-centred close and again
 consensus close inside two hours of kickoff. The builds do not BET the same games, so these
 rows are unpaired and no verdict word is printed from them.
 
-**One confirmatory look, on or after 2026-12-07:** on matched games (BET by both builds of
+**One confirmatory look, on or after 2026-11-30 (the final read):** on matched games (BET by both builds of
 a pair, weeks 2+, the last build of each slot in a week), the paired difference in
 favourable line value vs Hard Rock's close, paired bootstrap (2,000 draws), **Holm across
 the six pairwise comparisons** of `tue_pm` / `thu_pm` / `fri_pm` / `sat_am` at family
@@ -116,7 +117,7 @@ can be dropped (credits), which is a separate decision, not this row.
 
 ```
 PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --out reports/when_to_bet
-PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --confirmatory   # refused before 2026-12-07
+PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --confirmatory   # refused before 2026-11-30
 ```
 
 Reads Neon (`cards`, `games`, `odds_snapshots`); writes `reports/when_to_bet_<UTC>.{md,json,csv}`

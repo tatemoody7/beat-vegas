@@ -30,6 +30,12 @@ export const ARM_STARTS: Record<string, string> = {
   "H-ARM-HT1H": "2026-10-10T00:00:00",
 };
 
+/** The final read of the 2026 season (protocol.FINAL_READ_DATE; roadmap v2.6,
+ *  Tate 2026-10-18; pinned by tests/test_research_parity.py): the Monday after
+ *  the last captured slate (Sat 2026-11-28). Every arm is read for the last time
+ *  that day and a still-running one times out. It replaced the 2027-01-25 read. */
+export const FINAL_READ_DATE = "2026-11-30";
+
 /** The 1H-unders arm reads the paper picks the card logs; true when this pick
  *  was placed at or after its clock start. */
 export function isForward(arm: string, placedAtIso: string | null): boolean {
@@ -229,15 +235,15 @@ export type ExploratoryMeta = {
 
 /** H-ARM-EVP (Tate's option A, 2026-10-14; beatvegas/evp_paper.py). Not one of
  *  the registered arms: it never takes a slot in the error budget, and nothing
- *  is adopted from it; the January 2027 review decides whether a 2027 test is
- *  registered. */
+ *  is adopted from it; the final read (FINAL_READ_DATE, 2026-11-30) decides
+ *  whether a 2027 test is registered. */
 export const EXPLORATORY: readonly ExploratoryMeta[] = [
   {
     id: "H-ARM-EVP",
     name: "Value at Hard Rock’s price",
     rule: "The first-half under when its estimated value at Hard Rock’s price is +2% or more: the market’s vig-free line moved a fifth of the way toward our number.",
     decides:
-      "Exploratory: no error budget and no decision this season. The January 2027 review decides whether it becomes a registered test.",
+      "Exploratory: no error budget and no decision this season. The final read on Nov 30, 2026 decides whether it becomes a registered test.",
   },
 ];
 

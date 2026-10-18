@@ -9,8 +9,9 @@ Two kinds of output, deliberately kept apart:
   at Hard Rock's number, the price paid, and the line value against Hard Rock's own
   close and against the consensus close. The builds do not BET the same games, so
   per-build means are unpaired and say so. No verdict word is printed.
-* ONE confirmatory look, on or after CONFIRMATORY_DATE (after the 2026 regular
-  season): on MATCHED games (BET by both builds of a pair), the paired difference in
+* ONE confirmatory look, on or after CONFIRMATORY_DATE (the 2026 season's final
+  read, 2026-11-30; registered as 2026-12-07, moved by roadmap v2.6 on 2026-10-18
+  because paid capture ends after the 2026-11-28 slate): on MATCHED games (BET by both builds of a pair), the paired difference in
   favourable line value vs Hard Rock's close, paired bootstrap, Holm across the six
   pairwise comparisons of the four decision builds at family alpha 0.05, each pair
   n >= MIN_MATCHED. A build is "best" only if it beats every other build after
@@ -36,7 +37,9 @@ from ..snapshots import FOUR_BUILD_SLOTS
 from .censoring import wilson
 from .stats import holm_adjust, paired_bootstrap_mean
 
-CONFIRMATORY_DATE = date(2026, 12, 7)  # the Monday after the 2026 regular season
+# The final read (protocol.FINAL_READ_DATE; roadmap v2.6, D12). Registered 2026-12-07; moved
+# 2026-10-18, before any confirmatory number was read, with the rule itself untouched.
+CONFIRMATORY_DATE = date(2026, 11, 30)
 MIN_MATCHED = 20
 FAMILY_ALPHA = 0.05
 TIERS = ("BET", "EDGE")
@@ -44,7 +47,8 @@ ALL_PRICED = "ALL priced"  # every Hard-Rock-priced item whatever its tier
 
 RULE = (
     "PRE-REGISTERED (docs/HYPOTHESES.md H6, 2026-09-15): weekly runs are descriptive "
-    "only. One confirmatory look on or after 2026-12-07: matched games (BET by both "
+    "only. One confirmatory look on or after 2026-11-30 (the final read; registered as "
+    "2026-12-07, moved by roadmap v2.6 on 2026-10-18): matched games (BET by both "
     "builds), paired difference in favourable line value vs Hard Rock's close, paired "
     "bootstrap, Holm across the six pairwise comparisons of tue_pm / thu_pm / fri_pm / "
     "sat_am at family alpha 0.05, each pair n >= 20. Best = beats every other build "

@@ -37,6 +37,13 @@ Amended p1.1 (roadmap v1.5, Tate's calls of 2026-10-09, strategic review topic 3
   it has been read; a restart before any completed week is free (no result has
   been looked at).
 
+Amended p1.3 (roadmap v2.6, Tate's calls of 2026-10-18, the final-2026 plan):
+
+- The season ENDS after the Saturday 2026-11-28 slate (SEASON_LAST_KICKOFF, D1)
+  and every arm is read for the last time on Monday 2026-11-30 (FINAL_READ_DATE,
+  D4). A running arm times out at that read; nothing placed after the last
+  kickoff is an observation. `season_over(now)` is the deterministic switch.
+
 Pure: observations in, a position out. Tests pin the arithmetic; the simulation
 (scripts/protocol_sim.py) gives the operating characteristics Tate approved.
 """
@@ -45,9 +52,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-PROTOCOL_VERSION = "p1.2"
+PROTOCOL_VERSION = "p1.3"
 K_TESTS = 10
 FAMILY_ALPHA = 0.05
 ALPHA = FAMILY_ALPHA / K_TESTS  # 0.005 per confirmatory test
@@ -111,6 +119,21 @@ ARM_STARTS: Dict[str, Optional[str]] = {
 def arm_start(arm: str) -> Optional[str]:
     """The earliest placed_at that counts toward `arm`'s clock; None = paused."""
     return ARM_STARTS[arm]
+
+
+# The season's end (final-2026 plan, Tate 2026-10-18; roadmap v2.6, protocol p1.3).
+# D1: paid operation ends after Sat 2026-11-28 (week 13); its last kickoff, naive UTC.
+SEASON_LAST_KICKOFF = "2026-11-29T04:00:00"
+# D4: the final read, the Monday after; it replaces 2027-01-25 and drops the 12-07 mid-point.
+FINAL_READ_DATE = "2026-11-30"
+# The read's instant: the Monday-noon-UTC clock of p1.2 R2 on that day.
+FINAL_READ_AT = FINAL_READ_DATE + "T12:00:00"
+
+
+def season_over(now: datetime) -> bool:
+    """True from the final read's instant on (naive UTC, deterministic): every
+    running arm times out there, and the Monday workflow needs no hand input."""
+    return now >= datetime.fromisoformat(FINAL_READ_AT)
 
 
 UPPER = math.log((1.0 - BETA) / ALPHA)  # promote

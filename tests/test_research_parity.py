@@ -49,3 +49,10 @@ def test_the_arm_starts_on_the_site_are_the_protocols():
     assert set(starts) == set(P.ARMS)
     for arm in P.ARMS:
         assert starts[arm] == P.arm_start(arm), arm
+
+
+def test_the_final_read_date_on_the_site_is_the_protocols():
+    """p1.3 / roadmap v2.6: the season's final read, mirrored like ARM_STARTS."""
+    m = re.search(r'FINAL_READ_DATE = "([0-9-]+)"', TS.read_text())
+    assert m, "FINAL_READ_DATE not found in research.ts"
+    assert m.group(1) == P.FINAL_READ_DATE == "2026-11-30"

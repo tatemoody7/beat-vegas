@@ -5,7 +5,7 @@ ever better than the vig-free market reference for the same wager? By how much, 
 in the week, and did the market later move toward Hard Rock (Hard Rock knew something) or not
 (Hard Rock was off)? This replaces nothing and changes nothing: it reads the same `odds_snapshots`
 the arms read and writes a report. The six registered arms, the judge `cv1` and protocol `p1.1`
-run unchanged to the January review.
+run unchanged to the final read (2026-11-30, roadmap v2.6; it was the January review).
 
 ## The frozen rule `pv1` (`beatvegas/pricing.py`; a change is `pv2`, read beside it)
 
@@ -101,7 +101,7 @@ fallback is
 https://github.com/tatemoody7/beat-vegas/actions/workflows/pricing_monday.yml (the newest run,
 "Summary" tab shows the whole report), and the `pricing-report` artifact
 (`pricing_check_<UTC>.{md,json,csv}`; the CSV holds every compared state). `study.yml` can still
-run `pricing_check` by hand. Decision reads: 2026-12-07 (mid-point, none) and the January review.
+run `pricing_check` by hand. Decision read: the 2026-11-30 final read (roadmap v2.6, 2026-10-18; the 12-07 mid-point and the January review were dropped).
 
 ## Reads
 

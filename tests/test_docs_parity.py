@@ -334,3 +334,35 @@ def test_post_mortem_doc_quotes_the_frozen_gap175_cohort():
     assert rows, "the hist headline row for gap >= 1.75 at real closes is missing"
     n, wins, losses, pushes = map(int, rows[0])
     assert (n, wins, losses, pushes) == (c["n"], c["wins"], c["losses"], c["pushes"])
+
+
+# --------------------------------------------------------------------------- #
+# The season's end (protocol p1.3, roadmap v2.6): one date everywhere
+# --------------------------------------------------------------------------- #
+def test_every_governing_doc_states_the_final_read_date():
+    """Final-2026 plan D1/D4 (2026-10-18): paid capture ends after 2026-11-28 and the final
+    read is 2026-11-30. The code holds the date once (protocol.FINAL_READ_DATE); the roadmap,
+    the protocol, the registry, the review templates, the H6 doc and the brief must say the
+    same, and H6's own constant must be that day."""
+    from datetime import date
+
+    from beatvegas import protocol as P
+    from beatvegas.backtest import when_to_bet as W
+
+    assert P.FINAL_READ_DATE == "2026-11-30"
+    assert W.CONFIRMATORY_DATE == date.fromisoformat(P.FINAL_READ_DATE)
+    root = DOCS.parent
+    for rel in (
+        "docs/ROADMAP_2026.md",
+        "docs/PROTOCOL_2026.md",
+        "docs/HYPOTHESES.md",
+        "docs/WHEN_TO_BET.md",
+        "docs/program/JANUARY_2027_REVIEW.md",
+        "CLAUDE.md",
+    ):
+        body = _text(root / rel)
+        assert P.FINAL_READ_DATE in body or "11-30" in body, rel
+    roadmap = _text(root / "docs" / "ROADMAP_2026.md")
+    assert "| v2.6 | 2026-10-18 |" in roadmap and "2026-11-28" in roadmap
+    protocol = _text(root / "docs" / "PROTOCOL_2026.md")
+    assert f"`{P.PROTOCOL_VERSION}`" in protocol and P.SEASON_LAST_KICKOFF[:10] in protocol

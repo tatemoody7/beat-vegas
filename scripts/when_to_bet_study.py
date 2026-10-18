@@ -4,11 +4,11 @@ close and at the consensus close.
 
 A REPORT, NOT A BET. Weekly runs are descriptive; the one confirmatory look
 (matched games, paired bootstrap, Holm across the six pairs of the four decision
-builds) is refused before 2026-12-07 -- see beatvegas/backtest/when_to_bet.py and
+builds) is refused before 2026-11-30 (the final read) -- see beatvegas/backtest/when_to_bet.py and
 docs/HYPOTHESES.md row H6.
 
     PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --out reports/when_to_bet
-    PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --confirmatory   # after 2026-12-07
+    PYTHONPATH=. python scripts/when_to_bet_study.py --season 2026 --confirmatory   # from 2026-11-30
 
 Reads Neon (cards, games, odds_snapshots); writes <out>_<UTC>.{md,json,csv}; appends the
 markdown to $GITHUB_STEP_SUMMARY when set; exits 0 whatever the numbers say.
@@ -42,7 +42,7 @@ def parse_args(argv: Optional[list] = None) -> argparse.Namespace:
     ap.add_argument(
         "--confirmatory",
         action="store_true",
-        help="run the ONE pre-registered test (refused before 2026-12-07)",
+        help="run the ONE pre-registered test (refused before 2026-11-30, the final read)",
     )
     ap.add_argument("--today", default=None, help="override today's date (tests only)")
     return ap.parse_args(argv)

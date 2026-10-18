@@ -3,7 +3,11 @@
 # six arms' protocol positions, each written ONCE per read date into
 # `arm_positions` (unique on hypothesis + read_date, so a retry on the same
 # Monday rewrites the same rows with the newer run id -- nothing double-counts).
-# The site, the Monday read and the January review read that row. Dispatched by
+# The site, the Monday read and the final read (2026-11-30, roadmap v2.6) read
+# that row. The season's end (protocol p1.3): `protocol_position.py` times every
+# running arm out once its clock reaches 2026-11-30 12:00 UTC on its own; the
+# `season_over` dispatch input forces it earlier (SEASON_OVER=true, via env:,
+# never inlined), for the final read dispatched by hand. Dispatched by
 # the Vercel `pricing-monday` entries (web/lib/cronJobs.ts: 12Z, a 15Z retry, an
 # 18Z catch-up; the route re-dispatches only when no run since the window opened
 # succeeded); the 12:30Z GitHub cron is the backup. Grading has landed by then
@@ -15,6 +19,12 @@ on:
   schedule:
     - cron: '30 12 * * 1'
   workflow_dispatch:
+    inputs:
+      season_over:
+        description: 'the season has ended: every running arm times out at this read (implied from 2026-11-30 12:00 UTC)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -50,6 +60,8 @@ jobs:
       - name: Protocol positions (writes one arm_positions row per arm)
         id: positions
         if: always()
+        env:
+          SEASON_OVER: ${{ inputs.season_over }}
         run: python scripts/protocol_position.py --write
       - name: Publish the report on this run's summary page
         if: always()

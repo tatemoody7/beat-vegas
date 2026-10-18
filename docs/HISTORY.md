@@ -10,6 +10,26 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~16:00 UTC (THE SEASON ENDS NOV 28 AND THE FINAL READ IS NOV 30; ROADMAP v2.6, PROTOCOL p1.3).** Final-2026
+  plan PR-04 (paperwork and the `--season-over` wiring; Tate's decisions D1, D4, D12 of 2026-10-18). `beatvegas/protocol.py`
+  gains `SEASON_LAST_KICKOFF = "2026-11-29T04:00:00"` (week 13's last kickoff), `FINAL_READ_DATE = "2026-11-30"`,
+  `FINAL_READ_AT` (12:00 UTC that day, the p1.2 R2 clock) and `season_over(now)`; `PROTOCOL_VERSION` is `p1.3`.
+  `scripts/protocol_position.py::resolve_season_over` ends the season on the flag, on `SEASON_OVER=true`, or on the clock,
+  so the 11-30 Monday run times every running arm out by itself; `pricing_monday.yml` adds the boolean `season_over` dispatch
+  input, passed to the positions step as `env: SEASON_OVER` (never into `run:`); the report JSON records `season_over`.
+  H6's `when_to_bet.CONFIRMATORY_DATE` moves 2026-12-07 → 2026-11-30 (rule untouched, no confirmatory number read;
+  `RULE`, the study script, `docs/WHEN_TO_BET.md`, `docs/ASSUMPTIONS.md` and the registry row say so); the H-JUDGE,
+  H-VENUE-1, H-PRICE-HR and H-ARM-EVP rows date their reads 11-30 with the January / 12-07 dates kept as history;
+  `web/data/hypotheses.json` re-exported. `docs/ROADMAP_2026.md` v2.6 records D1-D14 in one row; `docs/PROTOCOL_2026.md`
+  p1.3 adds only the season-end rule (every running arm times out at the 11-30 read; nothing after the last kickoff is an
+  observation; the FGU/WXFG rung rule is PR-03); `docs/program/JANUARY_2027_REVIEW.md` is retitled to the 11-30 final read
+  (file name kept; the 12-07 section marked dropped; the 2027 default stays). `web/lib/research.ts` mirrors
+  `FINAL_READ_DATE` and the exploratory card's wording names the Nov 30 read. `CLAUDE.md`: the Reads, Accounts and Monday
+  rows carry the two dates; the 10-14 "this week" and the 12-07 H6 items are cut (399 lines). Tests: `test_protocol`
+  (the clock), `test_arms` (the resolver and `p1.3`), `test_workflows` (the input via env), `test_research_parity`
+  (`FINAL_READ_DATE`), `test_docs_parity` (every governing doc states 2026-11-30), `test_when_to_bet` (the new date).
+  No arm's selection rule, start, judge, alpha or boundary changed.
+
 - **2026-10-18 ~15:30 UTC (CHALLENGER GRADING AND THE JUDGE STEP FAIL LOUDLY).** Final-2026 plan PR-02 (evidence
   integrity, Tate's approval of 2026-10-18). Five of the six registered paper arms live in `challenger_picks` and are
   graded by `grade_challenger_picks`, which `scripts/pick.py::cmd_grade` wrapped in a try/except that only printed a

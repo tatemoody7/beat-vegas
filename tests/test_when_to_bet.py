@@ -106,8 +106,9 @@ def test_matched_pairs_keeps_only_games_both_builds_took_and_the_last_build_per_
 
 def test_confirmatory_is_refused_before_the_dated_look():
     df = _frame(_rows(2, "fri_pm", KICK, [1]))
-    c = W.confirmatory(df, today=date(2026, 11, 30))
-    assert not c["ran"] and c["verdict"] == "NOT YET EVALUABLE" and "2026-12-07" in c["reasons"][0]
+    c = W.confirmatory(df, today=date(2026, 11, 29))
+    assert not c["ran"] and c["verdict"] == "NOT YET EVALUABLE" and "2026-11-30" in c["reasons"][0]
+    assert W.CONFIRMATORY_DATE == date(2026, 11, 30)  # the final read (roadmap v2.6)
 
 
 def _season(shifts, weeks=range(2, 14), games_per_week=6):

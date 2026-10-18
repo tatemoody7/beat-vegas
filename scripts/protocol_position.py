@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Where each registered arm stands under the 2026 Statistical Protocol (p1.1).
+"""Where each registered arm stands under the 2026 Statistical Protocol (p1.3).
 
 The Monday program review reads this (docs/PROTOCOL_2026.md). For every arm in
 `beatvegas.protocol.ARMS` (docs/HYPOTHESES.md H-ARM-*): its paper picks -- the
@@ -13,6 +13,11 @@ logged Hard Rock price); a pick without one is an exclusion, counted by its
 guard and the 200-reading timeout.
 
 Read-only: nothing here writes, and no position it prints moves real money.
+
+The season's end (p1.3, roadmap v2.6): `--season-over` makes every running arm
+time out. It is implied once the clock reaches `protocol.FINAL_READ_AT`
+(2026-11-30 12:00 UTC, the final read) and by the environment variable
+`SEASON_OVER=true` (the `season_over` dispatch input of pricing_monday.yml).
 
     PYTHONPATH=. python scripts/protocol_position.py --out reports/protocol
     PYTHONPATH=. python scripts/protocol_position.py --season-over   # the final read
@@ -28,7 +33,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -57,9 +62,19 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     ap.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID") or "-")
     ap.add_argument(
-        "--season-over", action="store_true", help="the season has ended: running arms time out"
+        "--season-over",
+        action="store_true",
+        help=f"the season has ended: running arms time out (implied from {P.FINAL_READ_AT}Z "
+        "and by SEASON_OVER=true)",
     )
     return ap.parse_args(argv)
+
+
+def resolve_season_over(flag: bool, now: datetime, env: Optional[Mapping[str, str]] = None) -> bool:
+    """Pure: the flag, the `SEASON_OVER` environment variable ("true"), or the
+    protocol's own date (p1.3: at or after FINAL_READ_AT) -- any one ends the season."""
+    env = os.environ if env is None else env
+    return bool(flag) or env.get("SEASON_OVER", "").strip().lower() == "true" or P.season_over(now)
 
 
 def arm_rows(session, arm: str, spec: Dict[str, Any], since: Optional[str] = None) -> List[Any]:
@@ -374,15 +389,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
     arms: Dict[str, Dict[str, Any]] = {}
     now = datetime.utcnow()
+    over = resolve_season_over(args.season_over, now)
+    if over:
+        print(f"[protocol] season over (p1.3): running arms time out at this read ({now:%Y-%m-%d})")
     with session_scope() as s:
         for arm, spec in P.ARMS.items():
             start = P.arm_start(arm)
             if start is None:
                 line = paused_arm(len(arm_rows(s, arm, spec, since=P.ARMS_TAGGED_FROM)))
             else:
-                line = read_arm(
-                    with_games(s, arm_rows(s, arm, spec, since=start)), args.season_over, now
-                )
+                line = read_arm(with_games(s, arm_rows(s, arm, spec, since=start)), over, now)
             arms[arm] = {**line, "slot": spec["slot"]}
         # H-ARM-EVP (exploratory, 2026-10-14): read beside the arms, never as one.
         exploratory = exploratory_read(
@@ -390,7 +406,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             with_games(s, arm_rows(s, P.ARM_1H_UNDER, P.ARMS[P.ARM_1H_UNDER])),
             now,
         )
-    result = {"generated_at": now.isoformat() + "Z", "arms": arms, "exploratory": exploratory}
+    result = {
+        "generated_at": now.isoformat() + "Z",
+        "season_over": over,
+        "arms": arms,
+        "exploratory": exploratory,
+    }
     if args.write:
         with session_scope() as s:
             for arm, line in arms.items():

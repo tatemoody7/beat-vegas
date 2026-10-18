@@ -1015,3 +1015,21 @@ def test_study_runs_post_mortem_only_as_a_dry_run():
     assert "post_mortem --write is not a study" in run
     assert "post_mortem needs --dry-run" in run
     assert run.index("--write is not a study") < run.index('python "scripts/$IN_SCRIPT.py"')
+
+
+def test_pricing_monday_season_over_input_crosses_via_env():
+    """p1.3 (roadmap v2.6): the final read's `season_over` dispatch input reaches
+    protocol_position.py only as SEASON_OVER in env:, never inlined into run:. The
+    script also implies it from the clock (protocol.FINAL_READ_AT), so a scheduled
+    run on 2026-11-30 (input empty) still times the running arms out."""
+    data = _load(WF_DIR / "pricing_monday.yml")
+    inputs = _on(data)["workflow_dispatch"]["inputs"]
+    assert inputs["season_over"]["type"] == "boolean"
+    assert inputs["season_over"]["default"] is False
+    steps = data["jobs"]["report"]["steps"]
+    positions = next(s for s in steps if s.get("id") == "positions")
+    assert positions["env"]["SEASON_OVER"] == "${{ inputs.season_over }}"
+    assert "protocol_position.py --write" in positions["run"]
+    for s in steps:
+        if isinstance(s.get("run"), str):
+            assert "inputs." not in s["run"], "an input is inlined into a run: block"

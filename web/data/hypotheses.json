@@ -424,20 +424,20 @@
     "question": "On captured 2026 full-game totals, how do Hard Rock's and Kalshi's closes sit against the other books, what line value does the judge read at each venue's own terms, and what would a bettor free to take either venue have booked?",
     "status": "exploratory",
     "family": "venue-measurement (no confirmatory alpha; roadmap v2.0 decision 5: measure before any Kalshi account or capture)",
-    "doc": "`docs/HISTORY.md` 2026-10-11 (development read, study run 38149958361, fee caveat); the registered read is January's (`docs/program/JANUARY_2027_REVIEW.md`)"
+    "doc": "`docs/HISTORY.md` 2026-10-11 (development read, study run 38149958361, fee caveat); the registered read is the 2026-11-30 final read (`docs/program/JANUARY_2027_REVIEW.md`)"
   },
   {
     "id": "H-PRICE-HR",
     "question": "At the moments we captured it, is Hard Rock's price ever better than the vig-free market reference for the same wager, by how much, how often, where in the week, and does the market later move toward Hard Rock (Hard Rock knew) or not (Hard Rock was off)?",
     "status": "exploratory",
-    "family": "pricing-research (no confirmatory alpha; roadmap v2.1: the pricing-inefficiency programme, read at 2026-12-07 and the January review; a 2027 arm needs its own row)",
+    "family": "pricing-research (no confirmatory alpha; roadmap v2.1: the pricing-inefficiency programme, read at the 2026-11-30 final read (v2.6; was 2026-12-07 and the January review); a 2027 arm needs its own row)",
     "doc": "`docs/PRICING_RESEARCH.md` (study.yml `pricing_check`; the first run is written there)"
   },
   {
     "id": "H-ARM-EVP",
     "question": "Do paper first-half unders chosen by estimated value at Hard Rock's price, rather than by the model's gap, carry positive value against the consensus close?",
     "status": "exploratory",
-    "family": "exploratory (no ledger slot, no alpha, no sequential test; roadmap v2.5; a 2027 confirmatory registration is decided at the January 2027 review)",
+    "family": "exploratory (no ledger slot, no alpha, no sequential test; roadmap v2.5; a 2027 confirmatory registration is decided at the 2026-11-30 final read, v2.6; it was the January 2027 review)",
     "doc": "`docs/program/EVP_SPEC_2026-10.md`"
   },
   {

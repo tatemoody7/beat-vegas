@@ -73,6 +73,20 @@ def test_timeouts_at_the_season_end_and_at_max_readings():
     assert pos.state == P.TIMEOUT and pos.n == P.MAX_OBS
 
 
+def test_the_season_ends_at_the_final_read_by_the_clock():
+    """p1.3 (roadmap v2.6, Tate 2026-10-18): the final read is Monday 2026-11-30 and the
+    season is over from 12:00 UTC that day, deterministically; the last kickoff is before it."""
+    from datetime import datetime
+
+    assert P.PROTOCOL_VERSION == "p1.3"
+    assert P.SEASON_LAST_KICKOFF == "2026-11-29T04:00:00" and P.FINAL_READ_DATE == "2026-11-30"
+    assert P.SEASON_LAST_KICKOFF < P.FINAL_READ_AT == "2026-11-30T12:00:00"
+    assert not P.season_over(datetime(2026, 11, 29, 4, 0))  # the last kickoff itself
+    assert not P.season_over(datetime(2026, 11, 30, 11, 59, 59))
+    assert P.season_over(datetime(2026, 11, 30, 12, 0, 0))
+    assert P.season_over(datetime(2027, 1, 25, 12, 0))  # the read it replaced
+
+
 def test_observations_from_rows_counts_exclusions():
     class R:
         def __init__(self, week, ev):

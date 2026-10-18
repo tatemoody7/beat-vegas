@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 // The stored arm positions (`arm_positions`, 2026-10-14, programme step 10):
 // one row per registered hypothesis per Monday read, written only by the
 // Monday workflow (beatvegas/positions.py). The site reads the NEWEST row per
-// hypothesis and never recomputes a position: the Monday read and the January
-// review read the same row, so none of the three can disagree. Timestamps come
+// hypothesis and never recomputes a position: the Monday read and the final
+// read (2026-11-30) read the same row, so none of the three can disagree. Timestamps come
 // back as text and are read as UTC (lib/et.ts convention).
 
 export const ARM_STANDARDS = ["sprt", "pricing", "exploratory"] as const;

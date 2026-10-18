@@ -802,6 +802,47 @@ CREATE SEQUENCE public.odds_snapshots_id_seq
 ALTER SEQUENCE public.odds_snapshots_id_seq OWNED BY public.odds_snapshots.id;
 
 --
+-- Name: odds_spend; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.odds_spend (
+    id integer NOT NULL,
+    spent_at timestamp without time zone NOT NULL,
+    run_id character varying(32),
+    job character varying(16),
+    script character varying(64),
+    endpoint character varying(24) NOT NULL,
+    markets character varying(128),
+    regions character varying(64),
+    bookmakers text,
+    events integer,
+    credits integer,
+    remaining_after integer,
+    used_after integer,
+    purpose character varying(32),
+    params_json text,
+    http_status integer
+);
+
+--
+-- Name: odds_spend_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.odds_spend_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: odds_spend_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.odds_spend_id_seq OWNED BY public.odds_spend.id;
+
+--
 -- Name: poll_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1068,6 +1109,51 @@ CREATE SEQUENCE public.predictions_id_seq
 --
 
 ALTER SEQUENCE public.predictions_id_seq OWNED BY public.predictions.id;
+
+--
+-- Name: research_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.research_snapshots (
+    id integer NOT NULL,
+    game_id integer,
+    event_id character varying(64),
+    book character varying,
+    market character varying,
+    team character varying(64) NOT NULL,
+    line double precision,
+    spread double precision,
+    over_price integer,
+    under_price integer,
+    home_price integer,
+    away_price integer,
+    captured_at timestamp without time zone,
+    last_seen_at timestamp without time zone,
+    feed_updated_at timestamp without time zone,
+    feed_reseen_at timestamp without time zone,
+    purpose character varying(32) NOT NULL,
+    region character varying(16),
+    request_id integer,
+    source character varying(8) NOT NULL
+);
+
+--
+-- Name: research_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.research_snapshots_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: research_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.research_snapshots_id_seq OWNED BY public.research_snapshots.id;
 
 --
 -- Name: results; Type: TABLE; Schema: public; Owner: -
@@ -1500,6 +1586,12 @@ ALTER TABLE ONLY public.model_runs ALTER COLUMN id SET DEFAULT nextval('public.m
 ALTER TABLE ONLY public.odds_snapshots ALTER COLUMN id SET DEFAULT nextval('public.odds_snapshots_id_seq'::regclass);
 
 --
+-- Name: odds_spend id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.odds_spend ALTER COLUMN id SET DEFAULT nextval('public.odds_spend_id_seq'::regclass);
+
+--
 -- Name: poll_log id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1528,6 +1620,12 @@ ALTER TABLE ONLY public.postmortem_runs ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.predictions ALTER COLUMN id SET DEFAULT nextval('public.predictions_id_seq'::regclass);
+
+--
+-- Name: research_snapshots id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.research_snapshots ALTER COLUMN id SET DEFAULT nextval('public.research_snapshots_id_seq'::regclass);
 
 --
 -- Name: results id; Type: DEFAULT; Schema: public; Owner: -
@@ -1704,6 +1802,13 @@ ALTER TABLE ONLY public.odds_snapshots
     ADD CONSTRAINT odds_snapshots_pkey PRIMARY KEY (id);
 
 --
+-- Name: odds_spend odds_spend_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.odds_spend
+    ADD CONSTRAINT odds_spend_pkey PRIMARY KEY (id);
+
+--
 -- Name: poll_log poll_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1737,6 +1842,13 @@ ALTER TABLE ONLY public.postmortem_runs
 
 ALTER TABLE ONLY public.predictions
     ADD CONSTRAINT predictions_pkey PRIMARY KEY (id);
+
+--
+-- Name: research_snapshots research_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.research_snapshots
+    ADD CONSTRAINT research_snapshots_pkey PRIMARY KEY (id);
 
 --
 -- Name: results results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1800,6 +1912,13 @@ ALTER TABLE ONLY public.games
 
 ALTER TABLE ONLY public.odds_snapshots
     ADD CONSTRAINT uq_odds_snapshot UNIQUE (game_id, book, market, captured_at);
+
+--
+-- Name: research_snapshots uq_research_snapshot; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.research_snapshots
+    ADD CONSTRAINT uq_research_snapshot UNIQUE (event_id, book, market, team, line, captured_at, purpose);
 
 --
 -- Name: shortlist_entries uq_shortlist_entry_per_card; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2080,6 +2199,18 @@ CREATE INDEX ix_odds_snapshots_captured_at ON public.odds_snapshots USING btree 
 CREATE INDEX ix_odds_snapshots_game_id ON public.odds_snapshots USING btree (game_id);
 
 --
+-- Name: ix_odds_spend_job_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_odds_spend_job_at ON public.odds_spend USING btree (job, spent_at);
+
+--
+-- Name: ix_odds_spend_spent_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_odds_spend_spent_at ON public.odds_spend USING btree (spent_at);
+
+--
 -- Name: ix_pm_bucket_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2138,6 +2269,36 @@ CREATE INDEX ix_predictions_game_id ON public.predictions USING btree (game_id);
 --
 
 CREATE INDEX ix_predictions_model_version ON public.predictions USING btree (model_version);
+
+--
+-- Name: ix_research_game_market_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_research_game_market_at ON public.research_snapshots USING btree (game_id, market, captured_at);
+
+--
+-- Name: ix_research_purpose_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_research_purpose_at ON public.research_snapshots USING btree (purpose, captured_at);
+
+--
+-- Name: ix_research_snapshots_captured_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_research_snapshots_captured_at ON public.research_snapshots USING btree (captured_at);
+
+--
+-- Name: ix_research_snapshots_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_research_snapshots_event_id ON public.research_snapshots USING btree (event_id);
+
+--
+-- Name: ix_research_snapshots_game_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_research_snapshots_game_id ON public.research_snapshots USING btree (game_id);
 
 --
 -- Name: ix_results_game_id; Type: INDEX; Schema: public; Owner: -
@@ -2316,6 +2477,20 @@ ALTER TABLE ONLY public.odds_snapshots
 
 ALTER TABLE ONLY public.predictions
     ADD CONSTRAINT predictions_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id);
+
+--
+-- Name: research_snapshots research_snapshots_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.research_snapshots
+    ADD CONSTRAINT research_snapshots_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id);
+
+--
+-- Name: research_snapshots research_snapshots_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.research_snapshots
+    ADD CONSTRAINT research_snapshots_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.odds_spend(id);
 
 --
 -- Name: results results_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

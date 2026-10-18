@@ -581,6 +581,40 @@ CREATE SEQUENCE public.injury_snapshots_id_seq
 ALTER SEQUENCE public.injury_snapshots_id_seq OWNED BY public.injury_snapshots.id;
 
 --
+-- Name: judge_reading_audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.judge_reading_audit (
+    id integer NOT NULL,
+    ledger character varying(16) NOT NULL,
+    pick_id integer NOT NULL,
+    computed_at timestamp without time zone NOT NULL,
+    run_id character varying(32),
+    reason character varying(16) NOT NULL,
+    changed text NOT NULL,
+    stored_json text NOT NULL,
+    computed_json text NOT NULL
+);
+
+--
+-- Name: judge_reading_audit_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.judge_reading_audit_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: judge_reading_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.judge_reading_audit_id_seq OWNED BY public.judge_reading_audit.id;
+
+--
 -- Name: manual_picks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1436,6 +1470,12 @@ ALTER TABLE ONLY public.games ALTER COLUMN id SET DEFAULT nextval('public.games_
 ALTER TABLE ONLY public.injury_snapshots ALTER COLUMN id SET DEFAULT nextval('public.injury_snapshots_id_seq'::regclass);
 
 --
+-- Name: judge_reading_audit id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.judge_reading_audit ALTER COLUMN id SET DEFAULT nextval('public.judge_reading_audit_id_seq'::regclass);
+
+--
 -- Name: manual_picks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1627,6 +1667,13 @@ ALTER TABLE ONLY public.game_records
 
 ALTER TABLE ONLY public.injury_snapshots
     ADD CONSTRAINT injury_snapshots_pkey PRIMARY KEY (id);
+
+--
+-- Name: judge_reading_audit judge_reading_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.judge_reading_audit
+    ADD CONSTRAINT judge_reading_audit_pkey PRIMARY KEY (id);
 
 --
 -- Name: manual_picks manual_picks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1977,6 +2024,18 @@ CREATE INDEX ix_injury_snapshots_captured_at ON public.injury_snapshots USING bt
 --
 
 CREATE INDEX ix_injury_snapshots_season ON public.injury_snapshots USING btree (season);
+
+--
+-- Name: ix_judge_reading_audit_ledger; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_judge_reading_audit_ledger ON public.judge_reading_audit USING btree (ledger);
+
+--
+-- Name: ix_judge_reading_audit_pick_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_judge_reading_audit_pick_id ON public.judge_reading_audit USING btree (pick_id);
 
 --
 -- Name: ix_manual_picks_game_id; Type: INDEX; Schema: public; Owner: -

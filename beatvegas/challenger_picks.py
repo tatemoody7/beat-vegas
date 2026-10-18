@@ -118,8 +118,9 @@ def grade_challenger_picks(session, season: int, regrade: bool = False) -> int:
     if not regrade:
         q = q.filter(ChallengerPick.graded == False)  # noqa: E712
     graded = 0
+    reason = "regrade" if regrade else "grade"
     for p in q.all():
         g = session.query(Game).filter(Game.id == p.game_id).one_or_none()
-        if g is not None and grade_pick(session, p, g):
+        if g is not None and grade_pick(session, p, g, judge_reason=reason):
             graded += 1
     return graded

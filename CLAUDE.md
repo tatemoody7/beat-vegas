@@ -4,8 +4,8 @@
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
 most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.2) governs 2026**: every
-strategy runs on paper, judged by line value against the de-vigged consensus close; Tate also bets
-first-half unders with real money as a personal ledger that is never evidence (v1.4). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
+strategy runs on paper, judged by line value against the de-vigged consensus close; real money ended
+2026-10-18 (D2; 30 graded tickets frozen, never evidence). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
 automates gambling.** Site: https://beat-vegas.vercel.app — readable by anyone with the link,
 password guards writes.
@@ -51,10 +51,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   1H overs (bottom 20%), full-game unders, derivative consistency + stale lines (4-5, not built),
   weather (6-7), 60+ totals (8); shadow engines sit outside the slots. Every confirmatory clock
   starts after the Statistical Protocol is registered; all earlier rows are development evidence.
-- **Real money: Tate's personal first-half-unders ledger since 2026-10-08 (v1.4)** — the old rule
-  (BET at the per-slate bar, top 5 a week by gap, every money-path check), $10 flat, no stop rule,
-  never an observation for any arm; paused 2026-10-07 → 10-08 and 2026-10-17 13:27 → 17:10 UTC (audit). Signed in, a BET inside the cap
-  reads "Bet one unit", past it "Paper signal"; visitors never see bet wording.
+- **Real money ENDED 2026-10-18 (final-2026 plan, D2).** The personal first-half-unders ledger (v1.4, since
+  2026-10-08: per-slate bar, top 5 a week, $10 flat) is closed: 30 graded tickets stay as a frozen
+  historical ledger, never edited, never an observation for any arm. The owner log path leaves the site in
+  later PRs; the BETTING_POLICY and ASSUMPTIONS rules record how the tickets were placed.
 - **Real money stood 10-10, −0.29u through week 5** (Wilson 29.9–70.1%), plus two week-6 tickets
   placed 2026-10-06 before the pause (`manual_picks` 102, 103; they grade as normal). H-STOP-2
   closed inconclusive (profit n=10, LLR −0.26; line value n=9, LLR +0.73); H-NEGGAP-P, H-FG-P,
@@ -95,8 +95,8 @@ disagree, **this file wins**; memory files hold lessons and point here.
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
-- **The pause switch (`rule_paused`) is OFF since 2026-10-17 17:10 UTC, so the personal ledger is ON** (Tate lifted the audit pause of 13:27 UTC
-  the same day; written through Neon's HTTPS endpoint like `scripts/rule_pause.py`, logged as `app_settings_log` 546; earlier on 10-07 → 10-08).
+- **The pause switch (`rule_paused`) is ON and stays on since 2026-10-18** (D2): the personal ledger ended, so
+  nothing lifts it (`scripts/rule_pause.py`; earlier pauses 10-07 → 10-08, 10-17 13:27 → 17:10 UTC).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
   main-line share 97% beyond 48 h, 31% inside 2 h; 142 main→rung flips vs 5 back). Late
   candidates read `no_hr_line` because of it. Decide: ask the feed for `alternate_totals_h1`
@@ -219,8 +219,8 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 
 ## Money path (server-side; the site never trusts the browser)
-- **Live again for the personal ledger since 2026-10-08** (`docs/BETTING_POLICY.md`, v1.4; paused
-  2026-10-07 → 10-08); a promoted strategy's live validation will be its own track.
+- **Historical since 2026-10-18** (D2; `docs/BETTING_POLICY.md`): the rules below record how the 30
+  tickets were placed, not a live path; a promoted strategy's live validation would be its own track.
 - POST + PATCH `/api/picks` → `lib/ticketPolicy.ts::evaluateRealTicket` (`live`|`as_of_bet_time`): a BET needs
   Hard Rock's own MAIN line, a **live** verifiable price seen ≤6 h ago (`lib/lineCheck.ts`; none →
   `PRICE UNAVAILABLE`, old → `PRICE STALE` + the form's Refresh price), a price at or better than the kill

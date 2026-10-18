@@ -8,6 +8,16 @@ hold the rest.
 
 
 
+## 2026-10-18
+
+- **2026-10-18 ~15:00 UTC (REAL MONEY ENDED; THE MONEY DOCS DESCRIBE A FROZEN LEDGER).** Tate's decision D2 in the
+  final-2026 plan (PR-11, docs only): the personal first-half-unders ledger (v1.4) ends. Its 30 graded real tickets
+  stay as a frozen historical ledger, never edited; the `rule_paused` switch is set on today and stays on; the owner
+  log path leaves the site in later PRs (PR-12/13). `docs/BETTING_POLICY.md` gets a banner and past tense where it
+  called the path live, `docs/ASSUMPTIONS.md` is marked historical, one `docs/GLOSSARY.md` entry notes the unit now
+  reads paper picks only, and `CLAUDE.md` is reworded in its four places that said real money was on. No row, rule,
+  constant, test or code changed; every sentence `tests/test_docs_parity.py` pins is untouched.
+
 ## 2026-10-17
 
 - **2026-10-17 ~23:00 UTC (RECORDS SPLIT: HARD ROCK RECORDS AND MARKET RESEARCH, NEVER MIXED).** From the fact-check

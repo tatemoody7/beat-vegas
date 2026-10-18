@@ -62,7 +62,7 @@
   `picks.py::PAPER_STAKE`) so its record reads in the same units as the real
   one. Graded for record and CLV, but kept out of the bankroll.
 - **Unit** — one standard bet. 2026: **$10 flat**, every bet, on a $100 roll (see
-  `BETTING_POLICY.md` for the acknowledged risk).
+  `BETTING_POLICY.md` for the acknowledged risk). Real tickets ended 2026-10-18; the unit now reads paper picks only.
 - **Prediction market / exchange** — a CFTC-regulated venue (Kalshi, Polymarket,
   FanDuel Predicts, Novig, ProphetX) where you trade event contracts against
   other people instead of taking a fixed sportsbook quote. They avoid the

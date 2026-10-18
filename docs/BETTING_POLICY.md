@@ -1,12 +1,17 @@
 # Betting policy — 2026 season
 
-Decided 2026-09-01 (week 1 audit). This is the rulebook the site enforces and
-the bet card follows. Change it here first, then in code.
+> **Real money ended 2026-10-18** (final-2026 plan, decision D2). The 30 graded real tickets are a
+> frozen historical ledger, never edited. Everything below describes how those tickets were placed;
+> it is no longer a live path. The switch `rule_paused` is on and stays on ("The pause", below).
+> Nothing in this file changes a row, rule or constant.
 
-## Real money: the personal first-half-unders ledger (from 2026-10-08)
+Decided 2026-09-01 (week 1 audit). This was the rulebook the site enforced and
+the bet card followed. Change it here first, then in code.
 
-**Tate bets first-half unders with real money again, as a personal ledger kept apart from the
-research (roadmap amendment v1.4, Tate's call 2026-10-08).** 2026 stays the research season: every
+## Real money: the personal first-half-unders ledger (2026-10-08 to 2026-10-18, ended)
+
+**Tate bet first-half unders with real money from 2026-10-08, as a personal ledger kept apart from the
+research (roadmap amendment v1.4, Tate's call 2026-10-08; ended 2026-10-18, D2).** 2026 stayed the research season: every
 strategy runs on paper, is judged by line value against the de-vigged consensus close, and the paper
 arms run exactly as planned. The personal ledger:
 
@@ -17,13 +22,14 @@ arms run exactly as planned. The personal ledger:
 - **Never evidence.** No real ticket is ever an observation for any arm's test
   (`docs/PROTOCOL_2026.md` reads only an arm's own paper picks). Every real bet also has its paper
   twin, written by the build.
-- **No stop rule.** It runs to the season's end.
+- **No stop rule.** It was to run to the season's end; Tate ended it 2026-10-18 (D2).
 - **A promotion is separate.** A promoted arm's $10 flat live validation (roadmap) is a fresh track
   of its own; the personal ledger stays apart before and after.
-- **Shown on Results** as before, with line value against the consensus close (`ev_cons`,
+- **Shown on Results** (until the owner log path is removed), with line value against the consensus close (`ev_cons`,
   `docs/CONSENSUS.md`) beside each ticket. No dollars are public; a visitor never sees bet wording.
 
-Real money was paused from 2026-10-07 21:40 UTC to 2026-10-08 20:00 UTC (roadmap v1). The two
+Real money was paused from 2026-10-07 21:40 UTC to 2026-10-08 20:00 UTC (roadmap v1), and ended
+for good 2026-10-18. The two
 tickets placed 2026-10-06 (`manual_picks` 102 and 103) stand and count toward week 6's cap.
 
 ## Bankroll and stakes
@@ -260,7 +266,7 @@ comfortably inside the **20K/month** plan the project has been on since 2026-10-
 | Sat ~8:05–8:45am             | **Saturday decision build**, same whole-week sweep, before the 9am betting sitting. Also on the rest of the week, but Friday has already priced most of it, so Saturday logs only what newly qualifies | `card.yml` |
 | Every 30 min, Tue–Mon evenings + all Saturday | **Per-game closes**: Hard Rock 1H line re-captured for each game ~30–75 min before its own kickoff (`last_seen_at` when unchanged) | `lines_watch.yml` |
 
-| Game days                    | **Tate bets off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) **when it is written**. Logging later is allowed: enter the time the ticket was written ("Placed at"), and the row is judged as of that moment, not by the live read at log time (2026-09-28). Since 2026-10-07 a late log is recorded only if the card in force then rated the game BET (`NOT A BET THEN` otherwise) and Hard Rock's price was seen within 6 hours before the bet time (`HR_PRICE_MAX_AGE_H`; the kill price is recomputed from that snapshot). A ticket logged when it is written needs Hard Rock's price **seen in the last 6 hours** (`PRICE STALE` otherwise): snapshots land at the builds and the evening close polls, so midweek the newest can be a day old — **Refresh price** on the form polls that one game (1 Odds API credit, once per game per 10 minutes) and the ticket is logged again a minute or two later (M2). Only real tickets are logged by hand; paper is the build's | you |
+| Game days (until 2026-10-18)  | **Tate bet off the Board**, off the most recent decision build; the ticket is logged from the game page (`/game/[id]` → Log pick) **when it is written**. Logging later is allowed: enter the time the ticket was written ("Placed at"), and the row is judged as of that moment, not by the live read at log time (2026-09-28). Since 2026-10-07 a late log is recorded only if the card in force then rated the game BET (`NOT A BET THEN` otherwise) and Hard Rock's price was seen within 6 hours before the bet time (`HR_PRICE_MAX_AGE_H`; the kill price is recomputed from that snapshot). A ticket logged when it is written needs Hard Rock's price **seen in the last 6 hours** (`PRICE STALE` otherwise): snapshots land at the builds and the evening close polls, so midweek the newest can be a day old — **Refresh price** on the form polls that one game (1 Odds API credit, once per game per 10 minutes) and the ticket is logged again a minute or two later (M2). Only real tickets are logged by hand; paper is the build's | you |
 | Daily 6:30am (retry noon)    | Finals + 1H play-by-play refreshed; all ledgers graded; post-mortem refreshed — a game is graded the morning after it is played; Monday is the full weekly pass | `grade.yml`         |
 | Monday                       | Weekly review together; adjust for next week            | `/results`    |
 
@@ -353,5 +359,5 @@ the record. When the state cannot be read at all, real money is
 refused too (`RULE STATE UNREADABLE`): a switch we cannot see is not a switch that is off.
 `docs/STOPPING_RULE.md` says what threw it first (a pre-registered failure boundary, now closed).
 It was on from 2026-10-07 (roadmap v1, real money paused) and turned off on 2026-10-08 for the
-personal ledger (v1.4); the ledger has no stop rule, so nothing throws it automatically.
-It was on again 2026-10-17 13:27 → 17:10 UTC (the audit; Tate lifted it the same day).
+personal ledger (v1.4), and on again 2026-10-17 13:27 → 17:10 UTC (the audit). **It was set on
+2026-10-18, when real money ended (D2), and stays on**: nothing lifts it.

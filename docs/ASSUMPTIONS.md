@@ -6,6 +6,9 @@ this was written; the parity tests (`tests/test_gate_parity.py`, `tests/test_doc
 keep the values in step between Python and TypeScript, but line numbers drift with edits —
 treat them as "where to look", and the symbol name as the anchor.
 
+**Historical as of 2026-10-18.** Real money ended that day (final-2026 plan, D2; 30 graded tickets
+frozen), so every rule below records how those tickets were placed, not a live path. Nothing in them changes.
+
 **Nothing changes from this document.** It records what each rule rests on; it adopts,
 tunes or retires nothing. A change to any row lands through its own registered row in
 `docs/HYPOTHESES.md` (add the row first) or its own PR, and this ledger is updated after.

@@ -255,6 +255,8 @@ jobs:
         # down.
         if: steps.slot.outputs.force_sweep == 'true' && steps.active.outputs.week != ''
         continue-on-error: true
+        env:
+          BV_ODDS_JOB: card
         run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --days-ahead 6
       - name: 1H sweep (forced on every scheduled build; else only when today's is missing)
         id: sweep
@@ -272,6 +274,7 @@ jobs:
         # failed-run email goes out.
         continue-on-error: true
         env:
+          BV_ODDS_JOB: card
           MAX_CREDITS: ${{ inputs.max_credits }}
           # From beatvegas/ci.py's fixed table, not from a person; passed as
           # env all the same so no run: block on this job inlines an expression.

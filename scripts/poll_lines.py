@@ -49,6 +49,7 @@ from beatvegas.etl.match import match_event
 from beatvegas.hardrock import (
     HR_BOOK_KEY,
     games_with_hr_first_half,
+    hr_last_first_half_read,
     hr_universe_game_ids,
     normalize_book,
 )
@@ -66,6 +67,7 @@ from beatvegas.sweep import (
     filter_hr_universe,
     filter_missing_hr,
     filter_one_game,
+    filter_recently_read,
     latest_pace_by_team,
     rank_events,
     select_window,
@@ -228,6 +230,16 @@ def main() -> None:
         help="OPENER mode: skip games that already have a Hard Rock 1H snapshot",
     )
     ap.add_argument(
+        "--skip-read-within-min",
+        type=int,
+        default=0,
+        dest="skip_read_within_min",
+        help="CLOSE mode double-tick skip: drop an event whose Hard Rock 1H total was "
+        "read (captured or re-seen) in the last N minutes AND that kicks off more than "
+        "the judge's 2 h close window from now. A game inside 2 h is never skipped "
+        "(0 disables)",
+    )
+    ap.add_argument(
         "--game-id",
         type=int,
         default=None,
@@ -335,6 +347,9 @@ def main() -> None:
         )
         universe = hr_universe_game_ids(s, args.season) if args.hr_universe else set()
         have_hr_1h = games_with_hr_first_half(s, args.season) if args.missing_hr_only else set()
+        last_hr_read = (
+            hr_last_first_half_read(s, args.season) if args.skip_read_within_min > 0 else {}
+        )
     ctx = build_context(in_window, slate, dome_by_game, pace_by_team)
     n_window = len(in_window)
     if args.hr_universe:
@@ -346,6 +361,16 @@ def main() -> None:
             )
     if args.missing_hr_only:
         in_window = filter_missing_hr(in_window, ctx, have_hr_1h)
+    if args.skip_read_within_min > 0:
+        before = len(in_window)
+        in_window = filter_recently_read(
+            in_window, ctx, last_hr_read, now, within_min=args.skip_read_within_min
+        )
+        if before != len(in_window):
+            print(
+                f"[skip-read] {before - len(in_window)} event(s) read within "
+                f"{args.skip_read_within_min} min and more than 2 h from kickoff left out"
+            )
     if args.game_id is not None:
         in_window = filter_one_game(in_window, ctx, args.game_id)
         print(f"one-game refresh: game {args.game_id} -> {len(in_window)} event(s) to poll")

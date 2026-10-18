@@ -521,3 +521,90 @@ def test_no_status_file_flag_writes_nothing(env, monkeypatch, tmp_path):
     _seed(eng, GAMES, hr_fg_for=(1, 2, 3))
     _run(mod, monkeypatch, FakeClient(EVENTS, PAYLOADS), "--hours-back", "0", "--days-ahead", "3")
     assert list(tmp_path.iterdir()) == []
+
+
+# --- --skip-read-within-min (final-2026 PR-C2, decision C-D19) ---------------------------
+
+
+def _read_at(eng, gid, *, captured_min_ago, seen_min_ago=None):
+    """Hard Rock's 1H row for a game, captured and (optionally) re-seen N minutes ago."""
+    with Session(eng) as s:
+        s.add(
+            OddsSnapshot(
+                game_id=gid,
+                book="hardrockbet",
+                market="1H_total",
+                line=24.5,
+                over_price=-110,
+                under_price=-110,
+                captured_at=NOW - timedelta(minutes=captured_min_ago),
+                last_seen_at=(NOW - timedelta(minutes=seen_min_ago))
+                if seen_min_ago is not None
+                else None,
+            )
+        )
+        s.commit()
+
+
+SKIP_GAMES = [
+    (1, "Missouri", "Kansas", NOW + timedelta(minutes=90)),  # inside the judge's 2 h window
+    (2, "Florida", "Kansas State", NOW + timedelta(hours=5)),  # outside it
+    (3, "Akron", "Toledo", NOW + timedelta(hours=4)),  # outside it
+]
+SKIP_EVENTS = [_event(f"e{g[0]}", g[1], g[2], g[3]) for g in SKIP_GAMES]
+SKIP_PAYLOADS = {e["id"]: _payload(e) for e in SKIP_EVENTS}
+SKIP_ARGS = ("--hr-universe", "--hours-back", "0", "--kickoff-within-min", "360")
+
+
+def test_skip_read_drops_a_recent_read_beyond_two_hours_and_never_one_inside(env, monkeypatch):
+    mod, eng = env
+    _seed(eng, SKIP_GAMES, hr_fg_for=(1, 2, 3))
+    for gid in (1, 2):
+        _read_at(eng, gid, captured_min_ago=10)  # both read 10 min ago
+    client = FakeClient(SKIP_EVENTS, SKIP_PAYLOADS)
+    _run(mod, monkeypatch, client, *SKIP_ARGS, "--skip-read-within-min", "30")
+    # game 2: read 10 min ago and 5 h out -> skipped; game 1: read 10 min ago but 90 min out
+    # -> polled anyway; game 3: never read -> polled.
+    assert client.calls == ["e1", "e3"]
+
+
+def test_skip_read_counts_a_reseen_stamp_as_a_read(env, monkeypatch):
+    """An unchanged number only stamps last_seen_at; that is a read too."""
+    mod, eng = env
+    _seed(eng, SKIP_GAMES, hr_fg_for=(2,))
+    _read_at(eng, 2, captured_min_ago=600, seen_min_ago=5)
+    client = FakeClient(SKIP_EVENTS, SKIP_PAYLOADS)
+    _run(mod, monkeypatch, client, *SKIP_ARGS, "--skip-read-within-min", "30")
+    assert client.calls == []
+
+
+def test_skip_read_polls_when_the_last_read_is_older_than_the_window(env, monkeypatch):
+    mod, eng = env
+    _seed(eng, SKIP_GAMES, hr_fg_for=(2,))
+    _read_at(eng, 2, captured_min_ago=600, seen_min_ago=45)  # newest read 45 min ago > 30
+    client = FakeClient(SKIP_EVENTS, SKIP_PAYLOADS)
+    _run(mod, monkeypatch, client, *SKIP_ARGS, "--skip-read-within-min", "30")
+    assert client.calls == ["e2"]
+
+
+def test_skip_read_off_by_default_and_the_window_edge_is_two_hours(env, monkeypatch):
+    mod, eng = env
+    games = [(1, "Missouri", "Kansas", NOW + timedelta(minutes=121))]
+    ev = [_event("e1", "Missouri", "Kansas", games[0][3])]
+    _seed(eng, games, hr_fg_for=(1,))
+    _read_at(eng, 1, captured_min_ago=1)
+    off = FakeClient(ev, {"e1": _payload(ev[0])})
+    _run(mod, monkeypatch, off, *SKIP_ARGS)  # flag absent: polled
+    assert off.calls == ["e1"]
+    on = FakeClient(ev, {"e1": _payload(ev[0])})
+    _run(mod, monkeypatch, on, *SKIP_ARGS, "--skip-read-within-min", "30")
+    assert on.calls == []  # 121 min out is outside the judge's window: skipped
+    inside = FakeClient(
+        [_event("e1", "Missouri", "Kansas", NOW + timedelta(minutes=120))],
+        {"e1": _payload(ev[0])},
+    )
+    with Session(eng) as s:
+        s.query(Game).one().start_date = NOW + timedelta(minutes=120)
+        s.commit()
+    _run(mod, monkeypatch, inside, *SKIP_ARGS, "--skip-read-within-min", "30")
+    assert inside.calls == ["e1"]  # exactly 120 min out is inside the window: never skipped

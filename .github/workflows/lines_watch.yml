@@ -109,12 +109,14 @@ concurrency:
 # day, so a slot whose only kickoffs sat 76-119 min out was skipped by the check
 # the widening existed for). Vercel Hobby ticks can be 119 min apart; 120 still
 # reaches every kickoff inside the registered 2 h close window, 130 would not.
-# Since 2026-10-11 (docs/program/CAPTURE_DESIGN_2026-10.md) the Saturday ticks
-# look 6 hours ahead instead: the resolve step picks CLOSE_LOOKAHEAD_MIN_SAT for
-# a tick inside Saturday's window (14Z Saturday to 05Z Sunday), and the pre-check
-# and the poll read the chosen value from the same step output, so the two can
-# never disagree again. Weeknights keep 120 (one or two games, the question is
-# a Saturday one). The judge's 2-hour close window does not move.
+# Since 2026-10-11 (docs/program/CAPTURE_DESIGN_2026-10.md) Saturday ticks looked
+# 6 hours ahead; since 2026-10-18 (final-2026 PR-C2, C-D11) only the ticks whose
+# UTC hour is divisible by 3 do (15Z 18Z 21Z 00Z 03Z), the rest of Saturday's
+# window (14Z Saturday to 05Z Sunday) reads 2 h. The resolve step picks the
+# value and the pre-check and the poll read it from the same step output, so the
+# two can never disagree again. Weeknights keep 120 (one or two games, the
+# question is a Saturday one). The judge's 2-hour close window does not move:
+# the measured extra 6 h reads bought no judge coverage.
 env:
   CLOSE_LOOKAHEAD_MIN: 120
   CLOSE_LOOKAHEAD_MIN_SAT: 360
@@ -159,11 +161,18 @@ jobs:
             *) echo "::error::unknown market '$market'"; exit 1 ;;
           esac
           echo "market=$market" >> "$GITHUB_OUTPUT"
-          # The close look-ahead for THIS tick: Saturday's window (UTC Saturday
-          # from 14Z, or UTC Sunday before 05Z) reads 6 h ahead, else 2 h.
+          # The close look-ahead for THIS tick: inside Saturday's window (UTC
+          # Saturday from 14Z, or UTC Sunday before 05Z) a tick whose UTC hour is
+          # divisible by 3 (15Z 18Z 21Z 00Z 03Z) reads 6 h ahead and the others
+          # 2 h (decision C-D11); weeknights always 2 h. GitHub's backup crons
+          # follow the same hour rule.
           dow=$(date -u +%u); hour=$(date -u +%H)
           if { [ "$dow" = "6" ] && [ "$hour" -ge 14 ]; } || { [ "$dow" = "7" ] && [ "$hour" -lt 5 ]; }; then
-            lookahead="$CLOSE_LOOKAHEAD_MIN_SAT"
+            if [ $(( 10#$hour % 3 )) -eq 0 ]; then
+              lookahead="$CLOSE_LOOKAHEAD_MIN_SAT"
+            else
+              lookahead="$CLOSE_LOOKAHEAD_MIN"
+            fi
           else
             lookahead="$CLOSE_LOOKAHEAD_MIN"
           fi
@@ -207,15 +216,22 @@ jobs:
           pip install --no-deps --no-build-isolation -e .
       - name: 1H opener sweep (Hard Rock universe, games without an HR 1H line yet)
         if: steps.resolve.outputs.market == '1h_open'
+        env:
+          BV_ODDS_JOB: lines_watch
         run: python scripts/poll_lines.py --hr-universe --missing-hr-only --hours-back 0 --days-ahead 6
       - name: 1H per-game close (games kicking off within CLOSE_LOOKAHEAD_MIN)
         id: close
         if: steps.resolve.outputs.market == '1h_close' && steps.precheck.outputs.skip != 'true'
         env:
+          BV_ODDS_JOB: lines_watch
           CLOSE_LOOKAHEAD_MIN: ${{ steps.resolve.outputs.lookahead }}
         # --status-file records the poll's COVERAGE (events in the window,
         # events polled, credits) for the health contract below.
-        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min "$CLOSE_LOOKAHEAD_MIN" --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
+        # --skip-read-within-min 30 drops the second read of a double tick (a
+        # GitHub backup cron and a Vercel tick inside 20 min) for a game still
+        # more than 2 h from kickoff; a game inside 2 h is never skipped
+        # (final-2026 PR-C2, decision C-D19).
+        run: python scripts/poll_lines.py --hr-universe --kickoff-within-min "$CLOSE_LOOKAHEAD_MIN" --skip-read-within-min 30 --hours-back 0 --status-file "$RUNNER_TEMP/close_status.json"
       - name: Close-window coverage gauge (this Saturday so far; docs/HEALTH.md)
         # After each close poll: the share of today's kicked-off Hard-Rock-priced
         # games with a snapshot inside the 2-hour window, for the board banner
@@ -223,7 +239,7 @@ jobs:
         if: steps.close.outcome == 'success'
         continue-on-error: true
         run: python scripts/close_coverage.py
-      - name: Full-game close (same ticks; totals, spreads, moneylines for events inside REAL_FG_CLOSE_WINDOW_H)
+      - name: Full-game close (same ticks; totals + moneylines for Hard Rock games inside REAL_FG_CLOSE_WINDOW_H)
         id: fgclose
         # The full-game market is a reference ledger (never bet) and the
         # H-FG-U-R / H-FG-O-R retrospectives grade at a REAL full-game close.
@@ -233,20 +249,30 @@ jobs:
         # (roadmap step 4) it carries the spread and the moneyline with both
         # prices, and the exchanges (us_ex) for the consensus close:
         # `totals,spreads,h2h` x `us,us2,us_ex` = 9 credits a tick (~25 ticks a
-        # week -> ~225). Unchanged numbers are re-seen (last_seen_at) so they
+        # week -> ~225). Since 2026-10-18 (final-2026 PR-C2) a close tick asks
+        # `totals,h2h` only (6 credits; nothing reads the close `full_game_spread`
+        # rows, the pricing study pv1 reads `h2h`; card.yml and sunday.yml keep
+        # `spreads`, which fills Game.spread) and --hr-only-gate makes the pull only
+        # when a Hard Rock-universe game kicks off inside the window (the free
+        # /events list decides; 0 credits otherwise). Unchanged numbers are re-seen (last_seen_at) so they
         # count as the close. Never fails the job: continue-on-error, --allow-empty;
         # the health contract judges it instead (--status-file records what the
         # pull covered; lines_watch.fg_close_polled reads it with this step's outcome).
         if: steps.close.outcome == 'success'
         continue-on-error: true
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,spreads,h2h --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty --status-file "$RUNNER_TEMP/fg_close_status.json"
+        env:
+          BV_ODDS_JOB: lines_watch
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,h2h --hr-only-gate --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty --status-file "$RUNNER_TEMP/fg_close_status.json"
       - name: 1H one-game refresh (the site's Refresh price; 1 credit)
         if: steps.resolve.outputs.market == '1h_game'
         env:
+          BV_ODDS_JOB: lines_watch
           GAME_ID: ${{ steps.resolve.outputs.game_id }}
         run: python scripts/poll_lines.py --game-id "$GAME_ID" --hours-back 0 --days-ahead 8 --max-credits-per-run 2
       - name: 1H full refresh (manual)
         if: steps.resolve.outputs.market == '1h'
+        env:
+          BV_ODDS_JOB: lines_watch
         run: python scripts/poll_lines.py --hr-universe --hours-back 0 --days-ahead 3
       - name: Health contract (docs/HEALTH.md; writes last_health_lines_watch)
         id: health

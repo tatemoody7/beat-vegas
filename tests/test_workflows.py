@@ -871,16 +871,22 @@ def test_lines_watch_close_poll_writes_the_status_file_the_contract_reads():
     # 120 in the other for a day: a slot whose only kickoffs sat 76-119 min out
     # was skipped by the pre-check the widening existed for).
     assert data["env"]["CLOSE_LOOKAHEAD_MIN"] == 120
-    # Since 2026-10-11 the Saturday ticks look 6 h ahead (capture design note):
-    # the resolve step chooses per tick and BOTH consumers read its output, so the
-    # pre-check and the poll cannot drift apart again.
+    # Since 2026-10-11 the Saturday ticks look 6 h ahead (capture design note);
+    # since 2026-10-18 (final-2026 PR-C2, C-D11) only the ticks whose UTC hour is
+    # divisible by 3 (15Z 18Z 21Z 00Z 03Z) do, the others 2 h. The resolve step
+    # chooses per tick and BOTH consumers read its output, so the pre-check and
+    # the poll cannot drift apart again.
     assert data["env"]["CLOSE_LOOKAHEAD_MIN_SAT"] == 360
     resolve = next(s for s in steps if s.get("id") == "resolve")
     assert 'lookahead="$CLOSE_LOOKAHEAD_MIN_SAT"' in resolve["run"]
+    assert "10#$hour % 3" in resolve["run"]
     assert 'echo "lookahead=$lookahead" >> "$GITHUB_OUTPUT"' in resolve["run"]
     chosen = "${{ steps.resolve.outputs.lookahead }}"
     assert close["env"]["CLOSE_LOOKAHEAD_MIN"] == chosen
     assert '--kickoff-within-min "$CLOSE_LOOKAHEAD_MIN"' in close["run"]
+    # The double-tick skip (C-D19): outside the judge's 2 h window only (the
+    # script enforces that; tests/test_poll_lines.py pins the rule).
+    assert "--skip-read-within-min 30" in close["run"]
     precheck = next(s for s in steps if s.get("id") == "precheck")
     assert precheck["env"]["CLOSE_LOOKAHEAD_MIN"] == chosen
     assert "CLOSE_LOOKAHEAD_MIN" in precheck["run"] and "75" not in precheck["run"]
@@ -895,8 +901,10 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
     """Since 2026-10-06 the 1h_close run also captures the FULL-GAME close for
     events inside REAL_FG_CLOSE_WINDOW_H (3 h). Since 2026-10-07 (roadmap step
     4) that one bulk call carries the spread and the moneyline too, with the
-    exchanges: `totals,spreads,h2h` x `us,us2,us_ex` (9 credits a tick). It
-    runs only after a successful 1H close poll, can never redden the job
+    exchanges: `totals,spreads,h2h` x `us,us2,us_ex` (9 credits a tick). Since
+    2026-10-18 (final-2026 PR-C2) a close tick asks `totals,h2h` (6 credits;
+    nothing reads the close spread rows, pv1 reads h2h) and only when a Hard
+    Rock-universe game is due (--hr-only-gate). It runs only after a successful 1H close poll, can never redden the job
     (continue-on-error + --allow-empty), and the health contract stays the
     last step."""
     data = _load(WF_DIR / "lines_watch.yml")
@@ -908,7 +916,8 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
     for flag in (
         "--source oddsapi",
         "--regions us,us2,us_ex",
-        "--markets totals,spreads,h2h",
+        "--markets totals,h2h",
+        "--hr-only-gate",
         "--kickoff-within-min 180",
         "--credit-floor",
         "--allow-empty",
@@ -923,10 +932,12 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
 
 def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
     """Roadmap step 4 (2026-10-07, Tate's calls): the Sunday opener, the
-    card-day refresh and the close ticks all price on `us,us2,us_ex`, and none
-    narrows the markets below poll_full_game's default `totals,spreads,h2h`
-    (the close step names them explicitly). A pull that dropped `us_ex` or the
-    side markets would quietly thin the consensus the judge reads."""
+    card-day refresh and the close ticks all price on `us,us2,us_ex`. The
+    opener and the refresh keep poll_full_game's default `totals,spreads,h2h`
+    (`spreads` fills Game.spread there); the close ticks may narrow to
+    `totals,h2h` (final-2026 PR-C2: nothing reads the close spread rows) but
+    must keep `h2h`, which the pricing study pv1 reads. A pull that dropped
+    `us_ex` or the moneyline would quietly thin what the judge reads."""
     pulls = {
         "sunday.yml": "Capture full-game openers",
         "card.yml": "Full-game refresh",
@@ -940,7 +951,34 @@ def test_every_full_game_odds_pull_carries_the_exchanges_and_the_side_markets():
         assert "poll_full_game.py --source oddsapi" in run, wf
         assert "--regions us,us2,us_ex" in run, wf
         if "--markets" in run:
-            assert "--markets totals,spreads,h2h" in run, wf
+            wanted = (
+                "--markets totals,h2h"
+                if wf == "lines_watch.yml"
+                else "--markets totals,spreads,h2h"
+            )
+            assert wanted in run, wf
+        else:
+            assert wf != "lines_watch.yml"  # the close step names its markets
+
+
+def test_every_odds_calling_step_names_its_job_for_the_credit_ledger():
+    """PR-C2: `OddsAPIClient` takes its ledger `job` from env BV_ODDS_JOB, else
+    "hand" (the whole class of scheduled spend the 2026-10-18 audit could not
+    attribute). Every step of the three scheduled Odds-calling workflows that
+    runs poll_lines.py or poll_full_game.py sets it to the workflow's name."""
+    jobs = {"lines_watch.yml": "lines_watch", "card.yml": "card", "sunday.yml": "sunday"}
+    for wf, job in jobs.items():
+        data = _load(WF_DIR / wf)
+        steps = [s for j in data["jobs"].values() for s in j.get("steps", [])]
+        calling = [
+            s
+            for s in steps
+            if "poll_lines.py" in str(s.get("run", ""))
+            or "poll_full_game.py" in str(s.get("run", ""))
+        ]
+        assert calling, wf
+        for s in calling:
+            assert (s.get("env") or {}).get("BV_ODDS_JOB") == job, (wf, s.get("name"))
 
 
 def test_every_study_choice_is_in_the_case_line():
@@ -1007,7 +1045,10 @@ def test_lines_watch_one_game_refresh_validates_its_id_and_spends_one_event():
     assert run.index("^[0-9]{1,12}$") < run.index('echo "game_id=')
     one = next(s for s in steps if "--game-id" in str(s.get("run", "")))
     assert one["if"] == "steps.resolve.outputs.market == '1h_game'"
-    assert one["env"] == {"GAME_ID": "${{ steps.resolve.outputs.game_id }}"}
+    assert one["env"] == {
+        "BV_ODDS_JOB": "lines_watch",
+        "GAME_ID": "${{ steps.resolve.outputs.game_id }}",
+    }
     assert '--game-id "$GAME_ID"' in one["run"]
     assert "--max-credits-per-run 2" in one["run"]
     assert not INLINE_EXPR.search(one["run"])

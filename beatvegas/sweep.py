@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from .etl.match import _parse_dt, match_event
+from .lines import REAL_1H_CLOSE_WINDOW_H
 
 CLOSE_SPREAD = 14.0  # |spread| <= 14: the card's "not a blowout" band
 
@@ -162,3 +163,34 @@ def filter_hr_universe(
         if c is not None and c["game_id"] in hr_universe:
             kept.append(ev)
     return kept, False
+
+
+def filter_recently_read(
+    events: List[Dict[str, Any]],
+    ctx: Dict[str, Dict[str, Any]],
+    last_read_by_game: Dict[int, datetime],
+    now: datetime,
+    *,
+    within_min: int,
+) -> List[Dict[str, Any]]:
+    """Double-tick skip for the 1H close poll (final-2026 PR-C2, decision C-D19).
+
+    Drop an event when Hard Rock's 1H total for its game was read within the
+    last `within_min` minutes AND the game kicks off MORE than the judge's
+    close window (REAL_1H_CLOSE_WINDOW_H) from now. A GitHub backup cron and a
+    Vercel tick can both fire inside 20 minutes; the second read of a number
+    that far from kickoff buys nothing. A game inside the judge's window is never
+    skipped, whatever its last read, so the consensus close (cv1) sees every
+    read it did before. Unmatched events and events with an unreadable kickoff
+    are kept."""
+    protect_until = now + timedelta(hours=REAL_1H_CLOSE_WINDOW_H)
+    fresh_after = now - timedelta(minutes=within_min)
+    out = []
+    for ev in events:
+        c = ctx.get(ev["id"])
+        kick = _parse_dt(ev.get("commence_time"))
+        last = last_read_by_game.get(c["game_id"]) if c is not None else None
+        if last is not None and kick is not None and last >= fresh_after and kick > protect_until:
+            continue
+        out.append(ev)
+    return out

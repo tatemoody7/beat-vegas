@@ -10,6 +10,28 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 (THE CLOSE TICKS SPEND ONLY ON WHAT THE JUDGE READS).** Final-2026 plan PR-C2 (programme C, E1; decisions
+  C-D11 and C-D19). Four changes, measured against the week Tue 10-13 → Sun 10-18 (831 credits itemised = 831 gauge delta):
+  (1) **Look-ahead**: the Saturday resolve step now gives a tick a 360-minute look-ahead only when its UTC hour is divisible
+  by 3 (15Z 18Z 21Z 00Z 03Z) and 120 otherwise, GitHub backup crons by the same hour rule; the pre-check and the poll still
+  read the one resolve output. The old 6 h on all 15 ticks cost about 185 credits a week more than 2 h and bought no judge
+  coverage (cv1 reads snapshots inside 2 h of kickoff only; ticks ≤119 min apart still reach every such kickoff).
+  (2) **Spreads leave the close ticks**: the full-game close asks `totals,h2h` (6 credits, was 9); nothing reads the close
+  `full_game_spread` rows, `h2h` stays because pv1 reads it (`pricing.py::_close_ev_ml`); about 54 a week. `card.yml` and
+  `sunday.yml` keep `totals,spreads,h2h` (`spreads` fills `Game.spread` there). (3) **`poll_full_game.py --hr-only-gate`**:
+  after the free event list the paid pull is made only if a Hard Rock-universe game (`hr_universe_game_ids`: a full-game
+  total Hard Rock has priced this season) kicks off inside `--kickoff-within-min`; otherwise it prints "no Hard Rock game
+  inside the window", writes the status file `complete: true, events_in_window: 0, reason: no_hr_game` and spends nothing
+  (the `fg_close_polled` check reads that as n/a). Not measured separately; the weeknight full-game closes were 90 a week.
+  (4) **Double-tick skip**: `poll_lines.py --skip-read-within-min 30` (close step) drops an event whose Hard Rock 1H total
+  was read (max of `captured_at`, `last_seen_at`) in the last 30 minutes AND that kicks off MORE than 120 minutes
+  (`REAL_1H_CLOSE_WINDOW_H`) from now, about 50 a week of GitHub-plus-Vercel double reads. A game inside 2 h is never
+  skipped (C-D19). **What cv1 sees is unchanged**: inside 2 h nothing is skipped and the only market narrowed
+  (`full_game_spread`) is not one it, pv1, the HT1H trigger or the card reads at a close; the extra reads dropped were beyond
+  2 h or repeat reads of an unchanged number. Every Odds-calling step of `lines_watch.yml`, `card.yml` and `sunday.yml` now
+  sets `BV_ODDS_JOB`, so the `odds_spend` ledger stops reading "hand". Tests pin the markets, flags, hour rule, env and both
+  skip rules. No gate, model constant or registry row changes.
+
 - **2026-10-18 (THE FULL-GAME CLOSE CAPTURE HAS A HEALTH CONTRACT).** Final-2026 plan PR-05. The full-game close step in
   `lines_watch.yml` (`poll_full_game.py` on every close tick) is `continue-on-error` and exits 0 on an empty or
   credit-floor-skipped pull, so a silent failure left every run green while the two full-game arms (H-ARM-FGU, H-ARM-WXFG)

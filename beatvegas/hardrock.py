@@ -8,7 +8,8 @@ docs folds onto it at write time (`normalize_book`), so one key is the truth.
 from __future__ import annotations
 
 import re
-from typing import Optional, Set
+from datetime import datetime
+from typing import Dict, Optional, Set
 
 HR_BOOK_KEY = "hardrockbet"
 HR_BOOK_KEYS = (HR_BOOK_KEY,)  # kept as a tuple for callers that iterate
@@ -67,3 +68,30 @@ def games_with_hr_first_half(session, season: int) -> Set[int]:
         )
     )
     return {r[0] for r in q.distinct().all()}
+
+
+def hr_last_first_half_read(session, season: int) -> Dict[int, datetime]:
+    """game id -> the newest moment Hard Rock's 1H total was read for it this
+    season: max(captured_at, last_seen_at) over its 1H_total rows (an unchanged
+    number only stamps last_seen_at). The close poll's double-tick skip reads it
+    (poll_lines --skip-read-within-min)."""
+    from sqlalchemy import func
+
+    from .db.models import Game, OddsSnapshot
+
+    rows = (
+        session.query(
+            OddsSnapshot.game_id,
+            func.max(OddsSnapshot.captured_at),
+            func.max(OddsSnapshot.last_seen_at),
+        )
+        .join(Game, Game.id == OddsSnapshot.game_id)
+        .filter(
+            Game.season == season,
+            OddsSnapshot.market == "1H_total",
+            OddsSnapshot.book == HR_BOOK_KEY,
+        )
+        .group_by(OddsSnapshot.game_id)
+        .all()
+    )
+    return {gid: max(t for t in (cap, seen) if t is not None) for gid, cap, seen in rows}

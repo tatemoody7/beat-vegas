@@ -1,7 +1,7 @@
 """Full-game capture: schema carries spread, change-detection, derived opener."""
 
 import importlib.util
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -710,3 +710,142 @@ def test_events_that_match_no_game_are_incomplete_and_the_database_down_is_too(
     mod.main(["--status-file", path])
     st = _status(path)
     assert st["complete"] is False and st["reason"] == "db_unreachable"
+
+
+# --- --hr-only-gate (final-2026 PR-C2): the free event list decides the paid pull ---------
+
+
+class _GateClient:
+    """list_events is free; list_full_game_odds is the paid bulk call the gate guards."""
+
+    def __init__(self, events, paid):
+        self._events = events
+        self.paid = paid
+        self.last_credits = None
+        self.paid_calls = []
+
+    def list_events(self):
+        return self._events
+
+    def credits_low(self, floor):
+        return False
+
+    def list_full_game_odds(self, regions=None, markets="totals,spreads,h2h"):
+        self.paid_calls.append({"regions": regions, "markets": markets})
+        return self.paid
+
+
+def _gate_env(monkeypatch, now, hr_games=()):
+    """A poll_full_game module on SQLite: two games, `hr_games` of them Hard Rock-priced."""
+    import sys
+    from contextlib import contextmanager
+
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=8, home_team="LSU", away_team="Clemson"))
+        s.add(Game(id=2, season=2026, week=8, home_team="Akron", away_team="Toledo"))
+        s.commit()
+        for gid in hr_games:
+            s.add(
+                OddsSnapshot(
+                    game_id=gid,
+                    book="hardrockbet",
+                    market="full_game_total",
+                    line=50.5,
+                    captured_at=now - timedelta(days=5),
+                )
+            )
+        s.commit()
+
+    @contextmanager
+    def scope():
+        with Session(eng) as s:
+            yield s
+            s.commit()
+
+    class _Now(datetime):
+        @classmethod
+        def utcnow(cls):
+            return now
+
+    monkeypatch.setattr(mod, "session_scope", scope)
+    monkeypatch.setattr(mod, "try_init_db", lambda: True)
+    monkeypatch.setattr(mod, "datetime", _Now)
+    monkeypatch.setattr(sys, "argv", ["poll_full_game.py"])
+    return mod, eng
+
+
+def _ev(eid, home, away, kick):
+    return {
+        "id": eid,
+        "home_team": home,
+        "away_team": away,
+        "commence_time": kick.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+GATE_NOW = datetime(2026, 10, 24, 19, 0)  # a Saturday afternoon
+GATE_ARGS = [
+    "--source",
+    "oddsapi",
+    "--season",
+    "2026",
+    "--markets",
+    "totals,h2h",
+    "--hr-only-gate",
+    "--kickoff-within-min",
+    "180",
+    "--allow-empty",
+]
+
+
+def test_hr_only_gate_exits_before_the_paid_call_and_writes_a_complete_status(
+    monkeypatch, tmp_path, capsys
+):
+    """A game kicks off inside the window but Hard Rock never priced it: the free
+    event list answers, the bulk /odds call is never made (0 credits), the status
+    file says complete with an empty window."""
+    mod, eng = _gate_env(monkeypatch, GATE_NOW, hr_games=(2,))  # only Akron/Toledo is HR-priced
+    client = _GateClient([_ev("e1", "LSU", "Clemson", GATE_NOW + timedelta(minutes=90))], paid=[])
+    monkeypatch.setattr(mod, "OddsAPIClient", lambda: client)
+    path = str(tmp_path / "fg.json")
+    mod.main([*GATE_ARGS, "--status-file", path])
+    assert client.paid_calls == []
+    assert "no Hard Rock game inside the window" in capsys.readouterr().out
+    st = _status(path)
+    assert st["complete"] is True and st["events_in_window"] == 0 and st["events_polled"] == 0
+    assert st["rows_written"] == 0 and st["reason"] == "no_hr_game"
+    with Session(eng) as s:
+        assert s.query(OddsSnapshot).filter(OddsSnapshot.market != "full_game_total").count() == 0
+
+
+def test_hr_only_gate_ignores_a_hard_rock_game_outside_the_window(monkeypatch, tmp_path):
+    mod, _eng = _gate_env(monkeypatch, GATE_NOW, hr_games=(1,))
+    far = _ev("e1", "LSU", "Clemson", GATE_NOW + timedelta(minutes=240))  # beyond 180
+    client = _GateClient([far], paid=[])
+    monkeypatch.setattr(mod, "OddsAPIClient", lambda: client)
+    path = str(tmp_path / "fg.json")
+    mod.main([*GATE_ARGS, "--status-file", path])
+    assert client.paid_calls == []
+    assert _status(path)["complete"] is True
+
+
+def test_hr_only_gate_lets_the_pull_through_when_a_hard_rock_game_is_due(monkeypatch, tmp_path):
+    mod, _eng = _gate_env(monkeypatch, GATE_NOW, hr_games=(1, 2))
+    due = _ev("e1", "LSU", "Clemson", GATE_NOW + timedelta(minutes=90))
+    client = _GateClient([due], paid=[])
+    monkeypatch.setattr(mod, "OddsAPIClient", lambda: client)
+    mod.main([*GATE_ARGS, "--status-file", str(tmp_path / "fg.json")])
+    assert client.paid_calls == [{"regions": "us,us2", "markets": "totals,h2h"}]
+
+
+def test_without_the_gate_the_same_slate_is_still_pulled(monkeypatch, tmp_path):
+    """The gate is opt-in: card.yml and sunday.yml never pass it."""
+    mod, _eng = _gate_env(monkeypatch, GATE_NOW, hr_games=(2,))
+    client = _GateClient([_ev("e1", "LSU", "Clemson", GATE_NOW + timedelta(minutes=90))], paid=[])
+    monkeypatch.setattr(mod, "OddsAPIClient", lambda: client)
+    args = [a for a in GATE_ARGS if a != "--hr-only-gate"]
+    mod.main([*args, "--status-file", str(tmp_path / "fg.json")])
+    assert len(client.paid_calls) == 1

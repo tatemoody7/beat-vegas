@@ -33,13 +33,13 @@ import json
 import statistics
 import sys
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from beatvegas.ci import warn
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.match import _parse_dt, match_event
-from beatvegas.hardrock import normalize_book
+from beatvegas.hardrock import hr_universe_game_ids, normalize_book
 from beatvegas.season import current_season
 from beatvegas.snapshots_provenance import feed_stamp_for, note_reseen
 from beatvegas.sources.cfbd import CFBDClient
@@ -159,17 +159,23 @@ def _fetch(
     regions: str = "us,us2",
     credit_floor: int = 60,
     markets: str = DEFAULT_MARKETS,
+    gate: Optional[Callable[[List[Dict]], bool]] = None,
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     """Return (full_game_rows, first_half_rows, source_used, event_count).
 
     The Odds API's full-game rows also carry the side-market rows (spread,
     moneyline), told apart by their `market` key; main() splits them."""
-    fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor, markets)
+    fg, h1, used, n = _fetch_raw(source, season, regions, credit_floor, markets, gate)
     return _normalize_books(fg), _normalize_books(h1), used, n
 
 
 def _fetch_raw(
-    source: str, season: int, regions: str, credit_floor: int, markets: str = DEFAULT_MARKETS
+    source: str,
+    season: int,
+    regions: str,
+    credit_floor: int,
+    markets: str = DEFAULT_MARKETS,
+    gate: Optional[Callable[[List[Dict]], bool]] = None,
 ) -> Tuple[List[Dict], List[Dict], str, int]:
     dk_events = 0
     if source == "oddsapi":
@@ -179,7 +185,12 @@ def _fetch_raw(
         client = OddsAPIClient()
         # list_events is FREE but returns the credit headers: learn the balance
         # before the paid bulk call so a reserve floor can stop it.
-        client.list_events()
+        events_free = client.list_events()
+        # --hr-only-gate: the free event list decides whether the paid pull is
+        # worth making at all (nothing due that Hard Rock prices -> 0 credits).
+        if gate is not None and not gate(events_free):
+            _FETCH_STATE["skip"] = "no_hr_game"
+            return [], [], "oddsapi", 0
         if client.credits_low(credit_floor):
             warn(
                 f"Odds API credits at reserve floor "
@@ -280,6 +291,15 @@ def main(argv: Optional[List[str]] = None) -> None:
         "response is the whole slate, so the filter costs nothing",
     )
     ap.add_argument(
+        "--hr-only-gate",
+        action="store_true",
+        dest="hr_only_gate",
+        help="--source oddsapi only: after the free event list, make the paid pull only "
+        "when a Hard Rock-universe game (one Hard Rock has priced a full-game total on) "
+        "kicks off inside the window; otherwise exit 0 having spent nothing (the "
+        "close ticks, final-2026 PR-C2)",
+    )
+    ap.add_argument(
         "--allow-empty",
         action="store_true",
         help="exit 0 when no row was captured (a close tick with no full-game event "
@@ -308,24 +328,61 @@ def main(argv: Optional[List[str]] = None) -> None:
         )
         return
 
+    def _window(at: datetime) -> Tuple[datetime, datetime]:
+        horizon = at + timedelta(days=args.days_ahead)
+        if args.kickoff_within_min is not None:
+            horizon = min(horizon, at + timedelta(minutes=args.kickoff_within_min))
+        lo = at if args.kickoff_within_min is not None else at - timedelta(days=1)
+        return lo, horizon
+
+    def _hr_game_due(events: List[Dict]) -> bool:
+        """True when an event inside the window is a Hard Rock-universe game."""
+        lo, hi = _window(datetime.utcnow())
+        due = [
+            ev
+            for ev in events
+            if (dt := _parse_dt(ev.get("commence_time"))) is not None and lo <= dt <= hi
+        ]
+        if not due:
+            return False
+        with session_scope() as s:
+            games = _candidate_games(s, args.season)
+            universe = hr_universe_game_ids(s, args.season)
+        for ev in due:
+            gid, _ = match_event(ev["home_team"], ev["away_team"], ev.get("commence_time"), games)
+            if gid in universe:
+                return True
+        return False
+
+    fetch_kwargs = {"gate": _hr_game_due} if args.hr_only_gate else {}
     fg_rows, h1_rows, source, dk_events = _fetch(
         args.source,
         args.season,
         args.regions,
         credit_floor=args.credit_floor,
         markets=args.markets,
+        **fetch_kwargs,
     )
+    if _FETCH_STATE["skip"] == "no_hr_game":
+        print("no Hard Rock game inside the window: the paid pull was not made (0 credits)")
+        write_status(
+            args.status_file,
+            complete=True,
+            reason="no_hr_game",
+            events_in_window=0,
+            events_polled=0,
+            rows_written=0,
+            rows_reseen=0,
+        )
+        return
 
     now = datetime.utcnow()
-    horizon = now + timedelta(days=args.days_ahead)
-    if args.kickoff_within_min is not None:
-        horizon = min(horizon, now + timedelta(minutes=args.kickoff_within_min))
+    lo, horizon = _window(now)
 
     def _in_window(r) -> bool:
         dt = _parse_dt(r.get("commence_time"))
         if dt is None:
             return True
-        lo = now if args.kickoff_within_min is not None else now - timedelta(days=1)
         return lo <= dt <= horizon
 
     fg_rows = [r for r in fg_rows if _in_window(r)]

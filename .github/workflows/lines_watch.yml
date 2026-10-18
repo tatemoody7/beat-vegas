@@ -224,6 +224,7 @@ jobs:
         continue-on-error: true
         run: python scripts/close_coverage.py
       - name: Full-game close (same ticks; totals, spreads, moneylines for events inside REAL_FG_CLOSE_WINDOW_H)
+        id: fgclose
         # The full-game market is a reference ledger (never bet) and the
         # H-FG-U-R / H-FG-O-R retrospectives grade at a REAL full-game close.
         # Before 2026-10-06 only Sunday's opener and the card-day refresh were
@@ -233,10 +234,12 @@ jobs:
         # prices, and the exchanges (us_ex) for the consensus close:
         # `totals,spreads,h2h` x `us,us2,us_ex` = 9 credits a tick (~25 ticks a
         # week -> ~225). Unchanged numbers are re-seen (last_seen_at) so they
-        # count as the close. Never fails the job: continue-on-error, --allow-empty.
+        # count as the close. Never fails the job: continue-on-error, --allow-empty;
+        # the health contract judges it instead (--status-file records what the
+        # pull covered; lines_watch.fg_close_polled reads it with this step's outcome).
         if: steps.close.outcome == 'success'
         continue-on-error: true
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,spreads,h2h --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,spreads,h2h --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty --status-file "$RUNNER_TEMP/fg_close_status.json"
       - name: 1H one-game refresh (the site's Refresh price; 1 credit)
         if: steps.resolve.outputs.market == '1h_game'
         env:
@@ -253,7 +256,9 @@ jobs:
         # `started`; the close gauge moved) and writes the verdict + note to
         # `last_health_lines_watch` for the board banner and /api/health. No
         # failed-severity check here (the board's `close` gauge warning covers
-        # a dead run of slots), so this never reddens the run. Only the
+        # a dead run of slots), so this never reddens the run. The full-game
+        # close step (continue-on-error) is judged here too: its status file
+        # and a full-game row written or re-seen after `started`. Only the
         # scheduled market (1h_close) is judged: a dispatched 1h / 1h_open
         # refresh is SKIPPED, no verdict. Runs on always() once python is
         # installed (the pre-check skip installs nothing).
@@ -262,4 +267,5 @@ jobs:
           SKIPPED: ${{ steps.resolve.outputs.market != '1h_close' }}
           RUN_STARTED_AT: ${{ steps.resolve.outputs.started }}
           MARKET: ${{ steps.resolve.outputs.market }}
-        run: python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json"
+          OUTCOME_FG: ${{ steps.fgclose.outcome }}
+        run: python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json" --fg-status "$RUNNER_TEMP/fg_close_status.json"

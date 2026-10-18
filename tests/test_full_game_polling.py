@@ -597,3 +597,116 @@ def test_odds_snapshot_side_price_columns_are_migrated():
     for name in ("home_price", "away_price"):
         assert name in OddsSnapshot.__table__.columns
         assert _MIGRATIONS["odds_snapshots"][name] == "INTEGER"
+
+
+def _status(path):
+    import json
+
+    return json.loads(Path(path).read_text())
+
+
+def test_status_file_reports_the_window_the_rows_and_the_reseen_stamps(monkeypatch, tmp_path):
+    """--status-file (final-2026 PR-05): lines_watch's `fg_close_polled` check reads
+    events_in_window / events_polled / rows_written / rows_reseen / complete. A
+    first pull writes, the next one that finds the number standing re-sees."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.add(Game(id=2, season=2026, week=6, home_team="Ohio State", away_team="Oregon"))
+        s.commit()
+    rows = [
+        _row_at(1, "draftkings", 55.5, "2026-10-10T18:00:00Z"),  # 2 h out: in
+        _row_at(2, "draftkings", 48.5, "2026-10-10T23:30:00Z"),  # 7.5 h out: not yet
+    ]
+    path = str(tmp_path / "fg.json")
+    args = ["--kickoff-within-min", "180", "--allow-empty", "--status-file", path]
+    _run_poll(mod, monkeypatch, eng, rows, datetime(2026, 10, 10, 16, 0), extra_args=args)
+    assert _status(path) == {
+        "complete": True,
+        "reason": None,
+        "events_in_window": 1,
+        "events_polled": 1,
+        "events_unmatched": 0,
+        "rows_written": 1,
+        "rows_reseen": 0,
+    }
+    _run_poll(mod, monkeypatch, eng, rows, datetime(2026, 10, 10, 16, 30), extra_args=args)
+    st = _status(path)
+    assert st["complete"] is True and st["rows_written"] == 0 and st["rows_reseen"] == 1
+
+
+def test_status_file_counts_side_market_rows(monkeypatch, tmp_path):
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Game(id=1, season=2026, week=6, home_team="LSU", away_team="Clemson"))
+        s.commit()
+    rows = [
+        _row(1, "draftkings", 55.5, -7.0),
+        _side(1, "draftkings", "full_game_spread", -7.0, -110, -110),
+    ]
+    path = str(tmp_path / "fg.json")
+    _run_poll(
+        mod,
+        monkeypatch,
+        eng,
+        rows,
+        datetime(2026, 10, 10, 16, 0),
+        extra_args=["--status-file", path],
+    )
+    st = _status(path)
+    assert st["rows_written"] == 2 and st["events_in_window"] == 1 and st["events_polled"] == 1
+
+
+def test_empty_window_is_complete_and_a_credit_floor_skip_is_not(monkeypatch, tmp_path):
+    """No event due is a normal, complete state; the credit-floor guard exits 0 with
+    no rows too, and only the status file tells the two apart."""
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    path = str(tmp_path / "fg.json")
+    args = ["--allow-empty", "--status-file", path]
+    _run_poll(mod, monkeypatch, eng, [], datetime(2026, 10, 10, 16, 0), extra_args=args)
+    st = _status(path)
+    assert st["complete"] is True and st["events_in_window"] == 0 and st["reason"] is None
+
+    def floor_fetch(*a, **k):
+        mod._FETCH_STATE["skip"] = "credit_floor"
+        return [], [], "oddsapi", 0
+
+    monkeypatch.setattr(mod, "_fetch", floor_fetch)
+    mod.main(args)
+    st = _status(path)
+    assert st["complete"] is False and st["reason"] == "credit_floor"
+    # The next run starts clean: the skip reason does not outlive its run.
+    _run_poll(mod, monkeypatch, eng, [], datetime(2026, 10, 10, 16, 0), extra_args=args)
+    assert _status(path)["complete"] is True
+
+
+def test_events_that_match_no_game_are_incomplete_and_the_database_down_is_too(
+    monkeypatch, tmp_path
+):
+    mod = _load("poll_full_game")
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)  # no games: every event is unmatched
+    path = str(tmp_path / "fg.json")
+    row = _row(99, "draftkings", 55.5, -7.0)
+    row.update(game_id=None, home_team="Nowhere St", away_team="Elsewhere", commence_time=None)
+    _run_poll(
+        mod,
+        monkeypatch,
+        eng,
+        [row],
+        datetime(2026, 10, 10, 16, 0),
+        extra_args=["--allow-empty", "--status-file", path],
+    )
+    st = _status(path)
+    assert st["complete"] is False and st["reason"] == "no_match" and st["events_polled"] == 0
+
+    monkeypatch.setattr(mod, "try_init_db", lambda: False)
+    mod.main(["--status-file", path])
+    st = _status(path)
+    assert st["complete"] is False and st["reason"] == "db_unreachable"

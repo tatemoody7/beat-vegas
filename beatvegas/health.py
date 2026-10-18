@@ -104,7 +104,7 @@ class Ctx:
     `now` and `run_started_at` are naive UTC; `outcomes` maps a step name
     ("sweep", "preview", ...) to GitHub's step outcome ("success" / "failure" /
     "skipped" / "cancelled"); `status_files` holds the parsed JSON status files
-    that exist ("sweep", "close"); `env` is the raw environment for details."""
+    that exist ("sweep", "close", "fg"); `env` is the raw environment for details."""
 
     session: Any
     now: datetime
@@ -697,6 +697,53 @@ def lines_watch_hr_rows_touched(ctx: Ctx) -> Result:
     )
 
 
+def lines_watch_fg_close_polled(ctx: Ctx) -> Result:
+    """The full-game close step is continue-on-error and exits 0 on an empty or
+    credit-floor-skipped pull, so nothing else sees it fail. When the 1H close
+    run found events in its window, the full-game status file must exist and
+    say complete, and (if it found an event inside its own, narrower window) a
+    full_game_total row must have been written or re-seen since the run began."""
+    from .db.models import OddsSnapshot
+
+    close = ctx.status_files.get("close")
+    if not close or int(close.get("events_in_window") or 0) == 0:
+        return Result(True, "n/a, the close poll found no events")
+    outcome = ctx.outcomes.get("fg")
+    if outcome == "skipped":
+        return Result(True, "n/a, the full-game step did not run (the close poll did not succeed)")
+    fg = ctx.status_files.get("fg")
+    if fg is None:
+        return Result(
+            False,
+            f"no full-game status file (step outcome {outcome or 'unknown'}): the pull died "
+            "before it could report",
+        )
+    in_window = int(fg.get("events_in_window") or 0)
+    polled = int(fg.get("events_polled") or 0)
+    if fg.get("complete") is not True:
+        return Result(
+            False,
+            f"full-game pull incomplete: polled={polled}/{in_window} "
+            f"reason={fg.get('reason') or 'unknown'}",
+        )
+    if in_window == 0:
+        return Result(True, "n/a, no full-game event inside its close window")
+    n = (
+        ctx.session.query(OddsSnapshot.id)
+        .filter(
+            OddsSnapshot.market == FULL_GAME_MARKET,
+            (OddsSnapshot.captured_at >= ctx.run_started_at)
+            | (OddsSnapshot.last_seen_at >= ctx.run_started_at),
+        )
+        .count()
+    )
+    return Result(
+        n > 0,
+        f"{n} full-game total rows captured or re-seen since {_iso(ctx.run_started_at)} "
+        f"(polled={polled}/{in_window})",
+    )
+
+
 def lines_watch_close_gauge_written(ctx: Ctx) -> Result:
     polled = _close_polled(ctx)
     if polled == 0:
@@ -1039,7 +1086,7 @@ CONTRACTS: Dict[str, Contract] = {
         workflow="lines_watch.yml",
         window="every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN ahead (360 min on Saturday ticks since 2026-10-11, 120 on weeknights)",
         artifacts=("odds_snapshots 1H rows or last_seen_at stamps", "last_close_capture_at gauge"),
-        inputs=("MARKET",),
+        inputs=("MARKET", "OUTCOME_FG"),
         checks=(
             Check(
                 "lines_watch.close_polled",
@@ -1052,6 +1099,12 @@ CONTRACTS: Dict[str, Contract] = {
                 "degraded",
                 "when events were polled: an odds_snapshots row with book hardrockbet and market 1H_total has captured_at or last_seen_at >= RUN_STARTED_AT",
                 lines_watch_hr_rows_touched,
+            ),
+            Check(
+                "lines_watch.fg_close_polled",
+                "degraded",
+                "when the close poll found events in its window and the full-game step ran: the full-game status file exists and says complete, and (if it found an event inside its own window) an odds_snapshots row with market full_game_total has captured_at or last_seen_at >= RUN_STARTED_AT",
+                lines_watch_fg_close_polled,
             ),
             Check(
                 "lines_watch.close_gauge_written",
@@ -1080,6 +1133,11 @@ CONTRACTS: Dict[str, Contract] = {
                 "2026-09-09",
                 "a Hard Rock book key drift would make a close poll write no hardrockbet row while spending every credit; poll_lines warns, this makes it a verdict.",
                 ("lines_watch.hr_rows_touched",),
+            ),
+            FailureMode(
+                "2026-10-18",
+                "the full-game close step is continue-on-error and exits 0 on an empty or credit-floor-skipped pull, so a step that failed silently left every run green while the two full-game arms (H-ARM-FGU, H-ARM-WXFG) accumulated stale_close exclusions; the status file and the step outcome now make it a verdict (final-2026 plan PR-05).",
+                ("lines_watch.fg_close_polled",),
             ),
         ),
         info=lines_watch_info,

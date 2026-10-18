@@ -185,11 +185,16 @@ check is not planned while the judge's full-game reads are secondary).
 2. `lines_watch.hr_rows_touched` missed -> events were polled and no Hard Rock
    1H row was written or re-seen: the `hardrockbet` key drifted or Hard Rock
    has stopped posting the market. `sources/odds.py` and the `hr_rows=` line.
-3. `lines_watch.close_gauge_written` missed -> `poll_lines.py` polled events
+3. `lines_watch.fg_close_polled` missed -> the close poll found events but the full-game
+   close step (`poll_full_game.py`, continue-on-error) left no status file, said it was
+   incomplete (`reason`: `credit_floor`, `db_unreachable`, `no_match`), or wrote and re-saw
+   no `full_game_total` row since the run began. The two full-game arms then read
+   `stale_close`; read that step's log and the Odds credits.
+4. `lines_watch.close_gauge_written` missed -> `poll_lines.py` polled events
    but did not write `last_close_capture_at`; the gauge write is best-effort
    (`ops.record_gauge` never raises), so the log carries `[ops] gauge ... not
    recorded`.
-4. `lines_watch.close_window_coverage` missed (Saturday runs only) -> fewer
+5. `lines_watch.close_window_coverage` missed (Saturday runs only) -> fewer
    than 80% of that Saturday's kicked-off Hard-Rock-priced games had a
    first-half snapshot inside the 2-hour close window: the close slots are not
    firing (GitHub fired 3 of 18 in 2026 week 4). Check `last_dispatch_lines-close`
@@ -316,12 +321,13 @@ Failure modes on record:
 - Workflow: `.github/workflows/lines_watch.yml`
 - Window: every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN ahead (360 min on Saturday ticks since 2026-10-11, 120 on weeknights)
 - Artifacts: `odds_snapshots 1H rows or last_seen_at stamps`, `last_close_capture_at gauge`
-- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `MARKET`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `MARKET`, `OUTCOME_FG`
 
 | Check | Severity | Positive fact |
 |---|---|---|
 | `lines_watch.close_polled` | degraded | the close status file exists and says events_polled > 0, or events_in_window == 0 |
 | `lines_watch.hr_rows_touched` | degraded | when events were polled: an odds_snapshots row with book hardrockbet and market 1H_total has captured_at or last_seen_at >= RUN_STARTED_AT |
+| `lines_watch.fg_close_polled` | degraded | when the close poll found events in its window and the full-game step ran: the full-game status file exists and says complete, and (if it found an event inside its own window) an odds_snapshots row with market full_game_total has captured_at or last_seen_at >= RUN_STARTED_AT |
 | `lines_watch.close_gauge_written` | degraded | when events were polled: the `last_close_capture_at` gauge was written after RUN_STARTED_AT |
 | `lines_watch.close_window_coverage` | degraded | on a Saturday (ET) run: share of that Saturday's kicked-off Hard-Rock-priced games with a 1H_total snapshot captured or re-seen inside REAL_1H_CLOSE_WINDOW_H of kickoff >= CLOSE_COVERAGE_MIN [0.8] |
 
@@ -329,5 +335,6 @@ Failure modes on record:
 
 - **2026-08-28** -- GitHub's cron fired 2 of 19 scheduled close slots (and 3 of 18 Saturday slots in 2026 week 4, leaving 18 of 57 Hard-Rock-priced games with a close inside the window while the `close` gauge stayed fresh); since 2026-09-28 the Vercel `lines-close` dispatch is the cover, `close_window_coverage` and the board's `close_coverage` gauge are the alarm, and the board's `close` gauge (CLOSE_CAPTURE_MAX_AGE_H) still catches a dead week. No check here is failed-severity: the run that never fired cannot email. Caught by: `lines_watch.close_polled`, `lines_watch.close_gauge_written`, `lines_watch.close_window_coverage`.
 - **2026-09-09** -- a Hard Rock book key drift would make a close poll write no hardrockbet row while spending every credit; poll_lines warns, this makes it a verdict. Caught by: `lines_watch.hr_rows_touched`.
+- **2026-10-18** -- the full-game close step is continue-on-error and exits 0 on an empty or credit-floor-skipped pull, so a step that failed silently left every run green while the two full-game arms (H-ARM-FGU, H-ARM-WXFG) accumulated stale_close exclusions; the status file and the step outcome now make it a verdict (final-2026 plan PR-05). Caught by: `lines_watch.fg_close_polled`.
 
 <!-- contracts:end -->

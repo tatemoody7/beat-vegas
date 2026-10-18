@@ -51,8 +51,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # The sibling gates' plumbing, not a second copy of it: same stamped triple, same
 # step-summary behaviour, same real-close lookup, so the reports stay comparable.
+from beatvegas.backtest.reporting import append_step_summary, report_paths
 from scripts.level_anchor_gate import load_closes
-from scripts.residual_gate import append_step_summary, report_paths
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

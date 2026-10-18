@@ -32,9 +32,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from residual_gate import append_step_summary, report_paths  # noqa: E402
-
 from beatvegas import protocol as P  # noqa: E402
+from beatvegas.backtest.reporting import append_step_summary, report_paths  # noqa: E402
 from beatvegas.db.models import ChallengerPick, Game, ManualPick  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 from beatvegas.evp_paper import ARM_EVP  # noqa: E402

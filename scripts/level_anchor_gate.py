@@ -52,7 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Reuse the residual gate's output plumbing rather than restating it -- same
 # stamped triple, same step-summary behaviour, so the two reports are siblings.
-from scripts.residual_gate import append_step_summary, report_paths
+from beatvegas.backtest.reporting import append_step_summary, report_paths
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

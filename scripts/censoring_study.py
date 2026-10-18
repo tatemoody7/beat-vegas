@@ -272,7 +272,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     }
     report["verdict"] = C.verdict(report["gate"], report["per_season"], report["walk_forward"])
 
-    from scripts.residual_gate import append_step_summary, report_paths
+    from beatvegas.backtest.reporting import append_step_summary, report_paths
 
     md_path, json_path, _csv = report_paths(args.out)
     md_path.parent.mkdir(parents=True, exist_ok=True)

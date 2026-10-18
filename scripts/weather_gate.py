@@ -31,6 +31,9 @@ import sys
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence
 
+# Reuse the residual gate's output plumbing rather than restating it -- same
+# stamped triple, same step-summary behaviour, so the reports are siblings.
+from beatvegas.backtest.reporting import append_step_summary, report_paths
 from beatvegas.backtest.residual_gate import GateNotEvaluable
 from beatvegas.backtest.weather_gate import (
     DIAGNOSTIC_ARMS,
@@ -42,10 +45,6 @@ from beatvegas.db.models import Game
 from beatvegas.db.store import session_scope, try_init_db
 from beatvegas.etl.features import build_feature_frame
 from beatvegas.lines import REAL_1H_CLOSE_WINDOW_H, real_closes
-
-# Reuse the residual gate's output plumbing rather than restating it -- same
-# stamped triple, same step-summary behaviour, so the reports are siblings.
-from scripts.residual_gate import append_step_summary, report_paths
 
 
 def _arm(token: str) -> Optional[int]:

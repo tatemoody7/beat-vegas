@@ -25,16 +25,22 @@ from typing import Any, Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from residual_gate import (  # noqa: E402
-    append_step_summary,
-    load_closes,
-    load_played_frame,
-    report_paths,
-)
-
 from beatvegas import snapshots  # noqa: E402
 from beatvegas.backtest import blend as B  # noqa: E402
+from beatvegas.backtest.reporting import append_step_summary, report_paths  # noqa: E402
 from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
+from beatvegas.etl.features import build_feature_frame, training_frame  # noqa: E402
+
+
+def load_played_frame(fbs_only: bool = True):
+    """Played games only (same as scripts/residual_gate.py::load_played_frame)."""
+    return training_frame(build_feature_frame(min_games=2, fbs_only=fbs_only))
+
+
+def load_closes(session, game_ids):
+    """game_id -> real pre-kick 1H close (same as scripts/residual_gate.py::load_closes)."""
+    ids = [int(g) for g in game_ids]
+    return snapshots.consensus_closes(session, ids, snapshots.kickoffs_for(session, ids))
 
 
 def parse_args(argv: Optional[list] = None) -> argparse.Namespace:

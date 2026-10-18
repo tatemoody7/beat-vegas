@@ -146,6 +146,9 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
   curated `web/prisma/schema.prisma` + `npx prisma generate`, then deploy. Never commit a full
   `prisma db pull`: it introspects every table in the shared Neon database (22 models the app
   reads by raw SQL on purpose, six `swfl_*` fishing tables) and strips the comments (2026-10-04).
+  Research-only tables (plan C11, 2026-10-18): `research_snapshots` (purpose-tagged Odds API capture
+  no frozen reader touches; writer `beatvegas/research_capture.py`) and `odds_spend` (the credit ledger
+  `sources/odds.py` writes on every priced response; `BV_ODDS_JOB` / `BV_ODDS_PURPOSE` name the caller).
 - **Site** (`web/`): Next.js App Router + TypeScript + Tailwind v4 + Prisma 7 (driver adapters:
   `PrismaPg`, `PrismaNeon` under `NEON_HTTP=1`) + Recharts, on Vercel. Three tabs — Board (`/`, one
   ranked list under a slim research line), Results (`/results`: the personal stake, the arms' forward picks, the
@@ -209,11 +212,9 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `build_trophy_games` (rivalry list),
   `wepa_weekly_extract` (the H-WEPA-F z-table from the gitignored Patreon weekly files),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml), `build_shortlist_reference` (freezes `data/shortlist_reference.json` from the H-1H-FACTORS screen).
-- **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (the offline backtest engine and
-  its tools went 2026-10-11, roadmap v2.0).
+- **Model / research**: `line_study`, `model_artifacts`, `bv_adjust` (offline backtest engine retired 2026-10-11, v2.0).
 - **Pricing research (exploratory, read-only)**: `pricing_check` (H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
-- **Probes**: `probe_hr_keys` (one-off, by hand: `hardrockbet` vs `hardrockbet_fl` with the feed's
-  raw keys and stamps kept; prints the credits it spent; writes nothing); `probe_alt_totals_h1` (programme 4.4, one run, Hard Rock + 9 books in one region, ≤24 credits); `opening_watch` (temporary, ≤5,500 credits).
+- **Probes** (write nothing): `probe_hr_keys` (`hardrockbet` vs `hardrockbet_fl`, raw keys kept), `probe_alt_totals_h1` (≤24 credits, one run), `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20).
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.
 

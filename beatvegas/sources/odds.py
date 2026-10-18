@@ -22,7 +22,10 @@ CI logs.
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -92,6 +95,31 @@ def redact_key(text: str) -> str:
     return _API_KEY_RE.sub(r"\1***", text)
 
 
+_EVENT_ID_RE = re.compile(r"/events/([^/]+)/odds")
+
+
+def endpoint_of(url: str) -> str:
+    """The ledger's endpoint word for a v4 URL: `events`, `odds` (bulk),
+    `event_odds` (per event), or the same with a `hist_` prefix for the
+    historical mirror. Anything else reads `other`."""
+    path = url.split("?", 1)[0]
+    hist = "/historical/" in path
+    if _EVENT_ID_RE.search(path):
+        name = "event_odds"
+    elif path.endswith("/events"):
+        name = "events"
+    elif path.endswith("/odds"):
+        name = "odds"
+    else:
+        name = "other"
+    return f"hist_{name}" if hist else name
+
+
+def _event_id_of(url: str) -> Optional[str]:
+    m = _EVENT_ID_RE.search(url.split("?", 1)[0])
+    return m.group(1) if m else None
+
+
 def _raise_for_status(resp: requests.Response) -> None:
     """`resp.raise_for_status()` whose HTTPError message has the key redacted:
     requests puts the full request URL (apiKey included) in the message, and
@@ -108,7 +136,15 @@ class OddsAPIClient:
         api_key: Optional[str] = None,
         timeout: int = 30,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        job: Optional[str] = None,
+        purpose: Optional[str] = None,
     ):
+        # The spend ledger's context (odds_spend.job / .purpose): the caller's
+        # argument, else the workflow step's env (BV_ODDS_JOB / BV_ODDS_PURPOSE),
+        # else 'hand'. Set in the client so no script can spend unlogged.
+        self.job = job or os.environ.get("BV_ODDS_JOB") or "hand"
+        self.purpose = purpose or os.environ.get("BV_ODDS_PURPOSE") or None
+        self.last_spend_id: Optional[int] = None
         cfg = load_config().get("odds_api", {}) or {}
         self.api_key = api_key or odds_api_key()
         self.base_url = (cfg.get("base_url") or "https://api.the-odds-api.com/v4").rstrip("/")
@@ -186,6 +222,7 @@ class OddsAPIClient:
                 # retried call still reports the API's latest counters.
                 self._credits(resp)
                 if resp.status_code != 429 and resp.status_code < 500:
+                    self._record_spend(resp, url, params)
                     return resp
                 last_exc = requests.HTTPError(
                     redact_key(f"Odds API {resp.status_code} for {url}"), response=resp
@@ -219,6 +256,62 @@ class OddsAPIClient:
 
             record_gauge(ODDS_CREDITS_REMAINING, c.remaining)
         return c
+
+    def _record_spend(self, resp: requests.Response, url: str, params: Dict[str, Any]) -> None:
+        """Append one `odds_spend` row for this response (final-2026 plan C11):
+        what was asked, what the provider billed (`x-requests-last`) and the
+        balance after. Free calls (events lists, empty answers, 404s) are
+        recorded with their 0 so the balance series stays dense. Needs
+        DATABASE_URL (ops.gauges_enabled); a failed insert prints a warning and
+        never touches the pull. The id is kept in `last_spend_id` so a writer
+        can tag the rows the call paid for."""
+        self.last_spend_id = None
+        from ..ops import gauges_enabled
+
+        if not gauges_enabled():
+            return
+        try:
+            from ..db.models import OddsSpend
+            from ..db.store import session_scope
+
+            c = self.last_credits
+            events: Optional[int] = None
+            if resp.status_code == 200:
+                try:
+                    body = resp.json()
+                    if isinstance(body, dict) and "data" in body:
+                        body = body["data"]
+                    events = len(body) if isinstance(body, list) else (1 if body else 0)
+                except ValueError:
+                    events = None
+            safe = {k: str(v) for k, v in params.items() if k not in ("apiKey",)}
+            row = OddsSpend(
+                spent_at=datetime.utcnow(),
+                run_id=str(os.environ.get("GITHUB_RUN_ID") or "-"),
+                job=self.job,
+                script=os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else None,
+                endpoint=endpoint_of(url),
+                markets=safe.get("markets"),
+                regions=safe.get("regions"),
+                bookmakers=safe.get("bookmakers"),
+                events=events,
+                credits=c.last_cost if c else None,
+                remaining_after=c.remaining if c else None,
+                used_after=c.used if c else None,
+                purpose=self.purpose,
+                params_json=json.dumps(
+                    {k: v for k, v in safe.items() if k in ("date", "dateFormat") or k == "eventId"}
+                    | ({"event_id": _event_id_of(url)} if _event_id_of(url) else {}),
+                    default=str,
+                ),
+                http_status=resp.status_code,
+            )
+            with session_scope() as s:
+                s.add(row)
+                s.flush()
+                self.last_spend_id = row.id
+        except Exception as e:  # noqa: BLE001 - the ledger must never fail a pull
+            print(f"::warning::[odds] spend ledger not written: {redact_key(str(e))}")
 
     def credits_low(self, floor: int) -> bool:
         """True once the month's remaining credits (from the LAST response's

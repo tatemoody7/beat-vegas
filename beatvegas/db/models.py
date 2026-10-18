@@ -943,6 +943,83 @@ class AppSettingLog(Base):
     written_at = Column(DateTime, index=True)  # naive UTC
 
 
+class OddsSpend(Base):
+    """One row per priced Odds API response (2026-10-18, final-2026 plan C11):
+    the credit ledger. Written by `sources/odds.py::OddsAPIClient._record_spend`
+    from inside the client, so every pull -- live jobs, research sweeps, archive
+    buys, probes -- lands here with the credits the provider billed
+    (`x-requests-last`) and the balance after. `app_settings.odds_credits_remaining`
+    is the balance at the start of a run; this is the itemised spend. Read by the
+    budget controller (`beatvegas/credit_plan.py`), the digest and the final
+    report; never by a gate."""
+
+    __tablename__ = "odds_spend"
+    __table_args__ = (Index("ix_odds_spend_job_at", "job", "spent_at"),)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    spent_at = Column(DateTime, nullable=False, index=True)  # naive UTC
+    run_id = Column(String(32))  # GITHUB_RUN_ID or '-'
+    job = Column(String(16))  # card | lines_watch | sunday | research | archive | probe | hand
+    script = Column(String(64))  # sys.argv[0] basename
+    endpoint = Column(String(24), nullable=False)  # events | odds | event_odds | hist_*
+    markets = Column(String(128))
+    regions = Column(String(64))
+    bookmakers = Column(Text)
+    events = Column(Integer)  # events in the response (1 for a per-event call)
+    credits = Column(Integer)  # x-requests-last
+    remaining_after = Column(Integer)  # x-requests-remaining
+    used_after = Column(Integer)  # x-requests-used
+    purpose = Column(String(32))  # research purpose when the call fed research_snapshots
+    params_json = Column(Text)  # event id, historical date; never the key
+    http_status = Column(Integer)
+
+
+class ResearchSnapshot(Base):
+    """Research capture no frozen reader touches (2026-10-18, final-2026 plan
+    C11). The same shape as `odds_snapshots` plus the `purpose` that asked for
+    it, the `region` of the call, the `odds_spend` row that paid and the
+    `source` (live poll or historical archive). Markets add `alt_1H_total` (one
+    row per ladder rung), `team_total` and `team_total_1h` (with `team`). cv1,
+    pv1, the HT1H trigger and the card read `odds_snapshots` only; cv2 and the
+    2027 designs read this table at the final read. Written only by
+    `beatvegas/research_capture.py`."""
+
+    __tablename__ = "research_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "event_id",
+            "book",
+            "market",
+            "team",
+            "line",
+            "captured_at",
+            "purpose",
+            name="uq_research_snapshot",
+        ),
+        Index("ix_research_game_market_at", "game_id", "market", "captured_at"),
+        Index("ix_research_purpose_at", "purpose", "captured_at"),
+    )
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)  # NULL until matched
+    event_id = Column(String(64), index=True)  # the feed's event id
+    book = Column(String)
+    market = Column(String)
+    team = Column(String(64), nullable=False, default="")  # team totals only
+    line = Column(Float)
+    spread = Column(Float)
+    over_price = Column(Integer)
+    under_price = Column(Integer)
+    home_price = Column(Integer)
+    away_price = Column(Integer)
+    captured_at = Column(DateTime, index=True)  # poll clock, or the archive envelope's stamp
+    last_seen_at = Column(DateTime)  # live purposes only (write-on-change)
+    feed_updated_at = Column(DateTime)
+    feed_reseen_at = Column(DateTime)
+    purpose = Column(String(32), nullable=False)
+    region = Column(String(16))  # eu | us | us2 | us_ex | books | unknown
+    request_id = Column(Integer, ForeignKey("odds_spend.id"))
+    source = Column(String(8), nullable=False, default="live")  # live | historical
+
+
 class JudgeReadingAudit(Base):
     """What a later recomputation of the judge WOULD have written (2026-10-18,
     final-2026 plan PR-01). The judge's columns on `manual_picks` and

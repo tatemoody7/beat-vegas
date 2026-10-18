@@ -10,6 +10,25 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~20:30 UTC (THE ODDS API PROGRAMME, STEP 1: A CREDIT LEDGER AND A RESEARCH TABLE).** Tate asked
+  how to use the 20,000-credit plan (18% used, ~840 credits a week measured Tue 10-13 → Sun 10-18: 1H sweeps 215,
+  Saturday 1H closes 319, weeknight 1H 18, Saturday full-game 153, weeknight full-game 90, card full-game 36, Sunday
+  opener 9; the 10-15 line-release study cost 7,059, not the 6,509 quoted above). His decisions (plan sections
+  C6-C12): the moderate capture set as the baseline (a sharp `eu` reference, Monday openers, Hard Rock's alternate
+  1H ladder at close, Wed-Fri noon 1H sweeps and Mon-Fri totals-only full-game pulls, team totals where posted), four
+  zero-alpha exploratory collectors (derivative consistency ≥1.5 pts on `data/multiplier.json`'s share, Hard Rock vs
+  Pinnacle ≥+2%, full-game early-move follow, team-total mispricing), a budget controller (floor 1,500 + the measured
+  recurring need), and an archive queue that drains expiring credits automatically in the last four days of each
+  cycle (Pinnacle 2026 closes → Hard Rock ladder 2026 → full-game paths `us` → Hard Rock 1H release times → Pinnacle
+  2025 → Hard Rock ladder 2025 → full-game paths `us2` → Pinnacle 2024). No new confirmatory arm: with five or six
+  reading weeks left, 3 picks a week has ~10% power at +3%. **Rule: every frozen reader (cv1, pv1, the HT1H trigger,
+  the card) keeps reading `odds_snapshots`; all new capture lands in `research_snapshots`.** This PR (C1) adds that
+  table, `odds_spend` (one row per priced response, written by `OddsAPIClient._record_spend` with `x-requests-last`,
+  the balance after, job and purpose from `BV_ODDS_JOB` / `BV_ODDS_PURPOSE`; a failed insert is a warning), the
+  writer `beatvegas/research_capture.py` (write-on-change for live purposes, every wave for archive rows) and the
+  book→region table `sources/odds_regions.py`. A test forbids the provider's host anywhere but the client (the
+  temporary `opening_watch.py` exempt until PR-08). `migrate.yml` before the next pull; the tables are empty until C4.
+
 - **2026-10-18 ~16:00 UTC (THE SEASON ENDS NOV 28 AND THE FINAL READ IS NOV 30; ROADMAP v2.6, PROTOCOL p1.3).** Final-2026
   plan PR-04 (paperwork and the `--season-over` wiring; Tate's decisions D1, D4, D12 of 2026-10-18). `beatvegas/protocol.py`
   gains `SEASON_LAST_KICKOFF = "2026-11-29T04:00:00"` (week 13's last kickoff), `FINAL_READ_DATE = "2026-11-30"`,

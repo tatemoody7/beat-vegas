@@ -63,6 +63,10 @@ is that run's artifact.
 
 ## Where it runs
 
+- **cv1 reads `odds_snapshots` only.** The Odds API programme's research capture (a sharp
+  region, Hard Rock's alternate ladder, team totals, openers, archive waves) lands in
+  `research_snapshots` (2026-10-18, final-2026 plan C11) and never enters this judge; a
+  sharp-anchored reading (cv2) is computed from both tables at the final read, beside cv1.
 - `grade.yml` runs `scripts/consensus_backfill.py --write --missing-only` every day: a pick is
   read an hour after kickoff (p1.2 R3′), graded or not, and the columns land on its row
   (manual_picks and challenger_picks: `cons_version`, `cons_books`, `cons_line`, `cons_close_at`,

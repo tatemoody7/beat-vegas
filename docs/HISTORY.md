@@ -10,6 +10,26 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~22:00 UTC (THE ODDS API PROGRAMME, STEP 3: THE CREDIT BUDGET CONTROLLER).** Final-2026 plan PR-C3.
+  The guardrail in one sentence (Tate): every optional pull and archive buy must leave the balance at or above the
+  floor (1,500) plus the measured recurring need for the cycle's remaining weeks (to min(reset, Nov 29 04Z
+  `protocol.SEASON_LAST_KICKOFF`)), and archive buys run only in the last four days before the reset once that
+  Saturday's closes are captured. `beatvegas/credit_plan.py` holds the arithmetic (`remaining_weeks`, `allowance` =
+  balance − floor − recurring/week × weeks left, may be negative; `archive_window_open`; `measured_recurring` = the
+  trailing 7-day `odds_spend.credits` of jobs `card` / `lines_watch` / `sunday`, None until the ledger is a week old;
+  `PLAN`, the per-week estimate per purpose for the digest). `scripts/credit_plan.py` is the command line: `report`
+  (table, `$GITHUB_STEP_SUMMARY`, writes the new gauge `odds_projected_end` = balance − recurring need; the TS
+  `BASE_GAUGE_KEYS` carries it), `allow --purpose P --estimate N` (exit 0 when the allowance covers N, else 1 with
+  one line; an `archive_*` purpose is also refused with the reset unset or outside the window, `--drain` waives the
+  window for the post-season drain of C-D13), and `set-reset` / `set-floor` / `set-recurring`, which write through
+  `ops.record_gauge` so `app_settings_log` keeps the history. Settings in `app_settings`: `odds_cycle_reset_at` (ISO
+  naive UTC, unset by default: Tate confirms Nov 5 on the dashboard, so `report` says unset and non-archive purposes
+  count to the season end), `odds_credit_floor` (1,500), `odds_archive_window_days` (4),
+  `odds_recurring_fallback_per_week` (840 until PR-C2 lands, then set to ~450 with no deploy). "Last Saturday's closes
+  captured" is read from the `close_coverage_pct` gauge's note (`sat=` the latest finished Saturday in ET, at least one
+  game covered). **No workflow runs it yet:** the optional pulls (PR-C4a / C4b / C10) call `allow` and the digest
+  (PR-C11) calls `report`. Spends nothing, never read by a gate.
+
 - **2026-10-18 ~20:30 UTC (THE ODDS API PROGRAMME, STEP 1: A CREDIT LEDGER AND A RESEARCH TABLE).** Tate asked
   how to use the 20,000-credit plan (18% used, ~840 credits a week measured Tue 10-13 → Sun 10-18: 1H sweeps 215,
   Saturday 1H closes 319, weeknight 1H 18, Saturday full-game 153, weeknight full-game 90, card full-game 36, Sunday

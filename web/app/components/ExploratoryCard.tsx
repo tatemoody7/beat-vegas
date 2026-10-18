@@ -21,14 +21,7 @@ function evText(
     : `${pct(ev.mean)} (${pct(ev.lo)} to ${pct(ev.hi)})`;
 }
 
-export default function ExploratoryCard({
-  card,
-  authed = false,
-}: {
-  card: Card;
-  /** Signed in: the run id is the owner's detail (Q7). */
-  authed?: boolean;
-}) {
+export default function ExploratoryCard({ card }: { card: Card }) {
   const { meta } = card;
   return (
     <article
@@ -74,7 +67,7 @@ export default function ExploratoryCard({
       <p className="text-xs text-[var(--text-dim)]">
         {card.readAt === null
           ? "Not yet read."
-          : `Last read ${etDateLabel(card.readAt)}${authed && card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
+          : `Last read ${etDateLabel(card.readAt)}${card.runId && card.runId !== "-" ? ` · run ${card.runId}` : ""}`}
         {card.nextRead ? ` · Next read ${etDateLabel(card.nextRead)}` : ""}
       </p>
     </article>

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import ArmCard from "@/app/components/ArmCard";
-import { viewerIsAuthed } from "@/lib/session";
 import ExploratoryCard from "@/app/components/ExploratoryCard";
 import Glossary from "@/app/components/Glossary";
 import { getArmPositions, getPositionPayload } from "@/lib/armPositions";
+import { RESEARCH_BANNER } from "@/lib/labels";
 import {
   EXPLORATORY,
   PROTOCOL,
@@ -28,7 +28,7 @@ const KEYS: { color: string; term: string; text: string }[] = [
   {
     color: "var(--good)",
     term: "Green",
-    text: "a paper signal. The row says the line and price: “Paper signal: first-half under 24.5 at -110 on Hard Rock.” A visitor sees every rating before kickoff, in paper wording.",
+    text: "a paper signal. The row says the line and price: “Paper signal: first-half under 24.5 at -110 on Hard Rock.” Every rating shows before kickoff, in paper wording.",
   },
   {
     color: "var(--warn)",
@@ -64,7 +64,6 @@ const docName = (doc: string) => {
 };
 
 export default async function ResearchPage() {
-  const authed = await viewerIsAuthed();
   const positions = await getArmPositions();
   const cards = cardsFor(positions);
   const exploratoryCards = await Promise.all(
@@ -96,7 +95,7 @@ export default async function ResearchPage() {
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {cards.map((c) => (
-            <ArmCard key={c.meta.id} card={c} authed={authed} />
+            <ArmCard key={c.meta.id} card={c} />
           ))}
         </div>
       </section>
@@ -112,7 +111,7 @@ export default async function ResearchPage() {
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {exploratoryCards.map((c) => (
-            <ExploratoryCard key={c.meta.id} card={c} authed={authed} />
+            <ExploratoryCard key={c.meta.id} card={c} />
           ))}
         </div>
       </section>
@@ -153,18 +152,9 @@ export default async function ResearchPage() {
             only after {PROTOCOL.PRICING_NEEDED} such opportunities since the
             rule was frozen.
           </p>
-          <p>
-            The owner also bets first-half unders with real money as a personal
-            stake. That record is on{" "}
-            <Link
-              href="/results"
-              className="inline-flex min-h-6 items-center text-[var(--accent)] hover:underline"
-            >
-              Results
-            </Link>
-            , labelled as a personal stake, and is never evidence for any
-            strategy.
-          </p>
+          {/* Real money ended 2026-10-18 (final-2026 plan, D2): the one
+              sentence every page carries replaces the personal-stake note. */}
+          <p>{RESEARCH_BANNER}</p>
         </div>
       </section>
 

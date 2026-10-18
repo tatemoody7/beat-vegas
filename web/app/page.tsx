@@ -6,21 +6,13 @@ import {
   getGradeHealth,
   staleness,
 } from "@/lib/boardHealth";
-import {
-  getHomeBoard,
-  matchesFilters,
-  parseFilters,
-  tierCounts,
-} from "@/lib/homeBoard";
+import { getHomeBoard, matchesFilters, parseFilters } from "@/lib/homeBoard";
 import { getLatestCard } from "@/lib/card";
 import { getArmPositions } from "@/lib/armPositions";
 import { cardsFor } from "@/lib/research";
 import ResearchStrip from "@/app/components/ResearchStrip";
-import { getRulePause } from "@/lib/rulePause";
 import { resolveSeason } from "@/lib/season";
-import { gateGame } from "@/lib/signalGate";
 import { PASS_HEAD } from "@/lib/boardKey";
-import { viewerIsAuthed } from "@/lib/session";
 import { Fragment } from "react";
 import CardStatusBanner from "@/app/components/CardStatusBanner";
 import OpsBanner from "@/app/components/OpsBanner";
@@ -42,8 +34,9 @@ export const dynamic = "force-dynamic"; // always read live DB
 // strip, the slip header and the card panel headline, all three of which said
 // "no bets this week" in three different ways before the first game appeared.
 // Nothing follows the last game row, because Tate never scrolls past the board
-// (2026-09-10). Logging lives on /game/[id]; the bankroll lives on /results; the
-// card status banner is the only other thing on this page.
+// (2026-09-10). Since 2026-10-18 (final-2026 plan, D2/D17) nothing is logged
+// anywhere: the board is a read-only record, every warning renders for everyone,
+// and every rating reads in paper wording.
 export default async function BoardPage({
   searchParams,
 }: {
@@ -55,10 +48,6 @@ export default async function BoardPage({
     hr?: string;
   }>;
 }) {
-  // The owner's instruments (ops warnings, the My-teams chip, the pause
-  // switch's reason) render only behind the cookie; a visitor sees the board
-  // and the banners about the numbers on it (site review 2026-09-28).
-  const authed = await viewerIsAuthed();
   const seasons = await getSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
@@ -67,10 +56,7 @@ export default async function BoardPage({
   const weekArg =
     Number.isInteger(reqWeek) && reqWeek > 0 ? reqWeek : undefined;
   const board = await getHomeBoard(season, weekArg);
-  // The research season (docs/ROADMAP_2026.md): a visitor sees a game's rating
-  // only once it kicks off. Every count, list and row below reads the gated
-  // games, so nothing pre-kickoff reaches a visitor's page.
-  const all = board.games.map((g) => gateGame(g, authed));
+  const all = board.games;
   const results = staleness(await getGradeHealth(season));
   const buildHealth = buildStatus(await getBuildHealth());
   // The card's own health — "paper only, some inputs are missing", "built by
@@ -79,15 +65,15 @@ export default async function BoardPage({
   // about to bet off, not about a bet already placed (Tate 2026-09-13).
   const card =
     board.week === null ? null : await getLatestCard(season, board.week);
-  // The real-money switch. The research-season banner (app/layout.tsx) says
-  // money is paused to everyone; only an unreadable switch needs its own
-  // warning, and only the owner can act on it.
-  const pause = await getRulePause();
-
   const filters = parseFilters(sp);
   const games = all.filter((g) => matchesFilters(g, filters));
-  const counts = tierCounts(games);
   const filtered = games.length !== all.length;
+  const signals = games.filter(
+    (g) => !g.kickedOff && g.hold === null && g.edge.tier === "BET",
+  ).length;
+  const watched = games.filter(
+    (g) => !g.kickedOff && g.edge.tier === "EDGE",
+  ).length;
   // A game that has kicked off is not a decision: it drops out of the ranked
   // list into its own group at the end, instead of sitting among the week's
   // bets with no rank.
@@ -143,24 +129,13 @@ export default async function BoardPage({
         <BoardFilters current={filters} />
       </div>
 
-      {/* The build warnings are the owner's (Tate 2026-10-10): a visitor's
-          first screen is the board, not our ops. */}
-      {authed && <CardStatusBanner card={card} />}
+      {/* The build and ops warnings render for everyone (2026-10-18, D17):
+          a research record shows its own state. */}
+      <CardStatusBanner card={card} />
 
-      {authed && <OpsBanner />}
+      <OpsBanner />
 
-      {authed && pause.paused === "unreadable" && (
-        <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--text)]">
-            Real money is off until the pause switch can be read.
-          </p>
-          <p className="mt-1">
-            {`${pause.reason}. A switch we cannot see is not a switch that is off. Paper picks still log.`}
-          </p>
-        </div>
-      )}
-
-      {authed && buildHealth.missed && (
+      {buildHealth.missed && (
         <div className="bv-card mb-4 border-l-2 border-[var(--bad)] p-4 text-sm text-[var(--text-muted)]">
           <p className="font-medium text-[var(--text)]">
             {`${buildHealth.day}'s build did not run.`}
@@ -206,9 +181,7 @@ export default async function BoardPage({
             Hard Rock has not posted first-half lines yet.
           </p>
           <p className="mt-1">
-            {authed
-              ? `First-half totals usually post later in the week. Each game says the line and price that would make it a paper signal.`
-              : `First-half totals usually post later in the week.`}
+            {`First-half totals usually post later in the week. Each game says the line and price that would make it a paper signal.`}
           </p>
         </div>
       )}
@@ -219,22 +192,11 @@ export default async function BoardPage({
         </p>
       ) : (
         <>
-          {/* The tier counts are a pre-kickoff signal: the owner's only. */}
-          {authed && (
+          {/* The tier-count line went with the log path (2026-10-18): the
+              badges say it. The pre-filter count stays for the Hard Rock chip. */}
+          {filtered && (
             <p className="mb-3 text-sm text-[var(--text-dim)]">
-              <span className="font-mono font-semibold text-[var(--good)]">
-                {counts.bet}
-              </span>
-              {` ${counts.bet === 1 ? "bet" : "bets"} · `}
-              <span className="font-mono font-semibold text-[var(--warn)]">
-                {counts.edge}
-              </span>
-              {` watch · `}
-              <span className="font-mono font-semibold text-[var(--bad)]">
-                {counts.pass}
-              </span>
-              {` pass`}
-              {filtered ? ` · ${all.length} games before filters` : ""}
+              {`· ${all.length} games before filters`}
             </p>
           )}
 
@@ -244,7 +206,7 @@ export default async function BoardPage({
             </p>
           ) : (
             <>
-              {authed && counts.bet === 0 && counts.edge === 0 && (
+              {signals === 0 && watched === 0 && (
                 <p className="bv-card mb-4 p-5 text-sm text-[var(--text-muted)]">
                   {`Nothing clears the bar this week: no paper signals, nothing to watch. Zero is a normal week.`}
                 </p>

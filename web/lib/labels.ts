@@ -154,7 +154,7 @@ export function blockerTag(
 
 // --- pick reasons -------------------------------------------------------------
 
-export type ReasonKey = PickReason | "untagged" | "off_policy";
+export type ReasonKey = PickReason | "untagged";
 
 export const REASON_TEXT: Record<ReasonKey, { long: string; short: string }> = {
   model_gap: {
@@ -164,7 +164,6 @@ export const REASON_TEXT: Record<ReasonKey, { long: string; short: string }> = {
   price_edge: { long: "Price only — no model number", short: "price only" },
   manual: { long: "Your own call", short: "your call" },
   untagged: { long: "Logged before we tracked this", short: "untagged" },
-  off_policy: { long: "Real money on a Watch or Pass", short: "off the rules" },
 };
 
 // --- degraded card inputs -----------------------------------------------------
@@ -320,40 +319,17 @@ export type HrQuote = {
  * is the last MAIN line on file, so it carries its capture time in ET:
  * "u27.5 -105 · as of Thu 4:07pm". `hrAsOf` is naive UTC text from Postgres.
  */
-/**
- * How long ago a poll last SAW Hard Rock's price (2026-10-14, programme B5):
- * "price seen 3 h ago". The board's verdict carries no age, while the server
- * refuses a ticket on a price older than `maxAgeH` (lineCheck.HR_PRICE_MAX_AGE_H,
- * passed in so this module stays free of the database); past it the line says
- * so before you try to log. Display only: nothing here changes a verdict.
- * `seenAt` is naive UTC text from Postgres.
- */
-export function priceAgeText(
-  seenAt: string | null | undefined,
-  now: Date,
-  maxAgeH: number,
-): string | null {
-  if (!seenAt) return null;
-  const t = new Date(`${seenAt.trim().replace(" ", "T")}Z`);
-  if (Number.isNaN(t.getTime())) return null;
-  const h = Math.floor((now.getTime() - t.getTime()) / 3_600_000);
-  const ago = h < 1 ? "price seen under an hour ago" : `price seen ${h} h ago`;
-  return h >= maxAgeH
-    ? `${ago} · refresh before logging (a bet needs one seen within ${maxAgeH} h)`
-    : ago;
-}
-
-/** No source here confirms a starting QB: Rotowire's public feed is capped at a
- *  few players from that day's games, and `game_previews.qb_out` is True or
- *  unknown, never "playing" (2026-10-17). A QB known to be out already blocks
- *  the BET, so every real-money signal that remains carries this line (audit
- *  2026-10-17, Tate: allow the BET, warn on the row and the log form). */
-export const QB_UNKNOWN_TEXT = "QB status unknown — check before logging";
-
 /** The Board's one honest line (audit 2026-10-17, Tate): ranks are the
  *  model's view, green is a paper signal, and a gap is not an edge. */
 export const BOARD_HONESTY_TEXT =
   "Ranked by how far Hard Rock's line sits above our number. Green marks a paper signal, not a proven bet: this season our number has missed first halves by more than Hard Rock's line has, so a large gap is not a betting advantage.";
+
+/** The one sentence every page carries, in the footer strip (final-2026 plan,
+ *  D15, Tate 2026-10-18). It replaced the research-season banner of roadmap
+ *  v1.4/v1.7/v2.0, which named the owner's personal stake: real money ended
+ *  2026-10-18 and nothing on the site is a bet. */
+export const RESEARCH_BANNER =
+  "A college-football betting research lab. Six strategies on paper, judged against the market's closing price. Nothing here is a bet.";
 
 export function hrQuoteText(q: HrQuote | null | undefined): string {
   if (q == null || q.hrLine == null) return "no line yet";

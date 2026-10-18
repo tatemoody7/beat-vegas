@@ -50,7 +50,7 @@ test("a moved route keeps its query string", async ({ request }) => {
 test("the three tabs and the game route are not redirects", async ({
   request,
 }) => {
-  for (const path of ["/", "/results", "/research", "/records", "/login"]) {
+  for (const path of ["/", "/results", "/research", "/records"]) {
     const res = await request.get(path, { maxRedirects: 0 });
     expect(res.status(), path).toBe(200);
   }

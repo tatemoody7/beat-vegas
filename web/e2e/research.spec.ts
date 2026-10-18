@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { etDateLabel } from "../lib/et";
 import { armPositionsFor } from "./fixture/expected.mjs";
 import { seededNow } from "./helpers/fixture";
+import { RESEARCH_BANNER } from "../lib/labels";
 
 // Research (2026-10-14, programme step 11): the public record of what is being
 // tested. The cards come from the stored Monday read (arm_positions), never a
@@ -44,7 +45,8 @@ test.describe("research", () => {
       "12 of 30 readings · 2 weeks of 3 · 2 excluded · 14 logged",
     );
     await expect(one).toContainText("EV vs close -1.2% (-5.1% to +2.6%)");
-    // Signed in, the run id shows; dates read "Mon Oct 19" (Q7, 2026-10-15).
+    // The run id shows for everyone (2026-10-18, D17); dates read "Mon Oct 19"
+    // (Q7, 2026-10-15).
     await expect(one).toContainText("run 38590000009");
     await expect(one).toContainText(
       `Next read ${etDateLabel(rows[0].next_read)}`,
@@ -114,7 +116,7 @@ test.describe("research", () => {
     ).toHaveCount(0);
   });
 
-  test("explains the judge in plain words with the protocol's numbers, and names the personal stake as never evidence", async ({
+  test("explains the judge in plain words with the protocol's numbers, and says nothing here is a bet", async ({
     page,
   }) => {
     await page.goto("/research");
@@ -123,7 +125,11 @@ test.describe("research", () => {
     await expect(how).toContainText("3% or better");
     await expect(how).toContainText("200 readings");
     await expect(how).toContainText("40 such opportunities");
-    await expect(how).toContainText("never evidence for any strategy");
+    // Real money ended 2026-10-18 (D2): the personal-stake note is gone and
+    // the one sentence every page carries stands in its place.
+    await expect(how).toContainText(RESEARCH_BANNER);
+    await expect(how).not.toContainText("personal stake");
+    await expect(how).not.toContainText("real money");
   });
 
   test("lists the closed hypotheses from the registry with their verdicts", async ({
@@ -189,10 +195,8 @@ test.describe("research", () => {
   });
 });
 
-test.describe("research, signed out", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test("a visitor reads the same cards and no dollar figure", async ({
+test.describe("research, read by anyone", () => {
+  test("the cards carry their run ids, the intro is one line, and no dollar figure shows", async ({
     page,
   }) => {
     await page.goto("/research");
@@ -200,8 +204,8 @@ test.describe("research, signed out", () => {
       page.locator('section[aria-label="The strategies on paper"] article'),
     ).toHaveCount(7);
     expect(await page.locator("body").innerText()).not.toMatch(/\$\s?\d/);
-    // The run id is the owner's detail (Q7, 2026-10-15); the intro is one line.
-    await expect(page.getByText(/run \d{6,}/)).toHaveCount(0);
+    // The run id is public since 2026-10-18 (D17): there is no owner's view.
+    await expect(page.getByText(/run \d{6,}/).first()).toBeVisible();
     await expect(page.locator(".bv-page-sub")).toHaveText(
       "Every strategy runs on paper and is judged by its value against the closing line.",
     );

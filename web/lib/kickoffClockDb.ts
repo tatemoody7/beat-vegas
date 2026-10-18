@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { isoFromNaive } from "@/lib/betLedgerDb";
 import type { KickZones } from "@/lib/kickoffClock";
 
 // The loader behind lib/kickoffClock: the kickoff, the venue's zone and the
@@ -13,6 +12,20 @@ type Raw = {
   venue_tz: string | null;
   away_home_tz: string | null;
 };
+
+/** A `timestamp without time zone` read as text ("2026-09-18 20:12:04.5")
+ *  holds UTC: append the Z ourselves. Handing the bare value to a Date is how
+ *  you get a 4-5 h shift (lib/boardHealth.ts makes the same move). */
+export function isoFromNaive(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = s.trim();
+  const d = new Date(
+    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(t)
+      ? `${t.replace(" ", "T")}Z`
+      : t,
+  );
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 const isMissingColumn = (e: unknown): boolean =>
   /column .* does not exist|no such column/i.test(

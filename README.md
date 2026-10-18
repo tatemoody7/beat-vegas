@@ -143,9 +143,9 @@ readable by anyone with the link (the password is only needed to log picks), at
 plus a game page: **Board** (the home page — one rolling week grouped by day, every
 game with a Hard Rock total ranked best to worst, a Bet / Watch / Pass word and one
 line saying what to do; each row links to **`/game/[id]`**, where the decision, the
-lines, the reasons, the news and the Log-pick button live), **Results** (read-only:
-every bet as logged with its record in units, line value and the CSV; the owner's
-pick list with its controls only when signed in), **Research** (`/research`, since 2026-10-14: one
+lines, the reasons and the news live), **Record** (`/results`, since 2026-10-18: the
+paper strategies' forward picks with their value against the close, the pricing
+study's forward opportunities, the season comparison), **Research** (`/research`, since 2026-10-14: one
 card per registered hypothesis from the stored Monday read, the protocol in plain words, the closed
 hypotheses with their verdicts, how to read the Board, the terms; `/how-it-works` redirects here); `/records` is
 every rated game by week, with a CSV). Plain-English,
@@ -153,10 +153,11 @@ modern-sportsbook design system (deep navy + electric-cyan accent; `.bv-*` class
 in `web/app/globals.css`).
 
 **Architecture:** Neon Postgres is the single source of truth. GitHub Actions writes
-it; the Vercel app reads it and writes manual picks. `web/lib/*.ts` hold the
-SQL/scoring logic; API routes under `web/app/api/` mirror those queries.
-`GET /api/health` (ungated: flags, coverage, dispatch times and verdicts; the owner's detail
-only with the cookie) is what the smoke check and the ship skill read after a deploy.
+it; the Vercel app only reads it (a read-only research record since 2026-10-18: no
+login, no write route). `web/lib/*.ts` hold the SQL/scoring logic; the API routes
+under `web/app/api/` are `/api/records` (CSV), `/api/health` and `/api/cron/[job]`.
+`GET /api/health` (public: flags, coverage, budgets, dispatch times and verdicts) is
+what the smoke check and the ship skill read after a deploy.
 
 ### Local dev
 ```bash
@@ -167,14 +168,14 @@ npx vitest run         # tests
 ```
 `web/.env` holds `DATABASE_URL` (gitignored): Neon (prod data) or the local
 Postgres sandbox from `scripts/simulate_week.py` (use this on the campus network,
-which cannot reach Neon). Leave `APP_PASSWORD` unset locally to keep the write gate off.
+which cannot reach Neon). There is no password: the site is read-only.
 
 ### Deploy loop
 1. Edit code in `web/`, `npm run lint` / `npm run format`, test with `npm run dev`.
 2. Commit and **push to `main`** → Vercel auto-builds and deploys production in
    ~1 minute. Any other branch makes a Preview URL, not production.
 3. Live env vars (Vercel → Settings → Environment Variables): `DATABASE_URL`
-   (Neon), `APP_PASSWORD`, `BANKROLL_USD`, `UNIT_USD`.
+   (Neon), `CRON_SECRET`, `GITHUB_DISPATCH_TOKEN`.
 
 **Gotchas:**
 - **Commit author must be GitHub-linked.** Vercel blocks deploys whose commit

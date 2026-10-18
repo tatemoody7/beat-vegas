@@ -8,10 +8,8 @@ import {
   opsWarnings,
   staleness,
 } from "@/lib/boardHealth";
-import { getRulePause } from "@/lib/rulePause";
 import { currentCfbSeason } from "@/lib/season";
-import { viewerIsAuthed } from "@/lib/session";
-import { publicBody, type HealthBody } from "@/lib/healthBody";
+import { type HealthBody } from "@/lib/healthBody";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +17,11 @@ export const dynamic = "force-dynamic";
 // (cfb-sunday-ops checks lastFullGameCapture over HTTPS; Neon:5432 is blocked on campus).
 // Since 2026-09-13 it also reports GRADING freshness: grade.yml died for two days
 // and the only signal was a failed-run email nobody read.
-// Exposes only aggregate timestamps/counts — no lines, picks, or edges — so
-// it is exempt from the password gate in middleware.ts. Since 2026-10-14
-// (programme step 3) the OWNER's details ride only on the cookie: the real-money
-// pause switch, the API budgets, each job's run note and the run links inside
-// the warnings. A visitor still reads ok, the stale/missed flags, the capture
-// counts, close coverage, dispatch times and each job's verdict (`publicBody`).
+// Exposes only aggregate timestamps/counts — no lines, picks, or edges. Since
+// 2026-10-18 (the site is a read-only record, D17) everyone reads the same
+// body: the API budgets, each job's run note and the run links inside the
+// warnings are public with the rest. The real-money pause switch left the body
+// with the log path: nothing on the site reads it any more.
 export async function GET() {
   try {
     const rows = await prisma.$queryRaw<
@@ -45,16 +42,10 @@ export async function GET() {
     const r = rows[0];
     const grading = staleness(await getGradeHealth(currentCfbSeason()));
     const build = buildStatus(await getBuildHealth());
-    const pause = await getRulePause();
     const gauges = await getGauges();
     const warnings = opsWarnings(gauges);
-    const authed = await viewerIsAuthed();
-    const full: HealthBody = {
+    const body: HealthBody = {
       ok: true,
-      // The real-money pause (docs/STOPPING_RULE.md): thrown, or unreadable —
-      // both mean real money is refused right now.
-      rulePaused: pause.paused === true,
-      rulePauseReadable: pause.paused !== "unreadable",
       lastFullGameCapture: r?.last_fg_capture?.toISOString() ?? null,
       resultsStale: grading.stale,
       buildMissed: build.missed,
@@ -107,7 +98,7 @@ export async function GET() {
       },
       warnings: warnings.map((w) => w.text),
     };
-    return NextResponse.json(authed ? full : publicBody(full));
+    return NextResponse.json(body);
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }

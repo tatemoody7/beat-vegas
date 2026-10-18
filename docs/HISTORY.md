@@ -10,6 +10,34 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 (THE SITE IS A READ-ONLY RESEARCH RECORD: THE LOG PATH, THE LEDGER AND THE LOGIN GO).**
+  Final-2026 plan PR-12+13, decisions D2 / D16 / D17. **What left the site**: the owner log path
+  (`POST`/`PATCH`/`DELETE /api/picks`, `/api/price-refresh`, `lib/ticketPolicy.ts`, `priceRefresh.ts`, the
+  write half of `pickRules.ts` and `picks.ts`, the log form and button, the "bet logged" / cap-slot /
+  past-the-cap chips, the price-age note, the QB-unknown warning, the "Bet one unit" opening — every BET
+  sentence now opens `Paper signal:` for everyone); the personal real-money ledger (`BetLedger`,
+  `BankrollCurve`, `PicksList`, `personalStake.ts`, `betLedgerDb.ts`, `loggedAs.ts`, `clvDirection.ts`,
+  `curveTicks.ts`, `weeklyReview.ts`, the week picker, `/api/bets` and its CSV); the login and lock
+  (`/login`, `/api/login`, `/api/logout`, `lib/auth.ts`, `session.ts`, `viewerIsAuthed()`, Lock/Unlock in
+  the footer, `HeaderChrome`); `lib/signalGate.ts` (visitor = owner: ratings, our number, `/records` and
+  its CSV show before kickoff too); `lib/rulePause.ts`, the pause banner and the `rulePaused` keys in
+  `/api/health` (the switch stays ON in `app_settings`; nothing on the site reads it). **Results is
+  Record** (path `/results` kept): the arms' forward picks with their EV readings, then the pricing
+  opportunities, then the season comparison — market research, the paper rule, the full-game market —
+  with no Personal-stake row. **The 30 real tickets stay in `manual_picks`**, untouched, and appear only
+  in the final report (`docs/program/SEASON_2026_FINAL.md`, PR-17). Ops and build warnings, run ids and
+  the API budgets render for everyone. One sentence on every page (`labels.ts::RESEARCH_BANNER`): "A
+  college-football betting research lab. Six strategies on paper, judged against the market's closing
+  price. Nothing here is a bet." **The one secret left is `CRON_SECRET`** (`lib/gate.ts::cronGate` in
+  `middleware.ts`, matcher `/api/cron/:path*`, and again inside the route); `APP_PASSWORD` is read by
+  nothing and Tate can remove it from Vercel after the deploy. Guards: `tests/test_pick_columns_parity.py`
+  now refuses any `INSERT INTO manual_picks` under `web/app` or `web/lib` (`beatvegas/picks.py::add_pick`
+  is the one writer); `test_gate_parity.py` reads `verdict.ts` and `edge.ts` only; the e2e lane signs
+  nobody in (no `APP_PASSWORD`, no storageState), `ledger-integrity.spec.ts` asserts the gone routes
+  answer 404, `login.spec.ts` is deleted, `FEATURE_PARITY.md` carries 66 lines. The early-season sentence
+  in `edge.ts` still says "real money needs 2" because it mirrors `card.py` (frozen Python) and no FBS
+  team has under two games from week 8 on. Shots at 1440 and 390: overflow 0 on every route, header 69.
+
 - **2026-10-18 ~22:00 UTC (THE CLOSED STUDIES MOVE TO `scripts/archive/`).** Final-2026 plan PR-19. Twenty-seven
   scripts whose question is closed (or whose collector was retired) left `scripts/` by `git mv`, so the brief, the
   study menu and the test suite carry only what still runs: the gates and blends (`blend_gate`, `gates_study`,

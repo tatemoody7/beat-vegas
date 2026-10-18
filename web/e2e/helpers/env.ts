@@ -1,9 +1,8 @@
 // The few values the config, the setup project and the specs all share.
-// Nothing here is a secret: the password never leaves the machine running
-// the suite, and the database URL is the local sandbox unless CI overrides it.
+// Nothing here is a secret: the database URL is the local sandbox unless CI
+// overrides it. There is no password any more (2026-10-18, D17): the site is
+// a read-only record and the e2e lane signs nobody in.
 
-export const E2E_PASSWORD = "e2e-only-not-a-secret";
-export const AUTH_FILE = "e2e/.auth/user.json";
 export const DEFAULT_DATABASE_URL =
   "postgresql://postgres@127.0.0.1:54329/beatvegas_e2e";
 

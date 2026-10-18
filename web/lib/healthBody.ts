@@ -1,6 +1,8 @@
-// The /api/health body and its public projection (2026-10-14, programme step 3).
-// Kept out of the route file so the projection can be unit-tested: a Next route
-// module may export only its handlers.
+// The /api/health body (2026-10-14, programme step 3). Kept out of the route
+// file because a Next route module may export only its handlers. Since
+// 2026-10-18 (the site is a read-only record, D17) there is one body for
+// everyone: the pause switch left it (nothing on the site reads `rule_paused`
+// any more) and the owner-only projection went with the cookie.
 
 export type JobHealth = {
   verdict: string | null;
@@ -9,8 +11,6 @@ export type JobHealth = {
 };
 export type HealthBody = {
   ok: true;
-  rulePaused: boolean;
-  rulePauseReadable: boolean;
   lastFullGameCapture: string | null;
   resultsStale: boolean;
   buildMissed: boolean;
@@ -33,33 +33,3 @@ export type HealthBody = {
   };
   warnings: string[];
 };
-
-/** What a visitor reads: the body without the owner's operational detail —
- *  no pause switch, no API budgets, no per-job run note, and each warning cut
- *  before its "Run:" link. Keys are removed, never nulled, so a reader cannot
- *  mistake "hidden" for "off". */
-export function publicBody(full: HealthBody) {
-  const {
-    rulePaused: _p,
-    rulePauseReadable: _r,
-    gauges: { cfbdCallsRemaining: _c, oddsCreditsRemaining: _o, ...gauges },
-    ...rest
-  } = full;
-  void _p;
-  void _r;
-  void _c;
-  void _o;
-  return {
-    ...rest,
-    gauges: {
-      ...gauges,
-      health: Object.fromEntries(
-        Object.entries(gauges.health).map(([id, h]) => [
-          id,
-          { verdict: h.verdict, at: h.at },
-        ]),
-      ),
-    },
-    warnings: full.warnings.map((w) => w.replace(/ Run: \S+$/, "")),
-  };
-}

@@ -4,16 +4,17 @@ import { FACTOR_NOTE } from "../lib/score";
 
 // /game/[id] (app/components/GameDetail.tsx): the decision block must show the
 // SAME numbers the board row carried (it rebuilds the whole week to get the
-// rank and cap slot), the kill numbers where the sentence names them, the log
-// control in each of its states, and the per-book line movement.
+// rank), the kill numbers where the sentence names them, and the per-book line
+// movement. Since 2026-10-18 (final-2026 plan, D2) there is no log control, no
+// "bet logged" or cap chip, and every rating reads in paper wording.
 
 const { expected, rowById } = fixture();
 
 const fmt = (n: number | null, dp = 1) => (n === null ? "—" : n.toFixed(dp));
 const american = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 
-const BET_LOGGED = 900001; // BET #1, a real ticket already on it
-const BET_OPEN = 900002; // BET #2, nothing logged
+const BET_LOGGED = 900001; // BET #1 (a frozen real ticket sits on it in the database)
+const BET_OPEN = 900002; // BET #2
 const PRICE_BLOCKED = 900003; // EDGE, blocker price
 const GAP_SHORT = 900005; // EDGE, blocker gap
 const HR_ALT = 900015; // EDGE, blocker hr_alt_line: the feed's newest HR quote is an alternate
@@ -74,15 +75,6 @@ test.describe("the game page", () => {
     );
   });
 
-  test("carries the cap slot and the logged chip on the ticketed BET", async ({
-    page,
-  }) => {
-    const r = rowById.get(BET_LOGGED)!;
-    await page.goto(`/game/${BET_LOGGED}`);
-    const chips = page.locator("section.bv-card").first().locator(".bv-badge");
-    await expect(chips).toContainText(["bet logged", `cap slot ${r.capRank}`]);
-  });
-
   test("a Hard Rock alternate line: the tile shows the last main line with its time, paper only", async ({
     page,
   }) => {
@@ -110,99 +102,51 @@ test.describe("the game page", () => {
       `Hard Rocku${fmt(r.check!.hrLine)} ${american(r.check!.hrUnderPrice!)} · as of ${when}`,
     );
     await expect(tiles.locator("p.text-base")).toHaveText(r.edge.action);
-    await expect(
-      page.getByRole("button", { name: "Log a real ticket" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Log this bet" }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
   });
 
-  test.describe("the log control, signed in", () => {
-    test("offers 'Log this bet' on an open BET and 'Log a real ticket' on a Watch", async ({
-      page,
-    }) => {
-      await page.goto(`/game/${BET_OPEN}`);
-      await expect(
-        page.getByRole("button", { name: "Log this bet" }),
-      ).toBeVisible();
-      await page.goto(`/game/${GAP_SHORT}`);
-      await expect(
-        page.getByRole("button", { name: "Log a real ticket" }),
-      ).toBeVisible();
-    });
-
-    test("says a ticketed game is already logged and a played one has kicked off", async ({
-      page,
-    }) => {
-      await page.goto(`/game/${BET_LOGGED}`);
-      await expect(
-        page.getByText("Already logged. It is on Results."),
-      ).toBeVisible();
-      await page.goto(`/game/${PLAYED}`);
-      await expect(page.getByText("Already kicked off.")).toBeVisible();
-      await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
-    });
-
-    test("opens the pre-filled form with Hard Rock's line and price", async ({
-      page,
-    }) => {
-      const r = rowById.get(BET_OPEN)!;
-      await page.goto(`/game/${BET_OPEN}`);
-      await page.getByRole("button", { name: "Log this bet" }).click();
-      const form = page.locator("form.bv-card");
-      await expect(form).toContainText(
-        `${r.game.away} @ ${r.game.home} — first-half under, one unit.`,
-      );
-      await expect(form.locator('input[type="number"]').first()).toHaveValue(
-        String(r.check!.hrLine),
-      );
-      await expect(form.locator('input[type="number"]').nth(1)).toHaveValue(
-        String(r.check!.hrUnderPrice),
-      );
-      await expect(
-        form.getByRole("button", { name: /Log bet \(\$10\)/ }),
-      ).toBeVisible();
-      await form.getByRole("button", { name: "Cancel" }).click();
-      await expect(form).toHaveCount(0);
-    });
-  });
-
-  test.describe("signed out", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
-
-    test("a visitor reads the decision and the Hard Rock note, with no way to log", async ({
-      page,
-    }) => {
-      await page.goto(`/game/${BET_OPEN}`);
+  // The read-only record (2026-10-18, D2/D17): the decision block carries the
+  // Hard Rock note and nothing to click; the ticketed game and the open one
+  // read the same way, with no chip, no price age and no QB warning.
+  test("the decision block carries the Hard Rock note and offers no log control, chip or warning", async ({
+    page,
+  }) => {
+    for (const id of [BET_OPEN, BET_LOGGED]) {
+      await page.goto(`/game/${id}`);
       const card = page.locator("section.bv-card").first();
       await expect(card).toContainText(
         "Priced at Hard Rock Bet (Florida). Your book’s first-half total may differ; the line and price to beat are the ones shown.",
       );
-      await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
       await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
-    });
-
-    // Roadmap v1.7 (Tate 2026-10-10; lib/signalGate): before kickoff a visitor
-    // sees the owner's read -- the rating, our number, the factor read -- in
-    // paper wording, never bet wording; a played game shows its result.
-    test("a visitor sees the rating before kickoff in paper wording, and the result after it", async ({
-      page,
-    }) => {
-      await page.goto(`/game/${BET_OPEN}`);
-      const card = page.locator("section.bv-card").first();
-      await expect(card).toContainText("Paper signal:");
-      await expect(card).not.toContainText("Bet one unit");
-      await expect(card).not.toContainText("at kickoff");
+      await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);
+      await expect(page.getByText("Already logged")).toHaveCount(0);
+      await expect(card.locator(".bv-badge")).toHaveCount(0);
+      await expect(page.getByTestId("price-age")).toHaveCount(0);
+      await expect(page.getByTestId("qb-unknown")).toHaveCount(0);
       await expect(
-        page.getByText("The factor read publishes at kickoff."),
+        page.getByText(/cap slot \d|bet cap|bet logged/),
       ).toHaveCount(0);
-      // A played game is history: its result is public.
-      await page.goto(`/game/${PLAYED}`);
-      await expect(page.locator("section.bv-card").first()).toContainText(
-        "Won · first half 27, line 30.5",
-      );
-    });
+    }
+  });
+
+  // Every rating reads in paper wording before kickoff; a played game shows
+  // its result.
+  test("the rating reads in paper wording before kickoff, and the result after it", async ({
+    page,
+  }) => {
+    await page.goto(`/game/${BET_OPEN}`);
+    const card = page.locator("section.bv-card").first();
+    await expect(card).toContainText("Paper signal:");
+    await expect(card).not.toContainText("Bet one unit");
+    await expect(card).not.toContainText("at kickoff");
+    await expect(
+      page.getByText("The factor read publishes at kickoff."),
+    ).toHaveCount(0);
+    // A played game is history: its result is public.
+    await page.goto(`/game/${PLAYED}`);
+    await expect(page.locator("section.bv-card").first()).toContainText(
+      "Won · first half 27, line 30.5",
+    );
   });
 
   // Q5 (Tate 2026-10-15): the factors explain the line in scoring words; the

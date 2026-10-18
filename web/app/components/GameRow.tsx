@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { american, capitalize, fmt } from "@/lib/format";
+import { capitalize, fmt } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
-import { hrQuoteText, priceAgeText, QB_UNKNOWN_TEXT } from "@/lib/labels";
-import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
-import { WEEKLY_BET_CAP } from "@/lib/verdict";
+import { hrQuoteText } from "@/lib/labels";
 import { passShort } from "@/lib/edge";
 import ScoreBadge from "@/app/components/ScoreBadge";
 import TeamLogo from "@/app/components/TeamLogo";
@@ -17,21 +15,14 @@ import TeamLogo from "@/app/components/TeamLogo";
 //
 // The badge is rank plus colour with no tier word: "Watch" was true of 35 of 49
 // games, so it discriminated nothing, and the action line already says what to
-// do. A live BET row is lit green — lit means act.
-//
-// Only the two chips that change whether you should bet survive here (a bet
-// already logged, and being past the weekly cap). Early season and the blocker
-// tag are on the game page; kicked off is already the badge reading LIVE.
+// do. A lit green row is a paper signal, nothing more (2026-10-18, D2): the
+// "bet logged" and cap chips, the price age and the QB warning left with the
+// log path. Early season and the blocker tag are on the game page; kicked off
+// is already the badge reading LIVE.
 
 export default function GameRow({ g }: { g: HomeGame }) {
   const { row, edge, check } = g;
   const hr = hrQuoteText(check);
-  // A lit BET row says how old its price is (B5): the log refuses one older
-  // than HR_PRICE_MAX_AGE_H, and the board's colour cannot show that.
-  const age =
-    edge.tier === "BET" && !g.kickedOff
-      ? priceAgeText(check?.hrSeenAt, new Date(), HR_PRICE_MAX_AGE_H)
-      : null;
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null
@@ -72,27 +63,8 @@ export default function GameRow({ g }: { g: HomeGame }) {
             </span>
           </div>
 
-          {(g.picked || g.overCap) && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {g.picked && (
-                <span className="bv-badge bv-badge--accent">bet logged</span>
-              )}
-              {g.overCap && (
-                <span className="bv-badge bv-badge--push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</span>
-              )}
-            </div>
-          )}
-
           <div className="mt-1.5 font-mono text-xs text-[var(--text-muted)]">
             {hr}
-            {age && (
-              <span
-                data-testid="price-age"
-                className="ml-2 font-sans text-[var(--text-dim)]"
-              >
-                {age}
-              </span>
-            )}
           </div>
 
           <p
@@ -106,14 +78,6 @@ export default function GameRow({ g }: { g: HomeGame }) {
               (g.kickedOff ? null : passShort(edge)) ??
               edge.action}
           </p>
-          {lit && (
-            <p
-              data-testid="qb-unknown"
-              className="mt-1 text-xs text-[var(--warn)]"
-            >
-              {QB_UNKNOWN_TEXT}
-            </p>
-          )}
         </div>
 
         <span

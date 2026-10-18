@@ -15,8 +15,6 @@ import {
 } from "@/lib/records";
 import { american } from "@/lib/format";
 import { resolveSeason } from "@/lib/season";
-import { viewerIsAuthed } from "@/lib/session";
-import { gateRecords } from "@/lib/signalGate";
 import { barRule } from "@/lib/glossary";
 import { getScheduledCard } from "@/lib/card";
 import SeasonFallbackNotice from "@/app/components/SeasonFallbackNotice";
@@ -101,10 +99,10 @@ export default async function RecordsPage({
   const seasons = await getRecordSeasons();
   const sp = await searchParams;
   const { season, fallbackFrom } = resolveSeason(seasons, sp.season);
-  // Our number, the gaps and the rank stay blank for a visitor until kickoff
-  // (research season, lib/signalGate). Totals read only played games.
+  // Everyone reads the same rows (2026-10-18, D17): our number and the gap
+  // show before kickoff too. Totals read only played games.
   const raw: RecordRow[] = seasons.length ? await getSeasonRecords(season) : [];
-  const all = gateRecords(raw, await viewerIsAuthed(), new Date());
+  const all = raw;
 
   // A season with no Hard Rock line on file (everything before the 2026 cards)
   // opens on Market Research; its Hard Rock tab says why it is empty.
@@ -204,7 +202,10 @@ export default async function RecordsPage({
           </Link>
         ))}
       </div>
-      <p data-testid="records-totals" className="mb-5 text-sm text-[var(--text-muted)]">
+      <p
+        data-testid="records-totals"
+        className="mb-5 text-sm text-[var(--text-muted)]"
+      >
         {totalsLine}
       </p>
 
@@ -271,8 +272,7 @@ export default async function RecordsPage({
                   <tr key={i}>
                     <td className="bv-num text-[var(--text-dim)]">{r.week}</td>
                     <td className="text-[var(--text)]">
-                      {r.away}{" "}
-                      <span className="text-[var(--text-dim)]">@</span>{" "}
+                      {r.away} <span className="text-[var(--text-dim)]">@</span>{" "}
                       {r.home}
                       {r.scoredAfterKickoff && (
                         <span className="bv-badge bv-badge--push ml-2">

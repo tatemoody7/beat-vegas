@@ -41,8 +41,8 @@ skill's logic here.**
 
 - Browser pages: list `web/app/**/page.tsx`; map dir → URL path
   (`web/app/results/page.tsx` → `/results`, `web/app/page.tsx` → `/`). Current
-  set (3 tabs + a game page + records + login): `/` (Board), `/results`,
-  `/research`, `/records`, `/game/[id]`, `/login`. The thirteen retired
+  set (3 tabs + a game page + records): `/` (Board), `/results` (Record),
+  `/research`, `/records`, `/game/[id]`. The thirteen retired
   pages are `next.config.ts` redirects with `permanent: true` (`movedRoutes`),
   so each returns a **308** — not the 307 a `redirect()` stub sent — to its new
   home: `/board`, `/preview`, `/line-check`, `/movement` → `/`; `/ledger`,
@@ -51,29 +51,22 @@ skill's logic here.**
   `/research/records`, `/proof/records` → `/records`. The query string is
   forwarded. Check the status code and
   the `location` header and nothing else. If you cap the list, say so.
-- `web/app/api/**/route.ts` for context: `POST /api/picks`,
-  `PATCH`/`DELETE /api/picks/[id]`, `GET /api/records?season=` (CSV),
-  `GET /api/health` (public), `POST /api/login`, `POST /api/logout`,
-  `GET /api/cron/[job]` (Vercel cron, `CRON_SECRET`). There are no GET data APIs
-  any more — pages read the `lib/*` loaders directly, so data is checked via the
-  pages plus the network panel.
+- `web/app/api/**/route.ts` for context: `GET /api/records?season=` (CSV),
+  `GET /api/health` (public), `GET /api/cron/[job]` (Vercel cron, `CRON_SECRET`).
+  There are no write routes and no GET data APIs any more — pages read the
+  `lib/*` loaders directly, so data is checked via the pages plus the network
+  panel.
 
 ## 2. Auth
 
-Since 2026-09-16 every page and every GET is public; `APP_PASSWORD` guards
-WRITES only (`lib/gate.ts::gateDecision` in `web/middleware.ts`, plus
-`requireAuth` inside every pick route): an unsigned `POST /api/picks` or
-`PATCH`/`DELETE /api/picks/[id]` returns 401, a form POST elsewhere redirects
-to `/login`. Vercel without `APP_PASSWORD` set 503s everything.
+There is none (read-only research record since 2026-10-18, final-2026 plan D17):
+no `/login`, no `APP_PASSWORD`, no cookie. Every page and every route is public;
+the only lock is `CRON_SECRET` on `/api/cron/[job]` (`lib/gate.ts::cronGate` in
+`web/middleware.ts` and again inside the route).
 
-- Detect: load `/` on the live URL — it must render signed out, with **Unlock**
-  in the header. If it redirects to `/login`, something is wrong (report it).
-- Log in only to check the signed-in state: read `APP_PASSWORD` from local
-  `web/.env`. With the `Claude_in_Chrome` MCP, open `/login`, fill the password
-  field, submit (or POST `/api/login`). Confirm the cookie is set, the header
-  shows **Lock**, and a game page shows the log button instead of the unlock
-  link. `POST /api/login` is throttled (10 per IP per 15 min).
-- If Vercel **deployment protection** (not the app gate) returns 401/403, mint
+- Detect: load `/` on the live URL — it must render with the three tabs and no
+  Lock / Unlock anywhere. `POST /api/picks` and `GET /login` must be 404s.
+- If Vercel **deployment protection** (not the app) returns 401/403, mint
   access with `get_access_to_vercel_url` and retry.
 
 ## 3. Per-route sweep (live production URL)
@@ -98,7 +91,7 @@ number against Neon via the **`postgres`** MCP (HTTPS — per memory). Map:
 | Page         | lib                                                                                                                                                                   | Cross-check against Neon                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/` (Board)  | `lib/homeBoard.ts` → `board.ts`, `lineCheck.ts`, `preview.ts`, `picks.ts`, `movement.ts`; `lib/card.ts`, `lib/answerBar.ts`, `lib/boardHealth.ts`, `lib/rulePause.ts` | row count = `predictions` rows for the default week (`lib/week.ts::defaultWeek`, the latest week with a game still to kick off) inside `boardUniverse`; Hard Rock line/price per row matches the latest `odds_snapshots` row for `hardrockbet` + `1H_total`; the "Bar this week" sentence: share always 20%; bar and n equal the latest `cards.payload.slate` right after a build, but the board recomputes them live from the current Hard Rock lines (`lib/homeBoard.ts`, the `slateGaps` block), so later a different n (more lines priced) or line movement since `built_at` makes a different bar expected, not a FAIL; the answer bar's live bets = `manual_picks` where `is_paper=false` and `market='1H'`; no OpsBanner / missed-build / stale-results banner unless `/api/health` says so |
-| `/game/[id]` | `lib/homeBoard.ts::getHomeGame` (same chain), `lib/session.ts`                                                                                                        | the three decision tiles (Hard Rock's number, our number, gap) match the board row; the per-book lines list matches that game's latest `odds_snapshots` (`1H_total`) per book; signed out shows "Unlock to log a pick", signed in shows the log button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `/game/[id]` | `lib/homeBoard.ts::getHomeGame` (same chain)                                                                                                                          | the three decision tiles (Hard Rock's number, our number, gap) match the board row; the per-book lines list matches that game's latest `odds_snapshots` (`1H_total`) per book; no log control anywhere (read-only since 2026-10-18)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `/results`   | `lib/betLedgerDb.ts`, `lib/ledger.ts`, `lib/weeklyReview.ts`, `lib/decision-quality.ts` (signed in), `lib/picks.ts`, `lib/homeBoard.ts` (the units curve)             | the bet ledger leads: our bets' record with a "could plausibly be" interval, the units curve, one week heading per week; the three-row comparison; signed in, the Monday review (picks table, breakdown, decisions) follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `/research`  | `lib/armPositions.ts` (the stored Monday read, newest row per hypothesis), `lib/research.ts`, `web/data/hypotheses.json`, `lib/glossary.ts`                           | seven cards in slot order with each card's own standard (readings of 30 / opportunities of 40), no EV below ten readings, `outdated` past eight days, `not yet read` with no row; the closed-hypotheses table from the registry export; ten terms at `#glossary`; no backtest card, no dollar figure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `/records`   | `lib/records.ts` (`GET /api/records` CSV)                                                                                                                             | opens on the latest week with a graded outcome (`latestGradedWeek`); the week's row count = `games` rows for that season-week (LEFT JOIN `predictions` on `MODEL_VERSION`, so a game with no model row still lists); CSV downloads and its row count matches the season's `games` count                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

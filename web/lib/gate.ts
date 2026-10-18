@@ -1,50 +1,45 @@
-// The password gate's DECISION, as a pure function so middleware.ts stays a
-// thin adapter and the rule is unit-tested (lib/gate.test.ts).
-//
-// Public read-only (Tate, 2026-09-16): every page and every GET is open, so a
-// friend with the link sees the board, Results and Track record. The password
-// guards WRITES only — logging, editing and deleting picks — which are the
-// only requests that use an unsafe method. The pick routes ALSO check the
-// cookie themselves (lib/session.ts::requireAuth), so a future matcher edit
-// cannot open the ledger by accident.
+// The one lock left on the site (final-2026 plan, decision D17, 2026-10-18):
+// `/api/cron/[job]` is called by Vercel's scheduler with a bearer token that
+// must equal CRON_SECRET. Every page and every other route is public and
+// read-only; the password gate, its cookie and `/login` are gone, because no
+// write path remains for them to guard. Pure, so middleware.ts stays a thin
+// adapter and the rule is unit-tested (lib/gate.test.ts). Web Crypto only: the
+// same code runs in Edge middleware and in a Node route handler.
 
-export type GateDecision =
-  "misconfigured" | "next" | "unauthorized" | "redirect";
+export type CronGateDecision = "misconfigured" | "unauthorized" | "next";
 
-/** Methods that never change state; RFC 9110 §9.2.1. */
-export const SAFE_METHODS: ReadonlySet<string> = new Set([
-  "GET",
-  "HEAD",
-  "OPTIONS",
-]);
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(s),
+  );
+  return [...new Uint8Array(buf)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
-export function gateDecision(o: {
-  method: string;
-  pathname: string;
-  authed: boolean;
-  gateEnabled: boolean;
-  misconfigured: boolean;
-}): GateDecision {
-  // Deployed on Vercel without APP_PASSWORD: fail closed on EVERYTHING. The
-  // pages would be fine open, but the write routes would not, and a 503 that
-  // says why is louder than a ledger anyone can post to.
-  if (o.misconfigured) return "misconfigured";
-  if (!o.gateEnabled) return "next";
-  if (SAFE_METHODS.has(o.method.toUpperCase())) return "next";
-  if (o.authed) return "next";
-  return o.pathname.startsWith("/api/") ? "unauthorized" : "redirect";
+/** Constant-time string compare. Both sides are hashed to a fixed width first,
+ *  so a length mismatch never returns early and leaks the secret's length. */
+export async function safeEqual(a: string, b: string): Promise<boolean> {
+  const [ha, hb] = await Promise.all([sha256Hex(a), sha256Hex(b)]);
+  let diff = 0;
+  for (let i = 0; i < ha.length; i++) {
+    diff |= ha.charCodeAt(i) ^ hb.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 /**
- * Where /login sends the browser afterwards. Only a same-origin PATH is
- * accepted ("/game/401856688"); anything else — an absolute URL, a
- * protocol-relative "//evil", a backslash trick, an empty value — falls back
- * to the board. Open redirects are the classic mistake with a `next` param.
+ * Whether a cron request may proceed. FAILS CLOSED when the secret is not
+ * configured: a 200 there would read as a routine no-op in the dashboard while
+ * the route sat open as a public button that spends Odds API credits.
  */
-export function safeNext(raw: string | null | undefined): string {
-  if (!raw) return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\"))
-    return "/";
-  if (/[\x00-\x1f]/.test(raw)) return "/";
-  return raw;
+export async function cronGate(o: {
+  authorization: string | null;
+  secret: string | undefined;
+}): Promise<CronGateDecision> {
+  if (!o.secret) return "misconfigured";
+  const header = o.authorization ?? "";
+  if (!header.startsWith("Bearer ")) return "unauthorized";
+  return (await safeEqual(header.slice(7), o.secret)) ? "next" : "unauthorized";
 }

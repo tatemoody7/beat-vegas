@@ -1,24 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createPick,
-  isDuplicatePick,
-  isPaperFirstHalf,
-  isRealFirstHalf,
-  type PickFull,
-} from "./picks";
-
-// createPick writes through raw SQL; capture the tagged template it sends.
-const executeRaw = vi.fn();
-const queryRaw = vi.fn();
-const findUnique = vi.fn();
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    games: { findUnique: (...a: unknown[]) => findUnique(...a) },
-    $queryRaw: (...a: unknown[]) => queryRaw(...a),
-    $executeRaw: (...a: unknown[]) => executeRaw(...a),
-  },
-}));
+import { describe, expect, it } from "vitest";
+import { isPaperFirstHalf, isRealFirstHalf, type PickFull } from "./picks";
 import { recordFrom } from "./record";
+
+// The read layer only (2026-10-18, D2): the site no longer writes a pick.
 
 const pick = (o: Partial<PickFull>): PickFull => ({
   id: 1,
@@ -70,97 +54,5 @@ describe("the real record counts first-half real-money picks only", () => {
       record: "1-0",
       units: "+0.91",
     });
-  });
-});
-
-// The uq_manual_pick_per_ledger backstop only reaches the user as a 409 if this
-// classifier recognises the driver's message. Get it wrong and a double-click
-// becomes a bare 500 on the one screen where money is logged -- so pin the
-// exact strings Postgres and the SQLite dev/test path actually produce.
-describe("a unique-constraint violation is read as a duplicate, not a crash", () => {
-  it("recognises Postgres", () => {
-    expect(
-      isDuplicatePick(
-        new Error(
-          'duplicate key value violates unique constraint "uq_manual_pick_per_ledger"',
-        ),
-      ),
-    ).toBe(true);
-  });
-
-  it("recognises SQLite (local dev and the sim DB)", () => {
-    expect(
-      isDuplicatePick(
-        new Error(
-          "UNIQUE constraint failed: index 'uq_manual_pick_per_ledger'",
-        ),
-      ),
-    ).toBe(true);
-  });
-
-  it("does not swallow an unrelated failure as a duplicate", () => {
-    // These must reach the 503 branch, not be reported as "already logged".
-    expect(isDuplicatePick(new Error("connection terminated"))).toBe(false);
-    expect(isDuplicatePick(new Error('column "is_bonus" does not exist'))).toBe(
-      false,
-    );
-    expect(isDuplicatePick(undefined)).toBe(false);
-  });
-});
-
-describe("createPick writes the book and the price's provenance", () => {
-  beforeEach(() => {
-    executeRaw.mockReset();
-    queryRaw.mockReset().mockResolvedValue([]);
-    findUnique.mockReset().mockResolvedValue({
-      season: 2026,
-      week: 3,
-      home_team: "H",
-      away_team: "A",
-    });
-  });
-  const sent = () => {
-    const [strings, ...values] = executeRaw.mock.calls[0] as [
-      TemplateStringsArray,
-      ...unknown[],
-    ];
-    return { sql: strings.join("?"), values };
-  };
-
-  it("stores a priced ticket as Hard Rock's with provenance 'logged'", async () => {
-    await createPick({ gameId: 7, line: 26.5, price: -115 });
-    const { sql, values } = sent();
-    expect(sql).toMatch(/INSERT INTO manual_picks/);
-    expect(sql).toMatch(/\bbook, price_provenance\b/);
-    expect(values).toContain("hardrockbet");
-    expect(values).toContain("logged");
-    expect(values).toContain(-115);
-  });
-
-  it("stores a priceless ticket as NULL with provenance 'unknown' — never -110", async () => {
-    // The route refuses a real ticket without a price (PRICE MISSING) before
-    // it gets here; the writer itself still never invents one.
-    await createPick({ gameId: 7, line: 26.5 });
-    const { values } = sent();
-    expect(values).toContain("unknown");
-    expect(values).toContain(null);
-    expect(values).not.toContain(-110);
-  });
-
-  it("refuses a paper pick: paper is written by the card build only", async () => {
-    await expect(
-      createPick({ gameId: 7, line: 26.5, price: -110, isPaper: true }),
-    ).rejects.toThrow(/card build only/);
-    expect(executeRaw).not.toHaveBeenCalled();
-  });
-
-  it("writes the bonus flag set at log time", async () => {
-    await createPick({ gameId: 7, line: 26.5, price: -110, isBonus: true });
-    const { sql, values } = sent();
-    expect(sql).toMatch(/\bis_paper, is_bonus\b/);
-    // is_paper false, is_bonus true, in that order.
-    const i = values.indexOf(true);
-    expect(i).toBeGreaterThan(0);
-    expect(values[i - 1]).toBe(false);
   });
 });

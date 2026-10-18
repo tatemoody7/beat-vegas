@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { bookLabel } from "@/lib/books";
-import { hrQuoteText, priceAgeText, QB_UNKNOWN_TEXT } from "@/lib/labels";
-import { HR_PRICE_MAX_AGE_H } from "@/lib/lineCheck";
+import { hrQuoteText } from "@/lib/labels";
 import { american, capitalize, fmt, signed } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
 import { injuryNote } from "@/lib/previewRow";
@@ -15,7 +14,6 @@ import {
   type TeamForm,
   type TeamSplit,
 } from "@/lib/score";
-import { WEEKLY_BET_CAP } from "@/lib/verdict";
 import { badgeColor } from "@/lib/grade";
 import {
   STALE_WEATHER_KEYS,
@@ -28,13 +26,14 @@ import {
   tzShiftHours,
   type KickZones,
 } from "@/lib/kickoffClock";
-import LogPickButton from "@/app/components/LogPickButton";
 import TeamLogo from "@/app/components/TeamLogo";
 
 // One game, in full. This is where every number the board used to hide behind a
-// disclosure now lives: the decision up top (the three numbers, the sentence,
-// the log button), then Lines, What is behind it, and Injuries and news. The
-// board row is a link to here and carries none of it.
+// disclosure now lives: the decision up top (the three numbers and the
+// sentence), then Lines, What is behind it, and Injuries and news. The board
+// row is a link to here and carries none of it. The log button, the "bet
+// logged" and cap chips, the price age and the QB warning left on 2026-10-18
+// (final-2026 plan, D2): the page is a read-only record.
 //
 // There is no "Our number" section: the decision block already states the
 // number (Tate, 2026-09-10). Since 2026-09-16 the decision is the three tiles
@@ -441,9 +440,7 @@ function tierTone(g: HomeGame): string {
 
 export default function GameDetail({
   g,
-  unitUsd,
   backHref,
-  authed,
   forecast = null,
   zones = null,
 }: {
@@ -452,14 +449,9 @@ export default function GameDetail({
   zones?: KickZones | null;
   /** The newest card-build forecast for the kickoff hour (lib/forecast.ts). */
   forecast?: CardForecast | null;
-  /** The flat stake, read server-side — a client component cannot read it. */
-  unitUsd: number;
   backHref: string;
-  /** Signed in (or the gate is off): the log-pick form is offered. */
-  authed: boolean;
 }) {
   const { row, edge, check } = g;
-  const line = check?.hrLine ?? row.curLine ?? row.factors.line ?? null;
   const tone = tierTone(g);
   const played = row.firstHalfTotal !== null;
   const resultLine =
@@ -505,15 +497,6 @@ export default function GameDetail({
         </h2>
 
         <div className="mb-4 flex flex-wrap gap-1.5">
-          {g.picked && (
-            <span className="bv-badge bv-badge--accent">bet logged</span>
-          )}
-          {g.overCap && (
-            <span className="bv-badge bv-badge--push">{`past the ${WEEKLY_BET_CAP}-bet cap · paper only`}</span>
-          )}
-          {g.capRank !== null && !g.overCap && (
-            <span className="bv-badge bv-badge--push">{`cap slot ${g.capRank}`}</span>
-          )}
           {g.kickedOff && g.settled === null && (
             <span className="bv-badge bv-badge--push">already kicked off</span>
           )}
@@ -523,15 +506,7 @@ export default function GameDetail({
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Stat
-            label="Hard Rock"
-            value={hrQuoteText(check)}
-            note={
-              g.edge.tier === "BET" && !g.kickedOff
-                ? priceAgeText(check?.hrSeenAt, new Date(), HR_PRICE_MAX_AGE_H)
-                : null
-            }
-          />
+          <Stat label="Hard Rock" value={hrQuoteText(check)} />
           <Stat
             label="Market"
             value={row.curLine === null ? "—" : `u${fmt(row.curLine)}`}
@@ -547,14 +522,6 @@ export default function GameDetail({
         >
           {resultLine ?? edge.action}
         </p>
-        {g.edge.tier === "BET" && !g.kickedOff && (
-          <p
-            data-testid="qb-unknown"
-            className="mt-1 text-sm text-[var(--warn)]"
-          >
-            {QB_UNKNOWN_TEXT}
-          </p>
-        )}
         {/* Said once on the page a visitor acts from (site review 2026-09-28):
             the number is a Florida book's. */}
         {!played && (
@@ -562,29 +529,6 @@ export default function GameDetail({
             Priced at Hard Rock Bet (Florida). Your book’s first-half total may
             differ; the line and price to beat are the ones shown.
           </p>
-        )}
-
-        {authed && (
-          <div className="mt-4 border-t border-[var(--border)] pt-3">
-            <LogPickButton
-              authed={authed}
-              unitUsd={unitUsd}
-              prefill={{
-                gameId: row.gameId,
-                away: row.away,
-                home: row.home,
-                line: check?.hrLine ?? line,
-                price: check?.hrUnderPrice ?? null,
-                verdict: edge.verdict.verdict,
-                reason: edge.verdict.reason,
-                gap: edge.verdict.hrGap,
-                ev: check?.ev ?? null,
-                hrLine: check?.hrLine ?? null,
-              }}
-              picked={g.picked}
-              kickedOff={g.kickedOff}
-            />
-          </div>
         )}
       </section>
 
@@ -595,26 +539,13 @@ export default function GameDetail({
   );
 }
 
-function Stat({
-  label,
-  value,
-  note = null,
-}: {
-  label: string;
-  value: string;
-  note?: string | null;
-}) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[var(--r-sm)] bg-[var(--bg-2)] px-3 py-2">
       <div className="text-[0.6rem] uppercase tracking-[0.06em] text-[var(--text-dim)]">
         {label}
       </div>
       <div className="font-mono text-lg text-[var(--text)]">{value}</div>
-      {note && (
-        <div data-testid="price-age" className="text-xs text-[var(--text-dim)]">
-          {note}
-        </div>
-      )}
     </div>
   );
 }

@@ -10,6 +10,18 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 (THE FULL-GAME CLOSE CAPTURE HAS A HEALTH CONTRACT).** Final-2026 plan PR-05. The full-game close step in
+  `lines_watch.yml` (`poll_full_game.py` on every close tick) is `continue-on-error` and exits 0 on an empty or
+  credit-floor-skipped pull, so a silent failure left every run green while the two full-game arms (H-ARM-FGU, H-ARM-WXFG)
+  accumulated `stale_close` exclusions. `poll_full_game.py --status-file` now writes `{complete, reason, events_in_window,
+  events_polled, events_unmatched, rows_written, rows_reseen}` on every exit past the fetch (`credit_floor`, `db_unreachable`
+  and `no_match` read `complete: false`; an event the matcher cannot tie to a game is counted, not a failure). The step gets
+  `id: fgclose` and the health step `OUTCOME_FG` plus `--fg-status`; `scripts/health_check.py` loads it as the `fg` file.
+  New degraded check `lines_watch.fg_close_polled`: when the 1H close found events and the FG step ran, the status file must
+  exist and say complete, and (if it found an event in its own 180-min window) a `full_game_total` row must be captured or
+  re-seen since `RUN_STARTED_AT`. `docs/HEALTH.md` regenerated with a new step 3 under "When lines_watch is degraded". No
+  gate, model constant, registry row or credit spend changes.
+
 - **2026-10-18 ~21:30 UTC (P1.4: THE FULL-GAME ARMS IGNORE HARD ROCK'S ALTERNATE RUNGS; THE REPLAY FOUND NONE).**
   Final-2026 plan PR-03 (decision D9). The audit found H-ARM-FGU and H-ARM-WXFG took Hard Rock's newest full-game
   total on the −160 "centred" test alone, while the 1H arms also apply `devig.is_hr_rung` (−140 or worse, or 2+
@@ -86,7 +98,6 @@ hold the rest.
   writer `beatvegas/research_capture.py` (write-on-change for live purposes, every wave for archive rows) and the
   book→region table `sources/odds_regions.py`. A test forbids the provider's host anywhere but the client (the
   temporary `opening_watch.py` exempt until PR-08). `migrate.yml` before the next pull; the tables are empty until C4.
-
 - **2026-10-18 ~16:00 UTC (THE SEASON ENDS NOV 28 AND THE FINAL READ IS NOV 30; ROADMAP v2.6, PROTOCOL p1.3).** Final-2026
   plan PR-04 (paperwork and the `--season-over` wiring; Tate's decisions D1, D4, D12 of 2026-10-18). `beatvegas/protocol.py`
   gains `SEASON_LAST_KICKOFF = "2026-11-29T04:00:00"` (week 13's last kickoff), `FINAL_READ_DATE = "2026-11-30"`,

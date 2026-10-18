@@ -741,6 +741,62 @@ class TestLinesWatch:
             r = fn(_ctx(s, "lines_watch", status_files=polled))
             assert r.ok and r.detail.startswith("1 Hard Rock 1H rows")
 
+    def test_fg_close_polled_pass_and_fail(self, db):
+        eng, scope = db
+        fn = _check("lines_watch", "lines_watch.fg_close_polled").fn
+        close = {"events_in_window": 3, "events_polled": 3, "complete": True}
+        fg_ok = {"events_in_window": 2, "events_polled": 2, "complete": True}
+        with Session(eng) as s:
+            s.add(_game(1))
+            # Sunday's opener, never re-seen: not this run's.
+            s.add(
+                OddsSnapshot(
+                    game_id=1,
+                    book="draftkings",
+                    market="full_game_total",
+                    line=55.5,
+                    captured_at=STARTED - timedelta(days=5),
+                )
+            )
+            # A 1H row written by this run: the wrong market.
+            s.add(
+                OddsSnapshot(
+                    game_id=1, book="hardrockbet", market="1H_total", line=24.5, captured_at=NOW
+                )
+            )
+            s.commit()
+        with scope() as s:
+            # n/a: the 1H close found nothing, or its step failed so the FG step skipped.
+            assert fn(_ctx(s, "lines_watch")).ok
+            empty = {"close": {"events_in_window": 0, "events_polled": 0}}
+            assert fn(_ctx(s, "lines_watch", status_files=empty)).ok
+            r = fn(
+                _ctx(s, "lines_watch", status_files={"close": close}, outcomes={"fg": "skipped"})
+            )
+            assert r.ok and r.detail.startswith("n/a")
+            # The silent failure: events were due, the FG step left no status file.
+            r = fn(
+                _ctx(s, "lines_watch", status_files={"close": close}, outcomes={"fg": "failure"})
+            )
+            assert not r.ok and "no full-game status file" in r.detail and "failure" in r.detail
+            # Skipped at the credit floor: exits 0, complete is false.
+            skipped = {**fg_ok, "events_polled": 0, "complete": False, "reason": "credit_floor"}
+            r = fn(_ctx(s, "lines_watch", status_files={"close": close, "fg": skipped}))
+            assert not r.ok and "credit_floor" in r.detail
+            # Complete but no full_game_total row touched since the run began.
+            r = fn(_ctx(s, "lines_watch", status_files={"close": close, "fg": fg_ok}))
+            assert not r.ok and "0 full-game total rows" in r.detail
+            # No FG event inside its own (narrower) window: nothing to expect.
+            none_due = {"events_in_window": 0, "events_polled": 0, "complete": True}
+            assert fn(_ctx(s, "lines_watch", status_files={"close": close, "fg": none_due})).ok
+        with Session(eng) as s:
+            row = s.query(OddsSnapshot).filter(OddsSnapshot.market == "full_game_total").one()
+            row.last_seen_at = NOW  # an unchanged number re-seen IS the close
+            s.commit()
+        with scope() as s:
+            r = fn(_ctx(s, "lines_watch", status_files={"close": close, "fg": fg_ok}))
+            assert r.ok and r.detail.startswith("1 full-game total rows")
+
     def test_close_gauge_written_pass_and_fail(self, db):
         eng, scope = db
         fn = _check("lines_watch", "lines_watch.close_gauge_written").fn

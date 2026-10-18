@@ -29,6 +29,7 @@ Pair with scripts/poll_lines.py (The Odds API) for cross-book 1H consensus + clo
 from __future__ import annotations
 
 import argparse
+import json
 import statistics
 import sys
 from datetime import datetime, timedelta
@@ -50,6 +51,47 @@ from beatvegas.sources.draftkings import (
 )
 from beatvegas.sources.odds import SIDE_MARKETS, OddsAPIClient, normalize_full_game_sides
 from beatvegas.sources.odds import normalize_full_game as oa_normalize_full_game
+
+# Why the last _fetch returned nothing it was asked for (None = it did not skip).
+# _fetch's tuple is read by tests and callers, so the one skip that exits 0 with
+# no rows (the credit-floor guard) leaves its reason here for the status file.
+_FETCH_STATE: Dict[str, Optional[str]] = {"skip": None}
+
+
+def write_status(
+    path: Optional[str],
+    *,
+    complete: bool,
+    reason: Optional[str],
+    events_in_window: int,
+    events_polled: int,
+    rows_written: int,
+    rows_reseen: int,
+    events_unmatched: int = 0,
+) -> None:
+    """The run's coverage, for scripts/health_check.py (lines_watch's
+    `fg_close_polled`). Written on every exit that gets past the fetch: this
+    step is continue-on-error and exits 0 on an empty or skipped pull, so a
+    missing file means the run died before it could say what it did.
+
+    `complete` is true when the run was not skipped (credit floor, database
+    unreachable) and either found no event inside the window or priced at
+    least one that resolves to a CFBD game. An event the matcher cannot tie to
+    a game (an FCS pairing) is counted in `events_unmatched`, never a failure."""
+    if not path:
+        return
+    payload: Dict[str, object] = {
+        "complete": bool(complete),
+        "reason": reason,
+        "events_in_window": int(events_in_window),
+        "events_polled": int(events_polled),
+        "events_unmatched": int(events_unmatched),
+        "rows_written": int(rows_written),
+        "rows_reseen": int(rows_reseen),
+    }
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    print(f"[status] {path}: {json.dumps(payload)}")
 
 
 def _candidate_games(session, season: int) -> List[Dict]:
@@ -144,6 +186,7 @@ def _fetch_raw(
                 f"({client.last_credits.remaining} <= {credit_floor}) — skipping the "
                 "full-game pull. Pass --credit-floor 0 to override."
             )
+            _FETCH_STATE["skip"] = "credit_floor"
             return [], [], "oddsapi", 0
         # Billed (markets x regions) for the whole slate: `totals,spreads,h2h`
         # x `us,us2,us_ex` = 9 credits (the Sunday opener, the card-day refresh
@@ -242,9 +285,27 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="exit 0 when no row was captured (a close tick with no full-game event "
         "due is a normal state inside the 1H close job, not a dead feed)",
     )
+    ap.add_argument(
+        "--status-file",
+        dest="status_file",
+        metavar="PATH",
+        default=None,
+        help="write the run's coverage as JSON (events_in_window, events_polled, rows_written, "
+        "rows_reseen, complete) for the lines_watch health contract",
+    )
     args = ap.parse_args(argv)
 
+    _FETCH_STATE["skip"] = None
     if not try_init_db():
+        write_status(
+            args.status_file,
+            complete=False,
+            reason="db_unreachable",
+            events_in_window=0,
+            events_polled=0,
+            rows_written=0,
+            rows_reseen=0,
+        )
         return
 
     fg_rows, h1_rows, source, dk_events = _fetch(
@@ -275,6 +336,15 @@ def main(argv: Optional[List[str]] = None) -> None:
     fg_rows = [r for r in fg_rows if r.get("market") is None]
 
     written_fg = written_h1 = matched = unmatched = skipped = games_updated = 0
+    reseen = 0
+    # Distinct feed events in the window (the side markets ride the same events),
+    # for the status file; polled = the games they resolved to.
+    in_window_events = {
+        r.get("event_id")
+        or (r.get("game_id"), r.get("home_team"), r.get("away_team"), r.get("commence_time"))
+        for r in fg_rows + side_rows
+    }
+    polled_gids: set = set()
     written_side = {m: 0 for m in SIDE_MARKETS.values()}
     unmatched_names: List[str] = []
     best_row: Dict[int, Dict] = {}  # gid -> highest-priority book's row this run
@@ -298,6 +368,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                 skipped += 1
                 continue
             seen_fg.add((gid, r["book"]))
+            polled_gids.add(gid)
             matched += 1
             prev = _latest_snapshot(s, gid, r["book"], "full_game_total")
             # A game's FIRST snapshot is its opener: prefer the source's true
@@ -335,6 +406,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                 prev.last_seen_at = now
                 note_reseen(prev, stamp)
                 skipped += 1
+                reseen += 1
             # Remember the best-book row per game (not feed order): the Game
             # update below must not depend on which book happened to come last.
             cur = best_row.get(gid)
@@ -371,6 +443,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             if gid is None or (gid, r["book"], r["market"]) in seen_side:
                 continue
             seen_side.add((gid, r["book"], r["market"]))
+            polled_gids.add(gid)
             prev = _latest_snapshot(s, gid, r["book"], r["market"])
             home, away = r.get("home_price"), r.get("away_price")
             stamp = feed_stamp_for(r, now)
@@ -392,6 +465,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             else:
                 prev.last_seen_at = now
                 note_reseen(prev, stamp)
+                reseen += 1
 
         seen_h1: set = set()
         for r in h1_rows:
@@ -420,6 +494,17 @@ def main(argv: Optional[List[str]] = None) -> None:
                 prev.last_seen_at = now
                 note_reseen(prev, stamp)
 
+    skip_reason = _FETCH_STATE["skip"]
+    write_status(
+        args.status_file,
+        complete=skip_reason is None and (not in_window_events or bool(polled_gids)),
+        reason=skip_reason or (None if polled_gids or not in_window_events else "no_match"),
+        events_in_window=len(in_window_events),
+        events_polled=len(polled_gids),
+        events_unmatched=len(set(unmatched_names)),
+        rows_written=written_fg + sum(written_side.values()),
+        rows_reseen=reseen,
+    )
     print(
         f"source={source} dk_events={dk_events} "
         f"fg_rows={len(fg_rows)} h1_rows={len(h1_rows)} matched={matched} "

@@ -847,6 +847,9 @@ def test_every_scheduled_neon_writer_ends_with_its_health_contract():
             assert '--sweep-status "$RUNNER_TEMP/sweep_status.json"' in last["run"]
         if job == "lines_watch":
             assert '--close-status "$RUNNER_TEMP/close_status.json"' in last["run"]
+            assert '--fg-status "$RUNNER_TEMP/fg_close_status.json"' in last["run"]
+            # The full-game step is continue-on-error; the contract reads its outcome.
+            assert env["OUTCOME_FG"] == "${{ steps.fgclose.outcome }}"
         seen.add(job)
     # The other direction: every contract names a workflow that runs on a schedule.
     for job, c in health.CONTRACTS.items():
@@ -909,8 +912,11 @@ def test_lines_watch_full_game_close_step_rides_the_close_ticks_and_never_fails_
         "--kickoff-within-min 180",
         "--credit-floor",
         "--allow-empty",
+        '--status-file "$RUNNER_TEMP/fg_close_status.json"',
     ):
         assert flag in run, flag
+    # The contract judges what continue-on-error hides: it reads this step's outcome.
+    assert fg.get("id") == "fgclose"
     assert steps.index(fg) < steps.index(next(s for s in steps if s.get("id") == "health"))
     assert steps[-1].get("id") == "health"
 

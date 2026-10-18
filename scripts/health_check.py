@@ -5,7 +5,8 @@ what it was for? (beatvegas/health.py, docs/HEALTH.md)
     python scripts/health_check.py --job card  --sweep-status "$RUNNER_TEMP/sweep_status.json"
     python scripts/health_check.py --job grade
     python scripts/health_check.py --job sunday
-    python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json"
+    python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json" \
+        --fg-status "$RUNNER_TEMP/fg_close_status.json"
 
 Reads the run's facts from the environment the workflow passes through `env:`
 (never inlined into bash): SKIPPED, RUN_STARTED_AT (ISO UTC, the gate/probe
@@ -65,6 +66,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     ap.add_argument("--sweep-status", metavar="FILE", help="card.yml's 1H sweep status file")
     ap.add_argument(
         "--close-status", metavar="FILE", help="lines_watch.yml's close poll status file"
+    )
+    ap.add_argument(
+        "--fg-status", metavar="FILE", help="lines_watch.yml's full-game close status file"
     )
     return ap.parse_args(argv)
 
@@ -169,7 +173,9 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
     if not try_init_db():
         print(f"[health:{job}] DB unreachable — no verdict written.")
         return 0
-    status_files = load_status_files({"sweep": args.sweep_status, "close": args.close_status})
+    status_files = load_status_files(
+        {"sweep": args.sweep_status, "close": args.close_status, "fg": args.fg_status}
+    )
     contract = health.CONTRACTS[job]
     with session_scope() as s:
         ctx, notices = ctx_from_env(job, env, session=s, status_files=status_files)

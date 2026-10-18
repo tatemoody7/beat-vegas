@@ -162,6 +162,28 @@ def test_status_files_are_loaded_only_when_present_and_valid(mod, tmp_path):
     assert files["sweep"]["events_polled"] == 12
 
 
+def test_fg_status_argument_reaches_the_lines_watch_checks(mod, tmp_path, capsys):
+    """--fg-status (final-2026 PR-05) loads the full-game close status file under the
+    `fg` key; with OUTCOME_FG it lets the lines_watch contract see a step that
+    continue-on-error would otherwise hide."""
+    m, eng = mod
+    args = m.parse_args(["--job", "lines_watch", "--fg-status", str(tmp_path / "fg.json")])
+    assert args.fg_status == str(tmp_path / "fg.json")
+    close = tmp_path / "close.json"
+    close.write_text(json.dumps({"events_in_window": 2, "events_polled": 2, "complete": True}))
+    env = _env(MARKET="1h_close", OUTCOME_FG="failure")
+    # The FG step died before it wrote its file: degraded, exit 0, named in the note.
+    argv = ["--job", "lines_watch", "--close-status", str(close)]
+    rc = m.run(m.parse_args(argv + ["--fg-status", str(tmp_path / "fg.json")]), env)
+    assert rc == 0
+    with Session(eng) as s:
+        row = s.get(AppSetting, ops.health_key("lines_watch"))
+    assert row.value == "degraded" and "lines_watch.fg_close_polled" in row.note
+    assert "::warning::lines_watch.fg_close_polled:" in capsys.readouterr().out
+    files = m.load_status_files({"fg": str(close)})
+    assert files["fg"]["events_polled"] == 2
+
+
 # --------------------------------------------------------------------------- #
 # exit codes + the gauge
 # --------------------------------------------------------------------------- #

@@ -162,7 +162,7 @@ jobs:
         # (Hard Rock is in us2; no exchange 1H lines).
         env:
           BV_ODDS_JOB: sunday
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --research-regions eu --research-markets totals,h2h
       - name: Refresh pace for the active week (TeamRankings, season-to-date as of today)
         id: pace
         # combined_sec_play / combined_plays are model inputs joined on exact

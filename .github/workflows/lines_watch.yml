@@ -262,7 +262,7 @@ jobs:
         continue-on-error: true
         env:
           BV_ODDS_JOB: lines_watch
-        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,h2h --hr-only-gate --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty --status-file "$RUNNER_TEMP/fg_close_status.json"
+        run: python scripts/poll_full_game.py --source oddsapi --regions us,us2,us_ex --markets totals,h2h --research-regions eu --research-markets totals --hr-only-gate --kickoff-within-min 180 --days-ahead 1 --credit-floor 300 --allow-empty --status-file "$RUNNER_TEMP/fg_close_status.json"
       - name: 1H one-game refresh (the site's Refresh price; 1 credit)
         if: steps.resolve.outputs.market == '1h_game'
         env:

@@ -10,6 +10,24 @@ hold the rest.
 
 ## 2026-10-18
 
+- **2026-10-18 ~22:00 UTC (THE ODDS API PROGRAMME, STEP 4a: A SHARP REFERENCE BESIDE EVERY FULL-GAME PULL).** Final-2026
+  plan PR-C4a. `scripts/poll_full_game.py` takes `--research-regions`, `--research-markets` (default `totals`) and
+  `--research-purpose` (default `sharp_eu`). With `--research-regions eu` it makes a SECOND bulk `/odds` call after the
+  live pull is written (regions × markets, no bookmaker named, the client's ledger `purpose` set to `sharp_eu` for that
+  call only) and writes Pinnacle and the other `eu` books' full-game totals and moneylines to `research_snapshots`
+  (`purpose` `sharp_eu`, `region` `eu`, `request_id` = the `odds_spend` row, `game_id` set when the event matches a CFBD
+  game, NULL for an FCS pairing; the same write-on-change rule as `odds_snapshots`). **The judge sees none of it:** the
+  live bulk call keeps `us,us2,us_ex` and `odds_snapshots` gets no `eu` book (a test counts the rows with and without
+  the flags); cv1, pv1, the HT1H trigger and the card read `odds_snapshots` only, and `sharp_eu` rows feed cv2 at the
+  final read (`docs/CONSENSUS.md`). Before the paid call the budget controller (PR-C3) is asked in-process: the balance
+  is the live response's own credit header, the floor and recurring need come from `app_settings`; an allowance below
+  markets × regions prints `research eu: skipped (allowance ...)` and makes no call. No live pull (Hard Rock gate,
+  credit floor, nothing due in the window) means no research pull, and a research failure is a warning, never the live
+  pull's exit code. One summary line: `research eu: <written> written, <reseen> reseen, <credits> credits`. Wired into
+  `card.yml` (full-game refresh, `totals,h2h` = 2 credits), `sunday.yml` (opener, 2 credits) and the `lines_watch.yml`
+  close step (`totals` = 1 credit, only on ticks that pass the gate). Expected cost about **32 credits a week** (plan
+  C11: 4 card refreshes × 2 + the Sunday opener 2 + one credit per gated close tick); `odds_spend` records the actual.
+
 - **2026-10-18 (THE DAILY GRADE JOB STOPS PLAY-BY-PLAY, POST-MORTEM AND FACTOR-CHIP COLLECTION).** Final-2026 plan PR-09,
   decision D5. `grade.yml` lost four steps: the 1H play-by-play refresh (`backfill_pbp.py --only-missing` into
   `fh_team_game`), the SP+ factor credibility ledger (`grade_factor_ledger.py`), the post-mortem (`post_mortem.py` into

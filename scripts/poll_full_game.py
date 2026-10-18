@@ -19,6 +19,10 @@ Sources (`--source`):
             both teams' prices (roadmap step 4, 2026-10-07).
   auto    — try DK, fall back to CFBD if DK returns nothing (default)
 
+`--research-regions eu` (oddsapi only) adds a second bulk call after the live one:
+the sharp reference, written to `research_snapshots` (purpose `sharp_eu`) and never
+to `odds_snapshots`, so the judge and every frozen reader see no new book or region.
+
     python scripts/poll_full_game.py                      # auto, local
     python scripts/poll_full_game.py --source cfbd        # cloud-safe, one book
     python scripts/poll_full_game.py --source oddsapi     # multi-book incl. Hard Rock
@@ -35,6 +39,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
 
+from beatvegas import credit_plan, research_capture
 from beatvegas.ci import warn
 from beatvegas.db.models import Game, OddsSnapshot
 from beatvegas.db.store import session_scope, try_init_db
@@ -56,6 +61,9 @@ from beatvegas.sources.odds import normalize_full_game as oa_normalize_full_game
 # _fetch's tuple is read by tests and callers, so the one skip that exits 0 with
 # no rows (the credit-floor guard) leaves its reason here for the status file.
 _FETCH_STATE: Dict[str, Optional[str]] = {"skip": None}
+# The Odds API client the live pull used, kept for the research call that follows
+# it (same key, same credit headers). None when the pull never made one.
+_LIVE_CLIENT: Dict[str, object] = {"client": None}
 
 
 def write_status(
@@ -183,6 +191,7 @@ def _fetch_raw(
         # rows carry team names + commence_time, so they match by name+time like
         # the DK path (no CFBD game id). 1H is captured separately (poll_lines).
         client = OddsAPIClient()
+        _LIVE_CLIENT["client"] = client
         # list_events is FREE but returns the credit headers: learn the balance
         # before the paid bulk call so a reserve floor can stop it.
         events_free = client.list_events()
@@ -252,6 +261,79 @@ def _resolve_gid(r: Dict, games: List[Dict], ids: set) -> Optional[int]:
     return gid
 
 
+def _research_pull(
+    client,
+    *,
+    regions: str,
+    markets: str,
+    purpose: str,
+    now: datetime,
+    season: int,
+    keep: Callable[[Dict], bool],
+) -> None:
+    """The sharp reference (final-2026 plan PR-C4a): a SECOND bulk call beside the
+    live one, on regions the judge never reads (`eu`: Pinnacle and others), written
+    to `research_snapshots` only. Billed markets x regions, like any bulk call.
+
+    The live pull is already done and written; nothing here can change its rows or
+    the exit code. The credit controller decides first: the allowance (balance from
+    the live response's own credit header, floor and recurring need from
+    `app_settings`) must cover the call, else it is skipped with a printed reason.
+    Any failure is a warning."""
+    label = f"research {regions}"
+    cost = len([m for m in markets.split(",") if m]) * len([r for r in regions.split(",") if r])
+    try:
+        balance = getattr(getattr(client, "last_credits", None), "remaining", None)
+        if balance is None:
+            print(f"{label}: skipped (balance unknown)")
+            return
+        with session_scope() as s:
+            st = credit_plan.load_settings(s)
+            measured = credit_plan.measured_recurring(s, now)
+        per_week = st.recurring_fallback if measured is None else measured
+        room = credit_plan.allowance(balance, now, st.reset_at, st.floor, per_week)
+        if room < cost:
+            print(
+                f"{label}: skipped (allowance {room:,} < {cost} credits; balance {balance:,}, "
+                f"floor {st.floor:,}, recurring {per_week:,}/wk)"
+            )
+            return
+        # Never names a book: the call is regions x markets, nothing else.
+        saved = getattr(client, "purpose", None)
+        client.purpose = purpose
+        try:
+            events = client.list_full_game_odds(regions=regions, markets=markets)
+            request_id = getattr(client, "last_spend_id", None)
+        finally:
+            client.purpose = saved
+        credits = getattr(getattr(client, "last_credits", None), "last_cost", None)
+        rows = oa_normalize_full_game(events) + normalize_full_game_sides(events)
+        rows = [r for r in rows if keep(r)]
+        for r in rows:
+            r["market"] = r.get("market") or "full_game_total"
+        with session_scope() as s:
+            games = _candidate_games(s, season)
+            ids = {g["id"] for g in games}
+            for r in rows:
+                r["game_id"] = _resolve_gid(r, games, ids)
+            n = research_capture.write_rows(
+                s,
+                rows,
+                purpose=purpose,
+                region=regions if "," not in regions else None,
+                request_id=request_id,
+                source="live",
+                dedupe=True,
+                now=now,
+            )
+        print(
+            f"{label}: {n['written']} written, {n['reseen']} reseen, "
+            f"{credits if credits is not None else 'unknown'} credits"
+        )
+    except Exception as e:  # noqa: BLE001 - a research failure never touches the live pull
+        print(f"::warning::{label}: not captured ({type(e).__name__}: {e})")
+
+
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--season", type=int, default=current_season())
@@ -313,9 +395,29 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="write the run's coverage as JSON (events_in_window, events_polled, rows_written, "
         "rows_reseen, complete) for the lines_watch health contract",
     )
+    ap.add_argument(
+        "--research-regions",
+        default=None,
+        metavar="REGIONS",
+        help="--source oddsapi only: after the live pull, one more bulk call on these "
+        "regions (e.g. `eu`, Pinnacle) written to research_snapshots only, never "
+        "odds_snapshots; skipped when the credit allowance is short, or when the "
+        "live pull was gated or skipped (final-2026 PR-C4a)",
+    )
+    ap.add_argument(
+        "--research-markets",
+        default="totals",
+        help="markets for the --research-regions call, billed (markets x regions)",
+    )
+    ap.add_argument(
+        "--research-purpose",
+        default="sharp_eu",
+        help="research_snapshots.purpose (and odds_spend.purpose) for that call",
+    )
     args = ap.parse_args(argv)
 
     _FETCH_STATE["skip"] = None
+    _LIVE_CLIENT["client"] = None
     if not try_init_db():
         write_status(
             args.status_file,
@@ -550,6 +652,26 @@ def main(argv: Optional[List[str]] = None) -> None:
             else:
                 prev.last_seen_at = now
                 note_reseen(prev, stamp)
+
+    # The sharp reference rides behind the live pull: only when the live pull ran,
+    # priced something inside the window, and the source is the Odds API.
+    live_client = _LIVE_CLIENT["client"]
+    if (
+        args.research_regions
+        and source == "oddsapi"
+        and live_client is not None
+        and _FETCH_STATE["skip"] is None
+        and (fg_rows or side_rows)
+    ):
+        _research_pull(
+            live_client,
+            regions=args.research_regions,
+            markets=args.research_markets,
+            purpose=args.research_purpose,
+            now=now,
+            season=args.season,
+            keep=_in_window,
+        )
 
     skip_reason = _FETCH_STATE["skip"]
     write_status(

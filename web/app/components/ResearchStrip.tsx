@@ -8,6 +8,20 @@ import type { HypothesisCard } from "@/lib/research";
 // the stored Monday row like the cards do and never changes a rating; a visitor
 // sees the same line.
 
+const COUNT_WORDS = [
+  "no",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+];
+
 export function stripLine(cards: HypothesisCard[]): string {
   const arms = cards.filter((c) => c.meta.standard === "sprt");
   const read = arms.filter((c) => c.readAt !== null);
@@ -17,7 +31,7 @@ export function stripLine(cards: HypothesisCard[]): string {
     .map((c) => c.nextRead)
     .filter((d): d is string => !!d)
     .sort()[0];
-  const head = `${arms.length} strategies on paper`;
+  const head = `${COUNT_WORDS[arms.length] ?? arms.length} paper ${arms.length === 1 ? "strategy" : "strategies"} judged against the closing price`;
   if (read.length === 0) return `${head} · not yet read`;
   const progress =
     most === 0
@@ -26,8 +40,9 @@ export function stripLine(cards: HypothesisCard[]): string {
   return `${head} · ${progress}${next ? ` · next read ${etDateLabel(next)}` : ""}`;
 }
 
-/** The slim line's fixed opening (Tate 2026-10-15, Q1). */
-export const SLIM_LEAD = "Research season · first-half unders at Hard Rock";
+/** The slim line's fixed opening (Tate 2026-10-15, Q1); the strategies are
+ *  named by what they are, not by one of them (D4 build 5, 2026-10-20). */
+export const SLIM_LEAD = "Research season";
 
 export default function ResearchStrip({ cards }: { cards: HypothesisCard[] }) {
   return (

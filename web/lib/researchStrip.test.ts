@@ -33,7 +33,9 @@ const pos = (id: string, over: Partial<ArmPosition>): [string, ArmPosition] => [
 describe("the research strip line", () => {
   it("says not yet read before any Monday row", () => {
     const cards: HypothesisCard[] = cardsFor(new Map());
-    expect(stripLine(cards)).toBe("6 strategies on paper · not yet read");
+    expect(stripLine(cards)).toBe(
+      "six paper strategies judged against the closing price · not yet read",
+    );
   });
   it("counts readings toward 30 and names the next read", () => {
     const cards = cardsFor(
@@ -43,11 +45,11 @@ describe("the research strip line", () => {
       ]),
     );
     expect(stripLine(cards)).toBe(
-      "6 strategies on paper · up to 12 of 30 readings · next read Mon Oct 26",
+      "six paper strategies judged against the closing price · up to 12 of 30 readings · next read Mon Oct 26",
     );
     const zero = cardsFor(new Map([pos("H-ARM-FGU", { readings: 0 })]));
     expect(stripLine(zero)).toBe(
-      "6 strategies on paper · 0 of 30 readings · next read Mon Oct 26",
+      "six paper strategies judged against the closing price · 0 of 30 readings · next read Mon Oct 26",
     );
   });
 });

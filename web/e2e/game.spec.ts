@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fixture } from "./helpers/fixture";
 import { FACTOR_NOTE } from "../lib/score";
 
-// /game/[id] (app/components/GameDetail.tsx): the decision block must show the
+// /game/[id] (app/components/GameDetail.tsx): the paper-read block must show the
 // SAME numbers the board row carried (it rebuilds the whole week to get the
 // rank), the kill numbers where the sentence names them, and the per-book line
 // movement. Since 2026-10-18 (final-2026 plan, D2) there is no log control, no
@@ -12,6 +12,23 @@ const { expected, rowById } = fixture();
 
 const fmt = (n: number | null, dp = 1) => (n === null ? "—" : n.toFixed(dp));
 const american = (p: number) => (p > 0 ? `+${p}` : `${p}`);
+
+// lib/et.ts::etClockZone: naive-UTC capture instant -> "Tue 4:44 PM ET".
+const asOfText = (t: Date) => {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(t)
+      .map((x) => [x.type, x.value]),
+  );
+  const h = Number(p.hour) % 24;
+  return `${p.weekday} ${h % 12 === 0 ? 12 : h % 12}:${p.minute} ${h >= 12 ? "PM" : "AM"} ET`;
+};
 
 const BET_LOGGED = 900001; // BET #1 (a frozen real ticket sits on it in the database)
 const BET_OPEN = 900002; // BET #2
@@ -66,13 +83,33 @@ test.describe("the game page", () => {
     const short = rowById.get(GAP_SHORT)!;
     await page.goto(`/game/${GAP_SHORT}`);
     await expect(page.locator("section.bv-card").first()).toContainText(
-      `It becomes a signal at ${fmt(short.edge.killLine)} or higher.`,
+      `It becomes a paper signal at ${fmt(short.edge.killLine)} or higher.`,
     );
     const dear = rowById.get(PRICE_BLOCKED)!;
     await page.goto(`/game/${PRICE_BLOCKED}`);
     await expect(page.locator("section.bv-card").first()).toContainText(
-      `needs ${american(dear.edge.killPrice!)} or better.`,
+      `the rule needs ${american(dear.edge.killPrice!)} or better.`,
     );
+  });
+
+  // Final-2026 plan D4 build 5: a price says when it was captured. The fixture
+  // confirms each quote at its capture instant, so the two times agree.
+  test("a game page shows an as-of time beside the Hard Rock price, and the block is headed Paper read", async ({
+    page,
+  }) => {
+    for (const id of [BET_OPEN, PRICE_BLOCKED]) {
+      const r = rowById.get(id)!;
+      const when = asOfText(r.check!.hrAsOf!);
+      await page.goto(`/game/${id}`);
+      const tiles = page.locator("section.bv-card").first();
+      await expect(tiles.locator("h2")).toHaveText("Paper read");
+      await expect(tiles).not.toContainText("The decision");
+      await expect(tiles.getByTestId("hr-as-of")).toHaveText(`as of ${when}`);
+      await expect(page.getByTestId("lines-captured")).toHaveText(
+        `Hard Rock Bet price captured ${when}`,
+      );
+      await expect(page.getByText(/price to beat|Your book/)).toHaveCount(0);
+    }
   });
 
   test("a Hard Rock alternate line: the tile shows the last main line with its time, paper only", async ({
@@ -81,41 +118,28 @@ test.describe("the game page", () => {
     const r = rowById.get(HR_ALT)!;
     expect(r.edge.blocker).toBe("hr_alt_line");
     expect(r.check!.hrLive).toBe(false);
-    // lib/labels.ts::hrQuoteText: the held-over quote carries its ET capture time.
-    const t = new Date(r.check!.hrAsOf!);
-    const p = Object.fromEntries(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/New_York",
-        weekday: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hourCycle: "h23",
-      })
-        .formatToParts(t)
-        .map((x) => [x.type, x.value]),
-    );
-    const h = Number(p.hour) % 24;
-    const when = `${p.weekday} ${h % 12 === 0 ? 12 : h % 12}:${p.minute}${h >= 12 ? "pm" : "am"}`;
+    // lib/labels.ts::hrSeenText: the held-over quote carries its ET capture time.
+    const when = asOfText(r.check!.hrAsOf!);
     await page.goto(`/game/${HR_ALT}`);
     const tiles = page.locator("section.bv-card").first();
     await expect(tiles).toContainText(
-      `Hard Rocku${fmt(r.check!.hrLine)} ${american(r.check!.hrUnderPrice!)} · as of ${when}`,
+      `Hard Rocku${fmt(r.check!.hrLine)} ${american(r.check!.hrUnderPrice!)}as of ${when}`,
     );
     await expect(tiles.locator("p.text-base")).toHaveText(r.edge.action);
     await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
   });
 
-  // The read-only record (2026-10-18, D2/D17): the decision block carries the
+  // The read-only record (2026-10-18, D2/D17): the paper-read block carries the
   // Hard Rock note and nothing to click; the ticketed game and the open one
   // read the same way, with no chip, no price age and no QB warning.
-  test("the decision block carries the Hard Rock note and offers no log control, chip or warning", async ({
+  test("the paper-read block carries the Hard Rock note and offers no log control, chip or warning", async ({
     page,
   }) => {
     for (const id of [BET_OPEN, BET_LOGGED]) {
       await page.goto(`/game/${id}`);
       const card = page.locator("section.bv-card").first();
       await expect(card).toContainText(
-        "Priced at Hard Rock Bet (Florida). Your book’s first-half total may differ; the line and price to beat are the ones shown.",
+        "Prices are Hard Rock Bet (Florida) as captured; see the time beside each.",
       );
       await expect(page.getByRole("button", { name: /Log/ })).toHaveCount(0);
       await expect(page.getByText("Unlock to log a pick")).toHaveCount(0);

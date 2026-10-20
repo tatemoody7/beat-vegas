@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hrQuoteText,
+  hrSeenText,
   basisPhrase,
   BLOCKER_SHORT,
   blockerTag,
@@ -52,18 +53,18 @@ describe("every enum member has text", () => {
 describe("blockerTag", () => {
   it("puts the numbers in the tag, not a tooltip", () => {
     expect(blockerTag("price", { hrPrice: -125, killPrice: -115 })).toBe(
-      "Not yet — Hard Rock's price is -125; needs -115 or better",
+      "Not a paper signal yet: Hard Rock's under price is -125; the rule needs -115 or better",
     );
     expect(blockerTag("no_hr_line")).toBe(
-      "Not yet — Hard Rock has no first-half line",
+      "Not a paper signal yet: Hard Rock has no first-half line",
     );
     expect(blockerTag("off_market", { hrLine: 23.5, marketLine: 24.5 })).toBe(
-      "Not yet — Hard Rock's line is 1.0 below the market line",
+      "Not a paper signal yet: Hard Rock's line is 1.0 below the market line",
     );
     expect(blockerTag("gap", { killLine: 24.5 })).toBe(
-      "Not yet — the line needs to reach 24.5",
+      "Not a paper signal yet: the line needs to reach 24.5",
     );
-    expect(blockerTag("qb_out")).toBe("Starting QB out — recheck");
+    expect(blockerTag("qb_out")).toBe("Starting QB out");
     expect(blockerTag(null)).toBeNull();
   });
 });
@@ -93,8 +94,7 @@ describe("hrQuoteText", () => {
       }),
     ).toBe("u27.5 -105");
   });
-  it("dates a held-over main line in ET (naive UTC in, Eastern out)", () => {
-    // 20:07 UTC on Thu 2026-09-24 is 4:07pm EDT.
+  it("keeps the number plain on a held-over main line; the time is separate", () => {
     expect(
       hrQuoteText({
         hrLine: 27.5,
@@ -102,12 +102,49 @@ describe("hrQuoteText", () => {
         hrLive: false,
         hrAsOf: "2026-09-24 20:07:23.5",
       }),
-    ).toBe("u27.5 -105 · as of Thu 4:07pm");
+    ).toBe("u27.5 -105");
   });
   it("says so when there is no line", () => {
     expect(hrQuoteText(null)).toBe("no line yet");
     expect(hrQuoteText({ hrLine: null, hrUnderPrice: null })).toBe(
       "no line yet",
     );
+  });
+});
+
+describe("hrSeenText", () => {
+  it("reads naive UTC as ET, with the zone named", () => {
+    // 20:44 UTC on Tue 2026-10-20 is 4:44 PM EDT.
+    expect(
+      hrSeenText({
+        hrLine: 27.5,
+        hrUnderPrice: -105,
+        hrAsOf: "2026-10-20 20:44:09.5",
+      }),
+    ).toBe("Tue 4:44 PM ET");
+  });
+  it("prefers the newest confirmation over the capture", () => {
+    expect(
+      hrSeenText({
+        hrLine: 27.5,
+        hrUnderPrice: -105,
+        hrAsOf: "2026-10-20 20:44:09",
+        hrSeenAt: "2026-10-21 14:05:00",
+      }),
+    ).toBe("Wed 10:05 AM ET");
+  });
+  it("shows nothing without a timestamp or a line", () => {
+    expect(hrSeenText({ hrLine: 27.5, hrUnderPrice: -105 })).toBeNull();
+    expect(
+      hrSeenText({ hrLine: 27.5, hrUnderPrice: null, hrAsOf: "garbage" }),
+    ).toBeNull();
+    expect(
+      hrSeenText({
+        hrLine: null,
+        hrUnderPrice: null,
+        hrAsOf: "2026-10-20 20:44:09",
+      }),
+    ).toBeNull();
+    expect(hrSeenText(null)).toBeNull();
   });
 });

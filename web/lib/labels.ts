@@ -7,7 +7,7 @@
 // line value · Watch (never "EDGE" on screen) · kill line / kill price ·
 // paper pick · weekly cap.
 
-import { etClock12 } from "@/lib/et";
+import { etClockZone, parseNaiveUtc } from "@/lib/et";
 import { american, fmt } from "@/lib/format";
 import type { EdgeBlocker, EdgeTier } from "@/lib/edge";
 import type { LineBasis } from "@/lib/edge";
@@ -111,15 +111,15 @@ export function blockerTag(
   if (blocker === null) return null;
   switch (blocker) {
     case "no_hr_line":
-      return "Not yet — Hard Rock has no first-half line";
+      return "Not a paper signal yet: Hard Rock has no first-half line";
     case "hr_alt_line":
-      return "Not yet — Hard Rock's feed shows an alternate line; check the app";
+      return "Not a paper signal yet: Hard Rock's feed shows an alternate line";
     case "off_market": {
       const diff =
         ctx.marketLine != null && ctx.hrLine != null
           ? ` ${fmt(ctx.marketLine - ctx.hrLine)}`
           : "";
-      return `Not yet — Hard Rock's line is${diff} below the market line`;
+      return `Not a paper signal yet: Hard Rock's line is${diff} below the market line`;
     }
     case "price": {
       const hr = ctx.hrPrice != null ? american(ctx.hrPrice) : "too short";
@@ -127,22 +127,22 @@ export function blockerTag(
         ctx.killPrice != null
           ? `${american(ctx.killPrice)} or better`
           : "a better price";
-      return `Not yet — Hard Rock's price is ${hr}; needs ${needs}`;
+      return `Not a paper signal yet: Hard Rock's under price is ${hr}; the rule needs ${needs}`;
     }
     case "no_fair_price":
-      return "Not yet — no other book is at that number, so the price can't be compared";
+      return "Not a paper signal yet: no other book is at that number, so the price can't be compared";
     case "qb_out":
-      return "Starting QB out — recheck";
+      return "Starting QB out";
     case "early_season":
       return `Paper only — a team has under ${MIN_GAMES_FOR_REAL_MONEY} games this season`;
     case "held":
       return "Held — an input failed on this build; paper only";
     case "not_on_card":
-      return "Not yet — no scheduled build has read this game";
+      return "Not a paper signal yet: no scheduled build has read this game";
     case "gap":
       return ctx.killLine != null
-        ? `Not yet — the line needs to reach ${fmt(ctx.killLine)}`
-        : "Not yet — the gap is too small";
+        ? `Not a paper signal yet: the line needs to reach ${fmt(ctx.killLine)}`
+        : "Not a paper signal yet: the gap is too small";
     case "no_model":
       return "No model number yet — the week has not been scored";
     case "cap":
@@ -311,14 +311,10 @@ export type HrQuote = {
   hrUnderPrice: number | null;
   hrLive?: boolean;
   hrAsOf?: string | null;
+  /** Newest confirmation of the shown quote: max(captured_at, last_seen_at). */
+  hrSeenAt?: string | null;
 };
 
-/**
- * Hard Rock's number as the board shows it: "u27.5 -105". When the feed's
- * newest quote is an alternate line (lineCheck.hrLive false), the number shown
- * is the last MAIN line on file, so it carries its capture time in ET:
- * "u27.5 -105 · as of Thu 4:07pm". `hrAsOf` is naive UTC text from Postgres.
- */
 /** The Board's one honest line (audit 2026-10-17, Tate): ranks are the
  *  model's view, green is a paper signal, and a gap is not an edge. */
 export const BOARD_HONESTY_TEXT =
@@ -331,11 +327,24 @@ export const BOARD_HONESTY_TEXT =
 export const RESEARCH_BANNER =
   "A college-football betting research lab. Six strategies on paper, judged against the market's closing price. Nothing here is a bet.";
 
+/**
+ * Hard Rock's number as the board shows it: "u27.5 -105". Its time is a
+ * separate muted label (`hrSeenText`), never inside the number.
+ */
 export function hrQuoteText(q: HrQuote | null | undefined): string {
   if (q == null || q.hrLine == null) return "no line yet";
   const price = q.hrUnderPrice == null ? "" : ` ${american(q.hrUnderPrice)}`;
-  const base = `u${fmt(q.hrLine)}${price}`;
-  if (q.hrLive !== false || !q.hrAsOf) return base;
-  const t = new Date(`${q.hrAsOf.trim().replace(" ", "T")}Z`);
-  return Number.isNaN(t.getTime()) ? base : `${base} · as of ${etClock12(t)}`;
+  return `u${fmt(q.hrLine)}${price}`;
+}
+
+/**
+ * When the Hard Rock price shown was last confirmed, "Tue 4:44 PM ET" (naive
+ * UTC in, ET out): the newest of captured_at and last_seen_at of the very
+ * snapshot the row uses. Null when the quote has no timestamp: a time is never
+ * invented.
+ */
+export function hrSeenText(q: HrQuote | null | undefined): string | null {
+  if (q == null || q.hrLine == null) return null;
+  const t = parseNaiveUtc(q.hrSeenAt) ?? parseNaiveUtc(q.hrAsOf);
+  return t === null ? null : etClockZone(t);
 }

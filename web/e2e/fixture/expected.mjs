@@ -417,31 +417,32 @@ export function edgeFor(
     action = `Paper signal: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
   } else if (blocker === "no_hr_line" || basis === null) {
     if (basis === null) {
-      action = `Not yet — no first-half line anywhere. It becomes a signal at under ${fmt(killLine)} or higher.`;
+      action = `Not a paper signal yet: no first-half line anywhere. It becomes a paper signal at under ${fmt(killLine)} or higher.`;
     } else {
       const at =
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
-      action = `Not yet — Hard Rock has no first-half line. It becomes a signal at under ${fmt(killLine)} or higher${at}.`;
+      action = `Not a paper signal yet: Hard Rock has no first-half line. It becomes a paper signal at under ${fmt(killLine)} or higher${at}.`;
     }
   } else if (blocker === "hr_alt_line") {
-    action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(hrLine)}; check the app.`;
+    action = `Not a paper signal yet: Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(hrLine)}.`;
   } else if (blocker === "price") {
     const needs = `${american(killPrice ?? -110)} or better`;
     const hr = hrUnderPrice !== null ? american(hrUnderPrice) : "not posted";
-    action = `Not yet — Hard Rock’s price is ${hr}; needs ${needs}.`;
+    action = `Not a paper signal yet: Hard Rock’s under price is ${hr}; the rule needs ${needs}.`;
   } else if (blocker === "no_fair_price") {
     action =
       hrUnderPrice === null
-        ? `Not yet — Hard Rock has not priced its ${fmt(hrLine)} under. Paper only until it does.`
-        : `Not yet — no other book is at ${fmt(hrLine)}, so ${american(hrUnderPrice)} cannot be compared. Paper only until one is.`;
+        ? `Not a paper signal yet: Hard Rock has not priced its ${fmt(hrLine)} under. Paper only until it does.`
+        : `Not a paper signal yet: no other book is at ${fmt(hrLine)}, so ${american(hrUnderPrice)} cannot be compared. Paper only until one is.`;
   } else if (blocker === "qb_out") {
-    action = "Starting QB out — recheck. Our number does not know about it.";
+    action =
+      "Not a paper signal yet: a starting QB is out, and our number does not know about it.";
   } else if (blocker === "early_season") {
     const at = hrUnderPrice !== null ? ` at ${american(hrUnderPrice)}` : "";
     const n = minGamesPlayed ?? 0;
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
-    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a signal at ${fmt(killLine)} or higher.`;
+    action = `Not a paper signal yet: ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a paper signal at ${fmt(killLine)} or higher.`;
   } else {
     const gg = gap ?? 0;
     action =

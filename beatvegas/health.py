@@ -991,7 +991,7 @@ def digest_positions_fresh(ctx: Ctx) -> Result:
     age = (ctx.now - d).days
     return Result(
         age <= DIGEST_POSITIONS_MAX_AGE_D,
-        f"newest Monday read {newest} ({age} days ago; max {DIGEST_POSITIONS_MAX_AGE_D})",
+        f"newest Monday read {newest} ({age} day{'' if age == 1 else 's'} ago; max {DIGEST_POSITIONS_MAX_AGE_D})",
     )
 
 

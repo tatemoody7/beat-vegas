@@ -14,7 +14,12 @@ hold the rest.
   `dry_run` dispatch of `weekly_report.yml` (run 39501467471) wrote its page, then the health step exited 2:
   `health_check.py` had no `--weekly-status` argument (the edit adding it never applied, and no test parsed a
   workflow's command line). Fixed, and `tests/test_health_check_script.py::test_every_workflow_invocation_parses` now
-  parses every `health_check.py` line in every workflow (it fails on the old script).
+  parses every `health_check.py` line in every workflow (it fails on the old script). Reading the dry run's page (week 7)
+  against Neon found three more: a failed run that a later run of the same workflow fixed counted as a problem and
+  turned the status to ATTENTION (it is now listed under "Resolved this week" and changes nothing), pull-request CI
+  runs were counted as the system's runs (left out now, with their count named), and the credit line gave the ledger's
+  98 without the balance's own fall of ~1,660 that week, almost all the opening watch, which never wrote the ledger
+  (the page now shows the fall beside the ledger and the gap). Thousands separators on every count.
 - **2026-10-20 (PAPER WORDING ON THE GAME PAGE AND THE BOARD, AND A CAPTURE TIME ON EVERY PRICE).**
   Final-2026 plan D4 build 5; three wording problems found on the live site, display text only (no rank,
   score, gate, number or Board structure changed). (1) The game page's top block is headed **Paper read**
@@ -34,8 +39,6 @@ hold the rest.
   **Left alone**: `beatvegas/card.py` still writes the old "Not yet —" sentences into stored card items
   (Python mirror of `edge.ts`, other sessions editing tonight; the site rebuilds the sentence itself, so
   only a card row read straight from `cards.items` would show them).
-
-
 - **2026-10-20 ~21:45 UTC (THE SUNDAY REPORT: ONE PAGE A WEEK, COMMITTED AND EMAILED).** Final-2026 plan D4 build 3
   (Tate's calls the same day: a GitHub issue plus a committed file, Sunday 11am ET with provisional positions, no AI and
   no paid service). Before it, the week's record was rows in `arm_positions` plus a chat skill someone had to run.

@@ -55,6 +55,8 @@ from beatvegas.db.store import session_scope, try_init_db  # noqa: E402
 
 SITE = "https://beat-vegas.vercel.app"
 SITE_PATHS = ("/", "/research", "/results", "/records")
+# Workflows that test code before it merges, not the system running.
+DEV_WORKFLOWS = frozenset({"CI"})
 PLAN_CREDITS = 20_000  # The Odds API plan: 20,000 credits a cycle, no rollover
 
 # Account dates the report reminds Tate of when they fall within the next 14 days
@@ -102,6 +104,8 @@ class Report:
         self.problems_urgent: List[str] = []
         self.problems_wait: List[str] = []
         self.pending: List[str] = []
+        # A failed run a later run of the same workflow fixed: information, not a problem.
+        self.resolved: List[str] = []
 
     def src(self, text: str) -> str:
         self.sources.append(text)
@@ -164,9 +168,12 @@ def systems(
         out.append("Workflow runs: NOT CHECKED (the runs list was not available to this run).")
     else:
         since = r.since.strftime("%Y-%m-%dT%H:%M:%SZ")
-        week_runs = [x for x in runs if (x.get("createdAt") or "") >= since]
+        week_all = [x for x in runs if (x.get("createdAt") or "") >= since]
+        # Pull-request checks test code before it merges; they are not the system running.
+        week_runs = [x for x in week_all if x.get("workflowName") not in DEV_WORKFLOWS]
         q = r.src(
-            f"GitHub runs list (`gh run list --limit 200`), created since {since}: {len(week_runs)} runs"
+            f"GitHub runs list (`gh run list --limit 200`), created since {since}: {len(week_all)} runs,"
+            f" {len(week_all) - len(week_runs)} of them pull-request checks ({', '.join(sorted(DEV_WORKFLOWS))}) left out"
         )
         by: Dict[str, Counter] = defaultdict(Counter)
         for x in week_runs:
@@ -193,9 +200,10 @@ def systems(
             msg = (
                 f"{x.get('workflowName')} run {x.get('databaseId')} failed at {x.get('createdAt')}"
             )
-            (r.problems_wait if later else r.problems_urgent).append(
-                msg + (" (a later run succeeded)" if later else " (no later success)")
-            )
+            if later:
+                r.resolved.append(msg + " (a later run succeeded)")
+            else:
+                r.problems_urgent.append(msg + " (no later success)")
         out.append("")
     # Health verdicts as they stand.
     q = r.src("app_settings last_health_<job> rows (one per scheduled job)")
@@ -351,6 +359,40 @@ def research(r: Report, session) -> Tuple[List[str], str]:
     return out, learned[0]
 
 
+def _balance_fall(r: Report, session, ledger: int) -> str:
+    """The balance's own fall over the week beside the ledger: the opening watch
+    (to 2026-10-20) and any client outside beatvegas spend without a ledger row."""
+    start = (
+        session.query(AppSettingLog.value)
+        .filter(
+            AppSettingLog.key == ops.ODDS_CREDITS_REMAINING, AppSettingLog.written_at <= r.since
+        )
+        .order_by(AppSettingLog.written_at.desc())
+        .first()
+    )
+    end = (
+        session.query(AppSettingLog.value)
+        .filter(AppSettingLog.key == ops.ODDS_CREDITS_REMAINING)
+        .order_by(AppSettingLog.written_at.desc())
+        .first()
+    )
+    q = r.src(
+        "app_settings_log odds_credits_remaining: the last reading at or before the week's start and the newest"
+    )
+    try:
+        a, b = int(start[0]), int(end[0])
+    except (TypeError, ValueError):
+        return f"Balance over the week ({q}): NOT CHECKED (no reading at the week's start)."
+    if b > a:
+        return f"Balance over the week ({q}, VERIFIED): rose {a:,} -> {b:,} (a credit reset)."
+    fall = a - b
+    gap = fall - ledger
+    return (
+        f"Balance over the week ({q}, VERIFIED): fell {fall:,} ({a:,} -> {b:,}); the ledger explains "
+        f"{ledger:,}, {'leaving ' + format(gap, ',') + ' spent outside it' if gap > 0 else 'all of it'}."
+    )
+
+
 def data_and_credits(r: Report, session) -> Tuple[List[str], str]:
     out = ["## C. Data collection and credits", ""]
     bal, _n, bal_at = _gauge(session, ops.ODDS_CREDITS_REMAINING)
@@ -372,9 +414,12 @@ def data_and_credits(r: Report, session) -> Tuple[List[str], str]:
         "app_settings odds_credits_remaining, odds_cycle_reset_at, odds_credit_floor; credit_plan.allowance"
     )
     left_pct = f"{int(bal) / PLAN_CREDITS:.0%}" if bal else "—"
+    fall_line = _balance_fall(r, session, used)
     out += [
         f"Odds API ({q}, {q2}, VERIFIED): **{used:,} credits used this week**; balance {int(bal):,} ({left_pct} of the 20,000 plan) as of {_et(bal_at)}; "
-        f"reset {st.reset_at.date() if st.reset_at else 'UNSET'}; headroom above the {st.floor:,} floor after the recurring need: {allow if allow is not None else '—'}.",
+        f"reset {st.reset_at.date() if st.reset_at else 'UNSET'}; headroom above the {st.floor:,} floor after the recurring need: {f'{allow:,}' if allow is not None else '—'}.",
+        "",
+        fall_line,
         "",
     ]
     if by_job:
@@ -396,7 +441,7 @@ def data_and_credits(r: Report, session) -> Tuple[List[str], str]:
     )
     cfbd_used = (vals[0] - vals[-1]) if len(vals) >= 2 and vals[0] >= vals[-1] else None
     out += [
-        f"CFBD ({q}, VERIFIED): {cfbd_used if cfbd_used is not None else '—'} calls this week; {vals[-1] if vals else '—'} left.",
+        f"CFBD ({q}, VERIFIED): {f'{cfbd_used:,}' if cfbd_used is not None else '—'} calls this week; {f'{vals[-1]:,}' if vals else '—'} left.",
         "",
     ]
     # Research capture this week.
@@ -553,6 +598,9 @@ def build(
         + [""]
     )
     prob += ["Can wait:", ""] + ([f"- {x}" for x in r.problems_wait] or ["- none"]) + [""]
+    if r.resolved:
+        prob += ["Resolved this week (a later run of the same workflow succeeded; no action):", ""]
+        prob += [f"- {x}" for x in r.resolved] + [""]
     prob += (
         ["Pending (carried into next week's report):", ""]
         + ([f"- {x}" for x in r.pending] or ["- none"])

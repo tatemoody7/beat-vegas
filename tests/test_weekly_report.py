@@ -304,3 +304,50 @@ def test_the_weekly_contract_fails_on_a_missed_step(tmp_path):
         outcomes={"report": "success", "commit": "success", "issue": "failure"},
     )
     assert health.evaluate(health.CONTRACTS["weekly"], bad)[0] == "failed"
+
+
+def test_ci_runs_and_superseded_failures_are_not_problems(week):
+    runs = [
+        {
+            "databaseId": 1,
+            "workflowName": "CI",
+            "conclusion": "failure",
+            "createdAt": "2026-10-23T20:00:00Z",
+        },
+        {
+            "databaseId": 2,
+            "workflowName": "Daily grading",
+            "conclusion": "failure",
+            "createdAt": "2026-10-23T10:00:00Z",
+        },
+        {
+            "databaseId": 3,
+            "workflowName": "Daily grading",
+            "conclusion": "success",
+            "createdAt": "2026-10-23T11:00:00Z",
+        },
+    ]
+    md, meta = _build(week, runs=runs)
+    assert meta["urgent"] == 0 and meta["wait"] == 0
+    assert "Resolved this week" in md and "Daily grading run 2 failed" in md
+    assert "| CI |" not in md and "1 of them pull-request checks" in md
+
+
+def test_the_balance_fall_is_shown_beside_the_ledger(week):
+    eng, _ = week
+    with Session(eng) as s:
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining",
+                value="9200",
+                written_at=NOW - timedelta(days=7, hours=1),
+            )
+        )
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="8800", written_at=NOW - timedelta(hours=9)
+            )
+        )
+        s.commit()
+    md, _ = _build(week)
+    assert "fell 400 (9,200 -> 8,800); the ledger explains 322, leaving 78 spent outside it" in md

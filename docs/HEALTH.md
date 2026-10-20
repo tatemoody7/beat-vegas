@@ -224,6 +224,21 @@ to main and opens the week's issue; every check is `failed` severity, so a red r
 
 A dispatch with `dry_run` writes the page as an artifact and no verdict.
 
+### When archive is degraded or failed
+
+The archive queue (since 2026-10-20, final-2026 plan PR-C10) runs `auto` daily at 07Z; it spends only in the
+last four days before the credit reset. Read the run's `HEALTH:` line and its `archive-<run id>` artifact
+(`archive_status.json`: window, live balance, allowance, each item's state), then:
+
+1. `archive.ran` -> the auto step raised before writing its status (the traceback is in "Run the archive
+   command"; an Odds API error or a database read). Credits do not roll over: inside the window, fix and
+   dispatch `archive.yml` with item `auto` the same day.
+2. `archive.within_allowance` -> it spent outside the window, or more than the allowance it computed. Stop
+   the schedule (disable the workflow), read `odds_spend` for job `archive`, and check the balance against the
+   recurring need before anything else runs.
+3. `archive.items_ok` (degraded) -> one item raised and the queue went on. Its message is in the status file;
+   the item resumes where it stopped on the next run (bought waves are read back from the ledger).
+
 ### When digest is degraded or failed
 
 The digest (since 2026-10-20, final-2026 plan D4) is the one job whose red run is the point: it fails,
@@ -418,5 +433,22 @@ Failure modes on record:
 Failure modes on record:
 
 - **2026-10-20** -- Before the report existed the week's record was rows in arm_positions and a chat skill someone had to run; a week nobody opened Claude left no record. The page and the issue are now the record, and a run that wrote neither fails. Caught by: `weekly.report_written`, `weekly.committed`, `weekly.issue_opened`.
+
+### archive
+
+- Workflow: `.github/workflows/archive.yml`
+- Window: daily: the 07:00Z GitHub cron plus the Vercel `archive` entry (07Z); spends only inside the last 4 days before `odds_cycle_reset_at` once the last Saturday's closes are in; status, probes and dry runs write no verdict
+- Artifacts: `research_snapshots rows (purpose archive_*, source historical), one odds_spend row per call`, `the run's archive_status.json (artifact): window, live balance, allowance, each item's state`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `OUTCOME_ARCHIVE`
+
+| Check | Severity | Positive fact |
+|---|---|---|
+| `archive.ran` | failed | the auto step finished and wrote its status file |
+| `archive.within_allowance` | failed | spent nothing outside the window, and inside it no more than the controller's allowance |
+| `archive.items_ok` | degraded | no archive item raised (one item's failure never stops the queue) |
+
+Failure modes on record:
+
+- **2026-10-20** -- Credits do not roll over: an archive window that passes unnoticed (a missed run, an item that raises) loses what the cycle had left, and a run that spends from a stale gauge can eat the recurring need. The auto run reads the live balance, and its verdict names what it spent against the allowance. Caught by: `archive.ran`, `archive.within_allowance`.
 
 <!-- contracts:end -->

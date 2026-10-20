@@ -794,9 +794,13 @@ DIGEST_MAX_AGE_H: Dict[str, float] = {
     "monday": 8 * 24.0,
     "lines_watch": 8 * 24.0,
     "weekly": 8 * 24.0,
+    "archive": 48.0,
 }
 # A job the digest watches only from its first scheduled run on.
-DIGEST_JOB_FROM: Dict[str, datetime] = {"weekly": datetime(2026, 10, 26)}
+DIGEST_JOB_FROM: Dict[str, datetime] = {
+    "weekly": datetime(2026, 10, 26),
+    "archive": datetime(2026, 10, 23),
+}
 DIGEST_GRADE_MAX_AGE_H = 30.0
 DIGEST_POSITIONS_MAX_AGE_D = 8
 DIGEST_CFBD_MIN_CALLS = 300
@@ -1103,6 +1107,46 @@ def weekly_issue_opened(ctx: Ctx) -> Result:
 def weekly_info(ctx: Ctx) -> Dict[str, str]:
     st = ctx.status_files.get("weekly") or {}
     return {k: str(st.get(k)) for k in ("week", "status", "urgent", "pending") if k in st}
+
+
+# --------------------------------------------------------------------------- #
+# archive (final-2026 plan PR-C10, 2026-10-20): the end-of-cycle archive queue
+# --------------------------------------------------------------------------- #
+def archive_ran(ctx: Ctx) -> Result:
+    o = ctx.outcomes.get("archive", "not run")
+    st = ctx.status_files.get("archive")
+    return Result(
+        o == "success" and st is not None,
+        f"archive step {o}; status file {'read' if st else 'missing'}",
+    )
+
+
+def archive_within_allowance(ctx: Ctx) -> Result:
+    st = ctx.status_files.get("archive") or {}
+    spent = int(st.get("spent") or 0)
+    if not st.get("window_open"):
+        return Result(spent == 0, f"window closed, {spent} spent")
+    allow = st.get("allowance")
+    if allow is None:
+        return Result(spent == 0, f"no allowance computed, {spent} spent")
+    return Result(spent <= max(int(allow), 0), f"spent {spent:,} of an allowance of {int(allow):,}")
+
+
+def archive_items_ok(ctx: Ctx) -> Result:
+    st = ctx.status_files.get("archive") or {}
+    errs = st.get("errors") or []
+    return Result(not errs, "; ".join(errs)[:200] if errs else "no item failed")
+
+
+def archive_info(ctx: Ctx) -> Dict[str, str]:
+    st = ctx.status_files.get("archive") or {}
+    out = {
+        "window": "open" if st.get("window_open") else "closed",
+        "spent": str(st.get("spent", 0)),
+    }
+    if st.get("allowance") is not None:
+        out["allowance"] = str(st.get("allowance"))
+    return out
 
 
 CONTRACTS: Dict[str, Contract] = {
@@ -1565,6 +1609,48 @@ CONTRACTS: Dict[str, Contract] = {
             ),
         ),
         info=weekly_info,
+    ),
+    "archive": Contract(
+        job="archive",
+        workflow="archive.yml",
+        window=(
+            "daily: the 07:00Z GitHub cron plus the Vercel `archive` entry (07Z); spends only inside"
+            " the last 4 days before `odds_cycle_reset_at` once the last Saturday's closes are in;"
+            " status, probes and dry runs write no verdict"
+        ),
+        artifacts=(
+            "research_snapshots rows (purpose archive_*, source historical), one odds_spend row per call",
+            "the run's archive_status.json (artifact): window, live balance, allowance, each item's state",
+        ),
+        inputs=("OUTCOME_ARCHIVE",),
+        checks=(
+            Check(
+                "archive.ran",
+                "failed",
+                "the auto step finished and wrote its status file",
+                archive_ran,
+            ),
+            Check(
+                "archive.within_allowance",
+                "failed",
+                "spent nothing outside the window, and inside it no more than the controller's allowance",
+                archive_within_allowance,
+            ),
+            Check(
+                "archive.items_ok",
+                "degraded",
+                "no archive item raised (one item's failure never stops the queue)",
+                archive_items_ok,
+            ),
+        ),
+        failure_modes=(
+            FailureMode(
+                "2026-10-20",
+                "Credits do not roll over: an archive window that passes unnoticed (a missed run, an item that raises) loses what the cycle had left, and a run that spends from a stale gauge can eat the recurring need. The auto run reads the live balance, and its verdict names what it spent against the allowance.",
+                ("archive.ran", "archive.within_allowance"),
+            ),
+        ),
+        info=archive_info,
     ),
 }
 

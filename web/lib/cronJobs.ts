@@ -207,6 +207,20 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateOpenMin: null,
     gateCloseMin: null,
   },
+  archive: {
+    // The archive queue (final-2026 plan PR-C10, 2026-10-20): daily `auto`, which
+    // spends only inside the last 4 days before the credit reset (Nov 1-4, then
+    // Nov 30 - Dec 4) and does nothing otherwise. One 07Z entry (3am EDT / 2am
+    // EST, inside a 1:30-4:59am ET window); the 07:00Z GitHub cron runs too, and
+    // a second run the same day reads the live balance, so it never overspends.
+    workflow: "archive.yml",
+    inputs: { item: "auto" },
+    days: null,
+    dispatchOpenMin: 1 * 60 + 30,
+    dispatchCloseMin: 4 * 60 + 59,
+    gateOpenMin: null,
+    gateCloseMin: null,
+  },
   digest: {
     // The daily digest (final-2026 plan D4, 2026-10-20): silent when healthy, a
     // failed run (GitHub's email) when a job went quiet, a verdict failed, a

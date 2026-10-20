@@ -3,7 +3,7 @@
 **Mission (Tate, 2026-10-07): "Find where the market is wrong. Prove it with data. Bet only when we
 have an edge. Build trust by showing the truth."** Beat Vegas is a college-football betting research
 lab that may become a business; it follows the evidence to whatever market holds the strongest,
-most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.6) governs 2026**: every
+most repeatable, most defensible edge. **`docs/ROADMAP_2026.md` (v2.8) governs 2026**: every
 strategy runs on paper, judged by line value against the de-vigged consensus close; real money ended
 2026-10-18 (D2; 30 graded tickets frozen, never evidence). It began as a first-half (1H) unders system on **Hard Rock Bet** (the only sportsbook
 bettable from Florida); that is now one hypothesis among several. **It never places bets or
@@ -17,7 +17,7 @@ paragraph below in place and appends its episode there. When this file and a mem
 disagree, **this file wins**; memory files hold lessons and point here.
 
 ## Read first
-- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.6): what is tested, how an edge is judged,
+- `docs/ROADMAP_2026.md` — the governing 2026 plan (v2.8): what is tested, how an edge is judged,
   what real money does. Changed only by a versioned amendment logged at its bottom. `docs/CONSENSUS.md`
   is the judge it names (engine `cv1`, table `hp1`); `docs/PROTOCOL_2026.md` is the test every arm
   runs (weekly SPRT, alpha 0.5% each, K = 10).
@@ -182,7 +182,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
-| `archive.yml` | dispatch item/max_credits/game_id/live/dry_run | the archive queue (plan C12, Tate's order): `status`, `probe` (≤40 credits), `auto` (items land in PR-C10); ledger job `archive` |
+| `archive.yml` | daily 07Z (GitHub + Vercel `archive`), Sat 10-24 15Z ladder probe, dispatch item/max_credits/game_id/live/dry_run | the archive queue (plan C12, Tate's order; items `beatvegas/archive.py`, PR-C10): `auto` spends only in the last 4 days before the reset, from the LIVE balance, into `research_snapshots`; `status`, `probe`; ledger job `archive`, contract `archive` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |

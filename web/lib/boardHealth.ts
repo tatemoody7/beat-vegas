@@ -224,6 +224,7 @@ export const HEALTH_JOB_IDS = [
   "lines_watch",
   "digest",
   "weekly",
+  "archive",
 ] as const;
 export type HealthJobId = (typeof HEALTH_JOB_IDS)[number];
 

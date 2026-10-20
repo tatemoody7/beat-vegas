@@ -1073,14 +1073,15 @@ def test_pricing_monday_season_over_input_crosses_via_env():
             assert "inputs." not in s["run"], "an input is inlined into a run: block"
 
 
-def test_archive_yml_is_dispatch_only_and_writes_through_env():
-    """archive.yml (final-2026 plan PR-C6): the archive queue's workflow. Dispatch
-    only until PR-C10 adds the end-of-cycle schedule; every input reaches bash
-    through env:, the job carries BV_ODDS_JOB=archive so the ledger names it, and
-    it shares the neon-writers group like every other Neon writer."""
+def test_archive_yml_runs_auto_daily_and_writes_through_env():
+    """archive.yml (final-2026 plan PR-C6, schedule PR-C10): `auto` daily at 07Z,
+    the one-off live ladder probe on Sat 2026-10-24 15Z, and dispatch. Every input
+    reaches bash through env:, the job carries BV_ODDS_JOB=archive so the ledger
+    names it, and it shares the neon-writers group like every other Neon writer."""
     data = _load(WF_DIR / "archive.yml")
     on = _on(data)
-    assert set(on) == {"workflow_dispatch"}
+    assert set(on) == {"workflow_dispatch", "schedule"}
+    assert [c["cron"] for c in on["schedule"]] == ["0 7 * * *", "0 15 24 10 *"]
     inputs = on["workflow_dispatch"]["inputs"]
     assert set(inputs) == {"item", "max_credits", "game_id", "live", "dry_run"}
     assert inputs["item"]["options"] == ["status", "probe", "auto"]
@@ -1090,6 +1091,9 @@ def test_archive_yml_is_dispatch_only_and_writes_through_env():
     run_steps = [s for s in job["steps"] if isinstance(s.get("run"), str)]
     for s in run_steps:
         assert "inputs." not in s["run"], "an input is inlined into a run: block"
+    clock = next(s for s in run_steps if s.get("id") == "clock")
+    assert '"0 15 24 10 *" ]; then item=ladder_probe; else item=auto' in clock["run"]
     cmd = next(s for s in run_steps if "scripts/archive_buy.py" in s["run"])
-    assert set(cmd["env"]) == {"IN_ITEM", "IN_MAX", "IN_GAME", "IN_LIVE", "IN_DRY"}
-    assert '--max-credits "$IN_MAX"' in cmd["run"]
+    assert set(cmd["env"]) == {"ITEM", "IN_MAX", "IN_GAME", "IN_LIVE", "IN_DRY"}
+    assert "probe --live --skip-historical --max-credits 5" in cmd["run"]
+    assert '--status-file "$RUNNER_TEMP/archive_status.json"' in cmd["run"]

@@ -126,7 +126,7 @@ def week():
                 mean_ev=0.0403,
             )
         )
-        for job in ("card", "grade", "sunday", "monday", "lines_watch", "digest"):
+        for job in ("card", "grade", "sunday", "monday", "lines_watch", "digest", "archive"):
             _set(
                 s,
                 f"last_health_{job}",

@@ -69,7 +69,7 @@ def last_dispatch_key(job_id: str) -> str:
 # dispatch keys: the board derives the four keys from HEALTH_JOBS itself
 # (web/lib/boardHealth.ts HEALTH_JOB_IDS, parity-tested).
 HEALTH_PREFIX = "last_health_"
-HEALTH_JOBS = ("card", "grade", "sunday", "monday", "lines_watch", "digest", "weekly")
+HEALTH_JOBS = ("card", "grade", "sunday", "monday", "lines_watch", "digest", "weekly", "archive")
 
 
 def health_key(job: str) -> str:

@@ -190,10 +190,7 @@ def test_only_the_client_talks_to_the_provider():
     beatvegas/ or scripts/ may name the provider's host. (The workflows' free
     `curl` pre-check is the one exception, outside Python.)"""
     host = re.compile(r"api\.the-odds-api\.com")
-    # scripts/opening_watch.py is the stdlib-only temporary watch (ends
-    # 2026-10-20, removed by final-2026 plan PR-08); its spend is capped in the
-    # script and read from its artifacts, not the ledger. Drop this line with it.
-    exempt = {"scripts/opening_watch.py"}
+    exempt: set = set()  # the opening watch, the one exemption, was removed 2026-10-20
     offenders = []
     for folder in ("beatvegas", "scripts"):
         for p in (ROOT / folder).rglob("*.py"):

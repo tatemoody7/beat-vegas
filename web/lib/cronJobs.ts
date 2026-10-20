@@ -222,27 +222,6 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateOpenMin: null,
     gateCloseMin: null,
   },
-  "opening-watch": {
-    // The market-opening watch (temporary research, Tate's approval 2026-10-15;
-    // removed after Tue 10-20). GitHub's own cron for it fired 0 of ~4 ticks on
-    // its first afternoon, so Vercel's hourly entries are the trigger; GitHub's
-    // 20-minute cron stays as a backup that adds ticks when it does fire. Every
-    // tick dispatches: a tick pays credits only when a book opens a market (the
-    // script asks each market only of books that have not posted it), and the
-    // script itself refuses to spend outside Fri 18:00 - Tue 18:00 ET. Read-only:
-    // the workflow has no DATABASE_URL.
-    // days null: one daily entry per UTC hour (24, inside Vercel's 100-entry
-    // limit) cannot also name five weekdays; outside the watch the workflow
-    // writes outside_window and spends nothing (~1 Actions minute a tick).
-    workflow: "opening_watch.yml",
-    inputs: {},
-    days: null,
-    dispatchOpenMin: 0,
-    dispatchCloseMin: 24 * 60 - 1,
-    gateOpenMin: null,
-    gateCloseMin: null,
-    everyTick: true,
-  },
   grade: {
     workflow: "grade.yml",
     // grade.yml declares one OPTIONAL input (`hist`, the 2023-25 post-mortem

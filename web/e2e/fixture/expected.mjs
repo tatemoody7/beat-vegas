@@ -564,8 +564,6 @@ export const CRON_JOBS = {
   },
   // The Monday pricing report (2026-10-12): read-only, 12Z tick with a 15Z retry.
   "pricing-monday": { days: ["Mon"], openMin: 6 * 60, closeMin: 12 * 60 },
-  // The temporary market-opening watch (2026-10-15): hourly, every tick dispatches.
-  "opening-watch": { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
   // The daily digest (2026-10-20): silent unless something needs attention.
   digest: { days: null, openMin: 8 * 60, closeMin: 10 * 60 + 59 },

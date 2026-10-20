@@ -65,7 +65,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run list --repo "$GITHUB_REPOSITORY" --limit 200 \
+          gh run list --repo "$GITHUB_REPOSITORY" --limit 500 \
             --json databaseId,workflowName,event,status,conclusion,createdAt \
             | python -c "import json,sys; json.dump({'runs': json.load(sys.stdin)}, open(sys.argv[1], 'w'))" \
               "$RUNNER_TEMP/runs.json"

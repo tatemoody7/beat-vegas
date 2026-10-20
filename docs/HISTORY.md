@@ -10,6 +10,22 @@ hold the rest.
 
 ## 2026-10-20
 
+- **2026-10-20 ~22:15 UTC (THE OPENING WATCH ENDS: WHO POSTS NEXT WEEK'S LINES FIRST, AND THE WATCH REMOVED).**
+  Final-2026 plan D4 build 1 (PR-08). The temporary market-opening watch (Tate's approval 2026-10-15) ran 124 ticks
+  from Fri 10-16 22:08Z to its last spending tick Tue 10-20 21:39Z on week 8's 56 listed events and spent **1,944
+  credits** of its 5,500 cap (its own `state.json`; it never wrote `odds_spend`, the one exemption the ledger test
+  carried, now dropped). Read from the final state (run 39502168500's artifact; sighting times are tick times, 20 min
+  apart, 10 on Monday morning, so each is "by then", not the open itself). **Full-game totals**: Hard Rock posted 55 of
+  56 on Sunday (12 before 10am ET, 24 in the 11am hour, 19 in the 10pm hour) and 1 on Monday morning; Polymarket, FanDuel and DraftKings were first.
+  **First-half totals**: Hard Rock posted all 56 between Mon 9am and Tue 9am ET (29 on Monday 9am-3pm, 27 on Tuesday
+  4-9am), typically the 3rd-6th book of 13; Polymarket was first on 50 and FanDuel on 6 (FanDuel's median Mon 5am ET);
+  DraftKings, Caesars and Novig by Mon 12:40pm; BetMGM and BetRivers on Tuesday; Pinnacle 12 and Bovada 13 events by
+  Tue 5:40pm. **Full-game team totals**: Pinnacle first on all 56 (median Sun 5:40pm ET); Hard Rock 55, 3rd or 4th.
+  **First-half team totals**: only FanDuel (first on all 56), Hard Rock (56, second on 46) and DraftKings (53) post them.
+  So Hard Rock never opens a market first, its first-half line is up 8-32 h before the Tuesday card, and our first
+  sweep (Tue pm) is the earliest the registered arms could read it, as designed. Removed: `opening_watch.yml`,
+  `scripts/opening_watch.py`, its test, the `opening-watch` cron entry and its 24 Vercel entries (88 -> 64). The
+  Sunday report now reads the newest 500 runs (the watch's ticks had filled the 200-run window).
 - **2026-10-20 ~21:45 UTC (THE SUNDAY REPORT'S FIRST DRY RUN FOUND A FLAG THE HEALTH STEP DID NOT KNOW).** The
   `dry_run` dispatch of `weekly_report.yml` (run 39501467471) wrote its page, then the health step exited 2:
   `health_check.py` had no `--weekly-status` argument (the edit adding it never applied, and no test parsed a

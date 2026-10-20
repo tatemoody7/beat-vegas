@@ -42,6 +42,7 @@ PURPOSES = (
     "archive_hr_ladder",
     "archive_fg_paths",
     "archive_hr_release",
+    "archive_hr_tt1h",
     "archive_pinnacle_2025",
     "archive_hr_ladder_2025",
     "archive_fg_paths_us2",

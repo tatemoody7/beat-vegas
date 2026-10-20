@@ -128,14 +128,21 @@ def test_the_queue_is_tates_order_with_his_caps(mod):
         "hr_ladder_close_2026",
         "fg_paths_2026",
         "hr_release_2026",
+        "hr_team_totals_h1_2026",
         "pinnacle_2025_closes",
         "hr_ladder_close_2025",
         "fg_paths_2026_us2",
         "pinnacle_2024_closes",
     ]
-    assert [it.cap for it in m.ARCHIVE_QUEUE] == [1500, 3900, 3000, 6000, 2100, 4500, 2500, 2600]
+    assert [it.cap for it in m.ARCHIVE_QUEUE] == [
+        1500, 3900, 3000, 6000, 3300, 2100, 4500, 2500, 2600
+    ]
     assert all(it.purpose.startswith("archive_") for it in m.ARCHIVE_QUEUE)
-    assert all(it.run is None for it in m.ARCHIVE_QUEUE), "items land in PR-C10"
+    parked = [it.name for it in m.ARCHIVE_QUEUE if it.run is None]
+    assert parked == ["hr_ladder_close_2026", "hr_ladder_close_2025"], "C-D20"
+    from beatvegas.research_capture import PURPOSES
+
+    assert all(it.purpose in PURPOSES for it in m.ARCHIVE_QUEUE)
 
 
 def test_spent_reads_the_ledger_by_purpose(mod):
@@ -289,7 +296,8 @@ def test_status_lists_the_queue(mod, capsys):
     m, _ = mod
     assert m.cmd_status(SimpleNamespace()) == 0
     out = capsys.readouterr().out
-    assert "pinnacle_2026_closes" in out and "PR-C10" in out and "| 8 | pinnacle_2024_closes" in out
+    assert "pinnacle_2026_closes" in out and "parked (C-D20)" in out
+    assert "| 9 | pinnacle_2024_closes" in out
 
 
 def test_the_default_probe_game_is_a_week_five_hard_rock_game(mod):

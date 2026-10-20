@@ -418,13 +418,15 @@ class OddsAPIClient:
         return _unwrap_historical(resp.json()) or []
 
     def historical_bulk_totals(
-        self, date_iso: str, regions: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, date_iso: str, regions: Optional[str] = None, envelope: bool = False
+    ) -> Any:
         """Full-game `totals` for EVERY upcoming event as of a past timestamp, from
         the historical BULK /odds endpoint (one call covers the whole slate that
         commences after `date_iso`). Costs 10 credits x regions x markets — so
         10 with `us` — regardless of how many events come back. Used by
-        scripts/backfill_fg_history.py to grade the same picks on the full game."""
+        scripts/backfill_fg_history.py to grade the same picks on the full game.
+        `envelope=True` returns the whole historical envelope ({timestamp, data,
+        ...}) so a caller can stamp rows with the snapshot's own time (archive)."""
         url = f"{self.base_url}/historical/sports/{self.sport}/odds"
         params = {
             "apiKey": self.api_key,
@@ -436,6 +438,8 @@ class OddsAPIClient:
         }
         resp = self._get(url, params)
         _raise_for_status(resp)
+        if envelope:
+            return resp.json() or {}
         return _unwrap_historical(resp.json()) or []
 
     def historical_event_first_half_totals(self, event_id: str, date_iso: str) -> Dict[str, Any]:
@@ -457,12 +461,18 @@ class OddsAPIClient:
         return _unwrap_historical(resp.json()) or {}
 
     def historical_event_odds(
-        self, event_id: str, date_iso: str, markets: str, bookmakers: List[str]
+        self,
+        event_id: str,
+        date_iso: str,
+        markets: str,
+        bookmakers: List[str],
+        envelope: bool = False,
     ) -> Dict[str, Any]:
         """One event's odds for EXPLICIT markets and books as of a past timestamp
         (the archive queue, final-2026 plan C11). Billed 10 x [markets RETURNED]
         x 1 (the book list is one region); an empty answer costs 0. Keys left as
-        the feed spells them. Returns {} on 404 or an empty envelope."""
+        the feed spells them. Returns {} on 404 or an empty envelope;
+        `envelope=True` returns the whole envelope ({timestamp, data, ...})."""
         if len(bookmakers) > MAX_BOOKMAKERS_ONE_REGION:
             raise ValueError("more than one region's worth of bookmaker keys")
         url = f"{self.base_url}/historical/sports/{self.sport}/events/{event_id}/odds"
@@ -478,6 +488,8 @@ class OddsAPIClient:
         if resp.status_code == 404:
             return {}
         _raise_for_status(resp)
+        if envelope:
+            return resp.json() or {}
         return _unwrap_historical(resp.json()) or {}
 
 

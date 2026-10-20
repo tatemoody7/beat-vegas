@@ -3,19 +3,30 @@ name: Archive queue (Odds API credits -> research_snapshots)
 # The archive queue (final-2026 plan C11-C12): in the last four days of a billing
 # cycle the unspent Odds API credits buy historical captures, in Tate's order,
 # into research_snapshots -- never odds_snapshots, so no registered reader sees
-# them. Dispatch-only in this PR (C6): `probe` asks the archive whether it carries
-# Hard Rock's alternate first-half ladder and team totals (<= 40 credits);
-# `status` prints the queue; `auto` is the end-of-cycle runner, which spends
-# nothing until PR-C10 builds the items. The daily schedule arrives with PR-C10.
+# them. The items are beatvegas/archive.py (PR-C10, 2026-10-20).
 #
-# Every call is logged in odds_spend by the client (job `archive`), and the
-# controller's allowance (balance - floor - the cycle's recurring need) is
-# checked before each paid call.
+# Schedules:
+#   - daily 07:00Z (and the Vercel `archive` entry, 07Z): `auto`. Outside the
+#     archive window (credit_plan.archive_window_open: the last 4 days before
+#     `odds_cycle_reset_at`, after the last Saturday's closes are in) it spends
+#     nothing and says so; inside it reads the LIVE balance and spends the
+#     controller's allowance item by item. Health contract `archive`.
+#   - Sat 2026-10-24 15:00Z, once: the live half of the ladder probe (C-D20),
+#     <= 5 credits, about an hour before the noon kickoffs; its report decides
+#     whether the two Hard Rock ladder items are dropped or re-probed.
+# Dispatch: `status` prints the queue; `probe` asks the archive about one game;
+# `auto` as scheduled (`dry_run` reports and spends nothing).
+#
+# Every call is logged in odds_spend by the client (job `archive`, purpose = the
+# item), and the controller's allowance is checked before each paid call.
 
 permissions:
   contents: read
 
 on:
+  schedule:
+    - cron: '0 7 * * *'
+    - cron: '0 15 24 10 *'
   workflow_dispatch:
     inputs:
       item:
@@ -45,7 +56,7 @@ concurrency:
 jobs:
   archive:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 60
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
@@ -61,33 +72,64 @@ jobs:
         run: |
           pip install --require-hashes -r requirements/lock.txt
           pip install --no-deps --no-build-isolation -e .
-      - name: Run the archive command
+      - name: Run clock and what to run
+        id: clock
         env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
           IN_ITEM: ${{ inputs.item }}
+          IN_DRY: ${{ inputs.dry_run }}
+        run: |
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
+          item="$IN_ITEM"
+          if [ "$EVENT" = "schedule" ]; then
+            if [ "$SCHEDULE" = "0 15 24 10 *" ]; then item=ladder_probe; else item=auto; fi
+          fi
+          echo "item=$item" >> "$GITHUB_OUTPUT"
+          # Only a spending `auto` run is judged; status, probes and dry runs are not.
+          if [ "$item" = "auto" ] && [ "$IN_DRY" != "true" ]; then skip=false; else skip=true; fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      - name: Run the archive command
+        id: archive
+        env:
+          ITEM: ${{ steps.clock.outputs.item }}
           IN_MAX: ${{ inputs.max_credits }}
           IN_GAME: ${{ inputs.game_id }}
           IN_LIVE: ${{ inputs.live }}
           IN_DRY: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          case "$IN_ITEM" in
+          case "$ITEM" in
             status) python scripts/archive_buy.py status ;;
             probe)
               extra=""
               if [ -n "$IN_GAME" ]; then extra="$extra --game-id $IN_GAME"; fi
               if [ "$IN_LIVE" = "true" ]; then extra="$extra --live"; fi
-              python scripts/archive_buy.py probe --max-credits "$IN_MAX" $extra ;;
+              python scripts/archive_buy.py probe --max-credits "${IN_MAX:-40}" $extra ;;
+            ladder_probe)
+              python scripts/archive_buy.py probe --live --skip-historical --max-credits 5 ;;
             auto)
               extra=""
               if [ "$IN_DRY" = "true" ]; then extra="--dry-run"; fi
-              python scripts/archive_buy.py auto $extra ;;
-            *) echo "unknown item $IN_ITEM"; exit 1 ;;
+              python scripts/archive_buy.py auto --status-file "$RUNNER_TEMP/archive_status.json" $extra ;;
+            *) echo "unknown item $ITEM"; exit 1 ;;
           esac
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: archive-${{ github.run_id }}
-          path: reports/
+          path: |
+            reports/
+            ${{ runner.temp }}/archive_status.json
           if-no-files-found: ignore
           retention-days: 90
+      - name: Health contract (docs/HEALTH.md; writes last_health_archive)
+        id: health
+        # A failed verdict exits 1 (GitHub emails). Every value crosses via env:.
+        if: always()
+        env:
+          SKIPPED: ${{ steps.clock.outputs.skip }}
+          RUN_STARTED_AT: ${{ steps.clock.outputs.started }}
+          OUTCOME_ARCHIVE: ${{ steps.archive.outcome }}
+        run: python scripts/health_check.py --job archive --archive-status "$RUNNER_TEMP/archive_status.json"

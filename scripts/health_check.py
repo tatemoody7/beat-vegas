@@ -79,6 +79,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     ap.add_argument(
         "--weekly-status", metavar="FILE", help="weekly_report.yml's report status file"
     )
+    ap.add_argument("--archive-status", metavar="FILE", help="archive.yml's auto-run status file")
     return ap.parse_args(argv)
 
 
@@ -189,6 +190,7 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
             "fg": args.fg_status,
             "runs": getattr(args, "runs_status", None),
             "weekly": getattr(args, "weekly_status", None),
+            "archive": getattr(args, "archive_status", None),
         }
     )
     contract = health.CONTRACTS[job]

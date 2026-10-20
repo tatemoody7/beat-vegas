@@ -45,6 +45,7 @@ def _healthy(s):
         ("sunday", 7 * 24 - 2),
         ("monday", 6 * 24),
         ("lines_watch", 10),
+        ("archive", 6),
     ):
         _set(
             s,

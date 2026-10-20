@@ -10,6 +10,24 @@ hold the rest.
 
 ## 2026-10-20
 
+- **2026-10-20 ~23:00 UTC (THE ARCHIVE ITEMS: EXPIRING CREDITS BECOME DATASETS; ROADMAP v2.8).** Final-2026 plan D4
+  build 4 (PR-C10; Tate's queue C-D9/C-D17/C-D21, caps C12). `beatvegas/archive.py` builds seven of the nine queue
+  items; the two Hard Rock ladder items stay parked (C-D20). Close waves for Pinnacle 2026 weeks 1-7, 2025 and 2024: one
+  historical bulk `eu` totals call (10 credits) at kickoff - 30 min, grouping FBS-vs-FBS kickoffs within 30 min (2026:
+  118 waves, ~1,180 credits; 2025: 231, its 2,100 cap cuts the last ~20; 2024: 226, ~2,260). Full-game paths on `us`
+  then `us2`, 2026 weeks 1-7: a bulk totals call every 4 h from the Sunday 16:00Z before a week's first kickoff,
+  written on change. Hard Rock's 1H release time, weeks 1-4: per Hard-Rock-priced game, a search for the first
+  5-minute archive snapshot carrying Hard Rock's `totals_h1` (Hard Rock alone, so an empty answer is free) between 72 h
+  before and our first live capture, earlier finds of the week tried first. Hard Rock's 1H team totals, weeks 1-7, at
+  kickoff - 30 min (new purpose `archive_hr_tt1h`, cap 3,300). Event ids for weeks 1-6 (the live capture had none
+  before week 7) come from the archive's events list, 1 credit a week. Every row lands in `research_snapshots`
+  (source `historical`, the snapshot's own timestamp); a rerun skips what the ledger says was bought. `archive.yml`
+  now runs `auto` daily at 07Z (GitHub + a Vercel `archive` entry, 64 -> 65), which spends only inside the last four
+  days before `odds_cycle_reset_at` and, unlike the gauge, reads the LIVE balance first (a free events call), so the
+  day's second run cannot spend from a stale number; a one-off cron on Sat 10-24 15Z runs the live half of the ladder
+  probe (<= 5 credits). Health contract `archive` (ran; spent within the allowance; items degraded on an error); the
+  digest watches it from 10-23 (48 h). `archive_buy.py status` estimates what each item has left to buy. Roadmap v2.8
+  records Tate's same-day scope call: minimal + archive, the stopped items listed, nothing deleted.
 - **2026-10-20 ~22:15 UTC (THE OPENING WATCH ENDS: WHO POSTS NEXT WEEK'S LINES FIRST, AND THE WATCH REMOVED).**
   Final-2026 plan D4 build 1 (PR-08). The temporary market-opening watch (Tate's approval 2026-10-15) ran 124 ticks
   from Fri 10-16 22:08Z to its last spending tick Tue 10-20 21:39Z on week 8's 56 listed events and spent **1,944

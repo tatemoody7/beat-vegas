@@ -186,7 +186,6 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |
-| `opening_watch.yml` | Vercel `opening-watch` hourly + GitHub 20-min backup, Fri 10-16 → Tue 10-20 (temporary research) | — (artifacts and cache only; no database) |
 
 Secrets: `DATABASE_URL`, `CFBD_API_KEY`, `ODDS_API_KEY` (repository secrets only). Every job runs on
 `ubuntu-24.04` (pinned 2026-10-17, never `ubuntu-latest`), installs `pip install --require-hashes -r
@@ -208,7 +207,7 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   `weather_validate`, `backfill_weather_actuals` (study-only observed weather), `derive_multiplier`, `reconstruct_pick_prices`, `build_trophy_games` (rivalry list),
   `build_halfpoint_table` (the consensus engine's frozen line-conversion table, study.yml).
 - **Model / research**: `pricing_check` (exploratory, read-only: H-PRICE-HR, rule `pv1`; `docs/PRICING_RESEARCH.md`).
-- **Probes** (write nothing): `opening_watch` (temporary, ≤5,500 credits, ends 2026-10-20); `archive_buy` (the archive queue + its probe; writes `research_snapshots` only).
+- **Probes**: `archive_buy` (the archive queue + its probe; writes `research_snapshots` only).
 - **Archive** (`scripts/archive/`, 27 closed studies, probes and retired tools moved 2026-10-18, PR-19): not in `study.yml`, nothing live imports them; `scripts/archive/README.md` has each one's registry row, verdict and result doc; `tests/test_archive_scripts.py` keeps them compiling.
 - **Deploy / dev**: `deploy_neon` (ADDITIVE), `pg_sim` + `simulate_week` (local week sandbox), `seed_demo`, `fetch_fbs_teams` + `fetch_team_logos`
   (each August), `dump_e2e_schema`, `export_registry` (→ `web/data/hypotheses.json`, parity-tested), `hooks/post_edit.sh`, `hooks/on_stop.sh`.

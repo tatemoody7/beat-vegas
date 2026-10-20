@@ -174,7 +174,7 @@ def systems(
         # Pull-request checks test code before it merges; they are not the system running.
         week_runs = [x for x in week_all if x.get("workflowName") not in DEV_WORKFLOWS]
         q = r.src(
-            f"GitHub runs list (`gh run list --limit 200`), created since {since}: {len(week_all)} runs,"
+            f"GitHub runs list (`gh run list --limit 500`), created since {since}: {len(week_all)} runs,"
             f" {len(week_all) - len(week_runs)} of them pull-request checks ({', '.join(sorted(DEV_WORKFLOWS))}) left out"
         )
         by: Dict[str, Counter] = defaultdict(Counter)

@@ -177,6 +177,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
+| `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | only `last_health_digest`: fails (GitHub emails) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, or the ledger misses spend; silent when healthy |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |

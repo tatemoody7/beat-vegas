@@ -103,6 +103,23 @@ export function etLocalToUtc(local: string): Date | null {
   return Number.isNaN(guess.getTime()) ? null : guess;
 }
 
+/** Weekday + 12-hour ET clock with the zone named: "Tue 4:44 PM ET". The
+ *  capture time under a price (final-2026 plan D4 build 5). */
+export function etClockZone(d: Date): string {
+  const p = etParts(d);
+  const hour12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  return `${p.weekday} ${hour12}:${pad2(p.minute)} ${p.hour >= 12 ? "PM" : "AM"} ET`;
+}
+
+/** Naive-UTC text from Postgres ("2026-10-20 20:44:00", with or without
+ *  fractions) to the instant it names; null when empty or malformed. The `Z`
+ *  is the whole point: `new Date` on the bare string reads local time. */
+export function parseNaiveUtc(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const t = new Date(`${s.trim().replace(" ", "T")}Z`);
+  return Number.isNaN(t.getTime()) ? null : t;
+}
+
 /** Weekday, calendar day and 12-hour clock in ET: "Fri 9/18 4:12pm". The
  *  ledger's "posted" stamp, where the day matters as much as the hour. */
 export function etStamp(d: Date): string {

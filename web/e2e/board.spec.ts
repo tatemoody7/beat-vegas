@@ -11,7 +11,7 @@ import { SLIM_LEAD } from "../app/components/ResearchStrip";
 // holds to the TypeScript originals -- so this file checks the RENDER, not the
 // arithmetic twice.
 
-const { week, expected, thisWeek, byId } = fixture();
+const { week, expected, thisWeek, byId, rowById } = fixture();
 
 /** The game rows on the page, in DOM order: id, href, badge text, section label. */
 async function rows(page: Page) {
@@ -40,7 +40,7 @@ test.describe("the board", () => {
     await page.goto("/");
     const slim = page.locator('p[aria-label="Research status"]');
     await expect(slim).toContainText(
-      `${SLIM_LEAD} · 6 strategies on paper · up to 12 of 30 readings · next read`,
+      `${SLIM_LEAD} · six paper strategies judged against the closing price · up to 12 of 30 readings · next read`,
     );
     await expect(slim.getByRole("link")).toHaveAttribute("href", "/research");
     await expect(slim.locator(".bv-pill")).toHaveCount(0);
@@ -182,6 +182,29 @@ test.describe("the board", () => {
     for (const x of r) expect(x.chips, `${x.id}`).toEqual([]);
   });
 
+  // Final-2026 plan D4 build 5: a price says when it was captured; a row with
+  // no Hard Rock quote shows no time (one is never invented).
+  test("every row with a Hard Rock price shows its as-of time beside it, and no other row does", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const r = await rows(page);
+    let withTime = 0;
+    for (const x of r) {
+      const check = rowById.get(x.id)?.check ?? null;
+      const stamp = page.locator(`#game-${x.id} [data-testid="hr-as-of"]`);
+      if (check !== null && check.hrLine !== null && check.hrAsOf !== null) {
+        withTime += 1;
+        await expect(stamp, `${x.id}`).toHaveText(
+          /^as of (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2}:\d{2} (AM|PM) ET$/,
+        );
+      } else {
+        await expect(stamp, `${x.id}`).toHaveCount(0);
+      }
+    }
+    expect(withTime).toBeGreaterThan(0);
+  });
+
   test("the Hard Rock filter sets ?hr=1, presses the chip and hides the games without a line", async ({
     page,
   }) => {
@@ -268,7 +291,7 @@ test.describe("the board, read by anyone", () => {
     await expect(page.getByText("Rating publishes at kickoff.")).toHaveCount(0);
     // The slim research line is public too (2026-10-14, slimmed 2026-10-15).
     await expect(page.locator('p[aria-label="Research status"]')).toContainText(
-      "6 strategies on paper",
+      "six paper strategies judged against the closing price",
     );
     // The weekly cap was the real-money rule: no slot, no over-cap chip, no
     // "real money needs" clause anywhere (2026-10-18). The fixture's ticketed

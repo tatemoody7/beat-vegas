@@ -121,7 +121,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("hr_alt_line");
     expect(e.verdict.verdict).not.toBe("BET");
     expect(e.action).toBe(
-      `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${base.hrLine!.toFixed(1)}; check the app.`,
+      `Not a paper signal yet: Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${base.hrLine!.toFixed(1)}.`,
     );
   });
   it("no Hard Rock line + big market gap → EDGE / no_hr_line, action names the line to take", () => {
@@ -137,7 +137,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
-      "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.0 or higher.",
+      "Not a paper signal yet: Hard Rock has no first-half line. It becomes a paper signal at under 24.0 or higher.",
     );
     expect(e.kill.price).toBeNull();
     expect(e.kill.text).toBe("No longer a bet below u24.0.");
@@ -165,7 +165,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("no_hr_line");
     expect(e.action).toBe(
-      "Not yet — Hard Rock has no first-half line. It becomes a signal at under 24.0 or higher.",
+      "Not a paper signal yet: Hard Rock has no first-half line. It becomes a paper signal at under 24.0 or higher.",
     );
   });
   it("Hard Rock below the market is no longer a blocker (retired 2026-10-07)", () => {
@@ -205,7 +205,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("price");
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.action).toBe(
-      "Not yet — Hard Rock’s price is -125; needs -120 or better.",
+      "Not a paper signal yet: Hard Rock’s under price is -125; the rule needs -120 or better.",
     );
     expect(e.kill.price).toBe(-120);
   });
@@ -219,7 +219,7 @@ describe("edgeScore — model rows", () => {
     });
     expect(e.blocker).toBe("price");
     expect(e.action).toBe(
-      "Not yet — Hard Rock’s price is -125; needs -110 or better.",
+      "Not a paper signal yet: Hard Rock’s under price is -125; the rule needs -110 or better.",
     );
     expect(e.kill.price).toBeNull();
   });
@@ -305,7 +305,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("no_fair_price");
     expect(e.verdict.verdict).toBe("WATCH");
     expect(e.action).toBe(
-      "Not yet — no other book is at 24.5, so -105 cannot be compared. Paper only until one is.",
+      "Not a paper signal yet: no other book is at 24.5, so -105 cannot be compared. Paper only until one is.",
     );
     expect(e.kill.price).toBeNull();
     // unpriced Hard Rock line: same gate, "hasn't priced" wording (not a false
@@ -349,7 +349,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("qb_out");
     expect(e.action).toBe(
-      "Starting QB out — recheck. Our number does not know about it.",
+      "Not a paper signal yet: a starting QB is out, and our number does not know about it.",
     );
   });
   it("QB out on a would-be BET → EDGE / qb_out (verdict WATCH), score unchanged", () => {
@@ -371,7 +371,7 @@ describe("edgeScore — model rows", () => {
     );
     expect(e.verdict.strength).toBe(58 + 2.7 * 10);
     expect(e.action).toBe(
-      "Starting QB out — recheck. Our number does not know about it.",
+      "Not a paper signal yet: a starting QB is out, and our number does not know about it.",
     );
     expect(e.verdict.flags[0]).toMatch(/QB OUT/);
     expect(e.verdict.flags[0]).toContain("QB1 (knee) out");
@@ -415,7 +415,7 @@ describe("edgeScore — model rows", () => {
     expect(at115.verdict.verdict).toBe("WATCH");
     expect(at115.kill.price).toBe(-110);
     expect(at115.action).toBe(
-      "Not yet — Hard Rock’s price is -115; needs -110 or better.",
+      "Not a paper signal yet: Hard Rock’s under price is -115; the rule needs -110 or better.",
     );
   });
   it("gap just short of the bar at a good price → EDGE / gap", () => {
@@ -431,7 +431,7 @@ describe("edgeScore — model rows", () => {
     expect(e.tier).toBe("EDGE");
     expect(e.blocker).toBe("gap");
     expect(e.action).toBe(
-      "Not yet — the line is 1.5 above our number. It becomes a signal at 24.0 or higher.",
+      "Not a paper signal yet: the line is 1.5 above our number. It becomes a paper signal at 24.0 or higher.",
     );
   });
   it("small gap → Watch (amber band) with blocker gap; a tiny gap → PASS", () => {
@@ -465,7 +465,7 @@ describe("edgeScore — model rows", () => {
     expect(e.blocker).toBe("gap");
     expect(e.kill.line).toBe(24);
     expect(e.action).toBe(
-      "Not yet — the line is 0.7 above our number. It becomes a signal at 24.0 or higher.",
+      "Not a paper signal yet: the line is 0.7 above our number. It becomes a paper signal at 24.0 or higher.",
     );
   });
   it("with no Hard Rock line the sentence names the market line (site review 2026-09-28)", () => {
@@ -553,7 +553,7 @@ describe("edgeScore — model rows", () => {
     expect(e.score).toBe(50);
     expect(e.tier).toBe("PASS");
     expect(e.action).toBe(
-      "Not yet — no first-half line anywhere. It becomes a signal at under 24.0 or higher.",
+      "Not a paper signal yet: no first-half line anywhere. It becomes a paper signal at under 24.0 or higher.",
     );
   });
   it("score clamps to 0..100", () => {

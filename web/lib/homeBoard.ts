@@ -431,7 +431,7 @@ export function applyCardHold(
         tier: "EDGE",
         blocker: "not_on_card",
         action:
-          "Not yet — no scheduled build has read this game’s Hard Rock line and injury report; it is not a bet until one does.",
+          "Not a paper signal yet: no scheduled build has read this game’s Hard Rock line and injury report; it is not a bet until one does.",
       },
       hold: "unread",
     };

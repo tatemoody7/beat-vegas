@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { capitalize, fmt } from "@/lib/format";
 import type { HomeGame } from "@/lib/homeBoard";
-import { hrQuoteText } from "@/lib/labels";
+import { hrQuoteText, hrSeenText } from "@/lib/labels";
 import { passShort } from "@/lib/edge";
 import ScoreBadge from "@/app/components/ScoreBadge";
 import TeamLogo from "@/app/components/TeamLogo";
 
 // One game on the board: rank badge, matchup, kickoff, Hard Rock's number and
-// price, and one line saying what to do. Nothing else.
+// price with the time it was captured, and one line saying where the rule
+// stands. Nothing else.
 //
 // It is a LINK, not a disclosure. The whole row navigates to /game/[id], where
 // the gap bar, the book table, the movement chart and the factors live. The old
@@ -23,6 +24,7 @@ import TeamLogo from "@/app/components/TeamLogo";
 export default function GameRow({ g }: { g: HomeGame }) {
   const { row, edge, check } = g;
   const hr = hrQuoteText(check);
+  const seen = hrSeenText(check);
   const played = row.firstHalfTotal !== null;
   const resultLine =
     played && g.settled !== null
@@ -65,6 +67,14 @@ export default function GameRow({ g }: { g: HomeGame }) {
 
           <div className="mt-1.5 font-mono text-xs text-[var(--text-muted)]">
             {hr}
+            {seen !== null && (
+              <span
+                data-testid="hr-as-of"
+                className="ml-2 font-sans text-[var(--text-dim)]"
+              >
+                {`as of ${seen}`}
+              </span>
+            )}
           </div>
 
           <p

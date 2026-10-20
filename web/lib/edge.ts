@@ -263,8 +263,9 @@ export function edgeScore(i: EdgeInput): EdgeResult {
   // A BET's sentence opens with PAPER_ACTION, for everyone: the "Bet one unit"
   // opening of roadmap v1.4 left with real money on 2026-10-18 (D2).
   // One plain sentence saying what to do, and for anything that is not a bet
-  // yet, the number or price that would make it one (spec §13). "Wait" became
-  // "Not yet" so the sentence names a condition rather than an instruction.
+  // yet, the number or price that would make it one (spec §13). The sentence
+  // names a research condition, never an instruction to a bettor ("Not yet —"
+  // became "Not a paper signal yet:", 2026-10-20, final-2026 plan D4 build 5).
   let action: string;
   if (tier === "BET") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
@@ -275,35 +276,36 @@ export function edgeScore(i: EdgeInput): EdgeResult {
       : "Pass: no model number yet, and Hard Rock’s price is no better than the market.";
   } else if (blocker === "no_hr_line" || basis === null) {
     if (basis === null) {
-      action = `Not yet — no first-half line anywhere. It becomes a signal at under ${fmt(killLine)} or higher.`;
+      action = `Not a paper signal yet: no first-half line anywhere. It becomes a paper signal at under ${fmt(killLine)} or higher.`;
     } else {
       const at =
         killPrice !== null ? `, at ${american(killPrice)} or better` : "";
-      action = `Not yet — Hard Rock has no first-half line. It becomes a signal at under ${fmt(killLine)} or higher${at}.`;
+      action = `Not a paper signal yet: Hard Rock has no first-half line. It becomes a paper signal at under ${fmt(killLine)} or higher${at}.`;
     }
   } else if (blocker === "hr_alt_line") {
-    action = `Not yet — Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(i.hrLine)}; check the app.`;
+    action = `Not a paper signal yet: Hard Rock’s feed is showing an alternate line, not its main number. The last main line on file is under ${fmt(i.hrLine)}.`;
   } else if (blocker === "price") {
     const needs = `${american(killPrice ?? -110)} or better`;
     const hr =
       i.hrUnderPrice !== null ? american(i.hrUnderPrice) : "not posted";
-    action = `Not yet — Hard Rock’s price is ${hr}; needs ${needs}.`;
+    action = `Not a paper signal yet: Hard Rock’s under price is ${hr}; the rule needs ${needs}.`;
   } else if (blocker === "no_fair_price") {
     if (i.hrUnderPrice === null) {
-      action = `Not yet — Hard Rock has not priced its ${fmt(i.hrLine)} under. Paper only until it does.`;
+      action = `Not a paper signal yet: Hard Rock has not priced its ${fmt(i.hrLine)} under. Paper only until it does.`;
     } else {
       const hr = american(i.hrUnderPrice);
-      action = `Not yet — no other book is at ${fmt(i.hrLine)}, so ${hr} cannot be compared. Paper only until one is.`;
+      action = `Not a paper signal yet: no other book is at ${fmt(i.hrLine)}, so ${hr} cannot be compared. Paper only until one is.`;
     }
   } else if (blocker === "qb_out") {
-    action = "Starting QB out — recheck. Our number does not know about it.";
+    action =
+      "Not a paper signal yet: a starting QB is out, and our number does not know about it.";
   } else if (blocker === "early_season") {
     const at = i.hrUnderPrice !== null ? ` at ${american(i.hrUnderPrice)}` : "";
     const n = i.minGamesPlayed ?? 0;
     action = `Paper only — ${n} game${n === 1 ? "" : "s"} played this season; real money needs ${MIN_GAMES_FOR_REAL_MONEY}. Everything else clears: first-half under ${fmt(i.hrLine)}${at} on Hard Rock.`;
   } else if (tier === "EDGE") {
     // blocker "gap": the amber band — a model row short of the bar.
-    action = `Not yet — ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a signal at ${fmt(killLine)} or higher.`;
+    action = `Not a paper signal yet: ${noun} is ${fmt(gap ?? 0)} above our number. It becomes a paper signal at ${fmt(killLine)} or higher.`;
   } else {
     // PASS on a model row: the line is short of the bar, on our number, or
     // below it. The noun names the basis: a row that reads "no line yet" and

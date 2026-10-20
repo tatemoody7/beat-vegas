@@ -10,6 +10,27 @@ hold the rest.
 
 ## 2026-10-20
 
+- **2026-10-20 (PAPER WORDING ON THE GAME PAGE AND THE BOARD, AND A CAPTURE TIME ON EVERY PRICE).**
+  Final-2026 plan D4 build 5; three wording problems found on the live site, display text only (no rank,
+  score, gate, number or Board structure changed). (1) The game page's top block is headed **Paper read**
+  (was "The decision"); a not-qualifying sentence keeps its facts as a research condition: "Not a paper
+  signal yet: Hard Rock's under price is -115; the rule needs -105 or better." (was "Not yet — … needs …");
+  "It becomes a paper signal at …"; the alternate-line and QB-out sentences lost "check the app" and
+  "recheck"; `labels.ts::blockerTag` and the held-row text follow. The note under it reads "Prices are Hard
+  Rock Bet (Florida) as captured; see the time beside each." (the "your book / price to beat" sentence,
+  also on `/research`, is gone). (2) The Board's strip reads "Research season · six paper strategies judged
+  against the closing price · up to N of 30 readings · next read …" (the count is still `arms.length`).
+  (3) **Every Hard Rock price shows when it was captured**: `as of Tue 4:44 PM ET` beside the price on a
+  Board row and the game page's Hard Rock tile, and "Hard Rock Bet price captured …" over the Lines table;
+  the time is `lineCheck`'s `hrSeenAt` (max of captured_at and last_seen_at of the snapshot the row uses,
+  falling back to `hrAsOf`), via `et.ts::etClockZone` / `parseNaiveUtc` and `labels.ts::hrSeenText`; no
+  timestamp, no label. `hrQuoteText` no longer carries the alternate line's inline "· as of" (the separate
+  label replaced it). Specs and `FEATURE_PARITY` follow; `e2e/fixture/expected.mjs` mirrors the sentences.
+  **Left alone**: `beatvegas/card.py` still writes the old "Not yet —" sentences into stored card items
+  (Python mirror of `edge.ts`, other sessions editing tonight; the site rebuilds the sentence itself, so
+  only a card row read straight from `cards.items` would show them).
+
+
 - **2026-10-20 ~21:45 UTC (THE SUNDAY REPORT: ONE PAGE A WEEK, COMMITTED AND EMAILED).** Final-2026 plan D4 build 3
   (Tate's calls the same day: a GitHub issue plus a committed file, Sunday 11am ET with provisional positions, no AI and
   no paid service). Before it, the week's record was rows in `arm_positions` plus a chat skill someone had to run.

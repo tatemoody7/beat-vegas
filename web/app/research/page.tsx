@@ -32,7 +32,7 @@ const KEYS: { color: string; term: string; text: string }[] = [
   },
   {
     color: "var(--warn)",
-    term: "Amber, “Not yet”",
+    term: "Amber, “Not a paper signal yet”",
     text: "close, but a line or price is missing. The row says what would make it a signal.",
   },
   {
@@ -230,10 +230,9 @@ export default async function ResearchPage() {
           ))}
         </ul>
         <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-          Every rating is priced at Hard Rock Bet. Your book’s first-half total
-          may differ; the line and price to beat are the ones shown. Best time
-          to look: Friday after 5:30pm ET, and Saturday morning, once Hard
-          Rock’s first-half lines are up.
+          Every rating is priced at Hard Rock Bet as captured; the time sits
+          beside each price. Hard Rock posts most first-half lines by Friday and
+          nearly all by Saturday.
         </p>
       </section>
 

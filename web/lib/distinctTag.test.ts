@@ -9,8 +9,8 @@ describe("distinctTag", () => {
   it("drops a tag the action line already says", () => {
     expect(
       distinctTag(
-        "Not yet — Hard Rock's price is -125; needs -110 or better",
-        "Not yet — Hard Rock’s price is -125; needs -110 or better.",
+        "Not a paper signal yet: Hard Rock's under price is -125; the rule needs -110 or better",
+        "Not a paper signal yet: Hard Rock’s under price is -125; the rule needs -110 or better.",
       ),
     ).toBeNull();
   });
@@ -24,7 +24,7 @@ describe("distinctTag", () => {
   it("keeps a tag that adds something", () => {
     const tag = "Hard Rock has no first-half line";
     expect(
-      distinctTag(tag, "It becomes a signal at under 26.0 or higher."),
+      distinctTag(tag, "It becomes a paper signal at under 26.0 or higher."),
     ).toBe(tag);
   });
 

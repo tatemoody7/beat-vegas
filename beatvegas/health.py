@@ -770,6 +770,307 @@ def lines_watch_info(ctx: Ctx) -> Dict[str, str]:
 # --------------------------------------------------------------------------- #
 # The contracts
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# digest (final-2026 plan D4 build 2, 2026-10-20): the daily watcher
+# --------------------------------------------------------------------------- #
+# Every other contract judges the run that just finished. Silence is what none
+# of them can see: a job whose cron and Vercel tick both missed writes no
+# verdict at all, a `degraded` verdict never emails, a gauge can sit stale for
+# days. The digest runs once a day, reads every job's last verdict and the
+# budget gauges, and fails -- so GitHub emails -- on anything Tate would want to
+# know. Every check is `failed` severity: the digest exists to make noise, and is
+# silent only when everything holds.
+
+# How old each job's last verdict may be while the season runs (hours). Card
+# builds run Tue/Thu/Fri/Sat, so Saturday morning -> Tuesday afternoon is the
+# longest gap (~81 h); a weeknight close tick that finds no game writes no
+# verdict, so lines_watch gets a week, and the Saturday close coverage is
+# checked on its own below.
+DIGEST_MAX_AGE_H: Dict[str, float] = {
+    "card": 96.0,
+    "grade": 30.0,
+    "sunday": 8 * 24.0,
+    "monday": 8 * 24.0,
+    "lines_watch": 8 * 24.0,
+}
+DIGEST_GRADE_MAX_AGE_H = 30.0
+DIGEST_POSITIONS_MAX_AGE_D = 8
+DIGEST_CFBD_MIN_CALLS = 300
+DIGEST_CLOSE_COVERAGE_MIN = 0.9
+DIGEST_LEDGER_TOLERANCE = 0.05
+DIGEST_LEDGER_MIN_SLACK = 25
+# The temporary opening watch spent outside the ledger until its last tick
+# (final-2026 plan PR-08); the ledger-vs-gauge check starts after it.
+DIGEST_LEDGER_SINCE = datetime(2026, 10, 20, 22, 0)
+# The first Monday read with readings (2026-10-19) and the first Saturday the
+# coverage gauge must name (2026-10-17).
+DIGEST_FIRST_READ = datetime(2026, 10, 19)
+DIGEST_FIRST_SATURDAY = datetime(2026, 10, 17)
+
+
+def _season_end() -> datetime:
+    from .protocol import SEASON_LAST_KICKOFF
+
+    return datetime.fromisoformat(SEASON_LAST_KICKOFF)
+
+
+def digest_in_season(now: datetime) -> bool:
+    """The digest runs until three days after the last kickoff (the final
+    grades and the 11-30 read land inside that)."""
+    return now <= _season_end() + timedelta(days=3)
+
+
+def _gauge_row(ctx: Ctx, key: str):
+    from .db.models import AppSetting
+
+    return ctx.session.get(AppSetting, key)
+
+
+def _run_lookup(ctx: Ctx) -> Dict[str, dict]:
+    runs = (ctx.status_files.get("runs") or {}).get("runs") or []
+    return {str(r.get("databaseId")): r for r in runs if r.get("databaseId") is not None}
+
+
+def _later_success(ctx: Ctx, run: dict) -> bool:
+    runs = (ctx.status_files.get("runs") or {}).get("runs") or []
+    wf, at = run.get("workflowName"), run.get("createdAt") or ""
+    return any(
+        r.get("workflowName") == wf
+        and (r.get("createdAt") or "") > at
+        and r.get("conclusion") == "success"
+        for r in runs
+    )
+
+
+def _note_run_id(note: Optional[str]) -> Optional[str]:
+    for part in (note or "").split():
+        if part.startswith("run="):
+            return part[4:] or None
+    return None
+
+
+def digest_jobs_fresh(ctx: Ctx) -> Result:
+    """Every scheduled job wrote a verdict recently enough for its cadence."""
+    from .ops import health_key
+
+    stale = []
+    for job, max_h in DIGEST_MAX_AGE_H.items():
+        row = _gauge_row(ctx, health_key(job))
+        if row is None or row.updated_at is None:
+            stale.append(f"{job}: no verdict ever")
+            continue
+        age = (ctx.now - row.updated_at).total_seconds() / 3600.0
+        if age > max_h:
+            stale.append(f"{job}: {age:.0f} h old (max {max_h:.0f})")
+    return Result(not stale, "; ".join(stale) or f"all {len(DIGEST_MAX_AGE_H)} jobs fresh")
+
+
+def digest_jobs_not_failed(ctx: Ctx) -> Result:
+    """No job's newest verdict is `failed` -- unless the run behind it was
+    CANCELLED and a later run of the same workflow succeeded (a hand dispatch
+    cancelled in the queue is not a job that failed its contract; 2026-10-18)."""
+    from .ops import health_key
+
+    runs = _run_lookup(ctx)
+    bad, excused = [], []
+    for job in DIGEST_MAX_AGE_H:
+        row = _gauge_row(ctx, health_key(job))
+        if row is None or (row.value or "") != "failed":
+            continue
+        rid = _note_run_id(row.note)
+        run = runs.get(rid or "")
+        if run is not None and run.get("conclusion") == "cancelled" and _later_success(ctx, run):
+            excused.append(f"{job}: run {rid} cancelled, a later run succeeded")
+            continue
+        state = run.get("conclusion") if run else "unknown"
+        bad.append(f"{job}: failed (run {rid or '-'}, {state})")
+    detail = "; ".join(bad + excused) or "no job's last verdict is failed"
+    return Result(not bad, detail)
+
+
+def digest_grade_recent(ctx: Ctx) -> Result:
+    raw, _at = read_gauge(ctx.session, LAST_GRADE_COMPLETED_AT)
+    if not raw:
+        return Result(False, "last_grade_completed_at never written")
+    try:
+        at = datetime.fromisoformat(str(raw).replace("Z", ""))
+    except ValueError:
+        return Result(False, f"last_grade_completed_at unreadable: {raw!r}")
+    age = (ctx.now - at).total_seconds() / 3600.0
+    return Result(
+        age <= DIGEST_GRADE_MAX_AGE_H,
+        f"grading last completed {age:.0f} h ago (max {DIGEST_GRADE_MAX_AGE_H:.0f})",
+    )
+
+
+def _last_saturday_et(now: datetime) -> Optional[datetime]:
+    """The most recent Saturday (ET calendar date, as a naive date-time) whose
+    games are over: from Sunday 08:00 UTC on, yesterday's Saturday counts."""
+    d = (now - timedelta(hours=8)).date()
+    back = (d.weekday() - 5) % 7
+    sat = datetime(d.year, d.month, d.day) - timedelta(days=back)
+    return sat
+
+
+def digest_saturday_closes(ctx: Ctx) -> Result:
+    """The most recent in-season Saturday's close coverage (grade.yml's
+    close_coverage.py gauge, note `sat=<date> games=<n> covered=<k>`) names that
+    Saturday and reaches DIGEST_CLOSE_COVERAGE_MIN."""
+    from .ops import CLOSE_COVERAGE_PCT
+
+    sat = _last_saturday_et(ctx.now)
+    if sat is None or sat < DIGEST_FIRST_SATURDAY or sat > _season_end():
+        return Result(True, "no in-season Saturday to check")
+    row = _gauge_row(ctx, CLOSE_COVERAGE_PCT)
+    note = (row.note if row is not None else "") or ""
+    want = f"sat={sat.date().isoformat()}"
+    if want not in note:
+        return Result(False, f"close coverage gauge does not name {sat.date()} (note {note!r})")
+    try:
+        pct = float(row.value)
+    except (TypeError, ValueError):
+        return Result(False, f"close coverage unreadable: {row.value!r}")
+    return Result(
+        pct >= DIGEST_CLOSE_COVERAGE_MIN,
+        f"{sat.date()} close coverage {pct:.0%} ({note}); min {DIGEST_CLOSE_COVERAGE_MIN:.0%}",
+    )
+
+
+def digest_odds_budget(ctx: Ctx) -> Result:
+    """The Odds API balance covers the recurring need to the reset (or the
+    season's end) above the floor (beatvegas/credit_plan.py)."""
+    from . import credit_plan as cp
+    from .ops import ODDS_CREDITS_REMAINING
+
+    raw, _at = read_gauge(ctx.session, ODDS_CREDITS_REMAINING)
+    if raw in (None, ""):
+        return Result(False, "odds_credits_remaining never written")
+    balance = int(raw)
+    st = cp.load_settings(ctx.session)
+    measured = cp.measured_recurring(ctx.session, ctx.now)
+    per_week = measured if measured is not None else st.recurring_fallback
+    allow = cp.allowance(balance, ctx.now, st.reset_at, st.floor, per_week)
+    src = "measured" if measured is not None else "fallback"
+    return Result(
+        allow >= 0,
+        f"balance {balance:,}, floor {st.floor:,}, recurring {per_week:,}/wk ({src}), "
+        f"headroom {allow:,} to {st.reset_at.date() if st.reset_at else 'the season end'}",
+    )
+
+
+def digest_cfbd_calls(ctx: Ctx) -> Result:
+    """CFBD drops to its free 1,000 calls a month after 2026-11-05; the system
+    uses ~250 a week, so a low balance means a hand reload or a leak."""
+    from .ops import CFBD_CALLS_REMAINING
+
+    raw, _at = read_gauge(ctx.session, CFBD_CALLS_REMAINING)
+    if raw in (None, ""):
+        return Result(False, "cfbd_calls_remaining never written")
+    n = int(raw)
+    return Result(n > DIGEST_CFBD_MIN_CALLS, f"{n:,} CFBD calls left (min {DIGEST_CFBD_MIN_CALLS})")
+
+
+def digest_positions_fresh(ctx: Ctx) -> Result:
+    """The Monday read wrote arm positions within the last eight days."""
+    from sqlalchemy import func
+
+    from .db.models import ArmPosition
+
+    if ctx.now < DIGEST_FIRST_READ:
+        return Result(True, "before the first Monday read")
+    newest = ctx.session.query(func.max(ArmPosition.read_date)).scalar()
+    if not newest:
+        return Result(False, "no arm_positions row ever")
+    d = datetime.fromisoformat(str(newest))
+    age = (ctx.now - d).days
+    return Result(
+        age <= DIGEST_POSITIONS_MAX_AGE_D,
+        f"newest Monday read {newest} ({age} days ago; max {DIGEST_POSITIONS_MAX_AGE_D})",
+    )
+
+
+def _arm_counts(ctx: Ctx, since: datetime) -> Dict[str, int]:
+    from .db.models import ChallengerPick, ManualPick
+    from .protocol import ARMS
+
+    out = {name: 0 for name in ARMS}
+    for (arm,) in (
+        ctx.session.query(ManualPick.arm)
+        .filter(ManualPick.arm.isnot(None), ManualPick.placed_at >= since)
+        .all()
+    ):
+        if arm in out:
+            out[arm] += 1
+    for (arm,) in (
+        ctx.session.query(ChallengerPick.arm).filter(ChallengerPick.placed_at >= since).all()
+    ):
+        if arm in out:
+            out[arm] += 1
+    return out
+
+
+def digest_arms_logging(ctx: Ctx) -> Result:
+    """From Sunday on, the past week's card builds logged at least one paper
+    pick for the registered arms (an arm with no qualifying game is normal; all
+    six silent at once is a build that stopped logging)."""
+    if ctx.now.weekday() not in (6, 0) or ctx.now < DIGEST_FIRST_SATURDAY:  # Sun, Mon
+        return Result(True, "checked on Sundays and Mondays")
+    counts = _arm_counts(ctx, ctx.now - timedelta(days=7))
+    total = sum(counts.values())
+    return Result(
+        total > 0,
+        f"{total} arm picks in 7 days: " + ", ".join(f"{k} {v}" for k, v in counts.items()),
+    )
+
+
+def digest_ledger_matches_gauge(ctx: Ctx) -> Result:
+    """The credit ledger (odds_spend) explains the balance's fall between the
+    first and last balance readings in the window, within max(25, 5%)."""
+    from sqlalchemy import func
+
+    from .db.models import AppSettingLog, OddsSpend
+    from .ops import ODDS_CREDITS_REMAINING
+
+    since = max(ctx.now - timedelta(days=7), DIGEST_LEDGER_SINCE)
+    rows = (
+        ctx.session.query(AppSettingLog.written_at, AppSettingLog.value)
+        .filter(AppSettingLog.key == ODDS_CREDITS_REMAINING, AppSettingLog.written_at >= since)
+        .order_by(AppSettingLog.written_at.asc())
+        .all()
+    )
+    if len(rows) < 2:
+        return Result(
+            True, f"{len(rows)} balance reading(s) since {since:%m-%d %H:%M}; nothing to reconcile"
+        )
+    (t1, b1), (t2, b2) = rows[0], rows[-1]
+    fell = int(b1) - int(b2)
+    spent = (
+        ctx.session.query(func.coalesce(func.sum(OddsSpend.credits), 0))
+        .filter(OddsSpend.spent_at >= t1, OddsSpend.spent_at < t2)
+        .scalar()
+    )
+    spent = int(spent or 0)
+    slack = max(DIGEST_LEDGER_MIN_SLACK, int(abs(fell) * DIGEST_LEDGER_TOLERANCE))
+    return Result(
+        abs(fell - spent) <= slack,
+        f"balance fell {fell:,} and the ledger shows {spent:,} between {t1:%m-%d %H:%M} and {t2:%m-%d %H:%M} (slack {slack})",
+    )
+
+
+def digest_info(ctx: Ctx) -> Dict[str, str]:
+    from .ops import CFBD_CALLS_REMAINING, ODDS_CREDITS_REMAINING
+
+    odds, _ = read_gauge(ctx.session, ODDS_CREDITS_REMAINING)
+    cfbd, _ = read_gauge(ctx.session, CFBD_CALLS_REMAINING)
+    counts = _arm_counts(ctx, ctx.now - timedelta(days=7))
+    return {
+        "odds": str(odds),
+        "cfbd": str(cfbd),
+        "arm_picks_7d": str(sum(counts.values())),
+    }
+
+
 CONTRACTS: Dict[str, Contract] = {
     "card": Contract(
         job="card",
@@ -1108,6 +1409,86 @@ CONTRACTS: Dict[str, Contract] = {
             ),
         ),
         info=lines_watch_info,
+    ),
+    "digest": Contract(
+        job="digest",
+        workflow="digest.yml",
+        window=(
+            "daily: the Vercel `digest` tick (13Z EDT / 14Z EST, 8:00-10:59am ET) plus the 13:30Z"
+            " GitHub backup cron; silent when every check passes, a failed run (GitHub's email)"
+            " when any misses; skipped from three days after the season's last kickoff"
+        ),
+        artifacts=("last_health_digest gauge (the verdict and the misses)",),
+        inputs=(),
+        checks=(
+            Check(
+                "digest.jobs_fresh",
+                "failed",
+                "every scheduled job's last_health_<job> gauge exists and was written within its cadence (card 96 h, grade 30 h, sunday / monday / lines_watch 8 d)",
+                digest_jobs_fresh,
+            ),
+            Check(
+                "digest.jobs_not_failed",
+                "failed",
+                "no job's newest verdict is failed, unless its run was cancelled and a later run of the same workflow succeeded",
+                digest_jobs_not_failed,
+            ),
+            Check(
+                "digest.grade_recent",
+                "failed",
+                "last_grade_completed_at was written within the last 30 h",
+                digest_grade_recent,
+            ),
+            Check(
+                "digest.saturday_closes",
+                "failed",
+                "the close-coverage gauge names the most recent in-season Saturday and reads 90% or more",
+                digest_saturday_closes,
+            ),
+            Check(
+                "digest.odds_budget",
+                "failed",
+                "the Odds API balance covers the recurring need to the reset above the floor (credit_plan.allowance >= 0)",
+                digest_odds_budget,
+            ),
+            Check(
+                "digest.cfbd_calls",
+                "failed",
+                "more than 300 CFBD calls remain this month",
+                digest_cfbd_calls,
+            ),
+            Check(
+                "digest.positions_fresh",
+                "failed",
+                "the newest arm_positions read is within the last 8 days",
+                digest_positions_fresh,
+            ),
+            Check(
+                "digest.arms_logging",
+                "failed",
+                "on Sundays and Mondays, the registered arms logged at least one paper pick in the last 7 days",
+                digest_arms_logging,
+            ),
+            Check(
+                "digest.ledger_matches_gauge",
+                "failed",
+                "the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%))",
+                digest_ledger_matches_gauge,
+            ),
+        ),
+        failure_modes=(
+            FailureMode(
+                "2026-10-18",
+                "A hand grade dispatch was cancelled in the neon-writers queue; its health step wrote failed and the banner read FAILED for a day while nothing was missing. Nothing emailed and nothing distinguished it from a real failure. The digest reads the run's conclusion and excuses a cancelled run that a later success superseded.",
+                ("digest.jobs_not_failed",),
+            ),
+            FailureMode(
+                "2026-09-22",
+                "GitHub's billing stop refused every job for hours; no run wrote a verdict, so no contract could fail and no email went out (the gauges simply stopped moving). A verdict past its cadence is now a miss.",
+                ("digest.jobs_fresh", "digest.grade_recent"),
+            ),
+        ),
+        info=digest_info,
     ),
 }
 

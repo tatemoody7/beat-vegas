@@ -208,6 +208,31 @@ is normal (the free `/events` pre-check skips most of them), a run that never
 fired cannot email, and a dead week of close slots is what the board's `close`
 gauge warning covers.
 
+### When digest is degraded or failed
+
+The digest (since 2026-10-20, final-2026 plan D4) is the one job whose red run is the point: it fails,
+and GitHub emails, when anything below misses. Every check is `failed` severity; it is silent only
+when all hold. Read the run's `HEALTH:` line, then:
+
+1. `digest.jobs_fresh` -> a job wrote no verdict within its cadence (card 96 h, grade 30 h, sunday,
+   monday, lines_watch 8 days): its cron and its Vercel tick both missed, or GitHub refused the run.
+   `gh run list --workflow <file>` (a hand run from another session counts); re-dispatch it.
+2. `digest.jobs_not_failed` -> a job's newest verdict is `failed` and the run behind it was not a
+   cancelled one that a later success superseded. Open that job's runbook above.
+3. `digest.grade_recent` -> grading has not completed in 30 h: `grade.yml` (the four-hour guard skips
+   a hand run inside four hours of a graded one).
+4. `digest.saturday_closes` -> the last Saturday's close coverage is under 90% or the gauge does not
+   name it: the Saturday close poll missed games (lines_watch runbook).
+5. `digest.odds_budget` -> the balance no longer covers the recurring need to the reset above the floor:
+   `python scripts/credit_plan.py report`; stop optional pulls before closes are at risk.
+6. `digest.cfbd_calls` -> 300 or fewer CFBD calls left (the free tier is 1,000 a month from Nov 5): a hand
+   season reload or a leak; nothing optional should call CFBD.
+7. `digest.positions_fresh` -> no Monday read in 8 days: `gh workflow run pricing_monday.yml --ref main`.
+8. `digest.arms_logging` -> on a Sunday or Monday, no registered arm logged a paper pick in 7 days: the
+   card builds ran without logging (card runbook, `card.paper_logged_iff_window`).
+9. `digest.ledger_matches_gauge` -> the balance fell by more than the `odds_spend` ledger explains: a
+   caller is spending outside the client (`tests/test_odds_spend_ledger.py` should have caught it).
+
 ## The grace-window caveat
 
 The health step runs on `always()`, so it reports on a red run too. It cannot
@@ -336,5 +361,29 @@ Failure modes on record:
 - **2026-08-28** -- GitHub's cron fired 2 of 19 scheduled close slots (and 3 of 18 Saturday slots in 2026 week 4, leaving 18 of 57 Hard-Rock-priced games with a close inside the window while the `close` gauge stayed fresh); since 2026-09-28 the Vercel `lines-close` dispatch is the cover, `close_window_coverage` and the board's `close_coverage` gauge are the alarm, and the board's `close` gauge (CLOSE_CAPTURE_MAX_AGE_H) still catches a dead week. No check here is failed-severity: the run that never fired cannot email. Caught by: `lines_watch.close_polled`, `lines_watch.close_gauge_written`, `lines_watch.close_window_coverage`.
 - **2026-09-09** -- a Hard Rock book key drift would make a close poll write no hardrockbet row while spending every credit; poll_lines warns, this makes it a verdict. Caught by: `lines_watch.hr_rows_touched`.
 - **2026-10-18** -- the full-game close step is continue-on-error and exits 0 on an empty or credit-floor-skipped pull, so a step that failed silently left every run green while the two full-game arms (H-ARM-FGU, H-ARM-WXFG) accumulated stale_close exclusions; the status file and the step outcome now make it a verdict (final-2026 plan PR-05). Caught by: `lines_watch.fg_close_polled`.
+
+### digest
+
+- Workflow: `.github/workflows/digest.yml`
+- Window: daily: the Vercel `digest` tick (13Z EDT / 14Z EST, 8:00-10:59am ET) plus the 13:30Z GitHub backup cron; silent when every check passes, a failed run (GitHub's email) when any misses; skipped from three days after the season's last kickoff
+- Artifacts: `last_health_digest gauge (the verdict and the misses)`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): 
+
+| Check | Severity | Positive fact |
+|---|---|---|
+| `digest.jobs_fresh` | failed | every scheduled job's last_health_<job> gauge exists and was written within its cadence (card 96 h, grade 30 h, sunday / monday / lines_watch 8 d) |
+| `digest.jobs_not_failed` | failed | no job's newest verdict is failed, unless its run was cancelled and a later run of the same workflow succeeded |
+| `digest.grade_recent` | failed | last_grade_completed_at was written within the last 30 h |
+| `digest.saturday_closes` | failed | the close-coverage gauge names the most recent in-season Saturday and reads 90% or more |
+| `digest.odds_budget` | failed | the Odds API balance covers the recurring need to the reset above the floor (credit_plan.allowance >= 0) |
+| `digest.cfbd_calls` | failed | more than 300 CFBD calls remain this month |
+| `digest.positions_fresh` | failed | the newest arm_positions read is within the last 8 days |
+| `digest.arms_logging` | failed | on Sundays and Mondays, the registered arms logged at least one paper pick in the last 7 days |
+| `digest.ledger_matches_gauge` | failed | the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%)) |
+
+Failure modes on record:
+
+- **2026-10-18** -- A hand grade dispatch was cancelled in the neon-writers queue; its health step wrote failed and the banner read FAILED for a day while nothing was missing. Nothing emailed and nothing distinguished it from a real failure. The digest reads the run's conclusion and excuses a cancelled run that a later success superseded. Caught by: `digest.jobs_not_failed`.
+- **2026-09-22** -- GitHub's billing stop refused every job for hours; no run wrote a verdict, so no contract could fail and no email went out (the gauges simply stopped moving). A verdict past its cadence is now a miss. Caught by: `digest.jobs_fresh`, `digest.grade_recent`.
 
 <!-- contracts:end -->

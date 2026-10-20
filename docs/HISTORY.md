@@ -8,6 +8,24 @@ hold the rest.
 
 
 
+## 2026-10-20
+
+- **2026-10-20 ~21:30 UTC (THE DAILY DIGEST: SILENT WHEN HEALTHY, AN EMAIL WHEN NOT).** Final-2026 plan D4 build 2
+  (Tate's calls the same day: email on problems only; the remaining build kept to five items). The health check of
+  2026-10-20 found the system healthy (75 runs since Sunday evening, 0 failed; every verdict ok; the first Monday read
+  on 10-19 put every registered arm below zero against the close, five past the stop line but inside the 30-reading,
+  3-week no-decision window) and one gap that blocks running unattended: silence is not detected. GitHub emails only
+  when a run fails; a job that never fires, a degraded verdict, a stale gauge or a budget heading for the floor sends
+  nothing. `.github/workflows/digest.yml` runs daily (Vercel `digest` 13Z/14Z + the 13:30Z GitHub cron) and evaluates
+  the new `digest` contract, every check failed-severity so any miss reddens the run: each job's verdict within its
+  cadence (card 96 h, grade 30 h, sunday/monday/lines_watch 8 d); no newest verdict failed, except a cancelled run a
+  later success superseded (the 2026-10-18 hand dispatch case, read from the runs API); grading within 30 h; the last
+  in-season Saturday's close coverage named and ≥ 90%; the Odds API balance covering the recurring need to the reset
+  above the 1,500 floor (`credit_plan`); more than 300 CFBD calls left (the free tier from Nov 5); a Monday read within 8
+  days; on Sundays and Mondays at least one arm pick in 7 days; the `odds_spend` ledger explaining the balance's fall
+  within max(25, 5%) from 2026-10-20 22:00 (after the opening watch's last spend). It writes only `last_health_digest`
+  and is skipped from three days after the last kickoff. `tests/test_health_digest.py` breaks one fact at a time.
+
 ## 2026-10-18
 
 - **2026-10-18 (THE SITE IS A READ-ONLY RESEARCH RECORD: THE LOG PATH, THE LEDGER AND THE LOGIN GO).**

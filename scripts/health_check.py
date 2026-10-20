@@ -5,6 +5,7 @@ what it was for? (beatvegas/health.py, docs/HEALTH.md)
     python scripts/health_check.py --job card  --sweep-status "$RUNNER_TEMP/sweep_status.json"
     python scripts/health_check.py --job grade
     python scripts/health_check.py --job sunday
+    python scripts/health_check.py --job digest --runs-status "$RUNNER_TEMP/runs.json"
     python scripts/health_check.py --job lines_watch --close-status "$RUNNER_TEMP/close_status.json" \
         --fg-status "$RUNNER_TEMP/fg_close_status.json"
 
@@ -69,6 +70,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     ap.add_argument(
         "--fg-status", metavar="FILE", help="lines_watch.yml's full-game close status file"
+    )
+    ap.add_argument(
+        "--runs-status",
+        metavar="FILE",
+        help='digest.yml\'s recent-runs file ({"runs": [gh run list rows]})',
     )
     return ap.parse_args(argv)
 
@@ -174,7 +180,12 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
         print(f"[health:{job}] DB unreachable — no verdict written.")
         return 0
     status_files = load_status_files(
-        {"sweep": args.sweep_status, "close": args.close_status, "fg": args.fg_status}
+        {
+            "sweep": args.sweep_status,
+            "close": args.close_status,
+            "fg": args.fg_status,
+            "runs": getattr(args, "runs_status", None),
+        }
     )
     contract = health.CONTRACTS[job]
     with session_scope() as s:

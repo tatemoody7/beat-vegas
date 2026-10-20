@@ -193,6 +193,21 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateOpenMin: null,
     gateCloseMin: null,
   },
+  digest: {
+    // The daily digest (final-2026 plan D4, 2026-10-20): silent when healthy, a
+    // failed run (GitHub's email) when a job went quiet, a verdict failed, a
+    // gauge went stale or the budget heads for the floor. Read-only apart from
+    // its own verdict, so a second run in the window is harmless. Two entries,
+    // 13Z and 14Z (9am EDT / 9am EST), inside an 8:00-10:59am ET window; the
+    // 13:30Z GitHub cron is the backup.
+    workflow: "digest.yml",
+    inputs: {},
+    days: null,
+    dispatchOpenMin: 8 * 60,
+    dispatchCloseMin: 10 * 60 + 59,
+    gateOpenMin: null,
+    gateCloseMin: null,
+  },
   "opening-watch": {
     // The market-opening watch (temporary research, Tate's approval 2026-10-15;
     // removed after Tue 10-20). GitHub's own cron for it fired 0 of ~4 ticks on

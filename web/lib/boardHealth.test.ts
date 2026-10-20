@@ -397,6 +397,7 @@ describe("the health contracts (scripts/health_check.py -> last_health_<job>)", 
       "sunday",
       "monday",
       "lines_watch",
+      "digest",
     ]);
     for (const id of HEALTH_JOB_IDS) {
       expect(GAUGE_KEYS).toContain(`last_health_${id}`);

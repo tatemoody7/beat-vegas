@@ -567,6 +567,8 @@ export const CRON_JOBS = {
   // The temporary market-opening watch (2026-10-15): hourly, every tick dispatches.
   "opening-watch": { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
+  // The daily digest (2026-10-20): silent unless something needs attention.
+  digest: { days: null, openMin: 8 * 60, closeMin: 10 * 60 + 59 },
 };
 
 /** Of these ET day/minute windows, the one that closed most recently at or before `now`. */
@@ -602,7 +604,14 @@ export function lastClosedCardSlot(now) {
 
 /** The scheduled Neon-writing jobs that end with a health contract
  *  (beatvegas/health.py CONTRACTS; lib/boardHealth.ts HEALTH_JOB_IDS). */
-export const HEALTH_JOBS = ["card", "grade", "sunday", "monday", "lines_watch"];
+export const HEALTH_JOBS = [
+  "card",
+  "grade",
+  "sunday",
+  "monday",
+  "lines_watch",
+  "digest",
+];
 
 /** For every cron job: an instant five minutes into its last closed window -- a tick that acted in time, so opsWarnings stays silent. */
 export function lastDispatchTicks(now) {

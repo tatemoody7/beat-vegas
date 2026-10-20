@@ -1,0 +1,66 @@
+# The daily digest (final-2026 plan D4 build 2, Tate's call 2026-10-20: email on
+# problems only). Every other health contract judges the run that just finished;
+# none can see silence -- a job that never ran, a degraded verdict, a stale gauge,
+# a budget heading for the floor. This job reads them all once a day and FAILS,
+# so GitHub emails Tate, when anything misses; when everything holds it is silent
+# (a green run nobody reads). Reads Neon and the GitHub runs API; writes only its
+# own verdict (last_health_digest). Zero Odds API or CFBD calls.
+#
+# Dispatched by the Vercel `digest` entries (web/lib/cronJobs.ts: 13Z and 14Z, one
+# per DST regime, an 8:00-10:59am ET window); the 13:30Z GitHub cron is the
+# backup. From three days after the season's last kickoff the run is skipped.
+name: Daily digest (silent unless something needs attention)
+
+on:
+  schedule:
+    - cron: '30 13 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/lock.txt
+      - name: Install
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Run clock and season gate
+        id: clock
+        run: |
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
+          skip=$(python -c "from datetime import datetime; from beatvegas.health import digest_in_season; print('false' if digest_in_season(datetime.utcnow()) else 'true')")
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      - name: Recent workflow runs (so a cancelled run is not read as a failure)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --limit 200 \
+            --json databaseId,workflowName,event,status,conclusion,createdAt \
+            | python -c "import json,sys; json.dump({'runs': json.load(sys.stdin)}, open(sys.argv[1], 'w'))" \
+              "$RUNNER_TEMP/runs.json"
+      - name: Health contract (docs/HEALTH.md; writes last_health_digest)
+        id: health
+        # Every digest check is failed-severity: any miss exits 1 and GitHub
+        # emails. Every value crosses via env:, never inlined.
+        if: always()
+        env:
+          SKIPPED: ${{ steps.clock.outputs.skip }}
+          RUN_STARTED_AT: ${{ steps.clock.outputs.started }}
+        run: python scripts/health_check.py --job digest --runs-status "$RUNNER_TEMP/runs.json"

@@ -344,6 +344,14 @@
     {
       "path": "/api/cron/digest",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 15 * * 0"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 16 * * 0"
     }
   ]
 }

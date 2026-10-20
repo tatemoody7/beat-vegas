@@ -208,6 +208,22 @@ is normal (the free `/events` pre-check skips most of them), a run that never
 fired cannot email, and a dead week of close slots is what the board's `close`
 gauge warning covers.
 
+### When weekly is degraded or failed
+
+The Sunday report (since 2026-10-20, final-2026 plan D4) writes `docs/reads/<season>-wNN.md`, commits it
+to main and opens the week's issue; every check is `failed` severity, so a red run emails. Read the run's
+`HEALTH:` line, then:
+
+1. `weekly.report_written` -> `scripts/weekly_report.py` raised before writing the page (its traceback is
+   in the "Write the report" step; a database read is the usual cause). Fix it, then dispatch
+   `weekly_report.yml` by hand; nothing else depends on the page.
+2. `weekly.committed` -> the push to main lost three rebase races or was refused. The page is still in the
+   run's `weekly-report-<run id>` artifact; dispatch again (an unchanged page commits nothing).
+3. `weekly.issue_opened` -> `gh issue create` failed (permissions or the API). The page is committed;
+   dispatch again and the rerun comments on the week's issue if one exists.
+
+A dispatch with `dry_run` writes the page as an artifact and no verdict.
+
 ### When digest is degraded or failed
 
 The digest (since 2026-10-20, final-2026 plan D4) is the one job whose red run is the point: it fails,
@@ -385,5 +401,22 @@ Failure modes on record:
 
 - **2026-10-18** -- A hand grade dispatch was cancelled in the neon-writers queue; its health step wrote failed and the banner read FAILED for a day while nothing was missing. Nothing emailed and nothing distinguished it from a real failure. The digest reads the run's conclusion and excuses a cancelled run that a later success superseded. Caught by: `digest.jobs_not_failed`.
 - **2026-09-22** -- GitHub's billing stop refused every job for hours; no run wrote a verdict, so no contract could fail and no email went out (the gauges simply stopped moving). A verdict past its cadence is now a miss. Caught by: `digest.jobs_fresh`, `digest.grade_recent`.
+
+### weekly
+
+- Workflow: `.github/workflows/weekly_report.yml`
+- Window: Sunday: the Vercel `weekly-report` tick (15Z EDT / 16Z EST, 10:30am-12:59pm ET) plus the 16:30Z GitHub backup cron, which stands down when a report landed in the last 20 hours; a dry run writes no verdict
+- Artifacts: `docs/reads/<season>-wNN.md committed to main`, `a GitHub issue 'Week N report — <status>' (a rerun comments on it)`
+- Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `OUTCOME_REPORT`, `OUTCOME_COMMIT`, `OUTCOME_ISSUE`
+
+| Check | Severity | Positive fact |
+|---|---|---|
+| `weekly.report_written` | failed | the report step wrote its page and its status file names it |
+| `weekly.committed` | failed | the page was committed and pushed to main (or was already there unchanged) |
+| `weekly.issue_opened` | failed | this week's issue was opened, or commented on for a rerun |
+
+Failure modes on record:
+
+- **2026-10-20** -- Before the report existed the week's record was rows in arm_positions and a chat skill someone had to run; a week nobody opened Claude left no record. The page and the issue are now the record, and a run that wrote neither fails. Caught by: `weekly.report_written`, `weekly.committed`, `weekly.issue_opened`.
 
 <!-- contracts:end -->

@@ -10,6 +10,22 @@ hold the rest.
 
 ## 2026-10-20
 
+- **2026-10-20 ~21:45 UTC (THE SUNDAY REPORT: ONE PAGE A WEEK, COMMITTED AND EMAILED).** Final-2026 plan D4 build 3
+  (Tate's calls the same day: a GitHub issue plus a committed file, Sunday 11am ET with provisional positions, no AI and
+  no paid service). Before it, the week's record was rows in `arm_positions` plus a chat skill someone had to run.
+  `scripts/weekly_report.py` builds the page from the database and the GitHub runs list only (zero Odds or CFBD calls):
+  five summary lines (status, research, problems, credits, needs from Tate), then systems (runs by workflow, failures
+  with no later success, every gauge, the digest contract evaluated live), research (each arm's week: picks, record,
+  judge readings and exclusions by reason, mean EV, the official Monday position and a provisional one computed
+  read-only as of the coming Monday, labelled so), data and credits (the ledger by job and purpose, the balance and
+  the controller's headroom, CFBD calls, research rows by purpose), the site (five routes and `/api/health`), next
+  week and the account dates. Every number names its query (Q1, Q2 ... listed under Sources); every line is VERIFIED,
+  PENDING (a pick not graded or not read yet, carried by id) or NOT CHECKED. Status: BROKEN on a failed run with no
+  later success, ATTENTION on anything pending or a digest miss, else HEALTHY. `weekly_report.yml` (Vercel
+  `weekly-report` Sun 15Z/16Z + a 16:30Z cron that stands down when a page landed in 20 h) commits
+  `docs/reads/<season>-wNN.md` to main with a three-try rebase push and opens "Week N report — <status>" (a rerun
+  comments on that issue); `dry_run` keeps the page as an artifact only. Health contract `weekly` (three
+  failed-severity checks); the digest watches it from 2026-10-26. First report Sun 2026-10-25.
 - **2026-10-20 ~21:30 UTC (THE DAILY DIGEST: SILENT WHEN HEALTHY, AN EMAIL WHEN NOT).** Final-2026 plan D4 build 2
   (Tate's calls the same day: email on problems only; the remaining build kept to five items). The health check of
   2026-10-20 found the system healthy (75 runs since Sunday evening, 0 failed; every verdict ok; the first Monday read

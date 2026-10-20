@@ -568,6 +568,8 @@ export const CRON_JOBS = {
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
   // The daily digest (2026-10-20): silent unless something needs attention.
   digest: { days: null, openMin: 8 * 60, closeMin: 10 * 60 + 59 },
+  // The Sunday report (2026-10-20): once, 10:30am-12:59pm ET.
+  "weekly-report": { days: ["Sun"], openMin: 10 * 60 + 30, closeMin: 12 * 60 + 59 },
 };
 
 /** Of these ET day/minute windows, the one that closed most recently at or before `now`. */
@@ -610,6 +612,7 @@ export const HEALTH_JOBS = [
   "monday",
   "lines_watch",
   "digest",
+  "weekly",
 ];
 
 /** For every cron job: an instant five minutes into its last closed window -- a tick that acted in time, so opsWarnings stays silent. */

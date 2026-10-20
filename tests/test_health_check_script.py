@@ -262,3 +262,22 @@ def test_the_job_choices_are_the_contracts(mod):
         m.parse_args(["--job", "nope"])
     for job in health.CONTRACTS:
         assert m.parse_args(["--job", job]).job == job
+
+
+def test_every_workflow_invocation_parses(mod):
+    """Each `health_check.py` line in a workflow must parse: a flag the script
+    does not know exits 2 and writes no verdict (the 2026-10-20 weekly dry run)."""
+    import re
+    import shlex
+
+    from conftest import _ROOT
+
+    m, _eng = mod
+    seen = 0
+    for wf in sorted((_ROOT / ".github/workflows").glob("*.yml")):
+        text = re.sub(r"\\\n\s*", " ", wf.read_text())
+        for line in re.findall(r"python scripts/health_check\.py([^\n]*)", text):
+            argv = shlex.split(re.sub(r'"?\$[A-Za-z_{}]+[^\s"]*"?', "X", line))
+            m.parse_args(argv)
+            seen += 1
+    assert seen >= 7

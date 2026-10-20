@@ -10,6 +10,11 @@ hold the rest.
 
 ## 2026-10-20
 
+- **2026-10-20 ~21:45 UTC (THE SUNDAY REPORT'S FIRST DRY RUN FOUND A FLAG THE HEALTH STEP DID NOT KNOW).** The
+  `dry_run` dispatch of `weekly_report.yml` (run 39501467471) wrote its page, then the health step exited 2:
+  `health_check.py` had no `--weekly-status` argument (the edit adding it never applied, and no test parsed a
+  workflow's command line). Fixed, and `tests/test_health_check_script.py::test_every_workflow_invocation_parses` now
+  parses every `health_check.py` line in every workflow (it fails on the old script).
 - **2026-10-20 (PAPER WORDING ON THE GAME PAGE AND THE BOARD, AND A CAPTURE TIME ON EVERY PRICE).**
   Final-2026 plan D4 build 5; three wording problems found on the live site, display text only (no rank,
   score, gate, number or Board structure changed). (1) The game page's top block is headed **Paper read**

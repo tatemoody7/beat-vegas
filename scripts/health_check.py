@@ -76,6 +76,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         metavar="FILE",
         help='digest.yml\'s recent-runs file ({"runs": [gh run list rows]})',
     )
+    ap.add_argument(
+        "--weekly-status", metavar="FILE", help="weekly_report.yml's report status file"
+    )
     return ap.parse_args(argv)
 
 

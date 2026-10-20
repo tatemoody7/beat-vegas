@@ -793,7 +793,10 @@ DIGEST_MAX_AGE_H: Dict[str, float] = {
     "sunday": 8 * 24.0,
     "monday": 8 * 24.0,
     "lines_watch": 8 * 24.0,
+    "weekly": 8 * 24.0,
 }
+# A job the digest watches only from its first scheduled run on.
+DIGEST_JOB_FROM: Dict[str, datetime] = {"weekly": datetime(2026, 10, 26)}
 DIGEST_GRADE_MAX_AGE_H = 30.0
 DIGEST_POSITIONS_MAX_AGE_D = 8
 DIGEST_CFBD_MIN_CALLS = 300
@@ -856,6 +859,8 @@ def digest_jobs_fresh(ctx: Ctx) -> Result:
 
     stale = []
     for job, max_h in DIGEST_MAX_AGE_H.items():
+        if ctx.now < DIGEST_JOB_FROM.get(job, datetime.min):
+            continue
         row = _gauge_row(ctx, health_key(job))
         if row is None or row.updated_at is None:
             stale.append(f"{job}: no verdict ever")
@@ -1069,6 +1074,35 @@ def digest_info(ctx: Ctx) -> Dict[str, str]:
         "cfbd": str(cfbd),
         "arm_picks_7d": str(sum(counts.values())),
     }
+
+
+# --------------------------------------------------------------------------- #
+# weekly (final-2026 plan D4 build 3, 2026-10-20): the Sunday report
+# --------------------------------------------------------------------------- #
+def weekly_report_written(ctx: Ctx) -> Result:
+    st = ctx.status_files.get("weekly") or {}
+    path = st.get("path")
+    if not path:
+        return Result(
+            False, f"no report status file (report step {ctx.outcomes.get('report', 'not run')})"
+        )
+    exists = Path(path).exists()
+    return Result(exists, f"{path} {'written' if exists else 'missing'}; status {st.get('status')}")
+
+
+def weekly_committed(ctx: Ctx) -> Result:
+    o = ctx.outcomes.get("commit", "not run")
+    return Result(o == "success", f"commit step {o}")
+
+
+def weekly_issue_opened(ctx: Ctx) -> Result:
+    o = ctx.outcomes.get("issue", "not run")
+    return Result(o == "success", f"issue step {o}")
+
+
+def weekly_info(ctx: Ctx) -> Dict[str, str]:
+    st = ctx.status_files.get("weekly") or {}
+    return {k: str(st.get(k)) for k in ("week", "status", "urgent", "pending") if k in st}
 
 
 CONTRACTS: Dict[str, Contract] = {
@@ -1489,6 +1523,48 @@ CONTRACTS: Dict[str, Contract] = {
             ),
         ),
         info=digest_info,
+    ),
+    "weekly": Contract(
+        job="weekly",
+        workflow="weekly_report.yml",
+        window=(
+            "Sunday: the Vercel `weekly-report` tick (15Z EDT / 16Z EST, 10:30am-12:59pm ET) plus"
+            " the 16:30Z GitHub backup cron, which stands down when a report landed in the last"
+            " 20 hours; a dry run writes no verdict"
+        ),
+        artifacts=(
+            "docs/reads/<season>-wNN.md committed to main",
+            "a GitHub issue 'Week N report — <status>' (a rerun comments on it)",
+        ),
+        inputs=("OUTCOME_REPORT", "OUTCOME_COMMIT", "OUTCOME_ISSUE"),
+        checks=(
+            Check(
+                "weekly.report_written",
+                "failed",
+                "the report step wrote its page and its status file names it",
+                weekly_report_written,
+            ),
+            Check(
+                "weekly.committed",
+                "failed",
+                "the page was committed and pushed to main (or was already there unchanged)",
+                weekly_committed,
+            ),
+            Check(
+                "weekly.issue_opened",
+                "failed",
+                "this week's issue was opened, or commented on for a rerun",
+                weekly_issue_opened,
+            ),
+        ),
+        failure_modes=(
+            FailureMode(
+                "2026-10-20",
+                "Before the report existed the week's record was rows in arm_positions and a chat skill someone had to run; a week nobody opened Claude left no record. The page and the issue are now the record, and a run that wrote neither fails.",
+                ("weekly.report_written", "weekly.committed", "weekly.issue_opened"),
+            ),
+        ),
+        info=weekly_info,
     ),
 }
 

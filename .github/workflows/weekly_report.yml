@@ -1,0 +1,132 @@
+# The Sunday report (final-2026 plan D4 build 3; Tate's calls 2026-10-20). Each
+# Sunday at 11am ET, after the 10Z grading, scripts/weekly_report.py writes one
+# page from the database and the GitHub runs list -- no AI, no paid API, zero
+# Odds or CFBD calls -- commits it as docs/reads/<season>-wNN.md and opens a
+# GitHub issue with the same text, which GitHub emails to the repo's owner. A
+# rerun for the same week comments on that week's issue instead of opening another.
+#
+# Dispatched by the Vercel `weekly-report` entries (web/lib/cronJobs.ts: 15Z EDT /
+# 16Z EST); the 16:30Z GitHub cron is the backup and stands down when a report was
+# committed in the last 20 hours. `dry_run` writes the page as an artifact only.
+name: Sunday report (docs/reads + an issue)
+
+on:
+  schedule:
+    - cron: '30 16 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'write the page as an artifact only: no commit, no issue, no verdict'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+
+concurrency:
+  group: neon-writers
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 50
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/lock.txt
+      - name: Install
+        run: |
+          pip install --require-hashes -r requirements/lock.txt
+          pip install --no-deps --no-build-isolation -e .
+      - name: Run clock and duplicate guard
+        id: clock
+        env:
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
+          skip=false
+          # A scheduled backup stands down when a report landed in the last 20 hours.
+          if [ "$EVENT" = "schedule" ] && [ -n "$(git log --since='20 hours ago' --format=%H -- docs/reads)" ]; then skip=true; fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          if [ "$DRY_RUN" = "true" ]; then echo "dry=true" >> "$GITHUB_OUTPUT"; else echo "dry=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Recent workflow runs
+        if: steps.clock.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --limit 200 \
+            --json databaseId,workflowName,event,status,conclusion,createdAt \
+            | python -c "import json,sys; json.dump({'runs': json.load(sys.stdin)}, open(sys.argv[1], 'w'))" \
+              "$RUNNER_TEMP/runs.json"
+      - name: Write the report
+        id: report
+        if: steps.clock.outputs.skip != 'true'
+        run: |
+          python scripts/weekly_report.py --runs "$RUNNER_TEMP/runs.json" --out docs/reads \
+            --status-file "$RUNNER_TEMP/weekly_status.json" > "$RUNNER_TEMP/report_stdout.txt"
+          tail -1 "$RUNNER_TEMP/report_stdout.txt"
+          f=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['path'])" "$RUNNER_TEMP/weekly_status.json")
+          cat "$f" >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit the page
+        id: commit
+        if: steps.clock.outputs.skip != 'true' && steps.clock.outputs.dry != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/reads
+          if git diff --cached --quiet; then echo "unchanged, nothing to commit"; exit 0; fi
+          title=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['title'])" "$RUNNER_TEMP/weekly_status.json")
+          git commit -m "reads: $title"
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            git pull --rebase origin main
+          done
+          exit 1
+      - name: Open (or comment on) this week's issue
+        id: issue
+        if: steps.clock.outputs.skip != 'true' && steps.clock.outputs.dry != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['title'])" "$RUNNER_TEMP/weekly_status.json")
+          f=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['path'])" "$RUNNER_TEMP/weekly_status.json")
+          prefix="${title%% — *}"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"$prefix\" in:title" --json number,title \
+                --jq "[.[] | select(.title | startswith(\"$prefix\"))][0].number // empty")
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body-file "$f"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$f"
+          fi
+      - name: Keep the page
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: weekly-report-${{ github.run_id }}
+          path: docs/reads/
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Health contract (docs/HEALTH.md; writes last_health_weekly)
+        id: health
+        # A failed verdict exits 1 (GitHub emails). Every value crosses via env:.
+        if: always()
+        env:
+          SKIPPED: ${{ steps.clock.outputs.skip == 'true' || steps.clock.outputs.dry == 'true' }}
+          RUN_STARTED_AT: ${{ steps.clock.outputs.started }}
+          OUTCOME_REPORT: ${{ steps.report.outcome }}
+          OUTCOME_COMMIT: ${{ steps.commit.outcome }}
+          OUTCOME_ISSUE: ${{ steps.issue.outcome }}
+        run: python scripts/health_check.py --job weekly --weekly-status "$RUNNER_TEMP/weekly_status.json"

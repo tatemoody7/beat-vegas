@@ -185,6 +185,7 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
             "close": args.close_status,
             "fg": args.fg_status,
             "runs": getattr(args, "runs_status", None),
+            "weekly": getattr(args, "weekly_status", None),
         }
     )
     contract = health.CONTRACTS[job]

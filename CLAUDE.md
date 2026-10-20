@@ -178,6 +178,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
 | `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | only `last_health_digest`: fails (GitHub emails) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, or the ledger misses spend; silent when healthy |
+| `weekly_report.yml` | Vercel `weekly-report` (Sun 15Z/16Z) + 1 cron, dispatch (input dry_run) | `docs/reads/<season>-wNN.md` committed to main + the week's GitHub issue (emailed); read-only on Neon, zero credits |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
@@ -196,7 +197,7 @@ requirements/lock.txt` (Python 3.11, 32 pins), and takes dispatch inputs into `r
   `poll_lines` (1H; `--hr-universe`, ranked sweeps), `poll_full_game`, `build_card`,
   `research_preview`, `grade`, `grade_records`, `grade_factor_ledger`, `post_mortem`,
   `backfill` (season load; scores first, venues soft), `backfill_scores_espn`, `enrich_tempo`,
-  `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`, `credit_plan`,
+  `enrich_weather`, `post_derived_lines`, `close_coverage`, `record_gauge`, `health_check`, `credit_plan`, `weekly_report` (the Sunday page),
   `fg_shadow` (H-FG-P's `bv_fg_v1` scorer; never read as the champion), `consensus_backfill`
   (the judge's columns on graded picks; grade.yml writes, study.yml reports).
 - **Positions / rule**: `protocol_position` (the registered arms; `--write` stores `arm_positions`, Monday workflow only), `rule_pause`, `pick` (no `add`).

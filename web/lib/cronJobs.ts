@@ -193,6 +193,20 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateOpenMin: null,
     gateCloseMin: null,
   },
+  "weekly-report": {
+    // The Sunday report (final-2026 plan D4, 2026-10-20): after the 10Z grading,
+    // one page committed to docs/reads/ and a GitHub issue (emailed to Tate).
+    // Two entries, 15Z (11am EDT) and 16Z (11am EST), inside a 10:30am-12:59pm
+    // ET window; the 16:30Z GitHub cron is the backup and stands down when a
+    // report landed in the last 20 hours.
+    workflow: "weekly_report.yml",
+    inputs: {},
+    days: ["Sun"],
+    dispatchOpenMin: 10 * 60 + 30,
+    dispatchCloseMin: 12 * 60 + 59,
+    gateOpenMin: null,
+    gateCloseMin: null,
+  },
   digest: {
     // The daily digest (final-2026 plan D4, 2026-10-20): silent when healthy, a
     // failed run (GitHub's email) when a job went quiet, a verdict failed, a

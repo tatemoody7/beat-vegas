@@ -351,3 +351,23 @@ def test_the_balance_fall_is_shown_beside_the_ledger(week):
         s.commit()
     md, _ = _build(week)
     assert "fell 400 (9,200 -> 8,800); the ledger explains 322, leaving 78 spent outside it" in md
+
+
+def test_the_balance_comparison_starts_at_the_ledgers_first_row(week):
+    # A purchase before the ledger existed (the 2026-10-15 history study) is not "outside the ledger".
+    eng, _ = week
+    with Session(eng) as s:
+        for v, at in (
+            ("19000", NOW - timedelta(days=6)),
+            ("9150", NOW - timedelta(days=4, hours=1)),
+        ):
+            s.add(AppSettingLog(key="odds_credits_remaining", value=v, written_at=at))
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="8800", written_at=NOW - timedelta(hours=9)
+            )
+        )
+        s.commit()
+    md, _ = _build(week)
+    assert "fell 350 (9,150 -> 8,800); the ledger explains 322, leaving 28 spent outside it" in md
+    assert "(the balance fell 350)" in md.split("## A. Systems")[0]

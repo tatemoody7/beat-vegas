@@ -39,6 +39,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from sqlalchemy import func  # noqa: E402
+
 from beatvegas import credit_plan as cp  # noqa: E402
 from beatvegas import health, ops  # noqa: E402
 from beatvegas import protocol as P  # noqa: E402
@@ -359,13 +361,22 @@ def research(r: Report, session) -> Tuple[List[str], str]:
     return out, learned[0]
 
 
-def _balance_fall(r: Report, session, ledger: int) -> str:
-    """The balance's own fall over the week beside the ledger: the opening watch
-    (to 2026-10-20) and any client outside beatvegas spend without a ledger row."""
+def _balance_fall(r: Report, session) -> Tuple[str, Optional[int]]:
+    """The balance's own fall beside the ledger, from the later of the week's start
+    and the ledger's first row (2026-10-18): the opening watch (to 2026-10-20) and
+    any client outside beatvegas spend without a ledger row. (line, fall)."""
+    first = session.query(func.min(OddsSpend.spent_at)).scalar()
+    if first is None:
+        return "Balance over the week: NOT CHECKED (the ledger has no rows yet).", None
+    start_at = max(r.since, first)
+    ledger = sum(
+        int(c or 0)
+        for (c,) in session.query(OddsSpend.credits).filter(OddsSpend.spent_at >= start_at).all()
+    )
     start = (
         session.query(AppSettingLog.value)
         .filter(
-            AppSettingLog.key == ops.ODDS_CREDITS_REMAINING, AppSettingLog.written_at <= r.since
+            AppSettingLog.key == ops.ODDS_CREDITS_REMAINING, AppSettingLog.written_at <= start_at
         )
         .order_by(AppSettingLog.written_at.desc())
         .first()
@@ -377,19 +388,21 @@ def _balance_fall(r: Report, session, ledger: int) -> str:
         .first()
     )
     q = r.src(
-        "app_settings_log odds_credits_remaining: the last reading at or before the week's start and the newest"
+        f"app_settings_log odds_credits_remaining: the last reading at or before {start_at:%Y-%m-%d %H:%M} UTC"
+        " (the later of the week's start and the ledger's first row) and the newest; odds_spend since then"
     )
     try:
         a, b = int(start[0]), int(end[0])
     except (TypeError, ValueError):
-        return f"Balance over the week ({q}): NOT CHECKED (no reading at the week's start)."
+        return f"Balance over the week ({q}): NOT CHECKED (no reading at the start).", None
     if b > a:
-        return f"Balance over the week ({q}, VERIFIED): rose {a:,} -> {b:,} (a credit reset)."
+        return f"Balance over the week ({q}, VERIFIED): rose {a:,} -> {b:,} (a credit reset).", None
     fall = a - b
     gap = fall - ledger
     return (
         f"Balance over the week ({q}, VERIFIED): fell {fall:,} ({a:,} -> {b:,}); the ledger explains "
-        f"{ledger:,}, {'leaving ' + format(gap, ',') + ' spent outside it' if gap > 0 else 'all of it'}."
+        f"{ledger:,}, {'leaving ' + format(gap, ',') + ' spent outside it' if gap > 0 else 'all of it'}.",
+        fall,
     )
 
 
@@ -414,7 +427,7 @@ def data_and_credits(r: Report, session) -> Tuple[List[str], str]:
         "app_settings odds_credits_remaining, odds_cycle_reset_at, odds_credit_floor; credit_plan.allowance"
     )
     left_pct = f"{int(bal) / PLAN_CREDITS:.0%}" if bal else "—"
-    fall_line = _balance_fall(r, session, used)
+    fall_line, fall = _balance_fall(r, session)
     out += [
         f"Odds API ({q}, {q2}, VERIFIED): **{used:,} credits used this week**; balance {int(bal):,} ({left_pct} of the 20,000 plan) as of {_et(bal_at)}; "
         f"reset {st.reset_at.date() if st.reset_at else 'UNSET'}; headroom above the {st.floor:,} floor after the recurring need: {f'{allow:,}' if allow is not None else '—'}.",
@@ -458,11 +471,11 @@ def data_and_credits(r: Report, session) -> Tuple[List[str], str]:
         + "."
     )
     out.append("")
-    summary = (
-        f"{used:,} credits this week; {int(bal):,} left ({left_pct} of the plan)"
-        if bal
-        else f"{used:,} credits this week"
-    )
+    summary = f"{used:,} credits through the ledger this week"
+    if fall is not None and fall != used:
+        summary += f" (the balance fell {fall:,})"
+    if bal:
+        summary += f"; {int(bal):,} left ({left_pct} of the plan)"
     return out, summary
 
 

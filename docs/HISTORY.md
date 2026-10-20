@@ -19,7 +19,10 @@ hold the rest.
   turned the status to ATTENTION (it is now listed under "Resolved this week" and changes nothing), pull-request CI
   runs were counted as the system's runs (left out now, with their count named), and the credit line gave the ledger's
   98 without the balance's own fall of ~1,660 that week, almost all the opening watch, which never wrote the ledger
-  (the page now shows the fall beside the ledger and the gap). Thousands separators on every count.
+  (the page now shows the fall beside the ledger and the gap). Thousands separators on every count. The second dry run (run
+  39503278988) compared from a balance taken before the ledger existed (10-18) and called the 10-15 history purchase
+  "outside the ledger"; the comparison now starts at the later of the week's start and the ledger's first row, and the
+  summary line carries the fall when it differs from the ledger.
 - **2026-10-20 (PAPER WORDING ON THE GAME PAGE AND THE BOARD, AND A CAPTURE TIME ON EVERY PRICE).**
   Final-2026 plan D4 build 5; three wording problems found on the live site, display text only (no rank,
   score, gate, number or Board structure changed). (1) The game page's top block is headed **Paper read**

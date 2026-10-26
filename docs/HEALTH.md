@@ -253,7 +253,8 @@ when all hold. Read the run's `HEALTH:` line, then:
 3. `digest.grade_recent` -> grading has not completed in 30 h: `grade.yml` (the four-hour guard skips
    a hand run inside four hours of a graded one).
 4. `digest.saturday_closes` -> the last Saturday's close coverage is under 90% or the gauge does not
-   name it: the Saturday close poll missed games (lines_watch runbook).
+   name it: the Saturday close poll missed games (lines_watch runbook). Not read on Saturday itself
+   (to Sunday 08Z), while the close polls are still rewriting the gauge.
 5. `digest.odds_budget` -> the balance no longer covers the recurring need to the reset above the floor:
    `python scripts/credit_plan.py report`; stop optional pulls before closes are at risk.
 6. `digest.cfbd_calls` -> 300 or fewer CFBD calls left (the free tier is 1,000 a month from Nov 5): a hand

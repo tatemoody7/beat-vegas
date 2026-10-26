@@ -929,6 +929,13 @@ def digest_saturday_closes(ctx: Ctx) -> Result:
     from .ops import CLOSE_COVERAGE_PCT
 
     sat = _last_saturday_et(ctx.now)
+    if sat is not None and (ctx.now - timedelta(hours=8)).date() == sat.date():
+        # Saturday itself (to Sunday 08Z): the close polls rewrite the gauge for
+        # today's games as they kick off, so it names last Saturday until the first
+        # tick and a partial today after it; neither is a finished Saturday.
+        return Result(
+            True, f"{sat.date()} closes still being captured; checked from Sunday 08:00 UTC"
+        )
     if sat is None or sat < DIGEST_FIRST_SATURDAY or sat > _season_end():
         return Result(True, "no in-season Saturday to check")
     row = _gauge_row(ctx, CLOSE_COVERAGE_PCT)

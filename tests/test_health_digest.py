@@ -218,6 +218,23 @@ def test_saturday_coverage_must_name_last_saturday_and_reach_90(db):
     assert not res["digest.saturday_closes"].ok
 
 
+def test_saturday_coverage_is_not_read_while_that_saturday_is_still_running(db):
+    # Sat 10-24 13:10Z (the 13Z digest, before the first kickoff): the gauge still
+    # names 10-17, which run 40097016549 failed on; Saturday 16:46Z, the gauge names
+    # a partial 10-24 (9 games so far); Sunday 07:00Z, still before the 08Z cut.
+    for at, note in (
+        (datetime(2026, 10, 24, 13, 10), "sat=2026-10-17 games=50 covered=50"),
+        (datetime(2026, 10, 24, 16, 46), "sat=2026-10-24 games=9 covered=9"),
+        (datetime(2026, 10, 25, 7, 0), "sat=2026-10-24 games=43 covered=40"),
+    ):
+        with Session(db) as s:
+            _set(s, "close_coverage_pct", "1.000", at, note=note)
+            s.commit()
+        _, res = _run(db, now=at)
+        assert res["digest.saturday_closes"].ok, at
+        assert "still being captured" in res["digest.saturday_closes"].detail, at
+
+
 def test_a_stale_monday_read_is_a_miss(db):
     later = NOW + timedelta(days=9)
     _, res = _run(db, now=later)

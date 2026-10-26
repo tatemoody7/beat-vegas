@@ -8,6 +8,15 @@ hold the rest.
 
 
 
+## 2026-10-26
+
+- **2026-10-26 UTC (THE DIGEST STOPS READING A SATURDAY THAT IS STILL RUNNING).** The weekend audit found the 13Z
+  digest failed on Sat 10-24 (runs 40097016549 and 40101123180, two emails): `digest.saturday_closes` took today's
+  Saturday as "the last Saturday" from 08Z, while the close polls had not yet rewritten the gauge (it still named
+  10-17); after the first tick it passed on a partial Saturday (16:46Z, 9 games). The check now returns ok with
+  "still being captured" from Saturday 08Z to Sunday 08Z, as its docstring already said, and reads the finished
+  Saturday from Sunday 08Z. Test `test_saturday_coverage_is_not_read_while_that_saturday_is_still_running`.
+
 ## 2026-10-24
 
 - **2026-10-24 17:51 UTC (THE LADDER PROBE: HARD ROCK POSTS NO LIVE `alternate_totals_h1`; THE TWO LADDER ITEMS

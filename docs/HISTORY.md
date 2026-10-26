@@ -8,6 +8,21 @@ hold the rest.
 
 
 
+## 2026-10-24
+
+- **2026-10-24 17:51 UTC (THE LADDER PROBE: HARD ROCK POSTS NO LIVE `alternate_totals_h1`; THE TWO LADDER ITEMS
+  ARE DROPPED, C-D20).** The one-off `archive.yml` cron `0 15 24 10 *` fired 2 h 51 min late (run 40117974752,
+  GitHub's delay; item `ladder_probe`, `--live --skip-historical --max-credits 5`), still 69 min before its game's
+  kickoff: the next Hard-Rock-priced event on file, Oregon @ Illinois (`games.id` 401858495, 19:00Z, event
+  `0f773ec5cb1e5b41f52f2bf8dbc4f182`). One live event-odds call, four books (hardrockbet, draftkings, fanduel,
+  betmgm), 3 credits (`odds_spend` row at 17:51:16, balance 9,069 -> 9,066). Its report (`archive_probe_20261024T175116Z.json`
+  in the run's artifact): `alternate_totals_h1` posted by DraftKings only (24 rungs); `team_totals` by FanDuel and
+  BetMGM; `team_totals_h1` by FanDuel, **Hard Rock** and DraftKings. Hard Rock posted no first-half ladder live, so
+  under C-D20 no kickoff -10 min re-probe runs and `hr_ladder_close_2026` (cap 3,900) and `hr_ladder_close_2025`
+  (cap 4,500) stay parked, which drops them; they keep `run=None` in `scripts/archive_buy.py`, so `auto` never
+  spends on them. One game, one moment: it says Hard Rock does not list the ladder in the feed an hour out, not that
+  Hard Rock never offers one in its app. Hard Rock's 1H team totals exist live, as C-D21 assumed.
+
 ## 2026-10-20
 
 - **2026-10-20 ~23:00 UTC (THE ARCHIVE ITEMS: EXPIRING CREDITS BECOME DATASETS; ROADMAP v2.8).** Final-2026 plan D4

@@ -1157,7 +1157,12 @@ export function armPositionsFor(now) {
   while (monday.getUTCDay() !== 1 || monday.getTime() > now.getTime()) {
     monday.setUTCDate(monday.getUTCDate() - 1);
   }
-  const twoAgo = new Date(monday.getTime() - 7 * 86_400_000);
+  // Two Mondays back, so the pricing row is 14-21 days old and reads "outdated"
+  // (lib/armPositions.ts OUTDATED_AFTER_DAYS = 8) on every weekday. One Monday
+  // back (7 days + hours) was current from Monday 12:05Z to Wednesday 12:05Z, and
+  // research.spec "outdated past eight days" failed every Monday and Tuesday
+  // (2026-10-26, 2026-11-02).
+  const twoAgo = new Date(monday.getTime() - 14 * 86_400_000);
   const nextMonday = new Date(monday.getTime() + 7 * 86_400_000);
   const d = (x) => x.toISOString().slice(0, 10);
   const base = (hypothesis, over) => ({

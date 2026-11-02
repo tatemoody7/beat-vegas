@@ -169,6 +169,14 @@ _MIGRATIONS = {
     },
 }
 
+# Columns whose declared width grew after the table existed, (table, column) ->
+# the width the model now declares. Postgres enforces VARCHAR(n); SQLite never
+# did, which is how research_snapshots.source shipped as VARCHAR(8) and refused
+# every "historical" archive row on Neon (2026-11-01 and 11-02: 270 credits paid,
+# 0 rows). Applied in place, idempotently, on Postgres only; widening never
+# rewrites a row. tests/test_research_capture.py keeps this map equal to the model.
+_WIDEN = {("research_snapshots", "source"): 16}
+
 # One-off data fixes, (table, SQL); each must be idempotent and valid on BOTH
 # Postgres and SQLite (plain SQL-92 only). Run after the column migrations.
 _DATA_MIGRATIONS = [
@@ -492,6 +500,16 @@ def _apply_migrations(engine) -> None:
             for col, sqltype in cols.items():
                 if col not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
+        if not engine.url.get_backend_name().startswith("sqlite"):
+            for (table, col), width in _WIDEN.items():
+                if table not in existing:
+                    continue
+                cur = next((c for c in insp.get_columns(table) if c["name"] == col), None)
+                length = getattr(cur["type"], "length", None) if cur else None
+                if length is not None and length < width:
+                    conn.execute(
+                        text(f"ALTER TABLE {table} ALTER COLUMN {col} TYPE VARCHAR({width})")
+                    )
     for table, sql in _DATA_MIGRATIONS:
         if table not in existing:
             continue

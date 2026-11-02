@@ -15,7 +15,9 @@ name: Archive queue (Odds API credits -> research_snapshots)
 #     <= 5 credits, about an hour before the noon kickoffs; its report decides
 #     whether the two Hard Rock ladder items are dropped or re-probed.
 # Dispatch: `status` prints the queue; `probe` asks the archive about one game;
-# `auto` as scheduled (`dry_run` reports and spends nothing).
+# `auto` as scheduled (`dry_run` reports and spends nothing); `set-reset` writes
+# `odds_cycle_reset_at` (`reset_at`), the date the window and the allowance read
+# (docs/OPS_ACCOUNTS.md: Tate confirms the date, this dispatch sets it).
 #
 # Every call is logged in odds_spend by the client (job `archive`, purpose = the
 # item), and the controller's allowance is checked before each paid call.
@@ -32,7 +34,7 @@ on:
       item:
         description: 'what to run'
         type: choice
-        options: [status, probe, auto]
+        options: [status, probe, auto, set-reset]
         default: status
       max_credits:
         description: 'hard cap for this run (probe)'
@@ -48,6 +50,9 @@ on:
         description: 'auto: report, spend nothing'
         type: boolean
         default: false
+      reset_at:
+        description: 'set-reset: the next Odds API cycle reset, naive UTC ISO (the plan resets on the 1st at 00:00Z, measured 2026-11-01; Tate confirms on the dashboard)'
+        default: ''
 
 concurrency:
   group: neon-writers
@@ -97,6 +102,7 @@ jobs:
           IN_GAME: ${{ inputs.game_id }}
           IN_LIVE: ${{ inputs.live }}
           IN_DRY: ${{ inputs.dry_run }}
+          IN_RESET: ${{ inputs.reset_at }}
         run: |
           set -euo pipefail
           case "$ITEM" in
@@ -112,6 +118,9 @@ jobs:
               extra=""
               if [ "$IN_DRY" = "true" ]; then extra="--dry-run"; fi
               python scripts/archive_buy.py auto --status-file "$RUNNER_TEMP/archive_status.json" $extra ;;
+            set-reset)
+              if [ -z "$IN_RESET" ]; then echo "set-reset needs reset_at"; exit 1; fi
+              python scripts/credit_plan.py set-reset "$IN_RESET" ;;
             *) echo "unknown item $ITEM"; exit 1 ;;
           esac
       - name: Keep the report

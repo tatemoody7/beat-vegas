@@ -157,3 +157,19 @@ def test_frozen_readers_do_not_import_the_research_writer():
         text = open(sys.modules[mod].__file__).read()
         assert "research_capture" not in text and "ResearchSnapshot" not in text, mod
     assert src_names
+
+
+def test_every_source_and_purpose_fits_its_column():
+    """Neon enforces VARCHAR(n); SQLite never did, which is how `source` shipped as
+    String(8) and refused every "historical" archive row (2026-11-01). The widths
+    the model declares hold every value the writer can send, and the in-place
+    widening map in store.py names the same width as the model."""
+    from beatvegas.db.models import Base
+    from beatvegas.db.store import _WIDEN
+
+    src = ResearchSnapshot.__table__.c.source.type.length
+    assert src is not None and all(len(v) <= src for v in rc.SOURCES)
+    pur = ResearchSnapshot.__table__.c.purpose.type.length
+    assert pur is not None and all(len(v) <= pur for v in rc.PURPOSES)
+    for (table, col), width in _WIDEN.items():
+        assert Base.metadata.tables[table].c[col].type.length == width

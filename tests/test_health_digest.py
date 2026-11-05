@@ -337,6 +337,50 @@ def test_an_archive_run_degraded_without_spend_is_not_a_miss(db):
     assert verdict == "ok" and res["digest.archive_spend_stored"].ok
 
 
+def _cancelled_card(created: datetime, minutes: int = 30) -> dict:
+    return {
+        "databaseId": 41121210518,
+        "workflowName": "Bet card (cloud)",
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "createdAt": created.isoformat(timespec="seconds") + "Z",
+        "updatedAt": (created + timedelta(minutes=minutes)).isoformat(timespec="seconds") + "Z",
+    }
+
+
+def test_a_run_cancelled_at_its_job_limit_is_a_miss_until_a_later_run_succeeds(db):
+    """Fri 10-30: the card build finished every step, its health step wrote ok,
+    and GitHub cancelled the job at 30:02. Nothing emailed."""
+    runs = [_cancelled_card(NOW - timedelta(hours=16), minutes=30)]
+    verdict, res = _run(db, runs=runs)
+    r = res["digest.runs_not_cancelled"]
+    assert verdict == "failed" and not r.ok
+    assert "41121210518 cancelled after 30 min" in r.detail and "no later success" in r.detail
+    others = [k for k, x in res.items() if not x.ok and k != "digest.runs_not_cancelled"]
+    assert others == []
+    # Sun 11-01's shape: the refit was cut, the Vercel retry scored -- excused.
+    runs.append(
+        {
+            "databaseId": 41339400000,
+            "workflowName": "Bet card (cloud)",
+            "event": "workflow_dispatch",
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": (NOW - timedelta(hours=15)).isoformat(timespec="seconds") + "Z",
+        }
+    )
+    verdict, res = _run(db, runs=runs)
+    assert verdict == "ok" and "a later run succeeded" in res["digest.runs_not_cancelled"].detail
+
+
+def test_cancelled_runs_outside_the_day_and_pull_request_ci_are_not_read(db):
+    old = _cancelled_card(NOW - timedelta(hours=30))
+    ci = dict(_cancelled_card(NOW - timedelta(hours=2)), event="pull_request", workflowName="CI")
+    verdict, res = _run(db, runs=[old, ci])
+    assert verdict == "ok" and "no run cancelled" in res["digest.runs_not_cancelled"].detail
+
+
 def test_the_alert_memory_holds_one_email_per_miss_set_per_day(db):
     now = NOW
     with Session(db) as s:

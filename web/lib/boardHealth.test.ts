@@ -367,6 +367,67 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
     expect(win?.day).toBe("Sat");
     expect(win?.openedAt.toISOString()).toBe("2026-09-19T11:00:00.000Z");
   });
+
+  // The week after a clock change (audit A3, 2026-11-05): the window's
+  // instants come from the ET wall clock on ITS day, not from minutes counted
+  // back from `now` on the other side of the change.
+  const afternoon = (day: string) => ({
+    day,
+    openMin: 15 * 60 + 45,
+    closeMin: 17 * 60 + 15,
+  });
+  const sunAfterFallBack = new Date("2026-11-01T15:00:00Z"); // Sun 10am EST
+
+  it("reads an EDT window from an EST `now` at its real opening instant", () => {
+    // Tue 10-27 3:45pm EDT = 19:45Z (the bug said 20:45Z); the Vercel tick
+    // came at 20:32Z, inside the window.
+    const tue = lastClosedSlot([afternoon("Tue")], sunAfterFallBack);
+    expect(tue?.day).toBe("Tue");
+    expect(tue?.openedAt.toISOString()).toBe("2026-10-27T19:45:00.000Z");
+    const fri = lastClosedSlot([afternoon("Fri")], sunAfterFallBack);
+    expect(fri?.openedAt.toISOString()).toBe("2026-10-30T19:45:00.000Z");
+    expect(new Date("2026-10-27T20:32:53Z") >= tue!.openedAt).toBe(true);
+    expect(new Date("2026-10-30T20:11:07Z") >= fri!.openedAt).toBe(true);
+  });
+
+  it("reads an EST window from an EDT `now` the same way (spring forward)", () => {
+    // Tue 2026-03-03 3:45pm EST = 20:45Z, read on Tue 03-10 (EDT) before the window.
+    const win = lastClosedSlot(
+      [afternoon("Tue")],
+      new Date("2026-03-10T15:00:00Z"),
+    );
+    expect(win?.openedAt.toISOString()).toBe("2026-03-03T20:45:00.000Z");
+  });
+
+  it("today's window counts only once it has closed", () => {
+    // Tue 11-10 at 4:00pm EST (21:00Z): inside today's window, so last Tuesday's.
+    const open = lastClosedSlot(
+      [afternoon("Tue")],
+      new Date("2026-11-10T21:00:00Z"),
+    );
+    expect(open?.openedAt.toISOString()).toBe("2026-11-03T20:45:00.000Z");
+    // Tue 11-10 at 5:16pm EST: today's, just closed.
+    const closed = lastClosedSlot(
+      [afternoon("Tue")],
+      new Date("2026-11-10T22:16:00Z"),
+    );
+    expect(closed?.openedAt.toISOString()).toBe("2026-11-10T20:45:00.000Z");
+  });
+
+  it("picks the most recently closed of several windows", () => {
+    const win = lastClosedSlot(
+      [
+        afternoon("Tue"),
+        afternoon("Thu"),
+        afternoon("Fri"),
+        { day: "Sat", openMin: 465, closeMin: 540 },
+      ],
+      sunAfterFallBack,
+    );
+    // Sat 10-31 7:45am EDT = 11:45Z
+    expect(win?.day).toBe("Sat");
+    expect(win?.openedAt.toISOString()).toBe("2026-10-31T11:45:00.000Z");
+  });
 });
 
 import {

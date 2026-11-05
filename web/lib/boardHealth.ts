@@ -1,6 +1,6 @@
 import { CRON_JOBS, GITHUB_REPO } from "@/lib/cronJobs";
 import { cardBuilds, type BuildSlot } from "@/lib/nextBuild";
-import { etClock12, etDay, etMinutesOfDay, etParts } from "@/lib/et";
+import { etClock12, etDay, etLocalToUtc, etParts, pad2 } from "@/lib/et";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -138,22 +138,39 @@ export function lastClosedSlot(
   now: Date,
 ): { day: string; openedAt: Date } | null {
   if (slots.length === 0) return null;
-  const nowMin = etMinutesOfDay(now);
-  const nowDow = DAYS.indexOf(etParts(now).weekday as (typeof DAYS)[number]);
+  const p = etParts(now);
+  const nowDow = DAYS.indexOf(p.weekday as (typeof DAYS)[number]);
   if (nowDow < 0) return null;
+  // The window lives on an ET calendar day; its instants come from the wall
+  // clock on that day (etLocalToUtc, DST included). Counting elapsed minutes
+  // from `now` instead was an hour off for the week after each clock change
+  // (2026-11-01: the 10-27 and 10-30 ticks were read as early; audit A3).
+  const today = Date.UTC(p.year, p.month - 1, p.day);
+  const wall = (daysBack: number, min: number): Date | null => {
+    const d = new Date(today - daysBack * 86_400_000);
+    const ymd = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    return etLocalToUtc(
+      `${ymd}T${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`,
+    );
+  };
 
-  let best: { day: string; openedAt: Date; agoMin: number } | null = null;
+  let best: { day: string; openedAt: Date; closedAt: Date } | null = null;
   for (const s of slots) {
     const dow = DAYS.indexOf(s.day as (typeof DAYS)[number]);
     if (dow < 0) continue;
-    // Minutes since that window closed, walking back at most a week.
-    let ago = (nowDow - dow) * 1440 + (nowMin - s.closeMin);
-    if (ago < 0) ago += 7 * 1440;
-    const openedAt = new Date(
-      now.getTime() - (ago + (s.closeMin - s.openMin)) * 60_000,
-    );
-    if (best === null || ago < best.agoMin) {
-      best = { day: s.day, openedAt, agoMin: ago };
+    let daysBack = (nowDow - dow + 7) % 7;
+    let closedAt = wall(daysBack, s.closeMin);
+    if (closedAt === null) continue;
+    if (closedAt.getTime() > now.getTime()) {
+      // Today's window has not closed yet: last week's did.
+      daysBack += 7;
+      closedAt = wall(daysBack, s.closeMin);
+      if (closedAt === null) continue;
+    }
+    const openedAt = wall(daysBack, s.openMin);
+    if (openedAt === null) continue;
+    if (best === null || closedAt.getTime() > best.closedAt.getTime()) {
+      best = { day: s.day, openedAt, closedAt };
     }
   }
   return best ? { day: best.day, openedAt: best.openedAt } : null;

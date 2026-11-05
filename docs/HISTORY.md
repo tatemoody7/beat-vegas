@@ -10,6 +10,15 @@ hold the rest.
 
 ## 2026-11-05
 
+- **2026-11-05 (THE CLOSED-WINDOW CLOCK WALKS THE ET CALENDAR; THE WEEK-9 "VERCEL DID NOT TRIGGER" WARNINGS WERE
+  FALSE).** Audit A3. `web/lib/boardHealth.ts::lastClosedSlot` found a window's opening instant by counting
+  elapsed minutes back from `now` on the ET wall clock; across a clock change that is an hour off for a week,
+  so on Sun 11-01 the Tue 10-27 window read as opening 20:45Z (real: 19:45Z EDT) and the in-window Vercel
+  ticks of 10-27 20:32Z and 10-30 20:11Z were judged early -- the two "Vercel did not trigger card-tue-pm /
+  card-fri-pm" warnings in the week-9 report and on the board since. `buildStatus` (card missed) shared the
+  arithmetic. Now the window's day is found on the ET calendar and its open/close instants come from
+  `etLocalToUtc` on that day (DST included); today's window counts only once it has closed. Tests: the two
+  real ticks at the Nov 1 change, spring forward, a not-yet-closed window, and the most-recent-of-several pick.
 - **2026-11-05 (THE DIGEST STOPS CRYING WOLF: RESET-AWARE LEDGER, ONE EMAIL A DAY, A PAID-FOR FAILURE COUNTS).**
   The end-to-end reliability audit (plan file `~/.claude/plans/pasted-content-id-4d4a-i-want-elegant-horizon.md`,
   38 items) found the digest had emailed a false failure three times a day since 10-31 (14 failed runs, every

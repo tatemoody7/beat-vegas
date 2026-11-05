@@ -358,6 +358,21 @@ describe("the trigger gauge (app/api/cron/[job] -> last_dispatch_<job>)", () => 
     expect(opsWarnings(gaugesFrom([]), tue2pm)).toEqual([]);
   });
 
+  it("a one-off window (close-blackfriday) is judged on its date only", () => {
+    // The tick acted on 11-27 at 10:20am EST; the next Friday has no entry to
+    // miss, so no warning -- and none the Friday after either.
+    const g = gaugesFrom([row("close-blackfriday", "2026-11-27T15:20:00")]);
+    expect(opsWarnings(g, new Date("2026-12-04T22:00:00Z"))).toEqual([]);
+    expect(opsWarnings(g, new Date("2026-12-11T22:00:00Z"))).toEqual([]);
+    // On the date itself, a window that closed with only last week's tick warns.
+    const stale = gaugesFrom([row("close-blackfriday", "2026-11-20T15:20:00")]);
+    expect(
+      opsWarnings(stale, new Date("2026-11-27T21:30:00Z")).map((x) => x.key),
+    ).toEqual(["dispatch:close-blackfriday"]);
+    // ...and not while that window is still open.
+    expect(opsWarnings(stale, new Date("2026-11-27T18:00:00Z"))).toEqual([]);
+  });
+
   it("lastClosedSlot walks back at most a week and reports the opening instant", () => {
     const win = lastClosedSlot(
       [{ day: "Sat", openMin: 7 * 60, closeMin: 8 * 60 + 15 }],

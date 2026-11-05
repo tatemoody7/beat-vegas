@@ -10,6 +10,19 @@ hold the rest.
 
 ## 2026-11-05
 
+- **2026-11-05 (BLACK FRIDAY'S DAYTIME CLOSES GET A WINDOW).** Audit A5, Tate's call: capture them. Week 13 --
+  the last week of every arm's test -- has seven FBS games kicking off 12:00-3:30pm ET on Fri 11-27 (Nebraska @
+  Iowa, Mississippi State @ Ole Miss, Florida @ Florida State, Toledo @ Ohio, Buffalo @ Akron, App State @ South
+  Alabama, NDSU @ San Jose State; `games` 2026-11-27 17:00Z-20:30Z), and the weekday close window opens at 6pm
+  ET. Thursday's card already logs them (its 24 h paper window reaches Friday 4pm), so a card slot is not
+  needed; without a close inside 2 h of kickoff the judge would read a stale close or exclude them. New
+  `CronJob.dates` (ET calendar dates a job may run on; `dispatchDecision` refuses `wrong_date` on any other day,
+  so the scheduler's day-of-month/month fields are not load-bearing) and the job `close-blackfriday`: six
+  `vercel.json` entries `0 15-20 27 11 *` in a 10:00am-3:59pm ET window on 2026-11-27 only, the same 1H +
+  full-game close poll as the weeknight job; `lines_watch.yml` carries `0,30 15-20 27 11 *` as the backup. The
+  board's closed-window warning skips a dated job except on its date. Tests: the window and the three refusals
+  (before, after, wrong date, wrong day); the vercel.json lock-step test checks a dated job's entries against its
+  dates instead of both DST regimes. Remove the entries and the cron after the season.
 - **2026-11-05 (THE TWO LONG JOBS GET ROOM; A CANCELLED RUN IS A MISS THE NEXT MORNING).** Audit A4. October
   card builds ran 18-25 min against `card.yml`'s 30 and the Fri 10-30 build (run 41121210518) was cancelled at
   30:02 with every step done; `sunday.yml` ran 23-26 against 25 and the Sun 11-01 run (41339302710) was cut at

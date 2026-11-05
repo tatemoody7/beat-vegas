@@ -1,4 +1,4 @@
-import { etMinutesOfDay, etParts } from "@/lib/et";
+import { etDay, etMinutesOfDay, etParts } from "@/lib/et";
 
 /**
  * The trigger table for /api/cron/[job].
@@ -39,6 +39,14 @@ export type CronJob = {
   inputs: Readonly<Record<string, string>>;
   /** ET weekday short names this job may run on; null = any day. */
   days: readonly string[] | null;
+  /**
+   * ET calendar dates ("2026-11-27") this job may run on, for a one-off window
+   * (the Black Friday daytime closes, 2026-11-05). The vercel.json entries carry
+   * the day-of-month and month too, but this gate is what makes a tick on any
+   * other day a refusal at no cost, whatever the scheduler makes of those
+   * fields. Absent = every `days` day.
+   */
+  dates?: readonly string[];
   /** ET minutes-of-day, inclusive, in which a tick may dispatch. */
   dispatchOpenMin: number;
   dispatchCloseMin: number;
@@ -174,6 +182,29 @@ export const CRON_JOBS: Readonly<Record<string, CronJob>> = {
     gateCloseMin: null,
     everyTick: true,
   },
+  "close-blackfriday": {
+    // Black Friday 2026-11-27 (audit A5, Tate's call 2026-11-05: capture them).
+    // Week 13, the last week of every arm's test, has seven FBS games kicking
+    // off 12:00-3:30pm ET on a Friday -- Nebraska @ Iowa, Mississippi State @
+    // Ole Miss, Florida @ Florida State, Toledo @ Ohio, Buffalo @ Akron, App
+    // State @ South Alabama, NDSU @ San Jose State -- and no close poll looks
+    // before 6pm on a weekday. Thursday's card logs them (its 24 h paper
+    // window reaches Friday 4pm); without a close inside 2 h of kickoff the
+    // judge would read a stale close or exclude them. Same dispatch as the
+    // weeknight poll (1H + full-game closes, the 120-minute look-ahead, the
+    // free /events pre-check), six one-off entries 15Z-20Z (10am-3pm EST, each
+    // landing inside its hour) in a 10:00am-3:59pm ET window on that date only;
+    // lines_watch.yml carries the matching GitHub crons as the backup.
+    workflow: "lines_watch.yml",
+    inputs: { market: "1h_close" },
+    days: ["Fri"],
+    dates: ["2026-11-27"],
+    dispatchOpenMin: 10 * 60,
+    dispatchCloseMin: 16 * 60 - 1,
+    gateOpenMin: null,
+    gateCloseMin: null,
+    everyTick: true,
+  },
   "pricing-monday": {
     // The Monday pricing report (H-PRICE-HR, docs/PRICING_RESEARCH.md; Tate's
     // approval 2026-10-12). Read-only: the workflow writes a report, no table, so
@@ -268,6 +299,9 @@ export function dispatchDecision(job: CronJob, now: Date): DispatchDecision {
   const p = etParts(now);
   if (job.days !== null && !job.days.includes(p.weekday)) {
     return { allowed: false, reason: `wrong_day ${p.weekday}` };
+  }
+  if (job.dates !== undefined && !job.dates.includes(etDay(now))) {
+    return { allowed: false, reason: `wrong_date ${etDay(now)}` };
   }
   const mins = etMinutesOfDay(now);
   const clock = `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;

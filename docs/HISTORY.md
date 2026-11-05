@@ -8,6 +8,27 @@ hold the rest.
 
 
 
+## 2026-11-05
+
+- **2026-11-05 (THE DIGEST STOPS CRYING WOLF: RESET-AWARE LEDGER, ONE EMAIL A DAY, A PAID-FOR FAILURE COUNTS).**
+  The end-to-end reliability audit (plan file `~/.claude/plans/pasted-content-id-4d4a-i-want-elegant-horizon.md`,
+  38 items) found the digest had emailed a false failure three times a day since 10-31 (14 failed runs, every
+  one `ledger_matches_gauge` reading the 11-01 credit reset as a fall of ~10,500), while the one real loss (the
+  archive paying ~730 credits Nov 1-4 for rows Neon refused) never emailed because `archive.items_ok` is
+  degraded-severity. Three changes (A2 of the audit's fix list): (1) `digest_ledger_matches_gauge` restarts its
+  window at a rise of `DIGEST_LEDGER_RESET_RISE` (1,000) or more between two balance readings and names the reset
+  in its detail; (2) `scripts/health_check.py` exits 1 once per distinct set of failed-severity misses per UTC
+  day (`last_alert_<job>` = `<date>|<ids>`, `health.alert_already_sent`); a repeat writes the verdict (the board
+  still shows it) and exits 0 with "repeat of today's alert" in the summary, so the two Vercel ticks and GitHub's
+  late cron send one email, not three; (3) a new failed-severity check `digest.archive_spend_stored` misses when
+  the archive's newest verdict is `degraded` on a run whose note says `spent=` > 0. Tests: a reset inside the
+  window passes and still has to reconcile after it; the paid-and-failed archive note fails the digest; the
+  alert memory dedupes by day and id set; a failed card run twice in a day exits 1 then 0. The same morning
+  (Tate's calls from the audit: cancel the Odds API before Dec 1, Claude merges green PRs): #460, #459, #454,
+  #455 and Dependabot #457, #456, #450, #448, #452, #451 squash-merged and each deploy verified; `migrate.yml`
+  widened `research_snapshots.source` to 16 on Neon; `archive.yml set-reset` wrote `odds_cycle_reset_at` =
+  2026-12-01 (the measured cycle; the archive's last window is Nov 27-30).
+
 ## 2026-11-02
 
 - **2026-11-02 (THE ODDS API RESETS ON THE 1ST, AND THE ARCHIVE WROTE NOTHING).** Found by the week-9 review

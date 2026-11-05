@@ -268,3 +268,87 @@ def test_spend_outside_the_ledger_is_a_miss(db):
 def test_the_digest_is_off_after_the_season():
     assert health.digest_in_season(datetime(2026, 11, 30, 13, 0))
     assert not health.digest_in_season(datetime(2026, 12, 3, 13, 0))
+
+
+def test_a_credit_reset_inside_the_window_is_not_a_fall(db):
+    """2026-11-01: the balance rose 8,285 -> 20,000 at the monthly reset and the
+    check read it as a fall of ~11,000 for a week (14 false emails). The window
+    restarts at the reading that first showed the new balance."""
+    with Session(db) as s:
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="20000", written_at=NOW - timedelta(hours=8)
+            )
+        )
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="19950", written_at=NOW - timedelta(hours=1)
+            )
+        )
+        s.add(
+            OddsSpend(
+                spent_at=NOW - timedelta(hours=4), endpoint="event_odds", credits=50, job="card"
+            )
+        )
+        s.commit()
+    _, res = _run(db)
+    r = res["digest.ledger_matches_gauge"]
+    assert r.ok, r.detail
+    assert "reset 9,000 -> 20,000" in r.detail and "fell 50" in r.detail
+
+
+def test_spend_after_a_reset_still_has_to_match_the_ledger(db):
+    with Session(db) as s:
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="20000", written_at=NOW - timedelta(hours=8)
+            )
+        )
+        s.add(
+            AppSettingLog(
+                key="odds_credits_remaining", value="19000", written_at=NOW - timedelta(hours=1)
+            )
+        )
+        s.commit()
+    _, res = _run(db)
+    r = res["digest.ledger_matches_gauge"]
+    assert not r.ok and "fell 1,000" in r.detail and "reset" in r.detail
+
+
+def test_an_archive_run_that_paid_and_then_failed_is_a_miss(db):
+    """Nov 1-4 2026: every archive run spent 90-100 credits, Neon refused every
+    row, and `archive.items_ok` (degraded) never emailed."""
+    note = "run=41314518766 event=schedule miss=archive.items_ok(pinnacle_2026_closes: DataError) info=spent=90 window=open"
+    with Session(db) as s:
+        _set(s, "last_health_archive", "degraded", NOW - timedelta(hours=6), note=note)
+        s.commit()
+    verdict, res = _run(db)
+    r = res["digest.archive_spend_stored"]
+    assert verdict == "failed" and not r.ok
+    assert "90 credits spent" in r.detail and "41314518766" in r.detail
+
+
+def test_an_archive_run_degraded_without_spend_is_not_a_miss(db):
+    note = "run=5 event=schedule miss=archive.items_ok(probe skipped) info=spent=0 window=closed"
+    with Session(db) as s:
+        _set(s, "last_health_archive", "degraded", NOW - timedelta(hours=6), note=note)
+        s.commit()
+    verdict, res = _run(db)
+    assert verdict == "ok" and res["digest.archive_spend_stored"].ok
+
+
+def test_the_alert_memory_holds_one_email_per_miss_set_per_day(db):
+    now = NOW
+    with Session(db) as s:
+        assert not health.alert_already_sent(s, "digest", ["digest.jobs_fresh"], now)
+        _set(s, health.alert_key("digest"), health.alert_value(["digest.jobs_fresh"], now), now)
+        s.commit()
+        assert health.alert_already_sent(s, "digest", ["digest.jobs_fresh"], now)
+        # A new miss id emails again; a new day emails again; no miss never dedupes.
+        assert not health.alert_already_sent(
+            s, "digest", ["digest.jobs_fresh", "digest.grade_recent"], now
+        )
+        assert not health.alert_already_sent(
+            s, "digest", ["digest.jobs_fresh"], now + timedelta(days=1)
+        )
+        assert not health.alert_already_sent(s, "digest", [], now)

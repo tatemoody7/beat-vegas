@@ -243,7 +243,10 @@ last four days before the credit reset. Read the run's `HEALTH:` line and its `a
 
 The digest (since 2026-10-20, final-2026 plan D4) is the one job whose red run is the point: it fails,
 and GitHub emails, when anything below misses. Every check is `failed` severity; it is silent only
-when all hold. Read the run's `HEALTH:` line, then:
+when all hold. It runs up to three times a day (two Vercel ticks, GitHub's late backup cron); since
+2026-11-05 the same misses email **once per UTC day**: a repeat run writes its verdict (the board still
+shows it) and exits 0, with "repeat of today's alert" in its summary (`last_alert_digest` holds the
+date and the miss ids). A new miss, or the next day, emails again. Read the run's `HEALTH:` line, then:
 
 1. `digest.jobs_fresh` -> a job wrote no verdict within its cadence (card 96 h, grade 30 h, sunday,
    monday, lines_watch 8 days): its cron and its Vercel tick both missed, or GitHub refused the run.
@@ -264,6 +267,13 @@ when all hold. Read the run's `HEALTH:` line, then:
    card builds ran without logging (card runbook, `card.paper_logged_iff_window`).
 9. `digest.ledger_matches_gauge` -> the balance fell by more than the `odds_spend` ledger explains: a
    caller is spending outside the client (`tests/test_odds_spend_ledger.py` should have caught it).
+   A monthly reset (a rise of 1,000+ between two readings; the plan refills on the 1st) restarts the
+   window at the new balance and is named in the detail; it is never a miss by itself (it was, for a
+   week after 2026-11-01).
+10. `digest.archive_spend_stored` -> the archive's newest verdict is `degraded` on a run that spent
+   credits: an item paid for data and then failed (Nov 1-4 2026: Neon refused every row, ~730 credits).
+   Open the run named in the detail, read the item's error, and check `research_snapshots` for the
+   rows before the next 07Z run spends again (archive runbook).
 
 ## The grace-window caveat
 
@@ -397,7 +407,7 @@ Failure modes on record:
 ### digest
 
 - Workflow: `.github/workflows/digest.yml`
-- Window: daily: the Vercel `digest` tick (13Z EDT / 14Z EST, 8:00-10:59am ET) plus the 13:30Z GitHub backup cron; silent when every check passes, a failed run (GitHub's email) when any misses; skipped from three days after the season's last kickoff
+- Window: daily: the Vercel `digest` tick (13Z EDT / 14Z EST, 8:00-10:59am ET) plus the 13:30Z GitHub backup cron; silent when every check passes, a failed run (GitHub's email) when any misses -- once per distinct set of misses per UTC day (`last_alert_digest`; a repeat writes the verdict and exits 0); skipped from three days after the season's last kickoff
 - Artifacts: `last_health_digest gauge (the verdict and the misses)`
 - Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): 
 
@@ -411,7 +421,8 @@ Failure modes on record:
 | `digest.cfbd_calls` | failed | more than 300 CFBD calls remain this month |
 | `digest.positions_fresh` | failed | the newest arm_positions read is within the last 8 days |
 | `digest.arms_logging` | failed | on Sundays and Mondays, the registered arms logged at least one paper pick in the last 7 days |
-| `digest.ledger_matches_gauge` | failed | the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%)) |
+| `digest.ledger_matches_gauge` | failed | the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%)), the window restarting at a monthly reset |
+| `digest.archive_spend_stored` | failed | the archive's newest verdict is not degraded on a run that spent credits (an item that failed after paying) |
 
 Failure modes on record:
 

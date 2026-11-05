@@ -93,10 +93,10 @@ disagree, **this file wins**; memory files hold lessons and point here.
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
 - **The Odds API quota resets on the 1st at 00:00Z, not Nov 5 (measured 2026-11-01; HISTORY 2026-11-02).**
-  `odds_cycle_reset_at` still reads 2026-11-05 until Tate confirms the dashboard and the `archive.yml`
-  `set-reset` dispatch writes `2026-12-01T00:00:00`; until then the archive window is open against the new
-  cycle. The 11-01/11-02 archive runs paid 270 credits for rows Neon refused (fixed the same PR); the digest's
-  ledger check reads the reset as a fall until ~11-08. CFBD's counter also reset 11-01 (Patreon charge? Tate).
+  `odds_cycle_reset_at` = `2026-12-01T00:00:00` since 2026-11-05 (Tate: cancel before Dec 1), so the archive's
+  last window is Nov 27-30. The 11-01 → 11-04 archive runs paid ~730 credits for rows Neon refused (column
+  widened 11-05, `migrate.yml`); the digest's ledger check is reset-aware and emails once a day per miss set
+  since 11-05. CFBD's counter also reset 11-01 (Patreon charge? Tate). Audit + fix list: `~/.claude/plans/`.
 - **The pause switch (`rule_paused`) is ON and stays on since 2026-10-18** (D2): the personal ledger ended, so
   nothing lifts it (`scripts/rule_pause.py`; earlier pauses 10-07 → 10-08, 10-17 13:27 → 17:10 UTC).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
@@ -182,7 +182,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
-| `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | only `last_health_digest`: fails (GitHub emails) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, or the ledger misses spend; silent when healthy |
+| `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | `last_health_digest` + `last_alert_digest`: fails (GitHub emails, once a day per miss set) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, the ledger misses spend, or the archive paid and stored nothing; silent when healthy |
 | `weekly_report.yml` | Vercel `weekly-report` (Sun 15Z/16Z) + 1 cron, dispatch (input dry_run) | `docs/reads/<season>-wNN.md` committed to main + the week's GitHub issue (emailed); read-only on Neon, zero credits |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |

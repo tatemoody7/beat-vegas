@@ -807,6 +807,9 @@ DIGEST_CFBD_MIN_CALLS = 300
 DIGEST_CLOSE_COVERAGE_MIN = 0.9
 DIGEST_LEDGER_TOLERANCE = 0.05
 DIGEST_LEDGER_MIN_SLACK = 25
+# A rise this large between two balance readings is the monthly reset (the
+# 20,000 plan refills on the 1st; measured 8,285 -> 20,000 at 2026-11-01 00:46Z).
+DIGEST_LEDGER_RESET_RISE = 1000
 # The temporary opening watch spent outside the ledger until its last tick
 # (final-2026 plan PR-08); the ledger-vs-gauge check starts after it.
 DIGEST_LEDGER_SINCE = datetime(2026, 10, 20, 22, 0)
@@ -1042,7 +1045,11 @@ def digest_arms_logging(ctx: Ctx) -> Result:
 
 def digest_ledger_matches_gauge(ctx: Ctx) -> Result:
     """The credit ledger (odds_spend) explains the balance's fall between the
-    first and last balance readings in the window, within max(25, 5%)."""
+    first and last balance readings in the window, within max(25, 5%). A
+    monthly reset (the balance RISING by DIGEST_LEDGER_RESET_RISE or more
+    between two readings; the plan resets on the 1st) restarts the window at
+    the reading that first showed the new balance, so a reset is never read as
+    a fall of ten thousand credits (2026-10-31 -> 11-07, fourteen false emails)."""
     from sqlalchemy import func
 
     from .db.models import AppSettingLog, OddsSpend
@@ -1055,9 +1062,17 @@ def digest_ledger_matches_gauge(ctx: Ctx) -> Result:
         .order_by(AppSettingLog.written_at.asc())
         .all()
     )
+    reset_note = ""
+    reset_at = 0
+    for i in range(1, len(rows)):
+        if int(rows[i][1]) - int(rows[i - 1][1]) >= DIGEST_LEDGER_RESET_RISE:
+            reset_note = f"; reset {int(rows[i - 1][1]):,} -> {int(rows[i][1]):,} at {rows[i][0]:%m-%d %H:%M}"
+            reset_at = i
+    rows = rows[reset_at:]
     if len(rows) < 2:
         return Result(
-            True, f"{len(rows)} balance reading(s) since {since:%m-%d %H:%M}; nothing to reconcile"
+            True,
+            f"{len(rows)} balance reading(s) since {since:%m-%d %H:%M}; nothing to reconcile{reset_note}",
         )
     (t1, b1), (t2, b2) = rows[0], rows[-1]
     fell = int(b1) - int(b2)
@@ -1070,7 +1085,37 @@ def digest_ledger_matches_gauge(ctx: Ctx) -> Result:
     slack = max(DIGEST_LEDGER_MIN_SLACK, int(abs(fell) * DIGEST_LEDGER_TOLERANCE))
     return Result(
         abs(fell - spent) <= slack,
-        f"balance fell {fell:,} and the ledger shows {spent:,} between {t1:%m-%d %H:%M} and {t2:%m-%d %H:%M} (slack {slack})",
+        f"balance fell {fell:,} and the ledger shows {spent:,} between {t1:%m-%d %H:%M} and {t2:%m-%d %H:%M} (slack {slack}){reset_note}",
+    )
+
+
+def _note_info(note: Optional[str], key: str) -> Optional[str]:
+    """`k=v` pairs after `info=` in a verdict note (verdict_note writes them)."""
+    tail = (note or "").split("info=", 1)
+    if len(tail) < 2:
+        return None
+    for part in tail[1].split():
+        if part.startswith(key + "="):
+            return part[len(key) + 1 :]
+    return None
+
+
+def digest_archive_spend_stored(ctx: Ctx) -> Result:
+    """The archive's newest verdict is not `degraded` on a run that spent
+    credits. `archive.items_ok` is degraded-severity (one item's failure must
+    not stop the queue), so a run that paid for data Neon then refused never
+    emailed: Nov 1-4 2026, ~730 credits, zero rows. A degraded run that spent
+    nothing stays a warning."""
+    from .ops import health_key
+
+    row = _gauge_row(ctx, health_key("archive"))
+    if row is None or (row.value or "") != "degraded":
+        return Result(True, f"archive verdict {row.value if row else 'none'}")
+    spent = int(_note_info(row.note, "spent") or 0)
+    return Result(
+        spent == 0,
+        f"archive degraded with {spent:,} credits spent (run {_note_run_id(row.note) or '-'}): "
+        "an item failed after paying; check research_snapshots landed (docs/HEALTH.md#archive)",
     )
 
 
@@ -1501,7 +1546,9 @@ CONTRACTS: Dict[str, Contract] = {
         window=(
             "daily: the Vercel `digest` tick (13Z EDT / 14Z EST, 8:00-10:59am ET) plus the 13:30Z"
             " GitHub backup cron; silent when every check passes, a failed run (GitHub's email)"
-            " when any misses; skipped from three days after the season's last kickoff"
+            " when any misses -- once per distinct set of misses per UTC day (`last_alert_digest`;"
+            " a repeat writes the verdict and exits 0); skipped from three days after the season's"
+            " last kickoff"
         ),
         artifacts=("last_health_digest gauge (the verdict and the misses)",),
         inputs=(),
@@ -1557,8 +1604,14 @@ CONTRACTS: Dict[str, Contract] = {
             Check(
                 "digest.ledger_matches_gauge",
                 "failed",
-                "the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%))",
+                "the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%)), the window restarting at a monthly reset",
                 digest_ledger_matches_gauge,
+            ),
+            Check(
+                "digest.archive_spend_stored",
+                "failed",
+                "the archive's newest verdict is not degraded on a run that spent credits (an item that failed after paying)",
+                digest_archive_spend_stored,
             ),
         ),
         failure_modes=(
@@ -1683,6 +1736,34 @@ def evaluate(contract: Contract, ctx: Ctx) -> Tuple[Verdict, List[Tuple[Check, R
     if any(not r.ok for _c, r in results):
         return "degraded", results
     return "ok", results
+
+
+def alert_key(job: str) -> str:
+    """The gauge that remembers the last failed verdict GitHub was allowed to
+    email for: `<UTC date>|<sorted miss ids>`."""
+    return f"last_alert_{job}"
+
+
+def alert_already_sent(session, job: str, miss_ids: List[str], now: datetime) -> bool:
+    """True when a failed run of `job` already exited 1 today (UTC) for these
+    misses or a superset of them. The digest runs up to three times a day (two
+    Vercel ticks and GitHub's late backup cron); each red run is an email, and
+    the same miss three times a day is noise that hides the next real one. A new
+    miss id, or a new day, emails again."""
+    from .db.models import AppSetting
+
+    row = session.get(AppSetting, alert_key(job))
+    if row is None or not row.value or "|" not in row.value:
+        return False
+    day, ids = row.value.split("|", 1)
+    if day != now.strftime("%Y-%m-%d"):
+        return False
+    sent = {i for i in ids.split(",") if i}
+    return bool(miss_ids) and set(miss_ids) <= sent
+
+
+def alert_value(miss_ids: List[str], now: datetime) -> str:
+    return now.strftime("%Y-%m-%d") + "|" + ",".join(sorted(set(miss_ids)))
 
 
 def verdict_note(job: str, ctx: Ctx, results: List[Tuple[Check, Result]]) -> str:

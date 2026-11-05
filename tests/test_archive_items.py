@@ -430,3 +430,136 @@ def test_estimates_count_what_is_left_to_buy(db):
             "units": 3,
             "credits": 31,
         }
+
+
+# --------------------------------------------------------------------------- #
+# The unstored window (2026-11-01 -> the fix): paid calls whose rows Neon refused
+# --------------------------------------------------------------------------- #
+def _spend(s, *, at, credits, purpose, params, endpoint="hist_odds"):
+    row = OddsSpend(
+        spent_at=at,
+        endpoint=endpoint,
+        credits=credits,
+        http_status=200,
+        purpose=purpose,
+        params_json=json.dumps(params),
+    )
+    s.add(row)
+    s.flush()
+    return row.id
+
+
+def test_a_paid_wave_from_the_unstored_window_is_bought_again(db):
+    """11-01 and 11-02 bought one wave per item and Neon refused every row
+    (source VARCHAR(8)). The ledger says bought; the table says nothing landed.
+    The rerun asks for that wave again. A wave bought BEFORE the window (rows
+    landed, as the earlier test proves) stays bought."""
+    eng, scope = db
+    purpose = "archive_pinnacle_2026"
+    with Session(eng) as s:
+        # the first wave, paid on 11-01, no rows anywhere
+        _spend(
+            s,
+            at=A.UNSTORED_FROM + timedelta(hours=7, minutes=49),
+            credits=10,
+            purpose=purpose,
+            params={"date": iso(SAT - timedelta(minutes=30))},
+        )
+        s.commit()
+    with Session(eng) as s:
+        assert A.first_stored_at(s) is None
+        assert A.bought_calls(s, purpose) == set()
+    fake = FakeArchive()
+    A.run_close_waves(
+        fake,
+        scope,
+        season=2026,
+        weeks=(3,),
+        purpose=purpose,
+        regions="eu",
+        budget=A.Budget(100),
+        log=lambda *_: None,
+    )
+    assert [c[1] for c in fake.calls] == [
+        iso(SAT - timedelta(minutes=30)),
+        iso(SAT + timedelta(hours=3)),
+    ], "the refused wave is asked again, then the next one"
+    assert len(_rows(eng, purpose)) == 3
+
+
+def test_the_window_closes_at_the_first_stored_row_and_free_answers_stay_asked(db):
+    """Once any purpose has a historical row, paid calls at or after that spend
+    are bought as before (a path wave that wrote nothing because nothing changed
+    must not be re-bought forever). A 0-credit empty answer inside the window was
+    a real answer: the team-total item does not ask that game again."""
+    eng, scope = db
+    tt = "archive_hr_tt1h"
+    fix_at = A.UNSTORED_FROM + timedelta(days=2)
+    with Session(eng) as s:
+        # inside the window: a free empty answer (game 1) and a paid, unstored one (game 2)
+        kick1 = iso(GAMES[0][3] - timedelta(minutes=A.LEAD_MIN))
+        kick2 = iso(GAMES[1][3] - timedelta(minutes=A.LEAD_MIN))
+        _spend(
+            s,
+            at=A.UNSTORED_FROM + timedelta(hours=8),
+            credits=0,
+            purpose=tt,
+            params={"event_id": "ev1", "date": kick1},
+            endpoint="hist_event_odds",
+        )
+        _spend(
+            s,
+            at=A.UNSTORED_FROM + timedelta(hours=8, minutes=1),
+            credits=10,
+            purpose=tt,
+            params={"event_id": "ev2", "date": kick2},
+            endpoint="hist_event_odds",
+        )
+        # the fix: a paid call of another purpose that stored a row
+        req = _spend(
+            s,
+            at=fix_at,
+            credits=10,
+            purpose="archive_fg_paths",
+            params={"date": iso(SAT - timedelta(hours=20))},
+        )
+        s.add(
+            ResearchSnapshot(
+                game_id=1,
+                book="draftkings",
+                market="full_game_total",
+                line=51.5,
+                captured_at=SAT - timedelta(hours=20),
+                purpose="archive_fg_paths",
+                request_id=req,
+                source="historical",
+            )
+        )
+        # after the fix: a paid path wave that wrote nothing (unchanged quotes)
+        _spend(
+            s,
+            at=fix_at + timedelta(hours=4),
+            credits=10,
+            purpose="archive_fg_paths",
+            params={"date": iso(SAT - timedelta(hours=16))},
+        )
+        s.commit()
+    with Session(eng) as s:
+        assert A.first_stored_at(s) == fix_at
+        assert A.bought_calls(s, "archive_fg_paths") == {
+            (None, iso(SAT - timedelta(hours=20))),
+            (None, iso(SAT - timedelta(hours=16))),
+        }
+        assert A.bought_calls(s, tt) == {("ev1", kick1)}
+    fake = FakeArchive()
+    A.run_hr_tt1h(
+        fake,
+        scope,
+        season=2026,
+        weeks=(3,),
+        purpose=tt,
+        budget=A.Budget(100),
+        log=lambda *_: None,
+    )
+    asked = [c[1] for c in fake.calls if c[0] == "event"]
+    assert "ev1" not in asked and "ev2" in asked and "ev3" in asked

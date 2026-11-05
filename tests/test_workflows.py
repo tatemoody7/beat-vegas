@@ -1083,8 +1083,8 @@ def test_archive_yml_runs_auto_daily_and_writes_through_env():
     assert set(on) == {"workflow_dispatch", "schedule"}
     assert [c["cron"] for c in on["schedule"]] == ["0 7 * * *", "0 15 24 10 *"]
     inputs = on["workflow_dispatch"]["inputs"]
-    assert set(inputs) == {"item", "max_credits", "game_id", "live", "dry_run"}
-    assert inputs["item"]["options"] == ["status", "probe", "auto"]
+    assert set(inputs) == {"item", "max_credits", "game_id", "live", "dry_run", "reset_at"}
+    assert inputs["item"]["options"] == ["status", "probe", "auto", "set-reset"]
     assert (data.get("concurrency") or {}).get("group") == NEON_GROUP
     job = data["jobs"]["archive"]
     assert job["env"]["BV_ODDS_JOB"] == "archive"
@@ -1094,6 +1094,10 @@ def test_archive_yml_runs_auto_daily_and_writes_through_env():
     clock = next(s for s in run_steps if s.get("id") == "clock")
     assert '"0 15 24 10 *" ]; then item=ladder_probe; else item=auto' in clock["run"]
     cmd = next(s for s in run_steps if "scripts/archive_buy.py" in s["run"])
-    assert set(cmd["env"]) == {"ITEM", "IN_MAX", "IN_GAME", "IN_LIVE", "IN_DRY"}
+    assert set(cmd["env"]) == {"ITEM", "IN_MAX", "IN_GAME", "IN_LIVE", "IN_DRY", "IN_RESET"}
+    # set-reset (2026-11-02): the one way the reset date is written from a runner;
+    # it refuses an empty date rather than writing one.
+    assert 'python scripts/credit_plan.py set-reset "$IN_RESET"' in cmd["run"]
+    assert 'if [ -z "$IN_RESET" ]; then' in cmd["run"]
     assert "probe --live --skip-historical --max-credits 5" in cmd["run"]
     assert '--status-file "$RUNNER_TEMP/archive_status.json"' in cmd["run"]

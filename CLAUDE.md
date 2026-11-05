@@ -92,6 +92,11 @@ disagree, **this file wins**; memory files hold lessons and point here.
   10+ mph forecast, v1.6, `wx_paper.py`; 8 = 1H unders at a 60+ total, v1.8, `ht_paper.py`; `protocol_position.py` on Mondays; 4-5 not designed) → shadow engines (none this season, v2.0);
   the offline backtest engine is retired (2026-10-11). The
   full game's week-wide move is re-read once it has six weeks of in-window closes (protocol p1).
+- **The Odds API quota resets on the 1st at 00:00Z, not Nov 5 (measured 2026-11-01; HISTORY 2026-11-02).**
+  `odds_cycle_reset_at` still reads 2026-11-05 until Tate confirms the dashboard and the `archive.yml`
+  `set-reset` dispatch writes `2026-12-01T00:00:00`; until then the archive window is open against the new
+  cycle. The 11-01/11-02 archive runs paid 270 credits for rows Neon refused (fixed the same PR); the digest's
+  ledger check reads the reset as a fall until ~11-08. CFBD's counter also reset 11-01 (Patreon charge? Tate).
 - **The pause switch (`rule_paused`) is ON and stays on since 2026-10-18** (D2): the personal ledger ended, so
   nothing lifts it (`scripts/rule_pause.py`; earlier pauses 10-07 → 10-08, 10-17 13:27 → 17:10 UTC).
 - **Hard Rock's feed row drifts to an alternate rung near kickoff** (measured 2026-10-01:
@@ -182,7 +187,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |
 | `rescore.yml` | dispatch season/week | re-scores a past week, no snapshots |
-| `archive.yml` | daily 07Z (GitHub + Vercel `archive`), Sat 10-24 15Z ladder probe, dispatch item/max_credits/game_id/live/dry_run | the archive queue (plan C12, Tate's order; items `beatvegas/archive.py`, PR-C10): `auto` spends only in the last 4 days before the reset, from the LIVE balance, into `research_snapshots`; `status`, `probe`; ledger job `archive`, contract `archive` |
+| `archive.yml` | daily 07Z (GitHub + Vercel `archive`), Sat 10-24 15Z ladder probe, dispatch item/max_credits/game_id/live/dry_run/reset_at (`set-reset` writes `odds_cycle_reset_at`) | the archive queue (plan C12, Tate's order; items `beatvegas/archive.py`, PR-C10): `auto` spends only in the last 4 days before the reset, from the LIVE balance, into `research_snapshots`; `status`, `probe`; ledger job `archive`, contract `archive` |
 | `backfill_intercept.yml` | dispatch season/write | `predictions.bv_intercept` |
 | `backfill_1h.yml`, `history_load.yml` | dispatch (paid / free CFBD) | historical 1H closes; 2003-22 FBS games + pregame Elo (study-only) |
 | `enrich_tempo.yml`, `weather_backfill.yml` | dispatch | `team_tempo`, `weather_obs` |

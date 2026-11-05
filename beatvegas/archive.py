@@ -8,7 +8,11 @@ Each item turns expiring Odds API credits into a permanent historical dataset in
 of a billing cycle; each item spends at most what it is handed and stops cleanly
 when that runs out (`BudgetExhausted`). Resumable: what was already bought is read
 back from the credit ledger (`odds_spend.params_json` keeps each call's `date` and
-event) and from the rows already written, so a rerun never pays twice.
+event) and from the rows already written, so a rerun never pays twice. One
+exception (`UNSTORED_FROM`): from the first spending run (2026-11-01 07Z) until the
+fix landed, Neon's `research_snapshots.source` was VARCHAR(8) and refused every
+"historical" row after its call was paid; a paid call from that window whose rows
+never landed is not bought and is asked again (a free empty answer stays asked).
 
 Four kinds of item:
 
@@ -42,6 +46,8 @@ import json
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+from sqlalchemy import func
 
 from . import research_capture
 from .db.models import Game, OddsSnapshot, OddsSpend, ResearchSnapshot
@@ -277,14 +283,43 @@ def has_market(payload: Optional[Dict[str, Any]], market_key: str, book: str) ->
 # --------------------------------------------------------------------------- #
 # What was already bought (the ledger and the rows)
 # --------------------------------------------------------------------------- #
+# The first archive run that spent (2026-11-01 07:49Z). Until the fix, every row
+# the items wrote was refused by Neon (source VARCHAR(8) vs "historical"), after
+# the call was paid.
+UNSTORED_FROM = datetime(2026, 11, 1)
+
+
+def first_stored_at(session) -> Optional[datetime]:
+    """When the first historical row landed: the spend time of the earliest call
+    any archive purpose stored a row for. None until the fix has run once."""
+    return (
+        session.query(func.min(OddsSpend.spent_at))
+        .join(ResearchSnapshot, ResearchSnapshot.request_id == OddsSpend.id)
+        .filter(ResearchSnapshot.source == "historical")
+        .scalar()
+    )
+
+
 def bought_calls(session, purpose: str) -> Set[Tuple[Optional[str], Optional[str]]]:
-    """(event_id or None, date) of every answered call this purpose made."""
+    """(event_id or None, date) of every answered call this purpose made, less
+    the paid calls of the unstored window (UNSTORED_FROM up to the first stored
+    row): their rows never landed, so they are asked again. A free empty answer
+    (0 credits) from that window was a real answer and stays bought."""
+    stored_from = first_stored_at(session)
     out: Set[Tuple[Optional[str], Optional[str]]] = set()
-    for (pj,) in (
-        session.query(OddsSpend.params_json)
+    for pj, credits, at in (
+        session.query(OddsSpend.params_json, OddsSpend.credits, OddsSpend.spent_at)
         .filter(OddsSpend.purpose == purpose, OddsSpend.http_status == 200)
         .all()
     ):
+        unstored = (
+            (credits or 0) > 0
+            and at is not None
+            and at >= UNSTORED_FROM
+            and (stored_from is None or at < stored_from)
+        )
+        if unstored:
+            continue
         try:
             p = json.loads(pj or "{}")
         except ValueError:

@@ -8,6 +8,28 @@ hold the rest.
 
 
 
+## 2026-11-02
+
+- **2026-11-02 (THE ODDS API RESETS ON THE 1ST, AND THE ARCHIVE WROTE NOTHING).** Found by the week-9 review
+  (the Sunday report read BROKEN). (1) `app_settings_log` shows odds_credits_remaining 8,285 -> 20,000 at
+  2026-11-01 00:46Z, the only rise above 1,000 since July: the quota resets on the 1st at 00:00Z, not the
+  Nov 5 the controller held since 10-18 (`odds_cycle_reset_at`). So 8,285 credits expired unspent on 10-31, the
+  archive window opened on 11-01 against the new cycle, and the digest's `ledger_matches_gauge` has read the
+  reset as a fall of ~11,000 since 10-31 (it clears when the 7-day window passes 11-01). CFBD's counter reset
+  to 75,000 the same night (Patreon bills on the 1st; whether the Nov 5 drop holds is Tate's to check). (2)
+  Every archive insert failed on Neon: `research_snapshots.source` was `String(8)` and the archive writes
+  `historical` (10 chars); SQLite never enforced the width, so no test saw it. The 11-01 and 11-02 `auto` runs
+  paid 270 credits (one wave per item per run, 15 bulk waves and two present team-total asks) for 0 rows, and
+  `bought_calls` would have skipped those waves forever. Fixed: the column is `String(16)`, `store._WIDEN`
+  alters it in place on Postgres at the next `init_db` (every job runs one; `migrate.yml` is the explicit
+  path), `archive.bought_calls` treats a paid call between `UNSTORED_FROM` (2026-11-01) and the first stored
+  historical row as not bought (a free empty answer stays asked), and `test_research_capture` keeps every
+  source and purpose value inside its column and `_WIDEN` equal to the model. `archive.yml` gains the
+  `set-reset` item (input `reset_at`) so the reset date is written from a runner; the setting moves to
+  2026-12-01 only after Tate confirms the date on the dashboard (`docs/OPS_ACCOUNTS.md`), which closes the
+  window now open and reopens it Nov 27-30, after the last capture. Monday's official read the same morning
+  stopped H-ARM-1HU and H-ARM-1HO (31 readings, 3 weeks, LLR -8.38 and -9.52; mean EV -5.5% and -6.4%).
+
 ## 2026-10-20
 
 - **2026-10-20 ~23:00 UTC (THE ARCHIVE ITEMS: EXPIRING CREDITS BECOME DATASETS; ROADMAP v2.8).** Final-2026 plan D4

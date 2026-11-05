@@ -1017,7 +1017,10 @@ class ResearchSnapshot(Base):
     purpose = Column(String(32), nullable=False)
     region = Column(String(16))  # eu | us | us2 | us_ex | books | unknown
     request_id = Column(Integer, ForeignKey("odds_spend.id"))
-    source = Column(String(8), nullable=False, default="live")  # live | historical
+    # live | historical. Was String(8) until 2026-11-02: SQLite never enforces a
+    # width, Neon does, and every "historical" (10 chars) archive row was refused
+    # after its call was paid (store._WIDEN carries the ALTER).
+    source = Column(String(16), nullable=False, default="live")
 
 
 class JudgeReadingAudit(Base):

@@ -12,6 +12,13 @@
 # emailed today (UTC) writes its verdict and exits 0 (`last_alert_digest`,
 # scripts/health_check.py). From three days after the season's last kickoff the
 # run is skipped.
+#
+# The runs API is read for one more reason since 2026-11-05 (audit A4): a job
+# GitHub cancelled -- a timeout at its job limit, or the neon-writers queue --
+# never emails on its own, and its health step can even run before the cancel
+# (the Fri 10-30 card finished every step and was cancelled at 30:02). A
+# cancelled run in the last 24 h with no later success of the same workflow is
+# a miss here (`digest.runs_not_cancelled`).
 name: Daily digest (silent unless something needs attention)
 
 on:
@@ -50,12 +57,16 @@ jobs:
           echo "started=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
           skip=$(python -c "from datetime import datetime; from beatvegas.health import digest_in_season; print('false' if digest_in_season(datetime.utcnow()) else 'true')")
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
-      - name: Recent workflow runs (so a cancelled run is not read as a failure)
+      - name: Recent workflow runs (a cancelled run is excused by a later success, a miss otherwise)
         env:
           GH_TOKEN: ${{ github.token }}
+        # The field list is beatvegas/health.py::DIGEST_RUN_FIELDS
+        # (tests/test_workflows.py keeps them equal). `updatedAt` is the run's
+        # end: a run cancelled at its job limit (card 10-30, sunday 11-01) is
+        # named with how long it ran.
         run: |
           gh run list --repo "$GITHUB_REPOSITORY" --limit 200 \
-            --json databaseId,workflowName,event,status,conclusion,createdAt \
+            --json databaseId,workflowName,event,status,conclusion,createdAt,updatedAt \
             | python -c "import json,sys; json.dump({'runs': json.load(sys.stdin)}, open(sys.argv[1], 'w'))" \
               "$RUNNER_TEMP/runs.json"
       - name: Health contract (docs/HEALTH.md; writes last_health_digest)

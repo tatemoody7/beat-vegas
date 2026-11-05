@@ -1101,3 +1101,31 @@ def test_archive_yml_runs_auto_daily_and_writes_through_env():
     assert 'if [ -z "$IN_RESET" ]; then' in cmd["run"]
     assert "probe --live --skip-historical --max-credits 5" in cmd["run"]
     assert '--status-file "$RUNNER_TEMP/archive_status.json"' in cmd["run"]
+
+
+def test_digest_runs_step_asks_for_the_fields_the_contract_reads():
+    """`digest.runs_not_cancelled` reads updatedAt for the run's length; the step
+    and health.DIGEST_RUN_FIELDS must stay the same list."""
+    from beatvegas import health
+
+    data = _load(WF_DIR / "digest.yml")
+    step = next(
+        s
+        for job in data["jobs"].values()
+        for s in job["steps"]
+        if "gh run list" in (s.get("run") or "")
+    )
+    m = re.search(r"--json ([\w,]+)", step["run"])
+    assert m, "digest.yml's runs step has no --json field list"
+    assert m.group(1).split(",") == list(health.DIGEST_RUN_FIELDS)
+
+
+def test_the_two_long_jobs_keep_room_above_their_october_run_times():
+    """Audit A4 (2026-11-05): card builds ran 18-25 min against a 30-minute
+    limit (Fri 10-30 cancelled at 30:02), sunday 23-26 against 25 (Sun 11-01
+    cancelled at 25:39). Minutes are free on a public repo; a tighter limit
+    needs a reason here."""
+    card = _load(WF_DIR / "card.yml")["jobs"]["card"]
+    sunday = _load(WF_DIR / "sunday.yml")["jobs"]["capture-and-score"]
+    assert card["timeout-minutes"] >= 45, card["timeout-minutes"]
+    assert sunday["timeout-minutes"] >= 40, sunday["timeout-minutes"]

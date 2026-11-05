@@ -79,10 +79,12 @@ carries `HEALTH: <verdict> <note>`.
 
 1. `card.row_this_run` missed -> the build never wrote a card. Open the run:
    did the `build` step run at all (a `gate`/`slot` skip should have set
-   `SKIPPED`), did it die (traceback), or did the job time out? A timed-out
-   job is reported `cancelled` and only runs its `always()` steps inside
-   GitHub's grace window, so on a timeout THIS STEP MAY NEVER RUN -- the
-   board's missed-build banner (`buildStatus`) is the check that always fires.
+   `SKIPPED`), did it die (traceback), or did the job time out (45 min since
+   2026-11-05)? A timed-out job is reported `cancelled` and runs its `always()`
+   steps only inside GitHub's grace window, so on a timeout this step may not
+   run, or may run before the cancel and write `ok` (Fri 10-30): the digest's
+   `runs_not_cancelled` reads the run's conclusion the next morning, and the
+   board's missed-build banner (`buildStatus`) fires either way.
 2. `card.sweep_reached_slate` missed -> the Odds API sweep stopped early
    (credit floor, per-run cap, 5xx). The card shipped degraded off the lines it
    reached; the sweep step's log names the error. Re-dispatch with `force=true`
@@ -274,15 +276,24 @@ date and the miss ids). A new miss, or the next day, emails again. Read the run'
    credits: an item paid for data and then failed (Nov 1-4 2026: Neon refused every row, ~730 credits).
    Open the run named in the detail, read the item's error, and check `research_snapshots` for the
    rows before the next 07Z run spends again (archive runbook).
+11. `digest.runs_not_cancelled` -> a run GitHub cancelled in the last 24 h has no later success of
+   its workflow. The detail names the run and how long it ran: a length at the job's limit (card 45,
+   sunday 40, grade 25, lines_watch 10 min) is a timeout -- open the run, find the slow step, and
+   check what it left behind (the card and sunday runbooks above); a short length is the
+   `neon-writers` queue or a hand cancel. A cancelled run followed by a successful run of the same
+   workflow (the Sun 11-01 refit and its Vercel retry) is named but not a miss.
 
 ## The grace-window caveat
 
 The health step runs on `always()`, so it reports on a red run too. It cannot
-report on a run GitHub cancelled: a job timeout only lets `always()` steps run
-inside a short grace window, and a runner lost mid-job runs nothing. For the
-card that case is covered by the board's missed-build banner; for grade by
-the stale-results banner and the `dispatch:grade` gauge; for sunday by the
-Sunday probe writing no prediction row (the next tick scores).
+be trusted to report on a run GitHub cancelled: a job timeout lets `always()`
+steps run only inside a short grace window, a runner lost mid-job runs nothing,
+and a cancel that lands after the step (the Fri 10-30 card, every step done at
+30:02) leaves an `ok` verdict behind. The digest's `runs_not_cancelled` reads
+the run's conclusion the next morning (since 2026-11-05). Before that: for the
+card the board's missed-build banner; for grade the stale-results banner and
+the `dispatch:grade` gauge; for sunday the probe writing no prediction row
+(the next tick scores).
 
 ## Regenerating the block below
 
@@ -314,7 +325,7 @@ Parameters: `HR_PRICED_FLOOR = 10`, `STALE_AFTER_HOURS = 18`, `PACE_COVERAGE_MIN
 Failure modes on record:
 
 - **2026-09-10** -- a mid-sweep Odds API 5xx killed the job before build_card ran: no card at all. The sweep now continues on error; a partial sweep ships the card degraded. Caught by: `card.row_this_run`, `card.status_clean`, `card.sweep_reached_slate`.
-- **2026-09-21** -- the first build of the week (nothing cached, 57 fresh previews) hit the 15-minute job timeout; GitHub reported `cancelled` and no card shipped. The timeout is 30 now. A cancelled job only runs its always() steps inside GitHub's grace window, so this step may never run on a timeout -- the board's buildStatus (missed build) is the check that always fires. Caught by: `card.row_this_run`.
+- **2026-09-21** -- the first build of the week (nothing cached, 57 fresh previews) hit the 15-minute job timeout; GitHub reported `cancelled` and no card shipped. The timeout is 45 now (30 from 2026-09-22; October builds ran 18-25 min and the Fri 10-30 build was cancelled at 30:02 with every step done). A cancelled job runs its always() steps only inside GitHub's grace window, and a cancel after this step leaves a healthy verdict behind -- the digest's `runs_not_cancelled` reads the run's conclusion the next morning; the board's buildStatus (missed build) fires either way. Caught by: `card.row_this_run`.
 - **2026-09-13** -- the paper window gave each slot the gap to the next build, so Friday's three clean BETs were never logged and the Saturday build claimed the whole slate; and a `manual` refresh logging paper picks would freeze the week at that moment's lines. Caught by: `card.paper_logged_iff_window`.
 - **2026-09-09** -- a Vercel tick outside its window, or a GitHub cron running the build instead of the Vercel dispatch: invisible in the runs API. The board's `dispatch:<job>` warning covers it; the note carries `event=` so the trigger is on record. Caught by: info only.
 - **2026-09-20** -- `early_season` held 10 games on the Friday card (an FCS opener leaves a team at 1 FBS game). Correct behaviour, so it is info (`early_season_held=N`), never a miss. Caught by: info only.
@@ -423,9 +434,11 @@ Failure modes on record:
 | `digest.arms_logging` | failed | on Sundays and Mondays, the registered arms logged at least one paper pick in the last 7 days |
 | `digest.ledger_matches_gauge` | failed | the odds_spend ledger accounts for the balance's fall since the last week (within max(25, 5%)), the window restarting at a monthly reset |
 | `digest.archive_spend_stored` | failed | the archive's newest verdict is not degraded on a run that spent credits (an item that failed after paying) |
+| `digest.runs_not_cancelled` | failed | no run GitHub cancelled in the last 24 h (a job timeout, the queue) is still its workflow's last word: a later success excuses it, pull-request CI is not read |
 
 Failure modes on record:
 
+- **2026-10-30** -- The Fri 10-30 card build was cancelled at the 30-minute job limit with every step done (its health step had already written ok), and the Sun 11-01 refit was cut at 25:39 inside scoring. GitHub reports a timeout as `cancelled`, which emails nothing, and no check read the run's conclusion unless a verdict was already failed. The limits are 45 / 40 now and a cancelled run with no later success is a miss. Caught by: `digest.runs_not_cancelled`.
 - **2026-10-18** -- A hand grade dispatch was cancelled in the neon-writers queue; its health step wrote failed and the banner read FAILED for a day while nothing was missing. Nothing emailed and nothing distinguished it from a real failure. The digest reads the run's conclusion and excuses a cancelled run that a later success superseded. Caught by: `digest.jobs_not_failed`.
 - **2026-09-22** -- GitHub's billing stop refused every job for hours; no run wrote a verdict, so no contract could fail and no email went out (the gauges simply stopped moving). A verdict past its cadence is now a miss. Caught by: `digest.jobs_fresh`, `digest.grade_recent`.
 

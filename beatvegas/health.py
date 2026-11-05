@@ -817,6 +817,23 @@ DIGEST_LEDGER_SINCE = datetime(2026, 10, 20, 22, 0)
 # coverage gauge must name (2026-10-17).
 DIGEST_FIRST_READ = datetime(2026, 10, 19)
 DIGEST_FIRST_SATURDAY = datetime(2026, 10, 17)
+# A run GitHub cancelled (a job timeout, the neon-writers queue, a hand cancel)
+# this many hours before the digest, with no later success of its workflow, is
+# a miss (audit A4, 2026-11-05). 24 h: the digest's ticks are a day apart, so a
+# cancelled run is read once (twice only when today's tick lands a few minutes
+# earlier in its hour than yesterday's).
+DIGEST_CANCELLED_WINDOW_H = 24.0
+# What digest.yml's runs step asks `gh run list --json` for; the checks above
+# read these keys (tests/test_workflows.py keeps the step and this tuple equal).
+DIGEST_RUN_FIELDS = (
+    "databaseId",
+    "workflowName",
+    "event",
+    "status",
+    "conclusion",
+    "createdAt",
+    "updatedAt",
+)
 
 
 def _season_end() -> datetime:
@@ -1119,6 +1136,49 @@ def digest_archive_spend_stored(ctx: Ctx) -> Result:
     )
 
 
+def _run_time(raw: object) -> Optional[datetime]:
+    """gh's `2026-11-01T18:58:11Z` -> naive UTC; anything else -> None."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", ""))
+    except ValueError:
+        return None
+
+
+def digest_runs_not_cancelled(ctx: Ctx) -> Result:
+    """No run GitHub cancelled in the last DIGEST_CANCELLED_WINDOW_H hours is
+    still its workflow's last word. A job timeout is reported `cancelled`, not
+    failed, so it never emails on its own, and its health step can run BEFORE
+    the cancel and leave a healthy verdict behind: the Fri 10-30 card finished
+    every step and was cancelled at 30:02; the Sun 11-01 refit was cut at 25:39
+    inside scoring and the Vercel retry scored 11 min later (excused, as a queue
+    cancel followed by the real run is). Pull-request CI cancels itself on every
+    push and is not read."""
+    runs = (ctx.status_files.get("runs") or {}).get("runs") or []
+    since = ctx.now - timedelta(hours=DIGEST_CANCELLED_WINDOW_H)
+    bad, excused = [], []
+    for r in runs:
+        if r.get("conclusion") != "cancelled" or r.get("event") == "pull_request":
+            continue
+        started = _run_time(r.get("createdAt"))
+        if started is None or started < since:
+            continue
+        ended = _run_time(r.get("updatedAt"))
+        length = (
+            f"{(ended - started).total_seconds() / 60:.0f} min" if ended else "an unknown length"
+        )
+        label = f"{r.get('workflowName')} run {r.get('databaseId')} cancelled after {length}"
+        if _later_success(ctx, r):
+            excused.append(f"{label}, a later run succeeded")
+        else:
+            bad.append(f"{label}, no later success (a job timeout? open the run)")
+    detail = ", ".join(bad + excused) or (
+        f"no run cancelled in the last {DIGEST_CANCELLED_WINDOW_H:.0f} h"
+    )
+    return Result(not bad, detail)
+
+
 def digest_info(ctx: Ctx) -> Dict[str, str]:
     from .ops import CFBD_CALLS_REMAINING, ODDS_CREDITS_REMAINING
 
@@ -1259,7 +1319,7 @@ CONTRACTS: Dict[str, Contract] = {
             ),
             FailureMode(
                 "2026-09-21",
-                "the first build of the week (nothing cached, 57 fresh previews) hit the 15-minute job timeout; GitHub reported `cancelled` and no card shipped. The timeout is 30 now. A cancelled job only runs its always() steps inside GitHub's grace window, so this step may never run on a timeout -- the board's buildStatus (missed build) is the check that always fires.",
+                "the first build of the week (nothing cached, 57 fresh previews) hit the 15-minute job timeout; GitHub reported `cancelled` and no card shipped. The timeout is 45 now (30 from 2026-09-22; October builds ran 18-25 min and the Fri 10-30 build was cancelled at 30:02 with every step done). A cancelled job runs its always() steps only inside GitHub's grace window, and a cancel after this step leaves a healthy verdict behind -- the digest's `runs_not_cancelled` reads the run's conclusion the next morning; the board's buildStatus (missed build) fires either way.",
                 ("card.row_this_run",),
             ),
             FailureMode(
@@ -1613,8 +1673,19 @@ CONTRACTS: Dict[str, Contract] = {
                 "the archive's newest verdict is not degraded on a run that spent credits (an item that failed after paying)",
                 digest_archive_spend_stored,
             ),
+            Check(
+                "digest.runs_not_cancelled",
+                "failed",
+                "no run GitHub cancelled in the last 24 h (a job timeout, the queue) is still its workflow's last word: a later success excuses it, pull-request CI is not read",
+                digest_runs_not_cancelled,
+            ),
         ),
         failure_modes=(
+            FailureMode(
+                "2026-10-30",
+                "The Fri 10-30 card build was cancelled at the 30-minute job limit with every step done (its health step had already written ok), and the Sun 11-01 refit was cut at 25:39 inside scoring. GitHub reports a timeout as `cancelled`, which emails nothing, and no check read the run's conclusion unless a verdict was already failed. The limits are 45 / 40 now and a cancelled run with no later success is a miss.",
+                ("digest.runs_not_cancelled",),
+            ),
             FailureMode(
                 "2026-10-18",
                 "A hand grade dispatch was cancelled in the neon-writers queue; its health step wrote failed and the banner read FAILED for a day while nothing was missing. Nothing emailed and nothing distinguished it from a real failure. The digest reads the run's conclusion and excuses a cancelled run that a later success superseded.",

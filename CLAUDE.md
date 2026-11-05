@@ -182,7 +182,7 @@ board banner and `/api/health`, exits 1 on `failed` (GitHub emails) and 0 on `de
 | `grade.yml` | Vercel + 2 crons; inputs hist/regrade | finals, graded picks/records, gauges; `hist=true` also grades the 2023-25 Market Research rows |
 | `ci.yml` | `pull_request` only | — (pytest, vitest, tsc, e2e lane on postgres:16) |
 | `pricing_monday.yml` | Vercel `pricing-monday` (12Z + 15Z retry + 18Z catch-up) + 1 cron, dispatch (input season_over) | `arm_positions` (one row per hypothesis per read date; `--write` only here) + the pricing report (run Summary + `pricing-report` artifact) |
-| `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | `last_health_digest` + `last_alert_digest`: fails (GitHub emails, once a day per miss set) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, the ledger misses spend, or the archive paid and stored nothing; silent when healthy |
+| `digest.yml` | Vercel `digest` (13Z/14Z) + 1 cron | `last_health_digest` + `last_alert_digest`: fails (GitHub emails, once a day per miss set) when a job went quiet or failed, closes or grading lapsed, the Odds/CFBD budget runs short, the ledger misses spend, the archive paid and stored nothing, or a run was cancelled (a timeout) with no later success; silent when healthy |
 | `weekly_report.yml` | Vercel `weekly-report` (Sun 15Z/16Z) + 1 cron, dispatch (input dry_run) | `docs/reads/<season>-wNN.md` committed to main + the week's GitHub issue (emailed); read-only on Neon, zero credits |
 | `migrate.yml` | dispatch | `init_db` on Neon (additive) |
 | `study.yml` | dispatch script/args | a read-only report artifact (runner-frame numbers) |

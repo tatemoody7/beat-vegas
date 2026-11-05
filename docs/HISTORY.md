@@ -10,6 +10,20 @@ hold the rest.
 
 ## 2026-11-05
 
+- **2026-11-05 (THE TWO LONG JOBS GET ROOM; A CANCELLED RUN IS A MISS THE NEXT MORNING).** Audit A4. October
+  card builds ran 18-25 min against `card.yml`'s 30 and the Fri 10-30 build (run 41121210518) was cancelled at
+  30:02 with every step done; `sunday.yml` ran 23-26 against 25 and the Sun 11-01 run (41339302710) was cut at
+  25:39 inside scoring (refit 16 written, no predictions; the Vercel retry scored 11 min later). What the audit
+  got wrong: the health step DID run on both (GitHub ran the `always()` steps) -- the Sunday one wrote `failed`
+  on its own facts and the digest excused it after the retry, and the card one ran BEFORE the cancel and wrote
+  `ok`. So the gap is not a missing verdict; it is that a job timeout is reported `cancelled`, emails nothing,
+  and nothing read the conclusion unless a verdict was already `failed`. Changes: `card.yml` 30 -> 45 and
+  `sunday.yml` 25 -> 40 (minutes are free on a public repo; the limits were set under the $10 cap); a new
+  failed-severity digest check `digest.runs_not_cancelled` -- any run GitHub cancelled in the last 24 h
+  (`DIGEST_CANCELLED_WINDOW_H`), pull-request CI excluded, with no later success of the same workflow, named
+  with its length from the runs file's new `updatedAt` (`DIGEST_RUN_FIELDS`, parity-tested against
+  `digest.yml`). Tests: the 10-30 shape is a miss and a later success excuses it; a run older than a day and a
+  PR-CI cancel are not read; the two limits cannot drop below 45 / 40 without a reason in the test.
 - **2026-11-05 (THE CLOSED-WINDOW CLOCK WALKS THE ET CALENDAR; THE WEEK-9 "VERCEL DID NOT TRIGGER" WARNINGS WERE
   FALSE).** Audit A3. `web/lib/boardHealth.ts::lastClosedSlot` found a window's opening instant by counting
   elapsed minutes back from `now` on the ET wall clock; across a clock change that is an hour off for a week,

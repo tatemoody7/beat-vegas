@@ -51,7 +51,12 @@ concurrency:
 jobs:
   capture-and-score:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # 40 since 2026-11-05 (audit A4): October runs took 23-26 min against 25 and
+    # the Sun 11-01 run was cancelled at 25:39 inside the scoring step (refit
+    # written, no predictions; the Vercel retry scored 11 min later). GitHub
+    # reports a timeout as `cancelled`; the digest's `runs_not_cancelled` check
+    # is what reports the next one.
+    timeout-minutes: 40
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}

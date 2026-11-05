@@ -156,7 +156,11 @@ describe("lines-close (the Saturday close-poll backup)", () => {
     expect(job.everyTick).toBe(true);
     // Only the close polls may skip the duplicate probe: a card build that ran
     // twice spends a whole sweep, a close poll that ran twice re-sees the same lines.
-    const closePolls = new Set(["lines-close", "close-weeknight"]);
+    const closePolls = new Set([
+      "lines-close",
+      "close-weeknight",
+      "close-blackfriday",
+    ]);
     for (const [id, j] of Object.entries(CRON_JOBS)) {
       if (!closePolls.has(id)) expect(j.everyTick ?? false).toBe(false);
     }
@@ -238,6 +242,44 @@ describe("close-weeknight (Tue-Fri evening close polls, 2026-10-06)", () => {
       "wrong_day",
     );
     expect(dispatchDecision(job, at("2026-10-05T23:05:00Z")).reason).toContain(
+      "wrong_day",
+    );
+  });
+});
+
+describe("close-blackfriday (the 2026-11-27 daytime closes, audit A5)", () => {
+  const job = CRON_JOBS["close-blackfriday"];
+
+  it("dispatches the same close poll as the weeknight one, every tick", () => {
+    expect(job.workflow).toBe("lines_watch.yml");
+    expect(dispatchBody(job).inputs).toEqual({ market: "1h_close" });
+    expect(job.everyTick).toBe(true);
+    expect(job.dates).toEqual(["2026-11-27"]);
+  });
+
+  it("admits 10am-3:59pm EST on that Friday only", () => {
+    // 15Z is 10am EST (the first hour), 20:59Z is 3:59pm (the last minute).
+    expect(dispatchDecision(job, at("2026-11-27T15:00:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-11-27T20:59:00Z")).allowed).toBe(
+      true,
+    );
+    expect(dispatchDecision(job, at("2026-11-27T14:59:00Z")).reason).toContain(
+      "before_window",
+    );
+    expect(dispatchDecision(job, at("2026-11-27T21:00:00Z")).reason).toContain(
+      "after_window",
+    );
+    // Any other Friday is refused at no cost, whatever the scheduler fires.
+    expect(dispatchDecision(job, at("2026-11-20T16:00:00Z")).reason).toContain(
+      "wrong_date",
+    );
+    expect(dispatchDecision(job, at("2026-12-04T16:00:00Z")).reason).toContain(
+      "wrong_date",
+    );
+    // Thanksgiving Thursday is the wrong day before it is the wrong date.
+    expect(dispatchDecision(job, at("2026-11-26T16:00:00Z")).reason).toContain(
       "wrong_day",
     );
   });
@@ -462,6 +504,28 @@ describe("vercel.json stays in lock-step with the table", () => {
     };
     for (const [id, job] of Object.entries(CRON_JOBS)) {
       if (job.days === null) continue;
+      if (job.dates !== undefined) {
+        // A one-off window: every entry names a day-of-month and month, and
+        // each lands wholly inside the window on one of the job's dates.
+        const entries = crons.filter((c) => c.path.endsWith(id));
+        expect(entries.length, id).toBeGreaterThanOrEqual(1);
+        for (const c of entries) {
+          const [minute, hour, dom, mon] = c.schedule.split(" ");
+          const date = job.dates.find((d) =>
+            d.endsWith(`-${mon.padStart(2, "0")}-${dom.padStart(2, "0")}`),
+          );
+          expect(
+            date,
+            `${id} ${c.schedule} names no date of the job`,
+          ).toBeDefined();
+          const h = hour.padStart(2, "0");
+          const first = at(`${date}T${h}:${minute.padStart(2, "0")}:00Z`);
+          const last = new Date(first.getTime() + 59 * 60_000);
+          expect(dispatchDecision(job, first).allowed, c.schedule).toBe(true);
+          expect(dispatchDecision(job, last).allowed, c.schedule).toBe(true);
+        }
+        continue;
+      }
       for (const month of [july, december]) {
         const landing = crons
           .filter((c) => c.path.endsWith(id))

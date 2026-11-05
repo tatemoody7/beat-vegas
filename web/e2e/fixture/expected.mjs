@@ -562,13 +562,24 @@ export const CRON_JOBS = {
     openMin: 18 * 60,
     closeMin: 24 * 60 - 1,
   },
+  // The Black Friday daytime closes (2026-11-05): one date only, 10am-3:59pm ET.
+  "close-blackfriday": {
+    days: ["Fri"],
+    dates: ["2026-11-27"],
+    openMin: 10 * 60,
+    closeMin: 16 * 60 - 1,
+  },
   // The Monday pricing report (2026-10-12): read-only, 12Z tick with a 15Z retry.
   "pricing-monday": { days: ["Mon"], openMin: 6 * 60, closeMin: 12 * 60 },
   grade: { days: null, openMin: 0, closeMin: 24 * 60 - 1 },
   // The daily digest (2026-10-20): silent unless something needs attention.
   digest: { days: null, openMin: 8 * 60, closeMin: 10 * 60 + 59 },
   // The Sunday report (2026-10-20): once, 10:30am-12:59pm ET.
-  "weekly-report": { days: ["Sun"], openMin: 10 * 60 + 30, closeMin: 12 * 60 + 59 },
+  "weekly-report": {
+    days: ["Sun"],
+    openMin: 10 * 60 + 30,
+    closeMin: 12 * 60 + 59,
+  },
   // The archive queue (2026-10-20): daily, 1:30-4:59am ET; spends only in its window.
   archive: { days: null, openMin: 1 * 60 + 30, closeMin: 4 * 60 + 59 },
 };

@@ -230,6 +230,30 @@
       "schedule": "0 3 * * 6"
     },
     {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 15 27 11 *"
+    },
+    {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 16 27 11 *"
+    },
+    {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 17 27 11 *"
+    },
+    {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 18 27 11 *"
+    },
+    {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 19 27 11 *"
+    },
+    {
+      "path": "/api/cron/close-blackfriday",
+      "schedule": "0 20 27 11 *"
+    },
+    {
       "path": "/api/cron/pricing-monday",
       "schedule": "0 12 * * 1"
     },

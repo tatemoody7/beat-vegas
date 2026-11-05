@@ -397,7 +397,7 @@ Failure modes on record:
 ### lines_watch
 
 - Workflow: `.github/workflows/lines_watch.yml`
-- Window: every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday; the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN ahead (360 min on Saturday ticks whose UTC hour is divisible by 3 since 2026-10-18, 120 on the others and on weeknights)
+- Window: every 30 min in the kickoff windows (1h_close) plus one Vercel dispatch per UTC hour on Saturday and on Tue-Fri evenings, and on Fri 2026-11-27 only, 10am-3:59pm ET (the Black Friday daytime slate, six entries 15Z-20Z with half-hourly GitHub backups); the free /events pre-check and the poll both look CLOSE_LOOKAHEAD_MIN ahead (360 min on Saturday ticks whose UTC hour is divisible by 3 since 2026-10-18, 120 on the others and on weekdays)
 - Artifacts: `odds_snapshots 1H rows or last_seen_at stamps`, `last_close_capture_at gauge`
 - Inputs (env, beside `SKIPPED` and `RUN_STARTED_AT`): `MARKET`, `OUTCOME_FG`
 

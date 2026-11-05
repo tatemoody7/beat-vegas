@@ -478,6 +478,9 @@ export function opsWarnings(
     const last = g.lastDispatch[id] ?? null;
     if (last === null) continue;
     const job = CRON_JOBS[id];
+    // A one-off window (`dates`) closes on its own date only; every other
+    // week its weekday has no entry to miss.
+    if (job.dates !== undefined && !job.dates.includes(etDay(now))) continue;
     const days = job.days ?? DAYS;
     const win = lastClosedSlot(
       days.map((day) => ({

@@ -10,6 +10,14 @@ hold the rest.
 
 ## 2026-11-05
 
+- **2026-11-05 (THE TWO PAID SUBSCRIPTIONS ARE CANCELLED).** Tate's call after the audit ("cancel anything we are
+  putting money into"): The Odds API 20K plan ($30/month) cancelled on the dashboard on 11-05 -- access runs to the
+  end of the paid period per the provider's guide, the 19,121-credit balance is the last and nothing refills on
+  Dec 1; the CFBD Patreon membership was already cancelled on 10-18 and the memberships page read "Canceled. Access
+  expires on Nov 5, 2026", so the 11-01 counter reset was the final paid month, not a new charge (audit question 3
+  closed). From Nov 6 the CFBD key is the free tier (1,000 calls a month against ~600-900 measured). Neon Launch
+  (~$3/month, shared with the fishing tables) stays until the export after the 11-30 read; Vercel and GitHub are
+  free. `docs/OPS_ACCOUNTS.md` rows updated; the Odds API access-end date is still to be read off the dashboard.
 - **2026-11-05 (BLACK FRIDAY'S DAYTIME CLOSES GET A WINDOW).** Audit A5, Tate's call: capture them. Week 13 --
   the last week of every arm's test -- has seven FBS games kicking off 12:00-3:30pm ET on Fri 11-27 (Nebraska @
   Iowa, Mississippi State @ Ole Miss, Florida @ Florida State, Toledo @ Ohio, Buffalo @ Akron, App State @ South

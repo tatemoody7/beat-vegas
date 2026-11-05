@@ -8,7 +8,10 @@
 #
 # Dispatched by the Vercel `digest` entries (web/lib/cronJobs.ts: 13Z and 14Z, one
 # per DST regime, an 8:00-10:59am ET window); the 13:30Z GitHub cron is the
-# backup. From three days after the season's last kickoff the run is skipped.
+# backup. Up to three runs a day, one email: a red run whose misses were already
+# emailed today (UTC) writes its verdict and exits 0 (`last_alert_digest`,
+# scripts/health_check.py). From three days after the season's last kickoff the
+# run is skipped.
 name: Daily digest (silent unless something needs attention)
 
 on:

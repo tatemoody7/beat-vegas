@@ -281,3 +281,22 @@ def test_every_workflow_invocation_parses(mod):
             m.parse_args(argv)
             seen += 1
     assert seen >= 7
+
+
+def test_a_repeat_failure_the_same_day_is_not_emailed_twice(mod, tmp_path, capsys):
+    """The digest runs up to three times a day; a red run is an email. The same
+    misses a second time today exit 0 (the verdict is still written failed);
+    a new day, or a new miss, exits 1 again."""
+    m, eng = mod  # no card row: card.row_this_run misses
+    args = ["--job", "card", "--sweep-status", _sweep_file(tmp_path)]
+    assert m.run(m.parse_args(args), _env()) == 1
+    with Session(eng) as s:
+        alert = s.get(AppSetting, "last_alert_card")
+        assert alert is not None and alert.value.endswith("|card.row_this_run")
+    assert m.run(m.parse_args(args), _env()) == 0
+    assert _gauge(eng).value == "failed"
+    assert "already emailed today" in capsys.readouterr().out
+    with Session(eng) as s:
+        s.get(AppSetting, "last_alert_card").value = "2001-01-01|card.row_this_run"
+        s.commit()
+    assert m.run(m.parse_args(args), _env()) == 1

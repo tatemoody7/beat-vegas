@@ -201,6 +201,17 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
         verdict, results = health.evaluate(contract, ctx)
         note = health.verdict_note(job, ctx, results)
         written = record_gauge(health_key(job), verdict, note, session=s)
+        # One email per distinct set of misses per UTC day (the digest runs up
+        # to three times a day). The verdict above is written either way; only
+        # the exit code, and so GitHub's email, is held back on a repeat.
+        repeat = False
+        if verdict == "failed" and args.fail_on == "failed":
+            miss_ids = [c.id for c, r in results if not r.ok and c.severity == "failed"]
+            repeat = health.alert_already_sent(s, job, miss_ids, ctx.now)
+            if not repeat:
+                record_gauge(
+                    health.alert_key(job), health.alert_value(miss_ids, ctx.now), session=s
+                )
     for check, res in results:
         mark = "ok  " if res.ok else "MISS"
         print(f"[health:{job}] {mark} {check.id} ({check.severity}): {res.detail}")
@@ -212,6 +223,12 @@ def run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
     )
     step_summary(f"HEALTH: {verdict} {note}")
     if verdict == "failed" and args.fail_on == "failed":
+        if repeat:
+            print(
+                f"[health:{job}] already emailed today for these misses; exit 0, verdict stays failed"
+            )
+            step_summary("HEALTH: repeat of today's alert, not emailed again")
+            return 0
         return 1
     return 0
 
